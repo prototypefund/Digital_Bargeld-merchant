@@ -50,6 +50,42 @@ AS_IF([test $libgnunetutil != 1],
 *** ]])])
 
 
+# check for libpq (postgresql)
+AX_LIB_POSTGRESQL([9.3])
+AS_IF([test ! "$found_postgresql" = "yes"],
+  [AC_MSG_ERROR([[
+***
+*** You need postgresql / libpq to build this program.
+*** ]])])
+
+
+# Check for Taler's libtalerpq
+libtalerpq=0
+AC_MSG_CHECKING([for libtalerpq])
+AC_ARG_WITH(mint,
+            [AS_HELP_STRING([--with-mint=PFX], [base of Taler MINT installation])],
+            [AC_MSG_RESULT([given as $with_mint])],
+            [AC_MSG_RESULT(not given)
+             with_mint=yes])
+AS_CASE([$with_mint],
+        [yes], [],
+        [no], [AC_MSG_ERROR([--with-mint is required])],
+        [LDFLAGS="-L$with_mint/lib $LDFLAGS"
+         CPPFLAGS="-I$with_mint/include $CPPFLAGS $POSTGRESQL_CPPFLAGS"])
+AC_CHECK_HEADERS([taler/db_pq.h],
+ [AC_CHECK_LIB([talerpq], [TALER_DB_exec_prepared], libtalerpq=1)],
+   [], [#ifdef HAVE_GNUNET_PLATFORM_H
+        #include <gnunet/platform.h>
+       #endif])
+AS_IF([test $libtalerpq != 1],
+  [AC_MSG_ERROR([[
+***
+*** You need libtalerpq to build this program.
+*** This library is part of the Taler MINT, available at
+***   https://taler.net
+*** ]])])
+
+
 # check for libmicrohttpd
 microhttpd=0
 AC_MSG_CHECKING([for microhttpd])
@@ -69,15 +105,6 @@ AS_IF([test $microhttpd = 0],
   [AC_MSG_ERROR([[
 ***
 *** You need libmicrohttpd to build this program.
-*** ]])])
-
-
-# check for libpq (postgresql)
-AX_LIB_POSTGRESQL([9.3])
-AS_IF([test ! "$found_postgresql" = "yes"],
-  [AC_MSG_ERROR([[
-***
-*** You need postgresql / libpq to build this program.
 *** ]])])
 
 

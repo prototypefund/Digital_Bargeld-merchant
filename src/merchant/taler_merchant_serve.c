@@ -454,16 +454,16 @@ process_post_json (struct MHD_Connection *connection,
 static struct GNUNET_HashCode
 hash_wireformat (uint64_t nounce)
 {
-  struct TALER_HashContext hc;
+  struct GNUNET_HashContext *hc;
   struct GNUNET_HashCode hash;
 
-  TALER_hash_context_start (&hc);
-  TALER_hash_context_read (&hc, wire->iban, strlen (wire->iban));
-  TALER_hash_context_read (&hc, wire->name, strlen (wire->name));
-  TALER_hash_context_read (&hc, wire->bic, strlen (wire->bic));
+  hc = GNUNET_CRYPTO_hash_context_start ();
+  GNUNET_CRYPTO_hash_context_read (hc, wire->iban, strlen (wire->iban));
+  GNUNET_CRYPTO_hash_context_read (hc, wire->name, strlen (wire->name));
+  GNUNET_CRYPTO_hash_context_read (hc, wire->bic, strlen (wire->bic));
   nounce = GNUNET_htonll (nounce);
-  TALER_hash_context_read (&hc, &nounce, sizeof (nounce));
-  TALER_hash_context_finish (&hc, &hash);
+  GNUNET_CRYPTO_hash_context_read (hc, &nounce, sizeof (nounce));
+  GNUNET_CRYPTO_hash_context_finish (hc, &hash);
   return hash;
 }
 

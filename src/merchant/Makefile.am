@@ -12,6 +12,7 @@ taler_merchant_dbinit_LDADD = \
   -lpq \
   -lgnunetutil \
   -ltalerutil \
+  -ltalerpq \
   -lgnunetpostgres
 taler_merchant_dbinit_LDFLAGS = \
   $(POSTGRESQL_LDFLAGS)
@@ -47,6 +48,7 @@ taler_merchant_serve_LDADD = \
   -lmicrohttpd \
   -ltalermintapi \
   -ltalerutil \
+  -ltalerpq \
   -ljansson
 taler_merchant_serve_LDFLAGS = \
   $(POSTGRESQL_LDFLAGS)

@@ -191,19 +191,19 @@ am__define_uniq_tagged_files = \
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/grothoff/research/merchant/missing aclocal-1.14
+ACLOCAL = ${SHELL} /home/grothoff/research/taler-merchant/missing aclocal-1.14
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 0
 AR = ar
-AUTOCONF = ${SHELL} /home/grothoff/research/merchant/missing autoconf
-AUTOHEADER = ${SHELL} /home/grothoff/research/merchant/missing autoheader
-AUTOMAKE = ${SHELL} /home/grothoff/research/merchant/missing automake-1.14
+AUTOCONF = ${SHELL} /home/grothoff/research/taler-merchant/missing autoconf
+AUTOHEADER = ${SHELL} /home/grothoff/research/taler-merchant/missing autoheader
+AUTOMAKE = ${SHELL} /home/grothoff/research/taler-merchant/missing automake-1.14
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -Wall -g -O0 -Wall
 CPP = gcc -E
-CPPFLAGS = -I/home/grothoff//include 
+CPPFLAGS = -I/home/grothoff//include -I/home/grothoff//include  -I/usr/include/postgresql
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
@@ -223,7 +223,7 @@ INSTALL_PROGRAM = ${INSTALL}
 INSTALL_SCRIPT = ${INSTALL}
 INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
 LD = /usr/bin/ld -m elf_x86_64
-LDFLAGS = -L/home/grothoff//lib 
+LDFLAGS = -L/home/grothoff//lib -L/home/grothoff//lib 
 LIBGCRYPT_CFLAGS = 
 LIBGCRYPT_CONFIG = /usr/bin/libgcrypt-config
 LIBGCRYPT_LIBS = -lgcrypt
@@ -235,7 +235,7 @@ LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIPO = 
 LN_S = ln -s
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} /home/grothoff/research/merchant/missing makeinfo
+MAKEINFO = ${SHELL} /home/grothoff/research/taler-merchant/missing makeinfo
 MANIFEST_TOOL = :
 MKDIR_P = /bin/mkdir -p
 NM = /usr/bin/nm -B
@@ -263,10 +263,10 @@ SHELL = /bin/bash
 STRIP = strip
 VERSION = 0.0.0
 _libgnurl_config = 
-abs_builddir = /home/grothoff/research/merchant/src/merchant
-abs_srcdir = /home/grothoff/research/merchant/src/merchant
-abs_top_builddir = /home/grothoff/research/merchant
-abs_top_srcdir = /home/grothoff/research/merchant
+abs_builddir = /home/grothoff/research/taler-merchant/src/merchant
+abs_srcdir = /home/grothoff/research/taler-merchant/src/merchant
+abs_top_builddir = /home/grothoff/research/taler-merchant
+abs_top_srcdir = /home/grothoff/research/taler-merchant
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
@@ -295,7 +295,7 @@ host_vendor = unknown
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/grothoff/research/merchant/install-sh
+install_sh = ${SHELL} /home/grothoff/research/taler-merchant/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -325,6 +325,7 @@ taler_merchant_dbinit_LDADD = \
   -lpq \
   -lgnunetutil \
   -ltalerutil \
+  -ltalerpq \
   -lgnunetpostgres
 
 taler_merchant_dbinit_LDFLAGS = \
@@ -360,6 +361,7 @@ taler_merchant_serve_LDADD = \
   -lmicrohttpd \
   -ltalermintapi \
   -ltalerutil \
+  -ltalerpq \
   -ljansson
 
 taler_merchant_serve_LDFLAGS = \
