@@ -1,0 +1,9 @@
+*.o
+*.deps
+*.libs
+*.lo
+*.la
+*.log
+*.trs
+*/__pycache__
+test-*
