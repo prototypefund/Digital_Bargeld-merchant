@@ -33,6 +33,7 @@ test_merchant_db_SOURCES = \
   test_merchant_db.c
 test_merchant_db_LDADD = \
   -ltalerutil \
+  -ltalerpq \
   -lgnunetutil \
   -lgnunetpostgres \
   -lpq
