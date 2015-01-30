@@ -23,7 +23,7 @@
 #include "platform.h"
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_util.h>
-#include <taler/taler_db_lib.h>
+#include <taler/db_pq.h>
 #include "merchant_db.h"
 
 

@@ -46,7 +46,7 @@ taler_merchant_serve_LDADD = \
   -lgnunetutil \
   -lgnunetpostgres \
   -lmicrohttpd \
-  -ltalermintapi \
+  -ltalermint \
   -ltalerutil \
   -ltalerpq \
   -ljansson
