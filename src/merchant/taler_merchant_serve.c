@@ -811,7 +811,10 @@ handle_get_contract (struct MHD_Connection *connection,
   nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
 
   /* Prepare contract */
-  GNUNET_asprintf (&desc, template, hostname, port);
+  (void) GNUNET_asprintf (&desc,
+                          template,
+                          hostname,
+                          port);
   contract_id = MERCHANT_DB_contract_create (db_conn,
                                     expiry,
                                     &amount,
@@ -968,7 +971,7 @@ checkout_status (void *cls, int status, json_t *obj, char *emsg)
   char *download_page;
   char *location;
   struct MHD_Response *resp;
-  ssize_t size;
+  int size;
 
   LOG_DEBUG ("Processing checkout request reply\n");
   GNUNET_SCHEDULER_cancel (ctx->timeout_task);
@@ -1385,7 +1388,7 @@ build_list_product_response ()
   struct Download *dwn;
   size_t size;
   unsigned int cnt;
-  unsigned int psize;
+  int psize;
   unsigned int header_size;
   unsigned int footer_size;
   unsigned int *partial_sizes;
