@@ -1,0 +1,24 @@
+This directory contains the files needed to implment a simple/debug merchant website.
+
+Only tested on nginx. To run the website, it suffices to have all the files in the same
+directory, to have PHP enabled, and to set the following two redirections:
+
+1. your_site/certal/ => your_site/cert.php
+2. your_site/payler/ => your_site/pay.php
+
+File		|What implements
+--------------------------------
+o index.html	| The "negotiation" view, that is the form
+		  that allows the user to choose the product to buy.
+
+o checkout.php	| The "payment selection" that is the form
+		  that allows the user to choose the payment method he wishes to use.
+		  It also implements the request of certificate and its showing as a
+		  popup window (by JavaScript in it). For debugging purposes, it has a
+		  certificate hardcoded in it.
+
+o cert.php	| Replies with a JSON certificate that is held in a 'session' variable.
+
+o pay.php	| Actual receiving of money, plus it gives back a "fullfillment" page
+		  that informs the user of his well ended deal.
+
