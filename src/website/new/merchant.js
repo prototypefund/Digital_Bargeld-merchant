@@ -60,7 +60,8 @@ document.body.addEventListener("taler-wallet-installed", MERCHfirstStep, false, 
 
 /*
 notify the extension about the submission. That way it will be possible to retrieve
-the mint's URL and/or other info. from the filled form
+the mint's URL and/or other info. from the filled form. Actually, the extension will
+accomplish the POST too.
 
 */
 function MERCHtrigSubmission(){
@@ -76,4 +77,5 @@ document.body.dispatchEvent(subEvent);
 
 // always return false so that the post is actually done by the extension
 return false;
+
 }
