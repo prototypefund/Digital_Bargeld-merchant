@@ -50,7 +50,7 @@ function MERCHfirstStep(){
  };
 
 
- getform.open("GET", "file:///home/marcello/webstore/create-reserve-form.html", true);
+ getform.open("GET", "create-reserve-form.html", true);
  getform.send();
  
 }
