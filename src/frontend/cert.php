@@ -1,10 +1,3 @@
-<html>
-<head>
-<title>Fullfillment page</title>
-</head>
-<body>
-
-
 <?php 
 
 /*
@@ -25,23 +18,15 @@
 
 */
 
+//  Here goes all the Taler pay logic
 
- /*
+
 // recover the session
-	session_start();
-	if(!isset($_SESSION['contract'])){
-//		http_response_code(404);
-		echo "Sorry..";
-	}
-	else echo "Paid";
+  session_start();
+  if(!isset($_SESSION['contract'])){
+    http_response_code(404);
+    echo "Sorry page..";
+  }
+  else echo $_SESSION['contract'];
 
-	session_destroy();
-
-
-*/
 ?>
-
-Payment successful, thanks!
-
-</body>
-</html>

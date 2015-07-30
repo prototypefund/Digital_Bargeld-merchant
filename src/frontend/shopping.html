@@ -22,13 +22,19 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 
 -->
+<h1>Donation Page</h1>
+<p>Please choose a project and an amount you which to donate.</p>
 
 <form name="tform" action="checkout.php" method="POST">
 <div id="opt-form" align="left"><br>
-<input type="radio" name="group0" value="Milk"> Milk<br>
-<input type="radio" name="group0" value="Butter" checked="true"> Butter<br>
-<input type="radio" name="group0" value="Cheese"> Cheese<br>
-<input type="submit" name="keyName" value="Checkout">
+<input type="radio" name="group0" value="Milk"> Taler<br>
+<input type="radio" name="group0" value="Butter" checked="true"> Gnunet<br>
+<input type="radio" name="group0" value="Cheese"> INRIA<br><br><br>
+EUR <select id="taler-donation" name="kudos-donation">
+     <option value="5">5</option>
+</select>
+<input type="submit" name="keyName" value="Donate!"><br><br>
+
 </div>
 </form>
 

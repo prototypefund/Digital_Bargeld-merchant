@@ -1,7 +1,7 @@
-This directory contains the files needed to implment a simple/debug merchant website.
+This directory contains the files implementing the frontend of the new merchant architecture.
 
 Only tested on nginx. To run the website, it suffices to have all the files in the same
-directory, to have PHP enabled, and to set the following two redirections:
+directory, then having PHP enabled, and setting the following two redirections:
 
 1. your_site/certal/ => your_site/cert.php
 2. your_site/payler/ => your_site/pay.php
