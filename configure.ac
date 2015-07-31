@@ -177,9 +177,5 @@ AC_TYPE_UINTMAX_T
 # Checks for library functions.
 AC_CHECK_FUNCS([strdup])
 
-AC_CONFIG_FILES([#Makefile
-                 doc/Makefile
-                 src/Makefile
-                 src/include/Makefile
-                 src/merchant/Makefile])
+AC_CONFIG_FILES([src/backend/Makefile])
 AC_OUTPUT

@@ -1,0 +1,6 @@
+sources in src/merchant/ are obsolete, therefore the configure system does not
+provide support for building them.
+
+The new merchant's layout is reflected by the directories 'frontend' and 'backend',
+being respectively the PHP website homepage and the C 'core' which is charge of
+providing all the cryptographic and DB related primitives.
