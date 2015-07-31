@@ -20,20 +20,34 @@
 * @author Marcello Stanisci
 */
 
+#include "platform.h"
 #include <microhttpd.h>
 #include <gnunet/gnunet_util_lib.h>
+
+/**
+ * Shorthand for exit jumps.
+ */
+#define EXITIF(cond)                                              \
+  do {                                                            \
+    if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
+  } while (0)
 
 // task 1. Just implement a hello world server launched a` la GNUNET
 
 /**
  * The port we are running on
  */
-static long long unsigned port;
+unsigned short port;
 
 /**
  * The MHD Daemon
  */
 static struct MHD_Daemon *mhd;
+
+/**
+ * Global return code
+ */
+static int result;
 
 /**
 * Generate the 'hello world' response
@@ -44,8 +58,7 @@ static struct MHD_Daemon *mhd;
 */
  
 static unsigned int
-generate_hello (struct MHD_Connection *connection,
-                     struct MHD_Response **resp) // this parameter was preceded by a '_' in its original file. Why?
+generate_hello (struct MHD_Response **resp) // this parameter was preceded by a '_' in its original file. Why?
 {
  
   const char *hello = "Hello customer";
@@ -58,6 +71,63 @@ generate_hello (struct MHD_Connection *connection,
 
 
 }
+
+
+/**
+* Manage a non 200 HTTP status. I.e. it shows a 'failure' page to
+* the client
+* @param connection the channel thorugh which send the message
+* @status the HTTP status to examine
+* @return GNUNET_OK on successful message sending, GNUNET_SYSERR upon error
+*
+*/
+
+static int
+failure_resp (struct MHD_Connection *connection, unsigned int status)
+{
+  printf ("called failure mgmt\n");
+  static char page_404[]="\
+<!DOCTYPE html>                                         \
+<html><title>Resource not found</title><body><center>   \
+<h3>The resource you are looking for is not found.</h3> \
+</center></body></html>";
+  static char page_500[]="\
+<!DOCTYPE html> <html><title>Internal Server Error</title><body><center> \
+<h3>The server experienced an internal error and hence cannot serve your \
+request</h3></center></body></html>";
+  struct MHD_Response *resp;
+  char *page;
+  size_t size;
+#define PAGE(number) \
+  do {page=page_ ## number; size=sizeof(page_ ## number)-1;} while(0)
+
+  GNUNET_assert (400 <= status);
+  resp = NULL;
+  switch (status)
+  {
+  case 404:
+    PAGE(404);
+    break;
+  default:
+    status = 500;
+  case 500:
+    PAGE(500);
+  }
+#undef PAGE
+
+  EXITIF (NULL == (resp = MHD_create_response_from_buffer (size,
+                                                           page,
+                                                           MHD_RESPMEM_PERSISTENT)));
+  EXITIF (MHD_YES != MHD_queue_response (connection, status, resp));
+  MHD_destroy_response (resp);
+  return GNUNET_OK;
+
+ EXITIF_exit:
+  if (NULL != resp)
+    MHD_destroy_response (resp);
+  return GNUNET_SYSERR;
+}
+
 
 /**
  * A client has requested the given url using the given method
@@ -111,20 +181,23 @@ url_handler (void *cls,
 {
 
   unsigned int status;
+  unsigned int no_destroy;
   struct MHD_Response *resp;
 
-  #define URL_HELLO "/hello"
-  #define STR_404_NOTFOUND "The requested resource is not found"
 
+  printf ("hi, just called web micro server with url %s\n", url);
+  #define URL_HELLO "/hello"
+  no_destroy = 0;
+  resp = NULL;
+  status = 500;
   if (0 == strncasecmp (url, URL_HELLO, sizeof (URL_HELLO)))
     {
-      /* parse for /contract */
       if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
-        status = generate_hello (connection, &resp); //TBD
+        status = generate_hello (&resp); //TBD
       else
-        GNUNET_break (0);         /* FIXME: implement for post */
+        GNUNET_break (0);
     }
-
+  else status = 404;
 
   if (NULL != resp)
     {
@@ -156,16 +229,15 @@ int
 main (int argc, char *const *argv)
 {
   
-  mhd = MHD_start_daemon (MHD_USE_DEBUG, //| MHD_USE_TCP_FASTOPEN,
-                          (unsigned short) port,
+  port = 9966;
+  mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,
+                          port,
                           NULL, NULL,
                           &url_handler, NULL,
-                          //MHD_OPTION_TCP_FASTOPEN_QUEUE_SIZE,
-                          //(unsigned int) 16,
                           MHD_OPTION_END);
 
   getchar (); 
-  MHD_stop_daemon (daemon);
+  MHD_stop_daemon (mhd);
   return 0;
 
 
