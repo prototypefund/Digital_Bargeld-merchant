@@ -45,6 +45,16 @@ unsigned short port;
 static struct MHD_Daemon *mhd;
 
 /**
+ * Shutdown task identifier
+ */
+static struct GNUNET_SCHEDULER_Task *shutdown_task;
+
+/**
+ * Should we do a dry run where temporary tables are used for storing the data.
+ */
+static int dry;
+
+/**
  * Global return code
  */
 static int result;
@@ -216,7 +226,60 @@ url_handler (void *cls,
   
 }
 
+/**
+ * Shutdown task (magically invoked when the application is being
+ * quit)
+ *
+ * @param cls NULL
+ * @param tc scheduler task context
+ */
+static void
+do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
+{
 
+  if (NULL != mhd)
+    {
+      MHD_stop_daemon (mhd);
+      mhd = NULL;
+    }
+  
+}
+
+
+/**
+ * Main function that will be run by the scheduler.
+ *
+ * @param cls closure
+ * @param args remaining command-line arguments
+ * @param cfgfile name of the configuration file used (for saving, can be NULL!)
+ * @param config configuration
+ */
+static void
+run (void *cls, char *const *args, const char *cfgfile,
+     const struct GNUNET_CONFIGURATION_Handle *config)
+{
+
+  port = 9966;
+
+  shutdown_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
+                                                &do_shutdown, NULL);
+
+  mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,
+                          port,
+                          NULL, NULL,
+                          &url_handler, NULL,
+                          MHD_OPTION_END);
+
+
+  EXITIF (NULL == mhd);
+  result = GNUNET_OK;
+
+  EXITIF_exit:
+    if (GNUNET_OK != result)
+      GNUNET_SCHEDULER_shutdown ();
+
+
+}
 
 /**
  * The main function of the serve tool
@@ -229,19 +292,19 @@ int
 main (int argc, char *const *argv)
 {
   
-  port = 9966;
-  mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,
-                          port,
-                          NULL, NULL,
-                          &url_handler, NULL,
-                          MHD_OPTION_END);
+  static const struct GNUNET_GETOPT_CommandLineOption options[] = {
+      GNUNET_GETOPT_OPTION_END
+    };
+  
 
-  getchar (); 
-  MHD_stop_daemon (mhd);
-  return 0;
+  if (GNUNET_OK !=
+      GNUNET_PROGRAM_run (argc, argv,
+                          "taler-merchant-serve",
+                          "Serve merchant's HTTP interface",
+                          options, &run, NULL))
+    return 3;
+  return (GNUNET_OK == result) ? 0 : 1;
 
 
-
-
-
+ 
 }
