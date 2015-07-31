@@ -72,8 +72,12 @@ AS_CASE([$with_mint],
         [no], [AC_MSG_ERROR([--with-mint is required])],
         [LDFLAGS="-L$with_mint/lib $LDFLAGS"
          CPPFLAGS="-I$with_mint/include $CPPFLAGS $POSTGRESQL_CPPFLAGS"])
-AC_CHECK_HEADERS([taler/db_pq.h],
- [AC_CHECK_LIB([talerpq], [TALER_DB_exec_prepared], libtalerpq=1)],
+
+CPPFLAGS="$CPPFLAGS $POSTGRESQL_CPPFLAGS"
+LDFLAGS="$LDFLAGS -L/usr/local/lib"
+
+AC_CHECK_HEADERS([taler/taler_pq_lib.h],
+ [AC_CHECK_LIB([talerpq], [TALER_PQ_exec_prepared], libtalerpq=1)],
    [], [#ifdef HAVE_GNUNET_PLATFORM_H
         #include <gnunet/platform.h>
        #endif])
@@ -173,7 +177,7 @@ AC_TYPE_UINTMAX_T
 # Checks for library functions.
 AC_CHECK_FUNCS([strdup])
 
-AC_CONFIG_FILES([Makefile
+AC_CONFIG_FILES([#Makefile
                  doc/Makefile
                  src/Makefile
                  src/include/Makefile
