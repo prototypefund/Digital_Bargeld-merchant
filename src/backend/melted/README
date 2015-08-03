@@ -1,0 +1,9 @@
+Since the merchant's backend makes use of several routines that are native
+to the mint (in particular, those aimed to parse JSON object in HTTP POSTs),
+and since there is no possibility to export some of them in a shared library,
+then the files in this directory need to be moved *inside* the mint/src/mint
+directory in order to be compiled. Use 'copy.sh SRC DST' (STILL NOT TESTED)
+to copy the files in the desired location.
+
+Lastly, passing CFLAGS='-I/usr/include/postgresql' to ./configure seems to be
+mandatory, in order to compile the merchant http daemon.

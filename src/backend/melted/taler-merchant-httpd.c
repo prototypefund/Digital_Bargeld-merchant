@@ -22,9 +22,21 @@
 
 #include "platform.h"
 #include <microhttpd.h>
+#include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_json_lib.h>
+#include "taler-mint-httpd_parsing.h"
+#include "taler-mint-httpd_mhd.h"
+#include "taler-mint-httpd_admin.h"
+#include "taler-mint-httpd_deposit.h"
+#include "taler-mint-httpd_withdraw.h"
+#include "taler-mint-httpd_refresh.h"
+#include "taler-mint-httpd_keystate.h"
+#include "merchant.h"
+#include "merchant_db.h"
 
+extern struct MERCHANT_WIREFORMAT_Sepa *
+TALER_MERCHANT_parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg);
 
 /**
  * Shorthand for exit jumps.
@@ -47,9 +59,59 @@ unsigned short port;
 static struct MHD_Daemon *mhd;
 
 /**
+ * Connection handle to the our database
+ */
+PGconn *db_conn;
+
+/**
+ * Which currency is used by this mint?
+ * (verbatim copy from mint's code, just to make this
+ * merchant's source compile)
+ */
+char *TMH_mint_currency_string;
+
+/* As above */
+struct TALER_MINTDB_Plugin *TMH_plugin;
+
+
+/**
+ * As above, though the merchant does need some form of
+ * configuration
+ */
+struct GNUNET_CONFIGURATION_Handle *cfg;
+
+
+/**
+ * As above
+ */
+int TMH_test_mode;
+
+
+/**
+ * As above
+ */
+char *TMH_mint_directory;
+
+
+/**
+ * As above
+ */
+struct GNUNET_CRYPTO_EddsaPublicKey TMH_master_public_key;
+
+/**
+ * As above
+ */
+char *TMH_expected_wire_format;
+
+/**
  * Shutdown task identifier
  */
 static struct GNUNET_SCHEDULER_Task *shutdown_task;
+
+/**
+ * Our wireformat
+ */
+static struct MERCHANT_WIREFORMAT_Sepa *wire;
 
 /**
  * Should we do a dry run where temporary tables are used for storing the data.
@@ -60,206 +122,6 @@ static int dry;
  * Global return code
  */
 static int result;
-
-/** Beginning of JSON parse logic 
-* Located here only for testing purposes since the service they provide is already
-* implemented in the mint's code; it just needs to be exported as a library. To be announced as a issue.
-*/
-
-/**
- * Initial size for POST
- * request buffer.
- */
-#define REQUEST_BUFFER_INITIAL 1024
-
-/**
- * Maximum POST request size
- */
-#define REQUEST_BUFFER_MAX (1024*1024)
-
-
-/**
- * Buffer for POST requests.
- */
-struct Buffer
-{
-  /**
-   * Allocated memory
-   */
-  char *data;
-
-  /**
-   * Number of valid bytes in buffer.
-   */
-  size_t fill;
-
-  /**
-   * Number of allocated bytes in buffer.
-   */
-  size_t alloc;
-};
-
-
-/**
- * Initialize a buffer.
- *
- * @param buf the buffer to initialize
- * @param data the initial data
- * @param data_size size of the initial data
- * @param alloc_size size of the buffer
- * @param max_size maximum size that the buffer can grow to
- * @return a GNUnet result code
- */
-static int
-buffer_init (struct Buffer *buf, const void *data, size_t data_size, size_t alloc_size, size_t max_size)
-{
-  if (data_size > max_size || alloc_size > max_size)
-    return GNUNET_SYSERR;
-  if (data_size > alloc_size)
-    alloc_size = data_size;
-  buf->data = GNUNET_malloc (alloc_size);
-  memcpy (buf->data, data, data_size);
-  return GNUNET_OK;
-}
-
-
-/**
- * Free the data in a buffer.  Does *not* free
- * the buffer object itself.
- *
- * @param buf buffer to de-initialize
- */
-static void
-buffer_deinit (struct Buffer *buf)
-{
-  GNUNET_free (buf->data);
-  buf->data = NULL;
-}
-
-
-/**
- * Append data to a buffer, growing the buffer if necessary.
- *
- * @param buf the buffer to append to
- * @param data the data to append
- * @param size the size of @a data
- * @param max_size maximum size that the buffer can grow to
- * @return GNUNET_OK on success,
- *         GNUNET_NO if the buffer can't accomodate for the new data
- *         GNUNET_SYSERR on fatal error (out of memory?)
- */
-static int
-buffer_append (struct Buffer *buf, const void *data, size_t data_size, size_t max_size)
-{
-  if (buf->fill + data_size > max_size)
-    return GNUNET_NO;
-  if (data_size + buf->fill > buf->alloc)
-  {
-    char *new_buf;
-    size_t new_size = buf->alloc;
-    while (new_size < buf->fill + data_size)
-      new_size += 2;
-    if (new_size > max_size)
-      return GNUNET_NO;
-    new_buf = GNUNET_malloc (new_size);
-    memcpy (new_buf, buf->data, buf->fill);
-    buf->data = new_buf;
-    buf->alloc = new_size;
-  }
-  memcpy (buf->data + buf->fill, data, data_size);
-  buf->fill += data_size;
-  return GNUNET_OK;
-}
-
-
-
-/**
- * Process a POST request containing a JSON object.
- *
- * @param connection the MHD connection
- * @param con_cs the closure (contains a 'struct Buffer *')
- * @param upload_data the POST data
- * @param upload_data_size the POST data size
- * @param json the JSON object for a completed request
- *
- * @returns
- *    GNUNET_YES if json object was parsed
- *    GNUNET_NO is request incomplete or invalid
- *    GNUNET_SYSERR on internal error
- */
-static int
-process_post_json (struct MHD_Connection *connection,
-                   void **con_cls,
-                   const char *upload_data,
-                   size_t *upload_data_size,
-                   json_t **json)
-{
-  struct Buffer *r = *con_cls;
-
-  if (NULL == *con_cls)
-  {
-    /* We are seeing a fresh POST request. */
-
-    r = GNUNET_new (struct Buffer);
-    if (GNUNET_OK != buffer_init (r, upload_data, *upload_data_size,
-                 REQUEST_BUFFER_INITIAL, REQUEST_BUFFER_MAX))
-    {
-      *con_cls = NULL;
-      buffer_deinit (r);
-      GNUNET_free (r);
-      return GNUNET_SYSERR;
-    }
-    *upload_data_size = 0;
-    *con_cls = r;
-    return GNUNET_NO;
-  }
-  if (0 != *upload_data_size)
-  {
-    /* We are seeing an old request with more data available. */
-
-    if (GNUNET_OK != buffer_append (r, upload_data, *upload_data_size,
-                                    REQUEST_BUFFER_MAX))
-    {
-      /* Request too long or we're out of memory. */
-
-      *con_cls = NULL;
-      buffer_deinit (r);
-      GNUNET_free (r);
-      return GNUNET_SYSERR;
-    }
-    *upload_data_size = 0;
-    return GNUNET_NO;
-  }
-
-  /* We have seen the whole request. */
-
-  *json = json_loadb (r->data, r->fill, 0, NULL);
-  buffer_deinit (r);
-  GNUNET_free (r);
-  if (NULL == *json)
-  {
-    struct MHD_Response *resp;
-    int ret;
-
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING, "Can't parse JSON request body\n");
-    resp = MHD_create_response_from_buffer (strlen ("parse error"),
-                                            "parse error",
-                                            MHD_RESPMEM_PERSISTENT);
-    ret = MHD_queue_response (connection,
-                              MHD_HTTP_BAD_REQUEST,
-                              resp);
-    MHD_destroy_response (resp);
-    return ret;
-  }
-  *con_cls = NULL;
-
-  return GNUNET_YES;
-}
-
-
-/* ************** END of JSON POST processing logic ************ */
-
-
 
 /**
 * Return the given message to the other end of connection
@@ -365,6 +227,31 @@ request</h3></center></body></html>";
 
 
 /**
+* Generate the hash containing the information (= a nounce + merchant's IBAN) to
+* redeem money from mint in a subsequent /deposit operation
+* @param nounce the nounce
+* @return the hash to be included in the contract's blob
+*
+*/
+
+static struct GNUNET_HashCode
+hash_wireformat (uint64_t nounce)
+{
+  struct GNUNET_HashContext *hc;
+  struct GNUNET_HashCode hash;
+
+  hc = GNUNET_CRYPTO_hash_context_start ();
+  GNUNET_CRYPTO_hash_context_read (hc, wire->iban, strlen (wire->iban));
+  GNUNET_CRYPTO_hash_context_read (hc, wire->name, strlen (wire->name));
+  GNUNET_CRYPTO_hash_context_read (hc, wire->bic, strlen (wire->bic));
+  nounce = GNUNET_htonll (nounce);
+  GNUNET_CRYPTO_hash_context_read (hc, &nounce, sizeof (nounce));
+  GNUNET_CRYPTO_hash_context_finish (hc, &hash);
+  return hash;
+}
+
+
+/**
  * A client has requested the given url using the given method
  * (#MHD_HTTP_METHOD_GET, #MHD_HTTP_METHOD_PUT,
  * #MHD_HTTP_METHOD_DELETE, #MHD_HTTP_METHOD_POST, etc).  The callback
@@ -412,13 +299,17 @@ url_handler (void *cls,
              const char *version,
              const char *upload_data,
              size_t *upload_data_size,
-             void **con_cls)
+             void **connection_cls)
 {
 
   unsigned int status;
   unsigned int no_destroy;
   struct MHD_Response *resp;
-
+  struct TALER_Amount price;
+  json_t json_price;
+  json_t *root;
+  int res;
+  char *desc;
 
   #define URL_HELLO "/hello"
   #define URL_CONTRACT "/contract"
@@ -448,12 +339,64 @@ url_handler (void *cls,
 	  4. return it
 	*/
 
-        GNUNET_break (0);
-
+    res = TMH_PARSE_post_json (connection,
+                               connection_cls,
+                               upload_data,
+                               upload_data_size,
+                               &root);
+  
+    if (GNUNET_SYSERR == res)
+      return MHD_NO;
+    if ( (GNUNET_NO == res) || (NULL == root) )
+      return MHD_YES;
+  
+    /* not really needed for getting just a string. Though it'd be very handy
+    to enhace the mint's JSON-parsing capabilities with the merchant's needs.
+  
+    struct TMH_PARSE_FieldSpecification spec[] = {
+      TMH_PARSE_member_variable ("desc", (void **) &desc, &desc_len),
+      TMH_PARSE_member_amount ("price", &price),
+      TMH_PARSE_MEMBER_END
+    };
+    res = TMH_PARSE_json_data (connection,
+                               root,
+                               spec); */
+    /*
+  
+     The expected JSON :
+  
+      {
+      "desc"  : "some description",
+      "price" : a JSON compliant TALER_Amount objet
+      }
+  
+    */
+  
+    if (!json_unpack (root, "{s:s, s:o}", "desc", &desc, "price", &json_price))
+      status = generate_message (&resp, "unable to parse /contract JSON");
+    else
+    {
+      if (GNUNET_OK != TALER_json_to_amount (&json_price, &price))
+        status = generate_message (&resp, "unable to parse `price' field in /contract JSON");
+      else
+        {
+         /* Let's generate this contract! */
+	 /* First, initialize the DB, since it'll be stored there */
+       
+       
+       
+       
+       
+        }
 
     }
 
+  
+    
+  
 
+
+  }
 
   if (NULL != resp)
     {
@@ -507,6 +450,10 @@ run (void *cls, char *const *args, const char *cfgfile,
 
   port = 9966;
 
+
+  EXITIF (NULL == (wire = TALER_MERCHANT_parse_wireformat_sepa (config)));
+  EXITIF (GNUNET_OK != MERCHANT_DB_initialize (db_conn, dry));
+
   shutdown_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
                                                 &do_shutdown, NULL);
 
@@ -539,7 +486,10 @@ main (int argc, char *const *argv)
 {
   
   static const struct GNUNET_GETOPT_CommandLineOption options[] = {
-      GNUNET_GETOPT_OPTION_END
+    {'t', "temp", NULL,
+     gettext_noop ("Use temporary database tables"), GNUNET_NO,
+     &GNUNET_GETOPT_set_one, &dry},
+     GNUNET_GETOPT_OPTION_END
     };
   
 
