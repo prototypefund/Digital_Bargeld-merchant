@@ -50,6 +50,7 @@ taler_merchant_httpd_LDADD = \
   -lmicrohttpd \
   -ljansson \
   -lgnunetutil \
+  -ltalermint \
   -ltalerpq \
   -lgnunetpostgres \
   -lpq \

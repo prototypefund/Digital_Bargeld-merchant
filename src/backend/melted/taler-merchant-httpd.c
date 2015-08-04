@@ -25,6 +25,7 @@
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_json_lib.h>
+#include <taler/taler_mint_service.h>
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_mhd.h"
 #include "taler-mint-httpd_admin.h"
@@ -46,12 +47,25 @@ TALER_MERCHANT_parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *
     if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
   } while (0)
 
-// task 1. Just implement a hello world server launched a` la GNUNET
+/**
+ * Macro to round microseconds to seconds in GNUNET_TIME_* structs.
+ */
+#define ROUND_TO_SECS(name,us_field) name.us_field -= name.us_field % (1000 * 1000)
+
+/**
+ * Our hostname
+ */
+static char *hostname;
 
 /**
  * The port we are running on
  */
-unsigned short port;
+static long long unsigned port;
+
+/**
+ * Merchant's private key
+ */
+struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 
 /**
  * The MHD Daemon
@@ -114,6 +128,11 @@ static struct GNUNET_SCHEDULER_Task *shutdown_task;
 static struct MERCHANT_WIREFORMAT_Sepa *wire;
 
 /**
+ * Hash of the wireformat
+ */
+static struct GNUNET_HashCode h_wire;
+
+/**
  * Should we do a dry run where temporary tables are used for storing the data.
  */
 static int dry;
@@ -122,6 +141,74 @@ static int dry;
  * Global return code
  */
 static int result;
+
+GNUNET_NETWORK_STRUCT_BEGIN
+
+struct Contract
+{
+  /**
+   * The signature of the merchant for this contract
+   */
+  struct GNUNET_CRYPTO_EddsaSignature sig;
+
+  /**
+   * Purpose header for the signature over contract
+   */
+  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
+
+  /**
+   * The transaction identifier
+   */
+  char m[13];
+
+  /**
+   * Expiry time
+   */
+  struct GNUNET_TIME_AbsoluteNBO t;
+
+  /**
+   * The invoice amount
+   */
+  struct TALER_AmountNBO amount;
+
+  /**
+   * The hash of the preferred wire format + nounce
+   */
+  struct GNUNET_HashCode h_wire;
+
+  /**
+   * The contract data
+   */
+  char a[];
+};
+
+GNUNET_NETWORK_STRUCT_END
+
+/**
+ * Mint context
+ */
+static struct TALER_MINT_Context *mctx;
+
+/**
+ * Context information of the mints we trust
+ */
+struct Mint
+{
+  /**
+   * Public key of this mint
+   */
+  struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
+
+  /**
+   * Connection handle to this mint
+   */
+  struct TALER_MINT_Handle *conn;
+};
+
+/**
+ * Hashmap to store the mint context information
+ */
+static struct GNUNET_CONTAINER_MultiPeerMap *mints_map;
 
 /**
 * Return the given message to the other end of connection
@@ -158,7 +245,7 @@ static unsigned int
 generate_hello (struct MHD_Response **resp) // this parameter was preceded by a '_' in its original file. Why?
 {
  
-  const char *hello = "Hello customer";
+  const char *hello = "Hello customer\n";
   unsigned int ret;
 
   *resp = MHD_create_response_from_buffer (strlen (hello), (void *) hello,
@@ -169,6 +256,26 @@ generate_hello (struct MHD_Response **resp) // this parameter was preceded by a 
 
 }
 
+/**
+ * Callback for catching serious error conditions from MHD.
+ *
+ * @param cls user specified value
+ * @param file where the error occured
+ * @param line where the error occured
+ * @param reason error detail, may be NULL
+ */
+static void
+mhd_panic_cb (void *cls,
+              const char *file,
+              unsigned int line,
+              const char *reason)
+{
+  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+              "MHD panicked at %s:%u: %s",
+              file, line, reason);
+  result = GNUNET_SYSERR;
+  GNUNET_SCHEDULER_shutdown ();
+}
 
 /**
 * Manage a non 200 HTTP status. I.e. it shows a 'failure' page to
@@ -182,7 +289,6 @@ generate_hello (struct MHD_Response **resp) // this parameter was preceded by a 
 static int
 failure_resp (struct MHD_Connection *connection, unsigned int status)
 {
-  printf ("called failure mgmt\n");
   static char page_404[]="\
 <!DOCTYPE html>                                         \
 <html><title>Resource not found</title><body><center>   \
@@ -251,6 +357,66 @@ hash_wireformat (uint64_t nounce)
 }
 
 
+
+/*
+* Make a binary blob representing a contract, store it into the DB, sign it
+* and return a pointer to the signed blob.
+* @param a 0-terminated string representing the description of this
+* purchase (it should contain a human readable description of the good
+* in question)
+* @param product some product numerical id. Its indended use is to link this
+* good, or service being sold to the original products' DB managed by the frontend
+* @price the cost of this good or service
+* @return pointer to the allocated contract (which has a field, 'sig', holding
+* its own signature), NULL upon errors
+*/
+
+struct Contract *
+generate_and_store_contract (const char *a, uint64_t product, struct TALER_Amount *price)
+{
+  
+  struct Contract *contract;
+  struct GNUNET_TIME_Absolute expiry;
+  uint64_t nounce;
+  long long contract_id;
+  uint64_t contract_id_nbo;
+
+  expiry = GNUNET_TIME_absolute_add (GNUNET_TIME_absolute_get (),
+                                     GNUNET_TIME_UNIT_DAYS);
+  ROUND_TO_SECS (expiry, abs_value_us);
+  nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
+  contract_id = MERCHANT_DB_contract_create (db_conn,
+                                             expiry,
+                                             price,
+                                             a,
+                                             nounce,
+                                             product);
+  EXITIF (-1 == contract_id);
+  contract_id_nbo = GNUNET_htonll ((uint64_t) contract_id);
+  contract = GNUNET_malloc (sizeof (struct Contract) + strlen (a) + 1);
+  contract->purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
+  contract->purpose.size = htonl (sizeof (struct Contract)
+                                  - offsetof (struct Contract, purpose)
+                                  + strlen (a) + 1);
+  GNUNET_STRINGS_data_to_string (&contract_id_nbo, sizeof (contract_id_nbo),
+                                 contract->m, sizeof (contract->m));
+  contract->t = GNUNET_TIME_absolute_hton (expiry);
+  (void) strcpy (contract->a, a);
+  contract->h_wire = hash_wireformat (nounce);
+  TALER_amount_hton (&contract->amount,  price);
+  GNUNET_CRYPTO_eddsa_sign (privkey, &contract->purpose, &contract->sig);
+  return contract;
+
+  /* legacy from old merchant */
+  EXITIF_exit:
+    if (NULL != contract)
+    {
+      GNUNET_free (contract);
+    }
+    return NULL;
+}
+
+
 /**
  * A client has requested the given url using the given method
  * (#MHD_HTTP_METHOD_GET, #MHD_HTTP_METHOD_PUT,
@@ -304,10 +470,18 @@ url_handler (void *cls,
 
   unsigned int status;
   unsigned int no_destroy;
+  uint64_t prod_id;
+  struct Contract contract;
   struct MHD_Response *resp;
   struct TALER_Amount price;
-  json_t json_price;
+  struct GNUNET_CRYPTO_EddsaPublicKey pub;
+  json_t *json_price;
   json_t *root;
+  json_t *contract_enc;
+  json_t *sig_enc;
+  json_t *eddsa_pub_enc;
+  json_t *response;
+
   int res;
   char *desc;
 
@@ -315,7 +489,7 @@ url_handler (void *cls,
   #define URL_CONTRACT "/contract"
   no_destroy = 0;
   resp = NULL;
-  status = 500;
+  status = MHD_HTTP_INTERNAL_SERVER_ERROR;
   if (0 == strncasecmp (url, URL_HELLO, sizeof (URL_HELLO)))
     {
       if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
@@ -333,8 +507,6 @@ url_handler (void *cls,
       else
 
         /*
-          1. parse the json
-	  2. generate the contract
 	  3. pack the contract's json
 	  4. return it
 	*/
@@ -346,43 +518,61 @@ url_handler (void *cls,
                                &root);
   
     if (GNUNET_SYSERR == res)
-      return MHD_NO;
+      /* how to manage? */
     if ( (GNUNET_NO == res) || (NULL == root) )
-      return MHD_YES;
-  
-    /* not really needed for getting just a string. Though it'd be very handy
-    to enhace the mint's JSON-parsing capabilities with the merchant's needs.
-  
-    struct TMH_PARSE_FieldSpecification spec[] = {
-      TMH_PARSE_member_variable ("desc", (void **) &desc, &desc_len),
-      TMH_PARSE_member_amount ("price", &price),
-      TMH_PARSE_MEMBER_END
-    };
-    res = TMH_PARSE_json_data (connection,
-                               root,
-                               spec); */
-    /*
-  
-     The expected JSON :
-  
-      {
-      "desc"  : "some description",
-      "price" : a JSON compliant TALER_Amount objet
-      }
-  
-    */
-  
-    if (!json_unpack (root, "{s:s, s:o}", "desc", &desc, "price", &json_price))
+      /* how to manage? */
+    if (!json_unpack (root, "{s:s, s:I, s:o}",
+                      "desc", &desc,
+		      "product", &prod_id,
+		      "price", json_price))
+      /* still not possible to return a taler-compliant error message
+      since this JSON format is not among the taler officials ones */
       status = generate_message (&resp, "unable to parse /contract JSON");
     else
     {
       if (GNUNET_OK != TALER_json_to_amount (&json_price, &price))
+        /* still not possible to return a taler-compliant error message
+	since this JSON format is not among the taler officials ones */ 
         status = generate_message (&resp, "unable to parse `price' field in /contract JSON");
       else
         {
-         /* Let's generate this contract! */
-	 /* First, initialize the DB, since it'll be stored there */
-       
+          json_decref (root);
+          json_decref (json_price);
+          /* Let's generate this contract! */
+	  /* First, initialize the DB, since it'll be stored there */
+	  if (NULL == (contract = generate_and_store_contract (desc, prod_id, &price)))
+	  {
+	    /* status equals 500, so the user will get a "Internal server error" */
+	    failure_resp (connection, status); 
+	    return MHD_YES;
+	 
+	 }
+	 else
+	 {
+	   /* the contract is good and stored in DB, produce now JSON to return.
+	   As of now, the format is {"contract" : base32contract,
+	                             "sig" : contractSignature,
+				     "eddsa_pub" : keyToCheckSignatureAgainst
+				    }
+	   
+	   */
+	
+	   sig_enc = TALER_json_from_eddsa_sig (contract.purpose, contract.sig);
+	   GNUNET_CRYPTO_eddsa_key_get_public (&privkey, &pub);
+	   eddsa_pub_enc = TALER_json_from_data (pub, sizeof (pub));
+	   /* cutting of the signature at the beginning */
+	   contract_enc = TALER_json_from_data (&contract.purpose, sizeof (contract
+	                                        - offsetof (struct Contract, purpose)
+						+ 1));
+	   response = json_pack ("{s:o, s:o, s:o}", "contract", contract_enc, "sig", sig_enc,
+	                         "eddsa_pub", eddsa_pub_enc);
+	   TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
+	   /* FRONTIER - CODE ABOVE STILL NOT TESTED */
+	 
+	 }
+
+
+ 
        
        
        
@@ -404,13 +594,13 @@ url_handler (void *cls,
       if (!no_destroy)
         MHD_destroy_response (resp);
     }
-    else
-      EXITIF (GNUNET_OK != failure_resp (connection, status));
+  else
+    EXITIF (GNUNET_OK != failure_resp (connection, status));
     return MHD_YES;
   
    EXITIF_exit:
     result = GNUNET_SYSERR;
-    //GNUNET_SCHEDULER_shutdown (); to a later stage, maybe
+    GNUNET_SCHEDULER_shutdown ();
     return MHD_NO;
   
 }
@@ -431,8 +621,36 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
       MHD_stop_daemon (mhd);
       mhd = NULL;
     }
+
+  if (NULL != db_conn)
+    {
+      MERCHANT_DB_disconnect (db_conn);
+      db_conn = NULL;
+    }
+
   
 }
+
+
+
+/**
+ * Function called with information about who is auditing
+ * a particular mint and what key the mint is using.
+ *
+ * @param cls closure
+ * @param keys information about the various keys used
+ *        by the mint
+ */
+void
+keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
+{
+  /* which kind of mint's keys a merchant should need? Sign
+  keys? It has already the mint's (master?) public key from
+	  the conf file */  
+  return;
+
+}
+
 
 
 /**
@@ -448,14 +666,63 @@ run (void *cls, char *const *args, const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
 
-  port = 9966;
+  char *keyfile;
+  unsigned int nmints;
+  unsigned int cnt;
+  struct MERCHANT_MintInfo *mint_infos;
+  void *keys_mgmt_cls;
 
-
-  EXITIF (NULL == (wire = TALER_MERCHANT_parse_wireformat_sepa (config)));
-  EXITIF (GNUNET_OK != MERCHANT_DB_initialize (db_conn, dry));
-
+  mint_infos = NULL;
+  keyfile = NULL;
+  result = GNUNET_SYSERR;
   shutdown_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
                                                 &do_shutdown, NULL);
+  EXITIF (GNUNET_SYSERR == (nmints = TALER_MERCHANT_parse_mints (config,
+                                                                 &mint_infos)));
+  EXITIF (NULL == (wire = TALER_MERCHANT_parse_wireformat_sepa (config)));
+  EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_filename (config,
+                                                                "merchant",
+                                                                "KEYFILE",
+                                                                &keyfile));
+  EXITIF (NULL == (privkey = GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)));
+  EXITIF (NULL == (db_conn = MERCHANT_DB_connect (config)));
+  EXITIF (GNUNET_OK != MERCHANT_DB_initialize (db_conn, GNUNET_NO));
+  EXITIF (GNUNET_SYSERR ==
+          GNUNET_CONFIGURATION_get_value_number (config,
+                                                 "merchant",
+                                                 "port",
+                                                 &port));
+  EXITIF (GNUNET_SYSERR ==
+          GNUNET_CONFIGURATION_get_value_string (config,
+                                                 "merchant",
+                                                 "hostname",
+                                                 &hostname));
+
+  EXITIF (NULL == (mctx = TALER_MINT_init ()));
+  EXITIF (NULL == (mints_map = GNUNET_CONTAINER_multipeermap_create (nmints, GNUNET_YES)));
+  
+  for (cnt = 0; cnt < nmints; cnt++)
+    {
+      struct Mint *mint;
+  
+      mint = GNUNET_new (struct Mint);
+      mint->pubkey = mint_infos[cnt].pubkey;
+      /* port this to the new API */
+      mint->conn = TALER_MINT_connect (mctx,
+                                       mint_infos[cnt].hostname,
+                                       &keys_mgmt_cb,
+                                       keys_mgmt_cls); /*<- safe?segfault friendly?*/
+
+      /* NOTE: the keys mgmt callback should roughly do what the following lines do */
+      EXITIF (NULL == mint->conn);
+      
+      EXITIF (GNUNET_SYSERR == GNUNET_CONTAINER_multipeermap_put
+      (mints_map,
+       (struct GNUNET_PeerIdentity *) /* to retrieve now from cb's args -> */&mint->pubkey,
+       mint,
+       GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_FAST));
+    }
+  
 
   mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,
                           port,
@@ -465,12 +732,17 @@ run (void *cls, char *const *args, const char *cfgfile,
 
 
   EXITIF (NULL == mhd);
+  /* WARNING: a 'poll_mhd ()' call is here in the original merchant. Is that
+  mandatory ? */
+  GNUNET_CRYPTO_hash (wire, sizeof (*wire), &h_wire);
   result = GNUNET_OK;
 
   EXITIF_exit:
     if (GNUNET_OK != result)
       GNUNET_SCHEDULER_shutdown ();
-
+  GNUNET_free_non_null (keyfile);
+    if (GNUNET_OK != result)
+      GNUNET_SCHEDULER_shutdown ();
 
 }
 

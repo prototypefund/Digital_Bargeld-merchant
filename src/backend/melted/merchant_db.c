@@ -103,7 +103,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                           tmp_str);
   ret = GNUNET_POSTGRES_exec (conn, sql);
   (void) GNUNET_POSTGRES_exec (conn,
-                               (GNUNET_OK == ret) ? "COMMIT;" : "ROLLBACK");
+                              (GNUNET_OK == ret) ? "COMMIT;" : "ROLLBACK;");
   GNUNET_free (sql);
   if (GNUNET_OK != ret)
     return ret;
