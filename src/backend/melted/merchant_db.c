@@ -88,7 +88,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                           "BEGIN TRANSACTION;"
                           "CREATE %1$s TABLE IF NOT EXISTS contracts ("
                           "transaction_id SERIAL8 PRIMARY KEY,"
-                          "amount INT4 NOT NULL,"
+                          "amount INT8 NOT NULL,"
                           "amount_fraction INT4 NOT NULL,"
                           "description TEXT NOT NULL,"
                           "nounce BYTEA NOT NULL,"
@@ -204,21 +204,28 @@ MERCHANT_DB_contract_create (PGconn *conn,
 {
   PGresult *res;
   uint64_t expiry_ms_nbo;
-  uint32_t value_nbo;
+  uint64_t value_nbo;
   uint32_t fraction_nbo;
   uint64_t nounce_nbo;
   ExecStatusType status;
   uint64_t id;
+
+  value_nbo = GNUNET_htonll (amount->value);
+  fraction_nbo = GNUNET_htonll (amount->fraction);
+  nounce_nbo = GNUNET_htonll (nounce);
+  expiry_ms_nbo = GNUNET_htonll (expiry.abs_value_us);
+  product = GNUNET_htonll (product);
+
   /* ported. To be tested/compiled */
   struct TALER_PQ_QueryParam params[] = {
-    TALER_PQ_query_param_uint32 (&value_nbo),
-    TALER_PQ_query_param_uint32 (&fraction_nbo),
+    TALER_PQ_query_param_uint32 (&value_nbo), //FIXME uninitialized!
+    TALER_PQ_query_param_uint32 (&fraction_nbo), //FIXME uninitialized!
     /* a *string* is being put in the following statement,
     though the API talks about a *blob*. Will this be liked by
     the DB ? */
     TALER_PQ_query_param_fixed_size (desc, strlen(desc)),
-    TALER_PQ_query_param_uint64 (&nounce_nbo),
-    TALER_PQ_query_param_uint64 (&expiry_ms_nbo),
+    TALER_PQ_query_param_uint64 (&nounce_nbo), //FIXME uninitialized!
+    TALER_PQ_query_param_uint64 (&expiry_ms_nbo), //FIXME uninitialized!
     TALER_PQ_query_param_uint64 (&product),
     TALER_PQ_query_param_end
   };
@@ -227,11 +234,7 @@ MERCHANT_DB_contract_create (PGconn *conn,
     TALER_PQ_result_spec_end
   };
 
-  expiry_ms_nbo = GNUNET_htonll (expiry.abs_value_us);
-  value_nbo = htonl (amount->value);
-  fraction_nbo = htonl (amount->fraction);
-  nounce_nbo = GNUNET_htonll (nounce);
-  product = GNUNET_htonll (product);
+
   /* NOTE: the statement is prepared by MERCHANT_DB_initialize function */
   res = TALER_PQ_exec_prepared (conn, "contract_create", params);
   status = PQresultStatus (res);

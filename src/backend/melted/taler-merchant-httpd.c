@@ -33,6 +33,7 @@
 #include "taler-mint-httpd_withdraw.h"
 #include "taler-mint-httpd_refresh.h"
 #include "taler-mint-httpd_keystate.h"
+#include "taler-mint-httpd_responses.h"
 #include "merchant.h"
 #include "merchant_db.h"
 
@@ -360,12 +361,12 @@ hash_wireformat (uint64_t nounce)
 
 /*
 * Make a binary blob representing a contract, store it into the DB, sign it
-* and return a pointer to the signed blob.
+* and return a pointer to it.
 * @param a 0-terminated string representing the description of this
 * purchase (it should contain a human readable description of the good
 * in question)
-* @param product some product numerical id. Its indended use is to link this
-* good, or service being sold to the original products' DB managed by the frontend
+* @param product some product numerical id. Its indended use is to link the
+* good, or service being sold to some entry in the DB managed by the frontend
 * @price the cost of this good or service
 * @return pointer to the allocated contract (which has a field, 'sig', holding
 * its own signature), NULL upon errors
@@ -470,8 +471,8 @@ url_handler (void *cls,
 
   unsigned int status;
   unsigned int no_destroy;
-  uint64_t prod_id;
-  struct Contract contract;
+  json_int_t prod_id;
+  struct Contract *contract;
   struct MHD_Response *resp;
   struct TALER_Amount price;
   struct GNUNET_CRYPTO_EddsaPublicKey pub;
@@ -483,7 +484,7 @@ url_handler (void *cls,
   json_t *response;
 
   int res;
-  char *desc;
+  const char *desc;
 
   #define URL_HELLO "/hello"
   #define URL_CONTRACT "/contract"
@@ -501,54 +502,108 @@ url_handler (void *cls,
   // to be called by the frontend passing all the product's information
   // which are relevant for the contract's generation
   if (0 == strncasecmp (url, URL_CONTRACT, sizeof (URL_CONTRACT)))
-    {
-      if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
-        status = generate_message (&resp, "Sorry, only POST is allowed");
-      else
-
-        /*
-	  3. pack the contract's json
-	  4. return it
-	*/
-
-    res = TMH_PARSE_post_json (connection,
+  {
+    if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
+      status = generate_message (&resp, "Sorry, only POST is allowed");
+    else
+      res = TMH_PARSE_post_json (connection,
                                connection_cls,
                                upload_data,
                                upload_data_size,
                                &root);
   
     if (GNUNET_SYSERR == res)
-      /* how to manage? */
-    if ( (GNUNET_NO == res) || (NULL == root) )
-      /* how to manage? */
-    if (!json_unpack (root, "{s:s, s:I, s:o}",
-                      "desc", &desc,
-		      "product", &prod_id,
-		      "price", json_price))
+    {
+      status = generate_message (&resp, "unable to parse JSON root");
+      return MHD_NO;
+
+    }
+    if ((GNUNET_NO == res) || (NULL == root))
+      return MHD_YES;
+    
+    /* The frontend should supply a JSON in the follwoing format:
+
+    {
+     
+     "desc" : string human-readable describing this deal,
+     "product" : uint64-like integer referring to the product in some
+                 DB adminstered by the frontend,
+     "price" : a 'struct TALER_Amount' in the Taler compliant JSON format }
+
+     */
+
+    #if 0
+    /*res = json_typeof (root); <- seg fault*/
+    json_int_t id;
+    const char *desc_test;
+    const char *cur_test;
+    json_t *id_json;
+    json_t *desc_json;
+    json_t *cur_json;
+    id_json = json_object_get (root, "product");
+    desc_json = json_object_get (root, "desc");
+    id = json_integer_value (id_json);
+    desc_test = json_string_value (desc_json);
+    json_price = json_object_get (root, "price");
+    json_typeof (json_price);
+    cur_json = json_object_get (json_price, "currency");
+    cur_test = json_string_value (cur_json);
+    printf ("id is %" JSON_INTEGER_FORMAT "\n", id);
+    printf ("desc is %s\n", desc_test);
+    TALER_json_to_amount (json_price, &price);
+    printf ("cur_test is %s\n", price.currency);
+    #endif
+    json_error_t err;
+    #if 0
+    if (res = json_unpack_ex (root, &err, JSON_VALIDATE_ONLY, "{s:s, s:I, s:o}", 
+                      "desc",
+		      //&desc,
+		      "product", 
+		      //&prod_id, 
+		      "price"//, 
+		      //json_price
+		      ))
+    #else
+    if (res = json_unpack (root, "{s:s, s:I, s:o}", 
+                      "desc",
+		      &desc,
+		      "product", 
+		      &prod_id, 
+		      "price", 
+		      &json_price
+		      ))
+    #endif
+
+
       /* still not possible to return a taler-compliant error message
       since this JSON format is not among the taler officials ones */
-      status = generate_message (&resp, "unable to parse /contract JSON");
+    {
+      status = generate_message (&resp, "unable to parse /contract JSON\n");
+    }
     else
     {
-      if (GNUNET_OK != TALER_json_to_amount (&json_price, &price))
-        /* still not possible to return a taler-compliant error message
+
+      if (GNUNET_OK != TALER_json_to_amount (json_price, &price))
+        {/* still not possible to return a taler-compliant error message
 	since this JSON format is not among the taler officials ones */ 
-        status = generate_message (&resp, "unable to parse `price' field in /contract JSON");
+	status = generate_message (&resp, "unable to parse `price' field in /contract JSON");}
       else
-        {
+      {
+        /* Let's generate this contract! */
+	if (NULL == (contract = generate_and_store_contract (desc, prod_id, &price)))
+	{
+	  /* status equals 500, so the user will get a "Internal server error" */
+	  //failure_resp (connection, status); 
+          status = generate_message (&resp, "unable to generate and store this contract");
+	  //return MHD_YES;
+	 
+	}
+	else
+	{
           json_decref (root);
           json_decref (json_price);
-          /* Let's generate this contract! */
-	  /* First, initialize the DB, since it'll be stored there */
-	  if (NULL == (contract = generate_and_store_contract (desc, prod_id, &price)))
-	  {
-	    /* status equals 500, so the user will get a "Internal server error" */
-	    failure_resp (connection, status); 
-	    return MHD_YES;
-	 
-	 }
-	 else
-	 {
+
+	  printf ("Good contract\n");
 	   /* the contract is good and stored in DB, produce now JSON to return.
 	   As of now, the format is {"contract" : base32contract,
 	                             "sig" : contractSignature,
@@ -557,35 +612,22 @@ url_handler (void *cls,
 	   
 	   */
 	
-	   sig_enc = TALER_json_from_eddsa_sig (contract.purpose, contract.sig);
-	   GNUNET_CRYPTO_eddsa_key_get_public (&privkey, &pub);
-	   eddsa_pub_enc = TALER_json_from_data (pub, sizeof (pub));
-	   /* cutting of the signature at the beginning */
-	   contract_enc = TALER_json_from_data (&contract.purpose, sizeof (contract
+	  sig_enc = TALER_json_from_eddsa_sig (&contract->purpose, &contract->sig);
+	  GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
+	  eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
+	  /* cutting of the signature at the beginning */
+	  contract_enc = TALER_json_from_data (&contract->purpose, sizeof (*contract)
 	                                        - offsetof (struct Contract, purpose)
-						+ 1));
-	   response = json_pack ("{s:o, s:o, s:o}", "contract", contract_enc, "sig", sig_enc,
+						+ strlen (desc) +1);
+	  response = json_pack ("{s:o, s:o, s:o}", "contract", contract_enc, "sig", sig_enc,
 	                         "eddsa_pub", eddsa_pub_enc);
-	   TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
-	   /* FRONTIER - CODE ABOVE STILL NOT TESTED */
-	 
-	 }
-
-
- 
-       
-       
-       
-       
-        }
-
+	  TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
+	  printf ("Got something?\n");
+	  return MHD_YES;
+	  /* FRONTIER - CODE ABOVE STILL NOT TESTED */
+	}
+      }
     }
-
-  
-    
-  
-
-
   }
 
   if (NULL != resp)
@@ -596,13 +638,12 @@ url_handler (void *cls,
     }
   else
     EXITIF (GNUNET_OK != failure_resp (connection, status));
-    return MHD_YES;
+  return MHD_YES;
   
-   EXITIF_exit:
-    result = GNUNET_SYSERR;
-    GNUNET_SCHEDULER_shutdown ();
-    return MHD_NO;
-  
+ EXITIF_exit:
+   result = GNUNET_SYSERR;
+   GNUNET_SCHEDULER_shutdown ();
+   return MHD_NO;
 }
 
 /**
