@@ -64,15 +64,18 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp);
  * @param conn the database connection
  * @param expiry the time when the contract will expire
  * @param amount the taler amount corresponding to the contract
+ * @param c_id this contract's identification number
  * @param desc descripition of the contract
  * @param nounce a random 64-bit nounce
  * @param product description to identify a product
- * @return -1 upon error; the serial id of the inserted contract upon success
+ * @return GNUNET_OK on success, GNUNET_SYSERR upon error
  */
-long long
+
+uint32_t
 MERCHANT_DB_contract_create (PGconn *conn,
-                             struct GNUNET_TIME_Absolute expiry,
-                             struct TALER_Amount *amount,
+                             const struct GNUNET_TIME_Absolute *expiry,
+                             const struct TALER_Amount *amount,
+			     uint64_t c_id,
                              const char *desc,
                              uint64_t nounce,
                              uint64_t product);

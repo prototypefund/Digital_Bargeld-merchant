@@ -87,23 +87,24 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
   (void) GNUNET_asprintf (&sql,
                           "BEGIN TRANSACTION;"
                           "CREATE %1$s TABLE IF NOT EXISTS contracts ("
-                          "transaction_id SERIAL8 PRIMARY KEY,"
-                          "amount INT4 NOT NULL,"
+                          "contract_id INT8 PRIMARY KEY,"
+                          "amount INT8 NOT NULL,"
                           "amount_fraction INT4 NOT NULL,"
+			  "amount_currency VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL,"
                           "description TEXT NOT NULL,"
-                          "nounce BYTEA NOT NULL,"
+                          "nounce INT8 NOT NULL,"
                           "expiry INT8 NOT NULL,"
                           "product INT8 NOT NULL);"
                           "CREATE %1$s TABLE IF NOT EXISTS checkouts ("
                           "coin_pub BYTEA PRIMARY KEY,"
-                          "transaction_id INT8 REFERENCES contracts(transaction_id),"
+                          "contract_id INT8 REFERENCES contracts(contract_id),"
                           "amount INT4 NOT NULL,"
                           "amount_fraction INT4 NOT NULL,"
                           "coin_sig BYTEA NOT NULL);",
                           tmp_str);
   ret = GNUNET_POSTGRES_exec (conn, sql);
   (void) GNUNET_POSTGRES_exec (conn,
-                               (GNUNET_OK == ret) ? "COMMIT;" : "ROLLBACK");
+                              (GNUNET_OK == ret) ? "COMMIT;" : "ROLLBACK;");
   GNUNET_free (sql);
   if (GNUNET_OK != ret)
     return ret;
@@ -118,11 +119,10 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                    (conn,
                     "contract_create",
                     "INSERT INTO contracts"
-                    "(amount, amount_fraction, description,"
-                    "nounce, expiry, product) VALUES"
-                    "($1, $2, $3, $4, $5, $6)"
-                    "RETURNING transaction_id",
-                    6, NULL)));
+                    "(contract_id, amount, amount_fraction, amount_currency,"
+		    "description, nounce, expiry, product) VALUES"
+                    "($1, $2, $3, $4, $5, $6, $7, $8)",
+                    8, NULL)));
   EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
   PQclear (res);
 
@@ -133,7 +133,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                     "product"
                     ") FROM contracts "
                     "WHERE ("
-                    "transaction_id=$1"
+                    "contract_id=$1"
                     ")",
                     1, NULL)));
   EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
@@ -144,7 +144,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                     "checkout_create",
                     "INSERT INTO checkouts ("
                     "coin_pub,"
-                    "transaction_id,"
+                    "contract_id,"
                     "amount,"
                     "amount_fraction,"
                     "coin_sig"
@@ -162,8 +162,8 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                     "product"
                     ") FROM contracts "
                     "WHERE "
-                    "transaction_id IN ("
-                    "SELECT (transaction_id) FROM checkouts "
+                    "contract_id IN ("
+                    "SELECT (contract_id) FROM checkouts "
                     "WHERE coin_pub=$1"
                     ")",
                     1, NULL)));
@@ -189,61 +189,67 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
  * @param conn the database connection
  * @param expiry the time when the contract will expire
  * @param amount the taler amount corresponding to the contract
+ * @param c_id contract's id
  * @param desc descripition of the contract
  * @param nounce a random 64-bit nounce
  * @param product description to identify a product
- * @return -1 upon error; the serial id of the inserted contract upon success
+ * @return GNUNET_OK on success, GNUNET_SYSERR upon error
  */
-long long
+
+uint32_t
 MERCHANT_DB_contract_create (PGconn *conn,
-                             struct GNUNET_TIME_Absolute expiry,
-                             struct TALER_Amount *amount,
+                             const struct GNUNET_TIME_Absolute *expiry,
+                             const struct TALER_Amount *amount,
+			     uint64_t c_id,
                              const char *desc,
                              uint64_t nounce,
                              uint64_t product)
 {
   PGresult *res;
+  #if 0
   uint64_t expiry_ms_nbo;
-  uint32_t value_nbo;
+  uint64_t value_nbo;
   uint32_t fraction_nbo;
   uint64_t nounce_nbo;
+  #endif
   ExecStatusType status;
-  uint64_t id;
+
+  #if 0
+  /*
+  NOTE: the conversion to nl(l) happens *inside* the query param helpers; since
+  the policy imposes this format for storing values. */
+  value_nbo = GNUNET_htonll (amount->value);
+  fraction_nbo = GNUNET_htonll (amount->fraction);
+  nounce_nbo = GNUNET_htonll (nounce);
+  expiry_ms_nbo = GNUNET_htonll (expiry.abs_value_us);
+  product = GNUNET_htonll (product);
+  #endif
+
   /* ported. To be tested/compiled */
   struct TALER_PQ_QueryParam params[] = {
-    TALER_PQ_query_param_uint32 (&value_nbo),
-    TALER_PQ_query_param_uint32 (&fraction_nbo),
+    TALER_PQ_query_param_uint64 (&c_id), 
+    TALER_PQ_query_param_amount (amount),
     /* a *string* is being put in the following statement,
     though the API talks about a *blob*. Will this be liked by
     the DB ? */
+    // the following inserts a string as a blob. Will Taler provide a param-from-string helper?
     TALER_PQ_query_param_fixed_size (desc, strlen(desc)),
-    TALER_PQ_query_param_uint64 (&nounce_nbo),
-    TALER_PQ_query_param_uint64 (&expiry_ms_nbo),
+    TALER_PQ_query_param_uint64 (&nounce), 
+    TALER_PQ_query_param_absolute_time (expiry),
     TALER_PQ_query_param_uint64 (&product),
     TALER_PQ_query_param_end
   };
-  struct TALER_PQ_ResultSpec rs[] = {
-    TALER_PQ_result_spec_uint64 ("transaction_id", &id),
-    TALER_PQ_result_spec_end
-  };
-
-  expiry_ms_nbo = GNUNET_htonll (expiry.abs_value_us);
-  value_nbo = htonl (amount->value);
-  fraction_nbo = htonl (amount->fraction);
-  nounce_nbo = GNUNET_htonll (nounce);
-  product = GNUNET_htonll (product);
+  
   /* NOTE: the statement is prepared by MERCHANT_DB_initialize function */
   res = TALER_PQ_exec_prepared (conn, "contract_create", params);
   status = PQresultStatus (res);
-  EXITIF (PGRES_TUPLES_OK != status);
-  EXITIF (1 != PQntuples (res));
-  EXITIF (GNUNET_YES != TALER_PQ_extract_result (res, rs, 0));
+  EXITIF (PGRES_COMMAND_OK != status);
   PQclear (res);
-  return GNUNET_ntohll ((uint64_t) id);
+  return GNUNET_OK;
 
  EXITIF_exit:
   PQclear (res);
-  return -1;
+  return GNUNET_SYSERR;
 }
 
 long long
