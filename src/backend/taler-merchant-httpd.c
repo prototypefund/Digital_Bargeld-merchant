@@ -290,12 +290,22 @@ mhd_panic_cb (void *cls,
 static int
 failure_resp (struct MHD_Connection *connection, unsigned int status)
 {
-  static char page_404[]="\
+  static char page_MHD_HTTP_NOT_FOUND[]="\
 <!DOCTYPE html>                                         \
 <html><title>Resource not found</title><body><center>   \
 <h3>The resource you are looking for is not found.</h3> \
 </center></body></html>";
-  static char page_500[]="\
+  static char page_MHD_HTTP_BAD_REQUEST[]="\
+<!DOCTYPE html>                                         \
+<html><title>Bad request</title><body><center>   \
+<h3>Malformed POSTed JSON.</h3> \
+</center></body></html>";
+static char page_MHD_HTTP_METHOD_NOT_ALLOWED[]="\
+<!DOCTYPE html>                                         \
+<html><title>Method NOT allowe</title><body><center>   \
+<h3>ONLY POSTs are allowed.</h3> \
+</center></body></html>";
+  static char page_MHD_HTTP_INTERNAL_SERVER_ERROR[]="\
 <!DOCTYPE html> <html><title>Internal Server Error</title><body><center> \
 <h3>The server experienced an internal error and hence cannot serve your \
 request</h3></center></body></html>";
@@ -305,17 +315,23 @@ request</h3></center></body></html>";
 #define PAGE(number) \
   do {page=page_ ## number; size=sizeof(page_ ## number)-1;} while(0)
 
-  GNUNET_assert (400 <= status);
+  GNUNET_assert (MHD_HTTP_BAD_REQUEST <= status);
   resp = NULL;
   switch (status)
   {
-  case 404:
-    PAGE(404);
+  case MHD_HTTP_NOT_FOUND :
+    PAGE(MHD_HTTP_NOT_FOUND);
+    break;
+  case MHD_HTTP_BAD_REQUEST:
+    PAGE(MHD_HTTP_BAD_REQUEST);
+    break;
+  case MHD_HTTP_METHOD_NOT_ALLOWED:
+    PAGE(MHD_HTTP_METHOD_NOT_ALLOWED);
     break;
   default:
-    status = 500;
-  case 500:
-    PAGE(500);
+    status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+  case MHD_HTTP_INTERNAL_SERVER_ERROR:
+    PAGE(MHD_HTTP_INTERNAL_SERVER_ERROR);
   }
 #undef PAGE
 
@@ -491,11 +507,12 @@ url_handler (void *cls,
   #define URL_CONTRACT "/contract"
   no_destroy = 0;
   resp = NULL;
+  contract = NULL;
   status = MHD_HTTP_INTERNAL_SERVER_ERROR;
   if (0 == strncasecmp (url, URL_HELLO, sizeof (URL_HELLO)))
     {
       if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
-        status = generate_hello (&resp); //TBD
+        status = generate_hello (&resp);
       else
         GNUNET_break (0);
     }
@@ -505,7 +522,10 @@ url_handler (void *cls,
   if (0 == strncasecmp (url, URL_CONTRACT, sizeof (URL_CONTRACT)))
   {
     if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
-      status = generate_message (&resp, "Sorry, only POST is allowed");
+    {
+      status = MHD_HTTP_METHOD_NOT_ALLOWED;
+
+    }
     else
       res = TMH_PARSE_post_json (connection,
                                connection_cls,
@@ -514,11 +534,8 @@ url_handler (void *cls,
                                &root);
   
     if (GNUNET_SYSERR == res)
-    {
-      status = generate_message (&resp, "unable to parse JSON root");
-      return MHD_NO;
+      status = MHD_HTTP_METHOD_NOT_ALLOWED;
 
-    }
     if ((GNUNET_NO == res) || (NULL == root))
       return MHD_YES;
     
@@ -579,40 +596,31 @@ url_handler (void *cls,
 
       /* still not possible to return a taler-compliant error message
       since this JSON format is not among the taler officials ones */
-    {
-      status = generate_message (&resp, "unable to parse /contract JSON\n");
-    }
+      status = MHD_HTTP_BAD_REQUEST;
     else
     {
 
       if (GNUNET_OK != TALER_json_to_amount (json_price, &price))
-        {/* still not possible to return a taler-compliant error message
+        /* still not possible to return a taler-compliant error message
 	since this JSON format is not among the taler officials ones */ 
-	status = generate_message (&resp, "unable to parse `price' field in /contract JSON");}
+	status = MHD_HTTP_BAD_REQUEST;
       else
       {
         /* Let's generate this contract! */
 	if (NULL == (contract = generate_and_store_contract (desc, contract_id, prod_id, &price)))
-	{
-	  /* status equals 500, so the user will get a "Internal server error" */
-	  //failure_resp (connection, status); 
-          status = generate_message (&resp, "unable to generate and store this contract");
-	  //return MHD_YES;
-	 
-	}
+          status = MHD_HTTP_INTERNAL_SERVER_ERROR;
 	else
 	{
           json_decref (root);
           json_decref (json_price);
 
-	  printf ("Good contract\n");
-	   /* the contract is good and stored in DB, produce now JSON to return.
-	   As of now, the format is {"contract" : base32contract,
-	                             "sig" : contractSignature,
-				     "eddsa_pub" : keyToCheckSignatureAgainst
-				    }
+          /* the contract is good and stored in DB, produce now JSON to return.
+	  As of now, the format is {"contract" : base32contract,
+	                            "sig" : contractSignature,
+	                            "eddsa_pub" : keyToCheckSignatureAgainst
+                                   }
 	   
-	   */
+	  */
 	
 	  sig_enc = TALER_json_from_eddsa_sig (&contract->purpose, &contract->sig);
 	  GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
@@ -624,9 +632,12 @@ url_handler (void *cls,
 	  response = json_pack ("{s:o, s:o, s:o}", "contract", contract_enc, "sig", sig_enc,
 	                         "eddsa_pub", eddsa_pub_enc);
 	  TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
-	  printf ("Got something?\n");
-	  return MHD_YES;
+	  #define page_ok "\
+          <!DOCTYPE html> <html><title>Ok</title><body><center> \
+          <h3>Contract's generation succeeded</h3></center></body></html>"
+	  status = generate_message (&resp, page_ok);
 	  /* FRONTIER - CODE ABOVE STILL NOT TESTED */
+	  #undef page_ok
 	}
       }
     }
@@ -715,6 +726,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   struct MERCHANT_MintInfo *mint_infos;
   void *keys_mgmt_cls;
 
+  keys_mgmt_cls = NULL;
   mint_infos = NULL;
   keyfile = NULL;
   result = GNUNET_SYSERR;
