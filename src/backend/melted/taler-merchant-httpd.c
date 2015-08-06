@@ -363,6 +363,7 @@ hash_wireformat (uint64_t nounce)
 * Make a binary blob representing a contract, store it into the DB, sign it
 * and return a pointer to it.
 * @param a 0-terminated string representing the description of this
+* @param c_id contract id provided by the frontend
 * purchase (it should contain a human readable description of the good
 * in question)
 * @param product some product numerical id. Its indended use is to link the
@@ -373,27 +374,26 @@ hash_wireformat (uint64_t nounce)
 */
 
 struct Contract *
-generate_and_store_contract (const char *a, uint64_t product, struct TALER_Amount *price)
+generate_and_store_contract (const char *a, uint64_t c_id, uint64_t product, struct TALER_Amount *price)
 {
   
   struct Contract *contract;
   struct GNUNET_TIME_Absolute expiry;
   uint64_t nounce;
-  long long contract_id;
   uint64_t contract_id_nbo;
 
   expiry = GNUNET_TIME_absolute_add (GNUNET_TIME_absolute_get (),
                                      GNUNET_TIME_UNIT_DAYS);
   ROUND_TO_SECS (expiry, abs_value_us);
   nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
-  contract_id = MERCHANT_DB_contract_create (db_conn,
-                                             expiry,
-                                             price,
-                                             a,
-                                             nounce,
-                                             product);
-  EXITIF (-1 == contract_id);
-  contract_id_nbo = GNUNET_htonll ((uint64_t) contract_id);
+  EXITIF (GNUNET_SYSERR == MERCHANT_DB_contract_create (db_conn,
+                                              &expiry,
+                                              price,
+ 					      c_id,
+                                              a,
+                                              nounce,
+                                              product));
+  contract_id_nbo = GNUNET_htonll ((uint64_t) c_id);
   contract = GNUNET_malloc (sizeof (struct Contract) + strlen (a) + 1);
   contract->purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract->purpose.size = htonl (sizeof (struct Contract)
@@ -472,6 +472,7 @@ url_handler (void *cls,
   unsigned int status;
   unsigned int no_destroy;
   json_int_t prod_id;
+  json_int_t contract_id;
   struct Contract *contract;
   struct MHD_Response *resp;
   struct TALER_Amount price;
@@ -528,6 +529,7 @@ url_handler (void *cls,
      "desc" : string human-readable describing this deal,
      "product" : uint64-like integer referring to the product in some
                  DB adminstered by the frontend,
+     "cid" : uint64-like integer, this contract's id
      "price" : a 'struct TALER_Amount' in the Taler compliant JSON format }
 
      */
@@ -552,9 +554,7 @@ url_handler (void *cls,
     printf ("desc is %s\n", desc_test);
     TALER_json_to_amount (json_price, &price);
     printf ("cur_test is %s\n", price.currency);
-    #endif
     json_error_t err;
-    #if 0
     if (res = json_unpack_ex (root, &err, JSON_VALIDATE_ONLY, "{s:s, s:I, s:o}", 
                       "desc",
 		      //&desc,
@@ -564,14 +564,16 @@ url_handler (void *cls,
 		      //json_price
 		      ))
     #else
-    if (res = json_unpack (root, "{s:s, s:I, s:o}", 
+    if ((res = json_unpack (root, "{s:s, s:I, s:I, s:o}", 
                       "desc",
 		      &desc,
 		      "product", 
-		      &prod_id, 
+		      &prod_id,
+		      "cid",
+		      &contract_id,
 		      "price", 
 		      &json_price
-		      ))
+		      )))
     #endif
 
 
@@ -590,7 +592,7 @@ url_handler (void *cls,
       else
       {
         /* Let's generate this contract! */
-	if (NULL == (contract = generate_and_store_contract (desc, prod_id, &price)))
+	if (NULL == (contract = generate_and_store_contract (desc, contract_id, prod_id, &price)))
 	{
 	  /* status equals 500, so the user will get a "Internal server error" */
 	  //failure_resp (connection, status); 
