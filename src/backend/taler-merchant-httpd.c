@@ -485,6 +485,7 @@ url_handler (void *cls,
              void **connection_cls)
 {
 
+  printf ("%s\n", url);
   unsigned int status;
   unsigned int no_destroy;
   json_int_t prod_id;

@@ -4,6 +4,7 @@
 <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 <body>
+<div id='root' class="page-wrapper">
 
 <!--
 
@@ -23,15 +24,15 @@
 
 -->
 <h1>Donation Page</h1>
-<p>Please choose a project and an amount you which to donate.</p>
+<p>Please choose a project and an amount you whish to donate.</p>
 
 <form name="tform" action="checkout.php" method="POST">
 <div id="opt-form" align="left"><br>
-<input type="radio" name="group0" value="Milk"> Taler<br>
-<input type="radio" name="group0" value="Butter" checked="true"> Gnunet<br>
-<input type="radio" name="group0" value="Cheese"> INRIA<br><br><br>
+<input type="radio" name="group0" value="Taler">Taler<br>
+<input type="radio" name="group0" value="Gnunet" checked="true">Gnunet<br>
+<input type="radio" name="group0" value="INRIA">INRIA<br><br><br>
 EUR <select id="taler-donation" name="kudos-donation">
-     <option value="5">5</option>
+     <option value="5">10</option>
 </select>
 <input type="submit" name="keyName" value="Donate!"><br><br>
 
@@ -39,7 +40,7 @@ EUR <select id="taler-donation" name="kudos-donation">
 </form>
 
 <!--button onclick='sendContract();'>buy</a-->
-
+</div>
 </body>
 
 </html>
