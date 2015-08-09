@@ -60,27 +60,30 @@ else{
 						 'currency' => $currency)));
   // test
   // echo $json;
-  // send to backend
-  /* // _very_ problematic
-  $http_obj = new HttpRequest;
-  $http_obj.setMethod (METH_GET);
-  //$http_obj.setBody ($json);
-  $http_obj.send ();
-  $http_obj.setUrl ("http://" . $SERVER["SERVER_NAME"] . "/backend" . "/hello");
-  $status = $http_obj.getResponseHeader ('status');
-  */
+  
+  //echo phpinfo ();
+  
+  // crafting the request
+  $req = new http\Client\Request ("POST",
+                                  "http://" . $SERVER["SERVER_NAME"] . "/backend" . "/contract",
+                                  //"http://localhost:9898/",
+				  array ("Content-Type" => "application/json"));
+  $req->getBody()->append ($json);
+
   $client = new http\Client;
-  $certificate = http_post_data ("http://" . $SERVER["SERVER_NAME"] . "/backend" . "/hello",
-                                 null, $response);
-  $status_code = $response['response_code'];
+  $client->enqueue($req)->send ();
+  $resp = $client->getResponse ();
+  $status_code = $resp->getResponseCode ();
+  http_response_code ($status_code);
+  
 
-  set_response_code ($status_code);
-
-  if ($status != 200)
-    echo "Some error occurred during this operation";  
+  if ($status_code != 200){
+    echo "Error while generating the certificate, response code : " . $status_code;
+  }
   // send the contract back to the wallet without touching it
-  else echo $http_obj.getResponseBody ();
-
+  else{
+    echo $resp->body->toString ();
+  }
 
 }
 

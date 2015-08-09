@@ -41,8 +41,6 @@
 
 <?php
 
-// ID generation
-$transId = rand(1, 15);
 // getting the donation receiver's name
 $got_donation = $_POST['group0'];
 // create session
@@ -54,13 +52,14 @@ $_SESSION['maydonate'] = true;
 
 ?>
 
-<form name="tform" action="" method="POST">
+<form name="tform" action="cert.php" method="POST">
 <div id="opt-form" align="left"><br>
 <input type="radio" name="group1" value="Lisa">Lisa<br>
 <input type="radio" name="group1" value="You Card" checked>You Card<br>
 <input type="radio" name="group1" value="Card Me">Card Me<br>
 <input id="t-button-id" type="radio" name="group1" value="Taler" disabled="true">Taler<br>
-<input type="button" onclick="ok(this.form)" value="Ok"-->
+<input type="submit" value="Ok"-->
+<!--input type="button" onclick="ok(this.form)" value="Ok"-->
 </div>
 </form>
 
@@ -81,9 +80,7 @@ function ok(form){
               to the (XUL) extension) */      
               sendContract(cert.responseText);
               }
-              else alert("Certificate ready state: "
-	                 + cert.readyState + ", cert status: "
-			 + cert.status);
+              else alert("No certificate gotten, status " + cert.status);
             }
           };
 
