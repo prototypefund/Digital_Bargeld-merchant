@@ -30,3 +30,13 @@ taler_merchant_httpd_LDADD = \
   -lgnunetpostgres \
   -lpq \
   -lpthread
+
+# NOTE: the lines
+# /home/demo/mint/src/util/libtalerutil.la \
+# /home/demo/mint/src/mintdb/libtalermintdb.la \
+# don't seem to be replaceable with -ltalerutil and -ltalermintdb
+# -ltalerutil \
+# -ltalermintdb \
+# so that this Makefile.am depends on where the mint source tree
+# is in the user's computer.
+
