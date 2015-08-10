@@ -37,7 +37,8 @@ header {
 header h1 {
 	height: 190px;
 	margin: 0px;
-	background-image: url(toysX.jpg);
+	background-color: black;
+	background-image: url(Gala.jpg);
 	background-repeat: no-repeat;
 }
 header h1, header h2 {
