@@ -60,12 +60,11 @@ else{
 						 'currency' => $currency)));
   // test
   // echo $json;
-  
-  //echo phpinfo ();
+  // echo phpinfo ();
   
   // crafting the request
   $req = new http\Client\Request ("POST",
-                                  "http://" . $SERVER["SERVER_NAME"] . "/backend" . "/contract",
+                                  "http://" . $_SERVER["SERVER_NAME"] . "/backend" . "/contract",
                                   //"http://localhost:9898/",
 				  array ("Content-Type" => "application/json"));
   $req->getBody()->append ($json);
