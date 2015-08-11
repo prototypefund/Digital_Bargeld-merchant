@@ -26,13 +26,8 @@
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mint_service.h>
+#include <taler/taler_signatures.h>
 #include "taler-mint-httpd_parsing.h"
-#include "taler-mint-httpd_mhd.h"
-#include "taler-mint-httpd_admin.h"
-#include "taler-mint-httpd_deposit.h"
-#include "taler-mint-httpd_withdraw.h"
-#include "taler-mint-httpd_refresh.h"
-#include "taler-mint-httpd_keystate.h"
 #include "taler-mint-httpd_responses.h"
 #include "merchant.h"
 #include "merchant_db.h"
@@ -79,44 +74,9 @@ static struct MHD_Daemon *mhd;
 PGconn *db_conn;
 
 /**
- * Which currency is used by this mint?
- * (verbatim copy from mint's code, just to make this
- * merchant's source compile)
- */
-char *TMH_mint_currency_string;
-
-/* As above */
-struct TALER_MINTDB_Plugin *TMH_plugin;
-
-
-/**
- * As above, though the merchant does need some form of
- * configuration
+ * merchant's conf handle
  */
 struct GNUNET_CONFIGURATION_Handle *cfg;
-
-
-/**
- * As above
- */
-int TMH_test_mode;
-
-
-/**
- * As above
- */
-char *TMH_mint_directory;
-
-
-/**
- * As above
- */
-struct GNUNET_CRYPTO_EddsaPublicKey TMH_master_public_key;
-
-/**
- * As above
- */
-char *TMH_expected_wire_format;
 
 /**
  * Shutdown task identifier
