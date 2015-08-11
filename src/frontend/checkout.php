@@ -52,18 +52,20 @@ $_SESSION['maydonate'] = true;
 
 ?>
 
-<form name="tform" action="cert.php" method="POST">
+<form name="tform" action="" method="POST">
 <div id="opt-form" align="left"><br>
 <input type="radio" name="group1" value="Lisa">Lisa<br>
 <input type="radio" name="group1" value="You Card" checked>You Card<br>
 <input type="radio" name="group1" value="Card Me">Card Me<br>
 <input id="t-button-id" type="radio" name="group1" value="Taler" disabled="true">Taler<br>
-<input type="submit" value="Ok"-->
-<!--input type="button" onclick="ok(this.form)" value="Ok"-->
+<input type="button" onclick="ok(this.form)" value="Ok">
 </div>
 </form>
 
 <script type="text/javascript">
+
+// trigger certificate generation on the server, and signal certificate
+// arrival "here" in the client.
 
 function ok(form){
   for(var cnt=0; cnt < form.group1.length; cnt++){

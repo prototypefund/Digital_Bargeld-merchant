@@ -633,12 +633,16 @@ url_handler (void *cls,
 	  response = json_pack ("{s:o, s:o, s:o}", "contract", contract_enc, "sig", sig_enc,
 	                         "eddsa_pub", eddsa_pub_enc);
 	  TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
+	  return MHD_YES;
+
+	  /* not needed (?) anymore
 	  #define page_ok "\
           <!DOCTYPE html> <html><title>Ok</title><body><center> \
           <h3>Contract's generation succeeded</h3></center></body></html>"
 	  status = generate_message (&resp, page_ok);
-	  /* FRONTIER - CODE ABOVE STILL NOT TESTED */
 	  #undef page_ok
+	  */
+	  /* FRONTIER - CODE ABOVE STILL NOT TESTED */
 	}
       }
     }
