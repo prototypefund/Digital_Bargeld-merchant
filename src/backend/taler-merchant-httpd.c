@@ -26,6 +26,7 @@
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mint_service.h>
+#include <taler/taler_signatures.h>
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_responses.h"
 #include "merchant.h"

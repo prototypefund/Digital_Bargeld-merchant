@@ -24,7 +24,7 @@
  */
 #include "platform.h"
 #include "taler-mint-httpd_responses.h"
-#include "taler_util.h"
+#include <taler/taler_util.h>
 #include <gnunet/gnunet_util_lib.h>
 
 

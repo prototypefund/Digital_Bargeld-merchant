@@ -13,8 +13,7 @@ taler_merchant_httpd_SOURCES = \
 
 taler_merchant_httpd_LDADD = \
   $(LIBGCRYPT_LIBS) \
-  /home/marcello/Taler/trans_mint/src/util/libtalerutil.la \
-  /home/marcello/Taler/trans_mint/src/mintdb/libtalermintdb.la \
+  -ltalerutil \
   -lmicrohttpd \
   -ljansson \
   -lgnunetutil \
@@ -25,7 +24,7 @@ taler_merchant_httpd_LDADD = \
   -lpthread
 
 # NOTE: the lines
-# /home/demo/mint/src/util/libtalerutil.la \
+# /home/marcello/Taler/trans_mint/src/util/libtalerutil.la \
 # /home/demo/mint/src/mintdb/libtalermintdb.la \
 # don't seem to be replaceable with -ltalerutil and -ltalermintdb
 # -ltalerutil \

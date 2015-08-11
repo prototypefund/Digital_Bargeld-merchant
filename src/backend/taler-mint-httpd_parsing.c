@@ -27,7 +27,6 @@
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_responses.h"
 
-
 /**
  * Initial size for POST request buffer.
  */

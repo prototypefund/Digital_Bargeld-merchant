@@ -25,8 +25,7 @@
 
 #include <microhttpd.h>
 #include <jansson.h>
-#include "taler_util.h"
-
+#include <taler/taler_util.h>
 
 /**
  * Process a POST request containing a JSON object.  This
