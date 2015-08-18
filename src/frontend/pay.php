@@ -1,14 +1,12 @@
+<!DOCTYPE html>
 <html>
 <head>
 <title>Fullfillment page</title>
 </head>
 <body>
 
-
 <?php 
-
 /*
-
   This file is part of TALER
   Copyright (C) 2014, 2015 Christian Grothoff (and other contributing authors)
 
@@ -25,7 +23,6 @@
 
 */
 
-
  /*
 // recover the session
 	session_start();
@@ -40,7 +37,6 @@
 
 */
 ?>
-
 Payment successful, thanks!
 
 </body>

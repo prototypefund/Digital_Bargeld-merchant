@@ -1,7 +1,6 @@
+<!DOCTYPE html>
 <?php 
-
 /*
-
   This file is part of TALER
   Copyright (C) 2014, 2015 Christian Grothoff (and other contributing authors)
 
@@ -15,7 +14,6 @@
 
   You should have received a copy of the GNU General Public License along with
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
-
 */
 
 /*  
@@ -23,11 +21,8 @@
   Here goes all the Taler paying logic. The steps are
 
   1. recover the session
-
   2. generate the JSON to forward to the backend
-
   3. route back to the wallet the certificate just gotten
-
 */
 
 
@@ -37,7 +32,6 @@ if(!isset($_SESSION['maydonate'])){
   http_response_code(404);
   echo "Please try to donate before getting to this page :)";
 }
-
 else{
   // fake product id
   $p_id = rand(0,1001);
@@ -83,7 +77,6 @@ else{
   else{
     echo $resp->body->toString ();
   }
-
 }
 
 

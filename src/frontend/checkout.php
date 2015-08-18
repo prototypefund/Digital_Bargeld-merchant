@@ -1,38 +1,42 @@
+<!DOCTYPE html>
 <html>
 <head>
 <title>Choose payment method</title>
+    <script>
+        /*
+        @licstart  The following is the entire license notice for the
+        JavaScript code in this page.
+
+        Copyright (C) 2014,2015 GNUnet e.V.
+
+        The JavaScript code in this page is free software: you can
+        redistribute it and/or modify it under the terms of the GNU
+        General Public License (GNU GPL) as published by the Free Software
+        Foundation, either version 3 of the License, or (at your option)
+        any later version.  The code is distributed WITHOUT ANY WARRANTY;
+        without even the implied warranty of MERCHANTABILITY or FITNESS
+        FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+        As additional permission under GNU GPL version 3 section 7, you
+        may distribute non-source (e.g., minimized or compacted) forms of
+        that code without the copy of the GNU GPL normally required by
+        section 4, provided you include this license notice and a URL
+        through which recipients can access the Corresponding Source.
+
+        @licend  The above is the entire license notice
+        for the JavaScript code in this page.
+        */
+    </script>
 </head>
 <body>
-
-<!--
-
-  This file is part of TALER
-  Copyright (C) 2014, 2015 Christian Grothoff (and other contributing authors)
-
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU General Public License as published by the Free Software
-  Foundation; either version 3, or (at your option) any later version.
-
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License along with
-  TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
-
--->
-
-<!-- This page's main aim is to show to the customer all the accepted payments methods
-  and actually implementing just Taler; technically the steps are:
+<!-- 
+  This page's main aim is to show to the customer all the accepted
+  payments methods and actually implementing just Taler; technically
+  the steps are:
   
-
-
   1. retrieve the name of who will receive this donation
-
   2. show a menu with all the required payments means
-
   3. create a session
-
   4. (JavaScript) implement the "checkout" button for the sole Taler way.
   Actually, this button's duty is to notice this web portal that the customer
   wants to see a certificate, and optionally to pay.
@@ -46,10 +50,6 @@ $got_donation = $_POST['group0'];
 // create session
 session_start();
 $_SESSION['maydonate'] = true;
-
-
-
-
 ?>
 
 <form name="tform" action="" method="POST">

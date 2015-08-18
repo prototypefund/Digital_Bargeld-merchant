@@ -1,40 +1,160 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
-	<title>Taler's "Toy" Shop</title>
+  <title>Taler's "Toy" Shop</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+    <script>
+        /*
+        @licstart  The following is the entire license notice for the
+        JavaScript code in this page.
 
-	<link rel="stylesheet" type="text/css" href="style.css">
+        Copyright (C) 2015 GNUnet e.V.
 
+        The JavaScript code in this page is free software: you can
+        redistribute it and/or modify it under the terms of the GNU
+        General Public License (GNU GPL) as published by the Free Software
+        Foundation, either version 3 of the License, or (at your option)
+        any later version.  The code is distributed WITHOUT ANY WARRANTY;
+        without even the implied warranty of MERCHANTABILITY or FITNESS
+        FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+        As additional permission under GNU GPL version 3 section 7, you
+        may distribute non-source (e.g., minimized or compacted) forms of
+        that code without the copy of the GNU GPL normally required by
+        section 4, provided you include this license notice and a URL
+        through which recipients can access the Corresponding Source.
+
+        @licend  The above is the entire license notice
+        for the JavaScript code in this page.
+        */
+    </script>
 </head>
-
 <body id="css-zen-garden">
-<div id='root' class="page-wrapper">
-
-	<section class="intro" id="zen-intro">
-		<header>
-			<h1></h1>
-			<h2></h2>
-		</header>
-
-		<div class="preamble" id="zen-preamble" role="article">
-			<h3>"Toy" Merchant as a demo for Taler</h3>
-			<p>We provide a guided utilization of latest Taler's Wallet.</p>
-		</div>
-	</section>
-
-	<div class="supporting" id="zen-supporting" role="main">
-		<div class="explanation" id="zen-explanation" role="article">
-			<p>The latest version of the Wallet is available at the following link:
-                        <a href="http://toy.taler.net/extension">http://toy.taler.net/extension</a>
-                        </p>
-			<p>In case you already have a wallet installed, and some coins in it, please
-			move in the <a href="shopping.html">shopping area</a>
-			</p>
-		</div>
+  <div id='root' class="page-wrapper">
+    <section class="intro" id="zen-intro">
+      <h1>Welcome to the Taler "Toy" Demonstrator</h1>
+      <div class="preamble" id="zen-preamble" role="article">
+	 This "toy" website provides you with the ability to
+         experience using the Taler payment system without using
+         valuable currency.  Here, we guide you through the steps
+         of installing a Taler wallet, withdrawing Taler coins and
+         spending them at a merchant.  For this demonstrator, we
+         will be using a "toy" currency, KUDOS.  However, please note that
+         Taler is designed to work with ordinary currencies, such
+         as Dollars or Euros, not just toy currencies.
+      </div>
+    </section>
+  </div>
+  <div class="supporting" id="zen-supporting" role="main">
+    <h2>Installing the Taler wallet</h2>
+    <div class="explanation" id="zen-explanation" role="article">
+      <p>First, you need to install the Taler wallet browser extension.
+         It is currently only available for Firefox.  If you run
+         Firefox, simply click <a href="/extension">here</a>
+         to download and install the extension.  You will have to 
+         click on "allow" and "install" dialogs shown by Firefox.
+         After that, the Taler logo should appear on the right side
+         of your navigation bar.
+      </p>
+    </div>
+    <h2>Performing a wire transfer</h2>
+    <div class="explanation" id="zen-explanation" role="article">
+      <p>The next step is to transfer currency to the mint to
+         obtain Taler coins.  This is typically done using a 
+         wire transfer.  However, as this is just a demonstrator,
+         we will allow you to send us "toy" coins using a simple
+         form on this website instead.</p>
+      <p>You begin by clicking on the Taler icon and selecting
+         "Create reserve".  The extension will then display some
+         hexadecimal reserve public key, which you should copy to the 
+         clipboard.  After that, you can paste it into the form
+         below.  When dealing with real currency, you would do
+         the same, except that you would have to copy the string
+         into the subject area for your wire transfer.
+      </p>
+      <form id="reserve-form" name="tform" action="never_used" onsubmit="return MERCHtrigSubmission()" method="POST">
+        <br>
+        Paste your reserve public key here (right-click, "paste"):
+        <br>
+        <input type="text" name="pbk"></input>
+        <br>
+        Amount (FIXME: amount should ideally also be told to the wallet, but not during the form submission!):
+        <br> 
+        <select id="taler-amount" name="kudos-amount">
+          <option value="1">1 KUDOS</option>
+          <option value="5">5 KUDOS</option>
+          <option value="10">10 KUDOS</option>
+          <option value="1000">1000 KUDOS</option>
+        </select>
+        <br>
+        <input type="submit" value="Submit"></input>
+        <br>
+      </form>
+    </div>
+    <h2>Finally: Pay for something!</h2>
+    <div class="explanation" id="zen-explanation" role="article">
+      <p>Now it is time to spend your hard earned KUDOS.
+         For your convenience, we integrated a tiny shop 
+         accepting KUDOS right here into this page.</p>     
+      <p>Please choose a project and the amount of KUDOS you 
+         wish to donate.</p>
+      <form name="tform" action="checkout.php" method="POST">
+        <div id="opt-form" align="left">
+          <br>
+          <input type="radio" name="group0" value="Taler">Taler</input>
+          <br>
+          <input type="radio" name="group0" value="GNUnet" checked="true">GNUnet</input>
+          <br>
+          <input type="radio" name="group0" value="INRIA">INRIA</input>
+          <br>
+          <select id="taler-donation" name="kudos-donation">
+            <option value="1">1 KUDOS</option>
+            <option value="666">5 KUDOS (select this option to spot the merchant giving you the wrong contract)</option>
+            <option value="10">10 KUDOS</option>
+          </select>
+          <input type="submit" name="keyName" value="Donate!">
+          <br>
+          <br>
         </div>
-</div>
+      </form>
+    </div>
+  </div>
+  <script type="text/javascript">
+    /* This function is called if/when a Wallet is installed.
+       It should enable the parts of the page that only make
+       sense after the Wallet has been loaded.
+    */
 
-	<script type="text/javascript" src="merchant.js">
-	</script>
+    function MERCHfirstStep(){
+       // FIXME: old logic was too complicated, change visibility instead!
+    };
 
+    /* Set up a listener to be called whenever a Wallet gets installed
+       so that the user is led towards the demo's steps progressively
+    */
+    document.body.addEventListener("taler-wallet-installed", 
+                                   MERCHfirstStep, 
+                                   false, false);
+
+    /* Notify the extension about the submission. That way it will be
+       possible to retrieve the mint's URL and/or other info. from the
+       filled form. Actually, the extension will accomplish the POST
+       too. 
+       FIXME: This is bad, as we cannot do this later when
+         users submit real forms at the bank. Why is this
+         required?
+    */
+    function MERCHtrigSubmission(){
+      // set 'action' attribute to mint's url
+      // var mint = document.getElementById("mint-url");
+      // var form = document.getElementById("reserve-form");
+      // form.setAttribute("action", "http://demo.taler.net/admin/incoming/add");
+
+      var subEvent = new Event("submit-reserve");
+      document.body.dispatchEvent(subEvent);
+      // always return false so that the post is actually done by the extension
+      return false;
+    }  
+  </script>
 </body>
 </html>
