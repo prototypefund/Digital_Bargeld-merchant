@@ -79,22 +79,22 @@
          into this form.
       </p>
       <form id="reserve-form" name="tform" action="fake_wire_transfer.php" method="POST">
-        <br>
-        Paste your reserve public key here (right-click, "paste"):
-        <br>
-        <input type="text" name="reserve_pk"></input>
-        <br>
-        Amount to credit to your reserve:
-        <br> 
-        <select id="amount" name="kudos_amount">
-          <option value="1">1 KUDOS</option>
-          <option value="5">5 KUDOS</option>
-          <option value="10">10 KUDOS</option>
-          <option value="1000">1000 KUDOS</option>
-        </select>
-        <br>
-        <input type="submit" value="Submit"></input>
-        <br>
+        <div class="participation" id="fake-wire">
+          <br>
+          Paste your reserve public key here (right-click, "paste"):
+          <input type="text" name="reserve_pk"></input>
+          <br>
+          Amount to credit to your reserve: 
+          <select id="amount" name="kudos_amount">
+            <option value="1">1 KUDOS</option>
+            <option value="5">5 KUDOS</option>
+            <option value="10">10 KUDOS</option>
+            <option value="1000">1000 KUDOS</option>
+          </select>
+          <br>
+          <input type="submit" value="Submit"></input>
+          <br>
+        </div>
       </form>
     </div>
     <div class="explanation" id="payment" role="article" style="display:none;">
@@ -105,7 +105,7 @@
       <p>Please choose a project and the amount of KUDOS you 
          wish to donate.</p>
       <form name="tform" action="checkout.php" method="POST">
-        <div id="opt-form" align="left">
+        <div class="participation" id="fake-shop">
           <br>
           <input type="radio" name="group0" value="Taler" checked="true">Taler</input>
           <br>
