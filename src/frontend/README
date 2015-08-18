@@ -8,6 +8,9 @@ File		|What implements
 o index.html	| The homepage. Here it is possible to decide how much donate
                   to whom you would like.
 
+o fake_wire_transfer.php | PHP script that takes the wire transfer request and passes it on
+                         | to the /admin/add/incoming API of the demo-mint.
+
 o checkout.php	| The "payment selection" that is the form
 		  that allows the user to choose the payment method he wishes to use.
 		  It also implements the request of certificate and trigger the certificate
