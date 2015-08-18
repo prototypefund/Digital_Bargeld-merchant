@@ -14,7 +14,7 @@ body {
 	background-color: #FFFFFF;
 	margin: 0px;
 	padding: 10px;
-	font-family:  Georgia, "Times New Roman", Times, serif;
+	font-family: Ubuntu, Tahoma, Sans;
 	font-size: 90%;
 }
 
@@ -30,8 +30,8 @@ p {
 abbr {
 	border-bottom: 1px #6BA0D2 dashed;
 }
-header {
-	font-family: Verdana, Arial, Geneva, Helvetica, sans-serif;
+header,h1 {
+	font-family: Impact, Georgia, serif;
 	background-color: #FFFFFF;
 }
 header h1 {
@@ -69,7 +69,7 @@ header h2 abbr {
 	border: 1px solid #0C2953;
 	text-align: center;
 	font-size: 90%;
-	font-family: Verdana, Arial, Geneva, Helvetica, sans-serif;
+	font-family: Impact, Georgia, serif;
 	line-height: 110%;
 	color: #FFF;
 	background-image: url(summary.jpg);
@@ -130,12 +130,6 @@ header h2 abbr {
 	background-repeat: no-repeat;
 	background-position: 0% 100%;
 }
-.preamble p:first-letter {
-	color: #6BA0D2;
-	font-size: 140%;
-	font-weight: bold;
-	margin: 0px 2px 0px 0px;
-}
 .supporting {
 	margin: 0px;
 	padding: 10px 16em 0px 1em;
@@ -188,9 +182,6 @@ header h2 abbr {
 	margin: 10px 0px 0px 0px;
 	padding: 1px 3px 2px 3px;
 }
-.supporting p:first-letter {
-	font-weight: bold;
-}
 .supporting a:link {
 	color: #0083FF;
 	font-weight: bold;
@@ -206,7 +197,7 @@ header h2 abbr {
 }
 .sidebar, .summary p:last-child {
 	font-size: 90%;
-	font-family: Verdana, Arial, Geneva, Helvetica, sans-serif;
+	font-family: Impact, Georgia, serif;
 	position: absolute;
 	right: 21px;
 	width: 12em;
@@ -252,10 +243,6 @@ header h2 abbr {
 	border-top: 1px solid #0C2953;
 	background-image: url(resourcesh3.jpg);
 	background-position: 50% 30%;
-}
-.sidebar h3:first-letter {
-	color: #FFF;
-	font-size: 160%;
 }
 .sidebar ul {
 	list-style-type: none;
@@ -328,5 +315,5 @@ footer {
 }
 footer a {
 	font-size: 70%;
-	font-family: Verdana, Arial, Geneva, Helvetica, sans-serif;
+	font-family: Impact, Georgia, serif;
 }
