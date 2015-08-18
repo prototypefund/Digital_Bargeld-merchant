@@ -100,20 +100,26 @@ function ok(form){
 
 
 
-/* the following event gets fired whenever a customer has a taler
-wallet installed in his browser. In that case, the webmaster can decide
-whether or not displaying Taler as a payment option */
+/* the following event gets fired whenever a customer has a Taler
+   wallet installed in his browser. In that case, the webmaster can decide
+   whether or not displaying Taler as a payment option */
 
-function hasWallet(aEvent){
+function has_taler_wallet_cb(aEvent){
   // event awaited by the wallet to change its button's color
   var eve = new Event('taler-currency');
   document.body.dispatchEvent(eve);
 
-  // ungrey the Taler payment option from the form
+  // enable the Taler payment option from the form
   var tbutton = document.getElementById("t-button-id");
   tbutton.removeAttribute("disabled");
 };
 
+
+// The Taler extension was unloaded, disable the option
+function taler_wallet_unload_cb(aEvent){
+  var tbutton = document.getElementById("t-button-id");
+  tbutton.addAttribute("disabled");
+};
 
   
 function sendContract(jsonContract){
@@ -122,17 +128,13 @@ function sendContract(jsonContract){
   document.body.dispatchEvent(cevent);
 };
 
-function closeEnd(aEvent){
-  
-  var eve = new Event("taler-unload");
-  document.body.dispatchEvent(eve);
-
-};
-
+/* FIXME: these triggers do not work when I enable/disable
+   the extension... */
 // to be triggered by the wallet
-document.body.addEventListener("taler-wallet", hasWallet, false);
-// to be triggered by the wallet
-document.body.addEventListener("taler-unload", closeEnd, false);
+document.body.addEventListener("taler-wallet", has_taler_wallet_cb, false);
+
+// to be triggered by the wallet when it is unloaded
+document.body.addEventListener("taler-unload", taler_wallet_unload_cb, false);
 
 
 </script>

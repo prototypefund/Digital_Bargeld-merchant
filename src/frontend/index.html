@@ -30,22 +30,23 @@
     </script>
 </head>
 <body id="css-zen-garden">
-  <div id='root' class="page-wrapper">
+  <div class="supporting" id="welcome" role="main">
     <h2>Welcome to the Taler "Toy" Demonstrator</h2>
     <div class="explanation" id="zen-explanation" role="article">
-      This "toy" website provides you with the ability to
-      experience using the Taler payment system without using
-      valuable currency.  Here, we guide you through the steps
-      of installing a Taler wallet, withdrawing Taler coins and
-      spending them at a merchant.  For this demonstrator, we
-      will be using a "toy" currency, KUDOS.  However, please note that
-      Taler is designed to work with ordinary currencies, such
-      as Dollars or Euros, not just toy currencies.
+      <p>This "toy" website provides you with the ability to
+        experience using the Taler payment system without using
+        valuable currency.  Here, we guide you through the steps
+        of installing a Taler wallet, withdrawing Taler coins and
+        spending them at a merchant.  For this demonstrator, we
+        will be using a "toy" currency, KUDOS.  However, please note that
+        Taler is designed to work with ordinary currencies, such
+        as Dollars or Euros, not just toy currencies.
+      </p>
     </div>
   </div>
-  <div class="supporting" id="zen-supporting" role="main">
-    <h2>Installing the Taler wallet</h2>
-    <div class="explanation" id="zen-explanation" role="article">
+  <div class="supporting" id="instructions" role="main">
+    <div class="explanation" id="installation" role="article">
+      <h2>Step 1: Installing the Taler wallet</h2>
       <p>First, you need to install the Taler wallet browser extension.
          It is currently only available for Firefox.  If you run
          Firefox, simply click <a href="/extension">here</a>
@@ -55,12 +56,18 @@
          of your navigation bar.
       </p>
     </div>
-    <h2>Performing a wire transfer</h2>
-    <div class="explanation" id="zen-explanation" role="article">
+    <div class="explanation" id="installation-done" role="article" style="display:none;">
+      <h2>Step 1: Installing the Taler wallet</h2>
+      <p>Congratulations, you have installed the wallet correctly.
+         You can now proceed with the next steps.
+      </p>
+    </div>
+    <div class="explanation" id="wire" role="article" style="display:none;">
+      <h2>Step 2: Performing a wire transfer</h2>
       <p>The next step is to transfer currency to the mint to
          obtain Taler coins.  This is typically done using a 
          wire transfer.  However, as this is just a demonstrator,
-         we will allow you to send us "toy" coins using a simple
+         we will allow you to send the mint KUDOS coins using a simple
          form on this website instead.</p>
       <p>You begin by clicking on the Taler icon and selecting
          "Create reserve".  The extension will then display some
@@ -68,17 +75,18 @@
          clipboard.  After that, you can paste it into the form
          below.  When dealing with real currency, you would do
          the same, except that you would have to copy the string
-         into the subject area for your wire transfer.
+         into the subject area for your wire transfer instead of 
+         into this form.
       </p>
-      <form id="reserve-form" name="tform" action="never_used" onsubmit="return MERCHtrigSubmission()" method="POST">
+      <form id="reserve-form" name="tform" action="fake_wire_transfer.php" method="POST">
         <br>
         Paste your reserve public key here (right-click, "paste"):
         <br>
-        <input type="text" name="pbk"></input>
+        <input type="text" name="reserve_pk"></input>
         <br>
-        Amount (FIXME: amount should ideally also be told to the wallet, but not during the form submission!):
+        Amount to credit to your reserve:
         <br> 
-        <select id="taler-amount" name="kudos-amount">
+        <select id="amount" name="kudos_amount">
           <option value="1">1 KUDOS</option>
           <option value="5">5 KUDOS</option>
           <option value="10">10 KUDOS</option>
@@ -89,25 +97,25 @@
         <br>
       </form>
     </div>
-    <h2>Finally: Pay for something!</h2>
-    <div class="explanation" id="zen-explanation" role="article">
+    <div class="explanation" id="payment" role="article" style="display:none;">
+      <h2>Step 3: Select project to donate KUDOS to!</h2>
       <p>Now it is time to spend your hard earned KUDOS.
-         For your convenience, we integrated a tiny shop 
+         For your convenience, we integrated a tiny "shop"  
          accepting KUDOS right here into this page.</p>     
       <p>Please choose a project and the amount of KUDOS you 
          wish to donate.</p>
       <form name="tform" action="checkout.php" method="POST">
         <div id="opt-form" align="left">
           <br>
-          <input type="radio" name="group0" value="Taler">Taler</input>
+          <input type="radio" name="group0" value="Taler" checked="true">Taler</input>
           <br>
-          <input type="radio" name="group0" value="GNUnet" checked="true">GNUnet</input>
+          <input type="radio" name="group0" value="Tor">Tor</input>
           <br>
-          <input type="radio" name="group0" value="INRIA">INRIA</input>
+          <input type="radio" name="group0" value="GNUnet">GNUnet</input>
           <br>
           <select id="taler-donation" name="kudos-donation">
             <option value="1">1 KUDOS</option>
-            <option value="666">5 KUDOS (select this option to spot the merchant giving you the wrong contract)</option>
+            <option value="6">5 KUDOS (*)</option>
             <option value="10">10 KUDOS</option>
           </select>
           <input type="submit" name="keyName" value="Donate!">
@@ -115,6 +123,13 @@
           <br>
         </div>
       </form>
+      <p>(*) To make it a bit more fun, the 5 KUDOS option
+         is deliberately implemented with a fault: the merchant will try to
+         make you donate 6 KUDOS instead of the 5 KUDOS you got to see.  But do
+         not worry, you will be given the opportunity to review the
+         final offer from the merchant in a window secured
+         by the Taler extension.  That way, you can spot the 
+         error before committing to an incorrect contract.</p>
     </div>
   </div>
   <script type="text/javascript">
@@ -122,37 +137,41 @@
        It should enable the parts of the page that only make
        sense after the Wallet has been loaded.
     */
-
-    function MERCHfirstStep(){
-       // FIXME: old logic was too complicated, change visibility instead!
+    function wallet_installed_cb(){
+	b = document.getElementById("installation");
+        b.style.display = 'none';
+	b = document.getElementById("installation-done");
+        b.style.display = '';
+	b = document.getElementById("wire");
+        b.style.display = '';
+	b = document.getElementById("payment");
+        b.style.display = '';
+    };
+    function wallet_uninstalled_cb(){
+	b = document.getElementById("installation");
+        b.style.display = '';
+	b = document.getElementById("installation-done");
+        b.style.display = 'none';
+	b = document.getElementById("wire");
+        b.style.display = 'none';
+	b = document.getElementById("payment");
+        b.style.display = 'none';
     };
 
+
+   /* FIXME: these triggers do not work when I enable/disable
+      the extension... */
+
     /* Set up a listener to be called whenever a Wallet gets installed
-       so that the user is led towards the demo's steps progressively
-    */
+       so that the user is led towards the demo's steps progressively */
     document.body.addEventListener("taler-wallet-installed", 
-                                   MERCHfirstStep, 
+                                   wallet_installed_cb, 
                                    false, false);
 
-    /* Notify the extension about the submission. That way it will be
-       possible to retrieve the mint's URL and/or other info. from the
-       filled form. Actually, the extension will accomplish the POST
-       too. 
-       FIXME: This is bad, as we cannot do this later when
-         users submit real forms at the bank. Why is this
-         required?
-    */
-    function MERCHtrigSubmission(){
-      // set 'action' attribute to mint's url
-      // var mint = document.getElementById("mint-url");
-      // var form = document.getElementById("reserve-form");
-      // form.setAttribute("action", "http://demo.taler.net/admin/incoming/add");
-
-      var subEvent = new Event("submit-reserve");
-      document.body.dispatchEvent(subEvent);
-      // always return false so that the post is actually done by the extension
-      return false;
-    }  
+    /* Setup callback to be called whenever the wallet is uninstalled */
+    document.body.addEventListener("taler-unload", 
+                                   wallet_uninstalled_cb, 
+                                   false);
   </script>
 </body>
 </html>
