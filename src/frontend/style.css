@@ -168,6 +168,9 @@ header h2 abbr {
 .explanation h3 {
 	background-image: url(explanationShell.jpg);
 }
+.supporting form {
+	padding: 30px;
+}
 .participation h3 {
 	background-image: url(participationShell.jpg);
 }
