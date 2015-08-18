@@ -39,8 +39,8 @@
 <?php
 
 // Evaluate form
-$reserve_pk = $_POST['reserve_pk];
-$kudos_amount = $_POST['kudos_amount];
+$reserve_pk = $_POST['reserve_pk'];
+$kudos_amount = $_POST['kudos_amount'];
 
 // pack the JSON
 $json = json_encode (array ('reserve_pub' => $reserve_pk, 
