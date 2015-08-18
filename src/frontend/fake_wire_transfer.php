@@ -71,7 +71,7 @@ if ($status_code != 200)
 }
 else
 {
-  echo "Pretend wire transfer successful. Go <a href="/">back</a> and enjoy shopping!";
+  echo "Pretend wire transfer successful. Go <a href=\"/\">back</a> and enjoy shopping!";
 }
 ?>
 </body>
