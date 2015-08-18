@@ -44,7 +44,7 @@ $kudos_amount = $_POST['kudos_amount'];
 
 // pack the JSON
 $json = json_encode (array ('reserve_pub' => $reserve_pk, 
-                            'execution_date' => "/" . time() . "/",
+                            'execution_date' => "/Date(" . time() . ")/",
                             'wire' => array ('type' => 'test'),
                             'amount' => array ('value' => intval($kudos_amount),
 	                                       'fraction' => 0,
