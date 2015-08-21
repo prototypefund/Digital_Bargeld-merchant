@@ -12,15 +12,15 @@
 
         The JavaScript code in this page is free software: you can
         redistribute it and/or modify it under the terms of the GNU
-        General Public License (GNU GPL) as published by the Free Software
-        Foundation, either version 3 of the License, or (at your option)
+        Lesser General Public License (GNU LGPL) as published by the Free Software
+        Foundation, either version 2.1 of the License, or (at your option)
         any later version.  The code is distributed WITHOUT ANY WARRANTY;
         without even the implied warranty of MERCHANTABILITY or FITNESS
-        FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+        FOR A PARTICULAR PURPOSE.  See the GNU LGPL for more details.
 
-        As additional permission under GNU GPL version 3 section 7, you
+        As additional permission under GNU LGPL version 2.1 section 7, you
         may distribute non-source (e.g., minimized or compacted) forms of
-        that code without the copy of the GNU GPL normally required by
+        that code without the copy of the GNU LGPL normally required by
         section 4, provided you include this license notice and a URL
         through which recipients can access the Corresponding Source.
 
@@ -108,13 +108,13 @@
       <form name="tform" action="/checkout.php" method="POST">
         <div class="participation" id="fake-shop">
           <br>
-          <input type="radio" name="group0" value="Taler" checked="true">Taler</input>
+          <input type="radio" name="donation_receiver" value="Taler" checked="true">Taler</input>
           <br>
-          <input type="radio" name="group0" value="Tor">Tor</input>
+          <input type="radio" name="donation_receiver" value="Tor">Tor</input>
           <br>
-          <input type="radio" name="group0" value="GNUnet">GNUnet</input>
+          <input type="radio" name="donation_receiver" value="GNUnet">GNUnet</input>
           <br>
-          <select id="taler-donation" name="kudos-donation">
+          <select id="taler-donation" name="donation_amount">
             <option value="1">1 KUDOS</option>
             <option value="6">5 KUDOS (*)</option>
             <option value="10">10 KUDOS</option>
@@ -148,6 +148,7 @@
 	b = document.getElementById("payment");
         b.style.display = '';
     };
+
     function wallet_uninstalled_cb(){
 	b = document.getElementById("installation");
         b.style.display = '';
