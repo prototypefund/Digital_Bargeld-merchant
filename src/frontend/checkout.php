@@ -28,7 +28,7 @@
         */
     </script>
 </head>
-<body>
+<body onload="signal_me()">
 <!-- 
   This page's main aim is to show to the customer all the accepted
   payments methods and actually implementing just Taler; technically
@@ -137,31 +137,48 @@ function pay(form)
 /* The following event gets fired whenever a customer has a Taler
    wallet installed in his browser. In that case, the webmaster can decide
    whether or not displaying Taler as a payment option */
-function has_taler_wallet_cb(event)
+function has_taler_wallet_cb(aEvent)
 {
-  // event awaited by the wallet to change its button's color
-  var eve = new Event('taler-currency');
-  document.body.dispatchEvent(eve);
 
   // enable the Taler payment option from the form
   var tbutton = document.getElementById("taler-radio-button-id");
   tbutton.removeAttribute("disabled");
+
+  
+  if (aEvent.type == "taler-wallet-wfirst"){
+    var eve = new Event('taler-payment-wfirst');
+    document.body.dispatchEvent(eve);
+    }
+
 };
 
 
 /* Function called when the Taler extension was unloaded, 
    here we disable the option */
-function taler_wallet_unload_cb(event)
+function taler_wallet_unload_cb(aEvent)
 {
   var tbutton = document.getElementById("taler-radio-button-id");
-  tbutton.addAttribute("disabled");
+  tbutton.setAttribute("disabled", "true");
 };
 
+function signal_me()
+{
+  var eve = new Event('taler-payment-mfirst');
+  document.body.dispatchEvent(eve);
+};
 
-/* FIXME: these triggers do not work when I enable/disable
-   the extension... */
-// Register event to be triggered by the wallet (when present)
-document.body.addEventListener("taler-wallet", has_taler_wallet_cb, false);
+// Register event to be triggered by the wallet as a response to our
+// first event
+document.body.addEventListener("taler-wallet-mfirst", has_taler_wallet_cb, false);
+
+// event awaited by the wallet to change its button's color
+// alert("sending");
+// var eve = new Event('taler-payment-mfirst');
+// document.body.dispatchEvent(eve);
+
+// Register event to be triggered by the wallet when it gets enabled while
+// the user is on the payment page
+document.body.addEventListener("taler-wallet-wfirst", has_taler_wallet_cb, false);
 
 // Register event to be triggered by the wallet when it is unloaded
 document.body.addEventListener("taler-unload", taler_wallet_unload_cb, false);
