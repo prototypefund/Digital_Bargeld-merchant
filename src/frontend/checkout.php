@@ -74,8 +74,8 @@
    pass it to the extension */
 function handle_contract(json_contract)
 {
-  var cevent = new CustomEvent('taler-contract', { 'detail' : jsonContract });
-  document.body.dispatchEvent(cevent);
+  var cEvent = new CustomEvent('taler-contract', { 'detail' : jsonContract });
+  document.body.dispatchEvent(cEvent);
 };
 
 
