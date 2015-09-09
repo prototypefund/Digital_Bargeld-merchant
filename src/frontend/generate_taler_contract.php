@@ -29,7 +29,7 @@
 // 1) recover the session information
 session_start();
 if ( (! isset($_SESSION['receiver'])) ||
-     (! isset($_SESSION['amount']))
+     (! isset($_SESSION['amount'])) )
 {
   http_response_code (404);
   echo "Please select a contract before getting to this page...";
@@ -71,7 +71,7 @@ $json = json_encode (array ('desc' => $desc,
 // could be on an entirely different machine if
 // desired.
 $req = new http\Client\Request ("POST",
-                                "/backend/contract",
+                                $_SERVER['SERVER_NAME'] . "/backend/contract",
 				array ("Content-Type" => "application/json"));
 $req->getBody()->append ($json);
 
