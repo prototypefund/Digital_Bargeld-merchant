@@ -67,11 +67,14 @@ $json = json_encode (array ('desc' => $desc,
 			                      'fraction' => $fraction,
                                               'currency' => $currency)));
 
+echo "http://" . $SERVER['SERVER_NAME'] . "/backend/contract";
+exit;
+
 // Craft the HTTP request, note that the backend
 // could be on an entirely different machine if
 // desired.
 $req = new http\Client\Request ("POST",
-                                $_SERVER['SERVER_NAME'] . "/backend/contract",
+                                "http://" . $SERVER['SERVER_NAME'] . "/backend/contract",
 				array ("Content-Type" => "application/json"));
 $req->getBody()->append ($json);
 
