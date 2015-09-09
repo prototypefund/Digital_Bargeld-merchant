@@ -461,7 +461,7 @@ url_handler (void *cls,
   json_t *eddsa_pub_enc;
   json_t *response;
 
-  int res;
+  int res = GNUNET_SYSERR;
   const char *desc;
 
   #define URL_HELLO "/hello"
@@ -497,6 +497,7 @@ url_handler (void *cls,
     if (GNUNET_SYSERR == res)
       status = MHD_HTTP_METHOD_NOT_ALLOWED;
 
+    /* the POST's body has to be fetched furthermore */
     if ((GNUNET_NO == res) || (NULL == root))
       return MHD_YES;
     
@@ -512,36 +513,6 @@ url_handler (void *cls,
 
      */
 
-    #if 0
-    /*res = json_typeof (root); <- seg fault*/
-    json_int_t id;
-    const char *desc_test;
-    const char *cur_test;
-    json_t *id_json;
-    json_t *desc_json;
-    json_t *cur_json;
-    id_json = json_object_get (root, "product");
-    desc_json = json_object_get (root, "desc");
-    id = json_integer_value (id_json);
-    desc_test = json_string_value (desc_json);
-    json_price = json_object_get (root, "price");
-    json_typeof (json_price);
-    cur_json = json_object_get (json_price, "currency");
-    cur_test = json_string_value (cur_json);
-    printf ("id is %" JSON_INTEGER_FORMAT "\n", id);
-    printf ("desc is %s\n", desc_test);
-    TALER_json_to_amount (json_price, &price);
-    printf ("cur_test is %s\n", price.currency);
-    json_error_t err;
-    if (res = json_unpack_ex (root, &err, JSON_VALIDATE_ONLY, "{s:s, s:I, s:o}", 
-                      "desc",
-		      //&desc,
-		      "product", 
-		      //&prod_id, 
-		      "price"//, 
-		      //json_price
-		      ))
-    #else
     if ((res = json_unpack (root, "{s:s, s:I, s:I, s:o}", 
                       "desc",
 		      &desc,
@@ -552,9 +523,6 @@ url_handler (void *cls,
 		      "price", 
 		      &json_price
 		      )))
-    #endif
-
-
       /* still not possible to return a taler-compliant error message
       since this JSON format is not among the taler officials ones */
       status = MHD_HTTP_BAD_REQUEST;
@@ -595,14 +563,6 @@ url_handler (void *cls,
 	  TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
 	  return MHD_YES;
 
-	  /* not needed (?) anymore
-	  #define page_ok "\
-          <!DOCTYPE html> <html><title>Ok</title><body><center> \
-          <h3>Contract's generation succeeded</h3></center></body></html>"
-	  status = generate_message (&resp, page_ok);
-	  #undef page_ok
-	  */
-	  /* FRONTIER - CODE ABOVE STILL NOT TESTED */
 	}
       }
     }
