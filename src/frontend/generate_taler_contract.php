@@ -25,7 +25,8 @@
      to the wallet
 */
 
-
+// --- FIXME: by not commenting out the following test and trying to get
+// 'receiver' and 'amount' from the session, it gets 404 always.
 // 1) recover the session information
 session_start();
 if ( (! isset($_SESSION['receiver'])) ||
@@ -67,14 +68,11 @@ $json = json_encode (array ('desc' => $desc,
 			                      'fraction' => $fraction,
                                               'currency' => $currency)));
 
-echo "http://" . $SERVER['SERVER_NAME'] . "/backend/contract";
-exit;
-
 // Craft the HTTP request, note that the backend
 // could be on an entirely different machine if
 // desired.
 $req = new http\Client\Request ("POST",
-                                "http://" . $SERVER['SERVER_NAME'] . "/backend/contract",
+                                "http://" . $_SERVER["SERVER_NAME"] . "/backend/contract",
 				array ("Content-Type" => "application/json"));
 $req->getBody()->append ($json);
 

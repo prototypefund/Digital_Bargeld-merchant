@@ -23,6 +23,7 @@
 #include "platform.h"
 #include <microhttpd.h>
 #include <jansson.h>
+#include <gnunet/gnunet_crypto_lib.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mint_service.h>
@@ -108,19 +109,15 @@ GNUNET_NETWORK_STRUCT_BEGIN
 struct Contract
 {
   /**
-   * The signature of the merchant for this contract
-   */
-  struct GNUNET_CRYPTO_EddsaSignature sig;
-
-  /**
    * Purpose header for the signature over contract
    */
   struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
 
   /**
-   * The transaction identifier
+   * The transaction identifier. NOTE: it was m[13]. TODO:
+   * change the API accordingly!
    */
-  char m[13];
+  uint64_t m;
 
   /**
    * Expiry time
@@ -140,7 +137,7 @@ struct Contract
   /**
    * The contract data
    */
-  char a[];
+  char *a;
 };
 
 GNUNET_NETWORK_STRUCT_END
@@ -344,15 +341,22 @@ hash_wireformat (uint64_t nounce)
 * in question)
 * @param product some product numerical id. Its indended use is to link the
 * good, or service being sold to some entry in the DB managed by the frontend
-* @price the cost of this good or service
-* @return pointer to the allocated contract (which has a field, 'sig', holding
-* its own signature), NULL upon errors
+* @param price the cost of this good or service
+* @param sig the pointer to the contract signature's location
+* @return pointer to the allocated memory which will hold a 'struct Contract'
+* followed by a deal's description string, NULL upon errors
+*
 */
 
-struct Contract *
-generate_and_store_contract (const char *a, uint64_t c_id, uint64_t product, struct TALER_Amount *price)
+void *
+generate_and_store_contract (const char *a,
+                             uint64_t c_id,
+			     uint64_t product,
+			     const struct TALER_Amount *price,
+			     struct GNUNET_CRYPTO_EddsaSignature *sig)
 {
   
+  void *contract_and_desc;
   struct Contract *contract;
   struct GNUNET_TIME_Absolute expiry;
   uint64_t nounce;
@@ -370,25 +374,25 @@ generate_and_store_contract (const char *a, uint64_t c_id, uint64_t product, str
                                               nounce,
                                               product));
   contract_id_nbo = GNUNET_htonll ((uint64_t) c_id);
-  contract = GNUNET_malloc (sizeof (struct Contract) + strlen (a) + 1);
+  contract_and_desc = GNUNET_malloc (sizeof (struct Contract) + strlen (a) + 1);
+  contract = (struct Contract *) contract_and_desc;
   contract->purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
-  contract->purpose.size = htonl (sizeof (struct Contract)
-                                  - offsetof (struct Contract, purpose)
-                                  + strlen (a) + 1);
-  GNUNET_STRINGS_data_to_string (&contract_id_nbo, sizeof (contract_id_nbo),
-                                 contract->m, sizeof (contract->m));
+  contract->purpose.size = htonl (sizeof (struct Contract) + strlen (a) + 1);
+  contract->a = (char *) &contract->a + 4;
+  contract->m = contract_id_nbo;
   contract->t = GNUNET_TIME_absolute_hton (expiry);
-  (void) strcpy (contract->a, a);
+  strcpy (contract->a, a);
+  printf ("msg in stored contract : %s\n", contract->a);
   contract->h_wire = hash_wireformat (nounce);
-  TALER_amount_hton (&contract->amount,  price);
-  GNUNET_CRYPTO_eddsa_sign (privkey, &contract->purpose, &contract->sig);
-  return contract;
+  TALER_amount_hton (&contract->amount, price);
+  GNUNET_CRYPTO_eddsa_sign (privkey, &contract->purpose, sig);
+  return contract_and_desc;
 
   /* legacy from old merchant */
   EXITIF_exit:
     if (NULL != contract)
     {
-      GNUNET_free (contract);
+      GNUNET_free (contract_and_desc);
     }
     return NULL;
 }
@@ -451,6 +455,8 @@ url_handler (void *cls,
   json_int_t prod_id;
   json_int_t contract_id;
   struct Contract *contract;
+  void *contract_and_desc;
+  struct GNUNET_CRYPTO_EddsaSignature c_sig;
   struct MHD_Response *resp;
   struct TALER_Amount price;
   struct GNUNET_CRYPTO_EddsaPublicKey pub;
@@ -536,12 +542,19 @@ url_handler (void *cls,
       else
       {
         /* Let's generate this contract! */
-	if (NULL == (contract = generate_and_store_contract (desc, contract_id, prod_id, &price)))
-          status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+	if (NULL == (contract_and_desc = generate_and_store_contract (desc,
+	                                                              contract_id,
+								      prod_id,
+								      &price,
+								      &c_sig)))
+        {
+	  status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
 	else
 	{
           json_decref (root);
           json_decref (json_price);
+	  contract = (struct Contract *) contract_and_desc;
 
           /* the contract is good and stored in DB, produce now JSON to return.
 	  As of now, the format is {"contract" : base32contract,
@@ -551,15 +564,18 @@ url_handler (void *cls,
 	   
 	  */
 	
-	  sig_enc = TALER_json_from_eddsa_sig (&contract->purpose, &contract->sig);
+	  sig_enc = TALER_json_from_eddsa_sig (&contract->purpose, &c_sig);
 	  GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
 	  eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
-	  /* cutting of the signature at the beginning */
-	  contract_enc = TALER_json_from_data (&contract->purpose, sizeof (*contract)
-	                                        - offsetof (struct Contract, purpose)
-						+ strlen (desc) +1);
-	  response = json_pack ("{s:o, s:o, s:o}", "contract", contract_enc, "sig", sig_enc,
-	                         "eddsa_pub", eddsa_pub_enc);
+	  contract_enc = TALER_json_from_data ((void *) contract,
+	                                        sizeof (*contract) + strlen (desc) + 1);
+	  GNUNET_free (contract_and_desc);
+
+	  response = json_pack ("{s:o, s:o, s:o}",
+	                        "contract", contract_enc,
+				"sig", sig_enc,
+	                        "eddsa_pub", eddsa_pub_enc);
+
 	  TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
 	  return MHD_YES;
 
