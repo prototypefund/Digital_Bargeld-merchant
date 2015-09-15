@@ -27,11 +27,10 @@
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mint_service.h>
-#include <taler/taler_signatures.h>
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_responses.h"
+#include "taler_merchant_lib.h"
 #include "merchant.h"
-#include "merchant_db.h"
 
 extern struct MERCHANT_WIREFORMAT_Sepa *
 TALER_MERCHANT_parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg);
@@ -43,11 +42,6 @@ TALER_MERCHANT_parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *
   do {                                                            \
     if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
   } while (0)
-
-/**
- * Macro to round microseconds to seconds in GNUNET_TIME_* structs.
- */
-#define ROUND_TO_SECS(name,us_field) name.us_field -= name.us_field % (1000 * 1000)
 
 /**
  * Our hostname
@@ -103,44 +97,6 @@ static int dry;
  * Global return code
  */
 static int result;
-
-GNUNET_NETWORK_STRUCT_BEGIN
-
-struct Contract
-{
-  /**
-   * Purpose header for the signature over contract
-   */
-  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
-
-  /**
-   * The transaction identifier. NOTE: it was m[13]. TODO:
-   * change the API accordingly!
-   */
-  uint64_t m;
-
-  /**
-   * Expiry time
-   */
-  struct GNUNET_TIME_AbsoluteNBO t;
-
-  /**
-   * The invoice amount
-   */
-  struct TALER_AmountNBO amount;
-
-  /**
-   * The hash of the preferred wire format + nounce
-   */
-  struct GNUNET_HashCode h_wire;
-
-  /**
-   * The contract data
-   */
-  char *a;
-};
-
-GNUNET_NETWORK_STRUCT_END
 
 /**
  * Mint context
@@ -307,98 +263,6 @@ request</h3></center></body></html>";
 
 
 /**
-* Generate the hash containing the information (= a nounce + merchant's IBAN) to
-* redeem money from mint in a subsequent /deposit operation
-* @param nounce the nounce
-* @return the hash to be included in the contract's blob
-*
-*/
-
-static struct GNUNET_HashCode
-hash_wireformat (uint64_t nounce)
-{
-  struct GNUNET_HashContext *hc;
-  struct GNUNET_HashCode hash;
-
-  hc = GNUNET_CRYPTO_hash_context_start ();
-  GNUNET_CRYPTO_hash_context_read (hc, wire->iban, strlen (wire->iban));
-  GNUNET_CRYPTO_hash_context_read (hc, wire->name, strlen (wire->name));
-  GNUNET_CRYPTO_hash_context_read (hc, wire->bic, strlen (wire->bic));
-  nounce = GNUNET_htonll (nounce);
-  GNUNET_CRYPTO_hash_context_read (hc, &nounce, sizeof (nounce));
-  GNUNET_CRYPTO_hash_context_finish (hc, &hash);
-  return hash;
-}
-
-
-
-/*
-* Make a binary blob representing a contract, store it into the DB, sign it
-* and return a pointer to it.
-* @param a 0-terminated string representing the description of this
-* @param c_id contract id provided by the frontend
-* purchase (it should contain a human readable description of the good
-* in question)
-* @param product some product numerical id. Its indended use is to link the
-* good, or service being sold to some entry in the DB managed by the frontend
-* @param price the cost of this good or service
-* @param sig the pointer to the contract signature's location
-* @return pointer to the allocated memory which will hold a 'struct Contract'
-* followed by a deal's description string, NULL upon errors
-*
-*/
-
-void *
-generate_and_store_contract (const char *a,
-                             uint64_t c_id,
-			     uint64_t product,
-			     const struct TALER_Amount *price,
-			     struct GNUNET_CRYPTO_EddsaSignature *sig)
-{
-  
-  void *contract_and_desc;
-  struct Contract *contract;
-  struct GNUNET_TIME_Absolute expiry;
-  uint64_t nounce;
-  uint64_t contract_id_nbo;
-
-  expiry = GNUNET_TIME_absolute_add (GNUNET_TIME_absolute_get (),
-                                     GNUNET_TIME_UNIT_DAYS);
-  ROUND_TO_SECS (expiry, abs_value_us);
-  nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
-  EXITIF (GNUNET_SYSERR == MERCHANT_DB_contract_create (db_conn,
-                                              &expiry,
-                                              price,
- 					      c_id,
-                                              a,
-                                              nounce,
-                                              product));
-  contract_id_nbo = GNUNET_htonll ((uint64_t) c_id);
-  contract_and_desc = GNUNET_malloc (sizeof (struct Contract) + strlen (a) + 1);
-  contract = (struct Contract *) contract_and_desc;
-  contract->purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
-  contract->purpose.size = htonl (sizeof (struct Contract) + strlen (a) + 1);
-  contract->a = (char *) &contract->a + 4;
-  contract->m = contract_id_nbo;
-  contract->t = GNUNET_TIME_absolute_hton (expiry);
-  strcpy (contract->a, a);
-  printf ("msg in stored contract : %s\n", contract->a);
-  contract->h_wire = hash_wireformat (nounce);
-  TALER_amount_hton (&contract->amount, price);
-  GNUNET_CRYPTO_eddsa_sign (privkey, &contract->purpose, sig);
-  return contract_and_desc;
-
-  /* legacy from old merchant */
-  EXITIF_exit:
-    if (NULL != contract)
-    {
-      GNUNET_free (contract_and_desc);
-    }
-    return NULL;
-}
-
-
-/**
  * A client has requested the given url using the given method
  * (#MHD_HTTP_METHOD_GET, #MHD_HTTP_METHOD_PUT,
  * #MHD_HTTP_METHOD_DELETE, #MHD_HTTP_METHOD_POST, etc).  The callback
@@ -542,6 +406,7 @@ url_handler (void *cls,
       else
       {
         /* Let's generate this contract! */
+        /* FIXME : change this. Not existent anymore */
 	if (NULL == (contract_and_desc = generate_and_store_contract (desc,
 	                                                              contract_id,
 								      prod_id,
@@ -622,6 +487,8 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
       MERCHANT_DB_disconnect (db_conn);
       db_conn = NULL;
     }
+  if (keyfile != NULL)
+    GNUNET_free (privkey);
 
   
 }
@@ -640,8 +507,7 @@ void
 keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
 {
   /* which kind of mint's keys a merchant should need? Sign
-  keys? It has already the mint's (master?) public key from
-	  the conf file */  
+  keys? It has already the mint's master key from the conf file */  
   return;
 
 }
@@ -675,7 +541,7 @@ run (void *cls, char *const *args, const char *cfgfile,
                                                 &do_shutdown, NULL);
   EXITIF (GNUNET_SYSERR == (nmints = TALER_MERCHANT_parse_mints (config,
                                                                  &mint_infos)));
-  EXITIF (NULL == (wire = TALER_MERCHANT_parse_wireformat_sepa (config)));
+  
   EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_filename (config,
                                                                 "merchant",
                                                                 "KEYFILE",

@@ -1,0 +1,181 @@
+==1908== Memcheck, a memory error detector
+==1908== Copyright (C) 2002-2013, and GNU GPL'd, by Julian Seward et al.
+==1908== Using Valgrind-3.10.0 and LibVEX; rerun with -h for copyright info
+==1908== Command: ./merchant-contract-test -c merchant.conf
+==1908== Parent PID: 483
+==1908== 
+==1908== Conditional jump or move depends on uninitialised value(s)
+==1908==    at 0x40B084A: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908== 
+==1908== Conditional jump or move depends on uninitialised value(s)
+==1908==    at 0x402DDB8: is_overlap (vg_replace_strmem.c:128)
+==1908==    by 0x402DDB8: memcpy (vg_replace_strmem.c:916)
+==1908==    by 0x40B0881: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908== 
+==1908== Conditional jump or move depends on uninitialised value(s)
+==1908==    at 0x402DDBE: is_overlap (vg_replace_strmem.c:131)
+==1908==    by 0x402DDBE: memcpy (vg_replace_strmem.c:916)
+==1908==    by 0x40B0881: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908== 
+==1908== Conditional jump or move depends on uninitialised value(s)
+==1908==    at 0x402DDCD: memcpy (vg_replace_strmem.c:916)
+==1908==    by 0x40B0881: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908== 
+==1908== Conditional jump or move depends on uninitialised value(s)
+==1908==    at 0x402DE1C: is_overlap (vg_replace_strmem.c:119)
+==1908==    by 0x402DE1C: memcpy (vg_replace_strmem.c:916)
+==1908==    by 0x40B0881: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908== 
+==1908== Conditional jump or move depends on uninitialised value(s)
+==1908==    at 0x402DF8F: memcpy (vg_replace_strmem.c:916)
+==1908==    by 0x40B0881: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908== 
+==1908== Conditional jump or move depends on uninitialised value(s)
+==1908==    at 0x402E000: memcpy (vg_replace_strmem.c:916)
+==1908==    by 0x40B0881: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908== 
+==1908== Use of uninitialised value of size 4
+==1908==    at 0x402E023: memcpy (vg_replace_strmem.c:916)
+==1908==    by 0x40B0881: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908== 
+==1908== Invalid write of size 2
+==1908==    at 0x402E023: memcpy (vg_replace_strmem.c:916)
+==1908==    by 0x40B0881: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908==  Address 0xa is not stack'd, malloc'd or (recently) free'd
+==1908== 
+==1908== 
+==1908== Process terminating with default action of signal 11 (SIGSEGV)
+==1908==  Access not within mapped region at address 0xA
+==1908==    at 0x402E023: memcpy (vg_replace_strmem.c:916)
+==1908==    by 0x40B0881: ??? (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x404E8E7: gcry_mpi_print (in /lib/i386-linux-gnu/libgcrypt.so.20.0.3)
+==1908==    by 0x414117D: GNUNET_CRYPTO_mpi_print_unsigned (crypto_mpi.c:103)
+==1908==    by 0x413B27E: GNUNET_CRYPTO_eddsa_sign (crypto_ecc.c:824)
+==1908==    by 0x41E57F7: MERCHANT_handle_contract (taler-merchant-httpd_contract.c:142)
+==1908==    by 0x80494D6: run (merchant-contract-test.c:126)
+==1908==    by 0x41543EE: program_main (program.c:84)
+==1908==    by 0x41592ED: run_ready (scheduler.c:587)
+==1908==    by 0x41592ED: GNUNET_SCHEDULER_run (scheduler.c:868)
+==1908==    by 0x4154B09: GNUNET_PROGRAM_run2 (program.c:302)
+==1908==    by 0x4154E01: GNUNET_PROGRAM_run (program.c:341)
+==1908==    by 0x8049250: main (merchant-contract-test.c:158)
+==1908==  If you believe this happened as a result of a stack
+==1908==  overflow in your program's main thread (unlikely but
+==1908==  possible), you can try to increase the size of the
+==1908==  main thread stack using the --main-stacksize= flag.
+==1908==  The main thread stack size used in this run was 8388608.
+==1908== 
+==1908== HEAP SUMMARY:
+==1908==     in use at exit: 133,296 bytes in 2,329 blocks
+==1908==   total heap usage: 38,415 allocs, 36,086 frees, 1,274,533 bytes allocated
+==1908== 
+==1908== LEAK SUMMARY:
+==1908==    definitely lost: 314 bytes in 3 blocks
+==1908==    indirectly lost: 0 bytes in 0 blocks
+==1908==      possibly lost: 357 bytes in 17 blocks
+==1908==    still reachable: 132,625 bytes in 2,309 blocks
+==1908==         suppressed: 0 bytes in 0 blocks
+==1908== Rerun with --leak-check=full to see details of leaked memory
+==1908== 
+==1908== For counts of detected and suppressed errors, rerun with: -v
+==1908== Use --track-origins=yes to see where uninitialised values come from
+==1908== ERROR SUMMARY: 10 errors from 9 contexts (suppressed: 0 from 0)

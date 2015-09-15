@@ -25,8 +25,6 @@
      to the wallet
 */
 
-// --- FIXME: by not commenting out the following test and trying to get
-// 'receiver' and 'amount' from the session, it gets 404 always.
 // 1) recover the session information
 session_start();
 if ( (! isset($_SESSION['receiver'])) ||
@@ -34,6 +32,7 @@ if ( (! isset($_SESSION['receiver'])) ||
 {
   http_response_code (404);
   echo "Please select a contract before getting to this page...";
+  echo "attempted : " . $_SESSION['receiver'];
   exit (0);
 }
 

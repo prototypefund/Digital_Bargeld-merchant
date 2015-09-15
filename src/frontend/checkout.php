@@ -92,12 +92,12 @@ function taler_pay(form)
       if (contract_request.status == 200)
       {
         /* display contract_requestificate (i.e. it sends the JSON string
-           to the (XUL) extension) */      
+           to the extension) */      
         handle_contract(contract_request.responseText);
       }
       else 
       {
-        alert("Failed to receive contract from server. Status was " + contract_request.status);
+        alert("No contract got from merchant.\n" + contract_request.responseText);
       }
     }
   };
@@ -118,7 +118,6 @@ function pay(form)
   for (var cnt=0; cnt < form.payment_system.length; cnt++)
   {
     var choice = form.payment_system[cnt];
-
     if (choice.checked)
     {
        if (choice.value == "taler")
@@ -143,8 +142,7 @@ function has_taler_wallet_cb(aEvent)
   // enable the Taler payment option from the form
   var tbutton = document.getElementById("taler-radio-button-id");
   tbutton.removeAttribute("disabled");
-
-  
+ 
   if (aEvent.type == "taler-wallet-wfirst"){
     var eve = new Event('taler-payment-wfirst');
     document.body.dispatchEvent(eve);
@@ -161,11 +159,20 @@ function taler_wallet_unload_cb(aEvent)
   tbutton.setAttribute("disabled", "true");
 };
 
+/* The merchant signals its taler-friendlyness to the client */
 function signal_me()
 {
   var eve = new Event('taler-payment-mfirst');
   document.body.dispatchEvent(eve);
 };
+
+
+function test_without_wallet(){
+  var tbutton = document.getElementById("taler-radio-button-id");
+  tbutton.removeAttribute("disabled");
+};
+
+// test_without_wallet();
 
 // Register event to be triggered by the wallet as a response to our
 // first event

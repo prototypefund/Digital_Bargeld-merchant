@@ -9,7 +9,8 @@ taler_merchant_httpd_SOURCES = \
   merchant.c merchant.h \
   merchant_db.c merchant_db.h \
   taler-mint-httpd_parsing.c taler-mint-httpd_parsing.h \
-  taler-mint-httpd_responses.c taler-mint-httpd_responses.h 
+  taler-mint-httpd_responses.c taler-mint-httpd_responses.h \
+  ../backend-lib/taler-merchant-httpd_contract.h
 
 taler_merchant_httpd_LDADD = \
   $(LIBGCRYPT_LIBS) \
@@ -17,6 +18,7 @@ taler_merchant_httpd_LDADD = \
   -lmicrohttpd \
   -ljansson \
   -lgnunetutil \
+  -ltalermerchant \
   -ltalermint \
   -ltalerpq \
   -lgnunetpostgres \

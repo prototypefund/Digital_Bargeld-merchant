@@ -180,5 +180,7 @@ AC_CHECK_FUNCS([strdup])
 AC_CONFIG_FILES([Makefile
 src/Makefile
 src/include/Makefile
-src/backend/Makefile])
+src/tests/Makefile
+src/backend/Makefile
+src/backend-lib/Makefile])
 AC_OUTPUT
