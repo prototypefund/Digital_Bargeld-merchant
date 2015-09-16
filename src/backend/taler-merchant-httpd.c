@@ -23,14 +23,14 @@
 #include "platform.h"
 #include <microhttpd.h>
 #include <jansson.h>
-#include <gnunet/gnunet_crypto_lib.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mint_service.h>
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_responses.h"
-#include "taler_merchant_lib.h"
+#include "merchant_db.h"
 #include "merchant.h"
+#include "taler_merchant_lib.h"
 
 extern struct MERCHANT_WIREFORMAT_Sepa *
 TALER_MERCHANT_parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg);
@@ -57,6 +57,11 @@ static long long unsigned port;
  * Merchant's private key
  */
 struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
+
+/**
+ * File holding the merchant's private key
+ */
+char *keyfile;
 
 /**
  * The MHD Daemon
@@ -124,6 +129,7 @@ struct Mint
  */
 static struct GNUNET_CONTAINER_MultiPeerMap *mints_map;
 
+#if FUTURE_USE
 /**
 * Return the given message to the other end of connection
 * @msg (0-terminated) message to show
@@ -146,6 +152,7 @@ generate_message (struct MHD_Response **resp, const char *msg) // this parameter
 
 
 }
+#endif
 
 /**
 * Generate the 'hello world' response
@@ -170,6 +177,7 @@ generate_hello (struct MHD_Response **resp) // this parameter was preceded by a 
 
 }
 
+#ifdef PANIC_MGMT
 /**
  * Callback for catching serious error conditions from MHD.
  *
@@ -190,6 +198,7 @@ mhd_panic_cb (void *cls,
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_shutdown ();
 }
+#endif
 
 /**
 * Manage a non 200 HTTP status. I.e. it shows a 'failure' page to
@@ -215,7 +224,7 @@ failure_resp (struct MHD_Connection *connection, unsigned int status)
 </center></body></html>";
 static char page_MHD_HTTP_METHOD_NOT_ALLOWED[]="\
 <!DOCTYPE html>                                         \
-<html><title>Method NOT allowe</title><body><center>   \
+<html><title>Method NOT allowed</title><body><center>   \
 <h3>ONLY POSTs are allowed.</h3> \
 </center></body></html>";
   static char page_MHD_HTTP_INTERNAL_SERVER_ERROR[]="\
@@ -316,153 +325,122 @@ url_handler (void *cls,
   printf ("%s\n", url);
   unsigned int status;
   unsigned int no_destroy;
-  json_int_t prod_id;
-  json_int_t contract_id;
-  struct Contract *contract;
-  void *contract_and_desc;
   struct GNUNET_CRYPTO_EddsaSignature c_sig;
-  struct MHD_Response *resp;
-  struct TALER_Amount price;
   struct GNUNET_CRYPTO_EddsaPublicKey pub;
-  json_t *json_price;
+  struct ContractNBO contract;
+  struct MHD_Response *resp;
+  json_t *j_contract_complete;
   json_t *root;
-  json_t *contract_enc;
-  json_t *sig_enc;
+  json_t *j_sig_enc;
   json_t *eddsa_pub_enc;
   json_t *response;
 
   int res = GNUNET_SYSERR;
-  const char *desc;
 
   #define URL_HELLO "/hello"
   #define URL_CONTRACT "/contract"
   no_destroy = 0;
   resp = NULL;
-  contract = NULL;
   status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-  if (0 == strncasecmp (url, URL_HELLO, sizeof (URL_HELLO)))
-    {
-      if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
-        status = generate_hello (&resp);
-      else
-        GNUNET_break (0);
-    }
 
-  // to be called by the frontend passing all the product's information
-  // which are relevant for the contract's generation
+  if (0 == strncasecmp (url, URL_HELLO, sizeof (URL_HELLO)))
+  {
+    if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
+      status = generate_hello (&resp);
+    else
+    {
+      status = MHD_HTTP_METHOD_NOT_ALLOWED;
+    }
+  }
+
+  /* 
+  * To be called by the frontend passing the contract with some "holes"
+  * which will be completed, stored in DB, signed, and returned
+  *
+  */
+
   if (0 == strncasecmp (url, URL_CONTRACT, sizeof (URL_CONTRACT)))
   {
     if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
     {
       status = MHD_HTTP_METHOD_NOT_ALLOWED;
+      goto end;
 
     }
     else
       res = TMH_PARSE_post_json (connection,
-                               connection_cls,
-                               upload_data,
-                               upload_data_size,
-                               &root);
-  
+                                 connection_cls,
+                                 upload_data,
+                                 upload_data_size,
+                                 &root);
     if (GNUNET_SYSERR == res)
-      status = MHD_HTTP_METHOD_NOT_ALLOWED;
+    {
+      status = MHD_HTTP_BAD_REQUEST;
+      goto end;
+    }
 
     /* the POST's body has to be fetched furthermore */
     if ((GNUNET_NO == res) || (NULL == root))
       return MHD_YES;
     
-    /* The frontend should supply a JSON in the follwoing format:
+    /* The frontend should supply a JSON in the format described in
+    http://link-to-specs : */
 
+    if (NULL == (j_contract_complete = MERCHANT_handle_contract (root,
+                                                                 db_conn,
+								 wire,
+								 &contract)))
     {
-     
-     "desc" : string human-readable describing this deal,
-     "product" : uint64-like integer referring to the product in some
-                 DB adminstered by the frontend,
-     "cid" : uint64-like integer, this contract's id
-     "price" : a 'struct TALER_Amount' in the Taler compliant JSON format }
-
-     */
-
-    if ((res = json_unpack (root, "{s:s, s:I, s:I, s:o}", 
-                      "desc",
-		      &desc,
-		      "product", 
-		      &prod_id,
-		      "cid",
-		      &contract_id,
-		      "price", 
-		      &json_price
-		      )))
-      /* still not possible to return a taler-compliant error message
-      since this JSON format is not among the taler officials ones */
-      status = MHD_HTTP_BAD_REQUEST;
-    else
-    {
-
-      if (GNUNET_OK != TALER_json_to_amount (json_price, &price))
-        /* still not possible to return a taler-compliant error message
-	since this JSON format is not among the taler officials ones */ 
-	status = MHD_HTTP_BAD_REQUEST;
-      else
-      {
-        /* Let's generate this contract! */
-        /* FIXME : change this. Not existent anymore */
-	if (NULL == (contract_and_desc = generate_and_store_contract (desc,
-	                                                              contract_id,
-								      prod_id,
-								      &price,
-								      &c_sig)))
-        {
-	  status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-	}
-	else
-	{
-          json_decref (root);
-          json_decref (json_price);
-	  contract = (struct Contract *) contract_and_desc;
-
-          /* the contract is good and stored in DB, produce now JSON to return.
-	  As of now, the format is {"contract" : base32contract,
-	                            "sig" : contractSignature,
-	                            "eddsa_pub" : keyToCheckSignatureAgainst
-                                   }
-	   
-	  */
-	
-	  sig_enc = TALER_json_from_eddsa_sig (&contract->purpose, &c_sig);
-	  GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
-	  eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
-	  contract_enc = TALER_json_from_data ((void *) contract,
-	                                        sizeof (*contract) + strlen (desc) + 1);
-	  GNUNET_free (contract_and_desc);
-
-	  response = json_pack ("{s:o, s:o, s:o}",
-	                        "contract", contract_enc,
-				"sig", sig_enc,
-	                        "eddsa_pub", eddsa_pub_enc);
-
-	  TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
-	  return MHD_YES;
-
-	}
-      }
+      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      goto end;
     }
+
+    GNUNET_CRYPTO_eddsa_sign (privkey, &contract.purpose, &c_sig);
+
+    /**
+    *
+    * As of now, the format is 
+    *
+    * {"contract" : {the contract in "plain" JSON},
+    *  "sig" : base32 encoding of the signed 'struct ContractNBO',
+    *  "eddsa_pub" : base32 encoding of merchant's public key}
+    *
+    */
+	
+    j_sig_enc = TALER_json_from_eddsa_sig (&contract.purpose, &c_sig);
+    GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
+    eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
+    response = json_pack ("{s:o, s:o, s:o}",
+                          "contract", j_contract_complete,
+                          "sig", j_sig_enc,
+	                  "eddsa_pub", eddsa_pub_enc);
+
+    TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
+    return MHD_YES;
+
   }
 
+  end:
+
   if (NULL != resp)
-    {
-      EXITIF (MHD_YES != MHD_queue_response (connection, status, resp));
-      if (!no_destroy)
-        MHD_destroy_response (resp);
-    }
+  {
+    EXITIF (MHD_YES != MHD_queue_response (connection, status, resp));
+    return MHD_YES;
+    if (!no_destroy)
+      MHD_destroy_response (resp);
+  }
   else
-    EXITIF (GNUNET_OK != failure_resp (connection, status));
-  return MHD_YES;
+  {
   
- EXITIF_exit:
-   result = GNUNET_SYSERR;
-   GNUNET_SCHEDULER_shutdown ();
-   return MHD_NO;
+    EXITIF (GNUNET_OK != failure_resp (connection, status));
+    return MHD_YES;
+  
+  }
+  
+  EXITIF_exit:
+    result = GNUNET_SYSERR;
+    GNUNET_SCHEDULER_shutdown ();
+    return MHD_NO;
 }
 
 /**
@@ -527,7 +505,6 @@ run (void *cls, char *const *args, const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
 
-  char *keyfile;
   unsigned int nmints;
   unsigned int cnt;
   struct MERCHANT_MintInfo *mint_infos;
@@ -541,7 +518,7 @@ run (void *cls, char *const *args, const char *cfgfile,
                                                 &do_shutdown, NULL);
   EXITIF (GNUNET_SYSERR == (nmints = TALER_MERCHANT_parse_mints (config,
                                                                  &mint_infos)));
-  
+  EXITIF (NULL == (wire = TALER_MERCHANT_parse_wireformat_sepa (config)));
   EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_filename (config,
                                                                 "merchant",
                                                                 "KEYFILE",

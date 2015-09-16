@@ -51,12 +51,11 @@ hash_wireformat (uint64_t nounce, const struct MERCHANT_WIREFORMAT_Sepa *wire)
 /**
 * Take from the frontend the (partly) generated contract and fill
 * the missing values in it; for example, the SEPA-aware values.
-* Moreover, it stores the contract in the DB and does the signature of it.
+* Moreover, it stores the contract in the DB.
 * @param contract parsed contract, originated by the frontend
 * @param db_conn the handle to the local DB
-* @param kpriv merchant's private key
 * @param wire merchant's bank's details
-* @param sig where to store the signature
+* @param sig where to store the (subset of the) contract to be signed
 * @return pointer to the complete JSON; NULL upon errors
 */
 
@@ -64,11 +63,10 @@ hash_wireformat (uint64_t nounce, const struct MERCHANT_WIREFORMAT_Sepa *wire)
          of the contract. To expand to the full fledged version */
 
 json_t *
-MERCHANT_handle_contract (json_t *contract,
+MERCHANT_handle_contract (json_t *j_contract,
                           PGconn *db_conn,
-                          struct GNUNET_CRYPTO_EddsaPrivateKey *kpriv,
                           const struct MERCHANT_WIREFORMAT_Sepa *wire,
-			  struct GNUNET_CRYPTO_EddsaSignature *sig)
+			  struct ContractNBO *contract)
 {
   json_t *root;
   json_t *j_details;
@@ -88,7 +86,6 @@ MERCHANT_handle_contract (json_t *contract,
   struct GNUNET_TIME_Absolute timestamp;
   struct TALER_Amount amount;
   struct TALER_AmountNBO amount_nbo;
-  struct ContractNBO contract_nbo;
 
   nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
   // timing mgmt
@@ -105,14 +102,16 @@ MERCHANT_handle_contract (json_t *contract,
   jh_wire = json_string (h_wire_enc);
 
   #ifdef DEBUG
-  str = json_dumps (contract, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+  str = json_dumps (j_contract, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
   #endif
 
 
-  json_unpack (contract, "{s:o, s:I, s:o}",
-               "amount", &j_amount,
-	       "trans_id", &j_trans_id,
-	       "details", &j_details);
+  if (-1 == json_unpack (j_contract, "{s:o, s:I, s:o}",
+                         "amount", &j_amount,
+                         "trans_id", &j_trans_id,
+                         "details", &j_details))
+
+    return NULL;
 
   /* needed for DB stuff */
   TALER_json_to_amount (j_amount, &amount);
@@ -137,16 +136,15 @@ MERCHANT_handle_contract (json_t *contract,
                                                     a,
                                                     nounce,
                                                     product_id));
-  contract_nbo.h_wire = h_wire;
+  contract->h_wire = h_wire;
   TALER_amount_hton (&amount_nbo, &amount);
-  contract_nbo.amount = amount_nbo;
-  contract_nbo.t = GNUNET_TIME_absolute_hton (timestamp);
-  contract_nbo.m = GNUNET_htonll ((uint64_t) j_trans_id); // safe?
-  GNUNET_CRYPTO_hash (a, strlen (a) + 1, &contract_nbo.h_contract_details);
+  contract->amount = amount_nbo;
+  contract->t = GNUNET_TIME_absolute_hton (timestamp);
+  contract->m = GNUNET_htonll ((uint64_t) j_trans_id); // safe?
+  GNUNET_CRYPTO_hash (a, strlen (a) + 1, &contract->h_contract_details);
   free (a);
-  contract_nbo.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
-  contract_nbo.purpose.size = htonl (sizeof (struct ContractNBO));
-  GNUNET_CRYPTO_eddsa_sign (kpriv, &contract_nbo.purpose, sig);
+  contract->purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
+  contract->purpose.size = htonl (sizeof (struct ContractNBO));
 
   return root;
 }

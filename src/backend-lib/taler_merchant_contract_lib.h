@@ -55,8 +55,7 @@ GNUNET_NETWORK_STRUCT_END
          of the contract. To expand to the full fledged version */
 
 json_t *
-MERCHANT_handle_contract (json_t *contract,
+MERCHANT_handle_contract (json_t *j_contract,
                           PGconn *db_conn,
-			  struct GNUNET_CRYPTO_EddsaPrivateKey *kpriv,
                           const struct MERCHANT_WIREFORMAT_Sepa *wire,
-                          struct GNUNET_CRYPTO_EddsaSignature *sig);
+                          struct ContractNBO *contract);

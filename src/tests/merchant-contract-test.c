@@ -93,7 +93,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   struct TALER_Amount amount;
   int64_t t_id;
   int64_t p_id;
-  struct GNUNET_CRYPTO_EddsaSignature c_sig;
+  struct ContractNBO contract;
   struct GNUNET_TIME_Absolute deldate;
 
   db_conn = NULL;
@@ -249,9 +249,8 @@ run (void *cls, char *const *args, const char *cfgfile,
 
   j_root = MERCHANT_handle_contract (j_fake_contract,
                             db_conn,
-			    privkey,
 			    wire,
-			    &c_sig);
+			    &contract);
 
   #if 1
   str = json_dumps (j_root, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
