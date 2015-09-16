@@ -78,6 +78,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   json_t *j_amount;
   json_t *j_tax_amount;
   json_t *j_item_price;
+  json_t *j_max_fee;
   json_t *j_teatax;
   json_t *j_id; // trans id
   json_t *j_pid; // product id
@@ -163,6 +164,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   /* Description */
   desc = "Fake purchase";
 
+  j_max_fee = TALER_json_from_amount (&amount);
   /* Quantity: OPTIONAL FIELD */
   j_quantity = json_integer (3);
 
@@ -182,8 +184,9 @@ run (void *cls, char *const *args, const char *cfgfile,
   j_teatax = json_pack ("{s:o}",
                         "teatax", j_tax_amount);
 
-  if (NULL == (j_item = json_pack ("{s:s, s:I, s:o, s:I, s:[o]}",
+  if (NULL == (j_item = json_pack ("{s:s, s:o, s:I, s:o, s:I, s:[o]}",
                       "description", desc,
+		      "max fee", j_max_fee,
 		      "quantity", json_integer_value (j_quantity),
 		      "itemprice", j_item_price,
 		      "product_id", json_integer_value (j_pid),
@@ -243,9 +246,6 @@ run (void *cls, char *const *args, const char *cfgfile,
                     "amount", j_amount,
 		    "trans_id", json_integer_value (j_id),
 		    "details", j_details);
-
-
-
 
   j_root = MERCHANT_handle_contract (j_fake_contract,
                             db_conn,

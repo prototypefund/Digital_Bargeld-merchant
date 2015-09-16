@@ -116,7 +116,7 @@ MERCHANT_handle_contract (json_t *j_contract,
   /* needed for DB stuff */
   TALER_json_to_amount (j_amount, &amount);
   /* temporary way of getting this value. To be adapted to the expanded contract
-  format. See 'TODO' above. */
+  format. (This value is now supplied in the 'item' object!!) See 'TODO' above. */
   product_id = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
   /* adding the generated values in this JSON */
   root = json_pack ("{s:o, s:I, s:s, s:o, s:o}",

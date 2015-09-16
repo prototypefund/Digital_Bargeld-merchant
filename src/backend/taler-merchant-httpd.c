@@ -129,6 +129,17 @@ struct Mint
  */
 static struct GNUNET_CONTAINER_MultiPeerMap *mints_map;
 
+/**
+ * Mints' URL,port,key triples
+ */
+struct MERCHANT_MintInfo *mint_infos;
+
+/**
+ * The number of accepted mints
+ */
+unsigned int nmints;
+
+
 #if FUTURE_USE
 /**
 * Return the given message to the other end of connection
@@ -334,6 +345,15 @@ url_handler (void *cls,
   json_t *j_sig_enc;
   json_t *eddsa_pub_enc;
   json_t *response;
+  json_t *j_mints;
+  json_t *j_mint;
+  int cnt; /* loop counter */
+  #if 0
+  json_t *root_tmp;
+  json_t *j_amount_tmp;
+  json_t *j_details_tmp;
+  json_int_t *j_trans_id_tmp;
+  #endif
 
   int res = GNUNET_SYSERR;
 
@@ -385,6 +405,33 @@ url_handler (void *cls,
     
     /* The frontend should supply a JSON in the format described in
     http://link-to-specs : */
+
+    /* TODO Specifying the accepted mints, in the contract */
+    j_mints = json_array ();
+    for (cnt = 0; cnt < nmints; cnt++)
+    {
+      j_mint = json_pack ("{s:s}",
+                          mint_infos[cnt].hostname,
+                          GNUNET_CRYPTO_eddsa_public_key_to_string (&mint_infos[cnt].pubkey));
+      json_array_append_new (j_mints, j_mint);
+      #ifdef DEBUG
+      printf ("mint(s): url %s, key %s", mint_infos[cnt].hostname,
+              GNUNET_CRYPTO_eddsa_public_key_to_string (&mint_infos[cnt].pubkey));
+      #endif
+        
+    }
+
+    json_object_set (root, "mints", j_mints);
+
+    TMH_RESPONSE_reply_json (connection, root, MHD_HTTP_OK);	 
+    return MHD_YES;
+
+    #if 0
+    root_tmp = json_unpack ("{s:o, s:I, s:o}",
+                            "amount", &j_amount_tmp,
+			    "trans_id", &j_trans_id_tmp,
+			    "details", &j_details_tmp);
+    #endif
 
     if (NULL == (j_contract_complete = MERCHANT_handle_contract (root,
                                                                  db_conn,
@@ -505,9 +552,7 @@ run (void *cls, char *const *args, const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
 
-  unsigned int nmints;
   unsigned int cnt;
-  struct MERCHANT_MintInfo *mint_infos;
   void *keys_mgmt_cls;
 
   keys_mgmt_cls = NULL;
@@ -541,26 +586,26 @@ run (void *cls, char *const *args, const char *cfgfile,
   EXITIF (NULL == (mints_map = GNUNET_CONTAINER_multipeermap_create (nmints, GNUNET_YES)));
   
   for (cnt = 0; cnt < nmints; cnt++)
-    {
-      struct Mint *mint;
+  {
+    struct Mint *mint;
   
-      mint = GNUNET_new (struct Mint);
-      mint->pubkey = mint_infos[cnt].pubkey;
-      /* port this to the new API */
-      mint->conn = TALER_MINT_connect (mctx,
-                                       mint_infos[cnt].hostname,
-                                       &keys_mgmt_cb,
-                                       keys_mgmt_cls); /*<- safe?segfault friendly?*/
+    mint = GNUNET_new (struct Mint);
+    mint->pubkey = mint_infos[cnt].pubkey;
+    /* port this to the new API */
+    mint->conn = TALER_MINT_connect (mctx,
+                                     mint_infos[cnt].hostname,
+                                     &keys_mgmt_cb,
+                                     keys_mgmt_cls); /*<- safe?segfault friendly?*/
 
-      /* NOTE: the keys mgmt callback should roughly do what the following lines do */
-      EXITIF (NULL == mint->conn);
-      
-      EXITIF (GNUNET_SYSERR == GNUNET_CONTAINER_multipeermap_put
-      (mints_map,
-       (struct GNUNET_PeerIdentity *) /* to retrieve now from cb's args -> */&mint->pubkey,
-       mint,
-       GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_FAST));
-    }
+    /* NOTE: the keys mgmt callback should roughly do what the following lines do */
+    EXITIF (NULL == mint->conn);
+    
+    EXITIF (GNUNET_SYSERR == GNUNET_CONTAINER_multipeermap_put
+    (mints_map,
+     (struct GNUNET_PeerIdentity *) /* to retrieve now from cb's args -> */&mint->pubkey,
+     mint,
+     GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_FAST));
+  }
   
 
   mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,
