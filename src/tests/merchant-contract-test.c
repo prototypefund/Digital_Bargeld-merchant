@@ -82,12 +82,19 @@ run (void *cls, char *const *args, const char *cfgfile,
   json_t *j_id; // trans id
   json_t *j_pid; // product id
   json_t *j_quantity;
+  json_t *j_delloc;
+  json_t *j_merchant;
+  json_t *j_merchant_jurisdiction;
+  json_t *j_merchant_zipcode;
+  json_t *j_lnames;
+  json_t *j_deldate;
   char *str;
-  char *desc = "Fake purchase";
+  char *desc;
   struct TALER_Amount amount;
   int64_t t_id;
   int64_t p_id;
   struct GNUNET_CRYPTO_EddsaSignature c_sig;
+  struct GNUNET_TIME_Absolute deldate;
 
   db_conn = NULL;
   keyfile = NULL;
@@ -115,23 +122,15 @@ run (void *cls, char *const *args, const char *cfgfile,
   shutdown_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
                                                 &do_shutdown, NULL);
 
+  /**
+  * 'Root' object of the contract, leaving some holes to bi filled
+  * up by the merchant library.
+  *
+  */
+
   /* Amount */
   TALER_amount_get_zero ("KUDOS", &amount);
   j_amount = TALER_json_from_amount (&amount);
-  j_item_price = TALER_json_from_amount (&amount);
-  j_tax_amount = TALER_json_from_amount (&amount);
-
-  
-  /* Product ID*/
-  p_id = (int32_t) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX);
-
-  if (p_id < 0)
-     j_pid = json_integer ((-1) * p_id);
-  else
-     j_pid = json_integer (p_id);
-
-  /* Quantity */
-  j_quantity = json_integer (3);
 
   /* Transaction ID*/
   t_id = (int32_t) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX);
@@ -141,36 +140,124 @@ run (void *cls, char *const *args, const char *cfgfile,
   else
      j_id = json_integer (t_id);
 
-  /* Preparing the 'details' sub-object: an array of 'item' objects */
+  /**
+  * Holes:
+  *
+  * - 'h_wire' 
+  * - 'timestamp'
+  *
+  */
   
+  /**
+  *
+  * Preparing the 'details' sub-object: an array of 'item' objects
+  * plus some juridical and delivery-aware informations
+  *
+  */
+  
+  /**
+  *
+  * Preparing a 'item' sub-object
+  */
+  
+  /* Description */
+  desc = "Fake purchase";
+
+  /* Quantity: OPTIONAL FIELD */
+  j_quantity = json_integer (3);
+
+  /* item price: OPTIONAL FIELD*/
+  j_item_price = TALER_json_from_amount (&amount);
+  
+  /* Product ID */
+  p_id = (int32_t) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX);
+
+  if (p_id < 0)
+     j_pid = json_integer ((-1) * p_id);
+  else
+     j_pid = json_integer (p_id);
+
+  /* Taxes: array of "tax_name" : {tax amount} */
+  j_tax_amount = TALER_json_from_amount (&amount);
   j_teatax = json_pack ("{s:o}",
                         "teatax", j_tax_amount);
-  if (NULL == (j_item = json_pack ("{s:s, s:I, s:o, s:I}",
+
+  if (NULL == (j_item = json_pack ("{s:s, s:I, s:o, s:I, s:[o]}",
                       "description", desc,
 		      "quantity", json_integer_value (j_quantity),
 		      "itemprice", j_item_price,
-		      "product_id", json_integer_value (j_pid))))
+		      "product_id", json_integer_value (j_pid),
+		      "taxes", j_teatax)))
   {
     printf ("error in packing [j_item: %p]\n", j_item);
     return;
   }
+  
+  /* End of 'item' object definition */
 
   printf ("[j_item address: %p]\n", j_item);
 
-  str = json_dumps (j_item, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
-  printf ("a %s\n", str);
-  return;
+  /* Delivery date: OPTIONAL FIELD */
+  deldate = GNUNET_TIME_absolute_add (GNUNET_TIME_absolute_get (),
+                                      GNUNET_TIME_UNIT_WEEKS);
+  j_deldate = TALER_json_from_abs (deldate);
+  
+
+  /* Delivery location: OPTIONAL FIELD */
+  j_delloc = json_string ("MALTK"); /* just a 'tag' which points to some well defined location */
+			
+
+  /* Merchant jurisdiction: OPTIONAL FIELD (with its fields from 3rd to the last being optional)
+  * for another optional field */
+  j_merchant_zipcode = json_integer (9468);
+  j_merchant_jurisdiction = json_pack ("{s:s, s:s, s:s, s:s, s:s, s:I}",
+                                       "country", "Test Country",
+				       "city", "Test City",
+				       "state", "NA",
+				       "region", "NA",
+				       "province", "NA",
+				       "ZIP code", json_integer_value (j_merchant_zipcode));
+
+  /* Merchant details */
+  j_merchant = json_pack ("{s:s, s:s, s:o}",
+                          "address", "UALMP",
+			  "name", "test merchant",
+			  "jurisdiction", j_merchant_jurisdiction);
 
 
-  j_fake_contract = json_pack ("{s:o, s:i}",
+  /* L-names mapping */
+  j_lnames = json_pack ("[{s:s}, {s:s}]",
+                        "MALTK", "Test Address 1",
+	                "UALMP", "Second Test Address");
+
+
+
+  j_details = json_pack ("{s:o, s:o, s:o, s:o, s:o}",
+                         "items", j_item,
+			 "delivery date", j_deldate,
+			 "delivery location", j_delloc,
+			 "merchant", j_merchant,
+			 "L-names", j_lnames);
+
+  j_fake_contract = json_pack ("{s:o, s:I, s:o}",
                     "amount", j_amount,
-		    "trans_id", json_integer_value (j_id));
+		    "trans_id", json_integer_value (j_id),
+		    "details", j_details);
+
+
+
 
   j_root = MERCHANT_handle_contract (j_fake_contract,
                             db_conn,
 			    privkey,
 			    wire,
 			    &c_sig);
+
+  #if 1
+  str = json_dumps (j_root, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+  printf ("%s\n", str);
+  return;
+  #endif
 
 }
 

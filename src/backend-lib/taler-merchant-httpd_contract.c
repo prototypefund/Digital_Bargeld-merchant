@@ -71,6 +71,7 @@ MERCHANT_handle_contract (json_t *contract,
 			  struct GNUNET_CRYPTO_EddsaSignature *sig)
 {
   json_t *root;
+  json_t *j_details;
   json_t *j_timestamp;
   json_t *jh_wire;
   json_t *j_amount;
@@ -80,7 +81,9 @@ MERCHANT_handle_contract (json_t *contract,
   uint64_t product_id;
   char *a;
   char *h_wire_enc;
+  #ifdef DEBUG
   char *str;
+  #endif
   struct GNUNET_HashCode h_wire;
   struct GNUNET_TIME_Absolute timestamp;
   struct TALER_Amount amount;
@@ -101,12 +104,15 @@ MERCHANT_handle_contract (json_t *contract,
 
   jh_wire = json_string (h_wire_enc);
 
+  #ifdef DEBUG
   str = json_dumps (contract, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+  #endif
 
 
-  json_unpack (contract, "{s:o, s:I}",
+  json_unpack (contract, "{s:o, s:I, s:o}",
                "amount", &j_amount,
-	       "trans_id", &j_trans_id);
+	       "trans_id", &j_trans_id,
+	       "details", &j_details);
 
   /* needed for DB stuff */
   TALER_json_to_amount (j_amount, &amount);
@@ -114,11 +120,13 @@ MERCHANT_handle_contract (json_t *contract,
   format. See 'TODO' above. */
   product_id = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
   /* adding the generated values in this JSON */
-  root = json_pack ("{s:o, s:I, s:s, s:o}",
+  root = json_pack ("{s:o, s:I, s:s, s:o, s:o}",
              "amount", j_amount,
 	     "trans_id", j_trans_id,
 	     "h_wire", jh_wire,
-	     "timestamp", j_timestamp);
+	     "timestamp", j_timestamp,
+	     "details", j_details);
+
   a = json_dumps (root, JSON_COMPACT | JSON_PRESERVE_ORDER);
 
   // DB mgmt
