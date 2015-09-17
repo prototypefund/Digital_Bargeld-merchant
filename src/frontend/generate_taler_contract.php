@@ -25,10 +25,12 @@
      to the wallet
 */
 
+$cli_debug = !TRUE;
+
 // 1) recover the session information
 session_start();
-if ( (! isset($_SESSION['receiver'])) ||
-     (! isset($_SESSION['amount'])) )
+if (!$cli_debug && ((! isset($_SESSION['receiver'])) ||
+     (! isset($_SESSION['amount']))) )
 {
   http_response_code (404);
   echo "Please select a contract before getting to this page...";
@@ -37,8 +39,19 @@ if ( (! isset($_SESSION['receiver'])) ||
 }
 
 /* Obtain session state */
-$receiver = $_SESSION['receiver'];
-$amount = intval ($_SESSION['amount']);
+if (!$cli_debug)
+{
+  $receiver = $_SESSION['receiver'];
+  $amount = intval ($_SESSION['amount']);
+}
+else
+{
+  $receiver = "Test Receiver";
+  $amount = "5";
+
+}
+
+
 
 /* Fill in variables for simple JSON contract */
 // fake product id 
@@ -57,15 +70,49 @@ $value = $amount;
 $fraction = 0;
 // This is our 'toy' currency
 $currency = "KUDOS";
+// The tax for this deal
+$teatax = array ('value' => 1,
+                 'fraction' => 0,
+		 'currency' => $currency);
 
 // pack the JSON for the contract 
 // --- FIXME: exact format needs review!
-$json = json_encode (array ('desc' => $desc, 
-                            'product' => $p_id, 
-                            'cid' => $transaction_id,
-                            'price' => array ('value' => $value,
-			                      'fraction' => $fraction,
-                                              'currency' => $currency)));
+$json = json_encode (array ('amount' => array ('value' => $value,
+			                       'fraction' => $fraction,
+                                               'currency' => $currency),
+			    'max fee' => array ('value' => 3,
+			                        'fraction' => 0,
+						'currency' => $currency),
+                            'trans_id' => $transaction_id,
+                            'details' =>
+			      array ('items' =>
+			              array ('description' => $desc,
+					     'quantity' => 1,
+			                     'itemprice' => array ('value' => $value,
+			                                           'fraction' => $fraction,
+                                                                   'currency' => $currency)),
+					     'product_id' => $p_id,
+					     'taxes' => array (array ('teatax' => $teatax)),
+			             'delivery_date' => "Some Date Format",
+			             'delivery location' => 'LNAME1',
+			             'merchant' => array ('address' => 'LNAME2',
+			                                  'name' => 'test merchant',
+						          'jurisdiction' =>
+						            array ('country' => 'Test Country',
+						                   'city' => 'Test City',
+						                   'state' => 'Test State',
+							           'region' => 'Test Region',
+								   'province' => 'Test Province',
+								   'ZIP code' => 4908)),
+			             'L-names' => array (array ('LNAME1' => 'Test Address 1',
+			                                        'LNAME2' => 'Test Address 2')))));//,
+                    //JSON_PRETTY_PRINT);
+
+if ($cli_debug && FALSE)
+{
+  echo $json . "\n";
+  exit;
+}
 
 // Craft the HTTP request, note that the backend
 // could be on an entirely different machine if

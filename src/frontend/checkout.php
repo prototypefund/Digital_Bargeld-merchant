@@ -92,8 +92,9 @@ function taler_pay(form)
       if (contract_request.status == 200)
       {
         /* display contract_requestificate (i.e. it sends the JSON string
-           to the extension) */      
+           to the extension) alert (contract_request.responseText); */
         handle_contract(contract_request.responseText);
+	
       }
       else 
       {
@@ -172,7 +173,7 @@ function test_without_wallet(){
   tbutton.removeAttribute("disabled");
 };
 
-// test_without_wallet();
+test_without_wallet();
 
 // Register event to be triggered by the wallet as a response to our
 // first event

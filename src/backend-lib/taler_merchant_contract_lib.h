@@ -1,3 +1,21 @@
+/**
+ * Simplified version of the contract to be signed, meant to obsolete
+ * 'struct ContractNBO'.
+ */
+struct Contract
+{
+  /**
+   * Purpose header for the signature over contract
+   */
+  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
+
+  /**
+   * Hash of the JSON contract in UTF-8 including 0-termination,
+   * using JSON_COMPACT encoding with sorted fields.
+   */
+  struct GNUNET_HashCode h_contract_details;
+
+};
 
 GNUNET_NETWORK_STRUCT_BEGIN
 
@@ -58,4 +76,4 @@ json_t *
 MERCHANT_handle_contract (json_t *j_contract,
                           PGconn *db_conn,
                           const struct MERCHANT_WIREFORMAT_Sepa *wire,
-                          struct ContractNBO *contract);
+                          struct Contract *contract);

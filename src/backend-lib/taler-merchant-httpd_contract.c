@@ -67,7 +67,7 @@ json_t *
 MERCHANT_handle_contract (json_t *j_contract,
                           PGconn *db_conn,
                           const struct MERCHANT_WIREFORMAT_Sepa *wire,
-			  struct ContractNBO *contract)
+			  struct Contract *contract)
 {
   json_t *root;
   json_t *j_details;
@@ -145,15 +145,23 @@ MERCHANT_handle_contract (json_t *j_contract,
                                                     a,
                                                     nounce,
                                                     json_integer_value (j_product_id)));
+  #ifdef OBSOLETE
   contract->h_wire = h_wire;
   TALER_amount_hton (&amount_nbo, &amount);
   contract->amount = amount_nbo;
   contract->t = GNUNET_TIME_absolute_hton (timestamp);
   contract->m = GNUNET_htonll ((uint64_t) j_trans_id); // safe?
+  #endif
+
   GNUNET_CRYPTO_hash (a, strlen (a) + 1, &contract->h_contract_details);
   free (a);
   contract->purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
+
+  #ifdef OBSOLETE
   contract->purpose.size = htonl (sizeof (struct ContractNBO));
+  #endif
+
+  contract->purpose.size = htonl (sizeof (struct Contract));
 
   return root;
 }

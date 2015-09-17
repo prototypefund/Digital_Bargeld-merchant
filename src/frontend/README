@@ -24,3 +24,4 @@ o pay.php	| Actual receiving of money, plus it gives back a "fullfillment" page
 
 o toy		| the nginx configuration file skeleton for this virtual server. To be tuned
                   as needed.
+o sample.json   | JSON structure to be reproduced from the frontend, to be fed to the backend

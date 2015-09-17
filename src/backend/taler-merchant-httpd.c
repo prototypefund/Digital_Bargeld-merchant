@@ -338,7 +338,11 @@ url_handler (void *cls,
   unsigned int no_destroy;
   struct GNUNET_CRYPTO_EddsaSignature c_sig;
   struct GNUNET_CRYPTO_EddsaPublicKey pub;
+  #ifdef OBSOLETE
   struct ContractNBO contract;
+  #else
+  struct Contract contract;
+  #endif
   struct MHD_Response *resp;
   json_t *j_contract_complete;
   json_t *root;
@@ -452,13 +456,6 @@ url_handler (void *cls,
       goto end;
     }
 
-    #if 0
-    /* FIXME TMH_RESPONSE_reply_json subverts the order of some fields */
-    str = json_dumps (root_tmp, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
-    printf ("%s\n", str);
-    return;
-    #endif
-
     if (NULL == (j_contract_complete = MERCHANT_handle_contract (root_tmp,
                                                                  db_conn,
 								 wire,
@@ -467,14 +464,6 @@ url_handler (void *cls,
       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
       goto end;
     }
-
-    #if 0
-    /* FIXME TMH_RESPONSE_reply_json subverts the order of some fields */
-    str = json_dumps (j_contract_complete, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
-    printf ("%s\n", str);
-    return;
-    #endif
-
 
     GNUNET_CRYPTO_eddsa_sign (privkey, &contract.purpose, &c_sig);
 
@@ -495,15 +484,6 @@ url_handler (void *cls,
                           "contract", j_contract_complete,
                           "sig", j_sig_enc,
 	                  "eddsa_pub", eddsa_pub_enc);
-
-
-    #if 1
-    /* FIXME TMH_RESPONSE_reply_json subverts the order of some fields */
-    str = json_dumps (response, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
-    printf ("%s\n", str);
-    return;
-    #endif
-
     TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
     return MHD_YES;
 
@@ -648,16 +628,14 @@ run (void *cls, char *const *args, const char *cfgfile,
      mint,
      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_FAST));
   }
-  
-
   mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,
                           port,
                           NULL, NULL,
                           &url_handler, NULL,
                           MHD_OPTION_END);
 
-
   EXITIF (NULL == mhd);
+
   /* WARNING: a 'poll_mhd ()' call is here in the original merchant. Is that
   mandatory ? */
   GNUNET_CRYPTO_hash (wire, sizeof (*wire), &h_wire);
