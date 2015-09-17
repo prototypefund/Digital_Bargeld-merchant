@@ -348,11 +348,13 @@ url_handler (void *cls,
   json_t *j_mints;
   json_t *j_mint;
   int cnt; /* loop counter */
-  #if 0
+  char *str; /* to debug JSONs */
+  #if 1
   json_t *root_tmp;
   json_t *j_amount_tmp;
   json_t *j_details_tmp;
-  json_int_t *j_trans_id_tmp;
+  json_t *j_max_fee_tmp;
+  json_int_t j_trans_id_tmp;
   #endif
 
   int res = GNUNET_SYSERR;
@@ -414,26 +416,50 @@ url_handler (void *cls,
                           mint_infos[cnt].hostname,
                           GNUNET_CRYPTO_eddsa_public_key_to_string (&mint_infos[cnt].pubkey));
       json_array_append_new (j_mints, j_mint);
+
+      #define DEBUGG
       #ifdef DEBUG
-      printf ("mint(s): url %s, key %s", mint_infos[cnt].hostname,
+      printf ("mint(s): url %s, key %s\n", mint_infos[cnt].hostname,
               GNUNET_CRYPTO_eddsa_public_key_to_string (&mint_infos[cnt].pubkey));
+      str = json_dumps (j_mint, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+      printf ("%s\n", str);
       #endif
         
     }
 
-    json_object_set (root, "mints", j_mints);
+    if (-1 == (json_unpack (root,
+                            "{s:o, s:o, s:I, s:o}",
+                            "amount", &j_amount_tmp,
+			    "max fee", &j_max_fee_tmp,
+	                    "trans_id", &j_trans_id_tmp,
+	 		    "details", &j_details_tmp)))
+    {
+      printf ("no unpack\n");
+      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      goto end;
+    }
 
-    TMH_RESPONSE_reply_json (connection, root, MHD_HTTP_OK);	 
-    return MHD_YES;
+    
+    if (NULL == (root_tmp = json_pack ("{s:o, s:o, s:I, s:o, s:o}",
+                                 "amount", j_amount_tmp,
+			         "max fee", j_max_fee_tmp,
+	                         "trans_id", j_trans_id_tmp,
+			         "mints", j_mints,
+	 	                 "details", j_details_tmp)))
+    {
+      printf ("no pack\n");
+      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      goto end;
+    }
 
     #if 0
-    root_tmp = json_unpack ("{s:o, s:I, s:o}",
-                            "amount", &j_amount_tmp,
-			    "trans_id", &j_trans_id_tmp,
-			    "details", &j_details_tmp);
+    /* FIXME TMH_RESPONSE_reply_json subverts the order of some fields */
+    str = json_dumps (root_tmp, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+    printf ("%s\n", str);
+    return;
     #endif
 
-    if (NULL == (j_contract_complete = MERCHANT_handle_contract (root,
+    if (NULL == (j_contract_complete = MERCHANT_handle_contract (root_tmp,
                                                                  db_conn,
 								 wire,
 								 &contract)))
@@ -441,6 +467,14 @@ url_handler (void *cls,
       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
       goto end;
     }
+
+    #if 0
+    /* FIXME TMH_RESPONSE_reply_json subverts the order of some fields */
+    str = json_dumps (j_contract_complete, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+    printf ("%s\n", str);
+    return;
+    #endif
+
 
     GNUNET_CRYPTO_eddsa_sign (privkey, &contract.purpose, &c_sig);
 
@@ -461,6 +495,14 @@ url_handler (void *cls,
                           "contract", j_contract_complete,
                           "sig", j_sig_enc,
 	                  "eddsa_pub", eddsa_pub_enc);
+
+
+    #if 1
+    /* FIXME TMH_RESPONSE_reply_json subverts the order of some fields */
+    str = json_dumps (response, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+    printf ("%s\n", str);
+    return;
+    #endif
 
     TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
     return MHD_YES;

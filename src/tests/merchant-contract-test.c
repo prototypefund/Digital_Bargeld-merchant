@@ -74,6 +74,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   json_t *j_fake_contract;
   json_t *j_root;
   json_t *j_details;
+  json_t *j_mints;
   json_t *j_item;
   json_t *j_amount;
   json_t *j_tax_amount;
@@ -184,9 +185,8 @@ run (void *cls, char *const *args, const char *cfgfile,
   j_teatax = json_pack ("{s:o}",
                         "teatax", j_tax_amount);
 
-  if (NULL == (j_item = json_pack ("{s:s, s:o, s:I, s:o, s:I, s:[o]}",
+  if (NULL == (j_item = json_pack ("{s:s, s:I, s:o, s:I, s:[o]}",
                       "description", desc,
-		      "max fee", j_max_fee,
 		      "quantity", json_integer_value (j_quantity),
 		      "itemprice", j_item_price,
 		      "product_id", json_integer_value (j_pid),
@@ -242,21 +242,39 @@ run (void *cls, char *const *args, const char *cfgfile,
 			 "merchant", j_merchant,
 			 "L-names", j_lnames);
 
-  j_fake_contract = json_pack ("{s:o, s:I, s:o}",
-                    "amount", j_amount,
-		    "trans_id", json_integer_value (j_id),
-		    "details", j_details);
+  /* Faking out the mints' list */
+  j_mints = json_pack ("[{s:s}]",
+                       "demo.taler.net",
+		       "Q1WVGRGC1F4W7RYC6M23AEGFEXQEHQ730K3GG0B67VPHQSRR75H0");
 
-  j_root = MERCHANT_handle_contract (j_fake_contract,
+  j_fake_contract = json_pack ("{s:o, s:o, s:I, s:o, s:o}",
+                    "amount", j_amount,
+		    "max fee", j_max_fee,
+		    "trans_id", json_integer_value (j_id),
+		    "mints", j_mints,
+		    "details", j_details);
+  #if 0
+  str = json_dumps (j_fake_contract, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+  printf ("%s\n", str);
+  return;
+  #endif
+
+  if (NULL == (j_root = MERCHANT_handle_contract (j_fake_contract,
                             db_conn,
 			    wire,
-			    &contract);
+			    &contract)))
+  {
+    printf ("errors in contract handling\n");
+    return;
+  }
 
   #if 1
   str = json_dumps (j_root, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
   printf ("%s\n", str);
   return;
   #endif
+
+
 
 }
 

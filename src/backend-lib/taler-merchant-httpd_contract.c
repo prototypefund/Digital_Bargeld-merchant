@@ -52,15 +52,16 @@ hash_wireformat (uint64_t nounce, const struct MERCHANT_WIREFORMAT_Sepa *wire)
 * Take from the frontend the (partly) generated contract and fill
 * the missing values in it; for example, the SEPA-aware values.
 * Moreover, it stores the contract in the DB.
-* @param contract parsed contract, originated by the frontend
+* @param j_contract parsed contract, originated by the frontend
 * @param db_conn the handle to the local DB
 * @param wire merchant's bank's details
-* @param sig where to store the (subset of the) contract to be signed
+* @param where to store the (subset of the) contract to be (still) signed
 * @return pointer to the complete JSON; NULL upon errors
 */
 
-/* TODO: this handles a simplified version (for debugging purposes)
-         of the contract. To expand to the full fledged version */
+/**
+* TODO: inspection of reference counting and, accordingly, free those json_t*(s)
+* still allocated */
 
 json_t *
 MERCHANT_handle_contract (json_t *j_contract,
@@ -73,10 +74,13 @@ MERCHANT_handle_contract (json_t *j_contract,
   json_t *j_timestamp;
   json_t *jh_wire;
   json_t *j_amount;
+  json_t *j_mints;
+  json_t *j_max_fee;
   json_int_t j_trans_id;
 
   uint64_t nounce;
-  uint64_t product_id;
+  json_t *j_product_id;
+  json_t *j_items_tmp;
   char *a;
   char *h_wire_enc;
   #ifdef DEBUG
@@ -98,32 +102,37 @@ MERCHANT_handle_contract (json_t *j_contract,
   h_wire = hash_wireformat (nounce, wire);
   h_wire_enc = GNUNET_STRINGS_data_to_string_alloc (&h_wire,
                                                     sizeof (struct GNUNET_HashCode));
-
   jh_wire = json_string (h_wire_enc);
-
-  #ifdef DEBUG
-  str = json_dumps (j_contract, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
-  #endif
-
-
-  if (-1 == json_unpack (j_contract, "{s:o, s:I, s:o}",
+  if (-1 == json_unpack (j_contract, "{s:o, s:o, s:I, s:o, s:o}",
                          "amount", &j_amount,
+                         "max fee", &j_max_fee,
                          "trans_id", &j_trans_id,
+			 "mints", &j_mints,
                          "details", &j_details))
 
     return NULL;
 
   /* needed for DB stuff */
   TALER_json_to_amount (j_amount, &amount);
-  /* temporary way of getting this value. To be adapted to the expanded contract
-  format. (This value is now supplied in the 'item' object!!) See 'TODO' above. */
-  product_id = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
+  j_items_tmp = json_object_get (j_details, "items");
+  j_product_id = json_object_get (j_items_tmp, "product_id");
+
+  #ifdef DEBUG
+  printf ("prod id is at %p, eval to %d\n", j_product_id, json_integer_value (j_product_id));
+  return NULL;
+  #endif
+
+
+
+
   /* adding the generated values in this JSON */
-  root = json_pack ("{s:o, s:I, s:s, s:o, s:o}",
+  root = json_pack ("{s:o, s:o, s:I, s:s, s:o, s:o, s:o}",
              "amount", j_amount,
+             "max fee", j_max_fee,
 	     "trans_id", j_trans_id,
 	     "h_wire", jh_wire,
 	     "timestamp", j_timestamp,
+             "mints", j_mints,
 	     "details", j_details);
 
   a = json_dumps (root, JSON_COMPACT | JSON_PRESERVE_ORDER);
@@ -135,7 +144,7 @@ MERCHANT_handle_contract (json_t *j_contract,
  					            (uint64_t) j_trans_id, // safe?
                                                     a,
                                                     nounce,
-                                                    product_id));
+                                                    json_integer_value (j_product_id)));
   contract->h_wire = h_wire;
   TALER_amount_hton (&amount_nbo, &amount);
   contract->amount = amount_nbo;
