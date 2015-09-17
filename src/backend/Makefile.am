@@ -1,5 +1,5 @@
 # This Makefile.am is in the public domain
-AM_CPPFLAGS = -I$(top_srcdir)/src/include
+AM_CPPFLAGS = -I$(top_srcdir)/src/include -I$(top_srcdir)/src/backend-lib/
 
 bin_PROGRAMS = \
   taler-merchant-httpd
@@ -18,7 +18,7 @@ taler_merchant_httpd_LDADD = \
   -lmicrohttpd \
   -ljansson \
   -lgnunetutil \
-  -ltalermerchant \
+  $(top_srcdir)/src/backend-lib/libtalermerchant.la \
   -ltalermint \
   -ltalerpq \
   -lgnunetpostgres \
