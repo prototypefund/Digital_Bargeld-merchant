@@ -73,6 +73,7 @@ run (void *cls, char *const *args, const char *cfgfile,
 {
   json_t *j_fake_contract;
   json_t *j_root;
+  json_t *j_wire;
   json_t *j_details;
   json_t *j_mints;
   json_t *j_item;
@@ -90,7 +91,9 @@ run (void *cls, char *const *args, const char *cfgfile,
   json_t *j_merchant_zipcode;
   json_t *j_lnames;
   json_t *j_deldate;
+  json_t *j_expiry;
   char *str;
+  char *contract_tmp_str;
   char *desc;
   struct TALER_Amount amount;
   int64_t t_id;
@@ -101,6 +104,8 @@ run (void *cls, char *const *args, const char *cfgfile,
   struct Contract contract;
   #endif
   struct GNUNET_TIME_Absolute deldate;
+  struct GNUNET_TIME_Absolute now;
+  uint64_t nounce;
 
   db_conn = NULL;
   keyfile = NULL;
@@ -201,8 +206,6 @@ run (void *cls, char *const *args, const char *cfgfile,
   }
   
   /* End of 'item' object definition */
-
-  printf ("[j_item address: %p]\n", j_item);
   
   /* Delivery date: OPTIONAL FIELD */
   deldate = GNUNET_TIME_absolute_add (GNUNET_TIME_absolute_get (),
@@ -264,23 +267,22 @@ run (void *cls, char *const *args, const char *cfgfile,
   return;
   #endif
 
+  nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
+  now = GNUNET_TIME_absolute_get ();
+
+  j_wire = MERCHANT_get_wire_json (wire, nounce, now); 
 
   if (GNUNET_SYSERR == MERCHANT_handle_contract (j_fake_contract,
                                                  db_conn,
-			                         wire,
-			                         &contract))
-  {
+			                         &contract,
+						 now,
+						 now,
+						 now,
+						 nounce,
+						 contract_tmp_str))
     printf ("errors in contract handling\n");
-    return;
-  }
-
-  #if 1
-  str = json_dumps (j_fake_contract, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
-  printf ("%s\n", str);
-  return;
-  #endif
-
-
+  else
+    printf ("handling contract fine\n");
 
 }
 

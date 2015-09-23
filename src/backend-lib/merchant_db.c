@@ -94,7 +94,9 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
 			  "amount_currency VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL,"
                           "description TEXT NOT NULL,"
                           "nounce INT8 NOT NULL,"
+                          "timestamp INT8 NOT NULL,"
                           "expiry INT8 NOT NULL,"
+                          "edate INT8 NOT NULL,"
                           "product INT8 NOT NULL);"
                           "CREATE %1$s TABLE IF NOT EXISTS checkouts ("
                           "coin_pub BYTEA PRIMARY KEY,"
@@ -120,12 +122,32 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                    (conn,
                     "contract_create",
                     "INSERT INTO contracts"
-                    "(contract_id, hash, amount, amount_fraction, amount_currency,"
-		    "description, nounce, expiry, product) VALUES"
-                    "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-                    9, NULL)));
+                    "(contract_id, hash, timestamp, expiry, edate, amount, amount_fraction, amount_currency,"
+		    "description, nounce, product) VALUES"
+                    "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+                    11, NULL)));
   EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
   PQclear (res);
+
+
+  /* Query aimed to get the contract's nounce and edate which will be
+  both used for regenerating a 'wire' JSON object to insert into the
+  deposit permission. Implicitly, this query will tell whether a contract
+  was created or not */
+
+  EXITIF (NULL == (res = PQprepare
+                   (conn,
+                    "get_contract_hash",
+                    "SELECT ("
+                    "nounce, edate"
+                    ") FROM contracts "
+                    "WHERE ("
+                    "hash=$1"
+                    ")",
+                    1, NULL)));
+  EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
+  PQclear (res);
+
 
   EXITIF (NULL == (res = PQprepare
                    (conn,
@@ -184,23 +206,28 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
 
 
 /**
- * Inserts a contract record into the database and if successfull returns the
- * serial number of the inserted row.
- *
- * @param conn the database connection
- * @param expiry the time when the contract will expire
- * @param amount the taler amount corresponding to the contract
- * @param hash of the stringified JSON corresponding to this contract
- * @param c_id contract's id
- * @param desc descripition of the contract
- * @param nounce a random 64-bit nounce
- * @param product description to identify a product
- * @return GNUNET_OK on success, GNUNET_SYSERR upon error
- */
+* Inserts a contract record into the database and if successfull returns the
+* serial number of the inserted row.
+*
+* @param conn the database connection
+* @param timestamp the timestamp of this contract
+* @param expiry the time when the contract will expire
+* @param edate when the merchant wants to receive the wire transfer corresponding
+* to this deal (this value is also a field inside the 'wire' JSON format)
+* @param amount the taler amount corresponding to the contract
+* @param hash of the stringified JSON corresponding to this contract
+* @param c_id contract's id
+* @param desc descripition of the contract
+* @param nounce a random 64-bit nounce
+* @param product description to identify a product
+* @return GNUNET_OK on success, GNUNET_SYSERR upon error
+*/
 
 uint32_t
 MERCHANT_DB_contract_create (PGconn *conn,
-                             const struct GNUNET_TIME_Absolute *expiry,
+                             const struct GNUNET_TIME_Absolute timestamp,
+                             const struct GNUNET_TIME_Absolute expiry,
+			     struct GNUNET_TIME_Absolute edate,
                              const struct TALER_Amount *amount,
 			     const struct GNUNET_HashCode *h_contract,
 			     uint64_t c_id,
@@ -217,18 +244,18 @@ MERCHANT_DB_contract_create (PGconn *conn,
   #endif
   ExecStatusType status;
 
-  /* ported. To be tested/compiled */
   struct TALER_PQ_QueryParam params[] = {
     TALER_PQ_query_param_uint64 (&c_id), 
     TALER_PQ_query_param_fixed_size (h_contract, sizeof (struct GNUNET_HashCode)),
+    TALER_PQ_query_param_absolute_time (&timestamp),
+    TALER_PQ_query_param_absolute_time (&expiry),
+    TALER_PQ_query_param_absolute_time (&edate),
     TALER_PQ_query_param_amount (amount),
-    /* a *string* is being put in the following statement,
-    though the API talks about a *blob*. Will this be liked by
-    the DB ? */
-    // the following inserts a string as a blob. Will Taler provide a param-from-string helper?
+    /* A *string* is being put in the following statement,
+    though the column is declared as *blob*. Will this be
+    liked by the DB ? */
     TALER_PQ_query_param_fixed_size (desc, strlen (desc)),
     TALER_PQ_query_param_uint64 (&nounce), 
-    TALER_PQ_query_param_absolute_time (expiry),
     TALER_PQ_query_param_uint64 (&product),
     TALER_PQ_query_param_end
   };
@@ -345,3 +372,55 @@ MERCHANT_DB_get_checkout_product (PGconn *conn,
   return -1;
 }
 /* end of merchant-db.c */
+
+
+/**
+* The query gets a contract's nounce and edate used to reproduce
+* a 'wire' JSON object. This function is also useful to check whether
+* a claimed contract existed or not.
+* @param conn handle to the DB
+* @param h_contract the parameter for the row to match against
+* @param nounce where to store the found nounce
+* @param edate where to store the found edate
+* @return GNUNET_OK on success, GNUNET_SYSERR upon errors
+*
+*/
+
+uint32_t
+MERCHANT_DB_get_contract_values (PGconn *conn,
+                                 const struct GNUNET_HashCode *h_contract,
+                                 uint64_t *nounce,
+				 struct GNUNET_TIME_Absolute *edate)
+{
+  PGresult *res;
+  ExecStatusType status;
+
+  struct TALER_PQ_QueryParam params[] = {
+      TALER_PQ_query_param_fixed_size (h_contract, sizeof (struct GNUNET_HashCode)),
+      TALER_PQ_query_param_end
+  };
+
+  struct TALER_PQ_ResultSpec rs[] = {
+   TALER_PQ_result_spec_uint64 ("nounce", nounce),
+   TALER_PQ_result_spec_absolute_time ("edate", edate),
+   TALER_PQ_result_spec_end
+  };
+ 
+  res = TALER_PQ_exec_prepared (conn, "get_checkout_product", params);
+
+  status = PQresultStatus (res);
+  EXITIF (PGRES_TUPLES_OK != status);
+  if (0 == PQntuples (res))
+  {
+    TALER_LOG_DEBUG ("Contract not found");
+    goto EXITIF_exit;
+  }
+  EXITIF (1 != PQntuples (res));
+  EXITIF (GNUNET_YES != TALER_PQ_extract_result (res, rs, 0));
+  PQclear (res);
+  return GNUNET_OK;
+
+  EXITIF_exit:
+  PQclear (res);
+  return GNUNET_SYSERR;
+}

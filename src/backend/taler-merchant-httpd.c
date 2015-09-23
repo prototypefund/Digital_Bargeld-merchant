@@ -90,11 +90,6 @@ static struct GNUNET_SCHEDULER_Task *shutdown_task;
 static struct MERCHANT_WIREFORMAT_Sepa *wire;
 
 /**
- * Hash of the wireformat
- */
-static struct GNUNET_HashCode h_wire;
-
-/**
  * Should we do a dry run where temporary tables are used for storing the data.
  */
 static int dry;
@@ -282,38 +277,6 @@ request</h3></center></body></html>";
   return GNUNET_SYSERR;
 }
 
-/**
- * Take the global wire details and return a JSON containing them,
- * compliantly with the Taler's API.
- * @param edate when the beneficiary wants this transfer to take place
- * @return JSON representation of the wire details, NULL upon errors
- */
-
-static json_t *
-get_wire_json (struct GNUNET_TIME_Absolute edate)
-{
-  
-  json_t *root;
-  json_t *j_edate;
-  json_t *j_nounce;
-  uint64_t nounce;
-
-  nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
-  j_nounce = json_integer (nounce);
-
-  j_edate = TALER_json_from_abs (edate);
-  if (NULL == (root = json_pack ("{s:s, s:s, s:s, s:s, s:o}",
-                                 "type", "SEPA",
-		                 "IBAN", wire->iban,
-		                 "name", wire->name,
-		                 "BIC", wire->bic,
-		                 "edate", j_edate,
-		                 "r", json_integer_value (j_nounce))))
-    return NULL;
-
-  return root;
-}
-
 
 /**
  * A client has requested the given url using the given method
@@ -378,7 +341,6 @@ url_handler (void *cls,
   #endif
   struct MHD_Response *resp;
   json_t *root;
-  json_t *j_contract_complete;
   json_t *j_sig_enc;
   json_t *eddsa_pub_enc;
   json_t *response;
@@ -389,9 +351,7 @@ url_handler (void *cls,
   char *str; /* to debug JSONs */
   char *deposit_body;
   json_t *root_tmp;
-  json_t *j_refund_deadline;
-  json_t *j_amount_tmp;
-  json_t *j_depperm;
+  json_t *j_contract_add;
   json_t *j_details_tmp;
   json_t *j_max_fee_tmp;
   json_int_t j_int_trans_id_tmp;
@@ -402,12 +362,15 @@ url_handler (void *cls,
   char *denom_key;
   char *contract_sig;
   char *h_contract;
+  struct GNUNET_TIME_Absolute now;
+  struct GNUNET_TIME_Absolute expiry;
+  struct GNUNET_TIME_Absolute edate;
   struct GNUNET_HashCode h_json_wire;
   struct TALER_Amount amount_tmp;
   json_t *j_h_json_wire;
   struct curl_slist *slist;
-
-  struct GNUNET_TIME_Absolute now;
+  char *contract_str;
+  struct GNUNET_HashCode h_contract_str;
 
   CURL *curl;
   CURLcode curl_res;
@@ -455,110 +418,28 @@ url_handler (void *cls,
     if ((GNUNET_NO == res) || (NULL == root))
       return MHD_YES;
     
-    /* The frontend should supply a JSON in the format described in
-    http://link-to-specs : .. In practice, it just forwards what it
-    received from the wallet.
-    
+    /*
+
     Roughly, the backend must add to this JSON:
      
      1. The merchant's public key
-     2. A timestamp (?)
-     3. wire (see mint's specs)
-     4. h_wire
-     5. refund deadline (?)
+     2. wire
      
-     (?) : may the frontend will handle dates ?
+    TODO: Check if there is a row in 'contracts' table corresponding
+    to this contract ('s hash). If so, the corresponding 'nounce' and
+    'edate' have to be retrieved */
+    
+    j_wire = 
 
-    */
-
-    #ifdef DEBUG
-    /* NOTE: there is no need to thoroughly unpack this JSON, since
-    the backend must just *add* fields to it */
-    if (-1 == (json_unpack (root,
-                            "{s:s, s:I, s:s, s:s, s:s}",
-                            "ub_sig", &ub_sig,
-			    "coin_pub", &coin_pub,
-	                    "denom_pub", &denom_key,
-			    "H_contract", &h_contract,
-	 		    "sig", &contract_sig)))
-    {
-      printf ("no unpack\n");
-      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-      goto end;
-    }
-
-    printf ("Got this deposit permission:\nub_sig: %s\ncoin_pub: %s\ndenom_key: %s\nsig: %s\n",
-    ub_sig, coin_pub, denom_key, contract_sig);
-
-    return MHD_NO;
-    #endif
-
-    /* TODO: Check if there is a row in 'contracts' table corresponding to this
-    contract ('s hash). This query has to return the trans_id and the amount for
-    this contract - faked values for now. See bug #XXXX */
-
-    /* FIXME fake trans_id */
-    trans_id_tmp = (int64_t) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
-
-    if (trans_id_tmp < 0)
-       j_trans_id_tmp  = json_integer ((-1) * trans_id_tmp);
-    else
-       j_trans_id_tmp = json_integer (trans_id_tmp);
-
-    /* FIXME fake amount to redeem */
-    TALER_amount_get_zero ("EUR", &amount_tmp);
-    amount_tmp.value = 5;
-    j_amount_tmp = TALER_json_from_amount (&amount_tmp);
 
     /* Encoding merchant's key */
     GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
 
-    /* Timestamping 'now' */
-    now = GNUNET_TIME_absolute_get ();
-    
-    /* getting the SEPA-aware JSON */
-    if (NULL == (j_wire = get_wire_json (GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS))))
-      goto end;
-
-    /* hash it*/
-    if (GNUNET_SYSERR == TALER_hash_json (j_wire, &h_json_wire))
-      goto end;
-
-    j_h_json_wire = TALER_json_from_data (&h_json_wire, sizeof (struct GNUNET_HashCode));
-    /* refund deadline */
-    j_refund_deadline = TALER_json_from_abs (GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS));
-
-    /* pack it!*/
-    eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
-
-    if (NULL == (j_depperm = json_pack ("{s:o, s:o, s:o, s:o, s:o, s:I, s:o}",
-                                        "merchant_pub", eddsa_pub_enc,
-					"timestamp", TALER_json_from_abs (now),
-					"wire", j_wire,
-					"H_wire", j_h_json_wire,
-					"refund_deadline", j_refund_deadline,
-					"transaction_id", json_integer_value (j_trans_id_tmp),
-					"f", j_amount_tmp)))
-    {
-      printf ("BAD depperm packaging\n");
-      goto end;
-    }
-
-
-    /* melt to what received from the wallet */
-    if (-1 == json_object_update (j_depperm, root))
-    {
-      printf ("depperm response not built\n");
-      goto end; 
-    }
-
-    #define DEBUGG
-    #ifdef DEBUG
-    str = json_dumps (j_depperm, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
-    printf ("Depperm is: \n%s", str);
-    return MHD_NO;
-    #endif
+    /* Crafting the wire JSON */
+    if (NULL == (j_tmp = json_pack ("{s:o, s:I}",
+                                    "merchant_pub", eddsa_pub_enc,
+				    "wire", j_wire)))
 
     /* POST to mint's "/deposit" */
     curl = curl_easy_init (); 
@@ -656,16 +537,62 @@ url_handler (void *cls,
     
 
     }
-    if (NULL == (j_contract_complete = MERCHANT_handle_contract (root,
-                                                                 db_conn,
-								 wire,
-								 &contract)))
+
+
+    /* timestamp */
+    now = GNUNET_TIME_absolute_get ();
+    /* expiry */
+    expiry = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
+    /* edate */
+    edate = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
+
+    /* getting the SEPA-aware JSON */
+    /* nounce for hashing the wire object */
+    nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
+    /* get wire object */
+    if (NULL ==
+         (j_wire = MERCHANT_get_wire_json (wire,
+                                           nounce,                       
+                                           edate)))
+      goto end;
+    /* hash wire objcet */
+    if (GNUNET_SYSERR == TALER_hash_json (j_wire, &h_json_wire))
+      goto end;
+    j_h_json_wire = TALER_json_from_data (&h_json_wire, sizeof (struct GNUNET_HashCode));
+    /* get key JSON entry */
+    eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
+
+    if (NULL == (j_contract_add = json_pack ("{s:o, s:o, s:o}",
+                                        "merchant_pub", eddsa_pub_enc,
+					"H_wire", j_h_json_wire,
+					"timestamp", TALER_json_from_abs (now))))
+    {
+      printf ("BAD contract enhancement\n");
+      goto end;
+    }
+
+    /* melt to what received from the wallet */
+    if (-1 == json_object_update (j_contract_add, root))
+    {
+      printf ("depperm response not built\n");
+      goto end; 
+    }
+
+    if (GNUNET_SYSERR == MERCHANT_handle_contract (root,
+                                                   db_conn,
+			                           &contract,
+						   now,
+						   expiry,
+						   edate,
+						   nounce,
+						   contract_str))
     {
       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
       goto end;
     }
 
     GNUNET_CRYPTO_eddsa_sign (privkey, &contract.purpose, &c_sig);
+    GNUNET_CRYPTO_hash (contract_str, strlen (contract_str) + 1, &h_contract_str);
 
     /**
     *
@@ -680,10 +607,16 @@ url_handler (void *cls,
     j_sig_enc = TALER_json_from_eddsa_sig (&contract.purpose, &c_sig);
     GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
-    response = json_pack ("{s:o, s:o, s:o}",
-                          "contract", j_contract_complete,
+
+    response = json_pack ("{s:o, s:o, s:o, s:o}",
+                          "contract", root,
                           "sig", j_sig_enc,
-	                  "eddsa_pub", eddsa_pub_enc);
+	                  "eddsa_pub", eddsa_pub_enc,
+			  "h_contract",
+			  TALER_json_from_data (h_contract_str, sizeof (struct GNUNET_HashCode)));
+
+    GNUNET_free (contract_str);
+
     TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
     return MHD_YES;
 

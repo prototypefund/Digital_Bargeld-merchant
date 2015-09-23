@@ -58,23 +58,28 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp);
 
 
 /**
- * Inserts a contract record into the database and if successfull returns the
- * serial number of the inserted row.
- *
- * @param conn the database connection
- * @param expiry the time when the contract will expire
- * @param amount the taler amount corresponding to the contract
- * @param hash of the stringified JSON corresponding to this contract
- * @param c_id this contract's identification number
- * @param desc descripition of the contract
- * @param nounce a random 64-bit nounce
- * @param product description to identify a product
- * @return GNUNET_OK on success, GNUNET_SYSERR upon error
- */
+* Inserts a contract record into the database and if successfull returns the
+* serial number of the inserted row.
+*
+* @param conn the database connection
+* @param timestamp the timestamp of this contract
+* @param expiry the time when the contract will expire
+* @param edate when the merchant wants to receive the wire transfer corresponding
+* to this deal (this value is also a field inside the 'wire' JSON format)
+* @param amount the taler amount corresponding to the contract
+* @param hash of the stringified JSON corresponding to this contract
+* @param c_id contract's id
+* @param desc descripition of the contract
+* @param nounce a random 64-bit nounce
+* @param product description to identify a product
+* @return GNUNET_OK on success, GNUNET_SYSERR upon error
+*/
 
 uint32_t
 MERCHANT_DB_contract_create (PGconn *conn,
-                             const struct GNUNET_TIME_Absolute *expiry,
+                             const struct GNUNET_TIME_Absolute timestamp,
+                             const struct GNUNET_TIME_Absolute expiry,
+			     struct GNUNET_TIME_Absolute edate,
                              const struct TALER_Amount *amount,
 			     const struct GNUNET_HashCode *h_contract,
 			     uint64_t c_id,
@@ -97,6 +102,24 @@ MERCHANT_DB_checkout_create (PGconn *conn,
 long long
 MERCHANT_DB_get_checkout_product (PGconn *conn,
                                   struct GNUNET_CRYPTO_rsa_PublicKey *coin_pub);
+
+/**
+* The query gets a contract's nounce and edate used to reproduce
+* a 'wire' JSON object. This function is also useful to check whether
+* a claimed contract existed or not.
+* @param conn handle to the DB
+* @param h_contract the parameter for the row to match against
+* @param nounce where to store the found nounce
+* @param edate where to store the found edate
+* @return GNUNET_OK on success, GNUNET_SYSERR upon errors
+*
+*/
+
+uint32_t
+MERCHANT_DB_get_contract_values (PGconn *conn,
+                                 const struct GNUNET_HashCode *h_contract,
+                                 uint64_t *nounce,
+				 struct GNUNET_TIME_Absolute *edate);
 
 #endif  /* MERCHANT_DB_H */
 
