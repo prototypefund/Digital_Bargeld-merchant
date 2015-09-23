@@ -69,7 +69,7 @@ $value = $amount;
 // We don't have a fraction.
 $fraction = 0;
 // This is our 'toy' currency
-$currency = "KUDOS";
+$currency = "EUR"; // NOTE: mint does NOT generate KUDOS denom. keys
 // The tax for this deal
 $teatax = array ('value' => 1,
                  'fraction' => 0,

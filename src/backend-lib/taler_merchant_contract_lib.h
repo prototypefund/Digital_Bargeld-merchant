@@ -66,13 +66,14 @@ GNUNET_NETWORK_STRUCT_END
 * @param kpriv merchant's private key
 * @param wire merchant's bank's details
 * @param sig where to store the signature
-* @return pointer to the complete JSON; NULL upon errors
+* @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+*
 */
 
 /* TODO: this handles a simplified version (for debugging purposes)
          of the contract. To expand to the full fledged version */
 
-json_t *
+uint32_t
 MERCHANT_handle_contract (json_t *j_contract,
                           PGconn *db_conn,
                           const struct MERCHANT_WIREFORMAT_Sepa *wire,

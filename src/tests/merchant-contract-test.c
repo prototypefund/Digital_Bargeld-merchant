@@ -109,7 +109,7 @@ run (void *cls, char *const *args, const char *cfgfile,
 
 
   db_conn = MERCHANT_DB_connect (config);
-  if (GNUNET_OK != MERCHANT_DB_initialize (db_conn, GNUNET_NO))
+  if (GNUNET_OK != MERCHANT_DB_initialize (db_conn, GNUNET_YES))
   {
     printf ("no db init'd\n");
     result = GNUNET_SYSERR;
@@ -135,7 +135,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   */
 
   /* Amount */
-  TALER_amount_get_zero ("KUDOS", &amount);
+  TALER_amount_get_zero ("EUR", &amount);
   j_amount = TALER_json_from_amount (&amount);
 
   /* Transaction ID*/
@@ -203,11 +203,12 @@ run (void *cls, char *const *args, const char *cfgfile,
   /* End of 'item' object definition */
 
   printf ("[j_item address: %p]\n", j_item);
-
+  
   /* Delivery date: OPTIONAL FIELD */
   deldate = GNUNET_TIME_absolute_add (GNUNET_TIME_absolute_get (),
                                       GNUNET_TIME_UNIT_WEEKS);
   j_deldate = TALER_json_from_abs (deldate);
+
   
 
   /* Delivery location: OPTIONAL FIELD */
@@ -252,28 +253,29 @@ run (void *cls, char *const *args, const char *cfgfile,
 		       "Q1WVGRGC1F4W7RYC6M23AEGFEXQEHQ730K3GG0B67VPHQSRR75H0");
 
   j_fake_contract = json_pack ("{s:o, s:o, s:I, s:o, s:o}",
-                    "amount", j_amount,
-		    "max fee", j_max_fee,
-		    "trans_id", json_integer_value (j_id),
-		    "mints", j_mints,
-		    "details", j_details);
+                               "amount", j_amount,
+                               "max fee", j_max_fee,
+		               "trans_id", json_integer_value (j_id),
+		               "mints", j_mints,
+		               "details", j_details);
   #if 0
   str = json_dumps (j_fake_contract, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
   printf ("%s\n", str);
   return;
   #endif
 
-  if (NULL == (j_root = MERCHANT_handle_contract (j_fake_contract,
-                            db_conn,
-			    wire,
-			    &contract)))
+
+  if (GNUNET_SYSERR == MERCHANT_handle_contract (j_fake_contract,
+                                                 db_conn,
+			                         wire,
+			                         &contract))
   {
     printf ("errors in contract handling\n");
     return;
   }
 
   #if 1
-  str = json_dumps (j_root, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+  str = json_dumps (j_fake_contract, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
   printf ("%s\n", str);
   return;
   #endif

@@ -24,6 +24,7 @@
 #include <microhttpd.h>
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
+#include <curl/curl.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mint_service.h>
 #include "taler-mint-httpd_parsing.h"
@@ -151,7 +152,7 @@ unsigned int nmints;
 */
  
 static unsigned int
-generate_message (struct MHD_Response **resp, const char *msg) // this parameter was preceded by a '_' in its original file. Why?
+generate_message (struct MHD_Response **resp, const char *msg) 
 {
  
   unsigned int ret;
@@ -281,6 +282,38 @@ request</h3></center></body></html>";
   return GNUNET_SYSERR;
 }
 
+/**
+ * Take the global wire details and return a JSON containing them,
+ * compliantly with the Taler's API.
+ * @param edate when the beneficiary wants this transfer to take place
+ * @return JSON representation of the wire details, NULL upon errors
+ */
+
+static json_t *
+get_wire_json (struct GNUNET_TIME_Absolute edate)
+{
+  
+  json_t *root;
+  json_t *j_edate;
+  json_t *j_nounce;
+  uint64_t nounce;
+
+  nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
+  j_nounce = json_integer (nounce);
+
+  j_edate = TALER_json_from_abs (edate);
+  if (NULL == (root = json_pack ("{s:s, s:s, s:s, s:s, s:o}",
+                                 "type", "SEPA",
+		                 "IBAN", wire->iban,
+		                 "name", wire->name,
+		                 "BIC", wire->bic,
+		                 "edate", j_edate,
+		                 "r", json_integer_value (j_nounce))))
+    return NULL;
+
+  return root;
+}
+
 
 /**
  * A client has requested the given url using the given method
@@ -344,27 +377,46 @@ url_handler (void *cls,
   struct Contract contract;
   #endif
   struct MHD_Response *resp;
-  json_t *j_contract_complete;
   json_t *root;
+  json_t *j_contract_complete;
   json_t *j_sig_enc;
   json_t *eddsa_pub_enc;
   json_t *response;
   json_t *j_mints;
   json_t *j_mint;
+  json_t *j_wire;
   int cnt; /* loop counter */
   char *str; /* to debug JSONs */
-  #if 1
+  char *deposit_body;
   json_t *root_tmp;
+  json_t *j_refund_deadline;
   json_t *j_amount_tmp;
+  json_t *j_depperm;
   json_t *j_details_tmp;
   json_t *j_max_fee_tmp;
-  json_int_t j_trans_id_tmp;
-  #endif
+  json_int_t j_int_trans_id_tmp;
+  json_t *j_trans_id_tmp;
+  int64_t trans_id_tmp;
+  char *ub_sig;
+  char *coin_pub;
+  char *denom_key;
+  char *contract_sig;
+  char *h_contract;
+  struct GNUNET_HashCode h_json_wire;
+  struct TALER_Amount amount_tmp;
+  json_t *j_h_json_wire;
+  struct curl_slist *slist;
+
+  struct GNUNET_TIME_Absolute now;
+
+  CURL *curl;
+  CURLcode curl_res;
 
   int res = GNUNET_SYSERR;
 
   #define URL_HELLO "/hello"
   #define URL_CONTRACT "/contract"
+  #define URL_DEPPERM "/pay"
   no_destroy = 0;
   resp = NULL;
   status = MHD_HTTP_INTERNAL_SERVER_ERROR;
@@ -377,6 +429,172 @@ url_handler (void *cls,
     {
       status = MHD_HTTP_METHOD_NOT_ALLOWED;
     }
+  }
+
+  if (0 == strncasecmp (url, URL_DEPPERM, sizeof (URL_DEPPERM)))
+  {
+    if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
+    {
+      status = MHD_HTTP_METHOD_NOT_ALLOWED;
+      goto end;
+
+    }
+    else
+      res = TMH_PARSE_post_json (connection,
+                                 connection_cls,
+                                 upload_data,
+                                 upload_data_size,
+                                 &root);
+    if (GNUNET_SYSERR == res)
+    {
+      status = MHD_HTTP_BAD_REQUEST;
+      goto end;
+    }
+
+    /* the POST's body has to be fetched furthermore */
+    if ((GNUNET_NO == res) || (NULL == root))
+      return MHD_YES;
+    
+    /* The frontend should supply a JSON in the format described in
+    http://link-to-specs : .. In practice, it just forwards what it
+    received from the wallet.
+    
+    Roughly, the backend must add to this JSON:
+     
+     1. The merchant's public key
+     2. A timestamp (?)
+     3. wire (see mint's specs)
+     4. h_wire
+     5. refund deadline (?)
+     
+     (?) : may the frontend will handle dates ?
+
+    */
+
+    #ifdef DEBUG
+    /* NOTE: there is no need to thoroughly unpack this JSON, since
+    the backend must just *add* fields to it */
+    if (-1 == (json_unpack (root,
+                            "{s:s, s:I, s:s, s:s, s:s}",
+                            "ub_sig", &ub_sig,
+			    "coin_pub", &coin_pub,
+	                    "denom_pub", &denom_key,
+			    "H_contract", &h_contract,
+	 		    "sig", &contract_sig)))
+    {
+      printf ("no unpack\n");
+      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      goto end;
+    }
+
+    printf ("Got this deposit permission:\nub_sig: %s\ncoin_pub: %s\ndenom_key: %s\nsig: %s\n",
+    ub_sig, coin_pub, denom_key, contract_sig);
+
+    return MHD_NO;
+    #endif
+
+    /* TODO: Check if there is a row in 'contracts' table corresponding to this
+    contract ('s hash). This query has to return the trans_id and the amount for
+    this contract - faked values for now. See bug #XXXX */
+
+    /* FIXME fake trans_id */
+    trans_id_tmp = (int64_t) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
+
+    if (trans_id_tmp < 0)
+       j_trans_id_tmp  = json_integer ((-1) * trans_id_tmp);
+    else
+       j_trans_id_tmp = json_integer (trans_id_tmp);
+
+    /* FIXME fake amount to redeem */
+    TALER_amount_get_zero ("EUR", &amount_tmp);
+    amount_tmp.value = 5;
+    j_amount_tmp = TALER_json_from_amount (&amount_tmp);
+
+    /* Encoding merchant's key */
+    GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
+    eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
+
+    /* Timestamping 'now' */
+    now = GNUNET_TIME_absolute_get ();
+    
+    /* getting the SEPA-aware JSON */
+    if (NULL == (j_wire = get_wire_json (GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS))))
+      goto end;
+
+    /* hash it*/
+    if (GNUNET_SYSERR == TALER_hash_json (j_wire, &h_json_wire))
+      goto end;
+
+    j_h_json_wire = TALER_json_from_data (&h_json_wire, sizeof (struct GNUNET_HashCode));
+    /* refund deadline */
+    j_refund_deadline = TALER_json_from_abs (GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS));
+
+    /* pack it!*/
+    eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
+
+    if (NULL == (j_depperm = json_pack ("{s:o, s:o, s:o, s:o, s:o, s:I, s:o}",
+                                        "merchant_pub", eddsa_pub_enc,
+					"timestamp", TALER_json_from_abs (now),
+					"wire", j_wire,
+					"H_wire", j_h_json_wire,
+					"refund_deadline", j_refund_deadline,
+					"transaction_id", json_integer_value (j_trans_id_tmp),
+					"f", j_amount_tmp)))
+    {
+      printf ("BAD depperm packaging\n");
+      goto end;
+    }
+
+
+    /* melt to what received from the wallet */
+    if (-1 == json_object_update (j_depperm, root))
+    {
+      printf ("depperm response not built\n");
+      goto end; 
+    }
+
+    #define DEBUGG
+    #ifdef DEBUG
+    str = json_dumps (j_depperm, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+    printf ("Depperm is: \n%s", str);
+    return MHD_NO;
+    #endif
+
+    /* POST to mint's "/deposit" */
+    curl = curl_easy_init (); 
+
+    if (curl)
+    {
+    
+      slist = curl_slist_append (slist, "Content-type: application/json");
+      curl_easy_setopt (curl, CURLOPT_HTTPHEADER, slist);
+
+      /* FIXME the mint's URL is be retrieved from the partial deposit permission
+      (received by the wallet) */
+      curl_easy_setopt (curl, CURLOPT_URL, "http://demo.taler.net/deposit");
+    
+      /* NOTE: hopefully, this string won't need any URL-encoding, since as for the
+      Jansson specs, any space and-or newline are not in place using JSON_COMPACT
+      flag */
+      deposit_body = json_dumps (j_depperm, JSON_COMPACT | JSON_PRESERVE_ORDER);
+      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, deposit_body);
+
+      curl_res = curl_easy_perform (curl);
+
+      curl_slist_free_all(slist);
+      if(curl_res != CURLE_OK)
+      {
+        printf ("deposit rejected by mint\n");
+        goto end; 
+      }
+      else
+        printf ("deposit ok\n");
+
+     curl_easy_cleanup(curl);
+    
+    
+    }
+
   }
 
   /* 
@@ -431,32 +649,14 @@ url_handler (void *cls,
         
     }
 
-    if (-1 == (json_unpack (root,
-                            "{s:o, s:o, s:I, s:o}",
-                            "amount", &j_amount_tmp,
-			    "max fee", &j_max_fee_tmp,
-	                    "trans_id", &j_trans_id_tmp,
-	 		    "details", &j_details_tmp)))
+    if (-1 == (json_object_update (root, j_mints)))
     {
-      printf ("no unpack\n");
-      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      printf ("no mints specified in contract\n");  
       goto end;
-    }
-
     
-    if (NULL == (root_tmp = json_pack ("{s:o, s:o, s:I, s:o, s:o}",
-                                 "amount", j_amount_tmp,
-			         "max fee", j_max_fee_tmp,
-	                         "trans_id", j_trans_id_tmp,
-			         "mints", j_mints,
-	 	                 "details", j_details_tmp)))
-    {
-      printf ("no pack\n");
-      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-      goto end;
-    }
 
-    if (NULL == (j_contract_complete = MERCHANT_handle_contract (root_tmp,
+    }
+    if (NULL == (j_contract_complete = MERCHANT_handle_contract (root,
                                                                  db_conn,
 								 wire,
 								 &contract)))
@@ -540,8 +740,6 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
   
 }
 
-
-
 /**
  * Function called with information about who is auditing
  * a particular mint and what key the mint is using.
@@ -550,7 +748,7 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
  * @param keys information about the various keys used
  *        by the mint
  */
-void
+static void
 keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
 {
   /* which kind of mint's keys a merchant should need? Sign
@@ -569,7 +767,7 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
  * @param cfgfile name of the configuration file used (for saving, can be NULL!)
  * @param config configuration
  */
-static void
+void
 run (void *cls, char *const *args, const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
@@ -592,7 +790,7 @@ run (void *cls, char *const *args, const char *cfgfile,
                                                                 &keyfile));
   EXITIF (NULL == (privkey = GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)));
   EXITIF (NULL == (db_conn = MERCHANT_DB_connect (config)));
-  EXITIF (GNUNET_OK != MERCHANT_DB_initialize (db_conn, GNUNET_NO));
+  EXITIF (GNUNET_OK != MERCHANT_DB_initialize (db_conn, GNUNET_YES));
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_number (config,
                                                  "merchant",
@@ -661,7 +859,7 @@ int
 main (int argc, char *const *argv)
 {
   
-  static const struct GNUNET_GETOPT_CommandLineOption options[] = {
+   static const struct GNUNET_GETOPT_CommandLineOption options[] = {
     {'t', "temp", NULL,
      gettext_noop ("Use temporary database tables"), GNUNET_NO,
      &GNUNET_GETOPT_set_one, &dry},
@@ -677,6 +875,4 @@ main (int argc, char *const *argv)
     return 3;
   return (GNUNET_OK == result) ? 0 : 1;
 
-
- 
 }

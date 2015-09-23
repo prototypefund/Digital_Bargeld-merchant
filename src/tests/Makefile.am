@@ -1,5 +1,5 @@
 # This Makefile.am is in the public domain
-AM_CPPFLAGS = -I$(top_srcdir)/src/include
+AM_CPPFLAGS = -I$(top_srcdir)/src/include -I$(top_srcdir)/src/backend-lib/
 
 bin_PROGRAMS = \
   merchant-contract-test
@@ -10,7 +10,7 @@ bin_PROGRAMS = \
 merchant_contract_test_SOURCES = \
   merchant-contract-test.c \
   merchant.c \
-  merchant_db.c merchant_db.h
+  ../backend-lib/merchant_db.c ../backend-lib/merchant_db.h
 
 merchant_contract_test_LDADD = \
   $(LIBGCRYPT_LIBS) \

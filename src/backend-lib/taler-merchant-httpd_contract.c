@@ -50,26 +50,27 @@ hash_wireformat (uint64_t nounce, const struct MERCHANT_WIREFORMAT_Sepa *wire)
 
 /**
 * Take from the frontend the (partly) generated contract and fill
-* the missing values in it; for example, the SEPA-aware values.
+* the missing values in it; for example, the SEPA details.
 * Moreover, it stores the contract in the DB.
-* @param j_contract parsed contract, originated by the frontend
+* @param j_contract parsed contract, originated by the frontend. It will be
+* hold the new values.
 * @param db_conn the handle to the local DB
 * @param wire merchant's bank's details
-* @param where to store the (subset of the) contract to be (still) signed
-* @return pointer to the complete JSON; NULL upon errors
+* @param contract where to store the (subset of the) contract to be (still) signed
+* @return GNUNET_OK on success; GNUNET_SYSERR upon errors
 */
 
 /**
-* TODO: inspection of reference counting and, accordingly, free those json_t*(s)
+* TODO: inspect reference counting and, accordingly, free those json_t*(s)
 * still allocated */
 
-json_t *
+uint32_t
 MERCHANT_handle_contract (json_t *j_contract,
                           PGconn *db_conn,
                           const struct MERCHANT_WIREFORMAT_Sepa *wire,
 			  struct Contract *contract)
 {
-  json_t *root;
+  json_t *j_tmp;
   json_t *j_details;
   json_t *j_timestamp;
   json_t *jh_wire;
@@ -82,7 +83,7 @@ MERCHANT_handle_contract (json_t *j_contract,
   json_t *j_product_id;
   json_t *j_items_tmp;
   char *a;
-  char *h_wire_enc;
+  #define DaEBUG
   #ifdef DEBUG
   char *str;
   #endif
@@ -97,54 +98,53 @@ MERCHANT_handle_contract (json_t *j_contract,
                                      GNUNET_TIME_UNIT_DAYS);
   ROUND_TO_SECS (timestamp, abs_value_us);
   j_timestamp = TALER_json_from_abs (timestamp);
-
   // wireformat mgmt
   h_wire = hash_wireformat (nounce, wire);
-  h_wire_enc = GNUNET_STRINGS_data_to_string_alloc (&h_wire,
-                                                    sizeof (struct GNUNET_HashCode));
-  jh_wire = json_string (h_wire_enc);
-  if (-1 == json_unpack (j_contract, "{s:o, s:o, s:I, s:o, s:o}",
-                         "amount", &j_amount,
-                         "max fee", &j_max_fee,
-                         "trans_id", &j_trans_id,
-			 "mints", &j_mints,
-                         "details", &j_details))
+  jh_wire = TALER_json_from_data (&h_wire, sizeof (struct GNUNET_HashCode));
+  /* adding the generated values in this JSON */
+  if (NULL == (j_tmp = json_pack ("{s:o, s:o}",
+                                 "h_wire", jh_wire,
+                                 "timestamp", j_timestamp)))
+    return GNUNET_SYSERR;
 
-    return NULL;
+  if (-1 == json_object_update (j_contract, j_tmp))
+    return GNUNET_SYSERR;
+  /* needed for DB work */
+  j_amount = json_object_get (j_contract, "amount");
+  TALER_json_to_amount (j_amount, &amount); // produces a WARNING..
 
-  /* needed for DB stuff */
-  TALER_json_to_amount (j_amount, &amount);
-  j_items_tmp = json_object_get (j_details, "items");
-  j_product_id = json_object_get (j_items_tmp, "product_id");
+  a = json_dumps (j_contract, JSON_COMPACT | JSON_PRESERVE_ORDER);
 
   #ifdef DEBUG
-  printf ("prod id is at %p, eval to %d\n", j_product_id, json_integer_value (j_product_id));
-  return NULL;
+  str = json_dumps (j_amount, JSON_COMPACT | JSON_PRESERVE_ORDER);
+  printf ("amount : \n%s", str);
+  return GNUNET_SYSERR;
   #endif
 
+  /* TODO
 
+  Add a further field to the 'contract' table, indicating the timestamp
+  of this contract being finalized
 
+  */
 
-  /* adding the generated values in this JSON */
-  root = json_pack ("{s:o, s:o, s:I, s:s, s:o, s:o, s:o}",
-             "amount", j_amount,
-             "max fee", j_max_fee,
-	     "trans_id", j_trans_id,
-	     "h_wire", jh_wire,
-	     "timestamp", j_timestamp,
-             "mints", j_mints,
-	     "details", j_details);
-
-  a = json_dumps (root, JSON_COMPACT | JSON_PRESERVE_ORDER);
+  GNUNET_CRYPTO_hash (a, strlen (a) + 1, &contract->h_contract_details);
+  contract->purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
+  contract->purpose.size = htonl (sizeof (struct Contract));
 
   // DB mgmt
   if (GNUNET_SYSERR == MERCHANT_DB_contract_create (db_conn,
                                                     &timestamp,
                                                     &amount,
+                                                    &contract->h_contract_details,
  					            (uint64_t) j_trans_id, // safe?
                                                     a,
                                                     nounce,
-                                                    json_integer_value (j_product_id)));
+                                                    json_integer_value (j_product_id)))
+    return GNUNET_SYSERR;
+
+  free (a);
+
   #ifdef OBSOLETE
   contract->h_wire = h_wire;
   TALER_amount_hton (&amount_nbo, &amount);
@@ -153,15 +153,9 @@ MERCHANT_handle_contract (json_t *j_contract,
   contract->m = GNUNET_htonll ((uint64_t) j_trans_id); // safe?
   #endif
 
-  GNUNET_CRYPTO_hash (a, strlen (a) + 1, &contract->h_contract_details);
-  free (a);
-  contract->purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
-
   #ifdef OBSOLETE
   contract->purpose.size = htonl (sizeof (struct ContractNBO));
   #endif
 
-  contract->purpose.size = htonl (sizeof (struct Contract));
-
-  return root;
+  return GNUNET_OK;
 }

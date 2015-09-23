@@ -88,6 +88,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                           "BEGIN TRANSACTION;"
                           "CREATE %1$s TABLE IF NOT EXISTS contracts ("
                           "contract_id INT8 PRIMARY KEY,"
+			  "hash BYTEA NOT NULL,"
                           "amount INT8 NOT NULL,"
                           "amount_fraction INT4 NOT NULL,"
 			  "amount_currency VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL,"
@@ -119,10 +120,10 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                    (conn,
                     "contract_create",
                     "INSERT INTO contracts"
-                    "(contract_id, amount, amount_fraction, amount_currency,"
+                    "(contract_id, hash, amount, amount_fraction, amount_currency,"
 		    "description, nounce, expiry, product) VALUES"
-                    "($1, $2, $3, $4, $5, $6, $7, $8)",
-                    8, NULL)));
+                    "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                    9, NULL)));
   EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
   PQclear (res);
 
@@ -189,6 +190,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
  * @param conn the database connection
  * @param expiry the time when the contract will expire
  * @param amount the taler amount corresponding to the contract
+ * @param hash of the stringified JSON corresponding to this contract
  * @param c_id contract's id
  * @param desc descripition of the contract
  * @param nounce a random 64-bit nounce
@@ -200,6 +202,7 @@ uint32_t
 MERCHANT_DB_contract_create (PGconn *conn,
                              const struct GNUNET_TIME_Absolute *expiry,
                              const struct TALER_Amount *amount,
+			     const struct GNUNET_HashCode *h_contract,
 			     uint64_t c_id,
                              const char *desc,
                              uint64_t nounce,
@@ -214,26 +217,16 @@ MERCHANT_DB_contract_create (PGconn *conn,
   #endif
   ExecStatusType status;
 
-  #if 0
-  /*
-  NOTE: the conversion to nl(l) happens *inside* the query param helpers; since
-  the policy imposes this format for storing values. */
-  value_nbo = GNUNET_htonll (amount->value);
-  fraction_nbo = GNUNET_htonll (amount->fraction);
-  nounce_nbo = GNUNET_htonll (nounce);
-  expiry_ms_nbo = GNUNET_htonll (expiry.abs_value_us);
-  product = GNUNET_htonll (product);
-  #endif
-
   /* ported. To be tested/compiled */
   struct TALER_PQ_QueryParam params[] = {
     TALER_PQ_query_param_uint64 (&c_id), 
+    TALER_PQ_query_param_fixed_size (h_contract, sizeof (struct GNUNET_HashCode)),
     TALER_PQ_query_param_amount (amount),
     /* a *string* is being put in the following statement,
     though the API talks about a *blob*. Will this be liked by
     the DB ? */
     // the following inserts a string as a blob. Will Taler provide a param-from-string helper?
-    TALER_PQ_query_param_fixed_size (desc, strlen(desc)),
+    TALER_PQ_query_param_fixed_size (desc, strlen (desc)),
     TALER_PQ_query_param_uint64 (&nounce), 
     TALER_PQ_query_param_absolute_time (expiry),
     TALER_PQ_query_param_uint64 (&product),
