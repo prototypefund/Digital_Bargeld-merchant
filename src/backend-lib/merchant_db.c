@@ -138,9 +138,9 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
   EXITIF (NULL == (res = PQprepare
                    (conn,
                     "get_contract_hash",
-                    "SELECT ("
-                    "nounce, edate"
-                    ") FROM contracts "
+                    "SELECT "
+                    "nounce, edate "
+                    "FROM contracts "
                     "WHERE ("
                     "hash=$1"
                     ")",
@@ -406,7 +406,7 @@ MERCHANT_DB_get_contract_values (PGconn *conn,
    TALER_PQ_result_spec_end
   };
  
-  res = TALER_PQ_exec_prepared (conn, "get_checkout_product", params);
+  res = TALER_PQ_exec_prepared (conn, "get_contract_hash", params);
 
   status = PQresultStatus (res);
   EXITIF (PGRES_TUPLES_OK != status);
@@ -415,6 +415,7 @@ MERCHANT_DB_get_contract_values (PGconn *conn,
     TALER_LOG_DEBUG ("Contract not found");
     goto EXITIF_exit;
   }
+
   EXITIF (1 != PQntuples (res));
   EXITIF (GNUNET_YES != TALER_PQ_extract_result (res, rs, 0));
   PQclear (res);

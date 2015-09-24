@@ -58,6 +58,13 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
     }
 }
 
+extern uint32_t
+MERCHANT_DB_get_contract_values (PGconn *conn,
+                                 const struct GNUNET_HashCode *h_contract,
+                                 uint64_t *nounce,
+				 struct GNUNET_TIME_Absolute *edate);
+
+
 /**
  * Main function that will be run by the scheduler.
  *
@@ -104,8 +111,10 @@ run (void *cls, char *const *args, const char *cfgfile,
   struct Contract contract;
   #endif
   struct GNUNET_TIME_Absolute deldate;
+  struct GNUNET_TIME_Absolute edate;
   struct GNUNET_TIME_Absolute now;
   uint64_t nounce;
+  struct GNUNET_HashCode h_contract_str;
 
   db_conn = NULL;
   keyfile = NULL;
@@ -114,7 +123,7 @@ run (void *cls, char *const *args, const char *cfgfile,
 
 
   db_conn = MERCHANT_DB_connect (config);
-  if (GNUNET_OK != MERCHANT_DB_initialize (db_conn, GNUNET_YES))
+  if (GNUNET_OK != MERCHANT_DB_initialize (db_conn, GNUNET_NO))
   {
     printf ("no db init'd\n");
     result = GNUNET_SYSERR;
@@ -272,17 +281,39 @@ run (void *cls, char *const *args, const char *cfgfile,
 
   j_wire = MERCHANT_get_wire_json (wire, nounce, now); 
 
-  if (GNUNET_SYSERR == MERCHANT_handle_contract (j_fake_contract,
+  if (NULL == (contract_tmp_str = MERCHANT_handle_contract (j_fake_contract,
                                                  db_conn,
 			                         &contract,
 						 now,
 						 now,
 						 now,
-						 nounce,
-						 contract_tmp_str))
+						 nounce)))
+						 
     printf ("errors in contract handling\n");
   else
     printf ("handling contract fine\n");
+  
+
+  /* try to get from DB the generated contract
+
+  printf ("contract string : %s\n", contract_tmp_str);
+  return;
+
+  */
+
+  GNUNET_CRYPTO_hash (contract_tmp_str, strlen (contract_tmp_str) + 1, &h_contract_str);
+
+
+
+  if (GNUNET_SYSERR == MERCHANT_DB_get_contract_values (db_conn, &h_contract_str, &nounce, &edate))
+    printf ("no hash found\n");
+  else
+  {
+
+    char *late = GNUNET_STRINGS_absolute_time_to_string (edate);
+    printf ("hash found!, nounce is : %d\n", nounce, late);
+    printf ("hash found!, time is : %s\n", late);
+  }
 
 }
 

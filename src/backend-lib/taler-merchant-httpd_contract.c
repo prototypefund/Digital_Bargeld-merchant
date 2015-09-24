@@ -99,27 +99,27 @@ MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
 * @param edate when the merchant wants to receive the wire transfer corresponding
 * to this deal (this value is also a field inside the 'wire' JSON format)
 * @param nounce the nounce used to hash the wire details
-* @param contract_str where to store the (stringified) contract
-* @return GNUNET_OK on success; GNUNET_SYSERR upon errors
+* @param contract_str where to store 
+* @return pointer to the (stringified) contract; NULL upon errors
 */
 
 /**
 * TODO: inspect reference counting and, accordingly, free those json_t*(s)
 * still allocated */
 
-uint32_t
+char *
 MERCHANT_handle_contract (const json_t *j_contract,
                           PGconn *db_conn,
 			  struct Contract *contract,
 			  struct GNUNET_TIME_Absolute timestamp,
 			  struct GNUNET_TIME_Absolute expiry,
 			  struct GNUNET_TIME_Absolute edate,
-			  uint64_t nounce,
-			  const char *contract_str)
+			  uint64_t nounce)
 {
   json_t *j_amount;
   json_int_t j_product_id;
   json_int_t j_trans_id;
+  char *contract_str;
 
   struct TALER_Amount amount;
 
@@ -134,12 +134,11 @@ MERCHANT_handle_contract (const json_t *j_contract,
 			 "product_id", &j_product_id))
   {
     printf ("no unpacking\n");
-    return GNUNET_SYSERR;
+    return NULL;
   }
 
-  /* needed for DB work */
-  TALER_json_to_amount (j_amount, &amount); // produces a WARNING..
-
+  /* DB will store the amount */
+  TALER_json_to_amount (j_amount, &amount);
   contract_str = json_dumps (j_contract, JSON_COMPACT | JSON_PRESERVE_ORDER);
   GNUNET_CRYPTO_hash (contract_str, strlen (contract_str) + 1,
                       &contract->h_contract_details);
@@ -157,7 +156,8 @@ MERCHANT_handle_contract (const json_t *j_contract,
                                                     contract_str,
                                                     nounce,
                                                     (uint64_t) j_product_id))
-    return GNUNET_SYSERR;
-
-  return GNUNET_OK;
+    return NULL; 
+  return contract_str;
 }
+
+

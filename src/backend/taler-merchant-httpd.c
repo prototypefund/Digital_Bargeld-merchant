@@ -563,9 +563,9 @@ url_handler (void *cls,
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
 
     if (NULL == (j_contract_add = json_pack ("{s:o, s:o, s:o}",
-                                        "merchant_pub", eddsa_pub_enc,
-					"H_wire", j_h_json_wire,
-					"timestamp", TALER_json_from_abs (now))))
+                                             "merchant_pub", eddsa_pub_enc,
+                                             "H_wire", j_h_json_wire,
+                                             "timestamp", TALER_json_from_abs (now))))
     {
       printf ("BAD contract enhancement\n");
       goto end;
