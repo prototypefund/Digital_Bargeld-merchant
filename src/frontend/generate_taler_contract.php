@@ -25,7 +25,7 @@
      to the wallet
 */
 
-$cli_debug = TRUE;
+$cli_debug = !TRUE;
 
 // 1) recover the session information
 session_start();

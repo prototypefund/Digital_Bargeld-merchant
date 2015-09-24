@@ -557,6 +557,11 @@ url_handler (void *cls,
     edate = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
     refund = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
 
+    TALER_round_abs_time (&now);
+    TALER_round_abs_time (&expiry);
+    TALER_round_abs_time (&edate);
+    TALER_round_abs_time (&refund);
+
     /* getting the SEPA-aware JSON */
     /* nounce for hashing the wire object */
     nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);

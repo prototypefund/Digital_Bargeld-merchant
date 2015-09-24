@@ -79,7 +79,6 @@ run (void *cls, char *const *args, const char *cfgfile,
 
 {
   json_t *j_fake_contract;
-  json_t *j_root;
   json_t *j_wire;
   json_t *j_details;
   json_t *j_mints;
@@ -98,8 +97,6 @@ run (void *cls, char *const *args, const char *cfgfile,
   json_t *j_merchant_zipcode;
   json_t *j_lnames;
   json_t *j_deldate;
-  json_t *j_expiry;
-  char *str;
   char *contract_tmp_str;
   char *desc;
   struct TALER_Amount amount;
@@ -216,11 +213,10 @@ run (void *cls, char *const *args, const char *cfgfile,
   /* End of 'item' object definition */
   
   /* Delivery date: OPTIONAL FIELD */
-  deldate = GNUNET_TIME_absolute_add (GNUNET_TIME_absolute_get (),
-                                      GNUNET_TIME_UNIT_WEEKS);
-  j_deldate = TALER_json_from_abs (deldate);
-
-  
+  now = GNUNET_TIME_absolute_get ();
+  TALER_round_abs_time (&now);
+//  deldate = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
+  j_deldate = TALER_json_from_abs (now);
 
   /* Delivery location: OPTIONAL FIELD */
   j_delloc = json_string ("MALTK"); /* just a 'tag' which points to some well defined location */
@@ -277,7 +273,6 @@ run (void *cls, char *const *args, const char *cfgfile,
   #endif
 
   nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
-  now = GNUNET_TIME_absolute_get ();
 
   j_wire = MERCHANT_get_wire_json (wire, nounce, now); 
 
@@ -303,16 +298,13 @@ run (void *cls, char *const *args, const char *cfgfile,
   */
 
   GNUNET_CRYPTO_hash (contract_tmp_str, strlen (contract_tmp_str) + 1, &h_contract_str);
-
-
-
   if (GNUNET_SYSERR == MERCHANT_DB_get_contract_values (db_conn, &h_contract_str, &nounce, &edate))
     printf ("no hash found\n");
   else
   {
 
     char *late = GNUNET_STRINGS_absolute_time_to_string (edate);
-    printf ("hash found!, nounce is : %d\n", nounce, late);
+    printf ("hash found!, nounce is : %llu\n", nounce);
     printf ("hash found!, time is : %s\n", late);
   }
 
