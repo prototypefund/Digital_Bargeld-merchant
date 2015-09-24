@@ -97,6 +97,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                           "timestamp INT8 NOT NULL,"
                           "expiry INT8 NOT NULL,"
                           "edate INT8 NOT NULL,"
+                          "refund_deadline INT8 NOT NULL,"
                           "product INT8 NOT NULL);"
                           "CREATE %1$s TABLE IF NOT EXISTS checkouts ("
                           "coin_pub BYTEA PRIMARY KEY,"
@@ -122,10 +123,10 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                    (conn,
                     "contract_create",
                     "INSERT INTO contracts"
-                    "(contract_id, hash, timestamp, expiry, edate, amount, amount_fraction, amount_currency,"
+                    "(contract_id, hash, timestamp, expiry, edate, refund_deadline, amount, amount_fraction, amount_currency,"
 		    "description, nounce, product) VALUES"
-                    "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
-                    11, NULL)));
+                    "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+                    12, NULL)));
   EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
   PQclear (res);
 
@@ -214,6 +215,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
 * @param expiry the time when the contract will expire
 * @param edate when the merchant wants to receive the wire transfer corresponding
 * to this deal (this value is also a field inside the 'wire' JSON format)
+* @param refund deadline until which the merchant can return the paid amount
 * @param amount the taler amount corresponding to the contract
 * @param hash of the stringified JSON corresponding to this contract
 * @param c_id contract's id
@@ -228,6 +230,7 @@ MERCHANT_DB_contract_create (PGconn *conn,
                              const struct GNUNET_TIME_Absolute timestamp,
                              const struct GNUNET_TIME_Absolute expiry,
 			     struct GNUNET_TIME_Absolute edate,
+			     struct GNUNET_TIME_Absolute refund,
                              const struct TALER_Amount *amount,
 			     const struct GNUNET_HashCode *h_contract,
 			     uint64_t c_id,
@@ -250,6 +253,7 @@ MERCHANT_DB_contract_create (PGconn *conn,
     TALER_PQ_query_param_absolute_time (&timestamp),
     TALER_PQ_query_param_absolute_time (&expiry),
     TALER_PQ_query_param_absolute_time (&edate),
+    TALER_PQ_query_param_absolute_time (&refund),
     TALER_PQ_query_param_amount (amount),
     /* A *string* is being put in the following statement,
     though the column is declared as *blob*. Will this be

@@ -25,7 +25,7 @@
      to the wallet
 */
 
-$cli_debug = !TRUE;
+$cli_debug = TRUE;
 
 // 1) recover the session information
 session_start();
@@ -47,11 +47,9 @@ if (!$cli_debug)
 else
 {
   $receiver = "Test Receiver";
-  $amount = "5";
+  $amount = 5;
 
 }
-
-
 
 /* Fill in variables for simple JSON contract */
 // fake product id 
@@ -136,7 +134,7 @@ http_response_code ($status_code);
 // Now generate our body  
 if ($status_code != 200)
 {
-  echo "Error while generating the contract, response code: " . $status_code;
+  echo "Error while generating the contract, response code: " . $status_code . "\n";
 }
 else
 {

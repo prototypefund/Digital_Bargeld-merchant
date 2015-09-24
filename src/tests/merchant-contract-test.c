@@ -203,11 +203,10 @@ run (void *cls, char *const *args, const char *cfgfile,
   j_teatax = json_pack ("{s:o}",
                         "teatax", j_tax_amount);
 
-  if (NULL == (j_item = json_pack ("{s:s, s:I, s:o, s:I, s:[o]}",
+  if (NULL == (j_item = json_pack ("{s:s, s:I, s:o, s:[o]}",
                       "description", desc,
 		      "quantity", json_integer_value (j_quantity),
 		      "itemprice", j_item_price,
-		      "product_id", json_integer_value (j_pid),
 		      "taxes", j_teatax)))
   {
     printf ("error in packing [j_item: %p]\n", j_item);
@@ -252,7 +251,8 @@ run (void *cls, char *const *args, const char *cfgfile,
 
 
 
-  j_details = json_pack ("{s:o, s:o, s:o, s:o, s:o}",
+  j_details = json_pack ("{s:I, s:o, s:o, s:o, s:o, s:o}",
+		         "product_id", json_integer_value (j_pid),
                          "items", j_item,
 			 "delivery date", j_deldate,
 			 "delivery location", j_delloc,
@@ -284,6 +284,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   if (NULL == (contract_tmp_str = MERCHANT_handle_contract (j_fake_contract,
                                                  db_conn,
 			                         &contract,
+						 now,
 						 now,
 						 now,
 						 now,

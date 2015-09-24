@@ -66,6 +66,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp);
 * @param expiry the time when the contract will expire
 * @param edate when the merchant wants to receive the wire transfer corresponding
 * to this deal (this value is also a field inside the 'wire' JSON format)
+* @param refund deadline until which the merchant can return the paid amount
 * @param amount the taler amount corresponding to the contract
 * @param hash of the stringified JSON corresponding to this contract
 * @param c_id contract's id
@@ -80,6 +81,7 @@ MERCHANT_DB_contract_create (PGconn *conn,
                              const struct GNUNET_TIME_Absolute timestamp,
                              const struct GNUNET_TIME_Absolute expiry,
 			     struct GNUNET_TIME_Absolute edate,
+			     struct GNUNET_TIME_Absolute refund,
                              const struct TALER_Amount *amount,
 			     const struct GNUNET_HashCode *h_contract,
 			     uint64_t c_id,

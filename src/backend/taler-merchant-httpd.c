@@ -342,35 +342,26 @@ url_handler (void *cls,
   struct MHD_Response *resp;
   json_t *root;
   json_t *j_sig_enc;
+  json_t *j_h_contract;
+  json_t *j_tmp;
   json_t *eddsa_pub_enc;
   json_t *response;
   json_t *j_mints;
   json_t *j_mint;
   json_t *j_wire;
   int cnt; /* loop counter */
-  char *str; /* to debug JSONs */
   char *deposit_body;
-  json_t *root_tmp;
   json_t *j_contract_add;
-  json_t *j_details_tmp;
-  json_t *j_max_fee_tmp;
-  json_int_t j_int_trans_id_tmp;
-  json_t *j_trans_id_tmp;
-  int64_t trans_id_tmp;
-  char *ub_sig;
-  char *coin_pub;
-  char *denom_key;
-  char *contract_sig;
-  char *h_contract;
   struct GNUNET_TIME_Absolute now;
   struct GNUNET_TIME_Absolute expiry;
   struct GNUNET_TIME_Absolute edate;
+  struct GNUNET_TIME_Absolute refund;
   struct GNUNET_HashCode h_json_wire;
-  struct TALER_Amount amount_tmp;
   json_t *j_h_json_wire;
   struct curl_slist *slist;
   char *contract_str;
   struct GNUNET_HashCode h_contract_str;
+  uint64_t nounce;
 
   CURL *curl;
   CURLcode curl_res;
@@ -428,18 +419,44 @@ url_handler (void *cls,
     TODO: Check if there is a row in 'contracts' table corresponding
     to this contract ('s hash). If so, the corresponding 'nounce' and
     'edate' have to be retrieved */
+
+    /* Get this dep. perm.'s H_contract */
     
-    j_wire = 
-
-
+    if (NULL == (j_h_contract = json_object_get (root, "H_contract")))
+    {
+      printf ("H_contract field missing\n");
+      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      goto end;
+    }
+    TALER_json_to_data (j_h_contract, &h_contract_str, sizeof (struct GNUNET_HashCode));
+    if (GNUNET_SYSERR ==
+          MERCHANT_DB_get_contract_values (db_conn,
+	                                   &h_contract_str,
+					   &nounce,
+					   &edate))
+    {
+      printf ("not existing contract\n");
+      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      goto end;
+    }
+    /* Reproducing the wire object */
+    j_wire = MERCHANT_get_wire_json (wire,
+                                     nounce,
+				     edate);
     /* Encoding merchant's key */
     GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
 
-    /* Crafting the wire JSON */
     if (NULL == (j_tmp = json_pack ("{s:o, s:I}",
                                     "merchant_pub", eddsa_pub_enc,
 				    "wire", j_wire)))
+
+    if (-1 == json_object_update (root, j_tmp))
+    {
+       printf ("depperm not augmented\n");
+       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+       goto end;
+    }
 
     /* POST to mint's "/deposit" */
     curl = curl_easy_init (); 
@@ -457,7 +474,7 @@ url_handler (void *cls,
       /* NOTE: hopefully, this string won't need any URL-encoding, since as for the
       Jansson specs, any space and-or newline are not in place using JSON_COMPACT
       flag */
-      deposit_body = json_dumps (j_depperm, JSON_COMPACT | JSON_PRESERVE_ORDER);
+      deposit_body = json_dumps (root, JSON_COMPACT | JSON_PRESERVE_ORDER);
       curl_easy_setopt(curl, CURLOPT_POSTFIELDS, deposit_body);
 
       curl_res = curl_easy_perform (curl);
@@ -520,31 +537,25 @@ url_handler (void *cls,
                           GNUNET_CRYPTO_eddsa_public_key_to_string (&mint_infos[cnt].pubkey));
       json_array_append_new (j_mints, j_mint);
 
-      #define DEBUGG
-      #ifdef DEBUG
+      #if 0
       printf ("mint(s): url %s, key %s\n", mint_infos[cnt].hostname,
               GNUNET_CRYPTO_eddsa_public_key_to_string (&mint_infos[cnt].pubkey));
-      str = json_dumps (j_mint, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+      char *str = json_dumps (j_mint, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
       printf ("%s\n", str);
       #endif
         
     }
 
-    if (-1 == (json_object_update (root, j_mints)))
-    {
-      printf ("no mints specified in contract\n");  
-      goto end;
-    
-
-    }
-
-
     /* timestamp */
     now = GNUNET_TIME_absolute_get ();
     /* expiry */
     expiry = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
-    /* edate */
+    /* edate, note: this value must be generated now (and not when the
+    wallet sends back a deposit permission because the hashed 'wire' object,
+    which carries this values in it, has to be included in the signed bundle
+    by the wallet) */
     edate = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
+    refund = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
 
     /* getting the SEPA-aware JSON */
     /* nounce for hashing the wire object */
@@ -559,33 +570,41 @@ url_handler (void *cls,
     if (GNUNET_SYSERR == TALER_hash_json (j_wire, &h_json_wire))
       goto end;
     j_h_json_wire = TALER_json_from_data (&h_json_wire, sizeof (struct GNUNET_HashCode));
-    /* get key JSON entry */
+    /* JSONify public key */
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
 
-    if (NULL == (j_contract_add = json_pack ("{s:o, s:o, s:o}",
+    if (NULL == (j_contract_add = json_pack ("{s:o, s:o, s:o, s:o, s:o}",
                                              "merchant_pub", eddsa_pub_enc,
                                              "H_wire", j_h_json_wire,
-                                             "timestamp", TALER_json_from_abs (now))))
+                                             "timestamp", TALER_json_from_abs (now),
+                                             "refund", TALER_json_from_abs (refund),
+					     "mints", j_mints)))
     {
       printf ("BAD contract enhancement\n");
       goto end;
     }
 
     /* melt to what received from the wallet */
-    if (-1 == json_object_update (j_contract_add, root))
+    if (-1 == json_object_update (root, j_contract_add))
     {
       printf ("depperm response not built\n");
       goto end; 
     }
 
-    if (GNUNET_SYSERR == MERCHANT_handle_contract (root,
-                                                   db_conn,
-			                           &contract,
-						   now,
-						   expiry,
-						   edate,
-						   nounce,
-						   contract_str))
+      #if 0
+      char *str = json_dumps (root, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
+      printf ("augmented root : %s\n", str);
+      #endif
+
+
+    if (NULL == (contract_str = MERCHANT_handle_contract (root,
+                                                          db_conn,
+	                                                  &contract,
+		                                          now,
+					                  expiry,
+					                  edate,
+							  refund,
+					                  nounce)))
     {
       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
       goto end;
@@ -600,7 +619,10 @@ url_handler (void *cls,
     *
     * {"contract" : {the contract in "plain" JSON},
     *  "sig" : base32 encoding of the signed 'struct ContractNBO',
-    *  "eddsa_pub" : base32 encoding of merchant's public key}
+    *  "eddsa_pub" : base32 encoding of merchant's public key,
+    *  "h_contract" : the wallet will use this in the signature (to
+    *  avoid neverending bugs due to how JavaScript stringifies the
+    *  JSON respect to how libjansson does. To be soon removed.)}
     *
     */
 	
@@ -613,7 +635,7 @@ url_handler (void *cls,
                           "sig", j_sig_enc,
 	                  "eddsa_pub", eddsa_pub_enc,
 			  "h_contract",
-			  TALER_json_from_data (h_contract_str, sizeof (struct GNUNET_HashCode)));
+			  TALER_json_from_data ((void *) &h_contract_str, sizeof (struct GNUNET_HashCode)));
 
     GNUNET_free (contract_str);
 
@@ -769,7 +791,6 @@ run (void *cls, char *const *args, const char *cfgfile,
 
   /* WARNING: a 'poll_mhd ()' call is here in the original merchant. Is that
   mandatory ? */
-  GNUNET_CRYPTO_hash (wire, sizeof (*wire), &h_wire);
   result = GNUNET_OK;
 
   EXITIF_exit:
