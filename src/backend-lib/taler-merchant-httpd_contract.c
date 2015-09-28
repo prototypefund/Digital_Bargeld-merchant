@@ -68,15 +68,14 @@ MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
   json_t *j_edate;
   json_t *j_nounce;
 
-  nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
   j_nounce = json_integer (nounce);
   j_edate = TALER_json_from_abs (edate);
 
-  if (NULL == (root = json_pack ("{s:s, s:s, s:s, s:s, s:o}",
-                                 "type", "SEPA",
+  if (NULL == (root = json_pack ("{s:{s:s, s:s, s:s, s:s, s:o, s:I}}",
+                                 "wire", "type", "SEPA",
 		                 "IBAN", wire->iban,
 		                 "name", wire->name,
-		                 "BIC", wire->bic,
+		                 "bic", wire->bic,
 		                 "edate", j_edate,
 		                 "r", json_integer_value (j_nounce))))
     return NULL;

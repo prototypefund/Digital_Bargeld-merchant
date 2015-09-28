@@ -329,7 +329,7 @@ url_handler (void *cls,
              void **connection_cls)
 {
 
-  printf ("%s\n", url);
+  /*printf ("%s\n", url);*/
   unsigned int status;
   unsigned int no_destroy;
   struct GNUNET_CRYPTO_EddsaSignature c_sig;
@@ -405,23 +405,15 @@ url_handler (void *cls,
       goto end;
     }
 
-    /* the POST's body has to be fetched furthermore */
+    /* the POST's body has to be further fetched */
     if ((GNUNET_NO == res) || (NULL == root))
       return MHD_YES;
     
-    /*
-
-    Roughly, the backend must add to this JSON:
-     
-     1. The merchant's public key
-     2. wire
-     
-    TODO: Check if there is a row in 'contracts' table corresponding
-    to this contract ('s hash). If so, the corresponding 'nounce' and
-    'edate' have to be retrieved */
+    /* The merchant will only add its 'wire' object to the JSON
+    it got from the wallet */
 
     /* Get this dep. perm.'s H_contract */
-    
+	    
     if (NULL == (j_h_contract = json_object_get (root, "H_contract")))
     {
       printf ("H_contract field missing\n");
@@ -429,6 +421,10 @@ url_handler (void *cls,
       goto end;
     }
     TALER_json_to_data (j_h_contract, &h_contract_str, sizeof (struct GNUNET_HashCode));
+
+    nounce = 0;
+    edate.abs_value_us = 0;
+
     if (GNUNET_SYSERR ==
           MERCHANT_DB_get_contract_values (db_conn,
 	                                   &h_contract_str,
@@ -439,24 +435,69 @@ url_handler (void *cls,
       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
       goto end;
     }
+
+    #if 1
+    printf ("rtrv wire: nounce %llu, edate %llu\n", nounce, edate.abs_value_us);
+    #endif
+
     /* Reproducing the wire object */
-    j_wire = MERCHANT_get_wire_json (wire,
-                                     nounce,
-				     edate);
-    /* Encoding merchant's key */
+    if (NULL == (j_wire = MERCHANT_get_wire_json (wire,
+                                                  nounce,
+				                  edate)))
+
+    {
+       printf ("wire object not reproduced\n");
+       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+       goto end;
+    }
+
+    #if 1
+
+    json_int_t deb_nounce;
+    json_unpack (j_wire, "{s:I}", "r", &deb_nounce);
+    printf ("merch side, nounce %llu", deb_nounce);
+
+    #endif
+    #if 0 /* debug depperm signing */
+    char *hcon; 
+    struct GNUNET_HashCode hhwir;
+    char *hwir; 
+
+    TALER_hash_json (j_wire, &hhwir);
+    hcon = GNUNET_STRINGS_data_to_string_alloc (&h_contract_str, sizeof (struct GNUNET_HashCode));
+    hwir = GNUNET_STRINGS_data_to_string_alloc (&hhwir, sizeof (struct GNUNET_HashCode));
+    printf ("merchant side: hcon = %s,\n hwir = %s\n", hcon, hwir);
+
+    free (hcon);
+    free (hwir);
+    #endif
+
+
+    #if 0
+    /* merchant's public key is already packed in by the wallet */
+
     GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
-
-    if (NULL == (j_tmp = json_pack ("{s:o, s:I}",
+    if (NULL == (j_tmp = json_pack ("{s:o, s:o}",
                                     "merchant_pub", eddsa_pub_enc,
-				    "wire", j_wire)))
-
-    if (-1 == json_object_update (root, j_tmp))
+     				    "wire", j_wire)))
+    #endif
+    if (-1 == json_object_update (root, j_wire))
     {
        printf ("depperm not augmented\n");
        status = MHD_HTTP_INTERNAL_SERVER_ERROR;
        goto end;
     }
+
+    #if 0
+    char *str;
+    str = json_dumps (root, JSON_INDENT (2));
+    //printf ("adding to depperm : %s\n", str);
+    printf ("augmented deposit permission : %s\n", str);
+    GNUNET_free (str);
+    //status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+    //goto end;
+    #endif
 
     /* POST to mint's "/deposit" */
     curl = curl_easy_init (); 
@@ -486,7 +527,7 @@ url_handler (void *cls,
         goto end; 
       }
       else
-        printf ("deposit ok\n");
+        printf ("\ndeposit request issued\n");
 
      curl_easy_cleanup(curl);
     
@@ -521,12 +562,14 @@ url_handler (void *cls,
       goto end;
     }
 
+
     /* the POST's body has to be fetched furthermore */
     if ((GNUNET_NO == res) || (NULL == root))
       return MHD_YES;
     
     /* The frontend should supply a JSON in the format described in
     http://link-to-specs : */
+
 
     /* TODO Specifying the accepted mints, in the contract */
     j_mints = json_array ();
@@ -562,25 +605,48 @@ url_handler (void *cls,
     TALER_round_abs_time (&edate);
     TALER_round_abs_time (&refund);
 
+    #if 0
+    struct GNUNET_HashCode ts;
+    struct GNUNET_HashCode ref;
+    char *ts_enc;
+    char *ref_enc;
+    GNUNET_CRYPTO_hash (&now, sizeof (struct GNUNET_TIME_Absolute), &ts);
+    GNUNET_CRYPTO_hash (&refund, sizeof (struct GNUNET_TIME_Absolute), &ref);
+    ts_enc = GNUNET_STRINGS_data_to_string_alloc (&ts, sizeof (struct GNUNET_HashCode));
+    ref_enc = GNUNET_STRINGS_data_to_string_alloc (&ref, sizeof (struct GNUNET_HashCode));
+    printf ("hashing the time (AFTER rounding): ts = %s, ref = %s\n", ts_enc, ref_enc);
+    #endif
+
+
     /* getting the SEPA-aware JSON */
     /* nounce for hashing the wire object */
     nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
+
     /* get wire object */
-    if (NULL ==
-         (j_wire = MERCHANT_get_wire_json (wire,
-                                           nounce,                       
-                                           edate)))
+    
+    if (NULL == (j_wire = MERCHANT_get_wire_json (wire,
+                                                  nounce,                       
+                                                  edate)))
+    {
+      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
       goto end;
+    }
+
+    #if 1
+    printf ("gnr wire: nounce %llu, edate %llu\n", nounce, edate.abs_value_us);
+    #endif
+
     /* hash wire objcet */
     if (GNUNET_SYSERR == TALER_hash_json (j_wire, &h_json_wire))
       goto end;
-    j_h_json_wire = TALER_json_from_data (&h_json_wire, sizeof (struct GNUNET_HashCode));
+
+    j_h_json_wire = TALER_json_from_data ((void *) &h_json_wire, sizeof (struct GNUNET_HashCode));
     /* JSONify public key */
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
 
-    if (NULL == (j_contract_add = json_pack ("{s:o, s:o, s:o, s:o, s:o}",
+    if (NULL == (j_contract_add = json_pack ("{s:o, s:s, s:o, s:o, s:o}",
                                              "merchant_pub", eddsa_pub_enc,
-                                             "H_wire", j_h_json_wire,
+                                             "H_wire", json_string_value (j_h_json_wire),
                                              "timestamp", TALER_json_from_abs (now),
                                              "refund", TALER_json_from_abs (refund),
 					     "mints", j_mints)))
@@ -643,6 +709,10 @@ url_handler (void *cls,
 			  TALER_json_from_data ((void *) &h_contract_str, sizeof (struct GNUNET_HashCode)));
 
     GNUNET_free (contract_str);
+
+    #if 0
+    printf ("contract generated\n");
+    #endif
 
     TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
     return MHD_YES;
