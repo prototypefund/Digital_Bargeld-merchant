@@ -71,8 +71,8 @@ MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
   j_nounce = json_integer (nounce);
   j_edate = TALER_json_from_abs (edate);
 
-  if (NULL == (root = json_pack ("{s:{s:s, s:s, s:s, s:s, s:o, s:I}}",
-                                 "wire", "type", "SEPA",
+  if (NULL == (root = json_pack ("{s:s, s:s, s:s, s:s, s:o, s:I}",
+                                 "type", "SEPA",
 		                 "IBAN", wire->iban,
 		                 "name", wire->name,
 		                 "bic", wire->bic,
