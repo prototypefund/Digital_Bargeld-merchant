@@ -123,7 +123,8 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                    (conn,
                     "contract_create",
                     "INSERT INTO contracts"
-                    "(contract_id, hash, timestamp, expiry, edate, refund_deadline, amount, amount_fraction, amount_currency,"
+                    "(contract_id, hash, timestamp, expiry, edate,"
+		    "refund_deadline, amount, amount_fraction, amount_currency,"
 		    "description, nounce, product) VALUES"
                     "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
                     12, NULL)));
