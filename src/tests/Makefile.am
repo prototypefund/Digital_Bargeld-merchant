@@ -2,17 +2,17 @@
 AM_CPPFLAGS = -I$(top_srcdir)/src/include -I$(top_srcdir)/src/backend-lib/
 
 bin_PROGRAMS = \
-  merchant-contract-test
+  test-contract
 
 #merchant_contract_test_CFLAGS = \
 #  -Wl,--verbose
 
-merchant_contract_test_SOURCES = \
-  merchant-contract-test.c \
+test_contract_SOURCES = \
+  test_contract.c \
   merchant.c \
   ../backend-lib/merchant_db.c ../backend-lib/merchant_db.h
 
-merchant_contract_test_LDADD = \
+test_contract_LDADD = \
   $(LIBGCRYPT_LIBS) \
   -ltalerutil \
   -ltalermerchant \
@@ -22,5 +22,5 @@ merchant_contract_test_LDADD = \
   -ltalerpq \
   -lgnunetpostgres \
   -lpq \
-  -ltalermerchant \
+  $(top_srcdir)/src/backend-lib/libtalermerchant.la \
   -lpthread

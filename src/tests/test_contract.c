@@ -24,6 +24,7 @@
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_json_lib.h>
+#include "merchant.h"
 #include "merchant_db.h"
 #include <taler_merchant_lib.h>
 
@@ -107,11 +108,13 @@ run (void *cls, char *const *args, const char *cfgfile,
   #else
   struct Contract contract;
   #endif
-  struct GNUNET_TIME_Absolute deldate;
   struct GNUNET_TIME_Absolute edate;
   struct GNUNET_TIME_Absolute now;
   uint64_t nounce;
   struct GNUNET_HashCode h_contract_str;
+  char *aa;
+  char *fancy_time;
+  uint32_t ret;
 
   db_conn = NULL;
   keyfile = NULL;
@@ -150,7 +153,8 @@ run (void *cls, char *const *args, const char *cfgfile,
   j_amount = TALER_json_from_amount (&amount);
 
   /* Transaction ID*/
-  t_id = (int32_t) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX);
+  //t_id = (int32_t) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX);
+  t_id = 321;
 
   if (t_id < 0)
      j_id = json_integer ((-1) * t_id);
@@ -276,38 +280,38 @@ run (void *cls, char *const *args, const char *cfgfile,
 
   j_wire = MERCHANT_get_wire_json (wire, nounce, now); 
 
-  if (NULL == (contract_tmp_str = MERCHANT_handle_contract (j_fake_contract,
-                                                 db_conn,
-			                         &contract,
-						 now,
-						 now,
-						 now,
-						 now,
-						 nounce)))
-						 
-    printf ("errors in contract handling\n");
+  ret = MERCHANT_handle_contract (j_fake_contract,
+                                  db_conn,
+                                  &contract,
+	                          now,
+			          now,
+			          now,
+			          now,
+			          &aa,
+			          nounce);
+  if (ret == GNUNET_NO)	 
+  {
+    printf ("Failed, contract already in DB\n");
+    return;
+  }
   else
     printf ("handling contract fine\n");
   
 
-  /* try to get from DB the generated contract
+  printf ("contract string : %s\n", aa);
 
-  printf ("contract string : %s\n", contract_tmp_str);
-  return;
-
-  */
-
-  GNUNET_CRYPTO_hash (contract_tmp_str, strlen (contract_tmp_str) + 1, &h_contract_str);
+  GNUNET_CRYPTO_hash (aa, strlen (aa) + 1, &h_contract_str);
   if (GNUNET_SYSERR == MERCHANT_DB_get_contract_values (db_conn, &h_contract_str, &nounce, &edate))
     printf ("no hash found\n");
   else
   {
 
-    char *late = GNUNET_STRINGS_absolute_time_to_string (edate);
+    fancy_time = GNUNET_STRINGS_absolute_time_to_string (edate);
     printf ("hash found!, nounce is : %llu\n", nounce);
-    printf ("hash found!, time is : %s\n", late);
+    printf ("hash found!, time is : %s\n", fancy_time);
   }
 
+  return;
 }
 
 

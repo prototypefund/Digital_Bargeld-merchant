@@ -24,31 +24,6 @@
   } while (0)
 
 /**
-* Generate the hash containing the information (= a nounce + merchant's IBAN) to
-* redeem money from mint in a subsequent /deposit operation
-* @param nounce the nounce
-* @param wire the merchant's wire details
-* @return the hash to be included in the contract's blob
-*
-*/
-
-static struct GNUNET_HashCode
-hash_wireformat (uint64_t nounce, const struct MERCHANT_WIREFORMAT_Sepa *wire)
-{
-  struct GNUNET_HashContext *hc;
-  struct GNUNET_HashCode hash;
-
-  hc = GNUNET_CRYPTO_hash_context_start ();
-  GNUNET_CRYPTO_hash_context_read (hc, wire->iban, strlen (wire->iban));
-  GNUNET_CRYPTO_hash_context_read (hc, wire->name, strlen (wire->name));
-  GNUNET_CRYPTO_hash_context_read (hc, wire->bic, strlen (wire->bic));
-  nounce = GNUNET_htonll (nounce);
-  GNUNET_CRYPTO_hash_context_read (hc, &nounce, sizeof (nounce));
-  GNUNET_CRYPTO_hash_context_finish (hc, &hash);
-  return hash;
-}
-
-/**
  * Take the global wire details and return a JSON containing them,
  * compliantly with the Taler's API.
  * @param wire the merchant's wire details
@@ -99,22 +74,24 @@ MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
 * to this deal (this value is also a field inside the 'wire' JSON format)
 * @param refund deadline until which the merchant can return the paid amount
 * @param nounce the nounce used to hash the wire details
-* @param contract_str where to store 
-* @return pointer to the (stringified) contract; NULL upon errors
+* @param a will be pointed to the (allocated) stringified 0-terminated contract
+* @return GNUNET_OK on success, GNUNET_NO if attempting to double insert the
+* same contract, GNUNET_SYSERR in case of other (mostly DB related) errors.
 */
 
 /**
 * TODO: inspect reference counting and, accordingly, free those json_t*(s)
 * still allocated */
 
-char *
-MERCHANT_handle_contract (const json_t *j_contract,
+uint32_t
+MERCHANT_handle_contract (json_t *j_contract,
                           PGconn *db_conn,
 			  struct Contract *contract,
 			  struct GNUNET_TIME_Absolute timestamp,
 			  struct GNUNET_TIME_Absolute expiry,
 			  struct GNUNET_TIME_Absolute edate,
 			  struct GNUNET_TIME_Absolute refund,
+			  char **a,
 			  uint64_t nounce)
 {
   json_t *j_amount;
@@ -135,39 +112,27 @@ MERCHANT_handle_contract (const json_t *j_contract,
 			 &j_product_id))
   {
     printf ("no unpacking\n");
-    return NULL;
+    return GNUNET_SYSERR;
   }
-
-  /* DB will store the amount -- WARNING: this call produces a
-  'protocol violation' in json.c */
-
-  #if 0
-  char *str = json_dumps (j_amount, JSON_INDENT(2) | JSON_PRESERVE_ORDER);
-  printf ("extracted amount : %s\n", str);
-  #endif
-
 
   TALER_json_to_amount (j_amount, &amount);
   contract_str = json_dumps (j_contract, JSON_COMPACT | JSON_PRESERVE_ORDER);
+  *a = contract_str;
   GNUNET_CRYPTO_hash (contract_str, strlen (contract_str) + 1,
                       &contract->h_contract_details);
   contract->purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract->purpose.size = htonl (sizeof (struct Contract));
 
   // DB mgmt
-  if (GNUNET_SYSERR == MERCHANT_DB_contract_create (db_conn,
-                                                    timestamp,
-						    expiry,
-						    edate,
-						    refund,
-                                                    &amount,
-                                                    &contract->h_contract_details,
- 					            (uint64_t) j_trans_id, // safe?
-                                                    contract_str,
-                                                    nounce,
-                                                    (uint64_t) j_product_id))
-    return NULL; 
-  return contract_str;
+  return MERCHANT_DB_contract_create (db_conn,
+                                      timestamp,
+                                      expiry,
+	                              edate,
+				      refund,
+                                      &amount,
+                                      &contract->h_contract_details,
+ 				      (uint64_t) j_trans_id, // safe?
+                                      contract_str,
+                                      nounce,
+                                      (uint64_t) j_product_id);
 }
-
-

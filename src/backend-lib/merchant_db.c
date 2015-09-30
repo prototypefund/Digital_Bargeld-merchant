@@ -208,22 +208,25 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
 
 
 /**
-* Inserts a contract record into the database and if successfull returns the
-* serial number of the inserted row.
+* Insert a contract record into the database and if successfull
+* return the serial number of the inserted row.
 *
 * @param conn the database connection
 * @param timestamp the timestamp of this contract
 * @param expiry the time when the contract will expire
-* @param edate when the merchant wants to receive the wire transfer corresponding
-* to this deal (this value is also a field inside the 'wire' JSON format)
-* @param refund deadline until which the merchant can return the paid amount
+* @param edate when the merchant wants to receive the wire transfer
+* corresponding to this deal (this value is also a field inside the
+* 'wire' JSON format)
+* @param refund deadline until which the merchant can return the paid
+* amount
 * @param amount the taler amount corresponding to the contract
 * @param hash of the stringified JSON corresponding to this contract
 * @param c_id contract's id
 * @param desc descripition of the contract
 * @param nounce a random 64-bit nounce
 * @param product description to identify a product
-* @return GNUNET_OK on success, GNUNET_SYSERR upon error
+* @return GNUNET_OK on success, GNUNET_NO if attempting to insert an
+* already inserted @a c_id, GNUNET_SYSERR for other errors.
 */
 
 uint32_t
@@ -268,7 +271,34 @@ MERCHANT_DB_contract_create (PGconn *conn,
   /* NOTE: the statement is prepared by MERCHANT_DB_initialize function */
   res = TALER_PQ_exec_prepared (conn, "contract_create", params);
   status = PQresultStatus (res);
-  EXITIF (PGRES_COMMAND_OK != status);
+
+  if (PGRES_COMMAND_OK != status)
+  {
+    const char *sqlstate;
+
+    sqlstate = PQresultErrorField (res, PG_DIAG_SQLSTATE);
+    if (NULL == sqlstate)
+    {
+      /* very unexpected... */
+      GNUNET_break (0);
+      PQclear (res);
+      return GNUNET_SYSERR;
+    }
+    /* 40P01: deadlock, 40001: serialization failure */
+    if ( (0 == strcmp (sqlstate,
+                       "23505")))
+    {
+      /* Primary key violation */
+      PQclear (res);
+      return GNUNET_NO;
+    }
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Database commit failure: %s\n",
+                sqlstate);
+    PQclear (res);
+    return GNUNET_SYSERR;
+  }
+
   PQclear (res);
   return GNUNET_OK;
 

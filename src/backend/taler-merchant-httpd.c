@@ -366,7 +366,7 @@ url_handler (void *cls,
   CURL *curl;
   CURLcode curl_res;
 
-  int res = GNUNET_SYSERR;
+  uint32_t res = GNUNET_SYSERR;
 
   #define URL_HELLO "/hello"
   #define URL_CONTRACT "/contract"
@@ -588,16 +588,23 @@ url_handler (void *cls,
       goto end; 
     }
 
-    if (NULL == (contract_str = MERCHANT_handle_contract (root,
-                                                          db_conn,
-	                                                  &contract,
-		                                          now,
-					                  expiry,
-					                  edate,
-							  refund,
-					                  nounce)))
+    res = MERCHANT_handle_contract (root,
+                                       db_conn,
+                                       &contract,
+                                       now,
+                                       expiry,
+				       edate,
+				       refund,
+				       &contract_str,
+				       nounce);
+    if (GNUNET_SYSERR == res)
     {
       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      goto end;
+    }
+    if (GNUNET_NO == res)
+    {
+      status = 	MHD_HTTP_METHOD_NOT_ACCEPTABLE;
       goto end;
     }
 

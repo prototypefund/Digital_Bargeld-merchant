@@ -17,47 +17,6 @@ struct Contract
 
 };
 
-GNUNET_NETWORK_STRUCT_BEGIN
-
-struct ContractNBO
-{
-  /**
-   * Purpose header for the signature over contract
-   */
-  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
-
-  /**
-   * The transaction identifier. NOTE: it was m[13]. TODO:
-   * change the API accordingly!
-   */
-  uint64_t m;
-
-  /**
-   * Expiry time
-   */
-  struct GNUNET_TIME_AbsoluteNBO t;
-
-  /**
-   * The invoice amount
-   */
-  struct TALER_AmountNBO amount;
-
-  /**
-   * The hash of the merchant's wire details (bank account information), with a nounce
-   */
-  struct GNUNET_HashCode h_wire;
-
-  /**
-   * Hash of the JSON contract in UTF-8 including 0-termination,
-   * using JSON_COMPACT encoding with sorted fields.
-   */
-  struct GNUNET_HashCode h_contract_details;
-
-};
-
-GNUNET_NETWORK_STRUCT_END
-
-
 /**
  * Take the global wire details and return a JSON containing them,
  * compliantly with the Taler's API.
@@ -86,20 +45,22 @@ MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
 * to this deal (this value is also a field inside the 'wire' JSON format)
 * @param refund deadline until which the merchant can return the paid amount
 * @param nounce the nounce used to hash the wire details
-* @param contract_str where to store 
-* @return pointer to the (stringified) contract; NULL upon errors
+* @param a will be pointed to the (allocated) stringified 0-terminated contract
+* @return GNUNET_OK on success, GNUNET_NO if attempting to double insert the
+* same contract, GNUNET_SYSERR in case of other (mostly DB related) errors.
 */
 
 /**
 * TODO: inspect reference counting and, accordingly, free those json_t*(s)
 * still allocated */
 
-char *
-MERCHANT_handle_contract (const json_t *j_contract,
+uint32_t
+MERCHANT_handle_contract (json_t *j_contract,
                           PGconn *db_conn,
 			  struct Contract *contract,
 			  struct GNUNET_TIME_Absolute timestamp,
 			  struct GNUNET_TIME_Absolute expiry,
 			  struct GNUNET_TIME_Absolute edate,
 			  struct GNUNET_TIME_Absolute refund,
+			  char **a,
 			  uint64_t nounce);
