@@ -48,7 +48,7 @@ $json = json_encode (array ('reserve_pub' => $reserve_pk,
                             'wire' => array ('type' => 'test'),
                             'amount' => array ('value' => intval($kudos_amount),
 	                                       'fraction' => 0,
-					       'currency' => 'EUR'))); // TODO 'KUDOS' example needs 'KUDOS' denom keys ..
+					       'currency' => 'KUDOS'))); // TODO 'KUDOS' example needs 'KUDOS' denom keys ..
 
 // craft the HTTP request
 $req = new http\Client\Request ("POST",
