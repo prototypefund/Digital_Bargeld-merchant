@@ -15,7 +15,6 @@ test_contract_SOURCES = \
 test_contract_LDADD = \
   $(LIBGCRYPT_LIBS) \
   -ltalerutil \
-  -ltalermerchant \
   -ljansson \
   -lgnunetutil \
   -ltalermint \
