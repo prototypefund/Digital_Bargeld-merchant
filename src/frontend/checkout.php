@@ -46,11 +46,14 @@
   // get the donation information from form
   $donation_receiver = $_POST['donation_receiver'];
   $donation_amount = $_POST['donation_amount'];
+  $donation_currency = $_POST['donation_currency'];
 
   // create PHP session and store donation information in session
   session_start();
   $_SESSION['receiver'] = $donation_receiver;
   $_SESSION['amount'] = $donation_amount;
+  $_SESSION['currency'] = $donation_currency;
+  echo $donation_currency;
 ?>
 
 <form name="tform" action="" method="POST">

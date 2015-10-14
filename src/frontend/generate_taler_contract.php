@@ -23,9 +23,8 @@
   2. generate the JSON to forward to the backend
   3. forward the response with the contract from the backend to
      to the wallet
-*/
-
-$cli_debug = !TRUE;
+*/ 
+$cli_debug = false;
 
 // 1) recover the session information
 session_start();
@@ -43,6 +42,7 @@ if (!$cli_debug)
 {
   $receiver = $_SESSION['receiver'];
   $amount = intval ($_SESSION['amount']);
+  $currency = $_SESSION['currency'];
 }
 else
 {
@@ -66,8 +66,6 @@ $desc = "Donation to " . $receiver;
 $value = $amount;
 // We don't have a fraction.
 $fraction = 0;
-// This is our 'toy' currency
-$currency = "EUR"; // NOTE: mint does NOT generate KUDOS denom. keys
 // The tax for this deal
 $teatax = array ('value' => 1,
                  'fraction' => 0,
