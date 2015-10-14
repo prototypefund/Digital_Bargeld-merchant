@@ -53,7 +53,6 @@
   $_SESSION['receiver'] = $donation_receiver;
   $_SESSION['amount'] = $donation_amount;
   $_SESSION['currency'] = $donation_currency;
-  echo $donation_currency;
 ?>
 
 <form name="tform" action="" method="POST">
