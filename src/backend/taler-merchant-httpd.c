@@ -378,7 +378,7 @@ url_handler (void *cls,
 {
 
   /*printf ("%s\n", url);*/
-  unsigned int status;
+  unsigned long status;
   unsigned int no_destroy;
   struct GNUNET_CRYPTO_EddsaSignature c_sig;
   struct GNUNET_CRYPTO_EddsaPublicKey pub;
@@ -509,8 +509,6 @@ url_handler (void *cls,
     mr.ptr = malloc(1);
     mr.size = 0;
 
-
-
     if (curl)
     {
     
@@ -543,7 +541,9 @@ url_handler (void *cls,
       curl_easy_cleanup(curl);
     
       /* Bounce back to the frontend what the mint said */
-      status = generate_message (&resp, mr.ptr);
+      //printf ("get %s\n", mr.ptr);
+      generate_message (&resp, mr.ptr);
+      curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &status);
       GNUNET_free (mr.ptr);
  
     }
