@@ -83,6 +83,10 @@
           <br>
           Paste your reserve public key here (right-click, "paste"):
           <input type="text" name="reserve_pk"></input>
+	  <select id="mint" name="mint_url">
+            <option value="demo.taler.net">mint @taler.net</option>
+            <option value="localhost:4241">local mint (port 4241)</option>
+	  </select>
           <br>
           Amount to credit to your reserve: 
           <select id="amount" name="kudos_amount">

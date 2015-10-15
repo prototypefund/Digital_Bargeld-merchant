@@ -41,6 +41,7 @@
 // Evaluate form
 $reserve_pk = $_POST['reserve_pk'];
 $kudos_amount = $_POST['kudos_amount'];
+$mint = $_POST['mint_url'];
 
 // pack the JSON
 $json = json_encode (array ('reserve_pub' => $reserve_pk, 
@@ -52,7 +53,7 @@ $json = json_encode (array ('reserve_pub' => $reserve_pk,
 
 // craft the HTTP request
 $req = new http\Client\Request ("POST",
-                                "http://demo.taler.net/admin/add/incoming",
+                                "http://" . $mint . "/admin/add/incoming",
 			        array ("Content-Type" => "application/json"));
 $req->getBody()->append ($json);
 
