@@ -135,8 +135,37 @@ struct MERCHANT_MintInfo *mint_infos;
  */
 unsigned int nmints;
 
+struct Mint_Response
+{
+  char *ptr;
+  size_t size;
+    
+};
 
-#if FUTURE_USE
+
+/**
+* Generate the 'hello world' response
+* @param connection a MHD connection
+* @param resp where to store the response for the calling function.
+* Note that in its original implementation this parameter was preceeded
+* by a '_'. Still not clear why.
+* @return HTTP status code reflecting the operation outcome
+*
+*/
+ 
+static unsigned int
+generate_hello (struct MHD_Response **resp)
+{
+ 
+  const char *hello = "Hello customer\n";
+  unsigned int ret;
+
+  *resp = MHD_create_response_from_buffer (strlen (hello), (void *) hello,
+                                           MHD_RESPMEM_PERSISTENT);
+  ret = 200;
+  return ret;
+}
+
 /**
 * Return the given message to the other end of connection
 * @msg (0-terminated) message to show
@@ -156,31 +185,50 @@ generate_message (struct MHD_Response **resp, const char *msg)
                                            MHD_RESPMEM_PERSISTENT);
   ret = 200;
   return ret;
-
-
 }
-#endif
 
 /**
-* Generate the 'hello world' response
-* @param connection a MHD connection
-* @param resp where to store the response for the calling function
-* @return HTTP status code reflecting the operation outcome
+* Callback to pass to curl used to store a HTTP response
+* in a custom memory location.
+* See http://curl.haxx.se/libcurl/c/getinmemory.html for a
+* detailed example
+*
+* @param contents the data gotten so far from the server
+* @param size symbolic (arbitrarily chosen by libcurl) unit
+* of bytes
+* @param nmemb factor to multiply by @a size to get the real
+* size of @a contents
+* @param userdata a pointer to a memory location which remains
+* the same across all the calls to this callback (i.e. it has
+* to be grown at each invocation of this callback)
+* @return number of written bytes
+* See http://curl.haxx.se/libcurl/c/CURLOPT_WRITEFUNCTION.html
+* for official documentation
 *
 */
- 
-static unsigned int
-generate_hello (struct MHD_Response **resp) // this parameter was preceded by a '_' in its original file. Why?
+size_t
+get_response_in_memory (char *contents,
+                        size_t size,
+			size_t nmemb,
+			void *userdata)
 {
- 
-  const char *hello = "Hello customer\n";
-  unsigned int ret;
+  struct Mint_Response *mr;
+  size_t realsize;
 
-  *resp = MHD_create_response_from_buffer (strlen (hello), (void *) hello,
-                                           MHD_RESPMEM_PERSISTENT);
-  ret = 200;
-  return ret;
+  realsize = size * nmemb;
+  mr = userdata;
+  mr->ptr = realloc (mr->ptr, mr->size + realsize + 1);
 
+  if (mr->ptr == NULL) {
+    printf ("Out of memory, could not get in memory mint's"
+            "response");
+    return 0;
+  }
+  memcpy(&(mr->ptr[mr->size]), contents, realsize);
+  mr->size += realsize;
+  mr->ptr[mr->size] = 0;
+
+  return realsize;
 
 }
 
@@ -457,6 +505,12 @@ url_handler (void *cls,
     /* POST to mint's "/deposit" */
     curl = curl_easy_init (); 
 
+    struct Mint_Response mr;
+    mr.ptr = malloc(1);
+    mr.size = 0;
+
+
+
     if (curl)
     {
     
@@ -466,7 +520,9 @@ url_handler (void *cls,
       /* FIXME the mint's URL is be retrieved from the partial deposit permission
       (received by the wallet) */
       curl_easy_setopt (curl, CURLOPT_URL, "http://demo.taler.net/deposit");
-    
+      curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, get_response_in_memory); 
+      curl_easy_setopt (curl, CURLOPT_WRITEDATA, (void *) &mr); 
+ 
       /* NOTE: hopefully, this string won't need any URL-encoding, since as for the
       Jansson specs, any space and-or newline are not in place using JSON_COMPACT
       flag */
@@ -484,10 +540,14 @@ url_handler (void *cls,
       else
         printf ("\ndeposit request issued\n");
 
-     curl_easy_cleanup(curl);
+      curl_easy_cleanup(curl);
     
-    
+      /* Bounce back to the frontend what the mint said */
+      status = generate_message (&resp, mr.ptr);
+      GNUNET_free (mr.ptr);
+ 
     }
+
 
   }
 
