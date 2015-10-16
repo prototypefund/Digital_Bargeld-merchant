@@ -85,7 +85,7 @@
           <input type="text" name="reserve_pk"></input>
 	  <select id="mint" name="mint_url">
             <option value="demo.taler.net">mint @taler.net</option>
-            <option value="localmint">localmint</option>
+            <option value="localmint">localmint (**)</option>
 	  </select>
           <br>
           Amount to credit to your reserve: 
@@ -135,6 +135,12 @@
          final offer from the merchant in a window secured
          by the Taler extension.  That way, you can spot the 
          error before committing to an incorrect contract.</p>
+      <p>(**) The 'localmint' option wants a mint whose base URL is "localmint".
+         A possible configuration for this would be having an entry like '127.0.0.1
+	    localmint' in '/etc/hosts' and a local HTTP virtual server which
+	 redirects calls to 'localmint' to '127.0.0.1:X', with 'X' being the port
+	 the mint is listening from.
+      </p>
     </div>
   </div>
   <script type="text/javascript">
