@@ -126,6 +126,14 @@ struct Mint
 static struct GNUNET_CONTAINER_MultiPeerMap *mints_map;
 
 /**
+ * Hashmap (with 'big entries') to make a mint's base URL
+ * to point to some mint-describing structure
+ */
+static struct GNUNET_CONTAINER_MultiHashMap *mints_hashmap;
+
+
+
+/**
  * Mints' URL,port,key triples
  */
 struct MERCHANT_MintInfo *mint_infos;
@@ -457,6 +465,25 @@ url_handler (void *cls,
     if ((GNUNET_NO == res) || (NULL == root))
       return MHD_YES;
     
+    /* Firstly, check if the wallet is paying against an approved
+      mint */
+    j_chosen_mint = json_object_get (root, "mint");
+    struct GNUNET_HashCode hash_key;
+    char *chosen_mint;
+
+    chosen_mint = json_string_value (j_chosen_mint);
+    GNUNET_CRYPTO_hash (chosen_mint, strlen (chosen_mint), &hash_key);
+    
+    if (NULL == GNUNET_CONTAINER_multihashmap_get (mints_hashmap, &hash_key))
+    {
+      printf ("Untrusted mint\n");
+      status = MHD_HTTP_FORBIDDEN;
+      goto end;    
+    
+    }
+
+    /* NOTE: from now on, the mint's base URL is pointed by 'chosen_mint' */
+      
     /* The merchant will only add its 'wire' object to the JSON
     it got from the wallet */
 
@@ -512,12 +539,14 @@ url_handler (void *cls,
     if (curl)
     {
     
+      char deposit_url[strlen (chosen_mint) + strlen ("http://") + strlen ("/deposit") + 1];
+      sprintf (deposit_url, "http://%s/deposit", chosen_mint);
       slist = curl_slist_append (slist, "Content-type: application/json");
       curl_easy_setopt (curl, CURLOPT_HTTPHEADER, slist);
 
       /* FIXME the mint's URL is be retrieved from the partial deposit permission
       (received by the wallet) */
-      curl_easy_setopt (curl, CURLOPT_URL, "http://demo.taler.net/deposit");
+      curl_easy_setopt (curl, CURLOPT_URL, deposit_url);
       curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, get_response_in_memory); 
       curl_easy_setopt (curl, CURLOPT_WRITEDATA, (void *) &mr); 
  
@@ -803,12 +832,18 @@ run (void *cls, char *const *args, const char *cfgfile,
                                                  &hostname));
 
   EXITIF (NULL == (mctx = TALER_MINT_init ()));
+  /* Still not used */
   EXITIF (NULL == (mints_map = GNUNET_CONTAINER_multipeermap_create (nmints, GNUNET_YES)));
+  /* Used when the wallet points out which mint it want to deal with.
+    That indication is made through the mint's base URL, which will be
+    the hash-key for this table */
+  EXITIF (NULL == (mints_hashmap = GNUNET_CONTAINER_multihashmap_create (nmints, GNUNET_NO)));
   
   for (cnt = 0; cnt < nmints; cnt++)
   {
     struct Mint *mint;
-  
+    struct GNUNET_HashCode mint_key;
+
     mint = GNUNET_new (struct Mint);
     mint->pubkey = mint_infos[cnt].pubkey;
     /* port this to the new API */
@@ -825,7 +860,20 @@ run (void *cls, char *const *args, const char *cfgfile,
      (struct GNUNET_PeerIdentity *) /* to retrieve now from cb's args -> */&mint->pubkey,
      mint,
      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_FAST));
+
+  /* 1 create hash key
+     2 create big entry
+     3 put
+  */
+   GNUNET_CRYPTO_hash (mint_infos[cnt].hostname,
+                       strlen (mint_infos[cnt].hostname),
+		       &mint_key); 
+   GNUNET_CONTAINER_multihashmap_put (mints_map,
+                                      &mint_key,
+				      &mint_infos[cnt],
+				      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY); 
   }
+
   mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,
                           port,
                           NULL, NULL,
