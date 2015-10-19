@@ -190,7 +190,7 @@ generate_message (struct MHD_Response **resp, const char *msg)
   unsigned int ret;
 
   *resp = MHD_create_response_from_buffer (strlen (msg), (void *) msg,
-                                           MHD_RESPMEM_PERSISTENT);
+                                           MHD_RESPMEM_MUST_FREE);
   ret = 200;
   return ret;
 }
@@ -467,6 +467,7 @@ url_handler (void *cls,
     
     /* Firstly, check if the wallet is paying against an approved
       mint */
+    json_t *j_chosen_mint;
     j_chosen_mint = json_object_get (root, "mint");
     struct GNUNET_HashCode hash_key;
     char *chosen_mint;
@@ -474,7 +475,8 @@ url_handler (void *cls,
     chosen_mint = json_string_value (j_chosen_mint);
     GNUNET_CRYPTO_hash (chosen_mint, strlen (chosen_mint), &hash_key);
     
-    if (NULL == GNUNET_CONTAINER_multihashmap_get (mints_hashmap, &hash_key))
+    if (NULL ==
+      GNUNET_CONTAINER_multihashmap_get (mints_hashmap, &hash_key))
     {
       printf ("Untrusted mint\n");
       status = MHD_HTTP_FORBIDDEN;
@@ -868,7 +870,7 @@ run (void *cls, char *const *args, const char *cfgfile,
    GNUNET_CRYPTO_hash (mint_infos[cnt].hostname,
                        strlen (mint_infos[cnt].hostname),
 		       &mint_key); 
-   GNUNET_CONTAINER_multihashmap_put (mints_map,
+   GNUNET_CONTAINER_multihashmap_put (mints_hashmap,
                                       &mint_key,
 				      &mint_infos[cnt],
 				      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY); 
