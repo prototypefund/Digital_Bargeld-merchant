@@ -661,8 +661,8 @@ url_handler (void *cls,
     /* JSONify public key */
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
 
-    if (NULL == (j_contract_add = json_pack ("{s:o, s:s, s:o, s:o, s:o}",
-                                             "merchant_pub", eddsa_pub_enc,
+    if (NULL == (j_contract_add = json_pack ("{s:s, s:s, s:o, s:o, s:o}",
+                                             "merchant_pub", json_string_value (eddsa_pub_enc),
                                              "H_wire", json_string_value (j_h_json_wire),
                                              "timestamp", TALER_json_from_abs (now),
                                              "refund", TALER_json_from_abs (refund),
@@ -706,10 +706,9 @@ url_handler (void *cls,
     GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
 
-    response = json_pack ("{s:o, s:o, s:o, s:o}",
+    response = json_pack ("{s:o, s:o, s:o}",
                           "contract", root,
                           "sig", j_sig_enc,
-	                  "eddsa_pub", eddsa_pub_enc,
 			  "h_contract",
 			  TALER_json_from_data ((void *) &h_contract_str, sizeof (struct GNUNET_HashCode)));
 
