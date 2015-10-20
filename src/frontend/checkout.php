@@ -153,7 +153,6 @@ function has_taler_wallet_cb(aEvent)
 
 };
 
-
 /* Function called when the Taler extension was unloaded, 
    here we disable the option */
 function taler_wallet_unload_cb(aEvent)
@@ -180,6 +179,15 @@ test_without_wallet();
 // Register event to be triggered by the wallet as a response to our
 // first event
 document.body.addEventListener("taler-wallet-mfirst", has_taler_wallet_cb, false);
+
+// The following callback is used to allow the button to change its
+// color whenever the user navigates away from this page
+document.body.addEventListener("taler-shutdown",
+  function(){
+    var unloadEvent = new Event('taler-unload');
+    document.body.dispatchEvent(unloadEvent);
+  },
+  false);
 
 // event awaited by the wallet to change its button's color
 // alert("sending");
