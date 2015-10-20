@@ -150,6 +150,18 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
   EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
   PQclear (res);
 
+  EXITIF (NULL == (res = PQprepare
+                   (conn,
+                    "get_contract_set",
+                    "SELECT "
+                    "contract_id, nounce, timestamp, edate, "
+                    "refund_deadline FROM contracts "
+                    "WHERE ("
+                    "hash=$1"
+                    ")",
+                    1, NULL)));
+  EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
+  PQclear (res);
 
   EXITIF (NULL == (res = PQprepare
                    (conn,
@@ -453,6 +465,60 @@ MERCHANT_DB_get_contract_values (PGconn *conn,
 
   EXITIF (1 != PQntuples (res));
   EXITIF (GNUNET_YES != TALER_PQ_extract_result (res, rs, 0));
+  PQclear (res);
+  return GNUNET_OK;
+
+  EXITIF_exit:
+  PQclear (res);
+  return GNUNET_SYSERR;
+}
+
+/**
+* Get a set of values representing a contract. This function is meant
+* to obsolete the '_get_contract_values' version.
+* @param h_contract the hashcode of this contract
+* @param contract_handle where to store the results
+* @raturn GNUNET_OK in case of success, GNUNET_SYSERR
+* upon errors
+*
+*/
+
+uint32_t
+MERCHANT_DB_get_contract_handle (PGconn *conn,
+                                 const struct GNUNET_HashCode *h_contract,
+				 struct MERCHANT_contract_handle *contract_handle)
+{
+  struct MERCHANT_contract_handle ch;
+  PGresult *res;
+  ExecStatusType status;
+
+  struct TALER_PQ_QueryParam params[] = {
+      TALER_PQ_query_param_fixed_size (h_contract, sizeof (struct GNUNET_HashCode)),
+      TALER_PQ_query_param_end
+  };
+
+  struct TALER_PQ_ResultSpec rs[] = {
+   TALER_PQ_result_spec_uint64 ("nounce", &ch.nounce),
+   TALER_PQ_result_spec_absolute_time ("edate", &ch.edate),
+   TALER_PQ_result_spec_absolute_time ("timestamp", &ch.timestamp),
+   TALER_PQ_result_spec_absolute_time ("refund_deadline", &ch.refund_deadline),
+   TALER_PQ_result_spec_uint64 ("contract_id", &ch.contract_id),
+   TALER_PQ_result_spec_end
+  };
+ 
+  res = TALER_PQ_exec_prepared (conn, "get_contract_set", params);
+
+  status = PQresultStatus (res);
+  EXITIF (PGRES_TUPLES_OK != status);
+  if (0 == PQntuples (res))
+  {
+    TALER_LOG_DEBUG ("Contract not found");
+    goto EXITIF_exit;
+  }
+
+  EXITIF (1 != PQntuples (res));
+  EXITIF (GNUNET_YES != TALER_PQ_extract_result (res, rs, 0));
+  *contract_handle = ch;
   PQclear (res);
   return GNUNET_OK;
 

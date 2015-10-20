@@ -15,10 +15,10 @@
 */
 
 /**
-* @file merchant/backend/taler-merchant-httpd.c
-* @brief HTTP serving layer mainly intended to communicate with the frontend
-* @author Marcello Stanisci
-*/
+ * @file merchant/backend/taler-merchant-httpd.c
+ * @brief HTTP serving layer mainly intended to communicate with the frontend
+ * @author Marcello Stanisci
+ */
 
 #include "platform.h"
 #include <microhttpd.h>
@@ -152,15 +152,14 @@ struct Mint_Response
 
 
 /**
-* Generate the 'hello world' response
-* @param connection a MHD connection
-* @param resp where to store the response for the calling function.
-* Note that in its original implementation this parameter was preceeded
-* by a '_'. Still not clear why.
-* @return HTTP status code reflecting the operation outcome
-*
-*/
- 
+ * Generate the 'hello world' response
+ * @param connection a MHD connection
+ * @param resp where to store the response for the calling function.
+ * Note that in its original implementation this parameter was preceeded
+ * by a '_'. Still not clear why.
+ * @return HTTP status code reflecting the operation outcome
+ *
+ */
 static unsigned int
 generate_hello (struct MHD_Response **resp)
 {
@@ -175,14 +174,13 @@ generate_hello (struct MHD_Response **resp)
 }
 
 /**
-* Return the given message to the other end of connection
-* @msg (0-terminated) message to show
-* @param connection a MHD connection
-* @param resp where to store the response for the calling function
-* @return HTTP status code reflecting the operation outcome
-*
-*/
- 
+ * Return the given message to the other end of connection
+ * @msg (0-terminated) message to show
+ * @param connection a MHD connection
+ * @param resp where to store the response for the calling function
+ * @return HTTP status code reflecting the operation outcome
+ *
+ */
 static unsigned int
 generate_message (struct MHD_Response **resp, const char *msg) 
 {
@@ -196,24 +194,24 @@ generate_message (struct MHD_Response **resp, const char *msg)
 }
 
 /**
-* Callback to pass to curl used to store a HTTP response
-* in a custom memory location.
-* See http://curl.haxx.se/libcurl/c/getinmemory.html for a
-* detailed example
-*
-* @param contents the data gotten so far from the server
-* @param size symbolic (arbitrarily chosen by libcurl) unit
-* of bytes
-* @param nmemb factor to multiply by @a size to get the real
-* size of @a contents
-* @param userdata a pointer to a memory location which remains
-* the same across all the calls to this callback (i.e. it has
-* to be grown at each invocation of this callback)
-* @return number of written bytes
-* See http://curl.haxx.se/libcurl/c/CURLOPT_WRITEFUNCTION.html
-* for official documentation
-*
-*/
+ * Callback to pass to curl used to store a HTTP response
+ * in a custom memory location.
+ * See http://curl.haxx.se/libcurl/c/getinmemory.html for a
+ * detailed example
+ *
+ * @param contents the data gotten so far from the server
+ * @param size symbolic (arbitrarily chosen by libcurl) unit
+ * of bytes
+ * @param nmemb factor to multiply by @a size to get the real
+ * size of @a contents
+ * @param userdata a pointer to a memory location which remains
+ * the same across all the calls to this callback (i.e. it has
+ * to be grown at each invocation of this callback)
+ * @return number of written bytes
+ * See http://curl.haxx.se/libcurl/c/CURLOPT_WRITEFUNCTION.html
+ * for official documentation
+ *
+ */
 size_t
 get_response_in_memory (char *contents,
                         size_t size,
@@ -264,14 +262,12 @@ mhd_panic_cb (void *cls,
 #endif
 
 /**
-* Manage a non 200 HTTP status. I.e. it shows a 'failure' page to
-* the client
-* @param connection the channel thorugh which send the message
-* @status the HTTP status to examine
-* @return GNUNET_OK on successful message sending, GNUNET_SYSERR upon error
-*
-*/
-
+ * Manage a non 200 HTTP status. I.e. it shows a 'failure' page to
+ * the client
+ * @param connection the channel thorugh which send the message
+ * @status the HTTP status to examine
+ * @return GNUNET_OK on successful message sending, GNUNET_SYSERR upon error
+ */
 static int
 failure_resp (struct MHD_Connection *connection, unsigned int status)
 {
@@ -373,7 +369,6 @@ request</h3></center></body></html>";
  *         #MHD_NO if the socket must be closed due to a serios
  *         error while handling the request
  */
-
 static int
 url_handler (void *cls,
              struct MHD_Connection *connection,
@@ -389,6 +384,7 @@ url_handler (void *cls,
   unsigned long status;
   unsigned int no_destroy;
   struct GNUNET_CRYPTO_EddsaSignature c_sig;
+  struct GNUNET_CRYPTO_EddsaSignature deposit_confirm_sig;
   struct GNUNET_CRYPTO_EddsaPublicKey pub;
   #ifdef OBSOLETE
   struct ContractNBO contract;
@@ -417,6 +413,8 @@ url_handler (void *cls,
   struct curl_slist *slist;
   char *contract_str;
   struct GNUNET_HashCode h_contract_str;
+  struct MERCHANT_contract_handle ch;
+  struct TALER_MintPublicKeyP mint_pub;
   uint64_t nounce;
 
   CURL *curl;
@@ -546,8 +544,6 @@ url_handler (void *cls,
       slist = curl_slist_append (slist, "Content-type: application/json");
       curl_easy_setopt (curl, CURLOPT_HTTPHEADER, slist);
 
-      /* FIXME the mint's URL is be retrieved from the partial deposit permission
-      (received by the wallet) */
       curl_easy_setopt (curl, CURLOPT_URL, deposit_url);
       curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, get_response_in_memory); 
       curl_easy_setopt (curl, CURLOPT_WRITEDATA, (void *) &mr); 
@@ -563,7 +559,7 @@ url_handler (void *cls,
       curl_slist_free_all(slist);
       if(curl_res != CURLE_OK)
       {
-        printf ("deposit rejected by mint\n");
+        printf ("deposit not sent\n");
         goto end; 
       }
       else
@@ -571,10 +567,67 @@ url_handler (void *cls,
 
       curl_easy_cleanup(curl);
     
-      /* Bounce back to the frontend what the mint said */
-      //printf ("get %s\n", mr.ptr);
-      generate_message (&resp, mr.ptr);
       curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &status);
+
+      /* If the request was successful, the deposit confirmation
+        has to be verified*/
+
+      if (MHD_HTTP_OK != result)
+      /* Jump here to error mgmt, see issue #3800 (TODO) */
+
+      if (GNUNET_SYSERR == 
+        MERCHANT_DB_get_contract_handle (db_conn, &h_contract_str, &ch))
+      {
+        status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+	goto end;
+      }
+
+      root = json_loads (mr.ptr, 0, NULL);
+      j_tmp = json_object_get (root, "sig");
+      TALER_json_to_data (j_tmp,
+                          &deposit_confirm_sig,
+                          sizeof (struct GNUNET_CRYPTO_EddsaSignature));
+      j_tmp = json_object_get (root, "pub");
+
+      TALER_json_to_data (j_tmp,
+                          &mint_pub.eddsa_pub,
+                          sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
+
+      GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
+
+
+      /* The following check could be done once the merchant is able to
+        retrieve the deposit fee for each coin it gets a payment with.
+	That happens because the signature made on a deposit confirmation
+	uses, among its values of interest, the subtraction of the deposit
+	fee from the used coin. That fee is never communicated by the wallet
+	to the merchant, so the only way for the merchant to get this
+	information is to fetch all the mint's keys, namely it needs to
+	invoke "/keys", and store what gotten in its DB */
+
+      #ifdef DENOMMGMT
+      if (GNUNET_NO ==
+           MERCHANT_verify_confirmation (&h_contract_str,
+	                                 &h_json_wire,
+					 ch.timestamp,
+					 ch.refund_deadline,
+					 ch.contract_id,
+					 amount_minus_fee, /* MISSING */
+					 coin_pub, /* MISSING */
+					 &pub,
+					 &deposit_confirm_sig,
+					 &mint_pub))
+      {
+        status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+	goto end;     
+      
+      }
+
+      #endif
+      
+      /* Place here the successful message to issue to the frontend */
+      status = MHD_HTTP_OK;
+      generate_message (&resp, "fullfillment page here");
       GNUNET_free (mr.ptr);
  
     }
@@ -658,7 +711,8 @@ url_handler (void *cls,
       goto end;
 
     j_h_json_wire = TALER_json_from_data ((void *) &h_json_wire, sizeof (struct GNUNET_HashCode));
-    /* JSONify public key */
+
+    GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
     eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
 
     if (NULL == (j_contract_add = json_pack ("{s:s, s:s, s:o, s:o, s:o}",
@@ -680,14 +734,14 @@ url_handler (void *cls,
     }
 
     res = MERCHANT_handle_contract (root,
-                                       db_conn,
-                                       &contract,
-                                       now,
-                                       expiry,
-				       edate,
-				       refund,
-				       &contract_str,
-				       nounce);
+                                    db_conn,
+                                    &contract,
+                                    now,
+                                    expiry,
+				    edate,
+				    refund,
+				    &contract_str,
+				    nounce);
     if (GNUNET_SYSERR == res)
     {
       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
@@ -703,8 +757,6 @@ url_handler (void *cls,
     GNUNET_CRYPTO_hash (contract_str, strlen (contract_str) + 1, &h_contract_str);
 
     j_sig_enc = TALER_json_from_eddsa_sig (&contract.purpose, &c_sig);
-    GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
-    eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
 
     response = json_pack ("{s:o, s:o, s:o}",
                           "contract", root,

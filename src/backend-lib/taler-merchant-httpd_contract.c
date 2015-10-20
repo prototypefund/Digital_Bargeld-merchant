@@ -6,23 +6,6 @@
 #include "merchant_db.h"
 #include "taler_merchant_contract_lib.h"
 
-
-/* TODO: make this file a library, and programmatically call the following
- * functions */
-
-/**
- * Macro to round microseconds to seconds in GNUNET_TIME_* structs.
- */
-#define ROUND_TO_SECS(name,us_field) name.us_field -= name.us_field % (1000 * 1000)
-
-/**
- * Shorthand for exit jumps.
- */
-#define EXITIF(cond)                                              \
-  do {                                                            \
-    if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
-  } while (0)
-
 /**
  * Take the global wire details and return a JSON containing them,
  * compliantly with the Taler's API.

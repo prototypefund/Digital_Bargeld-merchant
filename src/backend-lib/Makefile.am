@@ -10,6 +10,7 @@ include_HEADERS = \
 
 libtalermerchant_la_SOURCES = \
   taler-merchant-httpd_contract.c \
+  taler-merchant-httpd_deposit.c \
   taler_merchant_contract_lib.h \
   merchant_db.c merchant_db.h \
   merchant.h

@@ -26,6 +26,30 @@
 #include <gnunet/gnunet_postgres_lib.h>
 #include <taler/taler_util.h>
 
+/* Set of values that represent a contract. To be expanded on an
+  as-needed basis */
+struct MERCHANT_contract_handle
+{
+  /* The nounce used when hashing the wire details
+    for this contract */
+  uint64_t nounce;
+
+  /* The maximum time when the merchant expects the money tranfer
+    to his bank account to happen */
+  struct GNUNET_TIME_Absolute edate;
+
+  /* The time when this contract was generated */
+  struct GNUNET_TIME_Absolute timestamp;
+
+  /* The maximum time until which the merchant could issue a
+    refund to the customer */
+  struct GNUNET_TIME_Absolute refund_deadline;
+
+  /* The identification number for this contract */
+  uint64_t contract_id;
+
+};
+
 /**
  * Connect to postgresql database
  *
@@ -124,5 +148,20 @@ MERCHANT_DB_get_contract_values (PGconn *conn,
 				 struct GNUNET_TIME_Absolute *edate);
 
 #endif  /* MERCHANT_DB_H */
+
+/**
+* Get a set of values representing a contract. This function is meant
+* to obsolete the '_get_contract_values' version.
+* @param h_contract the hashcode of this contract
+* @param contract_handle where to store the results
+* @raturn GNUNET_OK in case of success, GNUNET_SYSERR
+* upon errors
+*
+*/
+
+uint32_t
+MERCHANT_DB_get_contract_handle (PGconn *conn,
+                                 const struct GNUNET_HashCode *h_contract,
+				 struct MERCHANT_contract_handle *contract_handle);
 
 /* end of merchant-db.h */

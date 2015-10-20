@@ -1,6 +1,5 @@
 /**
- * Simplified version of the contract to be signed, meant to obsolete
- * 'struct ContractNBO'.
+ * The contract sent by the merchant to the wallet
  */
 struct Contract
 {

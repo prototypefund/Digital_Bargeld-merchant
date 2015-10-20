@@ -27,6 +27,19 @@
 #include <gnunet/gnunet_crypto_lib.h>
 
 /**
+ * Macro to round microseconds to seconds in GNUNET_TIME_* structs.
+ */
+#define ROUND_TO_SECS(name,us_field) name.us_field -= name.us_field % (1000 * 1000)
+
+/**
+ * Shorthand for exit jumps.
+ */
+#define EXITIF(cond)                                              \
+  do {                                                            \
+    if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
+  } while (0)
+
+/**
  * A mint
  */
 struct MERCHANT_MintInfo {
