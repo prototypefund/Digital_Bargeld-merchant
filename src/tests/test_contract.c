@@ -23,7 +23,7 @@
 #include "platform.h"
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
-#include <taler/taler_json_lib.h>
+#include <taler/taler_util.h>
 #include "merchant.h"
 #include "merchant_db.h"
 #include <taler_merchant_lib.h>
@@ -80,7 +80,6 @@ run (void *cls, char *const *args, const char *cfgfile,
 
 {
   json_t *j_fake_contract;
-  json_t *j_wire;
   json_t *j_details;
   json_t *j_mints;
   json_t *j_item;
@@ -98,7 +97,6 @@ run (void *cls, char *const *args, const char *cfgfile,
   json_t *j_merchant_zipcode;
   json_t *j_lnames;
   json_t *j_deldate;
-  char *contract_tmp_str;
   char *desc;
   struct TALER_Amount amount;
   int64_t t_id;
@@ -113,7 +111,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   uint64_t nounce;
   struct GNUNET_HashCode h_contract_str;
   char *aa;
-  char *fancy_time;
+  const char *fancy_time;
   uint32_t ret;
 
   db_conn = NULL;
@@ -277,8 +275,6 @@ run (void *cls, char *const *args, const char *cfgfile,
   #endif
 
   nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
-
-  j_wire = MERCHANT_get_wire_json (wire, nounce, now); 
 
   ret = MERCHANT_handle_contract (j_fake_contract,
                                   db_conn,

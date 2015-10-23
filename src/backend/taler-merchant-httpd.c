@@ -25,24 +25,14 @@
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <curl/curl.h>
-#include <taler/taler_json_lib.h>
+#include <taler/taler_util.h>
 #include <taler/taler_mint_service.h>
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_responses.h"
 #include "merchant_db.h"
 #include "merchant.h"
 #include "taler_merchant_lib.h"
-
-extern struct MERCHANT_WIREFORMAT_Sepa *
-TALER_MERCHANT_parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg);
-
-/**
- * Shorthand for exit jumps.
- */
-#define EXITIF(cond)                                              \
-  do {                                                            \
-    if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
-  } while (0)
+#include "taler-mint-httpd_mhd.h"
 
 /**
  * Our hostname
@@ -65,19 +55,14 @@ struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 char *keyfile;
 
 /**
- * The MHD Daemon
+ * Mint context
  */
-static struct MHD_Daemon *mhd;
+static struct TALER_MINT_Context *mctx;
 
 /**
- * Connection handle to the our database
+ * Mints' URL,port,key triples
  */
-PGconn *db_conn;
-
-/**
- * merchant's conf handle
- */
-struct GNUNET_CONFIGURATION_Handle *cfg;
+struct MERCHANT_MintInfo *mint_infos;
 
 /**
  * Shutdown task identifier
@@ -85,9 +70,19 @@ struct GNUNET_CONFIGURATION_Handle *cfg;
 static struct GNUNET_SCHEDULER_Task *shutdown_task;
 
 /**
+ * Hashmap to store the mint context information
+ */
+static struct GNUNET_CONTAINER_MultiPeerMap *mints_map;
+
+/**
  * Our wireformat
  */
 static struct MERCHANT_WIREFORMAT_Sepa *wire;
+
+/**
+ * The number of accepted mints
+ */
+unsigned int nmints;
 
 /**
  * Should we do a dry run where temporary tables are used for storing the data.
@@ -100,9 +95,15 @@ static int dry;
 static int result;
 
 /**
- * Mint context
+ * Connection handle to the our database
  */
-static struct TALER_MINT_Context *mctx;
+PGconn *db_conn;
+
+/**
+ * Hashmap (with 'big entries') to make a mint's base URL
+ * to point to some mint-describing structure
+ */
+static struct GNUNET_CONTAINER_MultiHashMap *mints_hashmap;
 
 /**
  * Context information of the mints we trust
@@ -121,214 +122,9 @@ struct Mint
 };
 
 /**
- * Hashmap to store the mint context information
+ * The MHD Daemon
  */
-static struct GNUNET_CONTAINER_MultiPeerMap *mints_map;
-
-/**
- * Hashmap (with 'big entries') to make a mint's base URL
- * to point to some mint-describing structure
- */
-static struct GNUNET_CONTAINER_MultiHashMap *mints_hashmap;
-
-
-
-/**
- * Mints' URL,port,key triples
- */
-struct MERCHANT_MintInfo *mint_infos;
-
-/**
- * The number of accepted mints
- */
-unsigned int nmints;
-
-struct Mint_Response
-{
-  char *ptr;
-  size_t size;
-    
-};
-
-
-/**
- * Generate the 'hello world' response
- * @param connection a MHD connection
- * @param resp where to store the response for the calling function.
- * Note that in its original implementation this parameter was preceeded
- * by a '_'. Still not clear why.
- * @return HTTP status code reflecting the operation outcome
- *
- */
-static unsigned int
-generate_hello (struct MHD_Response **resp)
-{
- 
-  const char *hello = "Hello customer\n";
-  unsigned int ret;
-
-  *resp = MHD_create_response_from_buffer (strlen (hello), (void *) hello,
-                                           MHD_RESPMEM_PERSISTENT);
-  ret = 200;
-  return ret;
-}
-
-/**
- * Return the given message to the other end of connection
- * @msg (0-terminated) message to show
- * @param connection a MHD connection
- * @param resp where to store the response for the calling function
- * @return HTTP status code reflecting the operation outcome
- *
- */
-static unsigned int
-generate_message (struct MHD_Response **resp, const char *msg) 
-{
- 
-  unsigned int ret;
-
-  *resp = MHD_create_response_from_buffer (strlen (msg), (void *) msg,
-                                           MHD_RESPMEM_MUST_FREE);
-  ret = 200;
-  return ret;
-}
-
-/**
- * Callback to pass to curl used to store a HTTP response
- * in a custom memory location.
- * See http://curl.haxx.se/libcurl/c/getinmemory.html for a
- * detailed example
- *
- * @param contents the data gotten so far from the server
- * @param size symbolic (arbitrarily chosen by libcurl) unit
- * of bytes
- * @param nmemb factor to multiply by @a size to get the real
- * size of @a contents
- * @param userdata a pointer to a memory location which remains
- * the same across all the calls to this callback (i.e. it has
- * to be grown at each invocation of this callback)
- * @return number of written bytes
- * See http://curl.haxx.se/libcurl/c/CURLOPT_WRITEFUNCTION.html
- * for official documentation
- *
- */
-size_t
-get_response_in_memory (char *contents,
-                        size_t size,
-			size_t nmemb,
-			void *userdata)
-{
-  struct Mint_Response *mr;
-  size_t realsize;
-
-  realsize = size * nmemb;
-  mr = userdata;
-  mr->ptr = realloc (mr->ptr, mr->size + realsize + 1);
-
-  if (mr->ptr == NULL) {
-    printf ("Out of memory, could not get in memory mint's"
-            "response");
-    return 0;
-  }
-  memcpy(&(mr->ptr[mr->size]), contents, realsize);
-  mr->size += realsize;
-  mr->ptr[mr->size] = 0;
-
-  return realsize;
-
-}
-
-#ifdef PANIC_MGMT
-/**
- * Callback for catching serious error conditions from MHD.
- *
- * @param cls user specified value
- * @param file where the error occured
- * @param line where the error occured
- * @param reason error detail, may be NULL
- */
-static void
-mhd_panic_cb (void *cls,
-              const char *file,
-              unsigned int line,
-              const char *reason)
-{
-  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-              "MHD panicked at %s:%u: %s",
-              file, line, reason);
-  result = GNUNET_SYSERR;
-  GNUNET_SCHEDULER_shutdown ();
-}
-#endif
-
-/**
- * Manage a non 200 HTTP status. I.e. it shows a 'failure' page to
- * the client
- * @param connection the channel thorugh which send the message
- * @status the HTTP status to examine
- * @return GNUNET_OK on successful message sending, GNUNET_SYSERR upon error
- */
-static int
-failure_resp (struct MHD_Connection *connection, unsigned int status)
-{
-  static char page_MHD_HTTP_NOT_FOUND[]="\
-<!DOCTYPE html>                                         \
-<html><title>Resource not found</title><body><center>   \
-<h3>The resource you are looking for is not found.</h3> \
-</center></body></html>";
-  static char page_MHD_HTTP_BAD_REQUEST[]="\
-<!DOCTYPE html>                                         \
-<html><title>Bad request</title><body><center>   \
-<h3>Malformed POSTed JSON.</h3> \
-</center></body></html>";
-static char page_MHD_HTTP_METHOD_NOT_ALLOWED[]="\
-<!DOCTYPE html>                                         \
-<html><title>Method NOT allowed</title><body><center>   \
-<h3>ONLY POSTs are allowed.</h3> \
-</center></body></html>";
-  static char page_MHD_HTTP_INTERNAL_SERVER_ERROR[]="\
-<!DOCTYPE html> <html><title>Internal Server Error</title><body><center> \
-<h3>The server experienced an internal error and hence cannot serve your \
-request</h3></center></body></html>";
-  struct MHD_Response *resp;
-  char *page;
-  size_t size;
-#define PAGE(number) \
-  do {page=page_ ## number; size=sizeof(page_ ## number)-1;} while(0)
-
-  GNUNET_assert (MHD_HTTP_BAD_REQUEST <= status);
-  resp = NULL;
-  switch (status)
-  {
-  case MHD_HTTP_NOT_FOUND :
-    PAGE(MHD_HTTP_NOT_FOUND);
-    break;
-  case MHD_HTTP_BAD_REQUEST:
-    PAGE(MHD_HTTP_BAD_REQUEST);
-    break;
-  case MHD_HTTP_METHOD_NOT_ALLOWED:
-    PAGE(MHD_HTTP_METHOD_NOT_ALLOWED);
-    break;
-  default:
-    status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-  case MHD_HTTP_INTERNAL_SERVER_ERROR:
-    PAGE(MHD_HTTP_INTERNAL_SERVER_ERROR);
-  }
-#undef PAGE
-
-  EXITIF (NULL == (resp = MHD_create_response_from_buffer (size,
-                                                           page,
-                                                           MHD_RESPMEM_PERSISTENT)));
-  EXITIF (MHD_YES != MHD_queue_response (connection, status, resp));
-  MHD_destroy_response (resp);
-  return GNUNET_OK;
-
- EXITIF_exit:
-  if (NULL != resp)
-    MHD_destroy_response (resp);
-  return GNUNET_SYSERR;
-}
-
+static struct MHD_Daemon *mhd;
 
 /**
  * A client has requested the given url using the given method
@@ -377,422 +173,99 @@ url_handler (void *cls,
              const char *version,
              const char *upload_data,
              size_t *upload_data_size,
-             void **connection_cls)
+             void **con_cls)
 {
+  static struct TMH_RequestHandler handlers[] =
+    {
+      /* Landing page, tell humans to go away. */
+      { "/", MHD_HTTP_METHOD_GET, "text/plain",
+        "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n", 0,
+        &TMH_MHD_handler_static_response, MHD_HTTP_OK },
 
-  /*printf ("%s\n", url);*/
-  unsigned long status;
-  unsigned int no_destroy;
-  struct GNUNET_CRYPTO_EddsaSignature c_sig;
-  struct GNUNET_CRYPTO_EddsaSignature deposit_confirm_sig;
-  struct GNUNET_CRYPTO_EddsaPublicKey pub;
-  #ifdef OBSOLETE
-  struct ContractNBO contract;
-  #else
-  struct Contract contract;
-  #endif
-  struct MHD_Response *resp;
-  json_t *root;
-  json_t *j_sig_enc;
-  json_t *j_h_contract;
-  json_t *j_tmp;
-  json_t *eddsa_pub_enc;
-  json_t *response;
-  json_t *j_mints;
-  json_t *j_mint;
-  json_t *j_wire;
-  int cnt; /* loop counter */
-  char *deposit_body;
-  json_t *j_contract_add;
-  struct GNUNET_TIME_Absolute now;
-  struct GNUNET_TIME_Absolute expiry;
-  struct GNUNET_TIME_Absolute edate;
-  struct GNUNET_TIME_Absolute refund;
-  struct GNUNET_HashCode h_json_wire;
-  json_t *j_h_json_wire;
-  struct curl_slist *slist;
-  char *contract_str;
-  struct GNUNET_HashCode h_contract_str;
-  struct MERCHANT_contract_handle ch;
-  struct TALER_MintPublicKeyP mint_pub;
-  uint64_t nounce;
+      /* Further test page */
+      { "/hello", MHD_HTTP_METHOD_GET, "text/plain",
+        "Hello, Customer.\n", 0,
+        &TMH_MHD_handler_static_response, MHD_HTTP_OK },
 
-  CURL *curl;
-  CURLcode curl_res;
+      { "/contract", MHD_HTTP_METHOD_GET, "application/json",
+        NULL, 0,
+        &MH_handler_contract, MHD_HTTP_OK },
 
-  uint32_t res = GNUNET_SYSERR;
+      { "/contract", NULL, "text/plain",
+        "Only POST is allowed", 0,
+        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
 
-  #define URL_HELLO "/hello"
-  #define URL_CONTRACT "/contract"
-  #define URL_PAY "/pay"
-  no_destroy = 0;
-  resp = NULL;
-  status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      {NULL, NULL, NULL, NULL, 0, 0 }
+    };
 
-  if (0 == strncasecmp (url, URL_HELLO, sizeof (URL_HELLO)))
+  static struct TMH_RequestHandler h404 =
+    {
+      "", NULL, "text/html",
+      "<html><title>404: not found</title></html>", 0,
+      &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
+    };
+
+  /* Compiler complains about non returning a value in a non-void
+    declared function: the FIX is to return what the handler for
+    a particular URL returns */
+
+  struct TMH_RequestHandler *rh;
+  unsigned int i;
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Handling request for URL '%s'\n",
+              url);
+
+  for (i=0;NULL != handlers[i].url;i++)
   {
-    if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
-      status = generate_hello (&resp);
-    else
-    {
-      status = MHD_HTTP_METHOD_NOT_ALLOWED;
-    }
+    rh = &handlers[i];
+    if ( (0 == strcasecmp (url,
+                           rh->url)) &&
+         ( (NULL == rh->method) ||
+           (0 == strcasecmp (method,
+                             rh->method)) ) )
+      return rh->handler (rh,
+                          connection,
+                          con_cls,
+                          upload_data,
+                          upload_data_size);
   }
+  return TMH_MHD_handler_static_response (&h404,
+                                             connection,
+                                             con_cls,
+                                             upload_data,
+                                             upload_data_size);
 
-  if (0 == strncasecmp (url, URL_PAY, sizeof (URL_PAY)))
-  {
-    if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
-    {
-      status = MHD_HTTP_METHOD_NOT_ALLOWED;
-      goto end;
-
-    }
-    else
-      res = TMH_PARSE_post_json (connection,
-                                 connection_cls,
-                                 upload_data,
-                                 upload_data_size,
-                                 &root);
-    if (GNUNET_SYSERR == res)
-    {
-      status = MHD_HTTP_BAD_REQUEST;
-      goto end;
-    }
-
-    /* the POST's body has to be further fetched */
-    if ((GNUNET_NO == res) || (NULL == root))
-      return MHD_YES;
-    
-    /* Firstly, check if the wallet is paying against an approved
-      mint */
-    json_t *j_chosen_mint;
-    j_chosen_mint = json_object_get (root, "mint");
-    struct GNUNET_HashCode hash_key;
-    char *chosen_mint;
-
-    chosen_mint = json_string_value (j_chosen_mint);
-    GNUNET_CRYPTO_hash (chosen_mint, strlen (chosen_mint), &hash_key);
-    
-    if (NULL ==
-      GNUNET_CONTAINER_multihashmap_get (mints_hashmap, &hash_key))
-    {
-      printf ("Untrusted mint\n");
-      status = MHD_HTTP_FORBIDDEN;
-      goto end;    
-    
-    }
-
-    /* NOTE: from now on, the mint's base URL is pointed by 'chosen_mint' */
-      
-    /* The merchant will only add its 'wire' object to the JSON
-    it got from the wallet */
-
-    /* Get this dep. perm.'s H_contract */
-	    
-    if (NULL == (j_h_contract = json_object_get (root, "H_contract")))
-    {
-      printf ("H_contract field missing\n");
-      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-      goto end;
-    }
-    TALER_json_to_data (j_h_contract, &h_contract_str, sizeof (struct GNUNET_HashCode));
-
-    nounce = 0;
-    edate.abs_value_us = 0;
-
-    if (GNUNET_SYSERR ==
-          MERCHANT_DB_get_contract_values (db_conn,
-	                                   &h_contract_str,
-					   &nounce,
-					   &edate))
-    {
-      printf ("not existing contract\n");
-      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-      goto end;
-    }
-
-    /* Reproducing the wire object */
-    if (NULL == (j_wire = MERCHANT_get_wire_json (wire,
-                                                  nounce,
-				                  edate)))
-
-    {
-       printf ("wire object not reproduced\n");
-       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-       goto end;
-    }
-
-    if (-1 == json_object_set (root, "wire", j_wire))
-    {
-       printf ("depperm not augmented\n");
-       status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-       goto end;
-    }
-
-    /* POST to mint's "/deposit" */
-    curl = curl_easy_init (); 
-
-    struct Mint_Response mr;
-    mr.ptr = malloc(1);
-    mr.size = 0;
-
-    if (curl)
-    {
-    
-      char deposit_url[strlen (chosen_mint) + strlen ("http://") + strlen ("/deposit") + 1];
-      sprintf (deposit_url, "http://%s/deposit", chosen_mint);
-      slist = curl_slist_append (slist, "Content-type: application/json");
-      curl_easy_setopt (curl, CURLOPT_HTTPHEADER, slist);
-
-      curl_easy_setopt (curl, CURLOPT_URL, deposit_url);
-      curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, get_response_in_memory); 
-      curl_easy_setopt (curl, CURLOPT_WRITEDATA, (void *) &mr); 
- 
-      /* NOTE: hopefully, this string won't need any URL-encoding, since as for the
-      Jansson specs, any space and-or newline are not in place using JSON_COMPACT
-      flag */
-      deposit_body = json_dumps (root, JSON_COMPACT | JSON_PRESERVE_ORDER);
-      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, deposit_body);
-
-      curl_res = curl_easy_perform (curl);
-
-      curl_slist_free_all(slist);
-      if(curl_res != CURLE_OK)
-      {
-        printf ("deposit not sent\n");
-        goto end; 
-      }
-      else
-        printf ("\ndeposit request issued\n");
-
-      curl_easy_cleanup(curl);
-    
-      curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &status);
-
-      /* If the request was successful, the deposit confirmation
-        has to be verified*/
-
-      if (MHD_HTTP_OK != result)
-      /* Jump here to error mgmt, see issue #3800 (TODO) */
-
-      if (GNUNET_SYSERR == 
-        MERCHANT_DB_get_contract_handle (db_conn, &h_contract_str, &ch))
-      {
-        status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-	goto end;
-      }
-
-      root = json_loads (mr.ptr, 0, NULL);
-      j_tmp = json_object_get (root, "sig");
-      TALER_json_to_data (j_tmp,
-                          &deposit_confirm_sig,
-                          sizeof (struct GNUNET_CRYPTO_EddsaSignature));
-      j_tmp = json_object_get (root, "pub");
-
-      TALER_json_to_data (j_tmp,
-                          &mint_pub.eddsa_pub,
-                          sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
-
-      GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
-
-
-      /* The following check could be done once the merchant is able to
-        retrieve the deposit fee for each coin it gets a payment with.
-	That happens because the signature made on a deposit confirmation
-	uses, among its values of interest, the subtraction of the deposit
-	fee from the used coin. That fee is never communicated by the wallet
-	to the merchant, so the only way for the merchant to get this
-	information is to fetch all the mint's keys, namely it needs to
-	invoke "/keys", and store what gotten in its DB */
-
-      #ifdef DENOMMGMT
-      if (GNUNET_NO ==
-           MERCHANT_verify_confirmation (&h_contract_str,
-	                                 &h_json_wire,
-					 ch.timestamp,
-					 ch.refund_deadline,
-					 ch.contract_id,
-					 amount_minus_fee, /* MISSING */
-					 coin_pub, /* MISSING */
-					 &pub,
-					 &deposit_confirm_sig,
-					 &mint_pub))
-      {
-        status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-	goto end;     
-      
-      }
-
-      #endif
-      
-      /* Place here the successful message to issue to the frontend */
-      status = MHD_HTTP_OK;
-      generate_message (&resp, "fullfillment page here");
-      GNUNET_free (mr.ptr);
- 
-    }
-
-
-  }
-
-  /* 
-  * To be called by the frontend passing the contract with some "holes"
-  * which will be completed, stored in DB, signed, and returned
-  *
-  */
-
-  if (0 == strncasecmp (url, URL_CONTRACT, sizeof (URL_CONTRACT)))
-  {
-    if (0 == strcmp (MHD_HTTP_METHOD_GET, method))
-    {
-      status = MHD_HTTP_METHOD_NOT_ALLOWED;
-      goto end;
-
-    }
-    else
-      res = TMH_PARSE_post_json (connection,
-                                 connection_cls,
-                                 upload_data,
-                                 upload_data_size,
-                                 &root);
-    if (GNUNET_SYSERR == res)
-    {
-      status = MHD_HTTP_BAD_REQUEST;
-      goto end;
-    }
-
-
-    /* the POST's body has to be fetched furthermore */
-    if ((GNUNET_NO == res) || (NULL == root))
-      return MHD_YES;
-    
-    j_mints = json_array ();
-    for (cnt = 0; cnt < nmints; cnt++)
-    {
-      j_mint = json_pack ("{s:s}",
-                          mint_infos[cnt].hostname,
-                          GNUNET_CRYPTO_eddsa_public_key_to_string (&mint_infos[cnt].pubkey));
-      json_array_append_new (j_mints, j_mint);
-
-    }
-
-    /* timestamp */
-    now = GNUNET_TIME_absolute_get ();
-    /* expiry */
-    expiry = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
-    /* edate, note: this value must be generated now (and not when the
-    wallet sends back a deposit permission because the hashed 'wire' object,
-    which carries this values in it, has to be included in the signed bundle
-    by the wallet) */
-    edate = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
-    refund = GNUNET_TIME_absolute_add (now, GNUNET_TIME_UNIT_WEEKS);
-
-    TALER_round_abs_time (&now);
-    TALER_round_abs_time (&expiry);
-    TALER_round_abs_time (&edate);
-    TALER_round_abs_time (&refund);
-
-    /* getting the SEPA-aware JSON */
-    /* nounce for hashing the wire object */
-    nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
-
-    /* get wire object */
-    
-    if (NULL == (j_wire = MERCHANT_get_wire_json (wire,
-                                                  nounce,                       
-                                                  edate)))
-    {
-      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-      goto end;
-    }
-
-    /* hash wire objcet */
-    if (GNUNET_SYSERR == TALER_hash_json (j_wire, &h_json_wire))
-      goto end;
-
-    j_h_json_wire = TALER_json_from_data ((void *) &h_json_wire, sizeof (struct GNUNET_HashCode));
-
-    GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pub);
-    eddsa_pub_enc = TALER_json_from_data ((void *) &pub, sizeof (pub));
-
-    if (NULL == (j_contract_add = json_pack ("{s:s, s:s, s:o, s:o, s:o}",
-                                             "merchant_pub", json_string_value (eddsa_pub_enc),
-                                             "H_wire", json_string_value (j_h_json_wire),
-                                             "timestamp", TALER_json_from_abs (now),
-                                             "refund", TALER_json_from_abs (refund),
-					     "mints", j_mints)))
-    {
-      printf ("BAD contract enhancement\n");
-      goto end;
-    }
-
-    /* melt to what received from the wallet */
-    if (-1 == json_object_update (root, j_contract_add))
-    {
-      printf ("depperm response not built\n");
-      goto end; 
-    }
-
-    res = MERCHANT_handle_contract (root,
-                                    db_conn,
-                                    &contract,
-                                    now,
-                                    expiry,
-				    edate,
-				    refund,
-				    &contract_str,
-				    nounce);
-    if (GNUNET_SYSERR == res)
-    {
-      status = MHD_HTTP_INTERNAL_SERVER_ERROR;
-      goto end;
-    }
-    if (GNUNET_NO == res)
-    {
-      status = 	MHD_HTTP_METHOD_NOT_ACCEPTABLE;
-      goto end;
-    }
-
-    GNUNET_CRYPTO_eddsa_sign (privkey, &contract.purpose, &c_sig);
-    GNUNET_CRYPTO_hash (contract_str, strlen (contract_str) + 1, &h_contract_str);
-
-    j_sig_enc = TALER_json_from_eddsa_sig (&contract.purpose, &c_sig);
-
-    response = json_pack ("{s:o, s:o, s:o}",
-                          "contract", root,
-                          "sig", j_sig_enc,
-			  "h_contract",
-			  TALER_json_from_data ((void *) &h_contract_str, sizeof (struct GNUNET_HashCode)));
-
-    GNUNET_free (contract_str);
-
-    TMH_RESPONSE_reply_json (connection, response, MHD_HTTP_OK);	 
-    return MHD_YES;
-
-  }
-
-  end:
-
-  if (NULL != resp)
-  {
-    EXITIF (MHD_YES != MHD_queue_response (connection, status, resp));
-    return MHD_YES;
-    if (!no_destroy)
-      MHD_destroy_response (resp);
-  }
-  else
-  {
-  
-    EXITIF (GNUNET_OK != failure_resp (connection, status));
-    return MHD_YES;
-  
-  }
-  
-  EXITIF_exit:
-    result = GNUNET_SYSERR;
-    GNUNET_SCHEDULER_shutdown ();
-    return MHD_NO;
 }
+
+/**
+ * Function called with information about who is auditing
+ * a particular mint and what key the mint is using.
+ *
+ * @param cls closure
+ * @param keys information about the various keys used
+ *        by the mint
+ */
+static void
+keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
+{
+  /* which kind of mint's keys a merchant should need? Sign
+  keys? It has already the mint's master key from the conf file */  
+  
+  /* HOT UPDATE: the merchants needs the denomination keys!
+    Because it wants to (firstly) verify the deposit confirmation
+    sent by the mint, and the signed blob depends (among the
+    other things) on the coin's deposit fee. That information
+    is never communicated by the wallet to the merchant.
+    Again, the merchant needs it because it wants to verify that
+    the wallet didn't exceede the limit imposed by the merchant
+    on the total deposit fee for a purchase */
+
+
+  return;
+
+}
+
 
 /**
  * Shutdown task (magically invoked when the application is being
@@ -821,25 +294,6 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 
   
 }
-
-/**
- * Function called with information about who is auditing
- * a particular mint and what key the mint is using.
- *
- * @param cls closure
- * @param keys information about the various keys used
- *        by the mint
- */
-static void
-keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
-{
-  /* which kind of mint's keys a merchant should need? Sign
-  keys? It has already the mint's master key from the conf file */  
-  return;
-
-}
-
-
 
 /**
  * Main function that will be run by the scheduler.

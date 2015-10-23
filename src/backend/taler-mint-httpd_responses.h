@@ -89,4 +89,14 @@ TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
 int
 TMH_RESPONSE_reply_request_too_large (struct MHD_Connection *connection);
 
+/**
+ * Add headers we want to return in every response.
+ * Useful for testing, like if we want to always close
+ * connections.
+ *
+ * @param response response to modify
+ */
+void
+TMH_RESPONSE_add_global_headers (struct MHD_Response *response);
+
 #endif

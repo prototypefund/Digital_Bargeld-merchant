@@ -314,9 +314,6 @@ MERCHANT_DB_contract_create (PGconn *conn,
   PQclear (res);
   return GNUNET_OK;
 
- EXITIF_exit:
-  PQclear (res);
-  return GNUNET_SYSERR;
 }
 
 long long

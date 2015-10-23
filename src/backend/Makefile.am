@@ -10,6 +10,8 @@ taler_merchant_httpd_SOURCES = \
   ../backend-lib/merchant_db.c ../backend-lib/merchant_db.h \
   taler-mint-httpd_parsing.c taler-mint-httpd_parsing.h \
   taler-mint-httpd_responses.c taler-mint-httpd_responses.h \
+  taler-mint-httpd.h \
+  taler-mint-httpd_mhd.c taler-mint-httpd_mhd.h \
   ../backend-lib/taler-merchant-httpd_contract.h
 
 taler_merchant_httpd_LDADD = \
