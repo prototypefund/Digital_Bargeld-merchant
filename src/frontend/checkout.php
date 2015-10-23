@@ -146,11 +146,6 @@ function has_taler_wallet_cb(aEvent)
   var tbutton = document.getElementById("taler-radio-button-id");
   tbutton.removeAttribute("disabled");
  
-  if (aEvent.type == "taler-wallet-wfirst"){
-    var eve = new Event('taler-payment-wfirst');
-    document.body.dispatchEvent(eve);
-    }
-
 };
 
 /* Function called when the Taler extension was unloaded, 
@@ -164,10 +159,10 @@ function taler_wallet_unload_cb(aEvent)
 /* The merchant signals its taler-friendlyness to the client */
 function signal_me()
 {
-  var eve = new Event('taler-payment-mfirst');
+  var eve = new Event('taler-checkout-probe');
   document.body.dispatchEvent(eve);
+  //alert("signaling");
 };
-
 
 function test_without_wallet(){
   var tbutton = document.getElementById("taler-radio-button-id");
@@ -178,13 +173,15 @@ test_without_wallet();
 
 // Register event to be triggered by the wallet as a response to our
 // first event
-document.body.addEventListener("taler-wallet-mfirst", has_taler_wallet_cb, false);
+document.body.addEventListener("taler-wallet-present",
+                               has_taler_wallet_cb,
+			       false);
 
 // The following callback is used to allow the button to change its
 // color whenever the user navigates away from this page
-document.body.addEventListener("taler-shutdown",
+document.body.addEventListener("taler-navigating-away",
   function(){
-    var unloadEvent = new Event('taler-unload');
+    var unloadEvent = new Event('taler-checkout-away');
     document.body.dispatchEvent(unloadEvent);
   },
   false);
@@ -196,10 +193,14 @@ document.body.addEventListener("taler-shutdown",
 
 // Register event to be triggered by the wallet when it gets enabled while
 // the user is on the payment page
-document.body.addEventListener("taler-wallet-wfirst", has_taler_wallet_cb, false);
+document.body.addEventListener("taler-load",
+                               signal_me,
+			       false);
 
 // Register event to be triggered by the wallet when it is unloaded
-document.body.addEventListener("taler-unload", taler_wallet_unload_cb, false);
+document.body.addEventListener("taler-unload",
+                               taler_wallet_unload_cb,
+			       false);
 
 </script>
 </body>
