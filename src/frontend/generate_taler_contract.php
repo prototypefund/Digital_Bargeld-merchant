@@ -48,6 +48,7 @@ else
 {
   $receiver = "Test Receiver";
   $amount = 5;
+  $currency = "Test";
 
 }
 
@@ -71,6 +72,9 @@ $teatax = array ('value' => 1,
                  'fraction' => 0,
 		 'currency' => $currency);
 
+// Take a timestamp
+$now = new DateTime('now');
+
 // pack the JSON for the contract 
 // --- FIXME: exact format needs review!
 $json = json_encode (array ('amount' => array ('value' => $value,
@@ -90,6 +94,8 @@ $json = json_encode (array ('amount' => array ('value' => $value,
 				      'taxes' => array (array ('teatax' => $teatax)),
 			              'delivery_date' => "Some Date Format",
 			              'delivery_location' => 'LNAME1')),
+			    'timestamp' => "Date(" . $now->getTimestamp() . ")",
+			    'refund_deadline' => "Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")",
 			    'merchant' => array ('address' => 'LNAME2',
 			                         'name' => 'test merchant',
 					         'jurisdiction' => 'LNAME3'),
@@ -115,9 +121,9 @@ $json = json_encode (array ('amount' => array ('value' => $value,
 						                     'state' => 'Test State',
 							             'region' => 'Test Region',
 								     'province' => 'Test Province',
-								     'ZIP code' => 4908)))); //, JSON_PRETTY_PRINT);
+								     'ZIP code' => 4908))), JSON_PRETTY_PRINT);
 
-if ($cli_debug && TRUE)
+if ($cli_debug)
 {
   echo $json . "\n";
   exit;
