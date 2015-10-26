@@ -111,36 +111,28 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
             GNUNET_CRYPTO_eddsa_public_key_from_string (mint_pubkey_enc,
                                                         strlen (mint_pubkey_enc),
                                                         &mint.pubkey));
-
     EXITIF (GNUNET_OK !=
             GNUNET_CONFIGURATION_get_value_string (cfg,
                                                    mint_section,
                                                    "COUNTRY",
                                                    &mint_country));
-
     EXITIF (GNUNET_OK !=
             GNUNET_CONFIGURATION_get_value_string (cfg,
                                                    mint_section,
                                                    "CITY",
                                                    &mint_city));
-
-
     if (GNUNET_OK ==
         GNUNET_CONFIGURATION_get_value_string (cfg,
                                                mint_section,
                                                "STATE",
                                                &mint_state))
       mint.state = mint_state;
-
-
     if (GNUNET_OK ==
         GNUNET_CONFIGURATION_get_value_string (cfg,
                                                mint_section,
                                                "REGION",
                                                &mint_region))
       mint.region = mint_region;
-    
-
     if (GNUNET_OK ==
         GNUNET_CONFIGURATION_get_value_string (cfg,
                                                mint_section,

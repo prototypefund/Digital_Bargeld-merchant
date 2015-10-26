@@ -292,8 +292,6 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
     }
   if (keyfile != NULL)
     GNUNET_free (privkey);
-
-  
 }
 
 /**
@@ -304,16 +302,16 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 void
 dump_mint (struct MERCHANT_MintInfo *mint)
 {
-  char dump[];
+  char *dump;
   
   #define GET_MINT_VALUE_STRING(fieldname) \
   do { if (NULL != mint->fieldname) \
   { \
     dump = GNUNET_realloc (dump, strlen (dump) \
                                  + strlen (mint->fieldname) \
-                                 + strlen ("fieldname: ") \
+                                 + strlen (#fieldname ": ") \
 				 + 2); \
-    sprintf (dump[strlen (dump)], "fieldname: %s\n", mint->fieldname); \
+    sprintf (dump + strlen (dump), #fieldname ": %s\n", mint->fieldname); \
   } \
   } while (0);
 
@@ -322,9 +320,9 @@ dump_mint (struct MERCHANT_MintInfo *mint)
   { \
     dump = GNUNET_realloc (dump, strlen (dump) \
                                  + 5 \
-                                 + strlen ("fieldname: ") \
+                                 + strlen (#fieldname ": ") \
 				 + 2); \
-    sprintf (dump[strlen (dump)], "fieldname: %d\n", mint->fieldname); \
+    sprintf (dump + strlen (dump), #fieldname ": %d\n", mint->fieldname); \
   } \
   } while (0);
 
@@ -332,24 +330,14 @@ dump_mint (struct MERCHANT_MintInfo *mint)
 
   // TODO public key fetch
 
-  #define MAXUINT16 65536 
-  if (0 != mint->port && mint->port <= MAXUINT16)
-  {
-    dump = GNUNET_realloc (dump, strlen (dump)
-                                 + 5
-                                 + strlen ("port: ")
-                                 + 1);
-    
-    sprintf (dump[strlen (dump) + 1], "port: %d\n", mint->port);
-  }
-
-  GET_MINT_VALUE_STRING(state);
-  GET_MINT_VALUE_STRING(region);
+  GET_MINT_VALUE_STRING(city);
   GET_MINT_VALUE_STRING(province);
   GET_MINT_VALUE_UINT16(zip_code);
+  GET_MINT_VALUE_UINT16(port);
   GET_MINT_VALUE_STRING(street);
+  GET_MINT_VALUE_STRING(country);
   GET_MINT_VALUE_UINT16(street_no);
-  
+  printf ("country = %s\n", mint->country); 
   printf ("Dumping mint:\n%s", dump);
   GNUNET_free (dump);
 
