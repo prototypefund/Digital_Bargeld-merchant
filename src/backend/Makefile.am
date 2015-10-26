@@ -12,7 +12,8 @@ taler_merchant_httpd_SOURCES = \
   taler-mint-httpd_responses.c taler-mint-httpd_responses.h \
   taler-mint-httpd.h \
   taler-mint-httpd_mhd.c taler-mint-httpd_mhd.h \
-  ../backend-lib/taler-merchant-httpd_contract.h
+  taler-merchant-httpd_contract.c \
+  taler-merchant-httpd_contract.h
 
 taler_merchant_httpd_LDADD = \
   $(LIBGCRYPT_LIBS) \

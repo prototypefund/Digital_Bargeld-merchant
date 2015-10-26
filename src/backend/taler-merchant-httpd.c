@@ -33,6 +33,7 @@
 #include "merchant.h"
 #include "taler_merchant_lib.h"
 #include "taler-mint-httpd_mhd.h"
+#include "taler-merchant-httpd_contract.h"
 
 /**
  * Our hostname
@@ -60,7 +61,7 @@ char *keyfile;
 static struct TALER_MINT_Context *mctx;
 
 /**
- * Mints' URL,port,key triples
+ * Collection of all trusted mints informations
  */
 struct MERCHANT_MintInfo *mint_infos;
 
@@ -231,10 +232,10 @@ url_handler (void *cls,
                           upload_data_size);
   }
   return TMH_MHD_handler_static_response (&h404,
-                                             connection,
-                                             con_cls,
-                                             upload_data,
-                                             upload_data_size);
+                                          connection,
+                                          con_cls,
+                                          upload_data,
+                                          upload_data_size);
 
 }
 
@@ -296,6 +297,65 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 }
 
 /**
+ * Debugging function which prints all non-null fields within
+ * a mint descriptor. FIXME: Convert 'printf' in 'GNUNET_log'
+ * @param mint mint whose values are getting dumped
+ */
+void
+dump_mint (struct MERCHANT_MintInfo *mint)
+{
+  char dump[];
+  
+  #define GET_MINT_VALUE_STRING(fieldname) \
+  do { if (NULL != mint->fieldname) \
+  { \
+    dump = GNUNET_realloc (dump, strlen (dump) \
+                                 + strlen (mint->fieldname) \
+                                 + strlen ("fieldname: ") \
+				 + 2); \
+    sprintf (dump[strlen (dump)], "fieldname: %s\n", mint->fieldname); \
+  } \
+  } while (0);
+
+  #define GET_MINT_VALUE_UINT16(fieldname) \
+  do { if (0 != mint->fieldname && mint->fieldname < 65536) \
+  { \
+    dump = GNUNET_realloc (dump, strlen (dump) \
+                                 + 5 \
+                                 + strlen ("fieldname: ") \
+				 + 2); \
+    sprintf (dump[strlen (dump)], "fieldname: %d\n", mint->fieldname); \
+  } \
+  } while (0);
+
+  dump = GNUNET_malloc (1);
+
+  // TODO public key fetch
+
+  #define MAXUINT16 65536 
+  if (0 != mint->port && mint->port <= MAXUINT16)
+  {
+    dump = GNUNET_realloc (dump, strlen (dump)
+                                 + 5
+                                 + strlen ("port: ")
+                                 + 1);
+    
+    sprintf (dump[strlen (dump) + 1], "port: %d\n", mint->port);
+  }
+
+  GET_MINT_VALUE_STRING(state);
+  GET_MINT_VALUE_STRING(region);
+  GET_MINT_VALUE_STRING(province);
+  GET_MINT_VALUE_UINT16(zip_code);
+  GET_MINT_VALUE_STRING(street);
+  GET_MINT_VALUE_UINT16(street_no);
+  
+  printf ("Dumping mint:\n%s", dump);
+  GNUNET_free (dump);
+
+}
+
+/**
  * Main function that will be run by the scheduler.
  *
  * @param cls closure
@@ -317,6 +377,8 @@ run (void *cls, char *const *args, const char *cfgfile,
   result = GNUNET_SYSERR;
   shutdown_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
                                                 &do_shutdown, NULL);
+
+
   EXITIF (GNUNET_SYSERR == (nmints = TALER_MERCHANT_parse_mints (config,
                                                                  &mint_infos)));
   EXITIF (NULL == (wire = TALER_MERCHANT_parse_wireformat_sepa (config)));
@@ -348,37 +410,38 @@ run (void *cls, char *const *args, const char *cfgfile,
   
   for (cnt = 0; cnt < nmints; cnt++)
   {
+    dump_mint (&mint_infos[cnt]);
+
     struct Mint *mint;
     struct GNUNET_HashCode mint_key;
 
     mint = GNUNET_new (struct Mint);
     mint->pubkey = mint_infos[cnt].pubkey;
+
     /* port this to the new API */
+
+    /* ToTest
     mint->conn = TALER_MINT_connect (mctx,
                                      mint_infos[cnt].hostname,
                                      &keys_mgmt_cb,
-                                     keys_mgmt_cls); /*<- safe?segfault friendly?*/
-
-    /* NOTE: the keys mgmt callback should roughly do what the following lines do */
+                                     keys_mgmt_cls);
     EXITIF (NULL == mint->conn);
+    */
     
-    EXITIF (GNUNET_SYSERR == GNUNET_CONTAINER_multipeermap_put
-    (mints_map,
-     (struct GNUNET_PeerIdentity *) /* to retrieve now from cb's args -> */&mint->pubkey,
-     mint,
-     GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_FAST));
+    EXITIF (GNUNET_SYSERR ==
+            GNUNET_CONTAINER_multipeermap_put (mints_map,
+                                               (struct GNUNET_PeerIdentity *) &mint->pubkey,
+                                               mint,
+                                               GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_FAST));
 
-  /* 1 create hash key
-     2 create big entry
-     3 put
-  */
-   GNUNET_CRYPTO_hash (mint_infos[cnt].hostname,
-                       strlen (mint_infos[cnt].hostname),
-		       &mint_key); 
-   GNUNET_CONTAINER_multihashmap_put (mints_hashmap,
-                                      &mint_key,
-				      &mint_infos[cnt],
-				      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY); 
+     GNUNET_CRYPTO_hash (mint_infos[cnt].hostname,
+                         strlen (mint_infos[cnt].hostname),
+                         &mint_key); 
+
+     GNUNET_CONTAINER_multihashmap_put (mints_hashmap,
+                                        &mint_key,
+		                        &mint_infos[cnt],
+				        GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY); 
   }
 
   mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,

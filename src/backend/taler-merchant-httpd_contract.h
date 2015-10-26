@@ -15,24 +15,15 @@
 */
 
 /**
- * @file merchant/backend/taler-merchant-httpd.c
- * @brief HTTP serving layer mainly intended to communicate with the frontend
+ * @file merchant/backend/taler-merchant-httpd_contract.h
+ * @brief headers for /contract handler
  * @author Marcello Stanisci
  */
 
-#include "platform.h"
+#ifndef TALER_MINT_HTTPD_CONTRACT_H
+#define TALER_MINT_HTTPD_CONTRACT_H
 #include <microhttpd.h>
-#include <jansson.h>
-#include <gnunet/gnunet_util_lib.h>
-#include <curl/curl.h>
-#include <taler/taler_json_lib.h>
-#include <taler/taler_mint_service.h>
 #include "taler-mint-httpd.h"
-#include "taler-mint-httpd_parsing.h"
-#include "taler-mint-httpd_responses.h"
-#include "merchant_db.h"
-#include "merchant.h"
-#include "taler_merchant_lib.h"
 
 /**
  * Manage a contract request
@@ -50,27 +41,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                      struct MHD_Connection *connection,
                      void **connection_cls,
                      const char *upload_data,
-                     size_t *upload_data_size)
-{
-  /* 1. Generate preferred mint(s) array.
-  
-       a. Add the configuration lines to specify the mint's business
-          address.
-       b. Add this address to the 'locations' object, that should be
-          already present in the 'proposition' gotten from the frontend.
-       c. Point the 'address' field's label to the one added to 'locations'
-   
-     The 'mint' JSON layout is as follows:
+                     size_t *upload_data_size);
 
-     { "address": "address_label",
-       "url": "mint_base_url",
-       "master_pub": "base32 mint's master public key" }
-
-   */
-
-
-  /* To suppress compilation warning */
-  return 0;
-
-
-}
+#endif

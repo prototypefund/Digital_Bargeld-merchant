@@ -48,10 +48,18 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   char *token_nf;               /* do no free (nf) */
   char *mint_section;
   char *mint_hostname;
+  char *mint_country;
+  char *mint_city;
+  char *mint_state;
+  char *mint_region;
+  char *mint_province;
   char *mint_pubkey_enc;
+  char *mint_street;
   struct MERCHANT_MintInfo *r_mints;
   struct MERCHANT_MintInfo mint;
   unsigned long long mint_port;
+  unsigned long long mint_zip_code;
+  unsigned long long mint_street_no;
   unsigned int cnt;
   int OK;
 
@@ -60,6 +68,15 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   token_nf = NULL;
   mint_section = NULL;
   mint_hostname = NULL;
+  mint_port = 0;
+  mint_country = NULL;
+  mint_city = NULL;
+  mint_state = NULL;
+  mint_region = NULL;
+  mint_province = NULL;
+  mint_zip_code = 0;
+  mint_street = NULL;
+  mint_street_no = 0;
   mint_pubkey_enc = NULL;
   r_mints = NULL;
   cnt = 0;
@@ -73,6 +90,8 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   {
     GNUNET_assert (0 < GNUNET_asprintf (&mint_section,
                                         "mint-%s", token_nf));
+    memset (&mint, 0, sizeof (mint));
+
     EXITIF (GNUNET_OK !=
             GNUNET_CONFIGURATION_get_value_string (cfg,
                                                    mint_section,
@@ -92,14 +111,86 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
             GNUNET_CRYPTO_eddsa_public_key_from_string (mint_pubkey_enc,
                                                         strlen (mint_pubkey_enc),
                                                         &mint.pubkey));
+
+    EXITIF (GNUNET_OK !=
+            GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                   mint_section,
+                                                   "COUNTRY",
+                                                   &mint_country));
+
+    EXITIF (GNUNET_OK !=
+            GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                   mint_section,
+                                                   "CITY",
+                                                   &mint_city));
+
+
+    if (GNUNET_OK ==
+        GNUNET_CONFIGURATION_get_value_string (cfg,
+                                               mint_section,
+                                               "STATE",
+                                               &mint_state))
+      mint.state = mint_state;
+
+
+    if (GNUNET_OK ==
+        GNUNET_CONFIGURATION_get_value_string (cfg,
+                                               mint_section,
+                                               "REGION",
+                                               &mint_region))
+      mint.region = mint_region;
+    
+
+    if (GNUNET_OK ==
+        GNUNET_CONFIGURATION_get_value_string (cfg,
+                                               mint_section,
+                                               "PROVINCE",
+                                               &mint_province))
+      mint.province = mint_province;
+
+
+    EXITIF (GNUNET_OK !=
+            GNUNET_CONFIGURATION_get_value_number (cfg,
+                                                   mint_section,
+                                                   "ZIP_CODE",
+                                                   &mint_zip_code));
+
+    EXITIF (GNUNET_OK !=
+            GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                   mint_section,
+                                                   "STREET",
+                                                   &mint_street));
+
+    EXITIF (GNUNET_OK !=
+            GNUNET_CONFIGURATION_get_value_number (cfg,
+                                                   mint_section,
+                                                   "STREET_NUMBER",
+                                                   &mint_street_no));
     mint.hostname = mint_hostname;
     mint.port = (uint16_t) mint_port;
+    mint.country = mint_country;
+    mint.city = mint_city;
+    mint.zip_code = (uint16_t) mint_zip_code;
+    mint.street = mint_street;
+    mint.street_no = (uint16_t) mint_street_no;
     GNUNET_array_append (r_mints, cnt, mint);
+    GNUNET_free (mint_hostname);
     mint_hostname = NULL;
-    GNUNET_free (mint_pubkey_enc);
+    GNUNET_free (mint_country);
+    mint_country = NULL;
+    GNUNET_free (mint_city);
+    mint_city = NULL;
+    GNUNET_free_non_null (mint_state);
+    mint_state = NULL;
+    GNUNET_free_non_null (mint_region);
+    mint_region = NULL;
+    GNUNET_free_non_null (mint_province);
+    mint_province = NULL;
+    GNUNET_free_non_null (mint_pubkey_enc);
     mint_pubkey_enc = NULL;
-    GNUNET_free (mint_section);
+    GNUNET_free_non_null (mint_section);
     mint_section = NULL;
+
   }
   OK = 1;
 
