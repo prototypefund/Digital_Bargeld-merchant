@@ -55,17 +55,10 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 {
   /* 1. Generate preferred mint(s) array.
   
-       a. Add the configuration lines to specify the mint's business
-          address.
-       b. Add this address to the 'locations' object, that should be
-          already present in the 'proposition' gotten from the frontend.
-       c. Point the 'address' field's label to the one added to 'locations'
-   
      The 'mint' JSON layout is as follows:
 
-     { "address": "address_label",
-       "url": "mint_base_url",
-       "master_pub": "base32 mint's master public key" }
+       { "url": "mint_base_url",
+         "master_pub": "base32 mint's master public key" }
 
    */
 

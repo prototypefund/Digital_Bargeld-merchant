@@ -33,6 +33,7 @@
 #include "merchant.h"
 #include "taler_merchant_lib.h"
 #include "taler-mint-httpd_mhd.h"
+#include "taler-merchant-httpd_contract.h"
 
 /**
  * Our hostname
