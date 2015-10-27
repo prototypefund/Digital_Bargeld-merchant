@@ -9,7 +9,7 @@ bin_PROGRAMS = \
 
 test_contract_SOURCES = \
   test_contract.c \
-  merchant.c \
+  ../backend/merchant.c \
   ../backend-lib/merchant_db.c ../backend-lib/merchant_db.h
 
 test_contract_LDADD = \

@@ -16,7 +16,8 @@
 
 /**
  * @file merchant/backend/taler-merchant-httpd.c
- * @brief HTTP serving layer mainly intended to communicate with the frontend
+ * @brief HTTP serving layer intended to perform crypto-work and
+ * communication with the mint
  * @author Marcello Stanisci
  */
 
@@ -63,7 +64,7 @@ static struct TALER_MINT_Context *mctx;
 /**
  * Mints' URL,port,key triples
  */
-struct MERCHANT_MintInfo *mint_infos;
+struct MERCHANT_Mint *mints;
 
 /**
  * Shutdown task identifier
@@ -71,9 +72,9 @@ struct MERCHANT_MintInfo *mint_infos;
 static struct GNUNET_SCHEDULER_Task *shutdown_task;
 
 /**
- * Hashmap to store the mint context information
+ * Context "poller" identifier
  */
-static struct GNUNET_CONTAINER_MultiPeerMap *mints_map;
+static struct GNUNET_SCHEDULER_Task *poller_task;
 
 /**
  * Our wireformat
@@ -99,12 +100,6 @@ static int result;
  * Connection handle to the our database
  */
 PGconn *db_conn;
-
-/**
- * Hashmap (with 'big entries') to make a mint's base URL
- * to point to some mint-describing structure
- */
-static struct GNUNET_CONTAINER_MultiHashMap *mints_hashmap;
 
 /**
  * Context information of the mints we trust
@@ -253,7 +248,7 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
   /* which kind of mint's keys a merchant should need? Sign
   keys? It has already the mint's master key from the conf file */  
   
-  /* HOT UPDATE: the merchants needs the denomination keys!
+  /* HOT UPDATE: the merchants need the denomination keys!
     Because it wants to (firstly) verify the deposit confirmation
     sent by the mint, and the signed blob depends (among the
     other things) on the coin's deposit fee. That information
@@ -261,10 +256,7 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
     Again, the merchant needs it because it wants to verify that
     the wallet didn't exceede the limit imposed by the merchant
     on the total deposit fee for a purchase */
-
-
-  return;
-
+  printf ("Unregistering connection currently at %p\n", cls);
 }
 
 
@@ -279,6 +271,12 @@ static void
 do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
 
+  if (NULL != poller_task)
+  {
+    GNUNET_SCHEDULER_cancel (poller_task);
+    poller_task = NULL;
+  }
+
   if (NULL != mhd)
     {
       MHD_stop_daemon (mhd);
@@ -290,18 +288,77 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
       MERCHANT_DB_disconnect (db_conn);
       db_conn = NULL;
     }
-  if (keyfile != NULL)
+  if (NULL != keyfile)
     GNUNET_free (privkey);
 
   
 }
 
 /**
+ * Task that runs the context's event loop with the GNUnet scheduler.
+ *
+ * @param cls unused
+ * @param tc scheduler context (unused)
+ */
+static void
+context_task (void *cls,
+              const struct GNUNET_SCHEDULER_TaskContext *tc)
+{
+  long timeout;
+  int max_fd;
+  fd_set read_fd_set;
+  fd_set write_fd_set;
+  fd_set except_fd_set;
+  struct GNUNET_NETWORK_FDSet *rs;
+  struct GNUNET_NETWORK_FDSet *ws;
+  struct GNUNET_TIME_Relative delay;
+
+  poller_task = NULL;
+  TALER_MINT_perform (mctx);
+  max_fd = -1;
+  timeout = -1;
+  FD_ZERO (&read_fd_set);
+  FD_ZERO (&write_fd_set);
+  FD_ZERO (&except_fd_set);
+  TALER_MINT_get_select_info (mctx,
+                              &read_fd_set,
+                              &write_fd_set,
+                              &except_fd_set,
+                              &max_fd,
+                              &timeout);
+  if (timeout >= 0)
+    delay =
+    GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS,
+                                   timeout);
+  else
+    delay = GNUNET_TIME_UNIT_FOREVER_REL;
+  rs = GNUNET_NETWORK_fdset_create ();
+  GNUNET_NETWORK_fdset_copy_native (rs,
+                                    &read_fd_set,
+                                    max_fd + 1);
+  ws = GNUNET_NETWORK_fdset_create ();
+  GNUNET_NETWORK_fdset_copy_native (ws,
+                                    &write_fd_set,
+                                    max_fd + 1);
+  poller_task =
+  GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_DEFAULT,
+                               delay,
+                               rs,
+                               ws,
+                               &context_task,
+                               cls);
+  GNUNET_NETWORK_fdset_destroy (rs);
+  GNUNET_NETWORK_fdset_destroy (ws);
+}
+
+
+/**
  * Main function that will be run by the scheduler.
  *
  * @param cls closure
  * @param args remaining command-line arguments
- * @param cfgfile name of the configuration file used (for saving, can be NULL!)
+ * @param cfgfile name of the configuration file used (for saving, can be
+ * NULL!)
  * @param config configuration
  */
 void
@@ -313,21 +370,32 @@ run (void *cls, char *const *args, const char *cfgfile,
   void *keys_mgmt_cls;
 
   keys_mgmt_cls = NULL;
-  mint_infos = NULL;
+  mints = NULL;
   keyfile = NULL;
   result = GNUNET_SYSERR;
-  shutdown_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
-                                                &do_shutdown, NULL);
-  EXITIF (GNUNET_SYSERR == (nmints = TALER_MERCHANT_parse_mints (config,
-                                                                 &mint_infos)));
-  EXITIF (NULL == (wire = TALER_MERCHANT_parse_wireformat_sepa (config)));
-  EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_filename (config,
-                                                                "merchant",
-                                                                "KEYFILE",
-                                                                &keyfile));
-  EXITIF (NULL == (privkey = GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)));
-  EXITIF (NULL == (db_conn = MERCHANT_DB_connect (config)));
-  EXITIF (GNUNET_OK != MERCHANT_DB_initialize (db_conn, GNUNET_YES));
+  shutdown_task =
+  GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
+                                &do_shutdown,
+				NULL);
+  EXITIF (GNUNET_SYSERR ==
+         (nmints =
+	 TALER_MERCHANT_parse_mints (config,
+                                     &mints)));
+  EXITIF (NULL ==
+         (wire =
+	 TALER_MERCHANT_parse_wireformat_sepa (config)));
+  EXITIF (GNUNET_OK !=
+         GNUNET_CONFIGURATION_get_value_filename (config,
+                                                  "merchant",
+                                                  "KEYFILE",
+                                                  &keyfile));
+  EXITIF (NULL ==
+         (privkey =
+	 GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)));
+  EXITIF (NULL ==
+         (db_conn = MERCHANT_DB_connect (config)));
+  EXITIF (GNUNET_OK !=
+          MERCHANT_DB_initialize (db_conn, GNUNET_YES));
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_number (config,
                                                  "merchant",
@@ -338,48 +406,17 @@ run (void *cls, char *const *args, const char *cfgfile,
                                                  "merchant",
                                                  "hostname",
                                                  &hostname));
-
   EXITIF (NULL == (mctx = TALER_MINT_init ()));
-  /* Still not used */
-  EXITIF (NULL == (mints_map = GNUNET_CONTAINER_multipeermap_create (nmints, GNUNET_YES)));
-  /* Used when the wallet points out which mint it want to deal with.
-    That indication is made through the mint's base URL, which will be
-    the hash-key for this table */
-  EXITIF (NULL == (mints_hashmap = GNUNET_CONTAINER_multihashmap_create (nmints, GNUNET_NO)));
-  
   for (cnt = 0; cnt < nmints; cnt++)
   {
-    struct Mint *mint;
-    struct GNUNET_HashCode mint_key;
-
-    mint = GNUNET_new (struct Mint);
-    mint->pubkey = mint_infos[cnt].pubkey;
-    /* port this to the new API */
-    mint->conn = TALER_MINT_connect (mctx,
-                                     mint_infos[cnt].hostname,
-                                     &keys_mgmt_cb,
-                                     keys_mgmt_cls); /*<- safe?segfault friendly?*/
-
-    /* NOTE: the keys mgmt callback should roughly do what the following lines do */
-    EXITIF (NULL == mint->conn);
-    
-    EXITIF (GNUNET_SYSERR == GNUNET_CONTAINER_multipeermap_put
-    (mints_map,
-     (struct GNUNET_PeerIdentity *) /* to retrieve now from cb's args -> */&mint->pubkey,
-     mint,
-     GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_FAST));
-
-  /* 1 create hash key
-     2 create big entry
-     3 put
-  */
-   GNUNET_CRYPTO_hash (mint_infos[cnt].hostname,
-                       strlen (mint_infos[cnt].hostname),
-		       &mint_key); 
-   GNUNET_CONTAINER_multihashmap_put (mints_hashmap,
-                                      &mint_key,
-				      &mint_infos[cnt],
-				      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY); 
+    mints[cnt].conn = TALER_MINT_connect (mctx,
+                                          mints[cnt].hostname,
+                                          &keys_mgmt_cb,
+                                          &mints[cnt]); 
+    printf ("trying to, %p\n", &mints[cnt]);
+    EXITIF (NULL == mints[cnt].conn);
+    poller_task =
+    GNUNET_SCHEDULER_add_now (&context_task, mctx);
   }
 
   mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,
@@ -389,9 +426,6 @@ run (void *cls, char *const *args, const char *cfgfile,
                           MHD_OPTION_END);
 
   EXITIF (NULL == mhd);
-
-  /* WARNING: a 'poll_mhd ()' call is here in the original merchant. Is that
-  mandatory ? */
   result = GNUNET_OK;
 
   EXITIF_exit:

@@ -42,15 +42,15 @@
  */
 int
 TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
-                            struct MERCHANT_MintInfo **mints)
+                            struct MERCHANT_Mint **mints)
 {
   char *mints_str;
   char *token_nf;               /* do no free (nf) */
   char *mint_section;
   char *mint_hostname;
   char *mint_pubkey_enc;
-  struct MERCHANT_MintInfo *r_mints;
-  struct MERCHANT_MintInfo mint;
+  struct MERCHANT_Mint *r_mints;
+  struct MERCHANT_Mint mint;
   unsigned long long mint_port;
   unsigned int cnt;
   int OK;

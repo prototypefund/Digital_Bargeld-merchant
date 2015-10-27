@@ -25,6 +25,7 @@
 
 #include <gnunet/gnunet_common.h>
 #include <gnunet/gnunet_crypto_lib.h>
+#include <taler/taler_mint_service.h>
 
 /**
  * Macro to round microseconds to seconds in GNUNET_TIME_* structs.
@@ -42,7 +43,8 @@
 /**
  * A mint
  */
-struct MERCHANT_MintInfo {
+struct MERCHANT_Mint
+{
   /**
    * Hostname
    */
@@ -58,50 +60,11 @@ struct MERCHANT_MintInfo {
    */
   uint16_t port;
 
-  /* According to the mint's location, some of the following
-    fields may be omitted. In case of numbers, they will be set
-    to zero, otherwise SET TO nuLL */
-
   /**
-   * The Country where the mint operates from
+   * A connection to this mint
    */
-   char *country;
+  struct TALER_MINT_Handle *conn;
 
-  /**
-   * The city where the mint operates from
-   */
-   char *city;
-
-  /**
-   * The State (within a Country) where the mint
-   * operates from
-   */
-   char *state;
-
-  /**
-   * The region where the mint operates from
-   */
-   char *region;
-
-  /**
-   * The province where the mint operates from
-   */
-   char *province;
-
-  /**
-   * The ZIP code where the mint operates from
-   */
-   uint16_t zip_code;
-
-  /**
-   * The street's name where the mint operates from
-   */
-   char *street;
-
-  /**
-   * The street number where the mint operates from
-   */
-   uint16_t street_no;
 };
 
 
@@ -116,7 +79,7 @@ struct MERCHANT_MintInfo {
  */
 int
 TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
-                            struct MERCHANT_MintInfo **mints);
+                            struct MERCHANT_Mint **mints);
 
 
 GNUNET_NETWORK_STRUCT_BEGIN
