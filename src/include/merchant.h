@@ -51,14 +51,10 @@ struct MERCHANT_Mint
   char *hostname;
 
   /**
-   * The public key of the mint
+   * Flag which indicates whether some HTTP transfer between
+   * this merchant and the mint is still ongoing
    */
-  struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
-
-  /**
-   * The port where the mint's service is running
-   */
-  uint16_t port;
+  int pending;
 
   /**
    * A connection to this mint
@@ -66,7 +62,6 @@ struct MERCHANT_Mint
   struct TALER_MINT_Handle *conn;
 
 };
-
 
 /**
  * Parses mints from the configuration.

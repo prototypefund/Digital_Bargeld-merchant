@@ -62,6 +62,11 @@ char *keyfile;
 static struct TALER_MINT_Context *mctx;
 
 /**
+ * To make 'TMH_PARSE_navigate_json ()' compile
+ */
+char *TMH_mint_currency_string;
+
+/**
  * Mints' URL,port,key triples
  */
 struct MERCHANT_Mint *mints;
@@ -79,7 +84,12 @@ static struct GNUNET_SCHEDULER_Task *poller_task;
 /**
  * Our wireformat
  */
-static struct MERCHANT_WIREFORMAT_Sepa *wire;
+struct MERCHANT_WIREFORMAT_Sepa *wire;
+
+/**
+ * Salt used to hash the wire object
+ */
+long long salt;
 
 /**
  * The number of accepted mints
@@ -100,22 +110,6 @@ static int result;
  * Connection handle to the our database
  */
 PGconn *db_conn;
-
-/**
- * Context information of the mints we trust
- */
-struct Mint
-{
-  /**
-   * Public key of this mint
-   */
-  struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
-
-  /**
-   * Connection handle to this mint
-   */
-  struct TALER_MINT_Handle *conn;
-};
 
 /**
  * The MHD Daemon
@@ -238,16 +232,20 @@ url_handler (void *cls,
  * Function called with information about who is auditing
  * a particular mint and what key the mint is using.
  *
- * @param cls closure
+ * @param cls closure, will be 'struct MERCHANT_Mint' so that
+ * when this function gets called, it will change the flag 'pending'
+ * to 'false'. Note: 'keys' is automatically saved inside the mint's
+ * handle, which is contained inside 'struct MERCHANT_Mint', when
+ * this callback is called. Thus, once 'pending' turns 'false',
+ * it is safe to call 'TALER_MINT_get_keys()' on the mint's handle,
+ * in order to get the "good" keys.
+ *
  * @param keys information about the various keys used
  *        by the mint
  */
 static void
 keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
 {
-  /* which kind of mint's keys a merchant should need? Sign
-  keys? It has already the mint's master key from the conf file */  
-  
   /* HOT UPDATE: the merchants need the denomination keys!
     Because it wants to (firstly) verify the deposit confirmation
     sent by the mint, and the signed blob depends (among the
@@ -256,7 +254,8 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
     Again, the merchant needs it because it wants to verify that
     the wallet didn't exceede the limit imposed by the merchant
     on the total deposit fee for a purchase */
-  printf ("Unregistering connection currently at %p\n", cls);
+
+  ((struct MERCHANT_Mint *) cls)->pending = 0;
 }
 
 
@@ -270,7 +269,14 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
 static void
 do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
+  unsigned int cnt;
 
+  for (cnt = 0; cnt < nmints; cnt++)
+  {
+    if (NULL != mints[cnt].conn)
+      TALER_MINT_disconnect (mints[cnt].conn);
+  
+  }
   if (NULL != poller_task)
   {
     GNUNET_SCHEDULER_cancel (poller_task);
@@ -290,8 +296,6 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
     }
   if (NULL != keyfile)
     GNUNET_free (privkey);
-
-  
 }
 
 /**
@@ -351,6 +355,31 @@ context_task (void *cls,
   GNUNET_NETWORK_fdset_destroy (ws);
 }
 
+/**
+ * Function called whenever MHD is done with a request.  If the
+ * request was a POST, we may have stored a `struct Buffer *` in the
+ * @a con_cls that might still need to be cleaned up.  Call the
+ * respective function to free the memory.
+ *
+ * @param cls client-defined closure
+ * @param connection connection handle
+ * @param con_cls value as set by the last call to
+ *        the #MHD_AccessHandlerCallback
+ * @param toe reason for request termination
+ * @see #MHD_OPTION_NOTIFY_COMPLETED
+ * @ingroup request
+ */
+static void
+handle_mhd_completion_callback (void *cls,
+                                struct MHD_Connection *connection,
+                                void **con_cls,
+                                enum MHD_RequestTerminationCode toe)
+{
+  if (NULL == *con_cls)
+    return;
+  TMH_PARSE_post_cleanup_callback (*con_cls);
+  *con_cls = NULL;
+}
 
 /**
  * Main function that will be run by the scheduler.
@@ -367,9 +396,7 @@ run (void *cls, char *const *args, const char *cfgfile,
 {
 
   unsigned int cnt;
-  void *keys_mgmt_cls;
 
-  keys_mgmt_cls = NULL;
   mints = NULL;
   keyfile = NULL;
   result = GNUNET_SYSERR;
@@ -406,14 +433,22 @@ run (void *cls, char *const *args, const char *cfgfile,
                                                  "merchant",
                                                  "hostname",
                                                  &hostname));
+  EXITIF (GNUNET_SYSERR ==
+          GNUNET_CONFIGURATION_get_value_string (config,
+                                                 "merchant",
+                                                 "currency",
+                                                 &TMH_mint_currency_string));
+
+  salt = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE,
+                                   UINT64_MAX); 
   EXITIF (NULL == (mctx = TALER_MINT_init ()));
   for (cnt = 0; cnt < nmints; cnt++)
   {
+    mints[cnt].pending = 1;
     mints[cnt].conn = TALER_MINT_connect (mctx,
                                           mints[cnt].hostname,
                                           &keys_mgmt_cb,
                                           &mints[cnt]); 
-    printf ("trying to, %p\n", &mints[cnt]);
     EXITIF (NULL == mints[cnt].conn);
     poller_task =
     GNUNET_SCHEDULER_add_now (&context_task, mctx);
@@ -423,6 +458,9 @@ run (void *cls, char *const *args, const char *cfgfile,
                           port,
                           NULL, NULL,
                           &url_handler, NULL,
+			  MHD_OPTION_NOTIFY_COMPLETED,
+			  &handle_mhd_completion_callback, NULL,
+
                           MHD_OPTION_END);
 
   EXITIF (NULL == mhd);

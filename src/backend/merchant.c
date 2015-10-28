@@ -48,10 +48,8 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   char *token_nf;               /* do no free (nf) */
   char *mint_section;
   char *mint_hostname;
-  char *mint_pubkey_enc;
   struct MERCHANT_Mint *r_mints;
   struct MERCHANT_Mint mint;
-  unsigned long long mint_port;
   unsigned int cnt;
   int OK;
 
@@ -60,7 +58,6 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   token_nf = NULL;
   mint_section = NULL;
   mint_hostname = NULL;
-  mint_pubkey_enc = NULL;
   r_mints = NULL;
   cnt = 0;
   EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string (cfg,
@@ -78,26 +75,9 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
                                                    mint_section,
                                                    "HOSTNAME",
                                                    &mint_hostname));
-    EXITIF (GNUNET_OK !=
-            GNUNET_CONFIGURATION_get_value_number (cfg,
-                                                   mint_section,
-                                                   "PORT",
-                                                   &mint_port));
-    EXITIF (GNUNET_OK !=
-            GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                   mint_section,
-                                                   "PUBKEY",
-                                                   &mint_pubkey_enc));
-    EXITIF (GNUNET_OK !=
-            GNUNET_CRYPTO_eddsa_public_key_from_string (mint_pubkey_enc,
-                                                        strlen (mint_pubkey_enc),
-                                                        &mint.pubkey));
     mint.hostname = mint_hostname;
-    mint.port = (uint16_t) mint_port;
     GNUNET_array_append (r_mints, cnt, mint);
     mint_hostname = NULL;
-    GNUNET_free (mint_pubkey_enc);
-    mint_pubkey_enc = NULL;
     GNUNET_free (mint_section);
     mint_section = NULL;
   }
@@ -107,7 +87,6 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   GNUNET_free_non_null (mints_str);
   GNUNET_free_non_null (mint_section);
   GNUNET_free_non_null (mint_hostname);
-  GNUNET_free_non_null (mint_pubkey_enc);
   if (!OK)
   {
     GNUNET_free_non_null (r_mints);

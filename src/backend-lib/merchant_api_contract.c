@@ -32,32 +32,28 @@
  * Take the global wire details and return a JSON containing them,
  * compliantly with the Taler's API.
  * @param wire the merchant's wire details
- * @param nounce the nounce for hashing the wire details with
+ * @param salt the nounce for hashing the wire details with
  * @param edate when the beneficiary wants this transfer to take place
  * @return JSON representation of the wire details, NULL upon errors
  */
 
 json_t *
 MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
-                        uint64_t nounce,
-                        const struct GNUNET_TIME_Absolute edate)
+                        uint64_t salt)
 
 {
   
   json_t *root;
-  json_t *j_edate;
-  json_t *j_nounce;
+  json_t *j_salt;
 
-  j_nounce = json_integer (nounce);
-  j_edate = TALER_json_from_abs (edate);
+  j_nounce = json_integer (salt);
 
-  if (NULL == (root = json_pack ("{s:s, s:s, s:s, s:s, s:o, s:I}",
+  if (NULL == (root = json_pack ("{s:s, s:s, s:s, s:s, s:I}",
                                  "type", "SEPA",
 		                 "IBAN", wire->iban,
 		                 "name", wire->name,
 		                 "bic", wire->bic,
-		                 "edate", j_edate,
-		                 "r", json_integer_value (j_nounce))))
+		                 "r", json_integer_value (j_salt))))
     return NULL;
 
   return root;
