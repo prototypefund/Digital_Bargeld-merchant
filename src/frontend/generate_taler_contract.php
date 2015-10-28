@@ -24,7 +24,8 @@
   3. forward the response with the contract from the backend to
      to the wallet
 */ 
-$cli_debug = false;
+$cli_debug = true;
+$backend_test = true;
 
 // 1) recover the session information
 session_start();
@@ -124,7 +125,7 @@ $json = json_encode (array ('amount' => array ('value' => $value,
 								     'province' => 'Test Province',
 								     'ZIP code' => 4908))), JSON_PRETTY_PRINT);
 
-if ($cli_debug)
+if ($cli_debug && !$backend_test)
 {
   echo $json . "\n";
   exit;

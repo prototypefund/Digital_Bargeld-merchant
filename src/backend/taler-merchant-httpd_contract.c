@@ -163,5 +163,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 
   /* store relevant values for this contract, in DB */
   //res = MERCHANT_handle_contract ();
+  return TMH_RESPONSE_reply_json (connection, root, MHD_HTTP_OK);
   
 }
