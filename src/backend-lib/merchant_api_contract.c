@@ -46,7 +46,7 @@ MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
   json_t *root;
   json_t *j_salt;
 
-  j_nounce = json_integer (salt);
+  j_salt = json_integer (salt);
 
   if (NULL == (root = json_pack ("{s:s, s:s, s:s, s:s, s:I}",
                                  "type", "SEPA",
