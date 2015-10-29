@@ -13,7 +13,10 @@ taler_merchant_httpd_SOURCES = \
   taler-mint-httpd.h \
   taler-mint-httpd_mhd.c taler-mint-httpd_mhd.h \
   taler-merchant-httpd_contract.c \
-  taler-merchant-httpd_contract.h
+  taler-merchant-httpd_contract.h \
+  taler-merchant-httpd_pay.c \
+  taler-merchant-httpd_pay.h
+
 
 taler_merchant_httpd_LDADD = \
   $(LIBGCRYPT_LIBS) \

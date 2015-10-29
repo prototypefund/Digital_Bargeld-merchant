@@ -77,10 +77,10 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
 
   res = TMH_PARSE_post_json (connection,
-                              connection_cls,
-                              upload_data,
-                              upload_data_size,
-                              &root);
+                             connection_cls,
+                             upload_data,
+                             upload_data_size,
+                             &root);
   if (GNUNET_SYSERR == res)
     return MHD_NO;
   /* the POST's body has to be further fetched */

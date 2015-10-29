@@ -16,11 +16,59 @@
 
 */
 
+/*
+  This serving module adds the 'max_fee' field to the object which
+  sends to the backend, and optionally the field 'edate' (indicating
+  to the mint the tollerated deadline to receive funds for this payment)
+  NOTE: 'max_fee' must be consistent with the same value indicated within
+  the contract; thus, a "real" merchant must implement such a mapping
+
+*/
+
 $post_body = file_get_contents('php://input');
 
-$post_obj = json_decode($post_body);
 
-//debug and get test-ish data for the backend
-file_put_contents('/tmp/deposit_permission',
-                  json_encode($post_obj, JSON_PRETTY_PRINT));
+$deposit_permission = json_decode ($post_body);
+$max_fee = array ('max_fee' => array ('value' => 3,
+		                      'fraction' => 01010,
+		                      'currency' => $currency));
+
+
+$new_deposit_permission = array_merge ($deposit_permission, $max_fee);
+// Craft the HTTP request, note that the backend
+// could be on an entirely different machine if
+// desired.
+file_put_contents('/tmp/deposit_permission_maxfee.sample', json_encode($new_deposit_permission, JSON_PRETTY_PRINT));
+return;
+
+$req = new http\Client\Request ("GET",
+                                "http://" . $_SERVER["SERVER_NAME"] . "/backend/pay",
+				array ("Content-Type" => "application/json"));
+$req->getBody()->append ($json);
+
+// Execute the HTTP request
+$client = new http\Client;
+$client->enqueue($req)->send ();
+
+// Fetch the response
+$resp = $client->getResponse ();
+$status_code = $resp->getResponseCode ();
+
+// Our response code is the same we got from the backend:
+http_response_code ($status_code);
+
+// Now generate our body  
+if ($status_code != 200)
+{
+  /* error: just forwarding to the wallet what
+    gotten from the backend (which is forwarding 'as is'
+    the error gotten from the mint) */
+  echo $resp->body->toString ();
+  
+}
+else
+{
+  echo "Payment succedeed!\n";
+}
+
 ?>

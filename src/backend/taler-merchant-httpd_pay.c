@@ -45,9 +45,11 @@ extern long long salt;
  * Accomplish this payment.
  * @param rh context of the handler
  * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
+ * @param[in,out] connection_cls the connection's closure
+ * (can be updated)
  * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param[in,out] upload_data_size number of bytes (left) in @a
+ * upload_data
  * @return MHD result code
  */
 int
@@ -57,6 +59,20 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                 const char *upload_data,
                 size_t *upload_data_size)
 {
+
   json_t *root;
-  json_t *j_wire;
+  int res;
+
+  res = TMH_PARSE_post_json (connection,
+                             connection_cls,
+                             upload_data,
+                             upload_data_size,
+                             &root);
+  if (GNUNET_SYSERR == res)
+    return MHD_NO;
+  /* the POST's body has to be further fetched */
+  if ((GNUNET_NO == res) || (NULL == root))
+    return MHD_YES;
+
+  /* 1 Check if the total deposit fee is leq the limit */
 }
