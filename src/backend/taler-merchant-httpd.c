@@ -62,6 +62,12 @@ char *keyfile;
 static struct TALER_MINT_Context *mctx;
 
 /**
+ * This value tells the mint by which date this merchant would like 
+ * to receive the funds for a deposited payment
+ */
+struct GNUNET_TIME_Relative edate;
+
+/**
  * To make 'TMH_PARSE_navigate_json ()' compile
  */
 char *TMH_mint_currency_string;
@@ -177,7 +183,7 @@ url_handler (void *cls,
         "Hello, Customer.\n", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK },
 
-      { "/contract", MHD_HTTP_METHOD_POST, "application/json",
+      { "/contract", MHD_HTTP_METHOD_GET, "application/json",
         NULL, 0,
         &MH_handler_contract, MHD_HTTP_OK },
 
@@ -437,6 +443,12 @@ run (void *cls, char *const *args, const char *cfgfile,
                                                  "merchant",
                                                  "CURRENCY",
                                                  &TMH_mint_currency_string));
+
+  EXITIF (GNUNET_SYSERR ==
+          GNUNET_CONFIGURATION_get_value_string (config,
+                                                 "merchant",
+                                                 "EDATE",
+                                                 &edate));
 
   salt = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE,
                                    UINT64_MAX); 

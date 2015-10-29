@@ -151,7 +151,7 @@ if ($cli_debug && !$backend_test)
 // Craft the HTTP request, note that the backend
 // could be on an entirely different machine if
 // desired.
-$req = new http\Client\Request ("POST",
+$req = new http\Client\Request ("GET",
                                 "http://" . $_SERVER["SERVER_NAME"] . "/backend/contract",
 				array ("Content-Type" => "application/json"));
 $req->getBody()->append ($json);
