@@ -28,17 +28,23 @@
 $post_body = file_get_contents('php://input');
 
 
+$now = new DateTime('now');
+$edate = array ('edate' =>
+               "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/");
+
 $deposit_permission = json_decode ($post_body);
 $max_fee = array ('max_fee' => array ('value' => 3,
 		                      'fraction' => 01010,
 		                      'currency' => $currency));
 
-
 $new_deposit_permission = array_merge ($deposit_permission, $max_fee);
+$new_deposit_permission_edate = array_merge ($new_deposit_permission, $edate);
+
 // Craft the HTTP request, note that the backend
 // could be on an entirely different machine if
 // desired.
 file_put_contents('/tmp/deposit_permission_maxfee.sample', json_encode($new_deposit_permission, JSON_PRETTY_PRINT));
+
 return;
 
 $req = new http\Client\Request ("GET",
