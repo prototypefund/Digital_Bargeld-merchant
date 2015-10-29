@@ -177,7 +177,7 @@ url_handler (void *cls,
         "Hello, Customer.\n", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK },
 
-      { "/contract", MHD_HTTP_METHOD_GET, "application/json",
+      { "/contract", MHD_HTTP_METHOD_POST, "application/json",
         NULL, 0,
         &MH_handler_contract, MHD_HTTP_OK },
 
@@ -396,7 +396,6 @@ run (void *cls, char *const *args, const char *cfgfile,
 {
 
   unsigned int cnt;
-
   mints = NULL;
   keyfile = NULL;
   result = GNUNET_SYSERR;
@@ -426,21 +425,22 @@ run (void *cls, char *const *args, const char *cfgfile,
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_number (config,
                                                  "merchant",
-                                                 "port",
+                                                 "PORT",
                                                  &port));
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_string (config,
                                                  "merchant",
-                                                 "hostname",
+                                                 "HOSTNAME",
                                                  &hostname));
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_string (config,
                                                  "merchant",
-                                                 "currency",
+                                                 "CURRENCY",
                                                  &TMH_mint_currency_string));
 
   salt = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE,
                                    UINT64_MAX); 
+
   EXITIF (NULL == (mctx = TALER_MINT_init ()));
   for (cnt = 0; cnt < nmints; cnt++)
   {

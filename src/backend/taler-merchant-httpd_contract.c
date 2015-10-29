@@ -43,14 +43,16 @@ extern PGconn *db_conn;
 extern long long salt;
 
 /**
- * Manage a contract request
- *
+ * Manage a contract request. In practical terms, it adds the fields 'mints',
+ * 'merchant_pub', and 'H_wire' to the contract 'proposition' gotten from the
+ * frontend. Finally, it adds (outside of the contract) a signature of the
+ * (hashed stringification) of this contract and the hashed stringification
+ * of this contract to the final bundle sent back to the frontend.
  * @param rh context of the handler
  * @param connection the MHD connection to handle
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * 
  * @return MHD result code
  */
 int
@@ -67,44 +69,24 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   const struct TALER_MINT_Keys *keys;
   int res;
   int cnt;
-  uint64_t trans_id;
-  struct TALER_Amount amount;
-  struct GNUNET_TIME_Absolute timestamp;
-  struct GNUNET_TIME_Absolute refund;
-  struct GNUNET_TIME_Absolute expiry;
-  struct GNUNET_TIME_Absolute edate;
   struct GNUNET_HashCode h_wire;
   struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
-  struct TMH_PARSE_FieldSpecification spec[] =
-  {
-    TMH_PARSE_member_time_abs ("timestamp", &timestamp),
-    TMH_PARSE_member_time_abs ("refund_deadline", &refund),
-    TMH_PARSE_member_time_abs ("expiry", &expiry),
-    TMH_PARSE_member_amount ("amount", &amount),
-    TMH_PARSE_member_uint64 ("trans_id", &trans_id),
-    TMH_PARSE_MEMBER_END
-  };
-  
+  struct MERCHANT_Contract contract;
+  char *contract_str;
+
   res = TMH_PARSE_post_json (connection,
                               connection_cls,
                               upload_data,
                               upload_data_size,
                               &root);
-
   if (GNUNET_SYSERR == res)
     return MHD_NO;
   /* the POST's body has to be further fetched */
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
-  /* 1. Generate preferred mint(s) array.
+  /* Generate preferred mint(s) array. */
   
-     The 'mint' JSON layout is as follows:
-
-       { "url": "mint_base_url",
-         "master_pub": "base32 mint's master public key" }
-   */
-
   trusted_mints = json_array ();
   for (cnt = 0; cnt < nmints; cnt++)
   {
@@ -121,31 +103,22 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
     }
   }
 
-  /* Return badly if no mints are trusted (or ready). WARNING: it
-    may be possible that a mint trusted by the wallet is good, but
-    still pending; that case must be handled with some "polling-style"
-    routine, simply ignored, or ended with an invitation to the wallet
-    to just retry later */
+  /**
+   * Return badly if no mints are trusted (or no call to /keys has still
+   * returned the expected data). WARNING: it
+   * may be possible that a mint trusted by the wallet is good, but
+   * still pending; that case must be handled with some "polling-style"
+   * routine, simply ignored, or ended with an invitation to the wallet
+   * to just retry later
+   */
   if (!json_array_size (trusted_mints))
     return MHD_NO;
 
   json_object_set_new (root, "mints", trusted_mints);
 
-  res = TMH_PARSE_json_data (connection, root, spec);
-
-  if (GNUNET_SYSERR == res)
-    return MHD_NO; /* hard failure */
-  if (GNUNET_NO == res)
-    return MHD_YES; /* failure */
-
-
-  /* (indicative) deadline which the merchant wants its wire tranfer
-    before */
-  edate = GNUNET_TIME_absolute_add (timestamp, GNUNET_TIME_UNIT_WEEKS);
-  TALER_round_abs_time (&edate);
   if (NULL == (j_wire = MERCHANT_get_wire_json (wire,
                                                 salt)))                       
-  return MHD_NO;
+    return MHD_NO;
 
   /* hash wire objcet */
   if (GNUNET_SYSERR ==
@@ -161,8 +134,8 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                        "merchant_pub",
 		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
 
-  /* store relevant values for this contract, in DB */
-  //res = MERCHANT_handle_contract ();
+  /* Sign */
+  
   return TMH_RESPONSE_reply_json (connection, root, MHD_HTTP_OK);
   
 }

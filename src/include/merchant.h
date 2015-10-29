@@ -64,6 +64,26 @@ struct MERCHANT_Mint
 };
 
 /**
+ * The contract sent by the merchant to the wallet
+ */
+struct MERCHANT_Contract
+{
+  /**
+   * Purpose header for the signature over contract
+   */
+  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
+
+  /**
+   * Hash of the JSON contract in UTF-8 including 0-termination,
+   * using JSON_COMPACT encoding with sorted fields.
+   */
+  struct GNUNET_HashCode h_contract_details;
+
+};
+
+
+
+/**
  * Parses mints from the configuration.
  *
  * @param cfg the configuration
