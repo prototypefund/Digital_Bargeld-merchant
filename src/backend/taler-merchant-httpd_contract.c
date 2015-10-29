@@ -25,6 +25,7 @@
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <curl/curl.h>
+#include <taler/taler_signatures.h>
 #include <taler/taler_amount_lib.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mint_service.h>
@@ -73,6 +74,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
   struct MERCHANT_Contract contract;
   char *contract_str;
+  struct GNUNET_CRYPTO_EddsaSignature contract_sig;
 
   res = TMH_PARSE_post_json (connection,
                               connection_cls,
@@ -135,7 +137,20 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
 
   /* Sign */
-  
-  return TMH_RESPONSE_reply_json (connection, root, MHD_HTTP_OK);
+  contract_str = json_dumps (root, JSON_COMPACT | JSON_SORT_KEYS);  
+  GNUNET_CRYPTO_hash (contract_str, strlen (contract_str), &contract.h_contract);
+  contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
+  contract.purpose.size = htonl (sizeof (contract));
+  GNUNET_CRYPTO_eddsa_sign (&privkey, &contract.purpose, &contract_sig);
+
+  return TMH_RESPONSE_reply_json_pack (connection,
+				       MHD_HTTP_OK,
+				       "{s:o, s:o, s:o}",
+				       "contract", root,
+				       "sig", TALER_json_from_data
+				              (&contract_sig, sizeof (contract_sig)),
+				       "h_contract", TALER_json_from_data
+				                     (&contract.h_contract,
+				                      sizeof (contract.h_contract)));
   
 }

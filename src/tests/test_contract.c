@@ -101,11 +101,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   struct TALER_Amount amount;
   int64_t t_id;
   int64_t p_id;
-  #ifdef OBSOLETE
-  struct ContractNBO contract;
-  #else
   struct Contract contract;
-  #endif
   struct GNUNET_TIME_Absolute edate;
   struct GNUNET_TIME_Absolute now;
   uint64_t nounce;

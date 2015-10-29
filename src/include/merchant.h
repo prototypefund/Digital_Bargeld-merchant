@@ -75,9 +75,9 @@ struct MERCHANT_Contract
 
   /**
    * Hash of the JSON contract in UTF-8 including 0-termination,
-   * using JSON_COMPACT encoding with sorted fields.
+   * using JSON_COMPACT | JSON_SORT_KEYS
    */
-  struct GNUNET_HashCode h_contract_details;
+  struct GNUNET_HashCode h_contract;
 
 };
 
