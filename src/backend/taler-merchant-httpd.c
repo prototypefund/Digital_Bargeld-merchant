@@ -445,7 +445,7 @@ run (void *cls, char *const *args, const char *cfgfile,
                                                  &TMH_mint_currency_string));
 
   EXITIF (GNUNET_SYSERR ==
-          GNUNET_CONFIGURATION_get_value_string (config,
+          GNUNET_CONFIGURATION_get_value_time (config,
                                                  "merchant",
                                                  "EDATE",
                                                  &edate));

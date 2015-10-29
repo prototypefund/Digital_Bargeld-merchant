@@ -66,7 +66,7 @@ else
 {
   $receiver = "Test Receiver";
   $amount = 5;
-  $currency = "Test";
+  $currency = "KUDOS";
 
 }
 
@@ -112,9 +112,10 @@ $json = json_encode (array ('amount' => array ('value' => $value,
 				      'taxes' => array (array ('teatax' => $teatax)),
 			              'delivery_date' => "Some Date Format",
 			              'delivery_location' => 'LNAME1')),
-			    'timestamp' => "Date(" . $now->getTimestamp() . ")",
-			    'expiry' => "Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")",
-			    'refund_deadline' => "Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")",
+			    'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
+			    'pay_url' => "/taler/pay",
+			    'expiry' => "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
+			    'refund_deadline' => "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
 			    'merchant' => array ('address' => 'LNAME2',
 			                         'name' => 'test merchant',
 					         'jurisdiction' => 'LNAME3'),
