@@ -43,6 +43,8 @@ $now = new DateTime('now');
 $edate = array ('edate' =>
                "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/");
 
+echo $post_body;
+
 $deposit_permission = json_decode ($post_body, true);
 
 $max_fee = array ('max_fee' => array ('value' => 3,
@@ -58,9 +60,11 @@ $new_deposit_permission_edate = array_merge ($new_deposit_permission, $edate);
 
 if ($cli_debug && !$backend_test)
 {
-  file_put_contents('/tmp/noedate', json_encode ($new_deposit_permission, JSON_PRETTY_PRINT));
-  file_put_contents('/tmp/yesedate', json_encode ($new_deposit_permission_edate, JSON_PRETTY_PRINT));
 
+  /* NOTE the newline at the end of 'echo's argument */
+  //echo json_encode ($new_deposit_permission_edate, JSON_PRETTY_PRINT)
+  echo json_encode ($new_deposit_permission, JSON_PRETTY_PRINT)
+  . "\n";
   exit;
 }
 

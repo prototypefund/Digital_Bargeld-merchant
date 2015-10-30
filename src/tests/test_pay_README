@@ -1,0 +1,26 @@
+The merchant's "/pay" facility can be tested either directly by querying the
+backend or by querying the frontend (which in turn will query the backend).
+Each file *.sample is sample JSON to POST to both components (with the '_backend'
+named version being dedicated to just the backend).
+
+Note: the sample 'deposit_permission_edate_backend.sample' contains the optional
+'edate' field to the deposit permission (that field indicates the tollerated delay
+by this merchant to receive funds relative to this payment)
+
+The frontend test admits two versions of queries, as in the following examples:
+
+  * curl -H 'Content-type: application/json' -d@deposit_permission.sample \
+    http://merchant-url/pay.php?cli_debug=yes
+
+    (this form tests the whole communication between frontend and backend)
+
+  * curl -d@deposit_permission.sample http://merchant-url/pay.php?backend_test=no
+
+    (this form tests only the deposit permission enhancement made by the
+    frontend, so it doesn't further connect to the backend to actually POST
+    that data. By default, the frontend doesn't add the 'edate' field, so it
+    is necessary to uncomment the related line of code to test this feature)
+
+Finally, to POST to the backend, issue
+  * curl -H 'Content-type: application/json' -d@*_backend.sample http://backend-url/pay
+ 
