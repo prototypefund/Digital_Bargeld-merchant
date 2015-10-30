@@ -61,7 +61,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 {
 
   json_t *root;
+  json_t *coins;
+
   int res;
+  struct TALER_Amount max_deposit_fee;
+  //struct TALER_Amount acc_deposit_fee;
+  //struct TALER_Amount coin_deposit_fee;
 
   res = TMH_PARSE_post_json (connection,
                              connection_cls,
@@ -74,5 +79,34 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
-  /* 1 Check if the total deposit fee is leq the limit */
+  //printf ("/pay\n");
+
+  /* 0 What if the coin gives zero-length coins array? */
+
+  /* 1 Check if the total deposit fee is \leq the limit */
+
+  /* 2 Check if the chosen mint is among the merchant's preferred.
+
+    An error in this case could be due to:
+
+    * the wallet indicated a non existent mint
+    * the wallet indicated a non trusted mint
+
+    NOTE: by preventively checking this, the merchant
+    avoids getting HTTP response codes from random
+    websites that may mislead the wallet in the way
+    of managing the error. Of course, that protect the
+    merchant from POSTing coins to untrusted mints.
+
+   */
+
+  /* 3 For each coin in DB
+
+       a. Generate a deposit permission
+       b. store it in DB
+       c. POST to the mint (see mint-lib for this)
+          (retry until getting a persisten state)
+  */
+  /* 4 Return response code: success, or whatever data the
+    mint sent back regarding some bad coin */
 }

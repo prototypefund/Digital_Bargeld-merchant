@@ -43,10 +43,7 @@ $now = new DateTime('now');
 $edate = array ('edate' =>
                "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/");
 
-echo $post_body;
-
 $deposit_permission = json_decode ($post_body, true);
-
 $max_fee = array ('max_fee' => array ('value' => 3,
 		                      'fraction' => 8,
 		                      'currency' => "KUDOS"));
@@ -71,7 +68,7 @@ if ($cli_debug && !$backend_test)
 $req = new http\Client\Request ("POST",
                                 "http://" . $_SERVER["SERVER_NAME"] . "/backend/pay",
 				array ("Content-Type" => "application/json"));
-$req->getBody()->append ($new_deposit_permission);
+$req->getBody()->append (json_encode ($new_deposit_permission));
 
 // Execute the HTTP request
 $client = new http\Client;
