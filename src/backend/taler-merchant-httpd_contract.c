@@ -37,9 +37,11 @@
 #include "taler_merchant_lib.h"
 
 extern struct MERCHANT_Mint *mints;
+extern struct MERCHANT_Auditor *auditors;
 extern struct GNUNET_CRYPTO_EddsaPrivateKey privkey;
 extern const struct MERCHANT_WIREFORMAT_Sepa *wire;
 extern unsigned int nmints;
+extern unsigned int nauditors;
 extern PGconn *db_conn;
 extern long long salt;
 
@@ -65,6 +67,8 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 {
   json_t *root;
   json_t *trusted_mints;
+  json_t *j_auditors;
+  json_t *auditor;
   json_t *mint;
   json_t *j_wire;
   const struct TALER_MINT_Keys *keys;
@@ -83,8 +87,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                              &root);
   if (GNUNET_SYSERR == res)
     return MHD_NO;
-  /* the POST's body has to be further fetched */
-  if ((GNUNET_NO == res) || (NULL == root))
+  /* the POST's body has to be further fetched */ if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
   /* Generate preferred mint(s) array. */
@@ -104,6 +107,13 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
       json_array_append_new (trusted_mints, mint);
     }
   }
+  auditors = json_array ();
+  for (cnt = 0; cnt < nauditors; cnt++)
+  {
+    auditor = json_pack ("{s:s}",
+                         "name", auditors[cnt].name);
+    json_array_append_new (j_auditors, auditor);
+  }
 
   /**
    * Return badly if no mints are trusted (or no call to /keys has still
@@ -116,7 +126,14 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   if (!json_array_size (trusted_mints))
     return MHD_NO;
 
+  /**
+   * Hard error, no action can be taken by a wallet
+   */
+  if (!json_array_size (auditors))
+    return MHD_NO;
+
   json_object_set_new (root, "mints", trusted_mints);
+  json_object_set_new (root, "auditors", j_auditors);
 
   if (NULL == (j_wire = MERCHANT_get_wire_json (wire,
                                                 salt)))                       

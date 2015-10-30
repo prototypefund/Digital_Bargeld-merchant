@@ -41,7 +41,7 @@
   } while (0)
 
 /**
- * A mint
+ * Mint
  */
 struct MERCHANT_Mint
 {
@@ -60,6 +60,15 @@ struct MERCHANT_Mint
    * A connection to this mint
    */
   struct TALER_MINT_Handle *conn;
+
+};
+
+struct MERCHANT_Auditor
+{
+  /**
+   * Auditor's legal name
+   */
+  char *name;
 
 };
 
@@ -96,6 +105,18 @@ int
 TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
                             struct MERCHANT_Mint **mints);
 
+/**
+ * Parses auditors from the configuration.
+ *
+ * @param cfg the configuration
+ * @param mints the array of auditors upon successful parsing.  Will be NULL upon
+ *          error.
+ * @return the number of auditors in the above array; GNUNET_SYSERR upon error in
+ *          parsing.
+ */
+int
+TALER_MERCHANT_parse_auditors (const struct GNUNET_CONFIGURATION_Handle *cfg,
+                               struct MERCHANT_Auditor **auditors);
 
 GNUNET_NETWORK_STRUCT_BEGIN
 struct MERCHANT_WIREFORMAT_Sepa

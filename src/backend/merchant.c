@@ -97,6 +97,73 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   return cnt;
 }
 
+/**
+ * Parses auditors from the configuration.
+ *
+ * @param cfg the configuration
+ * @param mints the array of auditors upon successful parsing.  Will be NULL upon
+ *          error.
+ * @return the number of auditors in the above array; GNUNET_SYSERR upon error in
+ *          parsing.
+ */
+int
+TALER_MERCHANT_parse_auditors (const struct GNUNET_CONFIGURATION_Handle *cfg,
+                               struct MERCHANT_Auditor **auditors)
+{
+  char *auditors_str;
+  char *token_nf;               /* do no free (nf) */
+  char *auditor_section;
+  char *auditor_name;
+  struct MERCHANT_Auditor *r_auditors;
+  struct MERCHANT_Auditor auditor;
+  unsigned int cnt;
+  int OK;
+
+  OK = 0;
+  auditors_str = NULL;
+  token_nf = NULL;
+  auditor_section = NULL;
+  auditor_name = NULL;
+  r_auditors = NULL;
+  cnt = 0;
+  EXITIF (GNUNET_OK !=
+          GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                 "merchant",
+                                                 "AUDITORS",
+                                                 &auditors_str));
+  for (token_nf = strtok (auditors_str, " ");
+       NULL != token_nf;
+       token_nf = strtok (NULL, " "))
+  {
+    GNUNET_assert (0 < GNUNET_asprintf (&auditor_section,
+                                        "auditor-%s", token_nf));
+    EXITIF (GNUNET_OK !=
+            GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                   auditor_section,
+                                                   "NAME",
+                                                   &auditor_name));
+    auditor.name = auditor_name;
+    GNUNET_array_append (r_auditors, cnt, auditor);
+    auditor_name = NULL;
+    GNUNET_free (auditor_section);
+    auditor_section = NULL;
+  }
+  OK = 1;
+
+ EXITIF_exit:
+  GNUNET_free_non_null (auditors_str);
+  GNUNET_free_non_null (auditor_section);
+  GNUNET_free_non_null (auditor_name);
+  if (!OK)
+  {
+    GNUNET_free_non_null (r_auditors);
+    return GNUNET_SYSERR;
+  }
+
+  *auditors = r_auditors;
+  return cnt;
+}
+
 
 /**
  * Parse the SEPA information from the configuration.  If any of the required

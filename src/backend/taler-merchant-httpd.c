@@ -74,9 +74,14 @@ struct GNUNET_TIME_Relative edate;
 char *TMH_mint_currency_string;
 
 /**
- * Mints' URL,port,key triples
+ * Trusted mints
  */
 struct MERCHANT_Mint *mints;
+
+/**
+ * Active auditors
+ */
+struct MERCHANT_Auditor *auditors;
 
 /**
  * Shutdown task identifier
@@ -102,6 +107,11 @@ long long salt;
  * The number of accepted mints
  */
 unsigned int nmints;
+
+/**
+ * The number of active auditors
+ */
+unsigned int nauditors;
 
 /**
  * Should we do a dry run where temporary tables are used for storing the data.
@@ -423,6 +433,10 @@ run (void *cls, char *const *args, const char *cfgfile,
          (nmints =
 	 TALER_MERCHANT_parse_mints (config,
                                      &mints)));
+  EXITIF (GNUNET_SYSERR ==
+         (nauditors =
+	 TALER_MERCHANT_parse_auditors (config,
+                                        &auditors)));
   EXITIF (NULL ==
          (wire =
 	 TALER_MERCHANT_parse_wireformat_sepa (config)));
