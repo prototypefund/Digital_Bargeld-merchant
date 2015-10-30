@@ -97,6 +97,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   json_t *chosen_mint;
   json_t *coin_aggregate;
   unsigned int ncoins;
+  unsigned int mint_index; //pointing global array
   int res;
   struct TMH_PARSE_FieldSpecification spec[] = {
     TMH_PARSE_member_array ("coins", &coins); 
@@ -118,15 +119,15 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
   //printf ("/pay\n");
 
-  /* 0 What if the coin gives zero-length coins array? */
-
-  
   res = TMH_PARSE_json_data (connection,
                              coin_aggregate,
 			     spec);
 
   if (GNUNET_YES != res)
     return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
+
+  /* 0 What if the coin gives zero-length coins array? */
+  ncoins = json_array_size (coins);
   if (0 == ncoins)
     return TMH_RESPONSE_reply_external_error (connection,
                                               "empty coin array");
@@ -144,9 +145,18 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     merchant from POSTing coins to untrusted mints.
 
    */
+  for (mint_index = 0; mint_index < nmints; mint_index++)
+  {
+    if (0 == strcmp (mints[mint_index].hostname, json_string_value (chosen_mint))) 
+      break;
+    mint_index = -1;
+  }
+
+  if (-1 == mint_index)
+
+  /* TODO notify the wallet that it indicated an unknown mint */
 
   /* 2 Check if the total deposit fee is \leq the limit */
-  ncoins = json_array_size (coins);
   if (NULL == (coin_aggregate = json_array_get (coins, 0)))
     return MHD_NO;
 
