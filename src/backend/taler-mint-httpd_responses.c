@@ -186,4 +186,21 @@ TMH_RESPONSE_add_global_headers (struct MHD_Response *response)
                                     "close");
 }
 
+/**
+ * Send a response indicating an external error.
+ *
+ * @param connection the MHD connection to use
+ * @param hint hint about the error's nature
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
+                                   const char *hint)
+{
+  return TMH_RESPONSE_reply_json_pack (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       "{s:s, s:s}",
+                                       "error", "client error",
+                                       "hint", hint);
+}
 /* end of taler-mint-httpd_responses.c */

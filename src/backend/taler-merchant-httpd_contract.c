@@ -107,7 +107,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
       json_array_append_new (trusted_mints, mint);
     }
   }
-  auditors = json_array ();
+  j_auditors = json_array ();
   for (cnt = 0; cnt < nauditors; cnt++)
   {
     auditor = json_pack ("{s:s}",
@@ -129,7 +129,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   /**
    * Hard error, no action can be taken by a wallet
    */
-  if (!json_array_size (auditors))
+  if (!json_array_size (j_auditors))
     return MHD_NO;
 
   json_object_set_new (root, "mints", trusted_mints);

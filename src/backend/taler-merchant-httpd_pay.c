@@ -42,6 +42,38 @@ extern PGconn *db_conn;
 extern long long salt;
 
 /**
+ * Fetch the deposit fee related to the given coin aggregate.
+ * @param connection the connection to send an error response to
+ * @param coin_aggregate a coin "aggregate" is the JSON set of
+ * values contained in a single cell of the 'coins' array sent
+ * in a payment
+ * @param deposit_fee where to store the resulting deposi fee
+ * @param mint_index the index which points the chosen mint within
+ * the global 'mints' array
+ * @return GNUNET_OK if successful, GNUNET_NO if the data supplied
+ * is invalid, GNUNET_SYSERR upon internal errors
+ */
+int
+deposit_fee_from_coin_json (struct MHD_Connection *connection,
+                            json_t *coin_aggregate,
+                            struct TALER_Amount *deposit_fee,
+			    unsigned int mint_index)
+{
+  int res;
+  struct TALER_DenominationPublicKey denom;
+  struct TMH_PARSE_FieldSpecification spec[] = {
+    TMH_PARSE_member_denomination_public_key ("denom_pub", &denom); 
+  };
+  
+  res = TMH_PARSE_json_data (connection,
+                             coin_aggregate,
+			     spec);
+  if (GNUNET_OK != res)
+    return res;
+  /* Iterate over the mint keys to get the wanted data */
+}
+
+/**
  * Accomplish this payment.
  * @param rh context of the handler
  * @param connection the MHD connection to handle
@@ -62,12 +94,17 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
   json_t *root;
   json_t *coins;
-
+  json_t *chosen_mint;
+  json_t *coin_aggregate;
+  unsigned int ncoins;
   int res;
+  struct TMH_PARSE_FieldSpecification spec[] = {
+    TMH_PARSE_member_array ("coins", &coins); 
+    TMH_PARSE_member_object ("mint", &chosen_mint); 
+  };
   struct TALER_Amount max_deposit_fee;
   //struct TALER_Amount acc_deposit_fee;
   //struct TALER_Amount coin_deposit_fee;
-
   res = TMH_PARSE_post_json (connection,
                              connection_cls,
                              upload_data,
@@ -83,9 +120,17 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
   /* 0 What if the coin gives zero-length coins array? */
 
-  /* 1 Check if the total deposit fee is \leq the limit */
+  
+  res = TMH_PARSE_json_data (connection,
+                             coin_aggregate,
+			     spec);
 
-  /* 2 Check if the chosen mint is among the merchant's preferred.
+  if (GNUNET_YES != res)
+    return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
+  if (0 == ncoins)
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "empty coin array");
+  /* 1 Check if the chosen mint is among the merchant's preferred.
 
     An error in this case could be due to:
 
@@ -99,6 +144,11 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     merchant from POSTing coins to untrusted mints.
 
    */
+
+  /* 2 Check if the total deposit fee is \leq the limit */
+  ncoins = json_array_size (coins);
+  if (NULL == (coin_aggregate = json_array_get (coins, 0)))
+    return MHD_NO;
 
   /* 3 For each coin in DB
 
