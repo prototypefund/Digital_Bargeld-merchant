@@ -4,7 +4,7 @@
   - curl http://merchant-url/generate_taler_contract.php?cli_debug=yes
     (this form tests the whole communication between frontend and backend)
 
-  - curl http://merchant-url/generate_taler_contract.php?cli_debug=yes
+  - curl http://merchant-url/generate_taler_contract.php?backend_test=no
     (this form test only the contract proposition generation of the frontend,
      so it doesn't further connect to the backend to get the proposition JSON
      enhanced)

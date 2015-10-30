@@ -142,7 +142,6 @@ $json = json_encode (array ('amount' => array ('value' => $value,
 							             'region' => 'Test Region',
 								     'province' => 'Test Province',
 								     'ZIP code' => 4908))), JSON_PRETTY_PRINT);
-
 if ($cli_debug && !$backend_test)
 {
   echo $json . "\n";
