@@ -142,7 +142,8 @@ enum TMH_PARSE_JsonNavigationCommand
   TMH_PARSE_JNC_RET_UINT64,
   /**
    * Return a 'char *' as returned from 'json_string_value ()'.
-   * So it will live as long as the containg JSON is not freed
+   * So it will live as long as the containg JSON is not freed,
+   * and must not be freed by the user
    */
   TMH_PARSE_JNC_RET_STRING
 

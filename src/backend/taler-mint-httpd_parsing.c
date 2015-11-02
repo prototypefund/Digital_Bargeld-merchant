@@ -351,7 +351,7 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
  * Generate line in parser specification for string. The returned
  * string is already nul-terminated internally by JSON, so no length
  * information is provided. The string will live as long as the containg
- * JSON will
+ * JSON will, and mut not be freed by the user
  * @param field name of the field
  * @param[out] pointer to the string
  * @return corresponding field spec
