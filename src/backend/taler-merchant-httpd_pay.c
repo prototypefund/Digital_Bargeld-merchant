@@ -40,6 +40,8 @@ extern struct MERCHANT_Mint *mints;
 extern const struct MERCHANT_WIREFORMAT_Sepa *wire;
 extern PGconn *db_conn;
 extern long long salt;
+extern unsigned int nmints;
+extern struct GNUNET_TIME_Relative edate_delay;
 
 /**
  * Fetch the deposit fee related to the given coin aggregate.
@@ -54,23 +56,33 @@ extern long long salt;
  * is invalid, GNUNET_SYSERR upon internal errors
  */
 int
-deposit_fee_from_coin_json (struct MHD_Connection *connection,
-                            json_t *coin_aggregate,
-                            struct TALER_Amount *deposit_fee,
-			    unsigned int mint_index)
+deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
+                                 json_t *coin_aggregate,
+                                 struct TALER_Amount *deposit_fee,
+			         unsigned int mint_index)
 {
   int res;
+  const struct TALER_MINT_Keys *keys;
+  const struct TALER_MINT_DenomPublicKey *denom_details;
   struct TALER_DenominationPublicKey denom;
+
   struct TMH_PARSE_FieldSpecification spec[] = {
-    TMH_PARSE_member_denomination_public_key ("denom_pub", &denom); 
+    TMH_PARSE_member_denomination_public_key ("denom_pub", &denom)
   };
   
   res = TMH_PARSE_json_data (connection,
                              coin_aggregate,
 			     spec);
   if (GNUNET_OK != res)
-    return res;
-  /* Iterate over the mint keys to get the wanted data */
+    return res; /* may return GNUNET_NO */
+
+  if (1 == mints[mint_index].pending) 
+    return GNUNET_SYSERR;
+  keys = TALER_MINT_get_keys (mints[mint_index].conn);
+
+  denom_details = TALER_MINT_get_denomination_key (keys, &denom);
+  *deposit_fee = denom_details->fee_deposit;
+  return GNUNET_OK;
 }
 
 /**
@@ -94,18 +106,30 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
   json_t *root;
   json_t *coins;
-  json_t *chosen_mint;
+  char *chosen_mint;
+  size_t chosen_mint_length;
   json_t *coin_aggregate;
-  unsigned int ncoins;
+  unsigned int coins_cnt;
   unsigned int mint_index; //pointing global array
+  uint64_t transaction_id;
   int res;
+
+  struct TALER_Amount max_fee;
+  struct TALER_Amount acc_fee;
+  struct TALER_Amount coin_fee;
+  struct GNUNET_TIME_Absolute edate;
+  struct GNUNET_TIME_Absolute timestamp;
+
   struct TMH_PARSE_FieldSpecification spec[] = {
-    TMH_PARSE_member_array ("coins", &coins); 
-    TMH_PARSE_member_object ("mint", &chosen_mint); 
+    TMH_PARSE_member_array ("coins", &coins),
+    TMH_PARSE_member_variable ("mint",
+                              (void *) &chosen_mint,
+			      &chosen_mint_length), 
+
+    TMH_PARSE_member_amount ("max_fee", &max_fee),
+    TMH_PARSE_member_time_abs ("timestamp", &timestamp),
+    TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
   };
-  struct TALER_Amount max_deposit_fee;
-  //struct TALER_Amount acc_deposit_fee;
-  //struct TALER_Amount coin_deposit_fee;
   res = TMH_PARSE_post_json (connection,
                              connection_cls,
                              upload_data,
@@ -120,17 +144,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   //printf ("/pay\n");
 
   res = TMH_PARSE_json_data (connection,
-                             coin_aggregate,
+                             root,
 			     spec);
 
   if (GNUNET_YES != res)
     return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
 
-  /* 0 What if the coin gives zero-length coins array? */
-  ncoins = json_array_size (coins);
-  if (0 == ncoins)
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "empty coin array");
   /* 1 Check if the chosen mint is among the merchant's preferred.
 
     An error in this case could be due to:
@@ -147,23 +166,55 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
    */
   for (mint_index = 0; mint_index < nmints; mint_index++)
   {
-    if (0 == strcmp (mints[mint_index].hostname, json_string_value (chosen_mint))) 
+    if (0 == strncmp (mints[mint_index].hostname,
+                      chosen_mint, chosen_mint_length))
       break;
     mint_index = -1;
   }
 
-  if (-1 == mint_index)
+  if (-1 == mint_index);
+    return TMH_RESPONSE_reply_external_error (connection, "unknown mint"); 
 
-  /* TODO notify the wallet that it indicated an unknown mint */
+  printf ("mint idx %d", mint_index);
 
-  /* 2 Check if the total deposit fee is \leq the limit */
-  if (NULL == (coin_aggregate = json_array_get (coins, 0)))
-    return MHD_NO;
+  /* no 'edate' from frontend. Generate it here; it will be timestamp
+    + a edate delay supplied in config file */
+  if (NULL == json_object_get (root, "edate"))
+  {
+    edate = GNUNET_TIME_absolute_add (timestamp, edate_delay);
+    if (-1 == json_object_set (root, "edate", TALER_json_from_abs (edate)))
+      return MHD_NO;
+  }
 
+  coins_cnt = json_array_size (coins);
+  
+  if (0 == coins_cnt)
+    return TMH_RESPONSE_reply_external_error (connection, "no coins given"); 
+
+  json_array_foreach (coins, coins_cnt, coin_aggregate)
+  {
+    res = deposit_fee_from_coin_aggregate (connection,
+                                           coin_aggregate,
+		                           &coin_fee,
+				           mint_index);
+    if (GNUNET_OK != res)
+      return MHD_NO; 
+
+    if (0 == coins_cnt)
+      acc_fee = coin_fee;
+    else
+      TALER_amount_add (&acc_fee,
+                        &acc_fee,
+			&coin_fee);
+  }
+
+  if (-1 == TALER_amount_cmp (&max_fee, &acc_fee))
+    return MHD_HTTP_NOT_ACCEPTABLE;
+  
   /* 3 For each coin in DB
 
        a. Generate a deposit permission
-       b. store it in DB
+       b. store it and its tid in DB
        c. POST to the mint (see mint-lib for this)
           (retry until getting a persisten state)
   */

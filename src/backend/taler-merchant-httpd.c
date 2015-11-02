@@ -66,7 +66,7 @@ static struct TALER_MINT_Context *mctx;
  * This value tells the mint by which date this merchant would like 
  * to receive the funds for a deposited payment
  */
-struct GNUNET_TIME_Relative edate;
+struct GNUNET_TIME_Relative edate_delay;
 
 /**
  * To make 'TMH_PARSE_navigate_json ()' compile
@@ -472,7 +472,7 @@ run (void *cls, char *const *args, const char *cfgfile,
           GNUNET_CONFIGURATION_get_value_time (config,
                                                  "merchant",
                                                  "EDATE",
-                                                 &edate));
+                                                 &edate_delay));
 
   salt = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE,
                                    UINT64_MAX); 

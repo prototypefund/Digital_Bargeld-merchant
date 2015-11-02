@@ -81,6 +81,16 @@ int
 TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
                                    const char *hint);
 /**
+ * Send a response indicating an external error.
+ *
+ * @param connection the MHD connection to use
+ * @param hint hint about the error's nature
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
+                                   const char *hint);
+/**
  * Send a response indicating that the request was too big.
  *
  * @param connection the MHD connection to use
