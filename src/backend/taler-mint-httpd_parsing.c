@@ -347,6 +347,25 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
   return GNUNET_YES;
 }
 
+/**
+ * Generate line in parser specification for string. The returned
+ * string is already nul-terminated internally by JSON, so no length
+ * information is provided. The string will live as long as the containg
+ * JSON will
+ * @param field name of the field
+ * @param[out] pointer to the string
+ * @return corresponding field spec
+ */
+struct TMH_PARSE_FieldSpecification
+TMH_PARSE_member_string (const char *field,
+                         char **out)
+{
+  struct TMH_PARSE_FieldSpecification ret =
+    {field, (void **) out, 0, NULL, TMH_PARSE_JNC_RET_STRING, 0};
+  return ret;
+
+
+}
 
 /**
  * Generate line in parser specification for 64-bit integer
@@ -499,7 +518,8 @@ TMH_PARSE_member_variable (const char *field,
  *
  * @param connection the connection to send an error response to
  * @param root the JSON node to start the navigation at.
- * @param ... navigation specification (see `enum TMH_PARSE_JsonNavigationCommand`)
+ * @param ... navigation specification (see
+ * `enum TMH_PARSE_JsonNavigationCommand`)
  * @return
  *    #GNUNET_YES if navigation was successful
  *    #GNUNET_NO if json is malformed, error response was generated
@@ -611,6 +631,13 @@ TMH_PARSE_navigate_json (struct MHD_Connection *connection,
       }
       break;
 
+    case TMH_PARSE_JNC_RET_STRING:
+    {
+      void **where = va_arg (argp, void **); 
+      *where = json_string_value (root);
+      ret = GNUNET_OK;
+    
+    }
     case TMH_PARSE_JNC_RET_DATA_VAR:
       {
         void **where = va_arg (argp, void **);

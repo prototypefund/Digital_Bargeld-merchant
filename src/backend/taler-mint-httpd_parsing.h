@@ -139,7 +139,12 @@ enum TMH_PARSE_JsonNavigationCommand
    * encoded as a JSON integer.
    * Param: uint64_t *
    */
-  TMH_PARSE_JNC_RET_UINT64
+  TMH_PARSE_JNC_RET_UINT64,
+  /**
+   * Return a 'char *' as returned from 'json_string_value ()'.
+   * So it will live as long as the containg JSON is not freed
+   */
+  TMH_PARSE_JNC_RET_STRING
 
 };
 
