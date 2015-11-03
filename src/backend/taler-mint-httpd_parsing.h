@@ -271,7 +271,18 @@ TMH_PARSE_member_variable (const char *field,
                            void **ptr,
                            size_t *ptr_size);
 
-
+/**
+ * Generate line in parser specification for string. The returned
+ * string is already nul-terminated internally by JSON, so no length
+ * information is provided. The string will live as long as the containg
+ * JSON will, and must not be freed by the user
+ * @param field name of the field
+ * @param[out] pointer to the string
+ * @return corresponding field spec
+ */
+struct TMH_PARSE_FieldSpecification
+TMH_PARSE_member_string (const char *field,
+                         char **out);
 /**
  * Generate line in parser specification for 64-bit integer
  * given as an integer in JSON.

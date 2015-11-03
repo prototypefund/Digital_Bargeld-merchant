@@ -1,7 +1,9 @@
 {
+    "transaction_id" : 1,
+    "timestamp": "\/Date(1447334003)\/",
     "H_wire": "V1F0F5AWSNX60E6TXZEYDZRE84J8HMBGXEM09AEVV3N97MM75P6JQRSWR5KQVC1RBBF2SRXY7P10H0ZM0VETWPFAJJRBVJSXNMDWTYR",
     "merchant_pub": "BQ0TMTBV2XEJ8G2PXA9KRDD5WDT5EV29KPVS6J9RBQJCS8BCPQ70",
-    "mint": "localmint",
+    "mint": "demo.taler.net",
     "coins": [
         {
             "f": {

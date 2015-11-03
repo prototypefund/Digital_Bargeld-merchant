@@ -247,10 +247,10 @@ url_handler (void *cls,
                           upload_data_size);
   }
   return TMH_MHD_handler_static_response (&h404,
-                                             connection,
-                                             con_cls,
-                                             upload_data,
-                                             upload_data_size);
+                                          connection,
+                                          con_cls,
+                                          upload_data,
+                                          upload_data_size);
 
 }
 
@@ -281,7 +281,12 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
     the wallet didn't exceede the limit imposed by the merchant
     on the total deposit fee for a purchase */
 
-  ((struct MERCHANT_Mint *) cls)->pending = 0;
+  if (NULL != keys)
+  {
+    ((struct MERCHANT_Mint *) cls)->pending = 0;
+  }
+  else
+    printf ("no keys gotten\n");
 }
 
 
@@ -532,7 +537,7 @@ main (int argc, char *const *argv)
 
   if (GNUNET_OK !=
       GNUNET_PROGRAM_run (argc, argv,
-                          "taler-merchant-serve",
+                          "taler-merchant-http",
                           "Serve merchant's HTTP interface",
                           options, &run, NULL))
     return 3;

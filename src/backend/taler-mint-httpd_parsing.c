@@ -184,6 +184,9 @@ release_data (struct TMH_PARSE_FieldSpecification *spec,
     case TMH_PARSE_JNC_FIELD:
       GNUNET_break (0);
       return;
+    case TMH_PARSE_JNC_RET_STRING:
+      GNUNET_break (0);
+      return;
     case TMH_PARSE_JNC_INDEX:
       GNUNET_break (0);
       return;
@@ -351,7 +354,7 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
  * Generate line in parser specification for string. The returned
  * string is already nul-terminated internally by JSON, so no length
  * information is provided. The string will live as long as the containg
- * JSON will, and mut not be freed by the user
+ * JSON will, and must not be freed by the user
  * @param field name of the field
  * @param[out] pointer to the string
  * @return corresponding field spec
@@ -363,8 +366,6 @@ TMH_PARSE_member_string (const char *field,
   struct TMH_PARSE_FieldSpecification ret =
     {field, (void **) out, 0, NULL, TMH_PARSE_JNC_RET_STRING, 0};
   return ret;
-
-
 }
 
 /**
@@ -632,12 +633,12 @@ TMH_PARSE_navigate_json (struct MHD_Connection *connection,
       break;
 
     case TMH_PARSE_JNC_RET_STRING:
-    {
-      void **where = va_arg (argp, void **); 
-      *where = json_string_value (root);
-      ret = GNUNET_OK;
-    
-    }
+      {
+        void **where = va_arg (argp, void **); 
+        *where = (void*) json_string_value (root);
+        ret = GNUNET_OK;
+      }
+      break;
     case TMH_PARSE_JNC_RET_DATA_VAR:
       {
         void **where = va_arg (argp, void **);
@@ -984,6 +985,14 @@ TMH_PARSE_json_data (struct MHD_Connection *connection,
                                      TMH_PARSE_JNC_RET_DATA_VAR,
                                      (void **) spec[i].destination,
                                      spec[i].destination_size_out);
+      break;
+    case TMH_PARSE_JNC_RET_STRING:
+      ret = TMH_PARSE_navigate_json (connection,
+                                     root,
+                                     TMH_PARSE_JNC_FIELD,
+                                     spec[i].field_name,
+                                     TMH_PARSE_JNC_RET_STRING,
+                                     spec[i].destination);
       break;
     case TMH_PARSE_JNC_RET_TYPED_JSON:
       ret = TMH_PARSE_navigate_json (connection,

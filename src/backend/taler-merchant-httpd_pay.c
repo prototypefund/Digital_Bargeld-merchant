@@ -49,11 +49,12 @@ extern struct GNUNET_TIME_Relative edate_delay;
  * @param coin_aggregate a coin "aggregate" is the JSON set of
  * values contained in a single cell of the 'coins' array sent
  * in a payment
- * @param deposit_fee where to store the resulting deposi fee
+ * @param deposit_fee where to store the resulting deposit fee
  * @param mint_index the index which points the chosen mint within
  * the global 'mints' array
  * @return GNUNET_OK if successful, GNUNET_NO if the data supplied
- * is invalid, GNUNET_SYSERR upon internal errors
+ * is invalid (including the case when the key is not found),
+ * GNUNET_SYSERR upon internal errors
  */
 int
 deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
@@ -67,7 +68,8 @@ deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
   struct TALER_DenominationPublicKey denom;
 
   struct TMH_PARSE_FieldSpecification spec[] = {
-    TMH_PARSE_member_denomination_public_key ("denom_pub", &denom)
+    TMH_PARSE_member_denomination_public_key ("denom_pub", &denom),
+    TMH_PARSE_MEMBER_END
   };
   
   res = TMH_PARSE_json_data (connection,
@@ -76,11 +78,24 @@ deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
   if (GNUNET_OK != res)
     return res; /* may return GNUNET_NO */
 
+  /*printf ("mint %s (%d), pends: %d\n",
+           mints[mint_index].hostname,
+	   mint_index,
+	   mints[mint_index].pending);*/
+
   if (1 == mints[mint_index].pending) 
     return GNUNET_SYSERR;
   keys = TALER_MINT_get_keys (mints[mint_index].conn);
 
-  denom_details = TALER_MINT_get_denomination_key (keys, &denom);
+  if (NULL ==
+    (denom_details = TALER_MINT_get_denomination_key (keys, &denom)))
+    TMH_RESPONSE_reply_json_pack (connection,
+                                  MHD_HTTP_BAD_REQUEST,
+				  "{s:s, s:o}",
+				  "hint", "unknown denom to mint",
+				  "denom_pub", TALER_json_from_rsa_public_key (denom.rsa_public_key));
+    return GNUNET_NO;
+
   *deposit_fee = denom_details->fee_deposit;
   return GNUNET_OK;
 }
@@ -107,10 +122,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   json_t *root;
   json_t *coins;
   char *chosen_mint;
-  size_t chosen_mint_length;
   json_t *coin_aggregate;
   unsigned int coins_cnt;
-  unsigned int mint_index; //pointing global array
+  unsigned int mint_index; /*a cell in the global array*/
   uint64_t transaction_id;
   int res;
 
@@ -122,13 +136,11 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
   struct TMH_PARSE_FieldSpecification spec[] = {
     TMH_PARSE_member_array ("coins", &coins),
-    TMH_PARSE_member_variable ("mint",
-                              (void *) &chosen_mint,
-			      &chosen_mint_length), 
-
+    TMH_PARSE_member_string ("mint", &chosen_mint),
     TMH_PARSE_member_amount ("max_fee", &max_fee),
     TMH_PARSE_member_time_abs ("timestamp", &timestamp),
     TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
+    TMH_PARSE_MEMBER_END
   };
   res = TMH_PARSE_post_json (connection,
                              connection_cls,
@@ -140,8 +152,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   /* the POST's body has to be further fetched */
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
-
-  //printf ("/pay\n");
 
   res = TMH_PARSE_json_data (connection,
                              root,
@@ -164,18 +174,25 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     merchant from POSTing coins to untrusted mints.
 
    */
-  for (mint_index = 0; mint_index < nmints; mint_index++)
+
+  for (mint_index = 0; mint_index <= nmints; mint_index++)
   {
-    if (0 == strncmp (mints[mint_index].hostname,
-                      chosen_mint, chosen_mint_length))
+    /* no mint found in array */
+    if (mint_index == nmints)
+    {
+      mint_index = -1;
       break;
-    mint_index = -1;
+    }
+
+    /* test it by checking public key */
+    if (0 == strcmp (mints[mint_index].hostname,
+                     chosen_mint))
+      break;
+
   }
 
-  if (-1 == mint_index);
+  if (-1 == mint_index)
     return TMH_RESPONSE_reply_external_error (connection, "unknown mint"); 
-
-  printf ("mint idx %d", mint_index);
 
   /* no 'edate' from frontend. Generate it here; it will be timestamp
     + a edate delay supplied in config file */
@@ -197,7 +214,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                            coin_aggregate,
 		                           &coin_fee,
 				           mint_index);
-    if (GNUNET_OK != res)
+    if (GNUNET_NO == res)
+      return MHD_YES; 
+    if (GNUNET_SYSERR == res)
       return MHD_NO; 
 
     if (0 == coins_cnt)
