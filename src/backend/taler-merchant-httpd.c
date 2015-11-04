@@ -434,6 +434,9 @@ run (void *cls, char *const *args, const char *cfgfile,
   GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
                                 &do_shutdown,
 				NULL);
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "merchant launched\n");
+
   EXITIF (GNUNET_SYSERR ==
          (nmints =
 	 TALER_MERCHANT_parse_mints (config,

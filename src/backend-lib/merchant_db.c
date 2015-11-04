@@ -104,7 +104,12 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                           "contract_id INT8 REFERENCES contracts(contract_id),"
                           "amount INT4 NOT NULL,"
                           "amount_fraction INT4 NOT NULL,"
-                          "coin_sig BYTEA NOT NULL);",
+                          "coin_sig BYTEA NOT NULL);"
+			  "CREATE %1$s TABLE IF NOT EXISTS deposits ("
+			  "dep_perm TEXT NOT NULL"
+			  "transaction_id INT8 NOT NULL"
+			  "pending INT4 NOT NULL"
+			  "mint_url TEXT NOT NULL);",
                           tmp_str);
   ret = GNUNET_POSTGRES_exec (conn, sql);
   (void) GNUNET_POSTGRES_exec (conn,
@@ -165,6 +170,16 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
 
   EXITIF (NULL == (res = PQprepare
                    (conn,
+                    "store_deposit_permission",
+                    "INSERT INTO deposits"
+                    "(dep_perm, transaction_id, pending, mint_url) "
+                    "VALUES ($1, $2, $3, $4);", 4, NULL)));
+  EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
+  PQclear (res);
+
+
+  EXITIF (NULL == (res = PQprepare
+                   (conn,
                     "get_contract_product",
                     "SELECT ("
                     "product"
@@ -218,6 +233,22 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
   return GNUNET_SYSERR;
 }
 
+
+MERCHANT_DB_store_deposit_permission (PGconn *conn,
+                                      const char *deposit_permission,
+				      uint64_t transaction_id,
+				      unsigned int pending,
+				      const char *mint_url)
+{
+  struct TALER_PQ_QueryParam params[] = {
+    TALER_PQ_query_param_fixed_size (deposit_permission, strlen (deposit_permission)),
+    TALER_PQ_query_param_uint64 (&transaction_id),
+    TALER_PQ_query_param_uint32 (&pending),  
+    TALER_PQ_query_param_fixed_size (mint_url, strlen (mint_url)),
+    TALER_PQ_query_param_end  
+  };
+
+}
 
 /**
 * Insert a contract record into the database and if successfull

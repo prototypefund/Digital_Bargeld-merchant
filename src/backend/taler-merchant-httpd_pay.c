@@ -42,6 +42,7 @@ extern PGconn *db_conn;
 extern long long salt;
 extern unsigned int nmints;
 extern struct GNUNET_TIME_Relative edate_delay;
+extern struct GNUNET_CRYPTO_EddsaPrivateKey privkey;
 
 /**
  * Fetch the deposit fee related to the given coin aggregate.
@@ -133,6 +134,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct TALER_Amount coin_fee;
   struct GNUNET_TIME_Absolute edate;
   struct GNUNET_TIME_Absolute timestamp;
+  struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
 
   struct TMH_PARSE_FieldSpecification spec[] = {
     TMH_PARSE_member_array ("coins", &coins),
@@ -229,7 +231,34 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
   if (-1 == TALER_amount_cmp (&max_fee, &acc_fee))
     return MHD_HTTP_NOT_ACCEPTABLE;
+
+  /* cutting off unneeded fields from deposit permission as
+    gotten from the wallet */
+  if (-1 == json_object_del (root, "mint"))
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "malformed/non-existent 'mint' field");
+  if (-1 == json_object_del (root, "coins"))
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "malformed/non-existent 'coins' field");
+
+  /* adding our public key to deposit permission */
+  GNUNET_CRYPTO_eddsa_key_get_public (&privkey, &pubkey);
+  json_object_set_new (root,
+                       "merchant_pub",
+		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
+
+  json_array_foreach (coins, coins_cnt, coin_aggregate)
+  {
+    /* melt single coin with deposit permission "template" */
+    if (-1 == json_object_update (root, coin_aggregate))
+      return TMH_RESPONSE_reply_internal_error (connection, "deposit permission not generated");
+
+    /* store a stringification of it (paired with its transaction id)
+      into DB */ 
+    char *deposit_permission_str = json_dumps (root, JSON_COMPACT);
   
+  }
+
   /* 3 For each coin in DB
 
        a. Generate a deposit permission
