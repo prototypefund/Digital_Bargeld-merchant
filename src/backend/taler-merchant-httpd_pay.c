@@ -101,6 +101,26 @@ deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
   return GNUNET_OK;
 }
 
+
+/**
+ * Callback to handle a deposit permission's response. How does this behave if the mint
+ * goes offline during a call?
+ * @param cls closure (in our invocation it will be the transaction_id, so the cb can refer
+ * to the right DB row for this deposit permission)
+ * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
+ * 0 if the mint's reply is bogus (fails to follow the protocol)
+ * @param proof the received JSON reply, should be kept as proof (and, in case of errors,
+ * be forwarded to the customer)
+ */
+void
+deposit_cb (void *cls, unsigned int http_status, json_t *proof)
+{
+  if (MHD_HTTP_OK == http_status)
+  ; /* set pending to false in DB and notify the frontend with "OK" */
+  else
+  ; /* set a timeout to retry */
+}
+
 /**
  * Accomplish this payment.
  * @param rh context of the handler
@@ -124,26 +144,47 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   json_t *coins;
   char *chosen_mint;
   json_t *coin_aggregate;
+  json_t *wire_details;
   unsigned int coins_cnt;
   unsigned int mint_index; /*a cell in the global array*/
   uint64_t transaction_id;
   int res;
 
+  struct TALER_MINT_DepositHandle *dh;
   struct TALER_Amount max_fee;
   struct TALER_Amount acc_fee;
   struct TALER_Amount coin_fee;
+  struct TALER_Amount amount;
   struct GNUNET_TIME_Absolute edate;
   struct GNUNET_TIME_Absolute timestamp;
-  struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
+  struct GNUNET_TIME_Absolute refund_deadline;
+  struct TALER_MerchantPublicKeyP pubkey;
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+  struct TALER_DenominationPublicKey denom_pub;
+  struct TALER_DenominationSignature ub_sig;
+  struct TALER_CoinSpendSignatureP coin_sig;
+  struct GNUNET_HashCode h_contract;
 
   struct TMH_PARSE_FieldSpecification spec[] = {
     TMH_PARSE_member_array ("coins", &coins),
     TMH_PARSE_member_string ("mint", &chosen_mint),
     TMH_PARSE_member_amount ("max_fee", &max_fee),
     TMH_PARSE_member_time_abs ("timestamp", &timestamp),
+    TMH_PARSE_member_time_abs ("refund_deadline", &refund_deadline),
     TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
+    TMH_PARSE_member_fixed ("H_contract", &h_contract),
     TMH_PARSE_MEMBER_END
   };
+
+  struct TMH_PARSE_FieldSpecification coin_aggregate_spec[] = {
+    TMH_PARSE_member_amount ("f", &amount),
+    TMH_PARSE_member_fixed ("coin_pub", &coin_pub.eddsa_pub),
+    TMH_PARSE_member_denomination_public_key ("denom_pub", &denom_pub),
+    TMH_PARSE_member_denomination_signature ("ub_sig", &ub_sig),
+    TMH_PARSE_member_fixed ("coin_sig", &coin_sig.eddsa_signature),
+    TMH_PARSE_MEMBER_END
+  };
+
   res = TMH_PARSE_post_json (connection,
                              connection_cls,
                              upload_data,
@@ -242,30 +283,60 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                               "malformed/non-existent 'coins' field");
 
   /* adding our public key to deposit permission */
-  GNUNET_CRYPTO_eddsa_key_get_public (&privkey, &pubkey);
+  GNUNET_CRYPTO_eddsa_key_get_public (&privkey, &pubkey.eddsa_pub);
   json_object_set_new (root,
                        "merchant_pub",
 		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
 
+  wire_details = MERCHANT_get_wire_json (wire, salt);
   json_array_foreach (coins, coins_cnt, coin_aggregate)
   {
-    /* melt single coin with deposit permission "template" */
+
+    /* 3 For each coin in DB
+
+         a. Generate a deposit permission
+         b. store it and its tid in DB
+         c. POST to the mint (see mint-lib for this)
+            (retry until getting a persisten state)
+    */
+
+
+    /* a */
     if (-1 == json_object_update (root, coin_aggregate))
       return TMH_RESPONSE_reply_internal_error (connection, "deposit permission not generated");
 
-    /* store a stringification of it (paired with its transaction id)
-      into DB */ 
+    /* b */
     char *deposit_permission_str = json_dumps (root, JSON_COMPACT);
+    if (GNUNET_OK != MERCHANT_DB_store_deposit_permission (db_conn,
+                                                           deposit_permission_str,
+			                                   transaction_id,
+					                   1,
+					                   mints[mint_index].hostname))
+      return TMH_RESPONSE_reply_internal_error (connection, "internal DB failure");
+    res = TMH_PARSE_json_data (connection,
+                               coin_aggregate,
+                               coin_aggregate_spec);
+    if (GNUNET_OK != res)
+      return res; /* may return GNUNET_NO */
+ 
+
+    dh = TALER_MINT_deposit (mints[mint_index].conn,
+                             &amount,
+			     wire_details,
+			     &h_contract,
+			     &coin_pub,
+			     &ub_sig,
+			     &denom_pub,
+			     timestamp,
+                             transaction_id,
+                             &pubkey,
+			     refund_deadline,
+			     &coin_sig,
+			     deposit_cb,
+			     &transaction_id); /*may be destroyed by the time the cb gets called..*/
   
   }
 
-  /* 3 For each coin in DB
-
-       a. Generate a deposit permission
-       b. store it and its tid in DB
-       c. POST to the mint (see mint-lib for this)
-          (retry until getting a persisten state)
-  */
   /* 4 Return response code: success, or whatever data the
     mint sent back regarding some bad coin */
 }

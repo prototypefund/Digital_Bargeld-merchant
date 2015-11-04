@@ -164,4 +164,21 @@ MERCHANT_DB_get_contract_handle (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
 				 struct MERCHANT_contract_handle *contract_handle);
 
+/**
+ * Store a deposit permission in DB. To be mainly used if /deposit should
+ * be retried; also, the merchant can benefit from this information in case
+ * he needs to later investigate about some transaction_id.
+ * @param conn DB handle
+ * @param transaction_id identification number of this payment (which is the
+ * same id of the related contract)
+ * @param pending if true, this payment got to a persistent state
+ * @param which mint is to get this deposit permission
+ * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ */
+uint32_t
+MERCHANT_DB_store_deposit_permission (PGconn *conn,
+                                      const char *deposit_permission,
+				      uint64_t transaction_id,
+				      unsigned int pending,
+				      const char *mint_url);
 /* end of merchant-db.h */

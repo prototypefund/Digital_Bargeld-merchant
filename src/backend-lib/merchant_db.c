@@ -106,9 +106,9 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                           "amount_fraction INT4 NOT NULL,"
                           "coin_sig BYTEA NOT NULL);"
 			  "CREATE %1$s TABLE IF NOT EXISTS deposits ("
-			  "dep_perm TEXT NOT NULL"
-			  "transaction_id INT8 NOT NULL"
-			  "pending INT4 NOT NULL"
+			  "dep_perm TEXT NOT NULL,"
+			  "transaction_id INT8 PRIMARY KEY,"
+			  "pending INT4 NOT NULL,"
 			  "mint_url TEXT NOT NULL);",
                           tmp_str);
   ret = GNUNET_POSTGRES_exec (conn, sql);
@@ -174,6 +174,18 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                     "INSERT INTO deposits"
                     "(dep_perm, transaction_id, pending, mint_url) "
                     "VALUES ($1, $2, $3, $4);", 4, NULL)));
+
+  EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
+  PQclear (res);
+
+
+  EXITIF (NULL == (res = PQprepare
+                   (conn,
+                    "update_deposit_permission",
+                    "UPDATE deposits "
+                    "SET pending = $1 "
+                    "WHERE transaction_id = $2", 2, NULL)));
+
   EXITIF (PGRES_COMMAND_OK != (status = PQresultStatus(res)));
   PQclear (res);
 
@@ -233,13 +245,73 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
   return GNUNET_SYSERR;
 }
 
+/**
+ * Update the pending column of a deposit permission
+ * @param conn handle to DB
+ * @param transaction_id identification number of the deposit to
+ * update
+ * @param pending true if still pending, false otherwise (i.e. the
+ * mint did respond something)
+ * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ */
+uint32_t
+MERCHANT_DB_update_deposit_permission (PGconn *conn,
+                                       uint64_t transaction_id,
+				       unsigned int pending)
+{
+  PGresult *res;
+  ExecStatusType status;
 
+  struct TALER_PQ_QueryParam params[] = {
+    TALER_PQ_query_param_uint64 (&transaction_id),
+    TALER_PQ_query_param_uint32 (&pending),
+  };
+
+  res = TALER_PQ_exec_prepared (conn, "update_deposit_permission", params);
+  status = PQresultStatus (res);
+
+  if (PGRES_COMMAND_OK != status)
+  {
+
+    const char *sqlstate;
+
+    sqlstate = PQresultErrorField (res, PG_DIAG_SQLSTATE);
+    if (NULL == sqlstate)
+    {
+      /* very unexpected... */
+      GNUNET_break (0);
+      PQclear (res);
+      return GNUNET_SYSERR;
+    }
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Database commit failure: %s\n",
+                sqlstate);
+    PQclear (res);
+    return GNUNET_SYSERR;
+  }
+}
+
+/**
+ * Store a deposit permission in DB. To be mainly used if /deposit should
+ * be retried; also, the merchant can benefit from this information in case
+ * he needs to later investigate about some transaction_id.
+ * @param conn DB handle
+ * @param transaction_id identification number of this payment (which is the
+ * same id of the related contract)
+ * @param pending if true, this payment got to a persistent state
+ * @param which mint is to get this deposit permission
+ * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ */
+uint32_t
 MERCHANT_DB_store_deposit_permission (PGconn *conn,
                                       const char *deposit_permission,
 				      uint64_t transaction_id,
 				      unsigned int pending,
 				      const char *mint_url)
 {
+  PGresult *res;
+  ExecStatusType status;
+
   struct TALER_PQ_QueryParam params[] = {
     TALER_PQ_query_param_fixed_size (deposit_permission, strlen (deposit_permission)),
     TALER_PQ_query_param_uint64 (&transaction_id),
@@ -247,7 +319,40 @@ MERCHANT_DB_store_deposit_permission (PGconn *conn,
     TALER_PQ_query_param_fixed_size (mint_url, strlen (mint_url)),
     TALER_PQ_query_param_end  
   };
+  res = TALER_PQ_exec_prepared (conn, "store_deposit_permission", params);
+  status = PQresultStatus (res);
 
+  if (PGRES_COMMAND_OK != status)
+  {
+    const char *sqlstate;
+
+    sqlstate = PQresultErrorField (res, PG_DIAG_SQLSTATE);
+    if (NULL == sqlstate)
+    {
+      /* very unexpected... */
+      GNUNET_break (0);
+      PQclear (res);
+      return GNUNET_SYSERR;
+    }
+    /* 40P01: deadlock, 40001: serialization failure */
+    if ( (0 == strcmp (sqlstate,
+                       "23505")))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		  "Inserting same transaction id twice\n");
+      /* Primary key violation */
+      PQclear (res);
+      return GNUNET_SYSERR;
+    }
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Database commit failure: %s\n",
+                sqlstate);
+    PQclear (res);
+    return GNUNET_SYSERR;
+  }
+  
+    PQclear (res);
+    return GNUNET_OK;
 }
 
 /**
