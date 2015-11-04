@@ -158,6 +158,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute edate;
   struct GNUNET_TIME_Absolute timestamp;
   struct GNUNET_TIME_Absolute refund_deadline;
+  struct GNUNET_TIME_Absolute wire_deadline;
   struct TALER_MerchantPublicKeyP pubkey;
   struct TALER_CoinSpendPublicKeyP coin_pub;
   struct TALER_DenominationPublicKey denom_pub;
@@ -171,6 +172,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     TMH_PARSE_member_amount ("max_fee", &max_fee),
     TMH_PARSE_member_time_abs ("timestamp", &timestamp),
     TMH_PARSE_member_time_abs ("refund_deadline", &refund_deadline),
+    TMH_PARSE_member_time_abs ("edate", &wire_deadline),
     TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
     TMH_PARSE_member_fixed ("H_contract", &h_contract),
     TMH_PARSE_MEMBER_END
@@ -303,7 +305,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     /* a */
     if (-1 == json_object_update (root, coin_aggregate))
-      return TMH_RESPONSE_reply_internal_error (connection, "deposit permission not generated");
+      return TMH_RESPONSE_reply_internal_error (connection, "deposit permission not generated for storing");
 
     /* b */
     char *deposit_permission_str = json_dumps (root, JSON_COMPACT);
@@ -320,8 +322,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       return res; /* may return GNUNET_NO */
  
 
+    printf ("about to spend money\n");
+    return MHD_NO;
+
     dh = TALER_MINT_deposit (mints[mint_index].conn,
                              &amount,
+			     wire_deadline,
 			     wire_details,
 			     &h_contract,
 			     &coin_pub,

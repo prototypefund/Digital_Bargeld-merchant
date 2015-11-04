@@ -58,7 +58,7 @@ $new_deposit_permission_edate = array_merge ($new_deposit_permission, $edate);
 if ($cli_debug && !$backend_test)
 {
 
-  /* NOTE the newline at the end of 'echo's argument */
+  /* DO NOTE the newline at the end of 'echo's argument */
   //echo json_encode ($new_deposit_permission_edate, JSON_PRETTY_PRINT)
   echo json_encode ($new_deposit_permission, JSON_PRETTY_PRINT)
   . "\n";
