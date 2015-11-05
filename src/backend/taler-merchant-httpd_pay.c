@@ -44,6 +44,8 @@ extern unsigned int nmints;
 extern struct GNUNET_TIME_Relative edate_delay;
 extern struct GNUNET_CRYPTO_EddsaPrivateKey privkey;
 
+
+
 /**
  * Fetch the deposit fee related to the given coin aggregate.
  * @param connection the connection to send an error response to
@@ -145,8 +147,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   char *chosen_mint;
   json_t *coin_aggregate;
   json_t *wire_details;
-  unsigned int coins_cnt;
   unsigned int mint_index; /*a cell in the global array*/
+  unsigned int coins_index; /*a cell in the global array*/
+  unsigned int coins_cnt; /*a cell in the global array*/
   uint64_t transaction_id;
   int res;
 
@@ -164,6 +167,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct TALER_DenominationSignature ub_sig;
   struct TALER_CoinSpendSignatureP coin_sig;
   struct GNUNET_HashCode h_contract;
+
+  struct MERCHANT_DepositConfirmation *dc;
+  struct MERCHANT_DepositConfirmationCls *dccls;
 
   struct TMH_PARSE_FieldSpecification spec[] = {
     TMH_PARSE_member_array ("coins", &coins),
@@ -251,7 +257,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if (0 == coins_cnt)
     return TMH_RESPONSE_reply_external_error (connection, "no coins given"); 
 
-  json_array_foreach (coins, coins_cnt, coin_aggregate)
+  json_array_foreach (coins, coins_index, coin_aggregate)
   {
     res = deposit_fee_from_coin_aggregate (connection,
                                            coin_aggregate,
@@ -262,7 +268,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     if (GNUNET_SYSERR == res)
       return MHD_NO; 
 
-    if (0 == coins_cnt)
+    if (0 == coins_index)
       acc_fee = coin_fee;
     else
       TALER_amount_add (&acc_fee,
@@ -290,7 +296,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
 
   wire_details = MERCHANT_get_wire_json (wire, salt);
-  json_array_foreach (coins, coins_cnt, coin_aggregate)
+  /* since memory is zero'd out by GNUNET_malloc, any 'ackd' field will be
+    (implicitly) set to false */
+  dc = GNUNET_malloc (coins_cnt * sizeof (struct MERCHANT_DepositConfirmation));
+  if (NULL == dc)
+    return TMH_RESPONSE_reply_internal_error (connection, "memory failure");
+  json_array_foreach (coins, coins_index, coin_aggregate)
   {
 
     /* 3 For each coin in DB
@@ -301,10 +312,10 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
             (retry until getting a persisten state)
     */
 
-
     /* a */
     if (-1 == json_object_update (root, coin_aggregate))
-      return TMH_RESPONSE_reply_internal_error (connection, "deposit permission not generated for storing");
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                "deposit permission not generated for storing");
 
     /* b */
     char *deposit_permission_str = json_dumps (root, JSON_COMPACT);
@@ -319,10 +330,10 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                coin_aggregate_spec);
     if (GNUNET_OK != res)
       return res; /* may return GNUNET_NO */
- 
 
-    printf ("about to spend money\n");
-    return MHD_NO;
+    dccls = GNUNET_malloc (sizeof (struct MERCHANT_DepositConfirmationCls));
+    dccls->index = coins_index;
+    dccls->dc = dc;
 
     dh = TALER_MINT_deposit (mints[mint_index].conn,
                              &amount,
@@ -338,9 +349,19 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 			     refund_deadline,
 			     &coin_sig,
 			     deposit_cb,
-			     &transaction_id); /*may be destroyed by the time the cb gets called..*/
-  
+			     dccls); /*may be destroyed by the time the cb gets called..*/
+    if (NULL == dh)
+      TMH_RESPONSE_reply_json_pack (connection,
+                                    MHD_HTTP_SERVICE_UNAVAILABLE,
+				    "{s:s, s:i}",
+				    "mint", mints[mint_index].hostname,
+				    "transaction_id", transaction_id);
   }
+
+  /* suspend connection until the last coin has been ack'd to the cb.
+    That last cb will finally resume the connection and send back a response */
+  MHD_suspend_connection (connection);
+  return MHD_YES;
 
   /* 4 Return response code: success, or whatever data the
     mint sent back regarding some bad coin */

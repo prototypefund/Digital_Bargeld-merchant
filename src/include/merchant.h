@@ -26,6 +26,7 @@
 #include <gnunet/gnunet_common.h>
 #include <gnunet/gnunet_crypto_lib.h>
 #include <taler/taler_mint_service.h>
+#include "merchant.h"
 
 /**
  * Macro to round microseconds to seconds in GNUNET_TIME_* structs.
@@ -39,6 +40,49 @@
   do {                                                            \
     if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
   } while (0)
+
+/**
+ * Outcome of a /deposit request for a coin
+ */
+struct MERCHANT_DepositConfirmation
+{
+  /**
+   * How many coins this request is made of
+   */
+  unsigned int coins_cnt;
+  /**
+   * True if this coin's outcome has been read from
+   * its cb
+   */
+  unsigned int ackd;
+
+  /**
+   * The mint's response to this /deposit
+   */
+  unsigned int exit_status;
+
+  /**
+   * The mint's response body (JSON). Mainly useful in case
+   * some callback needs to send back to the to the wallet the
+   * outcome of an erroneous coin
+   */
+  json_t *proof;
+
+};
+
+struct MERCHANT_DepositConfirmationCls
+{
+  /**
+   * Offset of this coin into the array of all coins outcomes
+   */
+  unsigned int index;
+
+  /**
+   * Pointer to the global (malloc'd) array of all coins outcomes
+   */
+  struct MERCHANT_DepositConfirmation *dc;
+
+};
 
 /**
  * Mint
