@@ -29,7 +29,7 @@
         */
     </script>
 </head>
-<body id="css-zen-garden">
+<body id="css-zen-garden" onload="signal_me()">
   <div class="supporting" id="welcome" role="main">
     <div class="explanation" id="zen-explanation" role="article">
       <h1>Welcome to the Taler "Toy" Shop</h1>
@@ -143,15 +143,29 @@
         b.style.display = 'none';
     };
 
+    /* The merchant signals its taler-friendlyness to the client */
+    function signal_me()
+    {
+      var eve = new Event('taler-checkout-probe');
+      document.body.dispatchEvent(eve);
+      //alert("signaling");
+    };
+
+
+    function test_without_wallet(){
+        wallet_installed_cb();
+    }
+
     /* Set up a listener to be called whenever a Wallet gets installed
        so that the user is led towards the demo's steps progressively */
-    document.body.addEventListener("taler-wallet-installed",
-                                   wallet_installed_cb,
+    document.body.addEventListener("taler-wallet-present", 
+                                   wallet_installed_cb, 
                                    false, false);
 
-    /* Setup callback to be called whenever the wallet is uninstalled */
-    document.body.addEventListener("taler-unload",
-                                   wallet_uninstalled_cb,
+    /* Setup callback to be called whenever the wallet is loaded/enabled
+      while the browser is already on this page */
+    document.body.addEventListener("taler-load", 
+                                   signal_me, 
                                    false);
   </script>
 </body>
