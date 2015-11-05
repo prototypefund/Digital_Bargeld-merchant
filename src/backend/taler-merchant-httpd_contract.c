@@ -166,7 +166,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 				       "contract", root,
 				       "sig", TALER_json_from_data
 				              (&contract_sig, sizeof (contract_sig)),
-				       "h_contract", TALER_json_from_data
+				       "H_contract", TALER_json_from_data
 				                     (&contract.h_contract,
 				                      sizeof (contract.h_contract)));
   

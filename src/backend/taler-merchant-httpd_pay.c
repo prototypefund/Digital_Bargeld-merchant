@@ -87,16 +87,16 @@ deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
   if (1 == mints[mint_index].pending) 
     return GNUNET_SYSERR;
   keys = TALER_MINT_get_keys (mints[mint_index].conn);
-
-  if (NULL ==
-    (denom_details = TALER_MINT_get_denomination_key (keys, &denom)))
+  denom_details = TALER_MINT_get_denomination_key (keys, &denom);
+  if (NULL == denom_details)
+  {
     TMH_RESPONSE_reply_json_pack (connection,
                                   MHD_HTTP_BAD_REQUEST,
 				  "{s:s, s:o}",
 				  "hint", "unknown denom to mint",
 				  "denom_pub", TALER_json_from_rsa_public_key (denom.rsa_public_key));
     return GNUNET_NO;
-
+  }
   *deposit_fee = denom_details->fee_deposit;
   return GNUNET_OK;
 }
@@ -158,7 +158,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute edate;
   struct GNUNET_TIME_Absolute timestamp;
   struct GNUNET_TIME_Absolute refund_deadline;
-  struct GNUNET_TIME_Absolute wire_deadline;
   struct TALER_MerchantPublicKeyP pubkey;
   struct TALER_CoinSpendPublicKeyP coin_pub;
   struct TALER_DenominationPublicKey denom_pub;
@@ -172,7 +171,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     TMH_PARSE_member_amount ("max_fee", &max_fee),
     TMH_PARSE_member_time_abs ("timestamp", &timestamp),
     TMH_PARSE_member_time_abs ("refund_deadline", &refund_deadline),
-    TMH_PARSE_member_time_abs ("edate", &wire_deadline),
     TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
     TMH_PARSE_member_fixed ("H_contract", &h_contract),
     TMH_PARSE_MEMBER_END
@@ -272,6 +270,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 			&coin_fee);
   }
 
+
   if (-1 == TALER_amount_cmp (&max_fee, &acc_fee))
     return MHD_HTTP_NOT_ACCEPTABLE;
 
@@ -327,7 +326,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     dh = TALER_MINT_deposit (mints[mint_index].conn,
                              &amount,
-			     wire_deadline,
+			     edate,
 			     wire_details,
 			     &h_contract,
 			     &coin_pub,
