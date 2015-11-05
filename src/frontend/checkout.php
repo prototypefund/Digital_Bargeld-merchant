@@ -76,9 +76,7 @@
    pass it to the extension */
 function handle_contract(json_contract)
 {
-  var cEvent = new CustomEvent('taler-contract',
-                             { detail: json_contract,
-			       target: "/taler/pay"});
+  var cEvent = new CustomEvent('taler-contract', { detail: json_contract });
 
   document.body.dispatchEvent(cEvent);
 };
@@ -89,7 +87,7 @@ function handle_contract(json_contract)
 function taler_pay(form)
 {
   var contract_request = new XMLHttpRequest();
-  contract_request.open("POST", "/generate_taler_contract.php", true);
+  contract_request.open("GET", "/generate_taler_contract.php", true);
   contract_request.onload = function (e) 
   {
     if (contract_request.readyState == 4) 

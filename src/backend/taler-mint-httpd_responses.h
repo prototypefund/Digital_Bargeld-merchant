@@ -81,6 +81,16 @@ int
 TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
                                    const char *hint);
 /**
+ * Send a response indicating an external error.
+ *
+ * @param connection the MHD connection to use
+ * @param hint hint about the error's nature
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
+                                   const char *hint);
+/**
  * Send a response indicating that the request was too big.
  *
  * @param connection the MHD connection to use
@@ -88,5 +98,15 @@ TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
  */
 int
 TMH_RESPONSE_reply_request_too_large (struct MHD_Connection *connection);
+
+/**
+ * Add headers we want to return in every response.
+ * Useful for testing, like if we want to always close
+ * connections.
+ *
+ * @param response response to modify
+ */
+void
+TMH_RESPONSE_add_global_headers (struct MHD_Response *response);
 
 #endif

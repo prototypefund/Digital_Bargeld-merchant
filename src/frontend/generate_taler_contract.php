@@ -23,8 +23,26 @@
   2. generate the JSON to forward to the backend
   3. forward the response with the contract from the backend to
      to the wallet
-*/ 
+
+  To test this feature from the command line, issue:
+
+  - $ curl http://merchant_url/generate_taler_contract.php?cli_debug=yes
+    if the whole "journey" to the backend is begin tested
+  - $ curl http://merchant_url/generate_taler_contract.php?backend_test=no
+    if just the frontend job is being tested
+*/
+
 $cli_debug = false;
+$backend_test = true;
+
+if ($_GET['cli_debug'] == 'yes')
+  $cli_debug = true;
+
+if ($_GET['backend_test'] == 'no')
+{
+  $cli_debug = true;
+  $backend_test = false;
+}
 
 // 1) recover the session information
 session_start();
@@ -48,6 +66,7 @@ else
 {
   $receiver = "Test Receiver";
   $amount = 5;
+  $currency = "KUDOS";
 
 }
 
@@ -71,6 +90,9 @@ $teatax = array ('value' => 1,
                  'fraction' => 0,
 		 'currency' => $currency);
 
+// Take a timestamp
+$now = new DateTime('now');
+
 // pack the JSON for the contract 
 // --- FIXME: exact format needs review!
 $json = json_encode (array ('amount' => array ('value' => $value,
@@ -79,7 +101,7 @@ $json = json_encode (array ('amount' => array ('value' => $value,
 			    'max_fee' => array ('value' => 3,
 			                        'fraction' => 01010,
 						'currency' => $currency),
-                            'trans_id' => $transaction_id,
+                            'transaction_id' => $transaction_id,
                             'products' => array (
 			       array ('description' => $desc,
 			              'quantity' => 1,
@@ -90,6 +112,10 @@ $json = json_encode (array ('amount' => array ('value' => $value,
 				      'taxes' => array (array ('teatax' => $teatax)),
 			              'delivery_date' => "Some Date Format",
 			              'delivery_location' => 'LNAME1')),
+			    'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
+			    'pay_url' => "/taler/pay",
+			    'expiry' => "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
+			    'refund_deadline' => "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
 			    'merchant' => array ('address' => 'LNAME2',
 			                         'name' => 'test merchant',
 					         'jurisdiction' => 'LNAME3'),
@@ -115,9 +141,8 @@ $json = json_encode (array ('amount' => array ('value' => $value,
 						                     'state' => 'Test State',
 							             'region' => 'Test Region',
 								     'province' => 'Test Province',
-								     'ZIP code' => 4908)))); //, JSON_PRETTY_PRINT);
-
-if ($cli_debug && TRUE)
+								     'ZIP code' => 4908))), JSON_PRETTY_PRINT);
+if ($cli_debug && !$backend_test)
 {
   echo $json . "\n";
   exit;

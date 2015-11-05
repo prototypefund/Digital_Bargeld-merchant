@@ -70,39 +70,9 @@
          obtain Taler coins.  This is typically done using a
          wire transfer.  However, as this is just a demonstrator,
          we will allow you to send the mint KUDOS coins using a simple
-         form on this website instead.</p>
-      <p>You begin by clicking on the Taler icon and selecting
-         "Create reserve".  The extension will then display some
-         hexadecimal reserve public key, which you should copy to the
-         clipboard.  After that, you can paste it into the form
-         below.  When dealing with real currency, you would do
-         the same, except that you would have to copy the string
-         into the subject area for your wire transfer instead of
-         into this form.
+         form on the <a href="http://demo.taler.net/transfer" target="_blank">mint's website</a>
+	 (new tab).</p>
       </p>
-      <form id="reserve-form" name="tform" action="/fake_wire_transfer.php" method="POST">
-        <div class="participation" id="fake-wire">
-          <br>
-          Paste your reserve public key here (right-click, "paste"):
-          <input type="text" name="reserve_pk" />
-	  <select id="mint" name="mint_url">
-            <option value="demo.taler.net">mint @taler.net</option>
-            <option value="localmint">localmint (**)</option>
-	  </select>
-          <br>
-          Amount to credit to your reserve:
-          <select id="amount" name="kudos_amount">
-            <option value="1">1 KUDOS</option>
-            <option value="2">2 KUDOS</option>
-            <option value="5">5 KUDOS</option>
-            <option value="10">10 KUDOS</option>
-            <option value="1000">1000 KUDOS</option>
-          </select>
-          <br>
-          <input type="submit" value="Submit"/>
-          <br>
-        </div>
-      </form>
     </div>
     <div class="explanation" id="payment" role="article" style="display:none;">
       <h2>Step 3: Select project to donate KUDOS to!</h2>

@@ -165,4 +165,42 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection)
                                        "invalid json");
 }
 
+/**
+ * Add headers we want to return in every response.
+ * Useful for testing, like if we want to always close
+ * connections.
+ *
+ * @param response response to modify
+ */
+void
+TMH_RESPONSE_add_global_headers (struct MHD_Response *response)
+{
+  int TMH_mint_connection_close;
+  TMH_mint_connection_close = 0;
+
+  /* this test is taken verbatim from the mint's code,
+    so there is no particular need to do that for a merchant */
+  if (TMH_mint_connection_close)
+    (void) MHD_add_response_header (response,
+                                    MHD_HTTP_HEADER_CONNECTION,
+                                    "close");
+}
+
+/**
+ * Send a response indicating an external error.
+ *
+ * @param connection the MHD connection to use
+ * @param hint hint about the error's nature
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
+                                   const char *hint)
+{
+  return TMH_RESPONSE_reply_json_pack (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       "{s:s, s:s}",
+                                       "error", "client error",
+                                       "hint", hint);
+}
 /* end of taler-mint-httpd_responses.c */

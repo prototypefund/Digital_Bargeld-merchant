@@ -42,16 +42,14 @@
  */
 int
 TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
-                            struct MERCHANT_MintInfo **mints)
+                            struct MERCHANT_Mint **mints)
 {
   char *mints_str;
   char *token_nf;               /* do no free (nf) */
   char *mint_section;
   char *mint_hostname;
-  char *mint_pubkey_enc;
-  struct MERCHANT_MintInfo *r_mints;
-  struct MERCHANT_MintInfo mint;
-  unsigned long long mint_port;
+  struct MERCHANT_Mint *r_mints;
+  struct MERCHANT_Mint mint;
   unsigned int cnt;
   int OK;
 
@@ -60,7 +58,6 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   token_nf = NULL;
   mint_section = NULL;
   mint_hostname = NULL;
-  mint_pubkey_enc = NULL;
   r_mints = NULL;
   cnt = 0;
   EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string (cfg,
@@ -78,26 +75,9 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
                                                    mint_section,
                                                    "HOSTNAME",
                                                    &mint_hostname));
-    EXITIF (GNUNET_OK !=
-            GNUNET_CONFIGURATION_get_value_number (cfg,
-                                                   mint_section,
-                                                   "PORT",
-                                                   &mint_port));
-    EXITIF (GNUNET_OK !=
-            GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                   mint_section,
-                                                   "PUBKEY",
-                                                   &mint_pubkey_enc));
-    EXITIF (GNUNET_OK !=
-            GNUNET_CRYPTO_eddsa_public_key_from_string (mint_pubkey_enc,
-                                                        strlen (mint_pubkey_enc),
-                                                        &mint.pubkey));
     mint.hostname = mint_hostname;
-    mint.port = (uint16_t) mint_port;
     GNUNET_array_append (r_mints, cnt, mint);
     mint_hostname = NULL;
-    GNUNET_free (mint_pubkey_enc);
-    mint_pubkey_enc = NULL;
     GNUNET_free (mint_section);
     mint_section = NULL;
   }
@@ -107,7 +87,6 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   GNUNET_free_non_null (mints_str);
   GNUNET_free_non_null (mint_section);
   GNUNET_free_non_null (mint_hostname);
-  GNUNET_free_non_null (mint_pubkey_enc);
   if (!OK)
   {
     GNUNET_free_non_null (r_mints);
@@ -115,6 +94,73 @@ TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
   }
 
   *mints = r_mints;
+  return cnt;
+}
+
+/**
+ * Parses auditors from the configuration.
+ *
+ * @param cfg the configuration
+ * @param mints the array of auditors upon successful parsing.  Will be NULL upon
+ *          error.
+ * @return the number of auditors in the above array; GNUNET_SYSERR upon error in
+ *          parsing.
+ */
+int
+TALER_MERCHANT_parse_auditors (const struct GNUNET_CONFIGURATION_Handle *cfg,
+                               struct MERCHANT_Auditor **auditors)
+{
+  char *auditors_str;
+  char *token_nf;               /* do no free (nf) */
+  char *auditor_section;
+  char *auditor_name;
+  struct MERCHANT_Auditor *r_auditors;
+  struct MERCHANT_Auditor auditor;
+  unsigned int cnt;
+  int OK;
+
+  OK = 0;
+  auditors_str = NULL;
+  token_nf = NULL;
+  auditor_section = NULL;
+  auditor_name = NULL;
+  r_auditors = NULL;
+  cnt = 0;
+  EXITIF (GNUNET_OK !=
+          GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                 "merchant",
+                                                 "AUDITORS",
+                                                 &auditors_str));
+  for (token_nf = strtok (auditors_str, " ");
+       NULL != token_nf;
+       token_nf = strtok (NULL, " "))
+  {
+    GNUNET_assert (0 < GNUNET_asprintf (&auditor_section,
+                                        "auditor-%s", token_nf));
+    EXITIF (GNUNET_OK !=
+            GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                   auditor_section,
+                                                   "NAME",
+                                                   &auditor_name));
+    auditor.name = auditor_name;
+    GNUNET_array_append (r_auditors, cnt, auditor);
+    auditor_name = NULL;
+    GNUNET_free (auditor_section);
+    auditor_section = NULL;
+  }
+  OK = 1;
+
+ EXITIF_exit:
+  GNUNET_free_non_null (auditors_str);
+  GNUNET_free_non_null (auditor_section);
+  GNUNET_free_non_null (auditor_name);
+  if (!OK)
+  {
+    GNUNET_free_non_null (r_auditors);
+    return GNUNET_SYSERR;
+  }
+
+  *auditors = r_auditors;
   return cnt;
 }
 

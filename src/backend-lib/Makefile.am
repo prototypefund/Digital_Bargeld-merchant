@@ -6,12 +6,14 @@ lib_LTLIBRARIES = \
 
 include_HEADERS = \
   taler_merchant_lib.h \
-  taler_merchant_contract_lib.h
+  taler_merchant_contract_lib.h \
+  taler_merchant_deposit_lib.h
 
 libtalermerchant_la_SOURCES = \
-  taler-merchant-httpd_contract.c \
-  taler-merchant-httpd_deposit.c \
+  merchant_api_contract.c \
+  merchant_api_deposit.c \
   taler_merchant_contract_lib.h \
+  taler_merchant_deposit_lib.h \
   merchant_db.c merchant_db.h \
   merchant.h
 

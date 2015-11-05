@@ -25,6 +25,8 @@
 
 #include <gnunet/gnunet_common.h>
 #include <gnunet/gnunet_crypto_lib.h>
+#include <taler/taler_mint_service.h>
+#include "merchant.h"
 
 /**
  * Macro to round microseconds to seconds in GNUNET_TIME_* structs.
@@ -40,25 +42,98 @@
   } while (0)
 
 /**
- * A mint
+ * Outcome of a /deposit request for a coin
  */
-struct MERCHANT_MintInfo {
+struct MERCHANT_DepositConfirmation
+{
+  /**
+   * How many coins this request is made of
+   */
+  unsigned int coins_cnt;
+  /**
+   * True if this coin's outcome has been read from
+   * its cb
+   */
+  unsigned int ackd;
+
+  /**
+   * The mint's response to this /deposit
+   */
+  unsigned int exit_status;
+
+  /**
+   * The mint's response body (JSON). Mainly useful in case
+   * some callback needs to send back to the to the wallet the
+   * outcome of an erroneous coin
+   */
+  json_t *proof;
+
+};
+
+struct MERCHANT_DepositConfirmationCls
+{
+  /**
+   * Offset of this coin into the array of all coins outcomes
+   */
+  unsigned int index;
+
+  /**
+   * Pointer to the global (malloc'd) array of all coins outcomes
+   */
+  struct MERCHANT_DepositConfirmation *dc;
+
+};
+
+/**
+ * Mint
+ */
+struct MERCHANT_Mint
+{
   /**
    * Hostname
    */
   char *hostname;
 
   /**
-   * The public key of the mint
+   * Flag which indicates whether some HTTP transfer between
+   * this merchant and the mint is still ongoing
    */
-  struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
+  int pending;
 
   /**
-   * The port where the mint's service is running
+   * A connection to this mint
    */
-  uint16_t port;
+  struct TALER_MINT_Handle *conn;
 
 };
+
+struct MERCHANT_Auditor
+{
+  /**
+   * Auditor's legal name
+   */
+  char *name;
+
+};
+
+/**
+ * The contract sent by the merchant to the wallet
+ */
+struct MERCHANT_Contract
+{
+  /**
+   * Purpose header for the signature over contract
+   */
+  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
+
+  /**
+   * Hash of the JSON contract in UTF-8 including 0-termination,
+   * using JSON_COMPACT | JSON_SORT_KEYS
+   */
+  struct GNUNET_HashCode h_contract;
+
+};
+
 
 
 /**
@@ -72,8 +147,20 @@ struct MERCHANT_MintInfo {
  */
 int
 TALER_MERCHANT_parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg,
-                            struct MERCHANT_MintInfo **mints);
+                            struct MERCHANT_Mint **mints);
 
+/**
+ * Parses auditors from the configuration.
+ *
+ * @param cfg the configuration
+ * @param mints the array of auditors upon successful parsing.  Will be NULL upon
+ *          error.
+ * @return the number of auditors in the above array; GNUNET_SYSERR upon error in
+ *          parsing.
+ */
+int
+TALER_MERCHANT_parse_auditors (const struct GNUNET_CONFIGURATION_Handle *cfg,
+                               struct MERCHANT_Auditor **auditors);
 
 GNUNET_NETWORK_STRUCT_BEGIN
 struct MERCHANT_WIREFORMAT_Sepa
