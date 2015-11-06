@@ -107,8 +107,10 @@ deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
 /**
  * Callback to handle a deposit permission's response. How does this behave if the mint
  * goes offline during a call?
- * @param cls closure (in our invocation it will be the transaction_id, so the cb can refer
- * to the right DB row for this deposit permission)
+ * @param cls see `struct MERCHANT_DepositConfirmationCls` (i.e. a poinetr to the global
+ * array of confirmations and an index for this call in that array). That way, the last
+ * executed callback can detect that no other confirmations are on the way, and can pack
+ * a response for the wallet
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
  * 0 if the mint's reply is bogus (fails to follow the protocol)
  * @param proof the received JSON reply, should be kept as proof (and, in case of errors,
