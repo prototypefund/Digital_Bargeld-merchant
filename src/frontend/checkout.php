@@ -178,16 +178,6 @@ test_without_wallet();
 document.body.addEventListener("taler-wallet-present",
                                has_taler_wallet_cb,
 			       false);
-
-// The following callback is used to allow the button to change its
-// color whenever the user navigates away from this page
-document.body.addEventListener("taler-navigating-away",
-  function(){
-    var unloadEvent = new Event('taler-checkout-away');
-    document.body.dispatchEvent(unloadEvent);
-  },
-  false);
-
 // event awaited by the wallet to change its button's color
 // alert("sending");
 // var eve = new Event('taler-payment-mfirst');
