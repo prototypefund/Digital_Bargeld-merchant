@@ -171,8 +171,6 @@ function test_without_wallet(){
   tbutton.removeAttribute("disabled");
 };
 
-test_without_wallet();
-
 // Register event to be triggered by the wallet as a response to our
 // first event
 document.body.addEventListener("taler-wallet-present",
