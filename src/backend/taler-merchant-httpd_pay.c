@@ -119,10 +119,36 @@ deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
 void
 deposit_cb (void *cls, unsigned int http_status, json_t *proof)
 {
-  if (MHD_HTTP_OK == http_status)
-  ; /* set pending to false in DB and notify the frontend with "OK" */
-  else
-  ; /* set a timeout to retry */
+  /* NOTE: what if the mint doesn't respond? Does this callback get
+    called? */
+  int i;
+  struct MERCHANT_DepositConfirmationCls *dccls;
+  dccls = (struct MERCHANT_DepositConfirmationCls *) cls;
+
+  if (GNUNET_SYSERR ==
+      MERCHANT_DB_update_deposit_permission (db_conn,
+                                             dccls->transaction_id,
+	                                     0))
+    /* TODO */;
+  dccls->dc[dccls->index].ackd = 1;
+  dccls->dc[dccls->index].exit_status = http_status;
+  dccls->dc[dccls->index].proof = proof;
+  
+  /* loop through the confirmation array and return accordingly */
+  for (i = 0; i < dccls->coins_cnt; i++)
+  {
+    /* just return if there is at least one coin to be still
+      confirmed */
+    if (!dccls->dc[i].ackd)
+      return;
+  }
+
+  /* at this point, any coin has been confirmed by the mint. So
+    check for errors .. */
+
+  /* Finally */
+  GNUNET_free (dccls->dc);
+  GNUNET_free (dccls);
 }
 
 /**
@@ -150,8 +176,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   json_t *coin_aggregate;
   json_t *wire_details;
   unsigned int mint_index; /*a cell in the global array*/
-  unsigned int coins_index; /*a cell in the global array*/
-  unsigned int coins_cnt; /*a cell in the global array*/
+  unsigned int coins_index;
+  unsigned int coins_cnt;
   uint64_t transaction_id;
   int res;
 
@@ -336,6 +362,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     dccls = GNUNET_malloc (sizeof (struct MERCHANT_DepositConfirmationCls));
     dccls->index = coins_index;
     dccls->dc = dc;
+    dccls->coins_cnt = coins_cnt;
+    dccls->transaction_id = transaction_id;
 
     dh = TALER_MINT_deposit (mints[mint_index].conn,
                              &amount,

@@ -47,10 +47,6 @@
 struct MERCHANT_DepositConfirmation
 {
   /**
-   * How many coins this request is made of
-   */
-  unsigned int coins_cnt;
-  /**
    * True if this coin's outcome has been read from
    * its cb
    */
@@ -81,6 +77,16 @@ struct MERCHANT_DepositConfirmationCls
    * Pointer to the global (malloc'd) array of all coins outcomes
    */
   struct MERCHANT_DepositConfirmation *dc;
+
+  /**
+   * How many coins this paymen is made of.
+   */
+  unsigned int coins_cnt;
+
+  /**
+   * Transaction id
+   */
+  uint64_t transaction_id;
 
 };
 
