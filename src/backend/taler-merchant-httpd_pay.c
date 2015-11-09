@@ -32,6 +32,7 @@
 #include "taler-mint-httpd.h"
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_responses.h"
+#include "taler-mint-httpd_mhd.h"
 #include "merchant_db.h"
 #include "merchant.h"
 #include "taler_merchant_lib.h"
@@ -43,8 +44,6 @@ extern long long salt;
 extern unsigned int nmints;
 extern struct GNUNET_TIME_Relative edate_delay;
 extern struct GNUNET_CRYPTO_EddsaPrivateKey privkey;
-
-
 
 /**
  * Fetch the deposit fee related to the given coin aggregate.
@@ -303,13 +302,31 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   dc = GNUNET_malloc (coins_cnt * sizeof (struct MERCHANT_DepositConfirmation));
   if (NULL == dc)
     return TMH_RESPONSE_reply_internal_error (connection, "memory failure");
+
+  /* DEBUG CHECKPOINT: return a provisory fullfilment page to the wallet
+    to test the reception of coins array */
+  
+  #ifdef COINSCHECKPOINT
+  rh->data = "Coins received\n";
+  return TMH_MHD_handler_static_response (rh,
+                                          connection,
+	                                  connection_cls,
+				          upload_data,
+				          upload_data_size);
+
+  #endif
+
+  /* suspend connection until the last coin has been ack'd to the cb.
+    That last cb will finally resume the connection and send back a response */
+  MHD_suspend_connection (connection);
+
   json_array_foreach (coins, coins_index, coin_aggregate)
   {
 
     /* 3 For each coin in DB
 
          a. Generate a deposit permission
-         b. store it and its tid in DB
+         b. store it in DB
          c. POST to the mint (see mint-lib for this)
             (retry until getting a persisten state)
     */
@@ -353,16 +370,16 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 			     deposit_cb,
 			     dccls); /*may be destroyed by the time the cb gets called..*/
     if (NULL == dh)
-      TMH_RESPONSE_reply_json_pack (connection,
-                                    MHD_HTTP_SERVICE_UNAVAILABLE,
-				    "{s:s, s:i}",
-				    "mint", mints[mint_index].hostname,
-				    "transaction_id", transaction_id);
+    {
+      MHD_suspend_connection (connection);
+      return TMH_RESPONSE_reply_json_pack (connection,
+                                           MHD_HTTP_SERVICE_UNAVAILABLE,
+		                           "{s:s, s:i}",
+				           "mint", mints[mint_index].hostname,
+				           "transaction_id", transaction_id);
+    }
   }
 
-  /* suspend connection until the last coin has been ack'd to the cb.
-    That last cb will finally resume the connection and send back a response */
-  MHD_suspend_connection (connection);
   return MHD_YES;
 
   /* 4 Return response code: success, or whatever data the
