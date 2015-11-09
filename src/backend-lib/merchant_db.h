@@ -117,6 +117,20 @@ long long
 MERCHANT_DB_get_contract_product (PGconn *conn,
                                   uint64_t contract_id);
 
+/**
+ * Update the pending column of a deposit permission
+ * @param conn handle to DB
+ * @param transaction_id identification number of the deposit to
+ * update
+ * @param pending true if still pending, false otherwise (i.e. the
+ * mint did respond something)
+ * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ */
+uint32_t
+MERCHANT_DB_update_deposit_permission (PGconn *conn,
+                                       uint64_t transaction_id,
+				       unsigned int pending);
+
 unsigned int
 MERCHANT_DB_checkout_create (PGconn *conn,
                              struct GNUNET_CRYPTO_rsa_PublicKey *coin_pub,
