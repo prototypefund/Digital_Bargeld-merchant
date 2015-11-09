@@ -91,7 +91,7 @@ static struct GNUNET_SCHEDULER_Task *shutdown_task;
 /**
  * Context "poller" identifier
  */
-static struct GNUNET_SCHEDULER_Task *poller_task;
+struct GNUNET_SCHEDULER_Task *poller_task;
 
 /**
  * Our wireformat
@@ -330,12 +330,12 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 }
 
 /**
- * Task that runs the context's event loop with the GNUnet scheduler.
+ * Task that runs the context's event loop using the GNUnet scheduler.
  *
  * @param cls unused
  * @param tc scheduler context (unused)
  */
-static void
+void
 context_task (void *cls,
               const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
@@ -347,15 +347,17 @@ context_task (void *cls,
   struct GNUNET_NETWORK_FDSet *rs;
   struct GNUNET_NETWORK_FDSet *ws;
   struct GNUNET_TIME_Relative delay;
+  struct TALER_MINT_Context *ctx;
 
+  ctx = (struct TALER_MINT_Context *) cls;
   poller_task = NULL;
-  TALER_MINT_perform (mctx);
+  TALER_MINT_perform (ctx);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
   FD_ZERO (&write_fd_set);
   FD_ZERO (&except_fd_set);
-  TALER_MINT_get_select_info (mctx,
+  TALER_MINT_get_select_info (ctx,
                               &read_fd_set,
                               &write_fd_set,
                               &except_fd_set,
@@ -485,26 +487,25 @@ run (void *cls, char *const *args, const char *cfgfile,
   salt = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE,
                                    UINT64_MAX); 
 
-  EXITIF (NULL == (mctx = TALER_MINT_init ()));
   for (cnt = 0; cnt < nmints; cnt++)
   {
+    EXITIF (NULL == (mints[cnt].ctx = TALER_MINT_init ()));
     mints[cnt].pending = 1;
-    mints[cnt].conn = TALER_MINT_connect (mctx,
+    mints[cnt].conn = TALER_MINT_connect (mints[cnt].ctx,
                                           mints[cnt].hostname,
                                           &keys_mgmt_cb,
                                           &mints[cnt]); 
     EXITIF (NULL == mints[cnt].conn);
     poller_task =
-    GNUNET_SCHEDULER_add_now (&context_task, mctx);
+    GNUNET_SCHEDULER_add_now (&context_task, mints[cnt].ctx);
   }
 
-  mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY,
+  mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY | MHD_USE_SUSPEND_RESUME,
                           port,
                           NULL, NULL,
                           &url_handler, NULL,
 			  MHD_OPTION_NOTIFY_COMPLETED,
 			  &handle_mhd_completion_callback, NULL,
-
                           MHD_OPTION_END);
 
   EXITIF (NULL == mhd);

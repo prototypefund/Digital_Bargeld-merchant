@@ -107,7 +107,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                           "coin_sig BYTEA NOT NULL);"
 			  "CREATE %1$s TABLE IF NOT EXISTS deposits ("
 			  "dep_perm TEXT NOT NULL,"
-			  "transaction_id INT8 PRIMARY KEY,"
+			  "transaction_id INT8,"
 			  "pending INT4 NOT NULL,"
 			  "mint_url TEXT NOT NULL);",
                           tmp_str);

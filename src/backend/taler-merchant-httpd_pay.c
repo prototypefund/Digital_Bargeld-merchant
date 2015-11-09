@@ -44,6 +44,9 @@ extern long long salt;
 extern unsigned int nmints;
 extern struct GNUNET_TIME_Relative edate_delay;
 extern struct GNUNET_CRYPTO_EddsaPrivateKey privkey;
+extern struct GNUNET_SCHEDULER_Task *poller_task;
+extern void context_task (void *cls,
+                          const struct GNUNET_SCHEDULER_TaskContext *tc);
 
 /**
  * Fetch the deposit fee related to the given coin aggregate.
@@ -104,8 +107,7 @@ deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
 
 
 /**
- * Callback to handle a deposit permission's response. How does this behave if the mint
- * goes offline during a call?
+ * Callback to handle a deposit permission's response.
  * @param cls see `struct MERCHANT_DepositConfirmationCls` (i.e. a poinetr to the global
  * array of confirmations and an index for this call in that array). That way, the last
  * executed callback can detect that no other confirmations are on the way, and can pack
@@ -128,7 +130,9 @@ deposit_cb (void *cls, unsigned int http_status, json_t *proof)
       MERCHANT_DB_update_deposit_permission (db_conn,
                                              dccls->transaction_id,
 	                                     0))
-    /* TODO */;
+    /* TODO */
+    printf ("db error\n");
+  printf ("/deposit ack'd\n");
   dccls->dc[dccls->index].ackd = 1;
   dccls->dc[dccls->index].exit_status = http_status;
   dccls->dc[dccls->index].proof = proof;
@@ -142,7 +146,13 @@ deposit_cb (void *cls, unsigned int http_status, json_t *proof)
       return;
   }
 
-  /* at this point, any coin has been confirmed by the mint. So
+  printf ("All /deposit(s) ack'd\n");
+  MHD_resume_connection (dccls->connection);
+  TMH_RESPONSE_reply_json_pack (dccls->connection,
+                                MHD_HTTP_OK,
+				"{s:s}",
+				"result", "all conins ack'd (and connection resumed)");
+  /* TODO at this point, any coin has been confirmed by the mint. So
     check for errors .. */
 
   /* Finally */
@@ -381,7 +391,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     dccls->dc = dc;
     dccls->coins_cnt = coins_cnt;
     dccls->transaction_id = transaction_id;
-
+    dccls->connection = connection;
+    
     dh = TALER_MINT_deposit (mints[mint_index].conn,
                              &amount,
 			     edate,
@@ -408,6 +419,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     }
   }
 
+  printf ("poller task: %p\n", poller_task);
+  GNUNET_SCHEDULER_cancel (poller_task);
+  GNUNET_SCHEDULER_add_now (context_task, NULL);
   return MHD_YES;
 
   /* 4 Return response code: success, or whatever data the

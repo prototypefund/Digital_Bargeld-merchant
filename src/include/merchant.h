@@ -88,6 +88,10 @@ struct MERCHANT_DepositConfirmationCls
    */
   uint64_t transaction_id;
 
+  /**
+   * MHD connection to return to
+   */
+  struct MHD_Connection *connection;
 };
 
 /**
@@ -110,6 +114,11 @@ struct MERCHANT_Mint
    * A connection to this mint
    */
   struct TALER_MINT_Handle *conn;
+
+  /**
+   * This mint's context (useful to the event loop)
+   */
+  struct TALER_MINT_Context *ctx;
 
 };
 

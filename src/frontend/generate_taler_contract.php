@@ -46,8 +46,7 @@ if ($_GET['backend_test'] == 'no')
 
 // 1) recover the session information
 session_start();
-if (!$cli_debug && ((! isset($_SESSION['receiver'])) ||
-     (! isset($_SESSION['amount']))) )
+if (!$cli_debug && (! isset($_SESSION['receiver'])))
 {
   http_response_code (404);
   echo "Please select a contract before getting to this page...";
@@ -59,7 +58,8 @@ if (!$cli_debug && ((! isset($_SESSION['receiver'])) ||
 if (!$cli_debug)
 {
   $receiver = $_SESSION['receiver'];
-  $amount = intval ($_SESSION['amount']);
+  $amount_value = intval ($_SESSION['amount_value']);
+  $amount_fraction = intval ($_SESSION['amount_fraction']);
   $currency = $_SESSION['currency'];
 }
 else
@@ -81,10 +81,6 @@ $p_id = rand(0,1001);
 $transaction_id = rand(0, 1001);
 // Human-readable description of this deal
 $desc = "Donation to " . $receiver;
-// Add the value
-$value = $amount;
-// We don't have a fraction.
-$fraction = 0;
 // The tax for this deal
 $teatax = array ('value' => 1,
                  'fraction' => 0,
@@ -95,8 +91,8 @@ $now = new DateTime('now');
 
 // pack the JSON for the contract 
 // --- FIXME: exact format needs review!
-$json = json_encode (array ('amount' => array ('value' => $value,
-			                       'fraction' => $fraction,
+$json = json_encode (array ('amount' => array ('value' => $amount_value,
+			                       'fraction' => $amount_fraction,
                                                'currency' => $currency),
 			    'max_fee' => array ('value' => 3,
 			                        'fraction' => 01010,
