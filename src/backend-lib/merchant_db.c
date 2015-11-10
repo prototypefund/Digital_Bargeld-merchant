@@ -265,6 +265,7 @@ MERCHANT_DB_update_deposit_permission (PGconn *conn,
   struct TALER_PQ_QueryParam params[] = {
     TALER_PQ_query_param_uint64 (&transaction_id),
     TALER_PQ_query_param_uint32 (&pending),
+    TALER_PQ_query_param_end  
   };
 
   res = TALER_PQ_exec_prepared (conn, "update_deposit_permission", params);

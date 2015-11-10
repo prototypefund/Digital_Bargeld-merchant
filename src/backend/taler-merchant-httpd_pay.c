@@ -126,6 +126,7 @@ deposit_cb (void *cls, unsigned int http_status, json_t *proof)
   struct MERCHANT_DepositConfirmationCls *dccls;
   dccls = (struct MERCHANT_DepositConfirmationCls *) cls;
 
+  printf ("deposit cb\n");
   if (GNUNET_SYSERR ==
       MERCHANT_DB_update_deposit_permission (db_conn,
                                              dccls->transaction_id,
@@ -421,8 +422,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
   printf ("poller task: %p\n", poller_task);
   GNUNET_SCHEDULER_cancel (poller_task);
-  GNUNET_SCHEDULER_add_now (context_task, NULL);
-  return MHD_YES;
+  GNUNET_SCHEDULER_add_now (context_task, mints[mint_index].ctx);
 
   /* 4 Return response code: success, or whatever data the
     mint sent back regarding some bad coin */

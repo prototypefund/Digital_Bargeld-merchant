@@ -57,17 +57,9 @@ struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
  */
 char *keyfile;
 
-/**
-<<<<<<< HEAD
- * This value tells the mint by which date this merchant would like 
-=======
- * Mint context
- */
-static struct TALER_MINT_Context *mctx;
 
 /**
  * This value tells the mint by which date this merchant would like
->>>>>>> 4a6da71b506b52fa68873038882dd88333ff5308
  * to receive the funds for a deposited payment
  */
 struct GNUNET_TIME_Relative edate_delay;
