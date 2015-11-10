@@ -58,7 +58,16 @@ struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 char *keyfile;
 
 /**
+<<<<<<< HEAD
  * This value tells the mint by which date this merchant would like 
+=======
+ * Mint context
+ */
+static struct TALER_MINT_Context *mctx;
+
+/**
+ * This value tells the mint by which date this merchant would like
+>>>>>>> 4a6da71b506b52fa68873038882dd88333ff5308
  * to receive the funds for a deposited payment
  */
 struct GNUNET_TIME_Relative edate_delay;
@@ -82,6 +91,11 @@ struct MERCHANT_Auditor *auditors;
  * Shutdown task identifier
  */
 static struct GNUNET_SCHEDULER_Task *shutdown_task;
+
+/**
+ * Task running the HTTP server.
+ */
+static struct GNUNET_SCHEDULER_Task *mhd_task;
 
 /**
  * Context "poller" identifier
@@ -303,28 +317,32 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
   {
     if (NULL != mints[cnt].conn)
       TALER_MINT_disconnect (mints[cnt].conn);
-  
+
   }
   if (NULL != poller_task)
   {
     GNUNET_SCHEDULER_cancel (poller_task);
     poller_task = NULL;
   }
-
+  if (NULL != mhd_task)
+  {
+    GNUNET_SCHEDULER_cancel (mhd_task);
+    mhd_task = NULL;
+  }
   if (NULL != mhd)
-    {
-      MHD_stop_daemon (mhd);
-      mhd = NULL;
-    }
-
+  {
+    MHD_stop_daemon (mhd);
+    mhd = NULL;
+  }
   if (NULL != db_conn)
-    {
-      MERCHANT_DB_disconnect (db_conn);
-      db_conn = NULL;
-    }
+  {
+    MERCHANT_DB_disconnect (db_conn);
+    db_conn = NULL;
+  }
   if (NULL != keyfile)
     GNUNET_free (privkey);
 }
+
 
 /**
  * Task that runs the context's event loop using the GNUnet scheduler.
@@ -386,6 +404,7 @@ context_task (void *cls,
   GNUNET_NETWORK_fdset_destroy (ws);
 }
 
+
 /**
  * Function called whenever MHD is done with a request.  If the
  * request was a POST, we may have stored a `struct Buffer *` in the
@@ -411,6 +430,83 @@ handle_mhd_completion_callback (void *cls,
   TMH_PARSE_post_cleanup_callback (*con_cls);
   *con_cls = NULL;
 }
+
+
+/**
+ * Function that queries MHD's select sets and
+ * starts the task waiting for them.
+ */
+static struct GNUNET_SCHEDULER_Task *
+prepare_daemon (void);
+
+
+/**
+ * Call MHD to process pending requests and then go back
+ * and schedule the next run.
+ *
+ * @param cls the `struct MHD_Daemon` of the HTTP server to run
+ * @param tc scheduler context
+ */
+static void
+run_daemon (void *cls,
+            const struct GNUNET_SCHEDULER_TaskContext *tc)
+{
+  mhd_task = NULL;
+  GNUNET_assert (MHD_YES == MHD_run (mhd));
+  mhd_task = prepare_daemon ();
+}
+
+
+/**
+ * Function that queries MHD's select sets and
+ * starts the task waiting for them.
+ *
+ * @param daemon_handle HTTP server to prepare to run
+ */
+static struct GNUNET_SCHEDULER_Task *
+prepare_daemon ()
+{
+  struct GNUNET_SCHEDULER_Task * ret;
+  fd_set rs;
+  fd_set ws;
+  fd_set es;
+  struct GNUNET_NETWORK_FDSet *wrs;
+  struct GNUNET_NETWORK_FDSet *wws;
+  int max;
+  MHD_UNSIGNED_LONG_LONG timeout;
+  int haveto;
+  struct GNUNET_TIME_Relative tv;
+
+  FD_ZERO (&rs);
+  FD_ZERO (&ws);
+  FD_ZERO (&es);
+  wrs = GNUNET_NETWORK_fdset_create ();
+  wws = GNUNET_NETWORK_fdset_create ();
+  max = -1;
+  GNUNET_assert (MHD_YES ==
+                 MHD_get_fdset (mhd,
+                                &rs,
+                                &ws,
+                                &es,
+                                &max));
+  haveto = MHD_get_timeout (mhd, &timeout);
+  if (haveto == MHD_YES)
+    tv.rel_value_us = (uint64_t) timeout * 1000LL;
+  else
+    tv = GNUNET_TIME_UNIT_FOREVER_REL;
+  GNUNET_NETWORK_fdset_copy_native (wrs, &rs, max + 1);
+  GNUNET_NETWORK_fdset_copy_native (wws, &ws, max + 1);
+  ret =
+      GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_HIGH,
+				   tv, wrs, wws,
+                                   &run_daemon,
+                                   NULL);
+  GNUNET_NETWORK_fdset_destroy (wrs);
+  GNUNET_NETWORK_fdset_destroy (wws);
+  return ret;
+}
+
+
 
 /**
  * Main function that will be run by the scheduler.
@@ -483,7 +579,7 @@ run (void *cls, char *const *args, const char *cfgfile,
                                                  &edate_delay));
 
   salt = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE,
-                                   UINT64_MAX); 
+                                   UINT64_MAX);
 
   for (cnt = 0; cnt < nmints; cnt++)
   {
@@ -499,16 +595,16 @@ run (void *cls, char *const *args, const char *cfgfile,
     GNUNET_SCHEDULER_add_now (&context_task, mints[cnt].ctx);
   }
 
-  mhd = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY | MHD_USE_SUSPEND_RESUME,
+  mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
                           port,
                           NULL, NULL,
                           &url_handler, NULL,
 			  MHD_OPTION_NOTIFY_COMPLETED,
 			  &handle_mhd_completion_callback, NULL,
                           MHD_OPTION_END);
-
   EXITIF (NULL == mhd);
   result = GNUNET_OK;
+  mhd_task = prepare_daemon ();
 
   EXITIF_exit:
     if (GNUNET_OK != result)
@@ -529,14 +625,14 @@ run (void *cls, char *const *args, const char *cfgfile,
 int
 main (int argc, char *const *argv)
 {
-  
+
    static const struct GNUNET_GETOPT_CommandLineOption options[] = {
     {'t', "temp", NULL,
      gettext_noop ("Use temporary database tables"), GNUNET_NO,
      &GNUNET_GETOPT_set_one, &dry},
      GNUNET_GETOPT_OPTION_END
     };
-  
+
 
   if (GNUNET_OK !=
       GNUNET_PROGRAM_run (argc, argv,
