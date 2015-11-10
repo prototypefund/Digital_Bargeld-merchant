@@ -58,11 +58,6 @@ struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 char *keyfile;
 
 /**
- * Mint context
- */
-static struct TALER_MINT_Context *mctx;
-
-/**
  * This value tells the mint by which date this merchant would like 
  * to receive the funds for a deposited payment
  */
@@ -287,6 +282,8 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
   }
   else
     printf ("no keys gotten\n");
+
+  printf ("cb: poller_task [%p]\n", poller_task);
 }
 
 
@@ -332,7 +329,7 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 /**
  * Task that runs the context's event loop using the GNUnet scheduler.
  *
- * @param cls unused
+ * @param cls mint context
  * @param tc scheduler context (unused)
  */
 void
@@ -384,6 +381,7 @@ context_task (void *cls,
                                ws,
                                &context_task,
                                cls);
+  printf ("scheduling poller_task [%p]\n", poller_task);
   GNUNET_NETWORK_fdset_destroy (rs);
   GNUNET_NETWORK_fdset_destroy (ws);
 }
@@ -494,7 +492,8 @@ run (void *cls, char *const *args, const char *cfgfile,
     mints[cnt].conn = TALER_MINT_connect (mints[cnt].ctx,
                                           mints[cnt].hostname,
                                           &keys_mgmt_cb,
-                                          &mints[cnt]); 
+                                          &mints[cnt],
+					  TALER_MINT_OPTION_END); 
     EXITIF (NULL == mints[cnt].conn);
     poller_task =
     GNUNET_SCHEDULER_add_now (&context_task, mints[cnt].ctx);
