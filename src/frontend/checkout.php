@@ -62,7 +62,7 @@
 
 <form name="tform" action="" method="POST">
   <div id="opt-form" align="left"><br>
-    <input type="radio" name="payment_system" value="lisa" checked>Lisa</input>
+    <input type="radio" name="payment_system" value="lisa">Lisa</input>
     <br>
     <input type="radio" name="payment_system" value="ycard">You Card</input>
     <br>
@@ -151,6 +151,7 @@ function has_taler_wallet_cb(aEvent)
   // enable the Taler payment option from the form
   var tbutton = document.getElementById("taler-radio-button-id");
   tbutton.removeAttribute("disabled");
+  tbutton.setAttribute("checked", "true");
  
 };
 
