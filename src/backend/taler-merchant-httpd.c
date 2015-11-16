@@ -33,6 +33,7 @@
 #include "merchant_db.h"
 #include "merchant.h"
 #include "taler_merchant_lib.h"
+#include "taler-merchant-httpd.h"
 #include "taler-mint-httpd_mhd.h"
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
@@ -56,7 +57,6 @@ struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
  * File holding the merchant's private key
  */
 char *keyfile;
-
 
 /**
  * This value tells the mint by which date this merchant would like
@@ -417,9 +417,11 @@ handle_mhd_completion_callback (void *cls,
                                 void **con_cls,
                                 enum MHD_RequestTerminationCode toe)
 {
-  if (NULL == *con_cls)
+  struct TM_HandlerContext *hc = *con_cls;
+
+  if (NULL == hc)
     return;
-  TMH_PARSE_post_cleanup_callback (*con_cls);
+  hc->cc (hc);
   *con_cls = NULL;
 }
 
@@ -453,7 +455,7 @@ run_daemon (void *cls,
  * Kick MHD to run now, to be called after MHD_resume_connection().
  */
 void
-trigger_daemon ()
+TM_trigger_daemon ()
 {
   GNUNET_SCHEDULER_cancel (mhd_task);
   run_daemon (NULL, NULL);
@@ -592,7 +594,7 @@ run (void *cls, char *const *args, const char *cfgfile,
                                           mints[cnt].hostname,
                                           &keys_mgmt_cb,
                                           &mints[cnt],
-					  TALER_MINT_OPTION_END); 
+					  TALER_MINT_OPTION_END);
     EXITIF (NULL == mints[cnt].conn);
     poller_task =
     GNUNET_SCHEDULER_add_now (&context_task, mints[cnt].ctx);

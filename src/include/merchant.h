@@ -15,7 +15,7 @@
 */
 
 /**
- * @file merchant/merchant.c
+ * @file include/merchant.h
  * @brief Common utility functions for merchant
  * @author Sree Harsha Totakura <sreeharsha@totakura.in>
  */
@@ -23,8 +23,7 @@
 #ifndef MERCHANT_H
 #define MERCHANT_H
 
-#include <gnunet/gnunet_common.h>
-#include <gnunet/gnunet_crypto_lib.h>
+#include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_mint_service.h>
 #include "merchant.h"
 
@@ -66,33 +65,6 @@ struct MERCHANT_DepositConfirmation
 
 };
 
-struct MERCHANT_DepositConfirmationCls
-{
-  /**
-   * Offset of this coin into the array of all coins outcomes
-   */
-  unsigned int index;
-
-  /**
-   * Pointer to the global (malloc'd) array of all coins outcomes
-   */
-  struct MERCHANT_DepositConfirmation *dc;
-
-  /**
-   * How many coins this paymen is made of.
-   */
-  unsigned int coins_cnt;
-
-  /**
-   * Transaction id
-   */
-  uint64_t transaction_id;
-
-  /**
-   * MHD connection to return to
-   */
-  struct MHD_Connection *connection;
-};
 
 /**
  * Mint
