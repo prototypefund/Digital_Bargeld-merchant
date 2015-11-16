@@ -35,15 +35,10 @@
 #include "merchant_db.h"
 #include "merchant.h"
 #include "taler_merchant_lib.h"
+#include "taler-merchant-httpd.h"
 
-extern struct MERCHANT_Mint *mints;
 extern struct MERCHANT_Auditor *auditors;
-extern struct GNUNET_CRYPTO_EddsaPrivateKey privkey;
-extern const struct MERCHANT_WIREFORMAT_Sepa *wire;
-extern unsigned int nmints;
 extern unsigned int nauditors;
-extern PGconn *db_conn;
-extern long long salt;
 
 /**
  * Manage a contract request. In practical terms, it adds the fields 'mints',
@@ -148,7 +143,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                        "H_wire",
 		       TALER_json_from_data (&h_wire, sizeof (h_wire)));
 
-  GNUNET_CRYPTO_eddsa_key_get_public (&privkey, &pubkey);
+  GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pubkey);
   json_object_set_new (root,
                        "merchant_pub",
 		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
@@ -158,7 +153,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   GNUNET_CRYPTO_hash (contract_str, strlen (contract_str), &contract.h_contract);
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract.purpose.size = htonl (sizeof (contract));
-  GNUNET_CRYPTO_eddsa_sign (&privkey, &contract.purpose, &contract_sig);
+  GNUNET_CRYPTO_eddsa_sign (privkey, &contract.purpose, &contract_sig);
 
   return TMH_RESPONSE_reply_json_pack (connection,
 				       MHD_HTTP_OK,
