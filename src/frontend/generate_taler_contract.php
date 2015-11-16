@@ -65,7 +65,8 @@ if (!$cli_debug)
 else
 {
   $receiver = "Test Receiver";
-  $amount = 5;
+  $amount_value = 5;
+  $amount_fraction = 5;
   $currency = "KUDOS";
 
 }
