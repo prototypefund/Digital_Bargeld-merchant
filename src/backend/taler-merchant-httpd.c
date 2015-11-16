@@ -450,6 +450,17 @@ run_daemon (void *cls,
 
 
 /**
+ * Kick MHD to run now, to be called after MHD_resume_connection().
+ */
+void
+trigger_daemon ()
+{
+  GNUNET_SCHEDULER_cancel (mhd_task);
+  run_daemon (NULL, NULL);
+}
+
+
+/**
  * Function that queries MHD's select sets and
  * starts the task waiting for them.
  *
@@ -547,7 +558,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   EXITIF (NULL ==
          (db_conn = MERCHANT_DB_connect (config)));
   EXITIF (GNUNET_OK !=
-          MERCHANT_DB_initialize (db_conn, GNUNET_YES));
+          MERCHANT_DB_initialize (db_conn, dry));
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_number (config,
                                                  "merchant",

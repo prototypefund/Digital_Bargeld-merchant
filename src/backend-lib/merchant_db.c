@@ -106,10 +106,10 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
                           "amount_fraction INT4 NOT NULL,"
                           "coin_sig BYTEA NOT NULL);"
 			  "CREATE %1$s TABLE IF NOT EXISTS deposits ("
-			  "dep_perm TEXT NOT NULL,"
+			  "dep_perm VARCHAR NOT NULL,"
 			  "transaction_id INT8,"
 			  "pending INT4 NOT NULL,"
-			  "mint_url TEXT NOT NULL);",
+			  "mint_url VARCHAR NOT NULL);",
                           tmp_str);
   ret = GNUNET_POSTGRES_exec (conn, sql);
   (void) GNUNET_POSTGRES_exec (conn,
@@ -263,8 +263,8 @@ MERCHANT_DB_update_deposit_permission (PGconn *conn,
   ExecStatusType status;
 
   struct TALER_PQ_QueryParam params[] = {
-    TALER_PQ_query_param_uint64 (&transaction_id),
     TALER_PQ_query_param_uint32 (&pending),
+    TALER_PQ_query_param_uint64 (&transaction_id),
     TALER_PQ_query_param_end  
   };
 

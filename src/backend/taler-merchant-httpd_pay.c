@@ -144,15 +144,19 @@ deposit_cb (void *cls, unsigned int http_status, json_t *proof)
     /* just return if there is at least one coin to be still
       confirmed */
     if (!dccls->dc[i].ackd)
+    {
+      printf ("still vacant coins\n");
       return;
+    }
   }
 
   printf ("All /deposit(s) ack'd\n");
   MHD_resume_connection (dccls->connection);
-  TMH_RESPONSE_reply_json_pack (dccls->connection,
-                                MHD_HTTP_OK,
-				"{s:s}",
-				"result", "all conins ack'd (and connection resumed)");
+  i = TMH_RESPONSE_reply_json_pack (dccls->connection,
+                                    MHD_HTTP_OK,
+	                            "{s:s}",
+				    "result", "all conins ack'd (and connection resumed)");
+  printf ("mhd res %d\n", i);
   /* TODO at this point, any coin has been confirmed by the mint. So
     check for errors .. */
 
@@ -179,7 +183,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                 const char *upload_data,
                 size_t *upload_data_size)
 {
-
   json_t *root;
   json_t *coins;
   char *chosen_mint;
@@ -190,7 +193,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   unsigned int coins_cnt;
   uint64_t transaction_id;
   int res;
-
   struct TALER_MINT_DepositHandle *dh;
   struct TALER_Amount max_fee;
   struct TALER_Amount acc_fee;
@@ -205,7 +207,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct TALER_DenominationSignature ub_sig;
   struct TALER_CoinSpendSignatureP coin_sig;
   struct GNUNET_HashCode h_contract;
-
   struct MERCHANT_DepositConfirmation *dc;
   struct MERCHANT_DepositConfirmationCls *dccls;
 
@@ -411,7 +412,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 			     dccls); /*may be destroyed by the time the cb gets called..*/
     if (NULL == dh)
     {
-      MHD_suspend_connection (connection);
+      MHD_resume_connection (connection);
       return TMH_RESPONSE_reply_json_pack (connection,
                                            MHD_HTTP_SERVICE_UNAVAILABLE,
 		                           "{s:s, s:i}",
@@ -423,6 +424,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   printf ("poller task: %p\n", poller_task);
   GNUNET_SCHEDULER_cancel (poller_task);
   GNUNET_SCHEDULER_add_now (context_task, mints[mint_index].ctx);
+  return MHD_YES;
 
   /* 4 Return response code: success, or whatever data the
     mint sent back regarding some bad coin */
