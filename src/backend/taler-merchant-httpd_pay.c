@@ -202,15 +202,10 @@ deposit_cb (void *cls,
   pc->dc = NULL;
 
   printf ("All /deposit(s) ack'd\n");
-  pc->response = NULL; /* FIXME; */
-  /*
-  i = TMH_RESPONSE_reply_json_pack (pc->connection,
-                                    MHD_HTTP_OK,
-	                            "{s:s}",
-				    "result", "all conins ack'd (and connection resumed)");
-  printf ("mhd res %d\n", i);
-  */
 
+  pc->response = MHD_create_response_from_buffer (strlen ("All coins ack'd by the mint\n"),
+                                                  "All coins ack'd by the mint\n",
+                                                  MHD_RESPMEM_MUST_FREE);
   pc->response_code = MHD_HTTP_OK;
   MHD_resume_connection (pc->connection);
   TM_trigger_daemon (); /* we resumed, kick MHD */
@@ -299,7 +294,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     TMH_PARSE_MEMBER_END
   };
 
-  if (NULL == connection_cls)
+  if (NULL == *connection_cls)
   {
     pc = GNUNET_new (struct PayContext);
     pc->hc.cc = &pay_context_cleanup;
@@ -311,7 +306,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     /* not the first call, recover state */
     pc = *connection_cls;
   }
-
   if (0 != pc->response_code)
   {
     if (UINT_MAX == pc->response_code)
@@ -326,10 +320,11 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
 
   res = TMH_PARSE_post_json (connection,
-                             connection_cls,
+                             &pc->json_parse_context,
                              upload_data,
                              upload_data_size,
                              &root);
+  printf ("seg faulty?");
   if (GNUNET_SYSERR == res)
     return MHD_NO;
   /* the POST's body has to be further fetched */
@@ -452,7 +447,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   /* suspend connection until the last coin has been ack'd to the cb.
     That last cb will finally resume the connection and send back a response */
   MHD_suspend_connection (connection);
-
+  printf ("processing coins bundle\n");
   json_array_foreach (coins, coins_index, coin_aggregate)
   {
 
