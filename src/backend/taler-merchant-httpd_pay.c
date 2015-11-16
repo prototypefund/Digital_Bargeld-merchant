@@ -324,7 +324,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                              upload_data,
                              upload_data_size,
                              &root);
-  printf ("seg faulty?");
   if (GNUNET_SYSERR == res)
     return MHD_NO;
   /* the POST's body has to be further fetched */
@@ -447,7 +446,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   /* suspend connection until the last coin has been ack'd to the cb.
     That last cb will finally resume the connection and send back a response */
   MHD_suspend_connection (connection);
-  printf ("processing coins bundle\n");
   json_array_foreach (coins, coins_index, coin_aggregate)
   {
 

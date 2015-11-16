@@ -69,7 +69,7 @@
     <input type="radio" name="payment_system" value="cardme">Card Me</input>
     <br>
     <input type="radio" name="payment_system" value="taler" 
-          id="taler-radio-button-id" disabled="true">Taler</input>
+          id="taler-radio-button-id" disabled="true">GNU Taler</input>
     <br>
     <input type="button" onclick="pay(this.form)" value="Ok">
   </div>
