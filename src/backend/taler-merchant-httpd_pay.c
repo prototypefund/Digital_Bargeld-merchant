@@ -174,7 +174,8 @@ deposit_cb (void *cls,
     called? */
   int i;
 
-  printf ("deposit cb\n");
+  /*FIXME the index is the same for every individual cb */
+  printf ("deposit cb [coins_index %d]\n", pc->index);
   if (GNUNET_SYSERR ==
       MERCHANT_DB_update_deposit_permission (db_conn,
                                              pc->transaction_id,
@@ -495,7 +496,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 			     refund_deadline,
 			     &coin_sig,
 			     &deposit_cb,
-			     pc); /*may be destroyed by the time the cb gets called..*/
+			     pc); /*FIXME TODO instantiate an individual cls for each
+			            cb: each of them needs an index which points the
+				    array of all the confirmations */
     if (NULL == dh)
     {
       MHD_resume_connection (connection);
