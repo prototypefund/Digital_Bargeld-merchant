@@ -35,12 +35,18 @@
         experience using the
         <a href="https://www.taler.net/">GNU Taler</a>
         payment system without using
-        valuable currency.  Here, we guide you through the steps
-        of installing a Taler wallet, withdrawing Taler coins and
-        spending them at a merchant.  For this demonstrator, we
-        will be using a "toy" currency, KUDOS.  However, please note that
+        valuable currency. Instead, for the demonstrator we
+        will be using a "toy" currency, KUDOS. However, please remember that
         Taler is designed to work with ordinary currencies, such
         as Dollars or Euros, not just toy currencies.
+        <br>
+        This page, <tt>shop.demo.taler.net</tt> models the behavior of a
+        typical Web shop supporting Taler.  The other pages of the demo,
+        <tt>mint.demo.taler.net</tt> and
+        <tt>bank.demo.taler.net</tt>, correspond to a Taler mint
+        and bank with tight Taler integration respectively.
+        <!-- TODO: maybe offer the wallet at 'taler.net/extension' in the
+             future, instead of at 'demo.taler.net/'? -->
       </p>
       <p>Still missing a wallet? <a href="http://demo.taler.net/extension">Install one!</a>
       </p>
@@ -48,39 +54,60 @@
   </div>
   <div class="supporting" id="instructions" role="main">
     <div class="explanation" id="installation" role="article">
-      <h2>Step 1: Installing the Taler wallet</h2>
+      <h2>Step 1: Installing the Taler wallet (once)</h2>
       <p>First, you need to install the Taler wallet browser extension.
          It is currently only available for Firefox.  If you run
          Firefox, simply click <a href="/extension">here</a>
-         to download and install the extension.  You will have to
+         to download and install the extension.  You will then have to
          click on "allow" and "install" dialogs shown by Firefox.
          After that, the Taler logo should appear on the right side
          of your navigation bar.
+        <!-- TODO: insert screenshot highlighting the icon? -->
       </p>
     </div>
     <div class="explanation" id="installation-done" role="article" style="display:none;">
-      <h2>Step 1: Installing the Taler wallet</h2>
-      <p>Congratulations, you have installed the wallet correctly.
+      <h2>Step 1: Installing the Taler wallet (done!)</h2>
+      <p>Congratulations, you have installed the Taler wallet correctly.
          You can now proceed with the next steps.
       </p>
     </div>
     <div class="explanation" id="wire" role="article" style="display:none;">
-      <h2>Step 2: Performing a wire transfer</h2>
-      <p>The next step is to transfer currency to the mint to
-         obtain Taler coins.  This is typically done using a
-         wire transfer.  However, as this is just a demonstrator,
-         we will allow you to send the mint KUDOS coins using a simple
-         SEPA-like form from the <a href="http://bank.demo.taler.net/" target="_blank">bank</a>
-	 (new tab).</p>
+      <h2>Step 2: Withdraw coins (occasionally)</h2>
+      <p>The next step is to withdraw coins, after all you cannot
+         pay with an empty wallet.  To be allowed to withdraw
+         coins from a mint, you first need to transfer currency to the mint
+         using the normal banking system, for example by using a
+         wire transfer.  If the bank offers a tight integration with Taler, it
+         may also support this directly over the home banking online interface.
+         <br>
+         For the demonstration, we have created a "bank" that
+         allows you to "wire" funds (in KUDOS) to the mint simply by
+         filling in the desired amount into a form.  Naturally, when
+         using a real bank with real money, you would have to authenticate
+         and authorize the transfer.
+         <br>
+         Note that you would not do this step for each purchase or each shop.
+         Payment with Taler is like paying
+         with cash: you withdraw currency at the bank (or an ATM) and then
+         pay at many merchants without having to authenticate each time.
+         <br>
+         So, unless you have already done so, please go ahead and withdraw
+         KUDOS at the
+         <a href="http://bank.demo.taler.net/" target="_blank">Demo bank</a>
+	 (opens in a new tab).</p>
       </p>
     </div>
     <div class="explanation" id="payment" role="article" style="display:none;">
-      <h2>Step 3: Select project to donate KUDOS to!</h2>
+      <h2>Step 3: Shop! (as long as you have KUDOS left in the wallet)</h2>
       <p>Now it is time to spend your hard earned KUDOS.
-         For your convenience, we integrated a tiny "shop"
-         accepting KUDOS right here into this page.</p>
-      <p>Please choose a project and the amount of KUDOS you
-         wish to donate.</p>
+         Note that we cannot really tell if you got any yet,
+         as your Taler wallet balance is visible to you, but
+         of course is hidden entirely from the shop.</p>
+      <p>The form that follows corresponds to the shopping
+         cart of a real Web shop; however, we kept it
+         very simple for the demonstration.</p>
+      <p>So, please choose a project and the amount of KUDOS you
+         wish to donate:</p>
       <form name="tform" action="/checkout.php" method="POST">
         <div class="participation" id="fake-shop">
           <br>
@@ -151,20 +178,20 @@
         wallet_installed_cb();
     }
 
-    document.body.addEventListener("taler-unload", 
-                                   wallet_uninstalled_cb, 
+    document.body.addEventListener("taler-unload",
+                                   wallet_uninstalled_cb,
                                    false, false);
 
     /* Set up a listener to be called whenever a Wallet gets installed
        so that the user is led towards the demo's steps progressively */
-    document.body.addEventListener("taler-wallet-present", 
-                                   wallet_installed_cb, 
+    document.body.addEventListener("taler-wallet-present",
+                                   wallet_installed_cb,
                                    false, false);
 
     /* Setup callback to be called whenever the wallet is loaded/enabled
       while the browser is already on this page */
-    document.body.addEventListener("taler-load", 
-                                   signal_me, 
+    document.body.addEventListener("taler-load",
+                                   signal_me,
                                    false);
   </script>
 </body>
