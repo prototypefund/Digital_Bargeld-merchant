@@ -41,10 +41,17 @@
   } while (0)
 
 /**
- * Outcome of a /deposit request for a coin
+ * Outcome of a /deposit request for a coin. Typically forming an array enclosed
+ * into the unique PayContext
  */
 struct MERCHANT_DepositConfirmation
 {
+  /**
+   * Reference to the per-deposit-handler Context. Needed by the
+   * cleanup function to get it freed
+   */
+   struct DepositCallbackContext *dcc;
+
   /**
    * True if this coin's outcome has been read from
    * its cb

@@ -133,11 +133,6 @@ struct PayContext
   uint64_t transaction_id;
 
   /**
-   * Offset of this coin into the array of all coins outcomes
-   */
-  unsigned int index;
-
-  /**
    * How many coins this paymen is made of.
    */
   unsigned int coins_cnt;
@@ -151,6 +146,25 @@ struct PayContext
 
 };
 
+/**
+ * Information needed by a single /deposit callback to refer to its
+ * own coin inside the confirmations array, namely `struct MERCHANT_DepositConfirmation *dc`
+ * above. Note: this information can NOT be shared between all the callbacks.
+ */
+struct DepositCallbackContext
+{
+
+  /**
+   * Offset of this coin into the array of all coins outcomes
+   */
+  unsigned int index;
+
+  /**
+   * Reference to the main PayContext
+   */
+  struct PayContext *pc;
+
+};
 
 /**
  * Callback to handle a deposit permission's response.
@@ -169,46 +183,43 @@ deposit_cb (void *cls,
             unsigned int http_status,
             json_t *proof)
 {
-  struct PayContext *pc = cls;
-  /* NOTE: what if the mint doesn't respond? Does this callback get
-    called? */
+  struct DepositCallbackContext *dcc = cls;
   int i;
 
   /*FIXME the index is the same for every individual cb */
-  printf ("deposit cb [coins_index %d]\n", pc->index);
+  printf ("deposit cb [coins_index %d]\n", dcc->index);
   if (GNUNET_SYSERR ==
       MERCHANT_DB_update_deposit_permission (db_conn,
-                                             pc->transaction_id,
+                                             dcc->pc->transaction_id,
 	                                     0))
     /* TODO */
     printf ("db error\n");
   printf ("/deposit ack'd\n");
-  pc->dc[pc->index].ackd = 1;
-  pc->dc[pc->index].exit_status = http_status;
-  pc->dc[pc->index].proof = proof;
+  dcc->pc->dc[dcc->index].ackd = 1;
+  dcc->pc->dc[dcc->index].exit_status = http_status;
+  dcc->pc->dc[dcc->index].proof = proof;
 
   /* loop through the confirmation array and return accordingly */
-  for (i = 0; i < pc->coins_cnt; i++)
+  for (i = 0; i < dcc->pc->coins_cnt; i++)
   {
     /* just return if there is at least one coin to be still
       confirmed */
-    if (! pc->dc[i].ackd)
+    if (! dcc->pc->dc[i].ackd)
     {
       printf ("still vacant coins\n");
       return;
     }
   }
-  /* Clean up what we can already */
-  GNUNET_free (pc->dc);
-  pc->dc = NULL;
-
+  
   printf ("All /deposit(s) ack'd\n");
 
-  pc->response = MHD_create_response_from_buffer (strlen ("All coins ack'd by the mint\n"),
-                                                  "All coins ack'd by the mint\n",
-                                                  MHD_RESPMEM_MUST_FREE);
-  pc->response_code = MHD_HTTP_OK;
-  MHD_resume_connection (pc->connection);
+  dcc->pc->response = MHD_create_response_from_buffer (strlen ("All coins ack'd by the mint\n"),
+                                                               "All coins ack'd by the mint\n",
+                                                               MHD_RESPMEM_MUST_FREE);
+  printf ("response [%p]\n", dcc->pc->response);
+  dcc->pc->response_code = MHD_HTTP_OK;
+  /* Clean up what we can already */
+  MHD_resume_connection (dcc->pc->connection);
   TM_trigger_daemon (); /* we resumed, kick MHD */
 }
 
@@ -216,9 +227,14 @@ deposit_cb (void *cls,
 static void
 pay_context_cleanup (struct TM_HandlerContext *hc)
 {
+  int i;
   struct PayContext *pc = (struct PayContext *) hc;
 
+  for (i = 0; i < pc->coins_cnt; i++)
+    GNUNET_free_non_null (pc->dc[i].dcc);
+
   TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
+  printf ("response cu [%p]\n", pc->response);
   if (NULL != pc->response)
   {
     MHD_destroy_response (pc->response);
@@ -315,8 +331,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     res = MHD_queue_response (connection,
                               pc->response_code,
                               pc->response);
-    MHD_destroy_response (pc->response);
-    pc->response = NULL;
+    printf ("response main [%p]\n", pc->response);
+    if (pc->response != NULL)
+    {
+      MHD_destroy_response (pc->response);
+      pc->response = NULL;
+    }
     return res;
   }
 
@@ -447,6 +467,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   /* suspend connection until the last coin has been ack'd to the cb.
     That last cb will finally resume the connection and send back a response */
   MHD_suspend_connection (connection);
+
+  pc->dc = dc;
+  pc->coins_cnt = coins_cnt;
+  pc->transaction_id = transaction_id;
+
+
   json_array_foreach (coins, coins_index, coin_aggregate)
   {
 
@@ -477,10 +503,11 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     if (GNUNET_OK != res)
       return res; /* may return GNUNET_NO */
 
-    pc->index = coins_index;
-    pc->dc = dc;
-    pc->coins_cnt = coins_cnt;
-    pc->transaction_id = transaction_id;
+    /* c */
+    struct DepositCallbackContext *percoin_dcc = GNUNET_new (struct DepositCallbackContext);
+    pc->dc[coins_index].dcc = percoin_dcc;
+    percoin_dcc->index = coins_index;
+    percoin_dcc->pc = pc;
 
     dh = TALER_MINT_deposit (mints[mint_index].conn,
                              &amount,
@@ -496,7 +523,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 			     refund_deadline,
 			     &coin_sig,
 			     &deposit_cb,
-			     pc); /*FIXME TODO instantiate an individual cls for each
+			     percoin_dcc); /*FIXME TODO instantiate an individual cls for each
 			            cb: each of them needs an index which points the
 				    array of all the confirmations */
     if (NULL == dh)
