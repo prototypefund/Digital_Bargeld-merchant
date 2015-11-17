@@ -16,12 +16,5 @@ o checkout.php	| The "payment selection" that is the form
 		  It also implements the request of certificate and trigger the certificate
 		  viewer in the extension when it arrives in the customer's machine.
 
-
-o cert.php	| Replies with a JSON certificate gotten from the backend.
-
 o pay.php	| Actual receiving of money, plus it gives back a "fullfillment" page
 		  that informs the user of his well ended deal.
-
-o toy		| the nginx configuration file skeleton for this virtual server. To be tuned
-                  as needed.
-o sample.json   | JSON structure to be reproduced from the frontend, to be fed to the backend
