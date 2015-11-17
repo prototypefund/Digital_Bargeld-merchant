@@ -29,7 +29,7 @@
         */
     </script>
 </head>
-<body onload="signal_me()">
+<body onload="signal_taler_wallet_onload()">
 <!--
   This page's main aim is to show to the customer all the accepted
   payments methods and actually implementing just Taler; technically
@@ -204,8 +204,11 @@ function taler_wallet_unload_cb(aEvent)
 
 
 /* The merchant signals its taler-friendlyness to the wallet,
-   thereby causing the wallet to make itself more visible in the menu. */
-function signal_me()
+   thereby causing the wallet to make itself more visible in the menu.
+   This function should be called both when the page is loaded
+   (i.e. via body's onload) and when we receive a "taler-load" signal
+   (as the extension may be loaded/enabled after the page was loaded) */
+function signal_taler_wallet_onload()
 {
   var eve = new Event('taler-checkout-probe');
   document.body.dispatchEvent(eve);
@@ -221,7 +224,7 @@ function test_without_wallet(){
 };
 
 
-// /////////////// Main logic run on load ////////////////////////
+// /////////////// Main logic run first ////////////////////////
 
 // Register event to be triggered by the wallet as a response to our
 // first event
@@ -229,14 +232,10 @@ document.body.addEventListener("taler-wallet-present",
                                has_taler_wallet_cb,
 			       false);
 
-// event awaited by the wallet to change its button's color
-// var eve = new Event('taler-payment-mfirst');
-// document.body.dispatchEvent(eve);
-
 // Register event to be triggered by the wallet when it gets enabled while
 // the user is on the payment page
 document.body.addEventListener("taler-load",
-                               signal_me,
+                               signal_taler_wallet_onload,
 			       false);
 
 // Register event to be triggered by the wallet when it is unloaded

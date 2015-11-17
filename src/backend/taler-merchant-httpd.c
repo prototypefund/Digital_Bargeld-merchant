@@ -289,7 +289,6 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
   else
     printf ("no keys gotten\n");
 
-  printf ("cb: poller_task [%p]\n", poller_task);
 }
 
 
@@ -391,7 +390,6 @@ context_task (void *cls,
                                ws,
                                &context_task,
                                cls);
-  printf ("scheduling poller_task [%p]\n", poller_task);
   GNUNET_NETWORK_fdset_destroy (rs);
   GNUNET_NETWORK_fdset_destroy (ws);
 }
@@ -417,7 +415,7 @@ handle_mhd_completion_callback (void *cls,
                                 void **con_cls,
                                 enum MHD_RequestTerminationCode toe)
 {
-  struct TM_HandlerContext *hc = *con_cls;
+  struct TM_HandlerContext *hc = *con_cls; /* 'hc' is also a 'struct PayContext' */
 
   if (NULL == hc)
     return;
