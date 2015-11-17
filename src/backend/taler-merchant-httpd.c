@@ -415,7 +415,7 @@ handle_mhd_completion_callback (void *cls,
                                 void **con_cls,
                                 enum MHD_RequestTerminationCode toe)
 {
-  struct TM_HandlerContext *hc = *con_cls;
+  struct TM_HandlerContext *hc = *con_cls; /* 'hc' is also a 'struct PayContext' */
 
   if (NULL == hc)
     return;

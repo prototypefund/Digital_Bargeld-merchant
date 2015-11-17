@@ -92,7 +92,8 @@ if ($status_code != 200)
 }
 else
 {
-  echo "Payment succedeed!\n";
+  echo $resp->body->toString ();
+  //echo "Payment succeeded!\n";
 }
 
 ?>

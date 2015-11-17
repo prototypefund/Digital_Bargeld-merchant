@@ -73,11 +73,6 @@ deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
   if (GNUNET_OK != res)
     return res; /* may return GNUNET_NO */
 
-  /*printf ("mint %s (%d), pends: %d\n",
-           mints[mint_index].hostname,
-	   mint_index,
-	   mints[mint_index].pending);*/
-
   if (1 == mints[mint_index].pending)
     return GNUNET_SYSERR;
   keys = TALER_MINT_get_keys (mints[mint_index].conn);
@@ -187,14 +182,12 @@ deposit_cb (void *cls,
   int i;
 
   /*FIXME the index is the same for every individual cb */
-  printf ("deposit cb [coins_index %d]\n", dcc->index);
   if (GNUNET_SYSERR ==
       MERCHANT_DB_update_deposit_permission (db_conn,
                                              dcc->pc->transaction_id,
 	                                     0))
     /* TODO */
     printf ("db error\n");
-  printf ("/deposit ack'd\n");
   dcc->pc->dc[dcc->index].ackd = 1;
   dcc->pc->dc[dcc->index].exit_status = http_status;
   dcc->pc->dc[dcc->index].proof = proof;
@@ -215,8 +208,7 @@ deposit_cb (void *cls,
 
   dcc->pc->response = MHD_create_response_from_buffer (strlen ("All coins ack'd by the mint\n"),
                                                                "All coins ack'd by the mint\n",
-                                                               MHD_RESPMEM_MUST_FREE);
-  printf ("response [%p]\n", dcc->pc->response);
+                                                               MHD_RESPMEM_MUST_COPY);
   dcc->pc->response_code = MHD_HTTP_OK;
   /* Clean up what we can already */
   MHD_resume_connection (dcc->pc->connection);
@@ -234,12 +226,18 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
     GNUNET_free_non_null (pc->dc[i].dcc);
 
   TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
-  printf ("response cu [%p]\n", pc->response);
+
+  #if 0
   if (NULL != pc->response)
   {
+    /* undestroyable regardless of the other MHD_destroy_response called
+    in this source, FIXME */
+
     MHD_destroy_response (pc->response);
     pc->response = NULL;
   }
+  #endif
+
   GNUNET_free_non_null (pc->dc);
   GNUNET_free (pc);
 }
@@ -331,12 +329,15 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     res = MHD_queue_response (connection,
                               pc->response_code,
                               pc->response);
-    printf ("response main [%p]\n", pc->response);
+    #if 0
     if (pc->response != NULL)
     {
+      /* undestroyable regardless of the other MHD_destroy_response called
+        in this source, FIXME */
       MHD_destroy_response (pc->response);
       pc->response = NULL;
     }
+    #endif
     return res;
   }
 
@@ -537,7 +538,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     }
   }
 
-  printf ("poller task: %p\n", poller_task);
   GNUNET_SCHEDULER_cancel (poller_task);
   GNUNET_SCHEDULER_add_now (context_task, mints[mint_index].ctx);
   return MHD_YES;
