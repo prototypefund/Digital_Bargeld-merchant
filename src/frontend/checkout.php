@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Choose payment method</title>
+<title>Taler's "Demo" Shop: Choose payment method</title>
     <script>
         /*
         @licstart  The following is the entire license notice for the
@@ -30,11 +30,11 @@
     </script>
 </head>
 <body onload="signal_me()">
-<!-- 
+<!--
   This page's main aim is to show to the customer all the accepted
   payments methods and actually implementing just Taler; technically
   the steps are:
-  
+
   1. retrieve the information about the donation from the
      form and remember it in a PHP session
   2. show a menu with all the required payments system options,
@@ -59,17 +59,39 @@
   $_SESSION['amount_fraction'] = (int) ($donation_fraction * 1000000);
   $_SESSION['currency'] = $donation_currency;
 ?>
-
+<h2>Select your payment option</h2>
+<div>
+This is an example for a "checkout" page of a Web shop.
+On the previous page, you have created the shopping cart
+and decided which product to buy (i.e. which project to
+donate KUDOS to).  Now in this page, you are asked to
+select a payment option.  As Taler is not yet universally
+used, we expect merchants will offer various payment options.
+<p>
+The page also demonstrates how to only enable (or show) the Taler
+option if Taler is actually supported by the browser.  For example,
+if you disable the Taler extension now, the Taler payment option
+will be disabled in the page.  Naturally, you could also trivially
+hide the Taler option entirely by changing the visibility instead.
+<p>
+Note that you MUST select Taler here for the demo to continue,
+as the other payment options are just placeholders and not
+really working in the demonstration.  Also, it is of course
+possible to ask the user to make this choice already on the
+previous page (with the shopping cart), we just separated the
+two steps to keep each step as simple as possible.
+</div>
 <form name="tform" action="" method="POST">
   <div id="opt-form" align="left"><br>
-    <input type="radio" name="payment_system" value="lisa">Lisa</input>
+    <input type="radio" name="payment_system" value="lisa"
+           id="lisa-radio-button-id">Lisa</input>
     <br>
     <input type="radio" name="payment_system" value="ycard">You Card</input>
     <br>
     <input type="radio" name="payment_system" value="cardme">Card Me</input>
     <br>
-    <input type="radio" name="payment_system" value="taler" 
-          id="taler-radio-button-id" disabled="true">Taler</input>
+    <input type="radio" name="payment_system" value="taler"
+           id="taler-radio-button-id" disabled="true">Taler</input>
     <br>
     <input type="button" onclick="pay(this.form)" value="Ok">
   </div>
@@ -77,8 +99,9 @@
 
 <script type="text/javascript">
 
-/* We got a JSON contract from the merchant,
-   pass it to the extension */
+/* This function is called from "taler_pay" after
+   we downloaded the JSON contract from the merchant.
+   We now need to pass it to the extension. */
 function handle_contract(json_contract)
 {
   var cEvent = new CustomEvent('taler-contract', { detail: json_contract });
@@ -92,27 +115,41 @@ function handle_contract(json_contract)
 function taler_pay(form)
 {
   var contract_request = new XMLHttpRequest();
+
+  /* Note that the URL we give here is specific to the Demo-shop
+     and not required by the protocol: each web shop can
+     have its own way of generating and transmitting the
+     contract, there just must be a way to get the contract
+     and to pass it to the wallet when the user selects 'Pay'. */
   contract_request.open("GET", "/generate_taler_contract.php", true);
-  contract_request.onload = function (e) 
+  contract_request.onload = function (e)
   {
-    if (contract_request.readyState == 4) 
+    if (contract_request.readyState == 4)
     {
       if (contract_request.status == 200)
       {
         /* display contract_requestificate (i.e. it sends the JSON string
            to the extension) alert (contract_request.responseText); */
         handle_contract(contract_request.responseText);
-	
+
       }
-      else 
+      else
       {
-        alert("No contract got from merchant.\n" + contract_request.responseText);
+        /* There was an error obtaining the contract from the merchant,
+           obviously this should not happen. To keep it simple, we just
+           alert the user to the error. */
+        alert("Failure to download contract from merchant " +
+              "(" + contract_request.status + "):\n" +
+              contract_request.responseText);
       }
     }
   };
   contract_request.onerror = function (e)
   {
-    alert(contract_request.statusText);
+    /* There was an error obtaining the contract from the merchant,
+       obviously this should not happen. To keep it simple, we just
+       alert the user to the error. */
+    alert("Failure requesting the contract:\n" + contract_request.statusText);
   };
   contract_request.send(null);
 }
@@ -144,45 +181,55 @@ function pay(form)
 
 /* The following event gets fired whenever a customer has a Taler
    wallet installed in his browser. In that case, the webmaster can decide
-   whether or not displaying Taler as a payment option */
+   whether or not to display/enable Taler as a payment option in the dialog. */
 function has_taler_wallet_cb(aEvent)
 {
-
   // enable the Taler payment option from the form
   var tbutton = document.getElementById("taler-radio-button-id");
   tbutton.removeAttribute("disabled");
   tbutton.setAttribute("checked", "true");
- 
 };
 
-/* Function called when the Taler extension was unloaded, 
-   here we disable the option */
+
+/* Function called when the Taler extension was unloaded;
+   here we disable the Taler option and check "Lisa", as
+   some "valid" option should always be selected. */
 function taler_wallet_unload_cb(aEvent)
 {
   var tbutton = document.getElementById("taler-radio-button-id");
   tbutton.setAttribute("disabled", "true");
+  var lbutton = document.getElementById("lisa-radio-button-id");
+  lbutton.setAttribute("checked", "true");
 };
 
-/* The merchant signals its taler-friendlyness to the client */
+
+/* The merchant signals its taler-friendlyness to the wallet,
+   thereby causing the wallet to make itself more visible in the menu. */
 function signal_me()
 {
   var eve = new Event('taler-checkout-probe');
   document.body.dispatchEvent(eve);
-  //alert("signaling");
 };
 
+
+// function included to be run to test the page despite a
+// wallet not being present in the browser.  Enables the
+// Taler option. NOT needed in real deployments.
 function test_without_wallet(){
   var tbutton = document.getElementById("taler-radio-button-id");
   tbutton.removeAttribute("disabled");
 };
+
+
+// /////////////// Main logic run on load ////////////////////////
 
 // Register event to be triggered by the wallet as a response to our
 // first event
 document.body.addEventListener("taler-wallet-present",
                                has_taler_wallet_cb,
 			       false);
+
 // event awaited by the wallet to change its button's color
-// alert("sending");
 // var eve = new Event('taler-payment-mfirst');
 // document.body.dispatchEvent(eve);
 
