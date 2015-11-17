@@ -92,8 +92,8 @@ if ($status_code != 200)
 }
 else
 {
-  echo $resp->body->toString ();
-  //echo "Payment succeeded!\n";
+  header("Content-Type", "text/html");
+  echo '<html><title>GNU Taler payment</title><body>Payment succeeded!</body></html>\n';
 }
 
 ?>
