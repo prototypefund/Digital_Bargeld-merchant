@@ -92,8 +92,14 @@ if ($status_code != 200)
 }
 else
 {
-  header("Content-Type", "text/html");
-  echo '<html><title>GNU Taler payment</title><body>Payment succeeded!</body></html>\n';
+  /*$resp_page = "<html><title>GNU Taler payment</title>"
+  . "<body>Payment succeeded! Go to <a href=\"http://"
+  . $_SERVER["SERVER_NAME"] . "\">our homepage</a></body></html>"; 
+  header("Content-Type", "text/html");*/
+  $resp_page = "<html><title>GNU Taler payment</title>"
+  . "<body>Payment succeeded!</body></html>";
+
+  echo $resp_page;
 }
 
 ?>
