@@ -99,7 +99,7 @@ else
   /*$resp_page = "<html><title>GNU Taler payment</title>"
   . "<body>Payment succeeded!</body></html>";*/
 
-  echo "http://" + $_SERVER['SERVER_NAME'];
+  echo "http://" . $_SERVER['SERVER_NAME'] . "/fullfillment";
 }
 
 ?>
