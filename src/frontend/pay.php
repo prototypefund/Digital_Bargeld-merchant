@@ -94,12 +94,12 @@ else
 {
   /*$resp_page = "<html><title>GNU Taler payment</title>"
   . "<body>Payment succeeded! Go to <a href=\"http://"
-  . $_SERVER["SERVER_NAME"] . "\">our homepage</a></body></html>"; 
+  . $_SERVER["SERVER_NAME"] . "\">our homepage</a></body></html>";
   header("Content-Type", "text/html");*/
-  $resp_page = "<html><title>GNU Taler payment</title>"
-  . "<body>Payment succeeded!</body></html>";
+  /*$resp_page = "<html><title>GNU Taler payment</title>"
+  . "<body>Payment succeeded!</body></html>";*/
 
-  echo $resp_page;
+  echo "http://" + $_SERVER['SERVER_NAME'];
 }
 
 ?>
