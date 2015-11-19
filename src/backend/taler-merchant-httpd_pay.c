@@ -278,6 +278,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct TALER_Amount acc_fee;
   struct TALER_Amount coin_fee;
   struct TALER_Amount amount;
+  struct TALER_Amount percoin_amount;
   struct GNUNET_TIME_Absolute edate;
   struct GNUNET_TIME_Absolute timestamp;
   struct GNUNET_TIME_Absolute refund_deadline;
@@ -293,6 +294,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     TMH_PARSE_member_array ("coins", &coins),
     TMH_PARSE_member_string ("mint", &chosen_mint),
     TMH_PARSE_member_amount ("max_fee", &max_fee),
+    TMH_PARSE_member_amount ("amount", &amount),
     TMH_PARSE_member_time_abs ("timestamp", &timestamp),
     TMH_PARSE_member_time_abs ("refund_deadline", &refund_deadline),
     TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
@@ -301,7 +303,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   };
 
   struct TMH_PARSE_FieldSpecification coin_aggregate_spec[] = {
-    TMH_PARSE_member_amount ("f", &amount),
+    TMH_PARSE_member_amount ("f", &percoin_amount),
     TMH_PARSE_member_fixed ("coin_pub", &coin_pub.eddsa_pub),
     TMH_PARSE_member_denomination_public_key ("denom_pub", &denom_pub),
     TMH_PARSE_member_denomination_signature ("ub_sig", &ub_sig),
@@ -511,7 +513,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     percoin_dcc->pc = pc;
 
     dh = TALER_MINT_deposit (mints[mint_index].conn,
-                             &amount,
+                             &percoin_amount,
 			     edate,
 			     wire_details,
 			     &h_contract,
