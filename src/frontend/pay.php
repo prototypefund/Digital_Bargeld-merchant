@@ -92,15 +92,9 @@ if ($status_code != 200)
 }
 else
 {
-  /*$resp_page = "<html><title>GNU Taler payment</title>"
-  . "<body>Payment succeeded! Go to <a href=\"http://"
-  . $_SERVER["SERVER_NAME"] . "\">our homepage</a></body></html>";*/
-  header("Content-Type", "application/json");
-  /*$resp_page = "<html><title>GNU Taler payment</title>"
-  . "<body>Payment succeeded!</body></html>";*/
-
-  $ffill_obj = array ("fullfillment_page" => "http://" . $_SERVER['SERVER_NAME'] . "/fullfillment");
-  echo json_encode ($ffill_obj);
+http_response_code (301);
+header("Location: http://" . $_SERVER["SERVER_NAME"] . "/fullfillment");
+die();
 }
 
 ?>
