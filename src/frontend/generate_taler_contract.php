@@ -167,7 +167,7 @@ http_response_code ($status_code);
 // Now generate our body  
 if ($status_code != 200)
 {
-  echo "Error while generating the contract, response code: " . $status_code . "\n";
+  echo "Error while generating the contract";
 }
 else
 {

@@ -37,12 +37,12 @@ if ($_GET['backend_test'] == 'no')
 }
 
 session_start();
-$receiver = $_SESSION['receiver'];
 
-if (! $receiver)
-  echo "Please buy something before landing here!";
+
+if (! isset ($_SESSION['payment_ok']))
+  echo "Please land here after a successful payment!";
 else
-  echo "Thanks for donating to " . $receiver;
+  echo "Thanks for donating to " . $_SESSION['receiver'];
 
 ?>
 

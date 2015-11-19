@@ -25,6 +25,15 @@
 
 */
 
+session_start();
+
+if (! isset($_SESSION['receiver']))
+{
+  http_response_code(400);
+  echo "Please, donate to someone before landing here!";
+  exit();
+}
+
 $cli_debug = false;
 $backend_test = true;
 
@@ -92,6 +101,7 @@ if ($status_code != 200)
 }
 else
 {
+$_SESSION['payment_ok'] = true;
 http_response_code (301);
 header("Location: http://" . $_SERVER["SERVER_NAME"] . "/fullfillment");
 die();
