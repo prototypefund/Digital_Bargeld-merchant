@@ -25,9 +25,21 @@
 
 */
 
+$cli_debug = false;
+$backend_test = true;
+
+if ($_GET['cli_debug'] == 'yes')
+  $cli_debug = true;
+
+if ($_GET['backend_test'] == 'no')
+{
+  $cli_debug = true;
+  $backend_test = false;
+}
+
 session_start();
 
-if (! isset($_SESSION['receiver']))
+if (!$cli_debug && (! isset($_SESSION['receiver'])))
 {
   http_response_code(400);
   echo "Please, donate to someone before landing here!";
@@ -53,11 +65,15 @@ $edate = array ('edate' =>
                "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/");
 
 $deposit_permission = json_decode ($post_body, true);
-$max_fee = array ('max_fee' => array ('value' => 3,
-		                      'fraction' => 8,
-		                      'currency' => "KUDOS"));
 
-$new_deposit_permission = array_merge ($deposit_permission, $max_fee);
+$to_add = array ('max_fee' => array ('value' => 3,
+		                      'fraction' => 8,
+		                      'currency' => $_SESSION['currency']),
+                 'amount' => array ('value' => $_SESSION['amount_value'],
+                                     'fraction' => $_SESSION['amount_fraction'],
+		                     'currency' => $_SESSION['currency']));
+
+$new_deposit_permission = array_merge ($deposit_permission, $to_add);
 $new_deposit_permission_edate = array_merge ($new_deposit_permission, $edate);
 
 /* Craft the HTTP request, note that the backend
