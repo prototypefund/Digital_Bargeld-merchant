@@ -94,12 +94,13 @@ else
 {
   /*$resp_page = "<html><title>GNU Taler payment</title>"
   . "<body>Payment succeeded! Go to <a href=\"http://"
-  . $_SERVER["SERVER_NAME"] . "\">our homepage</a></body></html>";
-  header("Content-Type", "text/html");*/
+  . $_SERVER["SERVER_NAME"] . "\">our homepage</a></body></html>";*/
+  header("Content-Type", "application/json");
   /*$resp_page = "<html><title>GNU Taler payment</title>"
   . "<body>Payment succeeded!</body></html>";*/
 
-  echo "http://" + $_SERVER['SERVER_NAME'];
+  $ffill_obj = array ("fullfillment_page" => "http://" + $_SERVER['SERVER_NAME']);
+  echo json_encode ($ffill_obj);
 }
 
 ?>
