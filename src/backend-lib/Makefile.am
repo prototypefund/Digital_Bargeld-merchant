@@ -2,22 +2,12 @@
 AM_CPPFLAGS = -I$(top_srcdir)/src/include
 
 lib_LTLIBRARIES = \
-  libtalermerchant.la 
+  libtalermerchantdb.la
 
-include_HEADERS = \
-  taler_merchant_lib.h \
-  taler_merchant_contract_lib.h \
-  taler_merchant_deposit_lib.h
+libtalermerchantdb_la_SOURCES = \
+  merchant_db.c
 
-libtalermerchant_la_SOURCES = \
-  merchant_api_contract.c \
-  merchant_api_deposit.c \
-  taler_merchant_contract_lib.h \
-  taler_merchant_deposit_lib.h \
-  merchant_db.c merchant_db.h \
-  merchant.h
-
-libtalermerchant_la_LIBADD = \
+libtalermerchantdb_la_LIBADD = \
   $(LIBGCRYPT_LIBS) \
   -ltalerutil \
   -lgnunetutil \

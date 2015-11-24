@@ -6,7 +6,6 @@ bin_PROGRAMS = \
 
 taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd.c taler-merchant-httpd.h \
-  merchant.c merchant.h \
   ../backend-lib/merchant_db.c ../backend-lib/merchant_db.h \
   taler-mint-httpd_parsing.c taler-mint-httpd_parsing.h \
   taler-mint-httpd_responses.c taler-mint-httpd_responses.h \

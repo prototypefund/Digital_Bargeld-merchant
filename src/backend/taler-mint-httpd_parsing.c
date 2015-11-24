@@ -32,8 +32,8 @@
   'TMH_PARSE_nagivate_json ()' compile fine; so its value will be
   kept on some merchant's accepted currency. For multi currencies
   merchants, that of course would require a patch */
+extern char *TMH_merchant_currency_string;
 
-extern char *TMH_mint_currency_string;
 /**
  * Initial size for POST request buffer.
  */
@@ -634,7 +634,7 @@ TMH_PARSE_navigate_json (struct MHD_Connection *connection,
 
     case TMH_PARSE_JNC_RET_STRING:
       {
-        void **where = va_arg (argp, void **); 
+        void **where = va_arg (argp, void **);
         *where = (void*) json_string_value (root);
         ret = GNUNET_OK;
       }
@@ -876,7 +876,7 @@ TMH_PARSE_navigate_json (struct MHD_Connection *connection,
           break;
         }
         if (0 != strcmp (where->currency,
-                         TMH_mint_currency_string))
+                         TMH_merchant_currency_string))
         {
           GNUNET_break_op (0);
           ret = (MHD_YES !=

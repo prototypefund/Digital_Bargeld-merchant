@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014 Christian Grothoff (and other contributing authors)
+  (C) 2014, 2015 Christian Grothoff (and other contributing authors)
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -19,12 +19,20 @@
  * @brief database helper functions used by the merchant
  * @author Sree Harsha Totakura <sreeharsha@totakura.in>
  */
-
 #include "platform.h"
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_util.h>
 #include <taler/taler_pq_lib.h>
-#include "merchant_db.h"
+#include "taler_merchantdb_lib.h"
+
+/**
+ * Shorthand for exit jumps.
+ */
+#define EXITIF(cond)                                              \
+  do {                                                            \
+    if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
+  } while (0)
+
 
 
 #define PQSQL_strerror(kind, cmd, res)                \
@@ -245,6 +253,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
   return GNUNET_SYSERR;
 }
 
+
 /**
  * Update the pending column of a deposit permission
  * @param conn handle to DB
@@ -252,7 +261,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
  * update
  * @param pending true if still pending, false otherwise (i.e. the
  * mint did respond something)
- * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  */
 uint32_t
 MERCHANT_DB_update_deposit_permission (PGconn *conn,
@@ -265,7 +274,7 @@ MERCHANT_DB_update_deposit_permission (PGconn *conn,
   struct TALER_PQ_QueryParam params[] = {
     TALER_PQ_query_param_uint32 (&pending),
     TALER_PQ_query_param_uint64 (&transaction_id),
-    TALER_PQ_query_param_end  
+    TALER_PQ_query_param_end
   };
 
   res = TALER_PQ_exec_prepared (conn, "update_deposit_permission", params);
@@ -292,16 +301,18 @@ MERCHANT_DB_update_deposit_permission (PGconn *conn,
   }
 }
 
+
 /**
  * Store a deposit permission in DB. To be mainly used if /deposit should
  * be retried; also, the merchant can benefit from this information in case
- * he needs to later investigate about some transaction_id.
+ * he needs to later investigate about some @a transaction_id.
+ *
  * @param conn DB handle
  * @param transaction_id identification number of this payment (which is the
  * same id of the related contract)
  * @param pending if true, this payment got to a persistent state
  * @param which mint is to get this deposit permission
- * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  */
 uint32_t
 MERCHANT_DB_store_deposit_permission (PGconn *conn,
@@ -312,14 +323,14 @@ MERCHANT_DB_store_deposit_permission (PGconn *conn,
 {
   PGresult *res;
   ExecStatusType status;
-
   struct TALER_PQ_QueryParam params[] = {
     TALER_PQ_query_param_fixed_size (deposit_permission, strlen (deposit_permission)),
     TALER_PQ_query_param_uint64 (&transaction_id),
-    TALER_PQ_query_param_uint32 (&pending),  
+    TALER_PQ_query_param_uint32 (&pending),
     TALER_PQ_query_param_fixed_size (mint_url, strlen (mint_url)),
-    TALER_PQ_query_param_end  
+    TALER_PQ_query_param_end
   };
+
   res = TALER_PQ_exec_prepared (conn, "store_deposit_permission", params);
   status = PQresultStatus (res);
 
@@ -351,33 +362,33 @@ MERCHANT_DB_store_deposit_permission (PGconn *conn,
     PQclear (res);
     return GNUNET_SYSERR;
   }
-  
+
     PQclear (res);
     return GNUNET_OK;
 }
 
-/**
-* Insert a contract record into the database and if successfull
-* return the serial number of the inserted row.
-*
-* @param conn the database connection
-* @param timestamp the timestamp of this contract
-* @param expiry the time when the contract will expire
-* @param edate when the merchant wants to receive the wire transfer
-* corresponding to this deal (this value is also a field inside the
-* 'wire' JSON format)
-* @param refund deadline until which the merchant can return the paid
-* amount
-* @param amount the taler amount corresponding to the contract
-* @param hash of the stringified JSON corresponding to this contract
-* @param c_id contract's id
-* @param desc descripition of the contract
-* @param nounce a random 64-bit nounce
-* @param product description to identify a product
-* @return GNUNET_OK on success, GNUNET_NO if attempting to insert an
-* already inserted @a c_id, GNUNET_SYSERR for other errors.
-*/
 
+/**
+ * Insert a contract record into the database and if successfull
+ * return the serial number of the inserted row.
+ *
+ * @param conn the database connection
+ * @param timestamp the timestamp of this contract
+ * @param expiry the time when the contract will expire
+ * @param edate when the merchant wants to receive the wire transfer
+ * corresponding to this deal (this value is also a field inside the
+ * 'wire' JSON format)
+ * @param refund deadline until which the merchant can return the paid
+ * amount
+ * @param amount the taler amount corresponding to the contract
+ * @param hash of the stringified JSON corresponding to this contract
+ * @param c_id contract's id
+ * @param desc descripition of the contract
+ * @param nounce a random 64-bit nounce
+ * @param product description to identify a product
+ * @return #GNUNET_OK on success, #GNUNET_NO if attempting to insert an
+ * already inserted @a c_id, #GNUNET_SYSERR for other errors.
+ */
 uint32_t
 MERCHANT_DB_contract_create (PGconn *conn,
                              const struct GNUNET_TIME_Absolute timestamp,
@@ -392,16 +403,16 @@ MERCHANT_DB_contract_create (PGconn *conn,
                              uint64_t product)
 {
   PGresult *res;
-  #if 0
+#if 0
   uint64_t expiry_ms_nbo;
   uint64_t value_nbo;
   uint32_t fraction_nbo;
   uint64_t nounce_nbo;
-  #endif
+#endif
   ExecStatusType status;
 
   struct TALER_PQ_QueryParam params[] = {
-    TALER_PQ_query_param_uint64 (&c_id), 
+    TALER_PQ_query_param_uint64 (&c_id),
     TALER_PQ_query_param_fixed_size (h_contract, sizeof (struct GNUNET_HashCode)),
     TALER_PQ_query_param_absolute_time (&timestamp),
     TALER_PQ_query_param_absolute_time (&expiry),
@@ -412,11 +423,11 @@ MERCHANT_DB_contract_create (PGconn *conn,
     though the column is declared as *blob*. Will this be
     liked by the DB ? */
     TALER_PQ_query_param_fixed_size (desc, strlen (desc)),
-    TALER_PQ_query_param_uint64 (&nounce), 
+    TALER_PQ_query_param_uint64 (&nounce),
     TALER_PQ_query_param_uint64 (&product),
     TALER_PQ_query_param_end
   };
-  
+
   /* NOTE: the statement is prepared by MERCHANT_DB_initialize function */
   res = TALER_PQ_exec_prepared (conn, "contract_create", params);
   status = PQresultStatus (res);
@@ -450,8 +461,8 @@ MERCHANT_DB_contract_create (PGconn *conn,
 
   PQclear (res);
   return GNUNET_OK;
-
 }
+
 
 long long
 MERCHANT_DB_get_contract_product (PGconn *conn,
@@ -482,6 +493,7 @@ MERCHANT_DB_get_contract_product (PGconn *conn,
   PQclear (res);
   return -1;
 }
+
 
 unsigned int
 MERCHANT_DB_checkout_create (PGconn *conn,
@@ -552,21 +564,19 @@ MERCHANT_DB_get_checkout_product (PGconn *conn,
   PQclear (res);
   return -1;
 }
-/* end of merchant-db.c */
 
 
 /**
-* The query gets a contract's nounce and edate used to reproduce
-* a 'wire' JSON object. This function is also useful to check whether
-* a claimed contract existed or not.
-* @param conn handle to the DB
-* @param h_contract the parameter for the row to match against
-* @param nounce where to store the found nounce
-* @param edate where to store the found edate
-* @return GNUNET_OK on success, GNUNET_SYSERR upon errors
-*
-*/
-
+ * The query gets a contract's nounce and edate used to reproduce
+ * a 'wire' JSON object. This function is also useful to check whether
+ * a claimed contract existed or not.
+ *
+ * @param conn handle to the DB
+ * @param h_contract the parameter for the row to match against
+ * @param nounce where to store the found nounce
+ * @param edate where to store the found edate
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR upon errors
+ */
 uint32_t
 MERCHANT_DB_get_contract_values (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
@@ -580,13 +590,12 @@ MERCHANT_DB_get_contract_values (PGconn *conn,
       TALER_PQ_query_param_fixed_size (h_contract, sizeof (struct GNUNET_HashCode)),
       TALER_PQ_query_param_end
   };
-
   struct TALER_PQ_ResultSpec rs[] = {
    TALER_PQ_result_spec_uint64 ("nounce", nounce),
    TALER_PQ_result_spec_absolute_time ("edate", edate),
    TALER_PQ_result_spec_end
   };
- 
+
   res = TALER_PQ_exec_prepared (conn, "get_contract_hash", params);
 
   status = PQresultStatus (res);
@@ -607,16 +616,16 @@ MERCHANT_DB_get_contract_values (PGconn *conn,
   return GNUNET_SYSERR;
 }
 
-/**
-* Get a set of values representing a contract. This function is meant
-* to obsolete the '_get_contract_values' version.
-* @param h_contract the hashcode of this contract
-* @param contract_handle where to store the results
-* @raturn GNUNET_OK in case of success, GNUNET_SYSERR
-* upon errors
-*
-*/
 
+/**
+ * Get a set of values representing a contract. This function is meant
+ * to obsolete the '_get_contract_values' version.
+ *
+ * @param h_contract the hashcode of this contract
+ * @param contract_handle where to store the results
+ * @raturn GNUNET_OK in case of success, GNUNET_SYSERR
+ * upon errors
+ */
 uint32_t
 MERCHANT_DB_get_contract_handle (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
@@ -639,9 +648,8 @@ MERCHANT_DB_get_contract_handle (PGconn *conn,
    TALER_PQ_result_spec_uint64 ("contract_id", &ch.contract_id),
    TALER_PQ_result_spec_end
   };
- 
-  res = TALER_PQ_exec_prepared (conn, "get_contract_set", params);
 
+  res = TALER_PQ_exec_prepared (conn, "get_contract_set", params);
   status = PQresultStatus (res);
   EXITIF (PGRES_TUPLES_OK != status);
   if (0 == PQntuples (res))

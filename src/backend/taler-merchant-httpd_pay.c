@@ -18,7 +18,6 @@
  * @brief HTTP serving layer mainly intended to communicate with the frontend
  * @author Marcello Stanisci
  */
-
 #include "platform.h"
 #include <microhttpd.h>
 #include <jansson.h>
@@ -33,9 +32,41 @@
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_responses.h"
 #include "taler-mint-httpd_mhd.h"
-#include "merchant_db.h"
-#include "merchant.h"
-#include "taler_merchant_lib.h"
+#include "taler_merchantdb_lib.h"
+
+
+/**
+ * Outcome of a /deposit request for a coin. Typically forming an array enclosed
+ * into the unique PayContext
+ */
+struct MERCHANT_DepositConfirmation
+{
+  /**
+   * Reference to the per-deposit-handler Context. Needed by the
+   * cleanup function to get it freed
+   */
+  struct DepositCallbackContext *dcc;
+
+  /**
+   * The mint's response body (JSON). Mainly useful in case
+   * some callback needs to send back to the to the wallet the
+   * outcome of an erroneous coin
+   */
+  json_t *proof;
+
+  /**
+   * True if this coin's outcome has been read from
+   * its cb
+   */
+  unsigned int ackd;
+
+  /**
+   * The mint's response to this /deposit
+   */
+  unsigned int exit_status;
+
+};
+
 
 
 /**
@@ -73,9 +104,9 @@ deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
   if (GNUNET_OK != res)
     return res; /* may return GNUNET_NO */
 
-  if (1 == mints[mint_index].pending)
+  if (1 == mints[mint_index]->pending)
     return GNUNET_SYSERR;
-  keys = TALER_MINT_get_keys (mints[mint_index].conn);
+  keys = TALER_MINT_get_keys (mints[mint_index]->conn);
   denom_details = TALER_MINT_get_denomination_key (keys, &denom);
   if (NULL == denom_details)
   {
@@ -203,7 +234,7 @@ deposit_cb (void *cls,
       return;
     }
   }
-  
+
   printf ("All /deposit(s) ack'd\n");
 
   dcc->pc->response = MHD_create_response_from_buffer (strlen ("All coins ack'd by the mint\n"),
@@ -386,7 +417,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     }
 
     /* test it by checking public key */
-    if (0 == strcmp (mints[mint_index].hostname,
+    if (0 == strcmp (mints[mint_index]->hostname,
                      chosen_mint))
       break;
 
@@ -498,7 +529,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                                            deposit_permission_str,
 			                                   transaction_id,
 					                   1,
-					                   mints[mint_index].hostname))
+					                   mints[mint_index]->hostname))
       return TMH_RESPONSE_reply_internal_error (connection, "internal DB failure");
     res = TMH_PARSE_json_data (connection,
                                coin_aggregate,
@@ -512,7 +543,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     percoin_dcc->index = coins_index;
     percoin_dcc->pc = pc;
 
-    dh = TALER_MINT_deposit (mints[mint_index].conn,
+    dh = TALER_MINT_deposit (mints[mint_index]->conn,
                              &percoin_amount,
 			     edate,
 			     wire_details,
@@ -535,13 +566,13 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       return TMH_RESPONSE_reply_json_pack (connection,
                                            MHD_HTTP_SERVICE_UNAVAILABLE,
 		                           "{s:s, s:i}",
-				           "mint", mints[mint_index].hostname,
+				           "mint", mints[mint_index]->hostname,
 				           "transaction_id", transaction_id);
     }
   }
 
-  GNUNET_SCHEDULER_cancel (poller_task);
-  GNUNET_SCHEDULER_add_now (context_task, mints[mint_index].ctx);
+  GNUNET_SCHEDULER_cancel (mints[mint_index]->poller_task);
+  GNUNET_SCHEDULER_add_now (context_task, mints[mint_index]->ctx);
   return MHD_YES;
 
   /* 4 Return response code: success, or whatever data the

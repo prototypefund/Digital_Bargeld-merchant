@@ -19,13 +19,86 @@
  * @author Marcello Stanisci
  */
 
-#include "merchant_db.h"
+#include "platform.h"
+#include "taler_merchantdb_lib.h"
 
 /**
- * Kick MHD to run now, to be called after MHD_resume_connection().
+ * Shorthand for exit jumps.
  */
-void
-TM_trigger_daemon (void);
+#define EXITIF(cond)                                              \
+  do {                                                            \
+    if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
+  } while (0)
+
+
+/**
+ * Mint
+ */
+struct MERCHANT_Mint
+{
+  /**
+   * Hostname
+   */
+  char *hostname;
+
+  /**
+   * A connection to this mint
+   */
+  struct TALER_MINT_Handle *conn;
+
+  /**
+   * This mint's context (useful to the event loop)
+   */
+  struct TALER_MINT_Context *ctx;
+
+  /**
+   * Task we use to drive the interaction with this mint.
+   */
+  struct GNUNET_SCHEDULER_Task *poller_task;
+
+  /**
+   * Flag which indicates whether some HTTP transfer between
+   * this merchant and the mint is still ongoing
+   */
+  int pending;
+
+};
+
+
+struct MERCHANT_WIREFORMAT_Sepa
+{
+  /**
+   * The international bank account number
+   */
+  char *iban;
+
+  /**
+   * Name of the bank account holder
+   */
+  char *name;
+
+  /**
+   *The bank identification code
+   */
+  char *bic;
+
+  /**
+   * The latest payout date when the payment corresponding to this account has
+   * to take place.  A value of 0 indicates a transfer as soon as possible.
+   */
+  struct GNUNET_TIME_AbsoluteNBO payout;
+};
+
+
+struct MERCHANT_Auditor
+{
+  /**
+   * Auditor's legal name
+   */
+  char *name;
+
+};
+
 
 
 struct TM_HandlerContext;
@@ -48,9 +121,14 @@ struct TM_HandlerContext
 
 };
 
-extern struct MERCHANT_Mint *mints;
 
 extern struct MERCHANT_WIREFORMAT_Sepa *wire;
+
+
+extern struct MERCHANT_Mint **mints;
+
+extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
+
 
 extern PGconn *db_conn;
 
@@ -60,11 +138,29 @@ extern unsigned int nmints;
 
 extern struct GNUNET_TIME_Relative edate_delay;
 
-extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
-
-extern struct GNUNET_SCHEDULER_Task *poller_task;
-
 
 void
 context_task (void *cls,
               const struct GNUNET_SCHEDULER_TaskContext *tc);
+
+
+
+
+/**
+ * Take the global wire details and return a JSON containing them,
+ * compliantly with the Taler's API.
+ *
+ * @param wire the merchant's wire details
+ * @param salt the nounce for hashing the wire details with
+ * @return JSON representation of the wire details, NULL upon errors
+ */
+json_t *
+MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
+                        uint64_t salt);
+
+
+/**
+ * Kick MHD to run now, to be called after MHD_resume_connection().
+ */
+void
+TM_trigger_daemon (void);

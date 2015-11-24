@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014 Christian Grothoff (and other contributing authors)
+  (C) 2014, 2015 Christian Grothoff (and other contributing authors)
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -15,8 +15,8 @@
 */
 
 /**
- * @file merchant/merchant_db.h
- * @brief database helper functions used by the merchant
+ * @file include/taler_merchantdb_lib.h
+ * @brief database helper functions used by the merchant backend
  * @author Sree Harsha Totakura <sreeharsha@totakura.in>
  */
 
@@ -25,6 +25,8 @@
 
 #include <gnunet/gnunet_postgres_lib.h>
 #include <taler/taler_util.h>
+
+
 
 /* Set of values that represent a contract. To be expanded on an
   as-needed basis */
@@ -82,24 +84,23 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp);
 
 
 /**
-* Inserts a contract record into the database and if successfull returns the
-* serial number of the inserted row.
-*
-* @param conn the database connection
-* @param timestamp the timestamp of this contract
-* @param expiry the time when the contract will expire
-* @param edate when the merchant wants to receive the wire transfer corresponding
-* to this deal (this value is also a field inside the 'wire' JSON format)
-* @param refund deadline until which the merchant can return the paid amount
-* @param amount the taler amount corresponding to the contract
-* @param hash of the stringified JSON corresponding to this contract
-* @param c_id contract's id
-* @param desc descripition of the contract
-* @param nounce a random 64-bit nounce
-* @param product description to identify a product
-* @return GNUNET_OK on success, GNUNET_SYSERR upon error
-*/
-
+ * Inserts a contract record into the database and if successfull returns the
+ * serial number of the inserted row.
+ *
+ * @param conn the database connection
+ * @param timestamp the timestamp of this contract
+ * @param expiry the time when the contract will expire
+ * @param edate when the merchant wants to receive the wire transfer corresponding
+ * to this deal (this value is also a field inside the 'wire' JSON format)
+ * @param refund deadline until which the merchant can return the paid amount
+ * @param amount the taler amount corresponding to the contract
+ * @param hash of the stringified JSON corresponding to this contract
+ * @param c_id contract's id
+ * @param desc descripition of the contract
+ * @param nounce a random 64-bit nounce
+ * @param product description to identify a product
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ */
 uint32_t
 MERCHANT_DB_contract_create (PGconn *conn,
                              const struct GNUNET_TIME_Absolute timestamp,
@@ -113,18 +114,21 @@ MERCHANT_DB_contract_create (PGconn *conn,
                              uint64_t nounce,
                              uint64_t product);
 
+
 long long
 MERCHANT_DB_get_contract_product (PGconn *conn,
                                   uint64_t contract_id);
 
+
 /**
  * Update the pending column of a deposit permission
+ *
  * @param conn handle to DB
  * @param transaction_id identification number of the deposit to
  * update
  * @param pending true if still pending, false otherwise (i.e. the
  * mint did respond something)
- * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  */
 uint32_t
 MERCHANT_DB_update_deposit_permission (PGconn *conn,
@@ -144,17 +148,16 @@ MERCHANT_DB_get_checkout_product (PGconn *conn,
                                   struct GNUNET_CRYPTO_rsa_PublicKey *coin_pub);
 
 /**
-* The query gets a contract's nounce and edate used to reproduce
-* a 'wire' JSON object. This function is also useful to check whether
-* a claimed contract existed or not.
-* @param conn handle to the DB
-* @param h_contract the parameter for the row to match against
-* @param nounce where to store the found nounce
-* @param edate where to store the found edate
-* @return GNUNET_OK on success, GNUNET_SYSERR upon errors
-*
-*/
-
+ * The query gets a contract's nounce and edate used to reproduce
+ * a 'wire' JSON object. This function is also useful to check whether
+ * a claimed contract existed or not.
+ *
+ * @param conn handle to the DB
+ * @param h_contract the parameter for the row to match against
+ * @param nounce where to store the found nounce
+ * @param edate where to store the found expiration date
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR upon errors
+ */
 uint32_t
 MERCHANT_DB_get_contract_values (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
@@ -164,15 +167,14 @@ MERCHANT_DB_get_contract_values (PGconn *conn,
 #endif  /* MERCHANT_DB_H */
 
 /**
-* Get a set of values representing a contract. This function is meant
-* to obsolete the '_get_contract_values' version.
-* @param h_contract the hashcode of this contract
-* @param contract_handle where to store the results
-* @raturn GNUNET_OK in case of success, GNUNET_SYSERR
-* upon errors
-*
-*/
-
+ * Get a set of values representing a contract. This function is meant
+ * to obsolete the '_get_contract_values' version.
+ *
+ * @param h_contract the hashcode of this contract
+ * @param contract_handle where to store the results
+ * @raturn #GNUNET_OK in case of success, #GNUNET_SYSERR
+ * upon errors
+ */
 uint32_t
 MERCHANT_DB_get_contract_handle (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
@@ -187,7 +189,7 @@ MERCHANT_DB_get_contract_handle (PGconn *conn,
  * same id of the related contract)
  * @param pending if true, this payment got to a persistent state
  * @param which mint is to get this deposit permission
- * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  */
 uint32_t
 MERCHANT_DB_store_deposit_permission (PGconn *conn,

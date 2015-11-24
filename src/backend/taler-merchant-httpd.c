@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014 Christian Grothoff (and other contributing authors)
+  (C) 2014, 2015 Christian Grothoff (and other contributing authors)
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -30,13 +30,28 @@
 #include <taler/taler_mint_service.h>
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_responses.h"
-#include "merchant_db.h"
-#include "merchant.h"
-#include "taler_merchant_lib.h"
+#include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
 #include "taler-mint-httpd_mhd.h"
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
+
+
+
+/**
+ * Merchant's private key
+ */
+struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
+
+/**
+ * Our wireformat
+ */
+struct MERCHANT_WIREFORMAT_Sepa *wire;
+
+/**
+ * Salt used to hash the wire object
+ */
+long long salt;
 
 /**
  * Our hostname
@@ -49,14 +64,9 @@ static char *hostname;
 static long long unsigned port;
 
 /**
- * Merchant's private key
- */
-struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
-
-/**
  * File holding the merchant's private key
  */
-char *keyfile;
+static char *keyfile;
 
 /**
  * This value tells the mint by which date this merchant would like
@@ -65,14 +75,14 @@ char *keyfile;
 struct GNUNET_TIME_Relative edate_delay;
 
 /**
- * To make 'TMH_PARSE_navigate_json ()' compile
+ * Which currency is supported by this merchant?
  */
-char *TMH_mint_currency_string;
+char *TMH_merchant_currency_string;
 
 /**
- * Trusted mints
+ * Trusted mints (FIXME: they are NOT all trusted!).
  */
-struct MERCHANT_Mint *mints;
+struct MERCHANT_Mint **mints;
 
 /**
  * Active auditors
@@ -90,22 +100,7 @@ static struct GNUNET_SCHEDULER_Task *shutdown_task;
 static struct GNUNET_SCHEDULER_Task *mhd_task;
 
 /**
- * Context "poller" identifier
- */
-struct GNUNET_SCHEDULER_Task *poller_task;
-
-/**
- * Our wireformat
- */
-struct MERCHANT_WIREFORMAT_Sepa *wire;
-
-/**
- * Salt used to hash the wire object
- */
-long long salt;
-
-/**
- * The number of accepted mints
+ * Length of the #mints array.
  */
 unsigned int nmints;
 
@@ -133,6 +128,36 @@ PGconn *db_conn;
  * The MHD Daemon
  */
 static struct MHD_Daemon *mhd;
+
+
+/**
+ * Take the global wire details and return a JSON containing them,
+ * compliantly with the Taler's API.
+ *
+ * @param wire the merchant's wire details
+ * @param salt the nounce for hashing the wire details with
+ * @param edate when the beneficiary wants this transfer to take place
+ * @return JSON representation of the wire details, NULL upon errors
+ */
+json_t *
+MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
+                        uint64_t salt)
+
+{
+  json_t *root;
+  json_t *j_salt;
+
+  j_salt = json_integer (salt);
+  if (NULL == (root = json_pack ("{s:s, s:s, s:s, s:s, s:I}",
+                                 "type", "SEPA",
+		                 "IBAN", wire->iban,
+		                 "name", wire->name,
+		                 "bic", wire->bic,
+		                 "r", json_integer_value (j_salt))))
+    return NULL;
+  return root;
+}
+
 
 /**
  * A client has requested the given url using the given method
@@ -255,6 +280,7 @@ url_handler (void *cls,
 
 }
 
+
 /**
  * Function called with information about who is auditing
  * a particular mint and what key the mint is using.
@@ -288,7 +314,6 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
   }
   else
     printf ("no keys gotten\n");
-
 }
 
 
@@ -306,14 +331,13 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 
   for (cnt = 0; cnt < nmints; cnt++)
   {
-    if (NULL != mints[cnt].conn)
-      TALER_MINT_disconnect (mints[cnt].conn);
-
-  }
-  if (NULL != poller_task)
-  {
-    GNUNET_SCHEDULER_cancel (poller_task);
-    poller_task = NULL;
+    if (NULL != mints[cnt]->conn)
+      TALER_MINT_disconnect (mints[cnt]->conn);
+    if (NULL != mints[cnt]->poller_task)
+    {
+      GNUNET_SCHEDULER_cancel (mints[cnt]->poller_task);
+      mints[cnt]->poller_task = NULL;
+    }
   }
   if (NULL != mhd_task)
   {
@@ -338,13 +362,14 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 /**
  * Task that runs the context's event loop using the GNUnet scheduler.
  *
- * @param cls mint context
+ * @param cls a `struct MERCHANT_Mint *`
  * @param tc scheduler context (unused)
  */
 void
 context_task (void *cls,
               const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
+  struct MERCHANT_Mint *mint = cls;
   long timeout;
   int max_fd;
   fd_set read_fd_set;
@@ -353,17 +378,15 @@ context_task (void *cls,
   struct GNUNET_NETWORK_FDSet *rs;
   struct GNUNET_NETWORK_FDSet *ws;
   struct GNUNET_TIME_Relative delay;
-  struct TALER_MINT_Context *ctx;
 
-  ctx = (struct TALER_MINT_Context *) cls;
-  poller_task = NULL;
-  TALER_MINT_perform (ctx);
+  mint->poller_task = NULL;
+  TALER_MINT_perform (mint->ctx);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
   FD_ZERO (&write_fd_set);
   FD_ZERO (&except_fd_set);
-  TALER_MINT_get_select_info (ctx,
+  TALER_MINT_get_select_info (mint->ctx,
                               &read_fd_set,
                               &write_fd_set,
                               &except_fd_set,
@@ -383,13 +406,13 @@ context_task (void *cls,
   GNUNET_NETWORK_fdset_copy_native (ws,
                                     &write_fd_set,
                                     max_fd + 1);
-  poller_task =
-  GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_DEFAULT,
-                               delay,
-                               rs,
-                               ws,
-                               &context_task,
-                               cls);
+  mint->poller_task =
+    GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_DEFAULT,
+                                 delay,
+                                 rs,
+                                 ws,
+                                 &context_task,
+                                 mint);
   GNUNET_NETWORK_fdset_destroy (rs);
   GNUNET_NETWORK_fdset_destroy (ws);
 }
@@ -461,6 +484,191 @@ TM_trigger_daemon ()
 
 
 /**
+ * Parses mints listed in the configuration.
+ *
+ * @param cfg the configuration
+ * @return the number of mints in the above array; #GNUNET_SYSERR upon error in
+ *          parsing.
+ */
+static int
+parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg)
+{
+  char *mints_str;
+  char *token_nf;               /* do no free (nf) */
+  char *mint_section;
+  char *mint_hostname;
+  struct MERCHANT_Mint **r_mints;
+  struct MERCHANT_Mint *mint;
+  unsigned int cnt;
+  int ok;
+
+  ok = 0;
+  mints_str = NULL;
+  token_nf = NULL;
+  mint_section = NULL;
+  mint_hostname = NULL;
+  r_mints = NULL;
+  cnt = 0;
+  EXITIF (GNUNET_OK !=
+          GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                 "merchant",
+                                                 "TRUSTED_MINTS",
+                                                 &mints_str));
+  for (token_nf = strtok (mints_str, " ");
+       NULL != token_nf;
+       token_nf = strtok (NULL, " "))
+  {
+    GNUNET_assert (0 < GNUNET_asprintf (&mint_section,
+                                        "mint-%s", token_nf));
+    EXITIF (GNUNET_OK !=
+            GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                   mint_section,
+                                                   "HOSTNAME",
+                                                   &mint_hostname));
+    mint = GNUNET_new (struct MERCHANT_Mint);
+    mint->hostname = mint_hostname;
+    GNUNET_array_append (r_mints,
+                         cnt,
+                         mint);
+    GNUNET_free (mint_section);
+    mint_section = NULL;
+  }
+  ok = 1;
+
+ EXITIF_exit:
+  GNUNET_free_non_null (mints_str);
+  GNUNET_free_non_null (mint_section);
+  GNUNET_free_non_null (mint_hostname);
+  if (! ok)
+  {
+    GNUNET_free_non_null (r_mints);
+    return GNUNET_SYSERR;
+  }
+  mints = r_mints;
+  return cnt;
+}
+
+
+/**
+ * Parses auditors from the configuration.
+ *
+ * @param cfg the configuration
+ * @param mints the array of auditors upon successful parsing.  Will be NULL upon
+ *          error.
+ * @return the number of auditors in the above array; #GNUNET_SYSERR upon error in
+ *          parsing.
+ */
+static int
+parse_auditors (const struct GNUNET_CONFIGURATION_Handle *cfg,
+                struct MERCHANT_Auditor **auditors)
+{
+  char *auditors_str;
+  char *token_nf;               /* do no free (nf) */
+  char *auditor_section;
+  char *auditor_name;
+  struct MERCHANT_Auditor *r_auditors;
+  struct MERCHANT_Auditor auditor;
+  unsigned int cnt;
+  int ok;
+
+  ok = 0;
+  auditors_str = NULL;
+  token_nf = NULL;
+  auditor_section = NULL;
+  auditor_name = NULL;
+  r_auditors = NULL;
+  cnt = 0;
+  EXITIF (GNUNET_OK !=
+          GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                 "merchant",
+                                                 "AUDITORS",
+                                                 &auditors_str));
+  for (token_nf = strtok (auditors_str, " ");
+       NULL != token_nf;
+       token_nf = strtok (NULL, " "))
+  {
+    GNUNET_assert (0 < GNUNET_asprintf (&auditor_section,
+                                        "auditor-%s", token_nf));
+    EXITIF (GNUNET_OK !=
+            GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                   auditor_section,
+                                                   "NAME",
+                                                   &auditor_name));
+    auditor.name = auditor_name;
+    GNUNET_array_append (r_auditors, cnt, auditor);
+    auditor_name = NULL;
+    GNUNET_free (auditor_section);
+    auditor_section = NULL;
+  }
+  ok = 1;
+
+ EXITIF_exit:
+  GNUNET_free_non_null (auditors_str);
+  GNUNET_free_non_null (auditor_section);
+  GNUNET_free_non_null (auditor_name);
+  if (! ok)
+  {
+    GNUNET_free_non_null (r_auditors);
+    return GNUNET_SYSERR;
+  }
+
+  *auditors = r_auditors;
+  return cnt;
+}
+
+
+/**
+ * Parse the SEPA information from the configuration.  If any of the required
+ * fileds is missing return NULL.
+ *
+ * @param cfg the configuration
+ * @return Sepa details as a structure; NULL upon error
+ */
+static struct MERCHANT_WIREFORMAT_Sepa *
+parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg)
+{
+  struct MERCHANT_WIREFORMAT_Sepa *wf;
+
+  wf = GNUNET_new (struct MERCHANT_WIREFORMAT_Sepa);
+  EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                              "wire-sepa",
+                                                              "IBAN",
+                                                              &wf->iban));
+  EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                              "wire-sepa",
+                                                              "NAME",
+                                                              &wf->name));
+  EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                              "wire-sepa",
+                                                              "BIC",
+                                                              &wf->bic));
+  return wf;
+
+ EXITIF_exit:
+  GNUNET_free_non_null (wf->iban);
+  GNUNET_free_non_null (wf->name);
+  GNUNET_free_non_null (wf->bic);
+  GNUNET_free (wf);
+  return NULL;
+}
+
+
+/**
+ * Destroy and free resouces occupied by the wireformat structure
+ *
+ * @param wf the wireformat structure
+ */
+static void
+destroy_wireformat_sepa (struct MERCHANT_WIREFORMAT_Sepa *wf)
+{
+  GNUNET_free_non_null (wf->iban);
+  GNUNET_free_non_null (wf->name);
+  GNUNET_free_non_null (wf->bic);
+  GNUNET_free (wf);
+}
+
+
+/**
  * Function that queries MHD's select sets and
  * starts the task waiting for them.
  *
@@ -510,7 +718,6 @@ prepare_daemon ()
 }
 
 
-
 /**
  * Main function that will be run by the scheduler.
  *
@@ -521,42 +728,42 @@ prepare_daemon ()
  * @param config configuration
  */
 void
-run (void *cls, char *const *args, const char *cfgfile,
+run (void *cls,
+     char *const *args,
+     const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
-
   unsigned int cnt;
-  mints = NULL;
-  keyfile = NULL;
+
   result = GNUNET_SYSERR;
   shutdown_task =
-  GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
-                                &do_shutdown,
-				NULL);
+    GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
+                                  &do_shutdown,
+                                  NULL);
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "merchant launched\n");
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "merchant launched\n");
 
   EXITIF (GNUNET_SYSERR ==
-         (nmints =
-	 TALER_MERCHANT_parse_mints (config,
-                                     &mints)));
+          (nmints =
+           parse_mints (config)));
   EXITIF (GNUNET_SYSERR ==
-         (nauditors =
-	 TALER_MERCHANT_parse_auditors (config,
-                                        &auditors)));
+          (nauditors =
+           parse_auditors (config,
+                           &auditors)));
   EXITIF (NULL ==
-         (wire =
-	 TALER_MERCHANT_parse_wireformat_sepa (config)));
+          (wire =
+           parse_wireformat_sepa (config)));
   EXITIF (GNUNET_OK !=
-         GNUNET_CONFIGURATION_get_value_filename (config,
-                                                  "merchant",
-                                                  "KEYFILE",
-                                                  &keyfile));
+          GNUNET_CONFIGURATION_get_value_filename (config,
+                                                   "merchant",
+                                                   "KEYFILE",
+                                                   &keyfile));
   EXITIF (NULL ==
-         (privkey =
-	 GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)));
+          (privkey =
+          GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)));
   EXITIF (NULL ==
-         (db_conn = MERCHANT_DB_connect (config)));
+          (db_conn = MERCHANT_DB_connect (config)));
   EXITIF (GNUNET_OK !=
           MERCHANT_DB_initialize (db_conn, dry));
   EXITIF (GNUNET_SYSERR ==
@@ -573,7 +780,7 @@ run (void *cls, char *const *args, const char *cfgfile,
           GNUNET_CONFIGURATION_get_value_string (config,
                                                  "merchant",
                                                  "CURRENCY",
-                                                 &TMH_mint_currency_string));
+                                                 &TMH_merchant_currency_string));
 
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_time (config,
@@ -586,16 +793,17 @@ run (void *cls, char *const *args, const char *cfgfile,
 
   for (cnt = 0; cnt < nmints; cnt++)
   {
-    EXITIF (NULL == (mints[cnt].ctx = TALER_MINT_init ()));
-    mints[cnt].pending = 1;
-    mints[cnt].conn = TALER_MINT_connect (mints[cnt].ctx,
-                                          mints[cnt].hostname,
-                                          &keys_mgmt_cb,
-                                          &mints[cnt],
-					  TALER_MINT_OPTION_END);
-    EXITIF (NULL == mints[cnt].conn);
-    poller_task =
-    GNUNET_SCHEDULER_add_now (&context_task, mints[cnt].ctx);
+    EXITIF (NULL == (mints[cnt]->ctx = TALER_MINT_init ()));
+    mints[cnt]->pending = 1;
+    mints[cnt]->conn = TALER_MINT_connect (mints[cnt]->ctx,
+                                           mints[cnt]->hostname,
+                                           &keys_mgmt_cb,
+                                           mints[cnt],
+                                           TALER_MINT_OPTION_END);
+    EXITIF (NULL == mints[cnt]->conn);
+    mints[cnt]->poller_task =
+      GNUNET_SCHEDULER_add_now (&context_task,
+                                mints[cnt]);
   }
 
   mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
@@ -609,14 +817,14 @@ run (void *cls, char *const *args, const char *cfgfile,
   result = GNUNET_OK;
   mhd_task = prepare_daemon ();
 
-  EXITIF_exit:
-    if (GNUNET_OK != result)
-      GNUNET_SCHEDULER_shutdown ();
+ EXITIF_exit:
+  if (GNUNET_OK != result)
+    GNUNET_SCHEDULER_shutdown ();
   GNUNET_free_non_null (keyfile);
-    if (GNUNET_OK != result)
-      GNUNET_SCHEDULER_shutdown ();
-
+  if (GNUNET_OK != result)
+    GNUNET_SCHEDULER_shutdown ();
 }
+
 
 /**
  * The main function of the serve tool
@@ -628,14 +836,12 @@ run (void *cls, char *const *args, const char *cfgfile,
 int
 main (int argc, char *const *argv)
 {
-
-   static const struct GNUNET_GETOPT_CommandLineOption options[] = {
+  static const struct GNUNET_GETOPT_CommandLineOption options[] = {
     {'t', "temp", NULL,
      gettext_noop ("Use temporary database tables"), GNUNET_NO,
      &GNUNET_GETOPT_set_one, &dry},
-     GNUNET_GETOPT_OPTION_END
-    };
-
+    GNUNET_GETOPT_OPTION_END
+  };
 
   if (GNUNET_OK !=
       GNUNET_PROGRAM_run (argc, argv,
@@ -644,5 +850,4 @@ main (int argc, char *const *argv)
                           options, &run, NULL))
     return 3;
   return (GNUNET_OK == result) ? 0 : 1;
-
 }

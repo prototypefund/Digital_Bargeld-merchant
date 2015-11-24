@@ -32,9 +32,7 @@
 #include "taler-mint-httpd.h"
 #include "taler-mint-httpd_parsing.h"
 #include "taler-mint-httpd_responses.h"
-#include "merchant_db.h"
-#include "merchant.h"
-#include "taler_merchant_lib.h"
+#include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
 
 extern struct MERCHANT_Auditor *auditors;
@@ -71,7 +69,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   int cnt;
   struct GNUNET_HashCode h_wire;
   struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
-  struct MERCHANT_Contract contract;
+  struct TALER_ContractPS contract;
   char *contract_str;
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
 
@@ -86,15 +84,15 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
     return MHD_YES;
 
   /* Generate preferred mint(s) array. */
-  
+
   trusted_mints = json_array ();
   for (cnt = 0; cnt < nmints; cnt++)
   {
-    if (!mints[cnt].pending)
+    if (! mints[cnt]->pending)
     {
-      keys = TALER_MINT_get_keys (mints[cnt].conn);
+      keys = TALER_MINT_get_keys (mints[cnt]->conn);
       mint = json_pack ("{s:s, s:o}",
-                        "url", mints[cnt].hostname,
+                        "url", mints[cnt]->hostname,
 			"master_pub",
 			TALER_json_from_data
 			(&keys->master_pub.eddsa_pub,
@@ -131,7 +129,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   json_object_set_new (root, "auditors", j_auditors);
 
   if (NULL == (j_wire = MERCHANT_get_wire_json (wire,
-                                                salt)))                       
+                                                salt)))
     return MHD_NO;
 
   /* hash wire objcet */
@@ -149,7 +147,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
 
   /* Sign */
-  contract_str = json_dumps (root, JSON_COMPACT | JSON_SORT_KEYS);  
+  contract_str = json_dumps (root, JSON_COMPACT | JSON_SORT_KEYS);
   GNUNET_CRYPTO_hash (contract_str, strlen (contract_str), &contract.h_contract);
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract.purpose.size = htonl (sizeof (contract));
@@ -164,5 +162,5 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 				       "H_contract", TALER_json_from_data
 				                     (&contract.h_contract,
 				                      sizeof (contract.h_contract)));
-  
+
 }
