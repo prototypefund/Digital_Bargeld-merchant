@@ -34,8 +34,6 @@
   } while (0)
 
 
-
-
 /**
  * @brief Struct describing an URL and the handler for it.
  */
@@ -92,65 +90,6 @@ struct TMH_RequestHandler
 
 
 
-/**
- * Mint
- */
-struct MERCHANT_Mint
-{
-  /**
-   * Hostname
-   */
-  char *hostname;
-
-  /**
-   * A connection to this mint
-   */
-  struct TALER_MINT_Handle *conn;
-
-  /**
-   * This mint's context (useful to the event loop)
-   */
-  struct TALER_MINT_Context *ctx;
-
-  /**
-   * Task we use to drive the interaction with this mint.
-   */
-  struct GNUNET_SCHEDULER_Task *poller_task;
-
-  /**
-   * Flag which indicates whether some HTTP transfer between
-   * this merchant and the mint is still ongoing
-   */
-  int pending;
-
-};
-
-
-struct MERCHANT_WIREFORMAT_Sepa
-{
-  /**
-   * The international bank account number
-   */
-  char *iban;
-
-  /**
-   * Name of the bank account holder
-   */
-  char *name;
-
-  /**
-   *The bank identification code
-   */
-  char *bic;
-
-  /**
-   * The latest payout date when the payment corresponding to this account has
-   * to take place.  A value of 0 indicates a transfer as soon as possible.
-   */
-  struct GNUNET_TIME_AbsoluteNBO payout;
-};
-
-
 struct MERCHANT_Auditor
 {
   /**
@@ -161,7 +100,12 @@ struct MERCHANT_Auditor
 };
 
 
-
+/**
+ * Each MHD response handler that sets the "connection_cls" to a
+ * non-NULL value must use a struct that has this struct as its first
+ * member.  This struct contains a single callback, which will be
+ * invoked to clean up the memory when the contection is completed.
+ */
 struct TM_HandlerContext;
 
 /**
@@ -175,13 +119,22 @@ typedef void
 (*TM_ContextCleanup)(struct TM_HandlerContext *hc);
 
 
+/**
+ * Each MHD response handler that sets the "connection_cls" to a
+ * non-NULL value must use a struct that has this struct as its first
+ * member.  This struct contains a single callback, which will be
+ * invoked to clean up the memory when the contection is completed.
+ */
 struct TM_HandlerContext
 {
 
+  /**
+   * Function to execute the handler-specific cleanup of the
+   * (typically larger) context.
+   */
   TM_ContextCleanup cc;
 
 };
-
 
 
 /**
@@ -195,48 +148,33 @@ extern json_t *j_wire;
 extern struct GNUNET_HashCode h_wire;
 
 
+extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
+
+extern struct TALER_MerchantPublicKeyP pubkey;
+
 
 extern struct MERCHANT_Auditor *auditors;
+
 extern unsigned int nauditors;
 
-extern struct MERCHANT_Mint **mints;
 
-extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 
 
 extern PGconn *db_conn;
 
 
-extern unsigned int nmints;
 
 extern struct GNUNET_TIME_Relative edate_delay;
 
 
-void
-context_task (void *cls,
-              const struct GNUNET_SCHEDULER_TaskContext *tc);
-
-
-
-
-/**
- * Take the global wire details and return a JSON containing them,
- * compliantly with the Taler's API.
- *
- * @param wire the merchant's wire details
- * @param salt the nounce for hashing the wire details with
- * @return JSON representation of the wire details, NULL upon errors
- */
-json_t *
-MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
-                        uint64_t salt);
-
-
 /**
  * Kick MHD to run now, to be called after MHD_resume_connection().
+ * Basically, we need to explicitly resume MHD's event loop whenever
+ * we made progress serving a request.  This function re-schedules
+ * the task processing MHD's activities to run immediately.
  */
 void
-TM_trigger_daemon (void);
+TMH_trigger_daemon (void);
 
 
 #endif

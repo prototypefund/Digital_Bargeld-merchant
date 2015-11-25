@@ -31,6 +31,7 @@
 #include <taler/taler_mint_service.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_parsing.h"
+#include "taler-merchant-httpd_mints.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
@@ -57,11 +58,8 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                      size_t *upload_data_size)
 {
   json_t *root;
-  json_t *trusted_mints;
   json_t *j_auditors;
   json_t *auditor;
-  json_t *mint;
-  const struct TALER_MINT_Keys *keys;
   int res;
   int cnt;
   struct GNUNET_HashCode h_wire;
@@ -82,21 +80,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 
   /* Generate preferred mint(s) array. */
 
-  trusted_mints = json_array ();
-  for (cnt = 0; cnt < nmints; cnt++)
-  {
-    if (! mints[cnt]->pending)
-    {
-      keys = TALER_MINT_get_keys (mints[cnt]->conn);
-      mint = json_pack ("{s:s, s:o}",
-                        "url", mints[cnt]->hostname,
-			"master_pub",
-			TALER_json_from_data
-			(&keys->master_pub.eddsa_pub,
-		        sizeof (keys->master_pub.eddsa_pub)));
-      json_array_append_new (trusted_mints, mint);
-    }
-  }
   j_auditors = json_array ();
   for (cnt = 0; cnt < nauditors; cnt++)
   {

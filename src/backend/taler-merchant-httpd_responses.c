@@ -29,6 +29,35 @@
 
 
 /**
+ * Make JSON response object.
+ *
+ * @param json the json object
+ * @return MHD response object
+ */
+struct MHD_Response *
+TMH_RESPONSE_make_json (const json_t *json)
+{
+  struct MHD_Response *resp;
+  char *json_str;
+
+  json_str = json_dumps (json, JSON_INDENT(2));
+  GNUNET_assert (NULL != json_str);
+  resp = MHD_create_response_from_buffer (strlen (json_str), json_str,
+                                          MHD_RESPMEM_MUST_FREE);
+  if (NULL == resp)
+  {
+    free (json_str);
+    GNUNET_break (0);
+    return NULL;
+  }
+  (void) MHD_add_response_header (resp,
+                                  MHD_HTTP_HEADER_CONTENT_TYPE,
+                                  "application/json");
+  return resp;
+}
+
+
+/**
  * Send JSON object as response.
  *
  * @param connection the MHD connection
@@ -42,26 +71,49 @@ TMH_RESPONSE_reply_json (struct MHD_Connection *connection,
                          unsigned int response_code)
 {
   struct MHD_Response *resp;
-  char *json_str;
   int ret;
 
-  json_str = json_dumps (json, JSON_INDENT(2));
-  GNUNET_assert (NULL != json_str);
-  resp = MHD_create_response_from_buffer (strlen (json_str), json_str,
-                                          MHD_RESPMEM_MUST_FREE);
+  resp = TMH_RESPONSE_make_json (json);
   if (NULL == resp)
-  {
-    free (json_str);
-    GNUNET_break (0);
     return MHD_NO;
-  }
-  (void) MHD_add_response_header (resp,
-                                  MHD_HTTP_HEADER_CONTENT_TYPE,
-                                  "application/json");
   ret = MHD_queue_response (connection,
                             response_code,
                             resp);
   MHD_destroy_response (resp);
+  return ret;
+}
+
+
+/**
+ * Make JSON response object.
+ *
+ * @param fmt format string for pack
+ * @param ... varargs
+ * @return MHD response object
+ */
+struct MHD_Response *
+TMH_RESPONSE_make_json_pack (const char *fmt,
+                             ...)
+{
+  json_t *json;
+  va_list argp;
+  struct MHD_Response *ret;
+  json_error_t jerror;
+
+  va_start (argp, fmt);
+  json = json_vpack_ex (&jerror, 0, fmt, argp);
+  va_end (argp);
+  if (NULL == json)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to pack JSON with format `%s': %s\n",
+                fmt,
+                jerror.text);
+    GNUNET_break (0);
+    return MHD_NO;
+  }
+  ret = TMH_RESPONSE_make_json (json);
+  json_decref (json);
   return ret;
 }
 
@@ -106,6 +158,22 @@ TMH_RESPONSE_reply_json_pack (struct MHD_Connection *connection,
   return ret;
 }
 
+
+/**
+ * Create a response indicating an internal error.
+ *
+ * @param hint hint about the internal error's nature
+ * @return a MHD response object
+ */
+struct MHD_Response *
+TMH_RESPONSE_make_internal_error (const char *hint)
+{
+  return TMH_RESPONSE_make_json_pack ("{s:s, s:s}",
+                                      "error", "internal error",
+                                      "hint", hint);
+}
+
+
 /**
  * Send a response indicating an internal error.
  *
@@ -123,6 +191,7 @@ TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
                                        "error", "internal error",
                                        "hint", hint);
 }
+
 
 /**
  * Send a response indicating that the request was too big.
@@ -186,6 +255,7 @@ TMH_RESPONSE_add_global_headers (struct MHD_Response *response)
                                     "close");
 }
 
+
 /**
  * Send a response indicating an external error.
  *
@@ -203,4 +273,21 @@ TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
                                        "error", "client error",
                                        "hint", hint);
 }
+
+
+/**
+ * Create a response indicating an external error.
+ *
+ * @param hint hint about the internal error's nature
+ * @return a MHD response object
+ */
+struct MHD_Response *
+TMH_RESPONSE_make_external_error (const char *hint)
+{
+  return TMH_RESPONSE_make_json_pack ("{s:s, s:s}",
+                                      "error", "client error",
+                                      "hint", hint);
+}
+
+
 /* end of taler-mint-httpd_responses.c */

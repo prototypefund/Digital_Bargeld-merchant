@@ -32,27 +32,63 @@
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_mhd.h"
+#include "taler-merchant-httpd_mints.h"
 #include "taler_merchantdb_lib.h"
 
 
 /**
- * Outcome of a /deposit request for a coin. Typically forming an array enclosed
- * into the unique PayContext
+ * Information we keep for an individual call to the /pay handler.
+ */
+struct PayContext;
+
+
+/**
+ * Information kept during a /pay request for each coin.
  */
 struct MERCHANT_DepositConfirmation
 {
+
   /**
-   * Reference to the per-deposit-handler Context. Needed by the
-   * cleanup function to get it freed
+   * Reference to the main PayContext
    */
-  struct DepositCallbackContext *dcc;
+  struct PayContext *pc;
+
+  /**
+   *
+   */
+  struct TALER_MINT_DepositHandle *dh;
 
   /**
    * The mint's response body (JSON). Mainly useful in case
    * some callback needs to send back to the to the wallet the
-   * outcome of an erroneous coin
+   * outcome of an erroneous coin. DEAD?
    */
   json_t *proof;
+
+  /**
+   * Denomination for this coin.
+   */
+  struct TALER_DenominationPublicKey denom;
+
+  /**
+   *
+   */
+  struct TALER_Amount percoin_amount;
+
+  /**
+   *
+   */
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+
+  /**
+   *
+   */
+  struct TALER_DenominationSignature ub_sig;
+
+  /**
+   *
+   */
+  struct TALER_CoinSpendSignatureP coin_sig;
 
   /**
    * True if this coin's outcome has been read from
@@ -65,61 +101,12 @@ struct MERCHANT_DepositConfirmation
    */
   unsigned int exit_status;
 
+  /**
+   * Offset of this coin into the array of all coins outcomes
+   */
+  unsigned int index;
+
 };
-
-
-
-/**
- * Fetch the deposit fee related to the given coin aggregate.
- * @param connection the connection to send an error response to
- * @param coin_aggregate a coin "aggregate" is the JSON set of
- * values contained in a single cell of the 'coins' array sent
- * in a payment
- * @param deposit_fee where to store the resulting deposit fee
- * @param mint_index the index which points the chosen mint within
- * the global 'mints' array
- * @return GNUNET_OK if successful, GNUNET_NO if the data supplied
- * is invalid (including the case when the key is not found),
- * GNUNET_SYSERR upon internal errors
- */
-static int
-deposit_fee_from_coin_aggregate (struct MHD_Connection *connection,
-                                 json_t *coin_aggregate,
-                                 struct TALER_Amount *deposit_fee,
-			         unsigned int mint_index)
-{
-  int res;
-  const struct TALER_MINT_Keys *keys;
-  const struct TALER_MINT_DenomPublicKey *denom_details;
-  struct TALER_DenominationPublicKey denom;
-
-  struct TMH_PARSE_FieldSpecification spec[] = {
-    TMH_PARSE_member_denomination_public_key ("denom_pub", &denom),
-    TMH_PARSE_MEMBER_END
-  };
-
-  res = TMH_PARSE_json_data (connection,
-                             coin_aggregate,
-			     spec);
-  if (GNUNET_OK != res)
-    return res; /* may return GNUNET_NO */
-
-  if (1 == mints[mint_index]->pending)
-    return GNUNET_SYSERR;
-  keys = TALER_MINT_get_keys (mints[mint_index]->conn);
-  denom_details = TALER_MINT_get_denomination_key (keys, &denom);
-  if (NULL == denom_details)
-  {
-    TMH_RESPONSE_reply_json_pack (connection,
-                                  MHD_HTTP_BAD_REQUEST,
-				  "{s:s, s:o}",
-				  "hint", "unknown denom to mint",
-				  "denom_pub", TALER_json_from_rsa_public_key (denom.rsa_public_key));
-    return GNUNET_NO;
-  }
-  *deposit_fee = denom_details->fee_deposit;
-  return GNUNET_OK;
-}
 
 
 /**
@@ -149,19 +136,69 @@ struct PayContext
   void *json_parse_context;
 
   /**
+   * Root node of the request body in JSON.
+   */
+  json_t *root;
+
+  /**
+   * Coins included in @e root.
+   */
+  json_t *coins;
+
+  /**
+   * Mint URI given in @e root.
+   */
+  char *chosen_mint;
+
+  /**
+   * Transaction ID given in @e root.
+   */
+  uint64_t transaction_id;
+
+  /**
+   * Maximum fee from @e root.
+   */
+  struct TALER_Amount max_fee;
+
+  /**
+   * Amount from @e root.
+   */
+  struct TALER_Amount amount;
+
+  /**
+   * Timestamp from @e root.
+   */
+  struct GNUNET_TIME_Absolute timestamp;
+
+  /**
+   * Refund deadline from @e root.
+   */
+  struct GNUNET_TIME_Absolute refund_deadline;
+
+  /**
+   * "H_contract" from @e root.
+   */
+  struct GNUNET_HashCode h_contract;
+
+  /**
+   *
+   */
+  struct GNUNET_TIME_Absolute edate;
+
+  /**
    * Response to return, NULL if we don't have one yet.
    */
   struct MHD_Response *response;
 
   /**
-   * Transaction id
-   */
-  uint64_t transaction_id;
-
-  /**
-   * How many coins this paymen is made of.
+   * Number of coins this payment is made of.
    */
   unsigned int coins_cnt;
+
+  /**
+   * Number of transactions still pending.
+   */
+  unsigned int pending;
 
   /**
    * HTTP status code to use for the reply, i.e 200 for "OK".
@@ -172,105 +209,183 @@ struct PayContext
 
 };
 
-/**
- * Information needed by a single /deposit callback to refer to its
- * own coin inside the confirmations array, namely `struct MERCHANT_DepositConfirmation *dc`
- * above. Note: this information can NOT be shared between all the callbacks.
- */
-struct DepositCallbackContext
-{
-
-  /**
-   * Offset of this coin into the array of all coins outcomes
-   */
-  unsigned int index;
-
-  /**
-   * Reference to the main PayContext
-   */
-  struct PayContext *pc;
-
-};
 
 /**
  * Callback to handle a deposit permission's response.
  *
- * @param cls see `struct MERCHANT_DepositConfirmationCls` (i.e. a poinetr to the global
- * array of confirmations and an index for this call in that array). That way, the last
- * executed callback can detect that no other confirmations are on the way, and can pack
- * a response for the wallet
- * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
- * 0 if the mint's reply is bogus (fails to follow the protocol)
- * @param proof the received JSON reply, should be kept as proof (and, in case of errors,
- * be forwarded to the customer)
+ * @param cls a `struct MERCHANT_DepositConfirmation` (i.e. a pointer
+ *   into the global array of confirmations and an index for this call
+ *   in that array). That way, the last executed callback can detect
+ *   that no other confirmations are on the way, and can pack a response
+ *   for the wallet
+ * @param http_status HTTP response code, #MHD_HTTP_OK
+ *   (200) for successful deposit; 0 if the mint's reply is bogus (fails
+ *   to follow the protocol)
+ * @param proof the received JSON reply,
+ *   should be kept as proof (and, in case of errors, be forwarded to
+ *   the customer)
  */
 static void
 deposit_cb (void *cls,
             unsigned int http_status,
             json_t *proof)
 {
-  struct DepositCallbackContext *dcc = cls;
-  int i;
+  struct MERCHANT_DepositConfirmation *dc = cls;
+  struct PayContext *pc = dc->pc;
 
-  /*FIXME the index is the same for every individual cb */
-  if (GNUNET_SYSERR ==
-      TALER_MERCHANTDB_deposit_permission_update (db_conn,
-                                             dcc->pc->transaction_id,
-	                                     0))
-    /* TODO */
-    printf ("db error\n");
-  dcc->pc->dc[dcc->index].ackd = 1;
-  dcc->pc->dc[dcc->index].exit_status = http_status;
-  dcc->pc->dc[dcc->index].proof = proof;
+  /* FIXME: store to DB! */
+  dc->ackd = 1;
+  dc->exit_status = http_status;
+  dc->proof = proof; /* FIXME: needs rc+1 */
+  pc->pending--;
+  if (0 != pc->pending)
+    return; /* still more to do */
 
-  /* loop through the confirmation array and return accordingly */
-  for (i = 0; i < dcc->pc->coins_cnt; i++)
-  {
-    /* just return if there is at least one coin to be still
-      confirmed */
-    if (! dcc->pc->dc[i].ackd)
-    {
-      printf ("still vacant coins\n");
-      return;
-    }
-  }
-
-  printf ("All /deposit(s) ack'd\n");
-
-  dcc->pc->response = MHD_create_response_from_buffer (strlen ("All coins ack'd by the mint\n"),
-                                                               "All coins ack'd by the mint\n",
-                                                               MHD_RESPMEM_MUST_COPY);
-  dcc->pc->response_code = MHD_HTTP_OK;
-  /* Clean up what we can already */
-  MHD_resume_connection (dcc->pc->connection);
-  TM_trigger_daemon (); /* we resumed, kick MHD */
+  pc->response
+    = MHD_create_response_from_buffer (strlen ("All coins ack'd by the mint\n"),
+                                       "All coins ack'd by the mint\n",
+                                       MHD_RESPMEM_MUST_COPY);
+  /* FIXME: move this logic into a function: */
+  pc->response_code = MHD_HTTP_OK;
+  MHD_resume_connection (pc->connection);
+  TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
 
 
+/**
+ * Custom cleanup routine for a `struct PayContext`.
+ *
+ * @param hc the `struct PayContext` to clean up.
+ */
 static void
 pay_context_cleanup (struct TM_HandlerContext *hc)
 {
-  int i;
   struct PayContext *pc = (struct PayContext *) hc;
-
-  for (i = 0; i < pc->coins_cnt; i++)
-    GNUNET_free_non_null (pc->dc[i].dcc);
+  unsigned int i;
 
   TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
+  for (i=0;i<pc->coins_cnt;i++)
+  {
+    struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
 
-  #if 0
+    /* FIXME: clean up 'dc'! */
+  }
+  GNUNET_free_non_null (pc->dc);
   if (NULL != pc->response)
   {
-    /* undestroyable regardless of the other MHD_destroy_response called
-    in this source, FIXME */
-
     MHD_destroy_response (pc->response);
     pc->response = NULL;
   }
-  #endif
-
-  GNUNET_free_non_null (pc->dc);
   GNUNET_free (pc);
+}
+
+
+/**
+ * Function called with the result of our mint lookup.
+ *
+ * @param cls the `struct PayContext`
+ * @param mint NULL if mint was not found to be acceptable
+ * @param mh NULL if mint was not found to be acceptable
+ */
+static void
+process_pay_with_mint (void *cls,
+                       struct MERCHANT_Mint *mint,
+                       struct TALER_MINT_Handle *mh)
+{
+  struct PayContext *pc = cls;
+  struct TALER_Amount acc_fee;
+  struct TALER_Amount coin_fee;
+  const struct TALER_MINT_Keys *keys;
+  unsigned int i;
+
+  if (NULL == mint)
+  {
+    /* The mint on offer is not in the set of our (trusted)
+       mints.  Reject the payment. */
+    MHD_resume_connection (pc->connection);
+    pc->response_code = 403;
+    pc->response = TMH_RESPONSE_make_external_error ("unknown mint");
+    TMH_trigger_daemon ();
+    return;
+  }
+
+  keys = TALER_MINT_get_keys (mh);
+  if (NULL == keys)
+  {
+    GNUNET_break (0);
+    pc->response_code = UINT_MAX;
+    pc->response = TMH_RESPONSE_make_internal_error ("no keys");
+    TMH_trigger_daemon ();
+    return;
+  }
+
+  /* FIXME: do not just total up the fees, but also
+     the value of the deposited coins! */
+  for (i=0;i<pc->coins_cnt;i++)
+  {
+    struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
+    const struct TALER_MINT_DenomPublicKey *denom_details;
+
+    denom_details = TALER_MINT_get_denomination_key (keys,
+                                                     &dc->denom);
+    if (NULL == denom_details)
+    {
+      pc->response_code = MHD_HTTP_BAD_REQUEST;
+      pc->response
+        = TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
+                                       "hint", "unknown denom to mint",
+                                       "denom_pub", TALER_json_from_rsa_public_key (dc->denom.rsa_public_key));
+      TMH_trigger_daemon ();
+      return;
+    }
+    if (0 == i)
+      acc_fee = denom_details->fee_deposit;
+    else
+      TALER_amount_add (&acc_fee,
+                        &denom_details->fee_deposit,
+			&coin_fee);
+  }
+
+  if (-1 == TALER_amount_cmp (&pc->max_fee,
+                              &acc_fee))
+  {
+    pc->response_code = MHD_HTTP_NOT_ACCEPTABLE;
+    pc->response = TMH_RESPONSE_make_external_error ("fees too high");
+    TMH_trigger_daemon ();
+    return;
+  }
+
+  /* Initiate /deposit operation for all coins */
+  for (i=0;i<pc->coins_cnt;i++)
+  {
+    struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
+
+    dc->dh = TALER_MINT_deposit (mh,
+                                 &dc->percoin_amount,
+                                 pc->edate,
+                                 j_wire,
+                                 &pc->h_contract,
+                                 &dc->coin_pub,
+                                 &dc->ub_sig,
+                                 &dc->denom,
+                                 pc->timestamp,
+                                 pc->transaction_id,
+                                 &pubkey,
+                                 pc->refund_deadline,
+                                 &dc->coin_sig,
+                                 &deposit_cb,
+                                 dc);
+    if (NULL == dc->dh)
+    {
+      MHD_resume_connection (pc->connection);
+      pc->response_code = MHD_HTTP_SERVICE_UNAVAILABLE;
+      pc->response = TMH_RESPONSE_make_json_pack ("{s:s, s:i}",
+                                                  "mint", pc->chosen_mint,
+                                                  "transaction_id", pc->transaction_id);
+      TMH_trigger_daemon ();
+      return;
+    }
+  }
 }
 
 
@@ -294,52 +409,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                 size_t *upload_data_size)
 {
   struct PayContext *pc;
-  json_t *root;
-  json_t *coins;
-  char *chosen_mint;
-  json_t *coin_aggregate;
-  unsigned int mint_index; /*a cell in the global array*/
-  unsigned int coins_index;
-  unsigned int coins_cnt;
-  uint64_t transaction_id;
   int res;
-  struct TALER_MINT_DepositHandle *dh;
-  struct TALER_Amount max_fee;
-  struct TALER_Amount acc_fee;
-  struct TALER_Amount coin_fee;
-  struct TALER_Amount amount;
-  struct TALER_Amount percoin_amount;
-  struct GNUNET_TIME_Absolute edate;
-  struct GNUNET_TIME_Absolute timestamp;
-  struct GNUNET_TIME_Absolute refund_deadline;
-  struct TALER_MerchantPublicKeyP pubkey;
-  struct TALER_CoinSpendPublicKeyP coin_pub;
-  struct TALER_DenominationPublicKey denom_pub;
-  struct TALER_DenominationSignature ub_sig;
-  struct TALER_CoinSpendSignatureP coin_sig;
-  struct GNUNET_HashCode h_contract;
-  struct MERCHANT_DepositConfirmation *dc;
-
-  struct TMH_PARSE_FieldSpecification spec[] = {
-    TMH_PARSE_member_array ("coins", &coins),
-    TMH_PARSE_member_string ("mint", &chosen_mint),
-    TMH_PARSE_member_amount ("max_fee", &max_fee),
-    TMH_PARSE_member_amount ("amount", &amount),
-    TMH_PARSE_member_time_abs ("timestamp", &timestamp),
-    TMH_PARSE_member_time_abs ("refund_deadline", &refund_deadline),
-    TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
-    TMH_PARSE_member_fixed ("H_contract", &h_contract),
-    TMH_PARSE_MEMBER_END
-  };
-
-  struct TMH_PARSE_FieldSpecification coin_aggregate_spec[] = {
-    TMH_PARSE_member_amount ("f", &percoin_amount),
-    TMH_PARSE_member_fixed ("coin_pub", &coin_pub.eddsa_pub),
-    TMH_PARSE_member_denomination_public_key ("denom_pub", &denom_pub),
-    TMH_PARSE_member_denomination_signature ("ub_sig", &ub_sig),
-    TMH_PARSE_member_fixed ("coin_sig", &coin_sig.eddsa_signature),
-    TMH_PARSE_MEMBER_END
-  };
+  json_t *coin;
+  unsigned int coins_index;
 
   if (NULL == *connection_cls)
   {
@@ -355,21 +427,17 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
   if (0 != pc->response_code)
   {
+    /* We are *done* processing the request, just queue the response (!) */
     if (UINT_MAX == pc->response_code)
       return MHD_NO; /* hard error */
-    /* We are *done* processing the request, just queue the response (!) */
     res = MHD_queue_response (connection,
                               pc->response_code,
                               pc->response);
-    #if 0
-    if (pc->response != NULL)
+    if (NULL != pc->response)
     {
-      /* undestroyable regardless of the other MHD_destroy_response called
-        in this source, FIXME */
       MHD_destroy_response (pc->response);
       pc->response = NULL;
     }
-    #endif
     return res;
   }
 
@@ -377,202 +445,81 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                              &pc->json_parse_context,
                              upload_data,
                              upload_data_size,
-                             &root);
+                             &pc->root);
   if (GNUNET_SYSERR == res)
-    return MHD_NO;
-  /* the POST's body has to be further fetched */
-  if ((GNUNET_NO == res) || (NULL == root))
-    return MHD_YES;
+    return MHD_NO;  /* error parsing JSON */
+  if ((GNUNET_NO == res) || (NULL == pc->root))
+    return MHD_YES; /* the POST's body has to be further fetched */
 
-  res = TMH_PARSE_json_data (connection,
-                             root,
-			     spec);
+  /* Got the JSON upload, parse it (FIXME: all of this here?) */
 
-  if (GNUNET_YES != res)
-    return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
-
-  /* 1 Check if the chosen mint is among the merchant's preferred.
-
-    An error in this case could be due to:
-
-    * the wallet indicated a non existent mint
-    * the wallet indicated a non trusted mint
-
-    NOTE: by preventively checking this, the merchant
-    avoids getting HTTP response codes from random
-    websites that may mislead the wallet in the way
-    of managing the error. Of course, that protect the
-    merchant from POSTing coins to untrusted mints.
-
-   */
-
-  for (mint_index = 0; mint_index <= nmints; mint_index++)
+  /* We got no 'edate' from frontend. Generate it here; it will be
+     timestamp plus the edate_delay supplied in config file */
+  if (NULL == json_object_get (pc->root, "edate"))
   {
-    /* no mint found in array */
-    if (mint_index == nmints)
-    {
-      mint_index = -1;
-      break;
-    }
-
-    /* test it by checking public key */
-    if (0 == strcmp (mints[mint_index]->hostname,
-                     chosen_mint))
-      break;
-
-  }
-
-  if (-1 == mint_index)
-    return TMH_RESPONSE_reply_external_error (connection, "unknown mint");
-
-  /* no 'edate' from frontend. Generate it here; it will be timestamp
-    + a edate delay supplied in config file */
-  if (NULL == json_object_get (root, "edate"))
-  {
-    edate = GNUNET_TIME_absolute_add (timestamp, edate_delay);
-    if (-1 == json_object_set (root, "edate", TALER_json_from_abs (edate)))
+    pc->edate = GNUNET_TIME_absolute_add (pc->timestamp, // FIXME: uninit!
+                                          edate_delay);
+    if (-1 == json_object_set (pc->root,
+                               "edate",
+                               TALER_json_from_abs (pc->edate)))
       return MHD_NO;
   }
 
-  coins_cnt = json_array_size (coins);
-
-  if (0 == coins_cnt)
-    return TMH_RESPONSE_reply_external_error (connection, "no coins given");
-
-  json_array_foreach (coins, coins_index, coin_aggregate)
   {
-    res = deposit_fee_from_coin_aggregate (connection,
-                                           coin_aggregate,
-		                           &coin_fee,
-				           mint_index);
-    if (GNUNET_NO == res)
-      return MHD_YES;
-    if (GNUNET_SYSERR == res)
-      return MHD_NO;
+    struct TMH_PARSE_FieldSpecification spec[] = {
+      TMH_PARSE_member_array ("coins", &pc->coins),
+      TMH_PARSE_member_string ("mint", &pc->chosen_mint),
+      TMH_PARSE_member_amount ("max_fee", &pc->max_fee),
+      TMH_PARSE_member_amount ("amount", &pc->amount),
+      TMH_PARSE_member_time_abs ("edate", &pc->edate),
+      TMH_PARSE_member_time_abs ("timestamp", &pc->timestamp),
+      TMH_PARSE_member_time_abs ("refund_deadline", &pc->refund_deadline),
+      TMH_PARSE_member_uint64 ("transaction_id", &pc->transaction_id),
+      TMH_PARSE_member_fixed ("H_contract", &pc->h_contract),
+      TMH_PARSE_MEMBER_END
+    };
 
-    if (0 == coins_index)
-      acc_fee = coin_fee;
-    else
-      TALER_amount_add (&acc_fee,
-                        &acc_fee,
-			&coin_fee);
-  }
-
-
-  if (-1 == TALER_amount_cmp (&max_fee, &acc_fee))
-    return MHD_HTTP_NOT_ACCEPTABLE;
-
-  /* cutting off unneeded fields from deposit permission as
-    gotten from the wallet */
-  if (-1 == json_object_del (root, "mint"))
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "malformed/non-existent 'mint' field");
-  if (-1 == json_object_del (root, "coins"))
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "malformed/non-existent 'coins' field");
-
-  /* adding our public key to deposit permission */
-  GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pubkey.eddsa_pub);
-  json_object_set_new (root,
-                       "merchant_pub",
-		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
-
-  /* since memory is zero'd out by GNUNET_malloc, any 'ackd' field will be
-    (implicitly) set to false */
-  dc = GNUNET_malloc (coins_cnt * sizeof (struct MERCHANT_DepositConfirmation));
-  if (NULL == dc)
-    return TMH_RESPONSE_reply_internal_error (connection, "memory failure");
-
-  /* DEBUG CHECKPOINT: return a provisory fullfilment page to the wallet
-    to test the reception of coins array */
-
-  #ifdef COINSCHECKPOINT
-  rh->data = "Coins received\n";
-  return TMH_MHD_handler_static_response (rh,
-                                          connection,
-	                                  connection_cls,
-				          upload_data,
-				          upload_data_size);
-
-  #endif
-
-  /* suspend connection until the last coin has been ack'd to the cb.
-    That last cb will finally resume the connection and send back a response */
-  MHD_suspend_connection (connection);
-
-  pc->dc = dc;
-  pc->coins_cnt = coins_cnt;
-  pc->transaction_id = transaction_id;
-
-
-  json_array_foreach (coins, coins_index, coin_aggregate)
-  {
-
-    /* 3 For each coin in DB
-
-         a. Generate a deposit permission
-         b. store it in DB
-         c. POST to the mint (see mint-lib for this)
-            (retry until getting a persisten state)
-    */
-
-    /* a */
-    if (-1 == json_object_update (root, coin_aggregate))
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                "deposit permission not generated for storing");
-
-    /* b */
-    char *deposit_permission_str = json_dumps (root, JSON_COMPACT);
-    if (GNUNET_OK != TALER_MERCHANTDB_deposit_permission_store (db_conn,
-                                                           deposit_permission_str,
-			                                   transaction_id,
-					                   1,
-					                   mints[mint_index]->hostname))
-      return TMH_RESPONSE_reply_internal_error (connection, "internal DB failure");
     res = TMH_PARSE_json_data (connection,
-                               coin_aggregate,
-                               coin_aggregate_spec);
-    if (GNUNET_OK != res)
-      return res; /* may return GNUNET_NO */
+                               pc->root,
+                               spec);
+    if (GNUNET_YES != res)
+      return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
 
-    /* c */
-    struct DepositCallbackContext *percoin_dcc = GNUNET_new (struct DepositCallbackContext);
-    pc->dc[coins_index].dcc = percoin_dcc;
-    percoin_dcc->index = coins_index;
-    percoin_dcc->pc = pc;
+    if (0 == json_array_size (pc->coins))
+      return TMH_RESPONSE_reply_external_error (connection,
+                                                "no coins given");
+  }
+  pc->dc = GNUNET_new_array (json_array_size (pc->coins),
+                             struct MERCHANT_DepositConfirmation);
 
-    dh = TALER_MINT_deposit (mints[mint_index]->conn,
-                             &percoin_amount,
-			     edate,
-			     j_wire,
-			     &h_contract,
-			     &coin_pub,
-			     &ub_sig,
-			     &denom_pub,
-			     timestamp,
-                             transaction_id,
-                             &pubkey,
-			     refund_deadline,
-			     &coin_sig,
-			     &deposit_cb,
-			     percoin_dcc); /*FIXME TODO instantiate an individual cls for each
-			            cb: each of them needs an index which points the
-				    array of all the confirmations */
-    if (NULL == dh)
-    {
-      MHD_resume_connection (connection);
-      return TMH_RESPONSE_reply_json_pack (connection,
-                                           MHD_HTTP_SERVICE_UNAVAILABLE,
-		                           "{s:s, s:i}",
-				           "mint", mints[mint_index]->hostname,
-				           "transaction_id", transaction_id);
-    }
+  json_array_foreach (pc->coins, coins_index, coin)
+  {
+    struct MERCHANT_DepositConfirmation *dc = &pc->dc[coins_index];
+    struct TMH_PARSE_FieldSpecification spec[] = {
+      TMH_PARSE_member_denomination_public_key ("denom_pub", &dc->denom),
+      TMH_PARSE_member_amount ("f", &dc->percoin_amount),
+      TMH_PARSE_member_fixed ("coin_pub", &dc->coin_pub),
+      TMH_PARSE_member_denomination_signature ("ub_sig", &dc->ub_sig),
+      TMH_PARSE_member_fixed ("coin_sig", &dc->coin_sig),
+      TMH_PARSE_MEMBER_END
+    };
+
+    res = TMH_PARSE_json_data (connection,
+                               coin,
+                               spec);
+    if (GNUNET_YES != res)
+      return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
+
+
   }
 
-  GNUNET_SCHEDULER_cancel (mints[mint_index]->poller_task);
-  GNUNET_SCHEDULER_add_now (context_task, mints[mint_index]->ctx);
+  /* Find the responsible mint, this may take a while... */
+  TMH_MINTS_find_mint (pc->chosen_mint,
+                       &process_pay_with_mint,
+                       pc);
+  /* Suspend connection until the last coin has been ack'd or
+     until we have encountered a hard error.
+     Eventually, we will resume the connection and send back a response. */
+  MHD_suspend_connection (connection);
   return MHD_YES;
-
-  /* 4 Return response code: success, or whatever data the
-    mint sent back regarding some bad coin */
 }

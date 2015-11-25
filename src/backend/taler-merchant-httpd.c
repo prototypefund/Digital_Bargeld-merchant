@@ -19,8 +19,8 @@
  * @brief HTTP serving layer intended to perform crypto-work and
  * communication with the mint
  * @author Marcello Stanisci
+ * @author Christian Grothoff
  */
-
 #include "platform.h"
 #include <microhttpd.h>
 #include <jansson.h>
@@ -34,6 +34,7 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_contract.h"
+#include "taler-merchant-httpd_mints.h"
 #include "taler-merchant-httpd_pay.h"
 
 
@@ -48,11 +49,15 @@ struct json_t *j_wire;
  */
 struct GNUNET_HashCode h_wire;
 
-
 /**
  * Merchant's private key
  */
 struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
+
+/**
+ * Merchant's public key
+ */
+struct TALER_MerchantPublicKeyP pubkey;
 
 /**
  * Our hostname
@@ -81,11 +86,6 @@ struct GNUNET_TIME_Relative edate_delay;
 char *TMH_merchant_currency_string;
 
 /**
- * Trusted mints (FIXME: they are NOT all trusted!).
- */
-struct MERCHANT_Mint **mints;
-
-/**
  * Active auditors
  */
 struct MERCHANT_Auditor *auditors;
@@ -99,11 +99,6 @@ static struct GNUNET_SCHEDULER_Task *shutdown_task;
  * Task running the HTTP server.
  */
 static struct GNUNET_SCHEDULER_Task *mhd_task;
-
-/**
- * Length of the #mints array.
- */
-unsigned int nmints;
 
 /**
  * The number of active auditors
@@ -187,15 +182,9 @@ url_handler (void *cls,
         "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK },
 
-      /* Further test page */
-      { "/hello", MHD_HTTP_METHOD_GET, "text/plain",
-        "Hello, Customer.\n", 0,
-        &TMH_MHD_handler_static_response, MHD_HTTP_OK },
-
       { "/contract", MHD_HTTP_METHOD_POST, "application/json",
         NULL, 0,
         &MH_handler_contract, MHD_HTTP_OK },
-
       { "/contract", NULL, "text/plain",
         "Only POST is allowed", 0,
         &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
@@ -203,33 +192,24 @@ url_handler (void *cls,
       { "/pay", MHD_HTTP_METHOD_POST, "application/json",
         NULL, 0,
         &MH_handler_pay, MHD_HTTP_OK },
-
       { "/pay", NULL, "text/plain",
         "Only POST is allowed", 0,
         &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
 
-
       {NULL, NULL, NULL, NULL, 0, 0 }
     };
-
   static struct TMH_RequestHandler h404 =
     {
       "", NULL, "text/html",
       "<html><title>404: not found</title></html>", 0,
       &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
     };
-
-  /* Compiler complains about non returning a value in a non-void
-    declared function: the FIX is to return what the handler for
-    a particular URL returns */
-
   struct TMH_RequestHandler *rh;
   unsigned int i;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Handling request for URL '%s'\n",
+              "Handling request for URL `%s'\n",
               url);
-
   for (i=0;NULL != handlers[i].url;i++)
   {
     rh = &handlers[i];
@@ -249,43 +229,6 @@ url_handler (void *cls,
                                           con_cls,
                                           upload_data,
                                           upload_data_size);
-
-}
-
-
-/**
- * Function called with information about who is auditing
- * a particular mint and what key the mint is using.
- *
- * @param cls closure, will be 'struct MERCHANT_Mint' so that
- * when this function gets called, it will change the flag 'pending'
- * to 'false'. Note: 'keys' is automatically saved inside the mint's
- * handle, which is contained inside 'struct MERCHANT_Mint', when
- * this callback is called. Thus, once 'pending' turns 'false',
- * it is safe to call 'TALER_MINT_get_keys()' on the mint's handle,
- * in order to get the "good" keys.
- *
- * @param keys information about the various keys used
- *        by the mint
- */
-static void
-keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
-{
-  /* HOT UPDATE: the merchants need the denomination keys!
-    Because it wants to (firstly) verify the deposit confirmation
-    sent by the mint, and the signed blob depends (among the
-    other things) on the coin's deposit fee. That information
-    is never communicated by the wallet to the merchant.
-    Again, the merchant needs it because it wants to verify that
-    the wallet didn't exceede the limit imposed by the merchant
-    on the total deposit fee for a purchase */
-
-  if (NULL != keys)
-  {
-    ((struct MERCHANT_Mint *) cls)->pending = 0;
-  }
-  else
-    printf ("no keys gotten\n");
 }
 
 
@@ -299,18 +242,6 @@ keys_mgmt_cb (void *cls, const struct TALER_MINT_Keys *keys)
 static void
 do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
-  unsigned int cnt;
-
-  for (cnt = 0; cnt < nmints; cnt++)
-  {
-    if (NULL != mints[cnt]->conn)
-      TALER_MINT_disconnect (mints[cnt]->conn);
-    if (NULL != mints[cnt]->poller_task)
-    {
-      GNUNET_SCHEDULER_cancel (mints[cnt]->poller_task);
-      mints[cnt]->poller_task = NULL;
-    }
-  }
   if (NULL != mhd_task)
   {
     GNUNET_SCHEDULER_cancel (mhd_task);
@@ -328,65 +259,6 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
   }
   if (NULL != keyfile)
     GNUNET_free (privkey);
-}
-
-
-/**
- * Task that runs the context's event loop using the GNUnet scheduler.
- *
- * @param cls a `struct MERCHANT_Mint *`
- * @param tc scheduler context (unused)
- */
-void
-context_task (void *cls,
-              const struct GNUNET_SCHEDULER_TaskContext *tc)
-{
-  struct MERCHANT_Mint *mint = cls;
-  long timeout;
-  int max_fd;
-  fd_set read_fd_set;
-  fd_set write_fd_set;
-  fd_set except_fd_set;
-  struct GNUNET_NETWORK_FDSet *rs;
-  struct GNUNET_NETWORK_FDSet *ws;
-  struct GNUNET_TIME_Relative delay;
-
-  mint->poller_task = NULL;
-  TALER_MINT_perform (mint->ctx);
-  max_fd = -1;
-  timeout = -1;
-  FD_ZERO (&read_fd_set);
-  FD_ZERO (&write_fd_set);
-  FD_ZERO (&except_fd_set);
-  TALER_MINT_get_select_info (mint->ctx,
-                              &read_fd_set,
-                              &write_fd_set,
-                              &except_fd_set,
-                              &max_fd,
-                              &timeout);
-  if (timeout >= 0)
-    delay =
-    GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS,
-                                   timeout);
-  else
-    delay = GNUNET_TIME_UNIT_FOREVER_REL;
-  rs = GNUNET_NETWORK_fdset_create ();
-  GNUNET_NETWORK_fdset_copy_native (rs,
-                                    &read_fd_set,
-                                    max_fd + 1);
-  ws = GNUNET_NETWORK_fdset_create ();
-  GNUNET_NETWORK_fdset_copy_native (ws,
-                                    &write_fd_set,
-                                    max_fd + 1);
-  mint->poller_task =
-    GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_DEFAULT,
-                                 delay,
-                                 rs,
-                                 ws,
-                                 &context_task,
-                                 mint);
-  GNUNET_NETWORK_fdset_destroy (rs);
-  GNUNET_NETWORK_fdset_destroy (ws);
 }
 
 
@@ -446,78 +318,15 @@ run_daemon (void *cls,
 
 /**
  * Kick MHD to run now, to be called after MHD_resume_connection().
+ * Basically, we need to explicitly resume MHD's event loop whenever
+ * we made progress serving a request.  This function re-schedules
+ * the task processing MHD's activities to run immediately.
  */
 void
-TM_trigger_daemon ()
+TMH_trigger_daemon ()
 {
   GNUNET_SCHEDULER_cancel (mhd_task);
   run_daemon (NULL, NULL);
-}
-
-
-/**
- * Parses mints listed in the configuration.
- *
- * @param cfg the configuration
- * @return the number of mints in the above array; #GNUNET_SYSERR upon error in
- *          parsing.
- */
-static int
-parse_mints (const struct GNUNET_CONFIGURATION_Handle *cfg)
-{
-  char *mints_str;
-  char *token_nf;               /* do no free (nf) */
-  char *mint_section;
-  char *mint_hostname;
-  struct MERCHANT_Mint **r_mints;
-  struct MERCHANT_Mint *mint;
-  unsigned int cnt;
-  int ok;
-
-  ok = 0;
-  mints_str = NULL;
-  token_nf = NULL;
-  mint_section = NULL;
-  mint_hostname = NULL;
-  r_mints = NULL;
-  cnt = 0;
-  EXITIF (GNUNET_OK !=
-          GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                 "merchant",
-                                                 "TRUSTED_MINTS",
-                                                 &mints_str));
-  for (token_nf = strtok (mints_str, " ");
-       NULL != token_nf;
-       token_nf = strtok (NULL, " "))
-  {
-    GNUNET_assert (0 < GNUNET_asprintf (&mint_section,
-                                        "mint-%s", token_nf));
-    EXITIF (GNUNET_OK !=
-            GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                   mint_section,
-                                                   "HOSTNAME",
-                                                   &mint_hostname));
-    mint = GNUNET_new (struct MERCHANT_Mint);
-    mint->hostname = mint_hostname;
-    GNUNET_array_append (r_mints,
-                         cnt,
-                         mint);
-    GNUNET_free (mint_section);
-    mint_section = NULL;
-  }
-  ok = 1;
-
- EXITIF_exit:
-  GNUNET_free_non_null (mints_str);
-  GNUNET_free_non_null (mint_section);
-  GNUNET_free_non_null (mint_hostname);
-  if (! ok)
-  {
-    GNUNET_free_non_null (r_mints);
-    return GNUNET_SYSERR;
-  }
-  mints = r_mints;
-  return cnt;
 }
 
 
@@ -748,16 +557,13 @@ run (void *cls,
      const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
-  unsigned int cnt;
-
   result = GNUNET_SYSERR;
   shutdown_task =
     GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
                                   &do_shutdown,
                                   NULL);
   EXITIF (GNUNET_SYSERR ==
-          (nmints =
-           parse_mints (config)));
+          TMH_MINTS_parse_cfg (config));
   EXITIF (GNUNET_SYSERR ==
           (nauditors =
            parse_auditors (config,
@@ -775,6 +581,8 @@ run (void *cls,
   EXITIF (NULL ==
           (privkey =
           GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)));
+  GNUNET_CRYPTO_eddsa_key_get_public (privkey,
+                                      &pubkey.eddsa_pub);
   EXITIF (NULL ==
           (db_conn = TALER_MERCHANTDB_connect (config)));
   EXITIF (GNUNET_OK !=
@@ -802,20 +610,6 @@ run (void *cls,
                                                  &edate_delay));
 
 
-  for (cnt = 0; cnt < nmints; cnt++)
-  {
-    EXITIF (NULL == (mints[cnt]->ctx = TALER_MINT_init ()));
-    mints[cnt]->pending = 1;
-    mints[cnt]->conn = TALER_MINT_connect (mints[cnt]->ctx,
-                                           mints[cnt]->hostname,
-                                           &keys_mgmt_cb,
-                                           mints[cnt],
-                                           TALER_MINT_OPTION_END);
-    EXITIF (NULL == mints[cnt]->conn);
-    mints[cnt]->poller_task =
-      GNUNET_SCHEDULER_add_now (&context_task,
-                                mints[cnt]);
-  }
 
   mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
                           port,

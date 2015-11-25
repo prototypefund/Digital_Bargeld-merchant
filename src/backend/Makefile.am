@@ -9,6 +9,7 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_parsing.c taler-merchant-httpd_parsing.h \
   taler-merchant-httpd_responses.c taler-merchant-httpd_responses.h \
   taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
+  taler-merchant-httpd_mints.c taler-merchant-httpd_mints.h \
   taler-merchant-httpd_contract.c taler-merchant-httpd_contract.h \
   taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h
 
