@@ -313,12 +313,10 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
  * Function called with the result of our mint lookup.
  *
  * @param cls the `struct PayContext`
- * @param mint NULL if mint was not found to be acceptable
  * @param mh NULL if mint was not found to be acceptable
  */
 static void
 process_pay_with_mint (void *cls,
-                       struct MERCHANT_Mint *mint,
                        struct TALER_MINT_Handle *mh)
 {
   struct PayContext *pc = cls;
@@ -327,7 +325,7 @@ process_pay_with_mint (void *cls,
   const struct TALER_MINT_Keys *keys;
   unsigned int i;
 
-  if (NULL == mint)
+  if (NULL == mh)
   {
     /* The mint on offer is not in the set of our (trusted)
        mints.  Reject the payment. */

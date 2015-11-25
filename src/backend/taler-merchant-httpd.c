@@ -248,6 +248,8 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
     TALER_MERCHANTDB_disconnect (db_conn);
     db_conn = NULL;
   }
+  TMH_MINTS_done ();
+  TMH_AUDITORS_done ();
   if (NULL != keyfile)
     GNUNET_free (privkey);
 }
@@ -486,7 +488,7 @@ run (void *cls,
                                   &do_shutdown,
                                   NULL);
   EXITIF (GNUNET_SYSERR ==
-          TMH_MINTS_parse_cfg (config));
+          TMH_MINTS_init (config));
   EXITIF (GNUNET_SYSERR ==
           TMH_AUDITORS_init (config));
   /* FIXME: for now, we just support SEPA here: */
