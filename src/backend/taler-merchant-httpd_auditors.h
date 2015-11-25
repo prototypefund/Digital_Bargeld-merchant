@@ -24,29 +24,35 @@
 
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
-#include <curl/curl.h>
 #include <taler/taler_util.h>
 #include <taler/taler_mint_service.h>
 #include "taler-merchant-httpd.h"
 
 
 /**
- * Array of auditors accepted by this mint.
+ * JSON representation of the auditors accepted by this mint.
  */
 extern json_t *j_auditors;
 
 
 /**
- * Parses auditors from the configuration.
+ * Parses auditor information from the configuration.
  *
  * @param cfg the configuration
- * @param mints the array of auditors upon successful parsing.  Will be NULL upon
- *          error.
- * @return the number of auditors in the above array; #GNUNET_SYSERR upon error in
+ * @return the number of auditors found; #GNUNET_SYSERR upon error in
  *          parsing.
  */
 int
 TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg);
+
+
+/**
+ * Release auditor information state.
+ */
+void
+TMH_AUDITORS_done (void);
+
+
 
 
 #endif

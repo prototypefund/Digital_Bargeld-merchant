@@ -69,12 +69,12 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
     return MHD_YES;
 
   /* add fields to the "root" that the backend should provide */
-  json_object_set_new (root,
-                       "mints",
-                       trusted_mints);
-  json_object_set_new (root,
-                       "auditors",
-                       j_auditors);
+  json_object_set (root,
+                   "mints",
+                   trusted_mints);
+  json_object_set (root,
+                   "auditors",
+                   j_auditors);
   json_object_set_new (root,
                        "H_wire",
 		       TALER_json_from_data (&h_wire,

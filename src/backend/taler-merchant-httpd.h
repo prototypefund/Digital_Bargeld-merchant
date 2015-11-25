@@ -89,17 +89,6 @@ struct TMH_RequestHandler
 };
 
 
-
-struct MERCHANT_Auditor
-{
-  /**
-   * Auditor's legal name
-   */
-  char *name;
-
-};
-
-
 /**
  * Each MHD response handler that sets the "connection_cls" to a
  * non-NULL value must use a struct that has this struct as its first

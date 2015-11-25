@@ -23,28 +23,39 @@
 #include "taler-merchant-httpd_auditors.h"
 
 /**
- * Active auditors
+ * Our representation of an auditor.
+ */
+struct MERCHANT_Auditor
+{
+  /**
+   * Auditor's legal name (FIXME: this is not what we really want.)
+   */
+  char *name;
+
+};
+
+
+/**
+ * Array of the auditors this merchant is willing to accept.
  */
 static struct MERCHANT_Auditor *auditors;
 
 /**
- * The number of active auditors
+ * The length of the #auditors array.
  */
 static unsigned int nauditors;
 
 /**
- * Array of auditors accepted by this mint.
+ * JSON representation of the auditors accepted by this mint.
  */
 json_t *j_auditors;
 
 
 /**
- * Parses auditors from the configuration.
+ * Parses auditor information from the configuration.
  *
  * @param cfg the configuration
- * @param mints the array of auditors upon successful parsing.  Will be NULL upon
- *          error.
- * @return the number of auditors in the above array; #GNUNET_SYSERR upon error in
+ * @return the number of auditors found; #GNUNET_SYSERR upon error in
  *          parsing.
  */
 int
@@ -106,11 +117,30 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
   /* Generate preferred mint(s) array. */
   j_auditors = json_array ();
   for (cnt = 0; cnt < nauditors; cnt++)
-  {
     json_array_append_new (j_auditors,
                            json_pack ("{s:s}",
                                       "name", auditors[cnt].name));
-  }
-
   return nauditors;
 }
+
+
+/**
+ * Release auditor information state.
+ */
+void
+TMH_AUDITORS_done ()
+{
+  unsigned int i;
+
+  json_decref (j_auditors);
+  j_auditors = NULL;
+  for (i=0;i<nauditors;i++)
+  {
+    GNUNET_free (auditors[i].name);
+  }
+  GNUNET_free (auditors);
+  auditors = NULL;
+  nauditors = 0;
+}
+
+/* end of taler-merchant-httpd_auditors.c */
