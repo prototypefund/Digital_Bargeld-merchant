@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014 GNUnet e.V.
+  Copyright (C) 2014, 2015 GNUnet e.V.
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -15,7 +15,7 @@
 */
 
 /**
- * @file taler-mint-httpd_responses.h
+ * @file taler-merchant-httpd_responses.h
  * @brief API for generating the various replies of the mint; these
  *        functions are called TMH_RESPONSE_reply_ and they generate
  *        and queue MHD response objects for a given connection.

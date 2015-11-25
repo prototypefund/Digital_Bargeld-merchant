@@ -28,11 +28,11 @@
 #include <curl/curl.h>
 #include <taler/taler_util.h>
 #include <taler/taler_mint_service.h>
-#include "taler-mint-httpd_parsing.h"
-#include "taler-mint-httpd_responses.h"
+#include "taler-merchant-httpd_parsing.h"
+#include "taler-merchant-httpd_responses.h"
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
-#include "taler-mint-httpd_mhd.h"
+#include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
 
@@ -351,7 +351,7 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
   }
   if (NULL != db_conn)
   {
-    MERCHANT_DB_disconnect (db_conn);
+    TALER_MERCHANTDB_disconnect (db_conn);
     db_conn = NULL;
   }
   if (NULL != keyfile)
@@ -618,8 +618,8 @@ parse_auditors (const struct GNUNET_CONFIGURATION_Handle *cfg,
 
 
 /**
- * Parse the SEPA information from the configuration.  If any of the required
- * fileds is missing return NULL.
+ * Parse the SEPA information from the configuration.  If any of the
+ * required fields is missing return NULL.
  *
  * @param cfg the configuration
  * @return Sepa details as a structure; NULL upon error
@@ -740,10 +740,6 @@ run (void *cls,
     GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
                                   &do_shutdown,
                                   NULL);
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "merchant launched\n");
-
   EXITIF (GNUNET_SYSERR ==
           (nmints =
            parse_mints (config)));
@@ -763,9 +759,9 @@ run (void *cls,
           (privkey =
           GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)));
   EXITIF (NULL ==
-          (db_conn = MERCHANT_DB_connect (config)));
+          (db_conn = TALER_MERCHANTDB_connect (config)));
   EXITIF (GNUNET_OK !=
-          MERCHANT_DB_initialize (db_conn, dry));
+          TALER_MERCHANTDB_initialize (db_conn, dry));
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_number (config,
                                                  "merchant",

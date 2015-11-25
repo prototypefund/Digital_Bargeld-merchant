@@ -54,13 +54,13 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 
   if (NULL != db_conn)
     {
-      MERCHANT_DB_disconnect (db_conn);
+      TALER_MERCHANTDB_disconnect (db_conn);
       db_conn = NULL;
     }
 }
 
 extern uint32_t
-MERCHANT_DB_get_contract_values (PGconn *conn,
+TALER_MERCHANTDB_contract_get_values (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
                                  uint64_t *nounce,
 				 struct GNUNET_TIME_Absolute *edate);
@@ -116,8 +116,8 @@ run (void *cls, char *const *args, const char *cfgfile,
   wire = NULL;
 
 
-  db_conn = MERCHANT_DB_connect (config);
-  if (GNUNET_OK != MERCHANT_DB_initialize (db_conn, GNUNET_NO))
+  db_conn = TALER_MERCHANTDB_connect (config);
+  if (GNUNET_OK != TALER_MERCHANTDB_initialize (db_conn, GNUNET_NO))
   {
     printf ("no db init'd\n");
     result = GNUNET_SYSERR;
@@ -293,7 +293,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   printf ("contract string : %s\n", aa);
 
   GNUNET_CRYPTO_hash (aa, strlen (aa) + 1, &h_contract_str);
-  if (GNUNET_SYSERR == MERCHANT_DB_get_contract_values (db_conn, &h_contract_str, &nounce, &edate))
+  if (GNUNET_SYSERR == TALER_MERCHANTDB_contract_get_values (db_conn, &h_contract_str, &nounce, &edate))
     printf ("no hash found\n");
   else
   {

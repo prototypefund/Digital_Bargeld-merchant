@@ -29,14 +29,12 @@
 #include <taler/taler_amount_lib.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mint_service.h>
-#include "taler-mint-httpd.h"
-#include "taler-mint-httpd_parsing.h"
-#include "taler-mint-httpd_responses.h"
+#include "taler-merchant-httpd.h"
+#include "taler-merchant-httpd_parsing.h"
+#include "taler-merchant-httpd_responses.h"
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
 
-extern struct MERCHANT_Auditor *auditors;
-extern unsigned int nauditors;
 
 /**
  * Manage a contract request. In practical terms, it adds the fields 'mints',

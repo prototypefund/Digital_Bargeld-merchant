@@ -511,7 +511,7 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
   }
   if (NULL != db_conn)
   {
-    MERCHANT_DB_disconnect (db_conn);
+    TALER_MERCHANTDB_disconnect (db_conn);
     db_conn = NULL;
   }
   if (NULL != mints_map)
@@ -792,7 +792,7 @@ handle_get_contract (struct MHD_Connection *connection,
                           template,
                           hostname,
                           port);
-  contract_id = MERCHANT_DB_contract_create (db_conn,
+  contract_id = TALER_MERCHANTDB_contract_create (db_conn,
                                     expiry,
                                     &amount,
                                     desc,
@@ -881,7 +881,7 @@ handle_download (struct MHD_Connection *conn,
           GNUNET_CRYPTO_eddsa_public_key_from_string (coin_pub_enc,
                                                       strlen (coin_pub_enc),
                                                       &coin_pub));
-  product_id = MERCHANT_DB_get_checkout_product (db_conn,
+  product_id = TALER_MERCHANTDB_checkout_get_product (db_conn,
                                                  &coin_pub);
   EXITIF (-1 == product_id);
   EXITIF (NULL == (item = find_product ((unsigned int) product_id)));
@@ -1117,7 +1117,7 @@ handle_checkout (struct MHD_Connection *conn,
   emsg = "Contract not found";
   status = MHD_HTTP_NOT_FOUND;
   LOG_DEBUG ("Looking for product associated with transaction %u\n", tid);
-  EXITIF (-1 == (product_id = MERCHANT_DB_get_contract_product (db_conn, tid)));
+  EXITIF (-1 == (product_id = TALER_MERCHANTDB_contract_get_product (db_conn, tid)));
 
   emsg = "Could not find the downloadable product.  Sorry :(";
   EXITIF (NULL == (product = find_product (product_id)));
@@ -1452,7 +1452,7 @@ run (void *cls, char *const *args, const char *cfgfile,
                                            &add_download_file,
                                            NULL));
   EXITIF (GNUNET_SYSERR == build_list_product_response ());
-  EXITIF (NULL == (db_conn = MERCHANT_DB_connect (config)));
+  EXITIF (NULL == (db_conn = TALER_MERCHANTDB_connect (config)));
   EXITIF (GNUNET_OK != MERCHANT_DB_initialise (db_conn, dry));
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_number (config,

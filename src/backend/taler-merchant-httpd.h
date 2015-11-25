@@ -18,9 +18,12 @@
  * @brief HTTP serving layer mainly intended to communicate with the frontend
  * @author Marcello Stanisci
  */
+#ifndef TALER_MERCHANT_HTTPD_H
+#define TALER_MERCHANT_HTTPD_H
 
 #include "platform.h"
 #include "taler_merchantdb_lib.h"
+#include <microhttpd.h>
 
 /**
  * Shorthand for exit jumps.
@@ -29,6 +32,64 @@
   do {                                                            \
     if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
   } while (0)
+
+
+
+
+/**
+ * @brief Struct describing an URL and the handler for it.
+ */
+struct TMH_RequestHandler
+{
+
+  /**
+   * URL the handler is for.
+   */
+  const char *url;
+
+  /**
+   * Method the handler is for, NULL for "all".
+   */
+  const char *method;
+
+  /**
+   * Mime type to use in reply (hint, can be NULL).
+   */
+  const char *mime_type;
+
+  /**
+   * Raw data for the @e handler
+   */
+  const void *data;
+
+  /**
+   * Number of bytes in @e data, 0 for 0-terminated.
+   */
+  size_t data_size;
+
+  /**
+   * Function to call to handle the request.
+   *
+   * @param rh this struct
+   * @param mime_type the @e mime_type for the reply (hint, can be NULL)
+   * @param connection the MHD connection to handle
+   * @param[in,out] connection_cls the connection's closure (can be updated)
+   * @param upload_data upload data
+   * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+   * @return MHD result code
+   */
+  int (*handler)(struct TMH_RequestHandler *rh,
+                 struct MHD_Connection *connection,
+                 void **connection_cls,
+                 const char *upload_data,
+                 size_t *upload_data_size);
+
+  /**
+   * Default response code.
+   */
+  int response_code;
+};
+
 
 
 /**
@@ -122,6 +183,9 @@ struct TM_HandlerContext
 };
 
 
+extern struct MERCHANT_Auditor *auditors;
+extern unsigned int nauditors;
+
 extern struct MERCHANT_WIREFORMAT_Sepa *wire;
 
 
@@ -164,3 +228,6 @@ MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
  */
 void
 TM_trigger_daemon (void);
+
+
+#endif

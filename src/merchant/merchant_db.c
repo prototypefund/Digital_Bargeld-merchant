@@ -48,7 +48,7 @@
  * @return connection to the postgresql database; NULL upon error
  */
 PGconn *
-MERCHANT_DB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg)
+TALER_MERCHANTDB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
   return GNUNET_POSTGRES_connect (cfg, "merchant-db");
 }
@@ -60,7 +60,7 @@ MERCHANT_DB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg)
  * @param conn database handle to close
  */
 void
-MERCHANT_DB_disconnect (PGconn *conn)
+TALER_MERCHANTDB_disconnect (PGconn *conn)
 {
   PQfinish (conn);
 }
@@ -195,7 +195,7 @@ MERCHANT_DB_initialise (PGconn *conn, int tmp)
  * @return -1 upon error; the serial id of the inserted contract upon success
  */
 long long
-MERCHANT_DB_contract_create (PGconn *conn,
+TALER_MERCHANTDB_contract_create (PGconn *conn,
                              struct GNUNET_TIME_Absolute expiry,
                              struct TALER_Amount *amount,
                              const char *desc,
@@ -242,7 +242,7 @@ MERCHANT_DB_contract_create (PGconn *conn,
 }
 
 long long
-MERCHANT_DB_get_contract_product (PGconn *conn,
+TALER_MERCHANTDB_contract_get_product (PGconn *conn,
                                   uint64_t contract_id)
 {
   PGresult *res;
@@ -272,7 +272,7 @@ MERCHANT_DB_get_contract_product (PGconn *conn,
 }
 
 unsigned int
-MERCHANT_DB_checkout_create (PGconn *conn,
+TALER_MERCHANTDB_checkout_create (PGconn *conn,
                              struct GNUNET_CRYPTO_EddsaPublicKey *coin_pub,
                              uint64_t transaction_id,
                              struct TALER_Amount *amount,
@@ -307,7 +307,7 @@ MERCHANT_DB_checkout_create (PGconn *conn,
 
 
 long long
-MERCHANT_DB_get_checkout_product (PGconn *conn,
+TALER_MERCHANTDB_checkout_get_product (PGconn *conn,
                                   struct GNUNET_CRYPTO_EddsaPublicKey *coin_pub)
 {
   PGresult *res;

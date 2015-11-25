@@ -23,7 +23,7 @@
 #ifndef TALER_MINT_HTTPD_PAY_H
 #define TALER_MINT_HTTPD_PAY_H
 #include <microhttpd.h>
-#include "taler-mint-httpd.h"
+#include "taler-merchant-httpd.h"
 
 /**
  * Manage a payment
@@ -33,7 +33,7 @@
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * 
+ *
  * @return MHD result code
  */
 int

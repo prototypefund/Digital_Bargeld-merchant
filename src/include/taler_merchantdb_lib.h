@@ -30,7 +30,7 @@
 
 /* Set of values that represent a contract. To be expanded on an
   as-needed basis */
-struct MERCHANT_contract_handle
+struct TALER_MERCHANTDB_ContractHandle
 {
   /* The nounce used when hashing the wire details
     for this contract */
@@ -59,7 +59,7 @@ struct MERCHANT_contract_handle
  * @return connection to the postgresql database; NULL upon error
  */
 PGconn *
-MERCHANT_DB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg);
+TALER_MERCHANTDB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg);
 
 
 /**
@@ -68,7 +68,7 @@ MERCHANT_DB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg);
  * @param conn database handle to close
  */
 void
-MERCHANT_DB_disconnect (PGconn *conn);
+TALER_MERCHANTDB_disconnect (PGconn *conn);
 
 
 /**
@@ -80,7 +80,7 @@ MERCHANT_DB_disconnect (PGconn *conn);
  * @return GNUNET_OK upon success; GNUNET_SYSERR upon failure
  */
 int
-MERCHANT_DB_initialize (PGconn *conn, int tmp);
+TALER_MERCHANTDB_initialize (PGconn *conn, int tmp);
 
 
 /**
@@ -102,7 +102,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp);
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
  */
 uint32_t
-MERCHANT_DB_contract_create (PGconn *conn,
+TALER_MERCHANTDB_contract_create (PGconn *conn,
                              const struct GNUNET_TIME_Absolute timestamp,
                              const struct GNUNET_TIME_Absolute expiry,
 			     struct GNUNET_TIME_Absolute edate,
@@ -116,7 +116,7 @@ MERCHANT_DB_contract_create (PGconn *conn,
 
 
 long long
-MERCHANT_DB_get_contract_product (PGconn *conn,
+TALER_MERCHANTDB_contract_get_product (PGconn *conn,
                                   uint64_t contract_id);
 
 
@@ -131,12 +131,12 @@ MERCHANT_DB_get_contract_product (PGconn *conn,
  * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  */
 uint32_t
-MERCHANT_DB_update_deposit_permission (PGconn *conn,
+TALER_MERCHANTDB_deposit_permission_update (PGconn *conn,
                                        uint64_t transaction_id,
 				       unsigned int pending);
 
 unsigned int
-MERCHANT_DB_checkout_create (PGconn *conn,
+TALER_MERCHANTDB_checkout_create (PGconn *conn,
                              struct GNUNET_CRYPTO_rsa_PublicKey *coin_pub,
                              uint64_t transaction_id,
                              struct TALER_Amount *amount,
@@ -144,7 +144,7 @@ MERCHANT_DB_checkout_create (PGconn *conn,
 
 
 long long
-MERCHANT_DB_get_checkout_product (PGconn *conn,
+TALER_MERCHANTDB_checkout_get_product (PGconn *conn,
                                   struct GNUNET_CRYPTO_rsa_PublicKey *coin_pub);
 
 /**
@@ -159,7 +159,7 @@ MERCHANT_DB_get_checkout_product (PGconn *conn,
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon errors
  */
 uint32_t
-MERCHANT_DB_get_contract_values (PGconn *conn,
+TALER_MERCHANTDB_contract_get_values (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
                                  uint64_t *nounce,
 				 struct GNUNET_TIME_Absolute *edate);
@@ -176,9 +176,9 @@ MERCHANT_DB_get_contract_values (PGconn *conn,
  * upon errors
  */
 uint32_t
-MERCHANT_DB_get_contract_handle (PGconn *conn,
+TALER_MERCHANTDB_contract_get_handle (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
-				 struct MERCHANT_contract_handle *contract_handle);
+				 struct TALER_MERCHANTDB_ContractHandle *contract_handle);
 
 /**
  * Store a deposit permission in DB. To be mainly used if /deposit should
@@ -192,7 +192,7 @@ MERCHANT_DB_get_contract_handle (PGconn *conn,
  * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  */
 uint32_t
-MERCHANT_DB_store_deposit_permission (PGconn *conn,
+TALER_MERCHANTDB_deposit_permission_store (PGconn *conn,
                                       const char *deposit_permission,
 				      uint64_t transaction_id,
 				      unsigned int pending,

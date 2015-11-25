@@ -14,7 +14,7 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file taler-mint-httpd_responses.c
+ * @file taler-merchant-httpd_responses.c
  * @brief API for generating the various replies of the mint; these
  *        functions are called TMH_RESPONSE_reply_ and they generate
  *        and queue MHD response objects for a given connection.
@@ -23,7 +23,7 @@
  * @author Christian Grothoff
  */
 #include "platform.h"
-#include "taler-mint-httpd_responses.h"
+#include "taler-merchant-httpd_responses.h"
 #include <taler/taler_util.h>
 #include <gnunet/gnunet_util_lib.h>
 

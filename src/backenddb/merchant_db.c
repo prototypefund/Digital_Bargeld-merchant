@@ -56,7 +56,7 @@
  * @return connection to the postgresql database; NULL upon error
  */
 PGconn *
-MERCHANT_DB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg)
+TALER_MERCHANTDB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
   return GNUNET_POSTGRES_connect (cfg, "merchant-db");
 }
@@ -68,7 +68,7 @@ MERCHANT_DB_connect (const struct GNUNET_CONFIGURATION_Handle *cfg)
  * @param conn database handle to close
  */
 void
-MERCHANT_DB_disconnect (PGconn *conn)
+TALER_MERCHANTDB_disconnect (PGconn *conn)
 {
   PQfinish (conn);
 }
@@ -83,7 +83,7 @@ MERCHANT_DB_disconnect (PGconn *conn)
  * @return GNUNET_OK upon success; GNUNET_SYSERR upon failure
  */
 int
-MERCHANT_DB_initialize (PGconn *conn, int tmp)
+TALER_MERCHANTDB_initialize (PGconn *conn, int tmp)
 {
   const char *tmp_str = (1 == tmp) ? "TEMPORARY" : "";
   char *sql;
@@ -264,7 +264,7 @@ MERCHANT_DB_initialize (PGconn *conn, int tmp)
  * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  */
 uint32_t
-MERCHANT_DB_update_deposit_permission (PGconn *conn,
+TALER_MERCHANTDB_deposit_permission_update (PGconn *conn,
                                        uint64_t transaction_id,
 				       unsigned int pending)
 {
@@ -299,6 +299,7 @@ MERCHANT_DB_update_deposit_permission (PGconn *conn,
     PQclear (res);
     return GNUNET_SYSERR;
   }
+  return GNUNET_OK;
 }
 
 
@@ -315,7 +316,7 @@ MERCHANT_DB_update_deposit_permission (PGconn *conn,
  * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  */
 uint32_t
-MERCHANT_DB_store_deposit_permission (PGconn *conn,
+TALER_MERCHANTDB_deposit_permission_store (PGconn *conn,
                                       const char *deposit_permission,
 				      uint64_t transaction_id,
 				      unsigned int pending,
@@ -390,7 +391,7 @@ MERCHANT_DB_store_deposit_permission (PGconn *conn,
  * already inserted @a c_id, #GNUNET_SYSERR for other errors.
  */
 uint32_t
-MERCHANT_DB_contract_create (PGconn *conn,
+TALER_MERCHANTDB_contract_create (PGconn *conn,
                              const struct GNUNET_TIME_Absolute timestamp,
                              const struct GNUNET_TIME_Absolute expiry,
 			     struct GNUNET_TIME_Absolute edate,
@@ -428,7 +429,7 @@ MERCHANT_DB_contract_create (PGconn *conn,
     TALER_PQ_query_param_end
   };
 
-  /* NOTE: the statement is prepared by MERCHANT_DB_initialize function */
+  /* NOTE: the statement is prepared by TALER_MERCHANTDB_initialize function */
   res = TALER_PQ_exec_prepared (conn, "contract_create", params);
   status = PQresultStatus (res);
 
@@ -465,7 +466,7 @@ MERCHANT_DB_contract_create (PGconn *conn,
 
 
 long long
-MERCHANT_DB_get_contract_product (PGconn *conn,
+TALER_MERCHANTDB_contract_get_product (PGconn *conn,
                                   uint64_t contract_id)
 {
   PGresult *res;
@@ -496,7 +497,7 @@ MERCHANT_DB_get_contract_product (PGconn *conn,
 
 
 unsigned int
-MERCHANT_DB_checkout_create (PGconn *conn,
+TALER_MERCHANTDB_checkout_create (PGconn *conn,
                              struct GNUNET_CRYPTO_rsa_PublicKey *coin_pub,
                              uint64_t transaction_id,
                              struct TALER_Amount *amount,
@@ -531,7 +532,7 @@ MERCHANT_DB_checkout_create (PGconn *conn,
 
 
 long long
-MERCHANT_DB_get_checkout_product (PGconn *conn,
+TALER_MERCHANTDB_checkout_get_product (PGconn *conn,
                                   struct GNUNET_CRYPTO_rsa_PublicKey *coin_pub)
 {
   PGresult *res;
@@ -578,7 +579,7 @@ MERCHANT_DB_get_checkout_product (PGconn *conn,
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon errors
  */
 uint32_t
-MERCHANT_DB_get_contract_values (PGconn *conn,
+TALER_MERCHANTDB_contract_get_values (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
                                  uint64_t *nounce,
 				 struct GNUNET_TIME_Absolute *edate)
@@ -627,11 +628,11 @@ MERCHANT_DB_get_contract_values (PGconn *conn,
  * upon errors
  */
 uint32_t
-MERCHANT_DB_get_contract_handle (PGconn *conn,
+TALER_MERCHANTDB_contract_get_handle (PGconn *conn,
                                  const struct GNUNET_HashCode *h_contract,
-				 struct MERCHANT_contract_handle *contract_handle)
+				 struct TALER_MERCHANTDB_ContractHandle *contract_handle)
 {
-  struct MERCHANT_contract_handle ch;
+  struct TALER_MERCHANTDB_ContractHandle ch;
   PGresult *res;
   ExecStatusType status;
 

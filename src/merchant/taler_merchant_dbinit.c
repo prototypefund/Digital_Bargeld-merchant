@@ -45,12 +45,12 @@ run (void *cls, char *const *args, const char *cfgfile,
 {
   PGconn *conn;
 
-  conn = MERCHANT_DB_connect (config);
+  conn = TALER_MERCHANTDB_connect (config);
   if (NULL == conn)
     return;
   if (GNUNET_OK == MERCHANT_DB_initialise (conn, GNUNET_NO))
     result = GNUNET_OK;
-  MERCHANT_DB_disconnect (conn);
+  TALER_MERCHANTDB_disconnect (conn);
 }
 
 

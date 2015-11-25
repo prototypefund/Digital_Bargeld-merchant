@@ -2,9 +2,9 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([taler], [0.0.0], [taler-bug@gnunet.org])
-AC_CONFIG_SRCDIR([src/merchant/merchant.c])
-AC_CONFIG_HEADERS([taler_config.h])
+AC_INIT([taler-merchant], [0.0.0], [taler-bug@gnunet.org])
+AC_CONFIG_SRCDIR([src/backend/taler-merchant-httpd.c])
+AC_CONFIG_HEADERS([taler_merchant_config.h])
 # support for non-recursive builds
 AM_INIT_AUTOMAKE([subdir-objects])
 

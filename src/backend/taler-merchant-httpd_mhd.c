@@ -15,7 +15,7 @@
 */
 
 /**
- * @file taler-mint-httpd_mhd.c
+ * @file taler-merchant-httpd_mhd.c
  * @brief helpers for MHD interaction; these are TALER_MINT_handler_ functions
  *        that generate simple MHD replies that do not require any real operations
  *        to be performed (error handling, static pages, etc.)
@@ -28,10 +28,10 @@
 #include <jansson.h>
 #include <microhttpd.h>
 #include <pthread.h>
-#include "taler-mint-httpd_responses.h"
-#include "taler-mint-httpd.h"
-#include "taler-mint-httpd_mhd.h"
-#include "taler-mint-httpd_responses.h"
+#include "taler-merchant-httpd_responses.h"
+#include "taler-merchant-httpd.h"
+#include "taler-merchant-httpd_mhd.h"
+#include "taler-merchant-httpd_responses.h"
 
 
 /**

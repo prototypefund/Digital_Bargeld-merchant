@@ -21,11 +21,10 @@
  * @author Benedikt Mueller
  * @author Christian Grothoff
  */
-
 #include "platform.h"
 #include <gnunet/gnunet_util_lib.h>
-#include "taler-mint-httpd_parsing.h"
-#include "taler-mint-httpd_responses.h"
+#include "taler-merchant-httpd_parsing.h"
+#include "taler-merchant-httpd_responses.h"
 
 /* Although the following declaration isn't in any case useful
   to a merchant's activity, it's needed here to make the function

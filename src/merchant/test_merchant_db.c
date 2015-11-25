@@ -52,7 +52,7 @@ static void
 do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
   if (NULL != conn)
-    MERCHANT_DB_disconnect (conn);
+    TALER_MERCHANTDB_disconnect (conn);
   conn = NULL;
 }
 
@@ -76,7 +76,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   uint64_t product;
   long long transaction_id;
 
-  conn = MERCHANT_DB_connect (config);
+  conn = TALER_MERCHANTDB_connect (config);
   EXITIF (NULL == conn);
   GNUNET_SCHEDULER_add_now (&do_shutdown, NULL);
   EXITIF (GNUNET_OK != MERCHANT_DB_initialise (conn, GNUNET_YES));
@@ -88,7 +88,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   nounce = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
   product = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE, UINT64_MAX);
   product &= (UINT64_MAX >> 1);
-  EXITIF (-1 == (transaction_id = MERCHANT_DB_contract_create (conn,
+  EXITIF (-1 == (transaction_id = TALER_MERCHANTDB_contract_create (conn,
                                                                expiry,
                                                                &amount,
                                                                desc,
@@ -103,19 +103,19 @@ run (void *cls, char *const *args, const char *cfgfile,
                                 &coin_pub, sizeof (coin_pub));
     GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
                                 &coin_sig, sizeof (coin_sig));
-    EXITIF (GNUNET_SYSERR == MERCHANT_DB_checkout_create (conn,
+    EXITIF (GNUNET_SYSERR == TALER_MERCHANTDB_checkout_create (conn,
                                                           &coin_pub,
                                                           transaction_id,
                                                           &amount,
                                                           &coin_sig));
-    EXITIF (-1 == (paid_product = MERCHANT_DB_get_checkout_product (conn,
+    EXITIF (-1 == (paid_product = TALER_MERCHANTDB_checkout_get_product (conn,
                                                                     &coin_pub)));
     EXITIF (paid_product < 0);
     EXITIF (((uint64_t) paid_product) != product);
     /* We should get -1 for product if a coin is not paid to us */
     GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
                                 &coin_pub, sizeof (coin_pub));
-    EXITIF (-1 != (product = MERCHANT_DB_get_checkout_product (conn,
+    EXITIF (-1 != (product = TALER_MERCHANTDB_checkout_get_product (conn,
                                                                &coin_pub)));
   }
   result = GNUNET_OK;

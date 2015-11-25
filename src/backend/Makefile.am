@@ -6,14 +6,11 @@ bin_PROGRAMS = \
 
 taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd.c taler-merchant-httpd.h \
-  taler-mint-httpd_parsing.c taler-mint-httpd_parsing.h \
-  taler-mint-httpd_responses.c taler-mint-httpd_responses.h \
-  taler-mint-httpd.h \
-  taler-mint-httpd_mhd.c taler-mint-httpd_mhd.h \
-  taler-merchant-httpd_contract.c \
-  taler-merchant-httpd_contract.h \
-  taler-merchant-httpd_pay.c \
-  taler-merchant-httpd_pay.h
+  taler-merchant-httpd_parsing.c taler-merchant-httpd_parsing.h \
+  taler-merchant-httpd_responses.c taler-merchant-httpd_responses.h \
+  taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
+  taler-merchant-httpd_contract.c taler-merchant-httpd_contract.h \
+  taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h
 
 
 taler_merchant_httpd_LDADD = \

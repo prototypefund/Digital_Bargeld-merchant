@@ -28,10 +28,10 @@
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mint_service.h>
 #include "taler-merchant-httpd.h"
-#include "taler-mint-httpd.h"
-#include "taler-mint-httpd_parsing.h"
-#include "taler-mint-httpd_responses.h"
-#include "taler-mint-httpd_mhd.h"
+#include "taler-merchant-httpd.h"
+#include "taler-merchant-httpd_parsing.h"
+#include "taler-merchant-httpd_responses.h"
+#include "taler-merchant-httpd_mhd.h"
 #include "taler_merchantdb_lib.h"
 
 
@@ -214,7 +214,7 @@ deposit_cb (void *cls,
 
   /*FIXME the index is the same for every individual cb */
   if (GNUNET_SYSERR ==
-      MERCHANT_DB_update_deposit_permission (db_conn,
+      TALER_MERCHANTDB_deposit_permission_update (db_conn,
                                              dcc->pc->transaction_id,
 	                                     0))
     /* TODO */
@@ -525,7 +525,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     /* b */
     char *deposit_permission_str = json_dumps (root, JSON_COMPACT);
-    if (GNUNET_OK != MERCHANT_DB_store_deposit_permission (db_conn,
+    if (GNUNET_OK != TALER_MERCHANTDB_deposit_permission_store (db_conn,
                                                            deposit_permission_str,
 			                                   transaction_id,
 					                   1,
