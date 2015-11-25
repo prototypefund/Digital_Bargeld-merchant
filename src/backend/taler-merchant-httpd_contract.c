@@ -19,29 +19,24 @@
  * @author Marcello Stanisci
  */
 #include "platform.h"
-#include <microhttpd.h>
 #include <jansson.h>
-#include <gnunet/gnunet_util_lib.h>
-#include <curl/curl.h>
 #include <taler/taler_signatures.h>
-#include <taler/taler_amount_lib.h>
-#include <taler/taler_json_lib.h>
-#include <taler/taler_mint_service.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_mints.h"
 #include "taler-merchant-httpd_responses.h"
-#include "taler_merchantdb_lib.h"
-#include "taler-merchant-httpd.h"
 
 
 /**
- * Manage a contract request. In practical terms, it adds the fields 'mints',
- * 'merchant_pub', and 'H_wire' to the contract 'proposition' gotten from the
- * frontend. Finally, it adds (outside of the contract) a signature of the
- * (hashed stringification) of this contract and the hashed stringification
- * of this contract to the final bundle sent back to the frontend.
+ * Manage a contract request. In practical terms, it adds the fields
+ * 'mints', 'merchant_pub', and 'H_wire' to the contract 'proposition'
+ * gotten from the frontend. Finally, it adds (outside of the
+ * contract) a signature of the (hashed stringification) of the
+ * contract (and the hashed stringification of this contract as well
+ * to aid diagnostics) to the final bundle, which is then send back to
+ * the frontend.
+ *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
  * @param[in,out] connection_cls the connection's closure (can be updated)
@@ -59,7 +54,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   json_t *root;
   int res;
   struct GNUNET_HashCode h_wire;
-  struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
   struct TALER_ContractPS contract;
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
 
@@ -74,24 +68,22 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
-
+  /* add fields to the "root" that the backend should provide */
   json_object_set_new (root,
                        "mints",
                        trusted_mints);
   json_object_set_new (root,
                        "auditors",
                        j_auditors);
-
   json_object_set_new (root,
                        "H_wire",
 		       TALER_json_from_data (&h_wire,
                                              sizeof (h_wire)));
-
-  GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pubkey);
   json_object_set_new (root,
                        "merchant_pub",
-		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
-
+		       TALER_json_from_data (&pubkey,
+                                             sizeof (pubkey)));
+  /* create contract signature */
   GNUNET_assert (GNUNET_OK ==
                  TALER_hash_json (root,
                                   &contract.h_contract));
@@ -100,15 +92,15 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   GNUNET_CRYPTO_eddsa_sign (privkey,
                             &contract.purpose,
                             &contract_sig);
-
+  /* return final response */
   return TMH_RESPONSE_reply_json_pack (connection,
 				       MHD_HTTP_OK,
 				       "{s:o, s:o, s:o}",
 				       "contract", root,
-				       "sig", TALER_json_from_data
-				              (&contract_sig,
-                                               sizeof (contract_sig)),
-				       "H_contract", TALER_json_from_data
-				                     (&contract.h_contract,
-				                      sizeof (contract.h_contract)));
+				       "sig", TALER_json_from_data (&contract_sig,
+                                                                    sizeof (contract_sig)),
+				       "H_contract", TALER_json_from_data (&contract.h_contract,
+                                                                           sizeof (contract.h_contract)));
 }
+
+/* end of taler-merchant-httpd_contract.c */
