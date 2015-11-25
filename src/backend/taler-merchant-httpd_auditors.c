@@ -25,7 +25,7 @@
 /**
  * Our representation of an auditor.
  */
-struct MERCHANT_Auditor
+struct Auditor
 {
   /**
    * Auditor's legal name (FIXME: this is not what we really want.)
@@ -38,7 +38,7 @@ struct MERCHANT_Auditor
 /**
  * Array of the auditors this merchant is willing to accept.
  */
-static struct MERCHANT_Auditor *auditors;
+static struct Auditor *auditors;
 
 /**
  * The length of the #auditors array.
@@ -65,8 +65,8 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
   char *token_nf;               /* do no free (nf) */
   char *auditor_section;
   char *auditor_name;
-  struct MERCHANT_Auditor *r_auditors;
-  struct MERCHANT_Auditor auditor;
+  struct Auditor *r_auditors;
+  struct Auditor auditor;
   unsigned int cnt;
   int ok;
 
