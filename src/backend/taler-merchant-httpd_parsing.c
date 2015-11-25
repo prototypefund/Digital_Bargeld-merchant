@@ -144,6 +144,7 @@ buffer_append (struct Buffer *buf,
   return GNUNET_OK;
 }
 
+
 /**
  * Function called whenever we are done with a request
  * to clean up our state.
@@ -162,6 +163,7 @@ TMH_PARSE_post_cleanup_callback (void *con_cls)
     GNUNET_free (r);
   }
 }
+
 
 /**
  * Release all memory allocated for the variable-size fields in
@@ -247,6 +249,7 @@ release_data (struct TMH_PARSE_FieldSpecification *spec,
     }
   }
 }
+
 
 /**
  * Process a POST request containing a JSON object.  This function
@@ -348,6 +351,7 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
 
   return GNUNET_YES;
 }
+
 
 /**
  * Generate line in parser specification for string. The returned
