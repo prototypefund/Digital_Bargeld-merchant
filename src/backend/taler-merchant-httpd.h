@@ -153,13 +153,6 @@ extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 extern struct TALER_MerchantPublicKeyP pubkey;
 
 
-extern struct MERCHANT_Auditor *auditors;
-
-extern unsigned int nauditors;
-
-
-
-
 extern PGconn *db_conn;
 
 

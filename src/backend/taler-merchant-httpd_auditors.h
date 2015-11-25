@@ -14,31 +14,39 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_pay.h
- * @brief headers for /pay handler
+ * @file backend/taler-merchant-httpd_auditors.h
+ * @brief logic this HTTPD keeps for each mint we interact with
  * @author Marcello Stanisci
+ * @author Christian Grothoff
  */
-#ifndef TALER_MINT_HTTPD_PAY_H
-#define TALER_MINT_HTTPD_PAY_H
-#include <microhttpd.h>
+#ifndef TALER_MERCHANT_HTTPD_AUDITORS_H
+#define TALER_MERCHANT_HTTPD_AUDITORS_H
+
+#include <jansson.h>
+#include <gnunet/gnunet_util_lib.h>
+#include <curl/curl.h>
+#include <taler/taler_util.h>
+#include <taler/taler_mint_service.h>
 #include "taler-merchant-httpd.h"
 
 
 /**
- * Manage a payment
+ * Array of auditors accepted by this mint.
+ */
+extern json_t *j_auditors;
+
+
+/**
+ * Parses auditors from the configuration.
  *
- * @param rh context of the handler
- * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @return MHD result code
+ * @param cfg the configuration
+ * @param mints the array of auditors upon successful parsing.  Will be NULL upon
+ *          error.
+ * @return the number of auditors in the above array; #GNUNET_SYSERR upon error in
+ *          parsing.
  */
 int
-MH_handler_pay (struct TMH_RequestHandler *rh,
-                struct MHD_Connection *connection,
-                void **connection_cls,
-                const char *upload_data,
-                size_t *upload_data_size);
+TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg);
+
 
 #endif

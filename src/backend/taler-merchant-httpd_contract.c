@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014 Christian Grothoff (and other contributing authors)
+  (C) 2014, 2015 Christian Grothoff (and other contributing authors)
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -13,13 +13,11 @@
   You should have received a copy of the GNU General Public License along with
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
-
 /**
- * @file merchant/backend/taler-merchant-httpd.c
+ * @file backend/taler-merchant-httpd_contract.c
  * @brief HTTP serving layer mainly intended to communicate with the frontend
  * @author Marcello Stanisci
  */
-
 #include "platform.h"
 #include <microhttpd.h>
 #include <jansson.h>
@@ -31,6 +29,7 @@
 #include <taler/taler_mint_service.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_parsing.h"
+#include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_mints.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler_merchantdb_lib.h"
@@ -58,14 +57,10 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                      size_t *upload_data_size)
 {
   json_t *root;
-  json_t *j_auditors;
-  json_t *auditor;
   int res;
-  int cnt;
   struct GNUNET_HashCode h_wire;
   struct GNUNET_CRYPTO_EddsaPublicKey pubkey;
   struct TALER_ContractPS contract;
-  char *contract_str;
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
 
   res = TMH_PARSE_post_json (connection,
@@ -75,38 +70,17 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                              &root);
   if (GNUNET_SYSERR == res)
     return MHD_NO;
-  /* the POST's body has to be further fetched */ if ((GNUNET_NO == res) || (NULL == root))
+  /* the POST's body has to be further fetched */
+  if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
-  /* Generate preferred mint(s) array. */
 
-  j_auditors = json_array ();
-  for (cnt = 0; cnt < nauditors; cnt++)
-  {
-    auditor = json_pack ("{s:s}",
-                         "name", auditors[cnt].name);
-    json_array_append_new (j_auditors, auditor);
-  }
-
-  /**
-   * Return badly if no mints are trusted (or no call to /keys has still
-   * returned the expected data). WARNING: it
-   * may be possible that a mint trusted by the wallet is good, but
-   * still pending; that case must be handled with some "polling-style"
-   * routine, simply ignored, or ended with an invitation to the wallet
-   * to just retry later
-   */
-  if (! json_array_size (trusted_mints))
-    return MHD_NO;
-
-  /**
-   * Hard error, no action can be taken by a wallet
-   */
-  if (! json_array_size (j_auditors))
-    return MHD_NO;
-
-  json_object_set_new (root, "mints", trusted_mints);
-  json_object_set_new (root, "auditors", j_auditors);
+  json_object_set_new (root,
+                       "mints",
+                       trusted_mints);
+  json_object_set_new (root,
+                       "auditors",
+                       j_auditors);
 
   json_object_set_new (root,
                        "H_wire",
@@ -118,21 +92,23 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                        "merchant_pub",
 		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
 
-  /* Sign */
-  contract_str = json_dumps (root, JSON_COMPACT | JSON_SORT_KEYS);
-  GNUNET_CRYPTO_hash (contract_str, strlen (contract_str), &contract.h_contract);
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_hash_json (root,
+                                  &contract.h_contract));
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract.purpose.size = htonl (sizeof (contract));
-  GNUNET_CRYPTO_eddsa_sign (privkey, &contract.purpose, &contract_sig);
+  GNUNET_CRYPTO_eddsa_sign (privkey,
+                            &contract.purpose,
+                            &contract_sig);
 
   return TMH_RESPONSE_reply_json_pack (connection,
 				       MHD_HTTP_OK,
 				       "{s:o, s:o, s:o}",
 				       "contract", root,
 				       "sig", TALER_json_from_data
-				              (&contract_sig, sizeof (contract_sig)),
+				              (&contract_sig,
+                                               sizeof (contract_sig)),
 				       "H_contract", TALER_json_from_data
 				                     (&contract.h_contract,
 				                      sizeof (contract.h_contract)));
-
 }

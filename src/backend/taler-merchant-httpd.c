@@ -33,8 +33,9 @@
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
-#include "taler-merchant-httpd_contract.h"
+#include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_mints.h"
+#include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
 
 
@@ -86,11 +87,6 @@ struct GNUNET_TIME_Relative edate_delay;
 char *TMH_merchant_currency_string;
 
 /**
- * Active auditors
- */
-struct MERCHANT_Auditor *auditors;
-
-/**
  * Shutdown task identifier
  */
 static struct GNUNET_SCHEDULER_Task *shutdown_task;
@@ -99,11 +95,6 @@ static struct GNUNET_SCHEDULER_Task *shutdown_task;
  * Task running the HTTP server.
  */
 static struct GNUNET_SCHEDULER_Task *mhd_task;
-
-/**
- * The number of active auditors
- */
-unsigned int nauditors;
 
 /**
  * Should we do a dry run where temporary tables are used for storing the data.
@@ -331,74 +322,6 @@ TMH_trigger_daemon ()
 
 
 /**
- * Parses auditors from the configuration.
- *
- * @param cfg the configuration
- * @param mints the array of auditors upon successful parsing.  Will be NULL upon
- *          error.
- * @return the number of auditors in the above array; #GNUNET_SYSERR upon error in
- *          parsing.
- */
-static int
-parse_auditors (const struct GNUNET_CONFIGURATION_Handle *cfg,
-                struct MERCHANT_Auditor **auditors)
-{
-  char *auditors_str;
-  char *token_nf;               /* do no free (nf) */
-  char *auditor_section;
-  char *auditor_name;
-  struct MERCHANT_Auditor *r_auditors;
-  struct MERCHANT_Auditor auditor;
-  unsigned int cnt;
-  int ok;
-
-  ok = 0;
-  auditors_str = NULL;
-  token_nf = NULL;
-  auditor_section = NULL;
-  auditor_name = NULL;
-  r_auditors = NULL;
-  cnt = 0;
-  EXITIF (GNUNET_OK !=
-          GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                 "merchant",
-                                                 "AUDITORS",
-                                                 &auditors_str));
-  for (token_nf = strtok (auditors_str, " ");
-       NULL != token_nf;
-       token_nf = strtok (NULL, " "))
-  {
-    GNUNET_assert (0 < GNUNET_asprintf (&auditor_section,
-                                        "auditor-%s", token_nf));
-    EXITIF (GNUNET_OK !=
-            GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                   auditor_section,
-                                                   "NAME",
-                                                   &auditor_name));
-    auditor.name = auditor_name;
-    GNUNET_array_append (r_auditors, cnt, auditor);
-    auditor_name = NULL;
-    GNUNET_free (auditor_section);
-    auditor_section = NULL;
-  }
-  ok = 1;
-
- EXITIF_exit:
-  GNUNET_free_non_null (auditors_str);
-  GNUNET_free_non_null (auditor_section);
-  GNUNET_free_non_null (auditor_name);
-  if (! ok)
-  {
-    GNUNET_free_non_null (r_auditors);
-    return GNUNET_SYSERR;
-  }
-
-  *auditors = r_auditors;
-  return cnt;
-}
-
-
-/**
  * Parse the SEPA information from the configuration.  If any of the
  * required fields is missing return an error.
  *
@@ -548,7 +471,7 @@ prepare_daemon ()
  * @param cls closure
  * @param args remaining command-line arguments
  * @param cfgfile name of the configuration file used (for saving, can be
- * NULL!)
+ *        NULL!)
  * @param config configuration
  */
 void
@@ -565,9 +488,7 @@ run (void *cls,
   EXITIF (GNUNET_SYSERR ==
           TMH_MINTS_parse_cfg (config));
   EXITIF (GNUNET_SYSERR ==
-          (nauditors =
-           parse_auditors (config,
-                           &auditors)));
+          TMH_AUDITORS_init (config));
   /* FIXME: for now, we just support SEPA here: */
   EXITIF (GNUNET_OK !=
            parse_wireformat_sepa (config));
@@ -605,11 +526,9 @@ run (void *cls,
 
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_time (config,
-                                                 "merchant",
-                                                 "EDATE",
-                                                 &edate_delay));
-
-
+                                               "merchant",
+                                               "EDATE",
+                                               &edate_delay));
 
   mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
                           port,
