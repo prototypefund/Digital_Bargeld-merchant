@@ -61,7 +61,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   json_t *j_auditors;
   json_t *auditor;
   json_t *mint;
-  json_t *j_wire;
   const struct TALER_MINT_Keys *keys;
   int res;
   int cnt;
@@ -114,30 +113,22 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
    * routine, simply ignored, or ended with an invitation to the wallet
    * to just retry later
    */
-  if (!json_array_size (trusted_mints))
+  if (! json_array_size (trusted_mints))
     return MHD_NO;
 
   /**
    * Hard error, no action can be taken by a wallet
    */
-  if (!json_array_size (j_auditors))
+  if (! json_array_size (j_auditors))
     return MHD_NO;
 
   json_object_set_new (root, "mints", trusted_mints);
   json_object_set_new (root, "auditors", j_auditors);
 
-  if (NULL == (j_wire = MERCHANT_get_wire_json (wire,
-                                                salt)))
-    return MHD_NO;
-
-  /* hash wire objcet */
-  if (GNUNET_SYSERR ==
-      TALER_hash_json (j_wire, &h_wire))
-    return MHD_NO;
-
   json_object_set_new (root,
                        "H_wire",
-		       TALER_json_from_data (&h_wire, sizeof (h_wire)));
+		       TALER_json_from_data (&h_wire,
+                                             sizeof (h_wire)));
 
   GNUNET_CRYPTO_eddsa_key_get_public (privkey, &pubkey);
   json_object_set_new (root,

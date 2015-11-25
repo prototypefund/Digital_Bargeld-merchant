@@ -183,11 +183,21 @@ struct TM_HandlerContext
 };
 
 
+
+/**
+ * Our wire format details in JSON format (with salt).
+ */
+extern json_t *j_wire;
+
+/**
+ * Hash of our wire format details as given in #j_wire.
+ */
+extern struct GNUNET_HashCode h_wire;
+
+
+
 extern struct MERCHANT_Auditor *auditors;
 extern unsigned int nauditors;
-
-extern struct MERCHANT_WIREFORMAT_Sepa *wire;
-
 
 extern struct MERCHANT_Mint **mints;
 
@@ -196,7 +206,6 @@ extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 
 extern PGconn *db_conn;
 
-extern long long salt;
 
 extern unsigned int nmints;
 

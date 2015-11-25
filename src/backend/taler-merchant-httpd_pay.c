@@ -298,7 +298,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   json_t *coins;
   char *chosen_mint;
   json_t *coin_aggregate;
-  json_t *wire_details;
   unsigned int mint_index; /*a cell in the global array*/
   unsigned int coins_index;
   unsigned int coins_cnt;
@@ -478,7 +477,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                        "merchant_pub",
 		       TALER_json_from_data (&pubkey, sizeof (pubkey)));
 
-  wire_details = MERCHANT_get_wire_json (wire, salt);
   /* since memory is zero'd out by GNUNET_malloc, any 'ackd' field will be
     (implicitly) set to false */
   dc = GNUNET_malloc (coins_cnt * sizeof (struct MERCHANT_DepositConfirmation));
@@ -546,7 +544,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     dh = TALER_MINT_deposit (mints[mint_index]->conn,
                              &percoin_amount,
 			     edate,
-			     wire_details,
+			     j_wire,
 			     &h_contract,
 			     &coin_pub,
 			     &ub_sig,

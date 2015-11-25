@@ -39,19 +39,20 @@
 
 
 /**
+ * Our wire format details in JSON format (with salt).
+ */
+struct json_t *j_wire;
+
+/**
+ * Hash of our wire format details as given in #j_wire.
+ */
+struct GNUNET_HashCode h_wire;
+
+
+/**
  * Merchant's private key
  */
 struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
-
-/**
- * Our wireformat
- */
-struct MERCHANT_WIREFORMAT_Sepa *wire;
-
-/**
- * Salt used to hash the wire object
- */
-long long salt;
 
 /**
  * Our hostname
@@ -128,35 +129,6 @@ PGconn *db_conn;
  * The MHD Daemon
  */
 static struct MHD_Daemon *mhd;
-
-
-/**
- * Take the global wire details and return a JSON containing them,
- * compliantly with the Taler's API.
- *
- * @param wire the merchant's wire details
- * @param salt the nounce for hashing the wire details with
- * @param edate when the beneficiary wants this transfer to take place
- * @return JSON representation of the wire details, NULL upon errors
- */
-json_t *
-MERCHANT_get_wire_json (const struct MERCHANT_WIREFORMAT_Sepa *wire,
-                        uint64_t salt)
-
-{
-  json_t *root;
-  json_t *j_salt;
-
-  j_salt = json_integer (salt);
-  if (NULL == (root = json_pack ("{s:s, s:s, s:s, s:s, s:I}",
-                                 "type", "SEPA",
-		                 "IBAN", wire->iban,
-		                 "name", wire->name,
-		                 "bic", wire->bic,
-		                 "r", json_integer_value (j_salt))))
-    return NULL;
-  return root;
-}
 
 
 /**
@@ -619,52 +591,95 @@ parse_auditors (const struct GNUNET_CONFIGURATION_Handle *cfg,
 
 /**
  * Parse the SEPA information from the configuration.  If any of the
- * required fields is missing return NULL.
+ * required fields is missing return an error.
  *
  * @param cfg the configuration
- * @return Sepa details as a structure; NULL upon error
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR on error
  */
-static struct MERCHANT_WIREFORMAT_Sepa *
+static int
 parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
-  struct MERCHANT_WIREFORMAT_Sepa *wf;
+  unsigned long long salt;
+  char *iban;
+  char *name;
+  char *bic;
 
-  wf = GNUNET_new (struct MERCHANT_WIREFORMAT_Sepa);
-  EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                              "wire-sepa",
-                                                              "IBAN",
-                                                              &wf->iban));
-  EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                              "wire-sepa",
-                                                              "NAME",
-                                                              &wf->name));
-  EXITIF (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                              "wire-sepa",
-                                                              "BIC",
-                                                              &wf->bic));
-  return wf;
-
- EXITIF_exit:
-  GNUNET_free_non_null (wf->iban);
-  GNUNET_free_non_null (wf->name);
-  GNUNET_free_non_null (wf->bic);
-  GNUNET_free (wf);
-  return NULL;
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_number (cfg,
+                                             "wire-sepa",
+                                             "SALT",
+                                             &salt))
+  {
+    salt = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE,
+                                     UINT64_MAX);
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "No SALT option given in `wire-sepa`, using %llu\n",
+                (unsigned long long) salt);
+  }
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             "wire-sepa",
+                                             "IBAN",
+                                             &iban))
+    return GNUNET_SYSERR;
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             "wire-sepa",
+                                             "NAME",
+                                             &name))
+  {
+    GNUNET_free (iban);
+    return GNUNET_SYSERR;
+  }
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             "wire-sepa",
+                                             "BIC",
+                                             &bic))
+  {
+    GNUNET_free (iban);
+    GNUNET_free (name);
+    GNUNET_free (bic);
+  }
+  j_wire = json_pack ("{s:s, s:s, s:s, s:s, s:o}",
+                      "type", "SEPA",
+                      "IBAN", iban,
+                      "name", name,
+                      "bic", bic,
+                      "r", json_integer (salt));
+  GNUNET_free (iban);
+  GNUNET_free (name);
+  GNUNET_free (bic);
+  if (NULL == j_wire)
+    return GNUNET_SYSERR;
+  return GNUNET_OK;
 }
 
 
 /**
- * Destroy and free resouces occupied by the wireformat structure
+ * Verify that #j_wire contains a well-formed wire format, and
+ * update #h_wire to match it (if successful).
  *
- * @param wf the wireformat structure
+ * @param allowed which wire format is allowed/expected?
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR on error
  */
-static void
-destroy_wireformat_sepa (struct MERCHANT_WIREFORMAT_Sepa *wf)
+static int
+validate_and_hash_wireformat (const char *allowed)
 {
-  GNUNET_free_non_null (wf->iban);
-  GNUNET_free_non_null (wf->name);
-  GNUNET_free_non_null (wf->bic);
-  GNUNET_free (wf);
+  const char *allowed_arr[] = {
+    allowed,
+    NULL
+  };
+
+  if (GNUNET_YES !=
+      TALER_json_validate_wireformat (allowed_arr,
+                                      j_wire))
+    return GNUNET_SYSERR;
+  if (GNUNET_SYSERR ==
+      TALER_hash_json (j_wire,
+                       &h_wire))
+    return MHD_NO;
+  return GNUNET_OK;
 }
 
 
@@ -747,9 +762,11 @@ run (void *cls,
           (nauditors =
            parse_auditors (config,
                            &auditors)));
-  EXITIF (NULL ==
-          (wire =
-           parse_wireformat_sepa (config)));
+  /* FIXME: for now, we just support SEPA here: */
+  EXITIF (GNUNET_OK !=
+           parse_wireformat_sepa (config));
+  EXITIF (GNUNET_OK !=
+          validate_and_hash_wireformat ("SEPA"));
   EXITIF (GNUNET_OK !=
           GNUNET_CONFIGURATION_get_value_filename (config,
                                                    "merchant",
@@ -784,8 +801,6 @@ run (void *cls,
                                                  "EDATE",
                                                  &edate_delay));
 
-  salt = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_NONCE,
-                                   UINT64_MAX);
 
   for (cnt = 0; cnt < nmints; cnt++)
   {
@@ -841,8 +856,8 @@ main (int argc, char *const *argv)
 
   if (GNUNET_OK !=
       GNUNET_PROGRAM_run (argc, argv,
-                          "taler-merchant-http",
-                          "Serve merchant's HTTP interface",
+                          "taler-merchant-httpd",
+                          "Taler merchant's HTTP backend interface",
                           options, &run, NULL))
     return 3;
   return (GNUNET_OK == result) ? 0 : 1;
