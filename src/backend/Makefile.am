@@ -14,17 +14,10 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_contract.c taler-merchant-httpd_contract.h \
   taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h
 
-
 taler_merchant_httpd_LDADD = \
-  $(LIBGCRYPT_LIBS) \
+  $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
+  -ltalermint \
   -ltalerutil \
   -lmicrohttpd \
   -ljansson \
-  -lcurl \
-  -lgnunetutil \
-  $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
-  -ltalermint \
-  -ltalerpq \
-  -lgnunetpostgres \
-  -lpq \
-  -lpthread
+  -lgnunetutil

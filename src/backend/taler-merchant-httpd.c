@@ -13,7 +13,6 @@
   You should have received a copy of the GNU General Public License along with
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
-
 /**
  * @file merchant/backend/taler-merchant-httpd.c
  * @brief HTTP serving layer intended to perform crypto-work and
@@ -25,7 +24,6 @@
 #include <microhttpd.h>
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
-#include <curl/curl.h>
 #include <taler/taler_util.h>
 #include <taler/taler_mint_service.h>
 #include "taler-merchant-httpd_parsing.h"
