@@ -61,6 +61,7 @@ struct MERCHANT_DepositConfirmation
 
   /**
    * Amount "f" that this coin contributes to the overall payment.
+   * FIXME: is this with/without fee?
    */
   struct TALER_Amount percoin_amount;
 
@@ -316,6 +317,7 @@ process_pay_with_mint (void *cls,
 {
   struct PayContext *pc = cls;
   struct TALER_Amount acc_fee;
+  struct TALER_Amount acc_amount;
   struct TALER_Amount coin_fee;
   const struct TALER_MINT_Keys *keys;
   unsigned int i;
@@ -326,8 +328,8 @@ process_pay_with_mint (void *cls,
        mints.  Reject the payment. */
     GNUNET_break_op (0);
     resume_pay_with_response (pc,
-                              403, /* FIXME */
-                              TMH_RESPONSE_make_external_error ("unknown mint"));
+                              MHD_HTTP_PRECONDITION_FAILED,
+                              TMH_RESPONSE_make_external_error ("mint not supported"));
     return;
   }
 
@@ -336,7 +338,7 @@ process_pay_with_mint (void *cls,
   {
     GNUNET_break (0);
     resume_pay_with_response (pc,
-                              UINT_MAX, /* FIXME */
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
                               TMH_RESPONSE_make_internal_error ("no keys"));
     return;
   }
@@ -359,12 +361,22 @@ process_pay_with_mint (void *cls,
                                                              "denom_pub", TALER_json_from_rsa_public_key (dc->denom.rsa_public_key)));
       return;
     }
+    /* FIXME: also check that this denomination key is
+       audited by an acceptable auditor! */
     if (0 == i)
+    {
       acc_fee = denom_details->fee_deposit;
+      acc_amount = dc->percoin_amount;
+    }
     else
+    {
       TALER_amount_add (&acc_fee,
                         &denom_details->fee_deposit,
-			&coin_fee);
+			&acc_fee);
+      TALER_amount_add (&acc_amount,
+                        &dc->percoin_amount,
+			&acc_amount);
+    }
   }
 
   /* FIXME: we should check that the total matches as well... */

@@ -147,7 +147,6 @@ int
 TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
   unsigned int cnt;
-  int ok;
 
   GNUNET_CONFIGURATION_iterate_sections (cfg,
                                          &parse_auditors,
