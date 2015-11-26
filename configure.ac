@@ -50,14 +50,12 @@ AS_IF([test $libgnunetutil != 1],
 *** ]])])
 
 
-# check for libpq (postgresql)
+# test for postgres
 AX_LIB_POSTGRESQL([9.3])
-AS_IF([test ! "$found_postgresql" = "yes"],
-  [AC_MSG_ERROR([[
-***
-*** You need postgresql / libpq to build this program.
-*** ]])])
-
+if test "$found_postgresql" = "yes"; then
+  postgres=true
+fi
+AM_CONDITIONAL(HAVE_POSTGRESQL, test x$postgres = xtrue)
 
 # Check for Taler's libtalerpq
 libtalerpq=0
@@ -81,13 +79,7 @@ AC_CHECK_HEADERS([taler/taler_pq_lib.h],
    [], [#ifdef HAVE_GNUNET_PLATFORM_H
         #include <gnunet/platform.h>
        #endif])
-AS_IF([test $libtalerpq != 1],
-  [AC_MSG_ERROR([[
-***
-*** You need libtalerpq to build this program.
-*** This library is part of the Taler MINT, available at
-***   https://taler.net
-*** ]])])
+AM_CONDITIONAL(HAVE_TALERPQ, test x$libtalerpq = x1)
 
 
 # check for libmicrohttpd
