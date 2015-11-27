@@ -65,13 +65,14 @@ json_t *j_auditors;
  * Function called on each configuration section. Finds sections
  * about auditors and parses the entries.
  *
- * @param cls closure
+ * @param cls closure, with a `const struct GNUNET_CONFIGURATION_Handle *`
  * @param section name of the section
  */
 static void
 parse_auditors (void *cls,
                 const char *section)
 {
+  const struct GNUNET_CONFIGURATION_Handle *cfg = cfg;
   char *pks;
   struct Auditor auditor;
 
@@ -150,7 +151,7 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 
   GNUNET_CONFIGURATION_iterate_sections (cfg,
                                          &parse_auditors,
-                                         NULL);
+                                         (void *) cfg);
 
   /* Generate preferred mint(s) array. */
   j_auditors = json_array ();

@@ -318,7 +318,7 @@ process_pay_with_mint (void *cls,
   struct PayContext *pc = cls;
   struct TALER_Amount acc_fee;
   struct TALER_Amount acc_amount;
-  struct TALER_Amount coin_fee;
+  // struct TALER_Amount coin_fee;
   const struct TALER_MINT_Keys *keys;
   unsigned int i;
 

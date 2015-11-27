@@ -142,7 +142,7 @@ extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 extern struct TALER_MerchantPublicKeyP pubkey;
 
 
-extern PGconn *db_conn;
+extern struct TALER_MERCHANTDB_Plugin *db;
 
 
 

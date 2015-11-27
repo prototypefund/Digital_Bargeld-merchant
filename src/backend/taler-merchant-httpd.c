@@ -107,7 +107,7 @@ static int result;
 /**
  * Connection handle to the our database
  */
-PGconn *db_conn;
+struct TALER_MERCHANTDB_Plugin *db;
 
 /**
  * The MHD Daemon
@@ -241,10 +241,10 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
     MHD_stop_daemon (mhd);
     mhd = NULL;
   }
-  if (NULL != db_conn)
+  if (NULL != db)
   {
-    TALER_MERCHANTDB_disconnect (db_conn);
-    db_conn = NULL;
+    TALER_MERCHANTDB_plugin_unload (db);
+    db = NULL;
   }
   TMH_MINTS_done ();
   TMH_AUDITORS_done ();
@@ -505,9 +505,9 @@ run (void *cls,
   GNUNET_CRYPTO_eddsa_key_get_public (privkey,
                                       &pubkey.eddsa_pub);
   EXITIF (NULL ==
-          (db_conn = TALER_MERCHANTDB_connect (config)));
+          (db = TALER_MERCHANTDB_plugin_load (config)));
   EXITIF (GNUNET_OK !=
-          TALER_MERCHANTDB_initialize (db_conn, dry));
+          db->initialize (db->cls, dry));
   EXITIF (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_number (config,
                                                  "merchant",
