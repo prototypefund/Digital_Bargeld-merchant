@@ -49,7 +49,7 @@ struct TALER_MERCHANTDB_Plugin
   /**
    * Initialize merchant tables
    *
-   * @param conn the connection handle to postgres db.
+   * @param cls closure
    * @param tmp #GNUNET_YES if the tables are to be made temporary i.e. their
    *          contents are dropped when the @a conn is closed
    * @return #GNUNET_OK upon success; #GNUNET_SYSERR upon failure
@@ -59,9 +59,9 @@ struct TALER_MERCHANTDB_Plugin
                  int tmp);
 
   /**
-   * Inserts a contract record into the database.
+   * Insert payment confirmation from the mint into the database.
    *
-   * @param dbh the database connection
+   * @param cls closure
    * @param h_contract hash of the contract
    * @param h_wire hash of our wire details
    * @param transaction_id of the contract
