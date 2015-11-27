@@ -62,6 +62,30 @@ json_t *j_auditors;
 
 
 /**
+ * Check if the given @a dk issued by mint @a mh is audited by
+ * an auditor that is acceptable for this merchant. (And if the
+ * denomination is not yet expired or something silly like that.)
+ *
+ * @param mh mint issuing @a dk
+ * @param dk a denomination issued by @a mh
+ * @return #GNUNET_OK if we accept this denomination
+ */
+int
+TMH_AUDITORS_check_dk (struct TALER_MINT_Handle *mh,
+                       struct TALER_MINT_DenomPublicKey *dk)
+{
+  // First, we should probably check to see if dk is expired.
+  //
+  // We should find out which auditors have signed off on this
+  // dk, and if there is any overlap with the auditors we accept;
+  // alternatively, if the given mint is flagged as trusted, we
+  // also accept this.
+  GNUNET_break (0); // NOT IMPLEMENTED, warn! #4074
+  return GNUNET_OK; /* stop-gap for now */
+}
+
+
+/**
  * Function called on each configuration section. Finds sections
  * about auditors and parses the entries.
  *

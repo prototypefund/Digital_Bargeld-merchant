@@ -61,7 +61,7 @@ struct MERCHANT_DepositConfirmation
 
   /**
    * Amount "f" that this coin contributes to the overall payment.
-   * FIXME: is this with/without fee?
+   * This amount includes the deposit fee.
    */
   struct TALER_Amount percoin_amount;
 
@@ -126,12 +126,16 @@ struct PayContext
   uint64_t transaction_id;
 
   /**
-   * Maximum fee from @e root.
+   * Maximum fee the merchant is willing to pay, from @e root.
+   * Note that IF the total fee of the mint is higher, that is
+   * acceptable to the merchant if the customer is willing to
+   * pay the difference (i.e. amount - max_fee <= actual-amount - actual-fee).
    */
   struct TALER_Amount max_fee;
 
   /**
-   * Amount from @e root.
+   * Amount from @e root.  This is the amount the merchant expects
+   * to make, minus @e max_fee.
    */
   struct TALER_Amount amount;
 
@@ -318,7 +322,6 @@ process_pay_with_mint (void *cls,
   struct PayContext *pc = cls;
   struct TALER_Amount acc_fee;
   struct TALER_Amount acc_amount;
-  // struct TALER_Amount coin_fee;
   const struct TALER_MINT_Keys *keys;
   unsigned int i;
 
@@ -343,8 +346,7 @@ process_pay_with_mint (void *cls,
     return;
   }
 
-  /* FIXME: do not just total up the fees, but also
-     the value of the deposited coins! */
+  /* Total up the fees and the value of the deposited coins! */
   for (i=0;i<pc->coins_cnt;i++)
   {
     struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
@@ -361,8 +363,17 @@ process_pay_with_mint (void *cls,
                                                              "denom_pub", TALER_json_from_rsa_public_key (dc->denom.rsa_public_key)));
       return;
     }
-    /* FIXME: also check that this denomination key is
-       audited by an acceptable auditor! */
+    if (GNUNET_OK !=
+        TMH_AUDITOR_check_dk (mh,
+                              denom_details))
+    {
+      resume_pay_with_response (pc,
+                                MHD_HTTP_BAD_REQUEST,
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
+                                                             "hint", "no acceptable auditor for denomination",
+                                                             "denom_pub", TALER_json_from_rsa_public_key (dc->denom.rsa_public_key)));
+      return;
+    }
     if (0 == i)
     {
       acc_fee = denom_details->fee_deposit;
@@ -379,14 +390,52 @@ process_pay_with_mint (void *cls,
     }
   }
 
-  /* FIXME: we should check that the total matches as well... */
+  /* Now check that the customer paid enough for the full contract */
   if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
   {
-    resume_pay_with_response (pc,
-                              MHD_HTTP_NOT_ACCEPTABLE,
-                              TMH_RESPONSE_make_external_error ("fees too high"));
-    return;
+    /* acc_fee > max_fee, customer needs to cover difference */
+    struct Amount excess_fee;
+    struct Amount total_needed;
+
+    /* compute fee amount to be covered by customer */
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_amount_subtract (&excess_fee,
+                                          acc_fee,
+                                          &pc->max_fee));
+    /* add that to the total */
+    if (GNUNET_OK !=
+        TALER_amount_add (&total_needed,
+                          &excess_fee,
+                          pc->amount))
+    {
+      GNUNET_break (0);
+      resume_pay_with_response (pc,
+                                MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                TMH_RESPONSE_make_internal_error ("overflow"));
+      return;
+    }
+    /* check if total payment sufficies */
+    if (-1 == TALER_amount_cmp (&acc_amount,
+                                &total_needed))
+    {
+      resume_pay_with_response (pc,
+                                MHD_HTTP_NOT_ACCEPTABLE,
+                                TMH_RESPONSE_make_external_error ("insufficient funds (including excessive mint fees to be covered by customer)"));
+      return;
+    }
+  }
+  else
+  {
+    /* fees are acceptable, we cover them all; let's check the amount */
+    if (-1 == TALER_amount_cmp (&acc_amount,
+                                &pc->amount))
+    {
+      resume_pay_with_response (pc,
+                                MHD_HTTP_NOT_ACCEPTABLE,
+                                TMH_RESPONSE_make_external_error ("insufficient funds"));
+      return;
+    }
   }
 
   /* Initiate /deposit operation for all coins */

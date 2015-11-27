@@ -47,6 +47,20 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg);
 
 
 /**
+ * Check if the given @a dk issued by mint @a mh is audited by
+ * an auditor that is acceptable for this merchant. (And if the
+ * denomination is not yet expired or something silly like that.)
+ *
+ * @param mh mint issuing @a dk
+ * @param dk a denomination issued by @a mh
+ * @return #GNUNET_OK if we accept this denomination
+ */
+int
+TMH_AUDITORS_check_dk (struct TALER_MINT_Handle *mh,
+                       struct TALER_MINT_DenomPublicKey *dk);
+
+
+/**
  * Release auditor information state.
  */
 void
