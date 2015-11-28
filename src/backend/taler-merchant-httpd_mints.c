@@ -201,7 +201,8 @@ TMH_MINTS_find_mint (const char *chosen_mint,
 
   }
   /* FIXME: if the mint is not found, we should download /keys
-     and check if the given mint is audited by an acceptable auditor... */
+     and check if the given mint is audited by an acceptable auditor...
+     #4075! */
   if (-1 == mint_index)
     fc (fc_cls, NULL);
   fc (fc_cls,
