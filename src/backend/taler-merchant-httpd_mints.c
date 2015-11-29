@@ -204,7 +204,8 @@ keys_mgmt_cb (void *cls,
                                  mint->fo_tail,
                                  fo);
     fo->fc (fo->fc_cls,
-            (NULL != keys) ? mint->conn : NULL);
+            (NULL != keys) ? mint->conn : NULL,
+            mint->trusted);
     GNUNET_free (fo);
   }
 }
@@ -286,7 +287,8 @@ return_result (void *cls,
                                mint->fo_tail,
                                fo);
   fo->fc (fo->fc_cls,
-          (GNUNET_SYSERR == mint->pending) ? NULL : mint->conn);
+          (GNUNET_SYSERR == mint->pending) ? NULL : mint->conn,
+          mint->trusted);
   GNUNET_free (fo);
   GNUNET_SCHEDULER_cancel (poller_task);
   GNUNET_SCHEDULER_add_now (&context_task,

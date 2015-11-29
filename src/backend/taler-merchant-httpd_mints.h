@@ -59,12 +59,13 @@ TMH_MINTS_done (void);
  * operation.
  *
  * @param cls closure
- * @param mint handle to the mint
  * @param mh handle to the mint context
+ * @param mint_trusted #GNUNET_YES if this mint is trusted by config
  */
 typedef void
 (*TMH_MINTS_FindContinuation)(void *cls,
-                              struct TALER_MINT_Handle *mh);
+                              struct TALER_MINT_Handle *mh,
+                              int mint_trusted);
 
 
 /**
@@ -99,5 +100,6 @@ TMH_MINTS_find_mint (const char *chosen_mint,
  */
 void
 TMH_MINTS_find_mint_cancel (struct TMH_MINTS_FindOperation *fo);
+
 
 #endif

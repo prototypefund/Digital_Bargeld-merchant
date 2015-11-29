@@ -53,11 +53,13 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg);
  *
  * @param mh mint issuing @a dk
  * @param dk a denomination issued by @a mh
+ * @param mint_trusted #GNUNET_YES if the mint of @a dk is trusted by config
  * @return #GNUNET_OK if we accept this denomination
  */
 int
 TMH_AUDITORS_check_dk (struct TALER_MINT_Handle *mh,
-                       const struct TALER_MINT_DenomPublicKey *dk);
+                       const struct TALER_MINT_DenomPublicKey *dk,
+                       int mint_trusted);
 
 
 /**

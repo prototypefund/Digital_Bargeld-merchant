@@ -327,10 +327,12 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
  *
  * @param cls the `struct PayContext`
  * @param mh NULL if mint was not found to be acceptable
+ * @param mint_trusted #GNUNET_YES if this mint is trusted by config
  */
 static void
 process_pay_with_mint (void *cls,
-                       struct TALER_MINT_Handle *mh)
+                       struct TALER_MINT_Handle *mh,
+                       int mint_trusted)
 {
   struct PayContext *pc = cls;
   struct TALER_Amount acc_fee;
@@ -379,7 +381,8 @@ process_pay_with_mint (void *cls,
     }
     if (GNUNET_OK !=
         TMH_AUDITORS_check_dk (mh,
-                               denom_details))
+                               denom_details,
+                               mint_trusted))
     {
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,

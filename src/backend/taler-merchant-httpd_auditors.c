@@ -68,20 +68,46 @@ json_t *j_auditors;
  *
  * @param mh mint issuing @a dk
  * @param dk a denomination issued by @a mh
+ * @param mint_trusted #GNUNET_YES if the mint of @a dk is trusted by config
  * @return #GNUNET_OK if we accept this denomination
  */
 int
 TMH_AUDITORS_check_dk (struct TALER_MINT_Handle *mh,
-                       const struct TALER_MINT_DenomPublicKey *dk)
+                       const struct TALER_MINT_DenomPublicKey *dk,
+                       int mint_trusted)
 {
-  // First, we should probably check to see if dk is expired.
-  //
-  // We should find out which auditors have signed off on this
-  // dk, and if there is any overlap with the auditors we accept;
-  // alternatively, if the given mint is flagged as trusted, we
-  // also accept this.
-  GNUNET_break (0); // NOT IMPLEMENTED, warn! #4074
-  return GNUNET_OK; /* stop-gap for now */
+  const struct TALER_MINT_Keys *keys;
+  const struct TALER_MINT_AuditorInformation *ai;
+  unsigned int i;
+  unsigned int j;
+
+  if (0 == GNUNET_TIME_absolute_get_remaining (dk->deposit_valid_until).rel_value_us)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Denomination key offered by client has expired for deposits\n");
+    return GNUNET_SYSERR; /* expired */
+  }
+  if (GNUNET_YES == mint_trusted)
+    return GNUNET_OK;
+  keys = TALER_MINT_get_keys (mh);
+  if (NULL == keys)
+  {
+    /* this should never happen, keys should have been successfully
+       obtained before we even got into this function */
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  for (i=0;i<keys->num_auditors;i++)
+  {
+    ai = &keys->auditors[i];
+    for (j=0;j<ai->num_denom_keys;j++)
+      if (ai->denom_keys[j] == dk)
+        return GNUNET_OK;
+  }
+  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+              "Denomination key %s offered by client not audited by accepted auditor\n",
+              GNUNET_h2s (&dk->h_key));
+  return GNUNET_NO;
 }
 
 
