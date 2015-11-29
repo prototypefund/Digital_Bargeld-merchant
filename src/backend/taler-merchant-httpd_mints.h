@@ -40,8 +40,8 @@ json_t *trusted_mints;
  * Parses "trusted" mints listed in the configuration.
  *
  * @param cfg the configuration
- * @return the number of mints found; #GNUNET_SYSERR upon error in
- *          parsing.
+ * @return #GNUNET_OK on success; #GNUNET_SYSERR upon error in
+ *          parsing or initialization.
  */
 int
 TMH_MINTS_init (const struct GNUNET_CONFIGURATION_Handle *cfg);
@@ -57,7 +57,6 @@ TMH_MINTS_done (void);
 /**
  * Function called with the result of a #TMH_MINTS_find_mint()
  * operation.
- * FIXME: do we really need both mint and ctx?
  *
  * @param cls closure
  * @param mint handle to the mint
@@ -66,6 +65,12 @@ TMH_MINTS_done (void);
 typedef void
 (*TMH_MINTS_FindContinuation)(void *cls,
                               struct TALER_MINT_Handle *mh);
+
+
+/**
+ * Information we keep for a pending #MMH_MINTS_find_mint() operation.
+ */
+struct TMH_MINTS_FindOperation;
 
 
 /**
@@ -81,9 +86,18 @@ typedef void
  * operation in case MHD connection goes down and needs to
  * free fc_cls.
  */
-void
+struct TMH_MINTS_FindOperation *
 TMH_MINTS_find_mint (const char *chosen_mint,
                      TMH_MINTS_FindContinuation fc,
                      void *fc_cls);
+
+
+/**
+ * Abort pending find operation.
+ *
+ * @param fo handle to operation to abort
+ */
+void
+TMH_MINTS_find_mint_cancel (struct TMH_MINTS_FindOperation *fo);
 
 #endif

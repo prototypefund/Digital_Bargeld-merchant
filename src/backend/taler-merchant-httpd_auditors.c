@@ -72,7 +72,7 @@ json_t *j_auditors;
  */
 int
 TMH_AUDITORS_check_dk (struct TALER_MINT_Handle *mh,
-                       struct TALER_MINT_DenomPublicKey *dk)
+                       const struct TALER_MINT_DenomPublicKey *dk)
 {
   // First, we should probably check to see if dk is expired.
   //

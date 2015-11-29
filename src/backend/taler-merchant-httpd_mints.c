@@ -24,14 +24,86 @@
 
 
 /**
+ * How often do we retry fetching /keys?
+ */
+#define KEYS_RETRY_FREQ GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MINUTES, 60)
+
+
+/**
+ * Mint
+ */
+struct Mint;
+
+
+/**
+ * Information we keep for a pending #MMH_MINTS_find_mint() operation.
+ */
+struct TMH_MINTS_FindOperation
+{
+
+  /**
+   * Kept in a DLL.
+   */
+  struct TMH_MINTS_FindOperation *next;
+
+  /**
+   * Kept in a DLL.
+   */
+  struct TMH_MINTS_FindOperation *prev;
+
+  /**
+   * Function to call with the result.
+   */
+  TMH_MINTS_FindContinuation fc;
+
+  /**
+   * Closure for @e fc.
+   */
+  void *fc_cls;
+
+  /**
+   * Mint we wait for the /keys for.
+   */
+  struct Mint *my_mint;
+
+  /**
+   * Task scheduled to asynchrnously return the result.
+   */
+  struct GNUNET_SCHEDULER_Task *at;
+
+};
+
+
+/**
  * Mint
  */
 struct Mint
 {
+
   /**
-   * Hostname
+   * Kept in a DLL.
    */
-  char *hostname;
+  struct Mint *next;
+
+  /**
+   * Kept in a DLL.
+   */
+  struct Mint *prev;
+
+  /**
+   * Head of FOs pending for this mint.
+   */
+  struct TMH_MINTS_FindOperation *fo_head;
+
+  /**
+   * Tail of FOs pending for this mint.
+   */
+  struct TMH_MINTS_FindOperation *fo_tail;
+
+  /**
+   * (base) URI of the mint.
+   */
+  char *uri;
 
   /**
    * A connection to this mint
@@ -39,14 +111,15 @@ struct Mint
   struct TALER_MINT_Handle *conn;
 
   /**
-   * This mint's context (useful to the event loop)
+   * Master public key, guaranteed to be set ONLY for
+   * trusted mints.
    */
-  struct TALER_MINT_Context *ctx;
+  struct TALER_MasterPublicKeyP master_pub;
 
   /**
-   * Task we use to drive the interaction with this mint.
+   * At what time should we try to fetch /keys again?
    */
-  struct GNUNET_SCHEDULER_Task *poller_task;
+  struct GNUNET_TIME_Absolute retry_time;
 
   /**
    * Flag which indicates whether some HTTP transfer between
@@ -54,18 +127,35 @@ struct Mint
    */
   int pending;
 
+  /**
+   * #GNUNET_YES if this mint is from our configuration and
+   * explicitly trusted, #GNUNET_NO if we need to check each
+   * key to be sure it is trusted.
+   */
+  int trusted;
+
 };
 
 
 /**
- * Trusted mints (FIXME: they are NOT all trusted!).
+ * Context for all mint operations (useful to the event loop)
  */
-static struct Mint **mints;
+static struct TALER_MINT_Context *ctx;
 
 /**
- * Length of the #mints array.
+ * Task we use to drive the interaction with this mint.
  */
-static unsigned int nmints;
+static struct GNUNET_SCHEDULER_Task *poller_task;
+
+/**
+ * Head of mints we know about.
+ */
+static struct Mint *mint_head;
+
+/**
+ * Tail of mints we know about.
+ */
+static struct Mint *mint_tail;
 
 /**
  * List of our trusted mints for inclusion in contracts.
@@ -91,21 +181,32 @@ static void
 keys_mgmt_cb (void *cls,
               const struct TALER_MINT_Keys *keys)
 {
-  /* HOT UPDATE: the merchants need the denomination keys!
-    Because it wants to (firstly) verify the deposit confirmation
-    sent by the mint, and the signed blob depends (among the
-    other things) on the coin's deposit fee. That information
-    is never communicated by the wallet to the merchant.
-    Again, the merchant needs it because it wants to verify that
-    the wallet didn't exceede the limit imposed by the merchant
-    on the total deposit fee for a purchase */
+  struct Mint *mint = cls;
+  struct TMH_MINTS_FindOperation *fo;
 
   if (NULL != keys)
   {
-    ((struct Mint *) cls)->pending = 0;
+    mint->pending = GNUNET_NO;
   }
   else
-    printf ("no keys gotten\n");
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Failed to fetch /keys from `%s'\n",
+                mint->uri);
+    TALER_MINT_disconnect (mint->conn);
+    mint->conn = NULL;
+    mint->pending = GNUNET_SYSERR; /* failed hard */
+    mint->retry_time = GNUNET_TIME_relative_to_absolute (KEYS_RETRY_FREQ);
+  }
+  while (NULL != (fo = mint->fo_head))
+  {
+    GNUNET_CONTAINER_DLL_remove (mint->fo_head,
+                                 mint->fo_tail,
+                                 fo);
+    fo->fc (fo->fc_cls,
+            (NULL != keys) ? mint->conn : NULL);
+    GNUNET_free (fo);
+  }
 }
 
 
@@ -119,7 +220,6 @@ static void
 context_task (void *cls,
               const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
-  struct Mint *mint = cls;
   long timeout;
   int max_fd;
   fd_set read_fd_set;
@@ -129,14 +229,14 @@ context_task (void *cls,
   struct GNUNET_NETWORK_FDSet *ws;
   struct GNUNET_TIME_Relative delay;
 
-  mint->poller_task = NULL;
-  TALER_MINT_perform (mint->ctx);
+  poller_task = NULL;
+  TALER_MINT_perform (ctx);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
   FD_ZERO (&write_fd_set);
   FD_ZERO (&except_fd_set);
-  TALER_MINT_get_select_info (mint->ctx,
+  TALER_MINT_get_select_info (ctx,
                               &read_fd_set,
                               &write_fd_set,
                               &except_fd_set,
@@ -156,15 +256,41 @@ context_task (void *cls,
   GNUNET_NETWORK_fdset_copy_native (ws,
                                     &write_fd_set,
                                     max_fd + 1);
-  mint->poller_task =
+  poller_task =
     GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_DEFAULT,
                                  delay,
                                  rs,
                                  ws,
                                  &context_task,
-                                 mint);
+                                 NULL);
   GNUNET_NETWORK_fdset_destroy (rs);
   GNUNET_NETWORK_fdset_destroy (ws);
+}
+
+
+/**
+ * Task to return find operation result asynchronously to caller.
+ *
+ * @param cls a `struct TMH_MINTS_FindOperation`
+ * @param tc unused
+ */
+static void
+return_result (void *cls,
+               const struct GNUNET_SCHEDULER_TaskContext *tc)
+{
+  struct TMH_MINTS_FindOperation *fo = cls;
+  struct Mint *mint = fo->my_mint;
+
+  fo->at = NULL;
+  GNUNET_CONTAINER_DLL_remove (mint->fo_head,
+                               mint->fo_tail,
+                               fo);
+  fo->fc (fo->fc_cls,
+          (GNUNET_SYSERR == mint->pending) ? NULL : mint->conn);
+  GNUNET_free (fo);
+  GNUNET_SCHEDULER_cancel (poller_task);
+  GNUNET_SCHEDULER_add_now (&context_task,
+                            NULL);
 }
 
 
@@ -176,41 +302,164 @@ context_task (void *cls,
  * @param chosen_mint URI of the mint we would like to talk to
  * @param fc function to call with the handles for the mint
  * @param fc_cls closure for @a fc
+ * @return NULL on error
  */
-void
+struct TMH_MINTS_FindOperation *
 TMH_MINTS_find_mint (const char *chosen_mint,
                      TMH_MINTS_FindContinuation fc,
                      void *fc_cls)
 {
-  unsigned int mint_index;
+  struct Mint *mint;
+  struct TMH_MINTS_FindOperation *fo;
 
-  for (mint_index = 0; mint_index <= nmints; mint_index++)
+  if (NULL == ctx)
   {
-    /* no mint found in array */
-    if (mint_index == nmints)
-    {
-      mint_index = -1;
-      break;
-    }
-
+    GNUNET_break (0);
+    return NULL;
+  }
+  /* Check if the mint is known */
+  for (mint = mint_head; NULL != mint; mint = mint->next)
     /* test it by checking public key --- FIXME: hostname or public key!?
        Should probably be URI, not hostname anyway! */
-    if (0 == strcmp (mints[mint_index]->hostname,
+    if (0 == strcmp (mint->uri,
                      chosen_mint))
       break;
-
+  if (NULL == mint)
+  {
+    /* This is a new mint */
+    mint = GNUNET_new (struct Mint);
+    mint->uri = GNUNET_strdup (chosen_mint);
+    mint->pending = GNUNET_YES;
+    GNUNET_CONTAINER_DLL_insert (mint_head,
+                                 mint_tail,
+                                 mint);
   }
-  /* FIXME: if the mint is not found, we should download /keys
-     and check if the given mint is audited by an acceptable auditor...
-     #4075! */
-  if (-1 == mint_index)
-    fc (fc_cls, NULL);
-  fc (fc_cls,
-      mints[mint_index]->conn);
-  GNUNET_SCHEDULER_cancel (mints[mint_index]->poller_task);
-  GNUNET_SCHEDULER_add_now (&context_task,
-                            mints[mint_index]->ctx);
 
+  /* check if we should resume this mint */
+  if ( (GNUNET_SYSERR == mint->pending) &&
+       (0 == GNUNET_TIME_absolute_get_remaining (mint->retry_time).rel_value_us) )
+    mint->pending = GNUNET_YES;
+
+
+  fo = GNUNET_new (struct TMH_MINTS_FindOperation);
+  fo->fc = fc;
+  fo->fc_cls = fc_cls;
+  fo->my_mint = mint;
+  GNUNET_CONTAINER_DLL_insert (mint->fo_head,
+                               mint->fo_tail,
+                               fo);
+
+  if (GNUNET_NO == mint->pending)
+  {
+    /* We are not currently waiting for a reply, immediately
+       return result */
+    fo->at = GNUNET_SCHEDULER_add_now (&return_result,
+                                       fo);
+    return fo;
+  }
+
+  /* If new or resumed, retry fetching /keys */
+  if ( (NULL == mint->conn) &&
+       (GNUNET_YES == mint->pending) )
+  {
+    mint->conn = TALER_MINT_connect (ctx,
+                                     mint->uri,
+                                     &keys_mgmt_cb,
+                                     mint,
+                                     TALER_MINT_OPTION_END);
+    GNUNET_break (NULL != mint->conn);
+  }
+  return fo;
+}
+
+
+/**
+ * Abort pending find operation.
+ *
+ * @param fo handle to operation to abort
+ */
+void
+TMH_MINTS_find_mint_cancel (struct TMH_MINTS_FindOperation *fo)
+{
+  struct Mint *mint = fo->my_mint;
+
+  if (NULL != fo->at)
+  {
+    GNUNET_SCHEDULER_cancel (fo->at);
+    fo->at = NULL;
+  }
+  GNUNET_CONTAINER_DLL_remove (mint->fo_head,
+                               mint->fo_tail,
+                               fo);
+  GNUNET_free (fo);
+}
+
+
+/**
+ * Function called on each configuration section. Finds sections
+ * about mints and parses the entries.
+ *
+ * @param cls closure, with a `const struct GNUNET_CONFIGURATION_Handle *`
+ * @param section name of the section
+ */
+static void
+parse_mints (void *cls,
+             const char *section)
+{
+  const struct GNUNET_CONFIGURATION_Handle *cfg = cfg;
+  char *uri;
+  char *mks;
+  struct Mint *mint;
+
+  if (0 != strncasecmp (section,
+                        "mint-",
+                        strlen ("mint-")))
+    return;
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             section,
+                                             "URI",
+                                             &uri))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               section,
+                               "URI");
+    return;
+  }
+  mint = GNUNET_new (struct Mint);
+  mint->uri = uri;
+  if (GNUNET_OK ==
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             section,
+                                             "MASTER_KEY",
+                                             &mks))
+  {
+    if (GNUNET_OK ==
+        GNUNET_CRYPTO_eddsa_public_key_from_string (mks,
+                                                    strlen (mks),
+                                                    &mint->master_pub.eddsa_pub))
+    {
+      mint->trusted = GNUNET_YES;
+    }
+    else
+    {
+      GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                 section,
+                                 "MASTER_KEY",
+                                 _("ill-formed key"));
+    }
+    GNUNET_free (mks);
+  }
+  GNUNET_CONTAINER_DLL_insert (mint_head,
+                               mint_tail,
+                               mint);
+  mint->pending = GNUNET_YES;
+  mint->conn = TALER_MINT_connect (ctx,
+                                   mint->uri,
+                                   &keys_mgmt_cb,
+                                   mint,
+                                   TALER_MINT_OPTION_END);
+  GNUNET_break (NULL != mint->conn);
 }
 
 
@@ -218,100 +467,37 @@ TMH_MINTS_find_mint (const char *chosen_mint,
  * Parses "trusted" mints listed in the configuration.
  *
  * @param cfg the configuration
- * @return the number of mints found; #GNUNET_SYSERR upon error in
+ * @return #GNUNET_OK on success; #GNUNET_SYSERR upon error in
  *          parsing.
  */
 int
 TMH_MINTS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
-  char *mints_str;
-  char *token_nf;               /* do no free (nf) */
-  char *mint_section;
-  char *mint_hostname;
-  struct Mint **r_mints;
   struct Mint *mint;
-  unsigned int cnt;
-  int ok;
-  const struct TALER_MINT_Keys *keys;
   json_t *j_mint;
 
-  ok = 0;
-  mints_str = NULL;
-  token_nf = NULL;
-  mint_section = NULL;
-  mint_hostname = NULL;
-  r_mints = NULL;
-  cnt = 0;
-  EXITIF (GNUNET_OK !=
-          GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                 "merchant",
-                                                 "TRUSTED_MINTS",
-                                                 &mints_str));
-  for (token_nf = strtok (mints_str, " ");
-       NULL != token_nf;
-       token_nf = strtok (NULL, " "))
-  {
-    GNUNET_assert (0 < GNUNET_asprintf (&mint_section,
-                                        "mint-%s", token_nf));
-    EXITIF (GNUNET_OK !=
-            GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                   mint_section,
-                                                   "HOSTNAME",
-                                                   &mint_hostname));
-    mint = GNUNET_new (struct Mint);
-    mint->hostname = mint_hostname;
-    GNUNET_array_append (r_mints,
-                         cnt,
-                         mint);
-    GNUNET_free (mint_section);
-    mint_section = NULL;
-  }
-  ok = 1;
-
-  mints = r_mints;
-  nmints = cnt;
-
-  for (cnt = 0; cnt < nmints; cnt++)
-  {
-    EXITIF (NULL == (mints[cnt]->ctx = TALER_MINT_init ()));
-    mints[cnt]->pending = 1;
-    mints[cnt]->conn = TALER_MINT_connect (mints[cnt]->ctx,
-                                           mints[cnt]->hostname,
-                                           &keys_mgmt_cb,
-                                           mints[cnt],
-                                           TALER_MINT_OPTION_END);
-    EXITIF (NULL == mints[cnt]->conn);
-    mints[cnt]->poller_task =
-      GNUNET_SCHEDULER_add_now (&context_task,
-                                mints[cnt]);
-  }
-
-  trusted_mints = json_array ();
-  for (cnt = 0; cnt < nmints; cnt++)
-  {
-    if (! mints[cnt]->pending)
-    {
-      keys = TALER_MINT_get_keys (mints[cnt]->conn);
-      j_mint = json_pack ("{s:s, s:o}",
-                          "url", mints[cnt]->hostname,
-                          "master_pub",
-                          TALER_json_from_data
-                          (&keys->master_pub.eddsa_pub,
-                           sizeof (keys->master_pub.eddsa_pub)));
-      json_array_append_new (trusted_mints, j_mint);
-    }
-  }
-
- EXITIF_exit:
-  GNUNET_free_non_null (mints_str);
-  GNUNET_free_non_null (mint_section);
-  GNUNET_free_non_null (mint_hostname);
-  if (! ok)
-  {
-    GNUNET_free_non_null (r_mints);
+  ctx = TALER_MINT_init ();
+  if (NULL == ctx)
     return GNUNET_SYSERR;
+  GNUNET_CONFIGURATION_iterate_sections (cfg,
+                                         &parse_mints,
+                                         (void *) cfg);
+  /* build JSON with list of trusted mints */
+  trusted_mints = json_array ();
+  for (mint = mint_head; NULL != mint; mint = mint->next)
+  {
+    if (GNUNET_YES != mint->trusted)
+      continue;
+    j_mint = json_pack ("{s:s, s:o}",
+                        "url", mint->uri,
+                        "master_pub", TALER_json_from_data (&mint->master_pub,
+                                                            sizeof (struct TALER_MasterPublicKeyP)));
+    json_array_append_new (trusted_mints,
+                           j_mint);
   }
-  return cnt;
+  poller_task = GNUNET_SCHEDULER_add_now (&context_task,
+                                          NULL);
+  return GNUNET_OK;
 }
 
 
@@ -321,16 +507,22 @@ TMH_MINTS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 void
 TMH_MINTS_done ()
 {
-  unsigned int cnt;
+  struct Mint *mint;
 
-  for (cnt = 0; cnt < nmints; cnt++)
+  while (NULL != (mint = mint_head))
   {
-    if (NULL != mints[cnt]->conn)
-      TALER_MINT_disconnect (mints[cnt]->conn);
-    if (NULL != mints[cnt]->poller_task)
-    {
-      GNUNET_SCHEDULER_cancel (mints[cnt]->poller_task);
-      mints[cnt]->poller_task = NULL;
-    }
+    GNUNET_CONTAINER_DLL_remove (mint_head,
+                                 mint_tail,
+                                 mint);
+    if (NULL != mint->conn)
+      TALER_MINT_disconnect (mint->conn);
+    GNUNET_free (mint->uri);
+    GNUNET_free (mint);
   }
+  if (NULL != poller_task)
+  {
+    GNUNET_SCHEDULER_cancel (poller_task);
+    poller_task = NULL;
+  }
+  TALER_MINT_fini (ctx);
 }

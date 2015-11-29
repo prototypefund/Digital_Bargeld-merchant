@@ -27,6 +27,7 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
+#include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_mints.h"
 #include "taler_merchantdb_lib.h"
 
@@ -109,6 +110,13 @@ struct PayContext
    * MHD connection to return to
    */
   struct MHD_Connection *connection;
+
+  /**
+   * Handle for operation to lookup /keys (and auditors) from
+   * the mint used for this transaction; NULL if no operation is
+   * pending.
+   */
+  struct TMH_MINTS_FindOperation *fo;
 
   /**
    * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
@@ -300,6 +308,11 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
     }
   }
   GNUNET_free_non_null (pc->dc);
+  if (NULL != pc->fo)
+  {
+    TMH_MINTS_find_mint_cancel (pc->fo);
+    pc->fo = NULL;
+  }
   if (NULL != pc->response)
   {
     MHD_destroy_response (pc->response);
@@ -325,6 +338,7 @@ process_pay_with_mint (void *cls,
   const struct TALER_MINT_Keys *keys;
   unsigned int i;
 
+  pc->fo = NULL;
   if (NULL == mh)
   {
     /* The mint on offer is not in the set of our (trusted)
@@ -364,8 +378,8 @@ process_pay_with_mint (void *cls,
       return;
     }
     if (GNUNET_OK !=
-        TMH_AUDITOR_check_dk (mh,
-                              denom_details))
+        TMH_AUDITORS_check_dk (mh,
+                               denom_details))
     {
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
@@ -395,19 +409,19 @@ process_pay_with_mint (void *cls,
                               &acc_fee))
   {
     /* acc_fee > max_fee, customer needs to cover difference */
-    struct Amount excess_fee;
-    struct Amount total_needed;
+    struct TALER_Amount excess_fee;
+    struct TALER_Amount total_needed;
 
     /* compute fee amount to be covered by customer */
     GNUNET_assert (GNUNET_OK ==
                    TALER_amount_subtract (&excess_fee,
-                                          acc_fee,
+                                          &acc_fee,
                                           &pc->max_fee));
     /* add that to the total */
     if (GNUNET_OK !=
         TALER_amount_add (&total_needed,
                           &excess_fee,
-                          pc->amount))
+                          &pc->amount))
     {
       GNUNET_break (0);
       resume_pay_with_response (pc,
@@ -612,9 +626,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
   /* Find the responsible mint, this may take a while... */
   pc->pending = pc->coins_cnt;
-  TMH_MINTS_find_mint (pc->chosen_mint,
-                       &process_pay_with_mint,
-                       pc);
+  pc->fo = TMH_MINTS_find_mint (pc->chosen_mint,
+                                &process_pay_with_mint,
+                                pc);
 
   /* ... so we suspend connection until the last coin has been ack'd
      or until we have encountered a hard error.  Eventually, we will

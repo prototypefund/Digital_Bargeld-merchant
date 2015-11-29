@@ -57,7 +57,7 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg);
  */
 int
 TMH_AUDITORS_check_dk (struct TALER_MINT_Handle *mh,
-                       struct TALER_MINT_DenomPublicKey *dk);
+                       const struct TALER_MINT_DenomPublicKey *dk);
 
 
 /**
