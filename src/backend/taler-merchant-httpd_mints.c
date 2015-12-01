@@ -408,7 +408,7 @@ static void
 parse_mints (void *cls,
              const char *section)
 {
-  const struct GNUNET_CONFIGURATION_Handle *cfg = cfg;
+  const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   char *uri;
   char *mks;
   struct Mint *mint;

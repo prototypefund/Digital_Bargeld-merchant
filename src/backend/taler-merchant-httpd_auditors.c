@@ -122,7 +122,7 @@ static void
 parse_auditors (void *cls,
                 const char *section)
 {
-  const struct GNUNET_CONFIGURATION_Handle *cfg = cfg;
+  const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   char *pks;
   struct Auditor auditor;
 
