@@ -35,4 +35,5 @@ libtaler_plugin_merchantdb_postgres_la_LDFLAGS = \
   -ltalerpq \
   -ltalerutil \
   -lpq \
+  -lgnunetpostgres \
   -lgnunetutil $(XLIB)
