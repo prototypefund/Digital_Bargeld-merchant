@@ -38,11 +38,6 @@ struct PostgresClosure
    */
   PGconn *conn;
 
-  /**
-   * Database connection string, as read from
-   * the configuration.
-   */
-  char *connection_cfg_str;
 };
 
 
@@ -211,17 +206,16 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
 
   pg = GNUNET_new (struct PostgresClosure);
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_string (cfg,
-                                             "merchantdb-postgres",
-                                             "CONFIG",
-                                             &pg->connection_cfg_str))
+      GNUNET_CONFIGURATION_have_value_string (cfg,
+                                              "merchantdb-postgres",
+                                              "CONFIG"))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "merchant",
-                               "db_conn_str");
+                               "merchantdb-postgres",
+                               "CONFIG");
     return NULL;
   }
-  pg->conn = GNUNET_POSTGRES_connect (cfg, "merchant-db");
+  pg->conn = GNUNET_POSTGRES_connect (cfg, "merchantdb-postgres");
   plugin = GNUNET_new (struct TALER_MERCHANTDB_Plugin);
   plugin->cls = pg;
   plugin->initialize = &postgres_initialize;
@@ -243,7 +237,6 @@ libtaler_plugin_merchantdb_postgres_done (void *cls)
   struct TALER_MERCHANTDB_Plugin *plugin = cls;
   struct PostgresClosure *pg = plugin->cls;
 
-  GNUNET_free (pg->connection_cfg_str);
   PQfinish (pg->conn);
   GNUNET_free (pg);
   GNUNET_free (plugin);
