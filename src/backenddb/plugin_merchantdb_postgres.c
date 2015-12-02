@@ -206,9 +206,9 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
 
   pg = GNUNET_new (struct PostgresClosure);
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_have_value_string (cfg,
-                                              "merchantdb-postgres",
-                                              "CONFIG"))
+      GNUNET_CONFIGURATION_have_value (cfg,
+                                       "merchantdb-postgres",
+                                       "CONFIG"))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "merchantdb-postgres",
