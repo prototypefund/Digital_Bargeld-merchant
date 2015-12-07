@@ -33,7 +33,7 @@
 /**
  * List of our trusted mints in JSON format for inclusion in contracts.
  */
-json_t *trusted_mints;
+extern json_t *trusted_mints;
 
 
 /**
