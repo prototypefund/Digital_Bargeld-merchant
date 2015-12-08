@@ -69,7 +69,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param refund refund deadline
    * @param amount_without_fee amount the mint will deposit
    * @param coin_pub public key of the coin
-   * @param merchant_pub our public key
+   * @param mint_proof proof from mint that coin was accepted
    * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
    */
   int
@@ -81,7 +81,7 @@ struct TALER_MERCHANTDB_Plugin
                     struct GNUNET_TIME_Absolute refund,
                     const struct TALER_Amount *amount_without_fee,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                    const struct TALER_MintSignatureP *mint_sig);
+		    json_t *mint_proof);
 
 };
 

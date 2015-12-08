@@ -17,6 +17,7 @@
  * @file backend/taler-merchant-httpd_pay.c
  * @brief HTTP serving layer mainly intended to communicate with the frontend
  * @author Marcello Stanisci
+ * @author Christian Grothoff
  */
 #include "platform.h"
 #include <jansson.h>
@@ -67,6 +68,11 @@ struct MERCHANT_DepositConfirmation
   struct TALER_Amount percoin_amount;
 
   /**
+   * Amount this coin contributes to the total purchase price.
+   */ 
+  struct TALER_Amount amount_without_fee;
+
+  /**
    * Public key of the coin.
    */
   struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -110,6 +116,12 @@ struct PayContext
    * MHD connection to return to
    */
   struct MHD_Connection *connection;
+
+  /**
+   * Handle to the mint that we are doing the payment with.
+   * (initially NULL while @e fo is trying to find a mint).
+   */
+  struct TALER_MINT_Handle *mh;
 
   /**
    * Handle for operation to lookup /keys (and auditors) from
@@ -219,6 +231,29 @@ resume_pay_with_response (struct PayContext *pc,
 
 
 /**
+ * Abort all pending /deposit operations.
+ *
+ * @param pc pay context to abort
+ */
+static void
+abort_deposit (struct PayContext *pc)
+{
+  unsigned int i;
+
+  for (i=0;i<pc->coins_cnt;i++)
+  {
+    struct MERCHANT_DepositConfirmation *dci = &pc->dc[i];
+    
+    if (NULL != dci->dh)
+    {
+      TALER_MINT_deposit_cancel (dci->dh);
+      dci->dh = NULL;
+    }
+  }
+}
+
+
+/**
  * Callback to handle a deposit permission's response.
  *
  * @param cls a `struct MERCHANT_DepositConfirmation` (i.e. a pointer
@@ -245,26 +280,34 @@ deposit_cb (void *cls,
   pc->pending--;
   if (MHD_HTTP_OK != http_status)
   {
-    unsigned int i;
-
     /* Transaction failed; stop all other ongoing deposits */
-    for (i=0;i<pc->coins_cnt;i++)
-    {
-      struct MERCHANT_DepositConfirmation *dci = &pc->dc[i];
-
-      if (NULL != dci->dh)
-      {
-        TALER_MINT_deposit_cancel (dci->dh);
-        dci->dh = NULL;
-      }
-    }
+    abort_deposit (pc);
     /* Forward error including 'proof' for the body */
     resume_pay_with_response (pc,
                               http_status,
                               TMH_RESPONSE_make_json (proof));
     return;
   }
-  /* FIXME: store result to DB here somewhere! */
+  /* store result to DB */
+  if (GNUNET_OK != 
+      db->store_payment (db->cls,
+			 &pc->h_contract,
+			 &h_wire,
+			 pc->transaction_id,
+			 pc->timestamp,
+			 pc->refund_deadline,
+			 &dc->amount_without_fee,
+			 &dc->coin_pub,
+			 proof))
+  {
+    /* internal error */
+    abort_deposit (pc);
+    /* Forward error including 'proof' for the body */
+    resume_pay_with_response (pc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
+                              TMH_RESPONSE_make_internal_error ("Merchant database error"));
+    return;
+  }
   if (0 != pc->pending)
     return; /* still more to do */
   resume_pay_with_response (pc,
@@ -351,6 +394,7 @@ process_pay_with_mint (void *cls,
                               TMH_RESPONSE_make_external_error ("mint not supported"));
     return;
   }
+  pc->mh = mh;
 
   keys = TALER_MINT_get_keys (mh);
   if (NULL == keys)
@@ -398,12 +442,34 @@ process_pay_with_mint (void *cls,
     }
     else
     {
-      TALER_amount_add (&acc_fee,
-                        &denom_details->fee_deposit,
-			&acc_fee);
-      TALER_amount_add (&acc_amount,
-                        &dc->percoin_amount,
-			&acc_amount);
+      if ( (GNUNET_OK !=
+	    TALER_amount_add (&acc_fee,
+			      &denom_details->fee_deposit,
+			      &acc_fee)) ||
+	   (GNUNET_OK !=
+	    TALER_amount_add (&acc_amount,
+			      &dc->percoin_amount,
+			      &acc_amount)) )
+      {
+	GNUNET_break_op (0);
+	/* Overflow in these amounts? Very strange. */
+	resume_pay_with_response (pc,
+				  MHD_HTTP_BAD_REQUEST,
+				  TMH_RESPONSE_make_internal_error ("Overflow adding up amounts"));
+	return;
+      }
+    }
+    if (GNUNET_SYSERR ==
+	TALER_amount_subtract (&dc->amount_without_fee,
+			       &dc->percoin_amount,
+			       &denom_details->fee_deposit))
+    {
+      GNUNET_break_op (0);
+      /* fee higher than residual coin value, makes no sense. */
+      resume_pay_with_response (pc,
+				MHD_HTTP_BAD_REQUEST,
+				TMH_RESPONSE_make_internal_error ("Fee higher than coin value"));
+      return;
     }
   }
 

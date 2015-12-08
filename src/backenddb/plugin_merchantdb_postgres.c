@@ -77,7 +77,7 @@ postgres_initialize (void *cls,
                    "amount_without_fee_frac INT4 NOT NULL,"
                    "amount_without_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL,"
                    "coin_pub BYTEA NOT NULL,"
-                   "mint_sig BYTEA NOT NULL);",
+                   "mint_proof BYTEA NOT NULL);",
                    tmp_str);
   ret = GNUNET_POSTGRES_exec (pg->conn,
                               sql);
@@ -96,7 +96,7 @@ postgres_initialize (void *cls,
                                   ",amount_without_fee_frac"
                                   ",amount_without_fee_curr"
                                   ",coin_pub"
-                                  ",mint_sig) VALUES "
+                                  ",mint_proof) VALUES "
                                   "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
                                   10, NULL))) ||
        (PGRES_COMMAND_OK != (status = PQresultStatus(res))) )
@@ -124,7 +124,7 @@ postgres_initialize (void *cls,
  * @param refund refund deadline
  * @param amount_without_fee amount the mint will deposit
  * @param coin_pub public key of the coin
- * @param merchant_pub our public key
+ * @param mint_proof proof from the mint that coin was accepted
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
  */
 static int
@@ -136,7 +136,7 @@ postgres_store_payment (void *cls,
                         struct GNUNET_TIME_Absolute refund,
                         const struct TALER_Amount *amount_without_fee,
                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                        const struct TALER_MintSignatureP *mint_sig)
+                        json_t *mint_proof)
 {
   struct PostgresClosure *pg = cls;
   PGresult *res;
@@ -150,7 +150,7 @@ postgres_store_payment (void *cls,
     TALER_PQ_query_param_absolute_time (&refund),
     TALER_PQ_query_param_amount (amount_without_fee),
     TALER_PQ_query_param_auto_from_type (coin_pub),
-    TALER_PQ_query_param_auto_from_type (mint_sig),
+    TALER_PQ_query_param_json (mint_proof),
     TALER_PQ_query_param_end
   };
 
