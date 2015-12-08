@@ -15,7 +15,7 @@
 */
 /**
  * @file backend/taler-merchant-httpd_pay.c
- * @brief HTTP serving layer mainly intended to communicate with the frontend
+ * @brief handling of /pay requests
  * @author Marcello Stanisci
  * @author Christian Grothoff
  */
