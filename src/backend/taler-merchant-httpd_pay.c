@@ -69,7 +69,7 @@ struct MERCHANT_DepositConfirmation
 
   /**
    * Amount this coin contributes to the total purchase price.
-   */ 
+   */
   struct TALER_Amount amount_without_fee;
 
   /**
@@ -243,7 +243,7 @@ abort_deposit (struct PayContext *pc)
   for (i=0;i<pc->coins_cnt;i++)
   {
     struct MERCHANT_DepositConfirmation *dci = &pc->dc[i];
-    
+
     if (NULL != dci->dh)
     {
       TALER_MINT_deposit_cancel (dci->dh);
@@ -289,7 +289,7 @@ deposit_cb (void *cls,
     return;
   }
   /* store result to DB */
-  if (GNUNET_OK != 
+  if (GNUNET_OK !=
       db->store_payment (db->cls,
 			 &pc->h_contract,
 			 &h_wire,
@@ -615,23 +615,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES; /* the POST's body has to be further fetched */
 
-  /* We got no 'edate' from frontend. Generate it here; it will be
-     timestamp plus the edate_delay supplied in config file */
-  if (NULL == json_object_get (root, "edate"))
-  {
-    pc->edate = GNUNET_TIME_absolute_add (pc->timestamp, // FIXME: uninit!
-                                          edate_delay);
-    if (-1 ==
-        json_object_set (root,
-                         "edate",
-                         TALER_json_from_abs (pc->edate)))
-    {
-      GNUNET_break (0);
-      json_decref (root);
-      return MHD_NO;
-    }
-  }
-
   /* Got the JSON upload, parse it */
   {
     json_t *coins;
@@ -646,7 +629,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       TMH_PARSE_member_time_abs ("timestamp", &pc->timestamp),
       TMH_PARSE_member_time_abs ("refund_deadline", &pc->refund_deadline),
       TMH_PARSE_member_fixed ("H_contract", &pc->h_contract),
-      TMH_PARSE_member_time_abs ("edate", &pc->edate),
       TMH_PARSE_MEMBER_END
     };
 
@@ -658,6 +640,32 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       json_decref (root);
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
+
+    /* 'edate' is optional, if it is not present, generate it here; it
+       will be timestamp plus the edate_delay supplied in config
+       file */
+    if (NULL == json_object_get (root, "edate"))
+    {
+      pc->edate = GNUNET_TIME_absolute_add (pc->timestamp,
+                                            edate_delay);
+    }
+    else
+    {
+      struct TMH_PARSE_FieldSpecification espec[] = {
+        TMH_PARSE_member_time_abs ("edate", &pc->edate),
+        TMH_PARSE_MEMBER_END
+      };
+
+      res = TMH_PARSE_json_data (connection,
+                                 root,
+                                 espec);
+      if (GNUNET_YES != res)
+      {
+        json_decref (root);
+        return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
+      }
+    }
+
 
     pc->coins_cnt = json_array_size (coins);
     if (0 == pc->coins_cnt)
