@@ -185,17 +185,17 @@ struct TALER_MERCHANT_PayCoin
  * @return a handle for this request
  */
 struct TALER_MERCHANT_Pay *
-TALER_MERCHANT_pay (struct TALER_MERCHANT_Context *merchant,
-                    const struct GNUNET_HashCode *h_wire,
-                    const struct GNUNET_HashCode *h_contract,
-                    struct GNUNET_TIME_Absolute timestamp,
-                    uint64_t transaction_id,
-                    const struct TALER_MerchantPublicKeyP *merchant_pub,
-                    struct GNUNET_TIME_Absolute refund_deadline,
-                    unsigned int num_coins,
-                    const struct TLAER_MERCHANT_PayCoin *coins,
-                    TALER_MERCHANT_PayCallback pay_cb,
-                    void *pay_cb_cls);
+TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
+                           const struct GNUNET_HashCode *h_wire,
+                           const struct GNUNET_HashCode *h_contract,
+                           struct GNUNET_TIME_Absolute timestamp,
+                           uint64_t transaction_id,
+                           const struct TALER_MerchantPublicKeyP *merchant_pub,
+                           struct GNUNET_TIME_Absolute refund_deadline,
+                           unsigned int num_coins,
+                           const struct TLAER_MERCHANT_PayCoin *coins,
+                           TALER_MERCHANT_PayCallback pay_cb,
+                           void *pay_cb_cls);
 
 
 /**
@@ -258,17 +258,17 @@ struct TALER_MERCHANT_PaidCoin
  * @return a handle for this request
  */
 struct TALER_MERCHANT_Pay *
-TALER_MERCHANT_pay2 (struct TALER_MERCHANT_Context *merchant,
-                     const struct GNUNET_HashCode *h_wire,
-                     const struct GNUNET_HashCode *h_contract,
-                     struct GNUNET_TIME_Absolute timestamp,
-                     uint64_t transaction_id,
-                     const struct TALER_MerchantPublicKeyP *merchant_pub,
-                     struct GNUNET_TIME_Absolute refund_deadline,
-                     unsigned int num_coins,
-                     const struct TALER_MERCHANT_PaidCoin *coins,
-                     TALER_MERCHANT_PayCallback pay_cb,
-                     void *pay_cb_cls);
+TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
+                             const struct GNUNET_HashCode *h_wire,
+                             const struct GNUNET_HashCode *h_contract,
+                             struct GNUNET_TIME_Absolute timestamp,
+                             uint64_t transaction_id,
+                             const struct TALER_MerchantPublicKeyP *merchant_pub,
+                             struct GNUNET_TIME_Absolute refund_deadline,
+                             unsigned int num_coins,
+                             const struct TALER_MERCHANT_PaidCoin *coins,
+                             TALER_MERCHANT_PayCallback pay_cb,
+                             void *pay_cb_cls);
 
 
 /**
