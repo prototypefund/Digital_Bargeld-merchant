@@ -53,7 +53,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 {
   json_t *root;
   int res;
-  struct GNUNET_HashCode h_wire;
   struct TALER_ContractPS contract;
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
 
@@ -67,10 +66,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   /* the POST's body has to be further fetched */
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
-
-  if (GNUNET_OK != TALER_hash_json (j_wire, &h_wire))
-    return TMH_RESPONSE_reply_internal_error (connection, 
-                                              "failed to hash wire details"); 
 
   /* add fields to the "root" that the backend should provide */
   json_object_set (root,
