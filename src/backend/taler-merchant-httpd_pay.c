@@ -699,7 +699,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
         return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
       }
       dc->index = coins_index;
-      dc->pc = &pc;
+      dc->pc = pc;
     }
   }
 
