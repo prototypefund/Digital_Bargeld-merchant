@@ -24,7 +24,7 @@
 #include <curl/curl.h>
 #include <gnunet/gnunet_util_lib.h>
 #include "taler_merchant_service.h"
-#include "taler_signatures.h"
+#include <taler/taler_signatures.h>
 
 
 /**

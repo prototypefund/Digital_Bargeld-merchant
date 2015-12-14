@@ -21,7 +21,7 @@
 #ifndef _TALER_MERCHANT_SERVICE_H
 #define _TALER_MERCHANT_SERVICE_H
 
-#include "taler_util.h"
+#include <taler/taler_util.h>
 
 /* ********************* event loop *********************** */
 
@@ -171,6 +171,7 @@ struct TALER_MERCHANT_PayCoin
  * Pay a merchant.  API for wallets that have the coin's private keys.
  *
  * @param merchant the merchant context
+ * @param mint_uri URI of the mint that the coins belong to
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
@@ -186,6 +187,7 @@ struct TALER_MERCHANT_PayCoin
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
+			   const char *mint_uri,
                            const struct GNUNET_HashCode *h_wire,
                            const struct GNUNET_HashCode *h_contract,
                            struct GNUNET_TIME_Absolute timestamp,
@@ -193,7 +195,7 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
                            const struct TALER_MerchantPublicKeyP *merchant_pub,
                            struct GNUNET_TIME_Absolute refund_deadline,
                            unsigned int num_coins,
-                           const struct TLAER_MERCHANT_PayCoin *coins,
+                           const struct TALER_MERCHANT_PayCoin *coins,
                            TALER_MERCHANT_PayCallback pay_cb,
                            void *pay_cb_cls);
 
@@ -244,6 +246,7 @@ struct TALER_MERCHANT_PaidCoin
  * in the type of @a coins compared to #TALER_MERCHANT_pay().
  *
  * @param merchant the merchant context
+ * @param mint_uri URI of the mint that the coins belong to
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
@@ -259,6 +262,7 @@ struct TALER_MERCHANT_PaidCoin
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
+			     const char *mint_uri,
                              const struct GNUNET_HashCode *h_wire,
                              const struct GNUNET_HashCode *h_contract,
                              struct GNUNET_TIME_Absolute timestamp,
