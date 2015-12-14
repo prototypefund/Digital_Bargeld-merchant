@@ -674,6 +674,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       return TMH_RESPONSE_reply_external_error (connection,
                                                 "no coins given");
     }
+    /* note: 1 coin = 1 deposit confirmation expected */
     pc->dc = GNUNET_new_array (pc->coins_cnt,
                                struct MERCHANT_DepositConfirmation);
 
