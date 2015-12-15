@@ -27,6 +27,13 @@
 $cli_debug = false;
 $backend_test = true;
 
+function generate_msg ($link){
+  $msg = "Thanks for donating to " . $_SESSION['receiver'] . ".";
+  if (false != $link)
+    $msg .= " Check our latest <a href=\"" . $link . "\">news!</a>";
+  return $msg;
+}
+
 if ($_GET['cli_debug'] == 'yes')
   $cli_debug = true;
 
@@ -38,11 +45,23 @@ if ($_GET['backend_test'] == 'no')
 
 session_start();
 
-
 if (! isset ($_SESSION['payment_ok']))
   echo "Please land here after a successful payment!";
-else
-  echo "Thanks for donating to " . $_SESSION['receiver'];
+else{
+  $news = false;
+  switch ($_SESSION['receiver']){
+    case "Taler":
+      $news = "https://taler.net/about";
+      break;
+    case "GNUnet":
+      $news = "https://gnunet.org/";
+      break;
+    case "Tor":
+      $news = "https://www.torproject.org/press/press.html.en";
+      break;
+ }
+  echo generate_msg ($news); 
+}
 
 ?>
 
