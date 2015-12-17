@@ -51,7 +51,7 @@ else{
   $news = false;
   switch ($_SESSION['receiver']){
     case "Taler":
-      $news = "https://taler.net/about";
+      $news = "https://taler.net/news";
       break;
     case "GNUnet":
       $news = "https://gnunet.org/";
