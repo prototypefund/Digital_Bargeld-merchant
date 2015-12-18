@@ -39,13 +39,6 @@ if ($_GET['backend_test'] == 'no')
 
 session_start();
 
-if (!$cli_debug && (! isset($_SESSION['receiver'])))
-{
-  http_response_code(400);
-  echo "Please, donate to someone before landing here!";
-  exit();
-}
-
 $cli_debug = false;
 $backend_test = true;
 
@@ -112,15 +105,17 @@ if ($status_code != 200)
   /* error: just forwarding to the wallet what
     gotten from the backend (which is forwarding 'as is'
     the error gotten from the mint) */
+  echo "Error came from the backend\n";
+  echo "json_encode ($new_deposit_permission)"
+  echo "\n";
   echo $resp->body->toString ();
-  
 }
 else
 {
-$_SESSION['payment_ok'] = true;
-http_response_code (301);
-header("Location: http://" . $_SERVER["SERVER_NAME"] . "/fullfillment");
-die();
+  $_SESSION['payment_ok'] = true;
+  http_response_code (301);
+  header("Location: http://" . $_SERVER["SERVER_NAME"] . "/fullfillment");
+  die();
 }
 
 ?>
