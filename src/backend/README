@@ -1,7 +1,0 @@
-Here are the files implementing the backend which is in charge of doing
-cryptographic calls, binary manipulations and some HTTP/JSON communication.
-
-NOTE:
-
-Makefile.am contains some hardcoded paths that need to be tuned to pick
-the right files.

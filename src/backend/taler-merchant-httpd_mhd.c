@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014 GNUnet e.V.
+  Copyright (C) 2014, 2015 GNUnet e.V.
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -13,9 +13,8 @@
   You should have received a copy of the GNU Affero General Public License along with
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
-
 /**
- * @file taler-mint-httpd_mhd.c
+ * @file taler-merchant-httpd_mhd.c
  * @brief helpers for MHD interaction; these are TALER_MINT_handler_ functions
  *        that generate simple MHD replies that do not require any real operations
  *        to be performed (error handling, static pages, etc.)
@@ -24,14 +23,9 @@
  * @author Christian Grothoff
  */
 #include "platform.h"
-#include <gnunet/gnunet_util_lib.h>
 #include <jansson.h>
-#include <microhttpd.h>
-#include <pthread.h>
-#include "taler-mint-httpd_responses.h"
-#include "taler-mint-httpd.h"
-#include "taler-mint-httpd_mhd.h"
-#include "taler-mint-httpd_responses.h"
+#include "taler-merchant-httpd_mhd.h"
+#include "taler-merchant-httpd_responses.h"
 
 
 /**

@@ -1,6 +1,0 @@
-1. why does the merchant daemon appears to be some executable under some
-.libs directory even though it gets launched through an executable located
-elsewhere?
-
-2. why does the httpd prints three times the URL corresponding to GET /some/url
-?

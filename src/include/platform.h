@@ -18,7 +18,7 @@
  * @file include/platform.h
  * @brief This file contains the includes and definitions which are used by the
  *        rest of the modules
- * @author Sree Harsha Totakura <sreeharsha@totakura.in> 
+ * @author Sree Harsha Totakura <sreeharsha@totakura.in>
  */
 
 #ifndef PLATFORM_H_
@@ -28,7 +28,7 @@
 #ifndef HAVE_USED_CONFIG_H
 # define HAVE_USED_CONFIG_H
 # ifdef HAVE_CONFIG_H
-#  include "taler_config.h"
+#  include "taler_merchant_config.h"
 # endif
 #endif
 

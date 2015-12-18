@@ -21,19 +21,18 @@
  * @author Benedikt Mueller
  * @author Christian Grothoff
  */
-
 #include "platform.h"
 #include <gnunet/gnunet_util_lib.h>
-#include "taler-mint-httpd_parsing.h"
-#include "taler-mint-httpd_responses.h"
+#include "taler-merchant-httpd_parsing.h"
+#include "taler-merchant-httpd_responses.h"
 
 /* Although the following declaration isn't in any case useful
   to a merchant's activity, it's needed here to make the function
   'TMH_PARSE_nagivate_json ()' compile fine; so its value will be
   kept on some merchant's accepted currency. For multi currencies
   merchants, that of course would require a patch */
+extern char *TMH_merchant_currency_string;
 
-extern char *TMH_mint_currency_string;
 /**
  * Initial size for POST request buffer.
  */
@@ -145,6 +144,7 @@ buffer_append (struct Buffer *buf,
   return GNUNET_OK;
 }
 
+
 /**
  * Function called whenever we are done with a request
  * to clean up our state.
@@ -163,6 +163,7 @@ TMH_PARSE_post_cleanup_callback (void *con_cls)
     GNUNET_free (r);
   }
 }
+
 
 /**
  * Release all memory allocated for the variable-size fields in
@@ -248,6 +249,7 @@ release_data (struct TMH_PARSE_FieldSpecification *spec,
     }
   }
 }
+
 
 /**
  * Process a POST request containing a JSON object.  This function
@@ -349,6 +351,7 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
 
   return GNUNET_YES;
 }
+
 
 /**
  * Generate line in parser specification for string. The returned
@@ -634,7 +637,7 @@ TMH_PARSE_navigate_json (struct MHD_Connection *connection,
 
     case TMH_PARSE_JNC_RET_STRING:
       {
-        void **where = va_arg (argp, void **); 
+        void **where = va_arg (argp, void **);
         *where = (void*) json_string_value (root);
         ret = GNUNET_OK;
       }
@@ -876,7 +879,7 @@ TMH_PARSE_navigate_json (struct MHD_Connection *connection,
           break;
         }
         if (0 != strcmp (where->currency,
-                         TMH_mint_currency_string))
+                         TMH_merchant_currency_string))
         {
           GNUNET_break_op (0);
           ret = (MHD_YES !=

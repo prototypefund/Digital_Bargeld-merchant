@@ -15,7 +15,7 @@
 */
 
 /**
- * @file taler-mint-httpd_mhd.h
+ * @file taler-merchant-httpd_mhd.h
  * @brief helpers for MHD interaction, used to generate simple responses
  * @author Florian Dold
  * @author Benedikt Mueller
@@ -25,7 +25,7 @@
 #define TALER_MINT_HTTPD_MHD_H
 #include <gnunet/gnunet_util_lib.h>
 #include <microhttpd.h>
-#include "taler-mint-httpd.h"
+#include "taler-merchant-httpd.h"
 
 
 /**

@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014 GNUnet e.V.
+  Copyright (C) 2014, 2015 GNUnet e.V.
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -15,7 +15,7 @@
 */
 
 /**
- * @file taler-mint-httpd_responses.h
+ * @file taler-merchant-httpd_responses.h
  * @brief API for generating the various replies of the mint; these
  *        functions are called TMH_RESPONSE_reply_ and they generate
  *        and queue MHD response objects for a given connection.
@@ -31,6 +31,16 @@
 #include <pthread.h>
 
 /**
+ * Make JSON response object.
+ *
+ * @param json the json object
+ * @return MHD response object
+ */
+struct MHD_Response *
+TMH_RESPONSE_make_json (const json_t *json);
+
+
+/**
  * Send JSON object as response.
  *
  * @param connection the MHD connection
@@ -42,6 +52,18 @@ int
 TMH_RESPONSE_reply_json (struct MHD_Connection *connection,
                          const json_t *json,
                          unsigned int response_code);
+
+
+/**
+ * Make JSON response object.
+ *
+ * @param fmt format string for pack
+ * @param ... varargs
+ * @return MHD response object
+ */
+struct MHD_Response *
+TMH_RESPONSE_make_json_pack (const char *fmt,
+                             ...);
 
 
 /**
@@ -70,6 +92,7 @@ TMH_RESPONSE_reply_json_pack (struct MHD_Connection *connection,
 int
 TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection);
 
+
 /**
  * Send a response indicating an internal error.
  *
@@ -80,6 +103,18 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection);
 int
 TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
                                    const char *hint);
+
+
+/**
+ * Create a response indicating an internal error.
+ *
+ * @param hint hint about the internal error's nature
+ * @return a MHD response object
+ */
+struct MHD_Response *
+TMH_RESPONSE_make_internal_error (const char *hint);
+
+
 /**
  * Send a response indicating an external error.
  *
@@ -90,6 +125,18 @@ TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
 int
 TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
                                    const char *hint);
+
+
+/**
+ * Create a response indicating an external error.
+ *
+ * @param hint hint about the internal error's nature
+ * @return a MHD response object
+ */
+struct MHD_Response *
+TMH_RESPONSE_make_external_error (const char *hint);
+
+
 /**
  * Send a response indicating that the request was too big.
  *
@@ -98,6 +145,7 @@ TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
  */
 int
 TMH_RESPONSE_reply_request_too_large (struct MHD_Connection *connection);
+
 
 /**
  * Add headers we want to return in every response.
