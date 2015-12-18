@@ -168,7 +168,7 @@
     function signal_me()
     {
       var eve = new Event('taler-checkout-probe');
-      document.body.dispatchEvent(eve);
+      document.dispatchEvent(eve);
       //alert("signaling");
     };
 
@@ -176,21 +176,21 @@
         wallet_installed_cb();
     }
 
-    document.body.addEventListener("taler-unload",
-                                   wallet_uninstalled_cb,
-                                   false, false);
+    document.addEventListener("taler-unload",
+                              wallet_uninstalled_cb,
+                              false, false);
 
     /* Set up a listener to be called whenever a Wallet gets installed
        so that the user is led towards the demo's steps progressively */
-    document.body.addEventListener("taler-wallet-present",
-                                   wallet_installed_cb,
-                                   false, false);
+    document.addEventListener("taler-wallet-present",
+                              wallet_installed_cb,
+                              false, false);
 
     /* Setup callback to be called whenever the wallet is loaded/enabled
       while the browser is already on this page */
-    document.body.addEventListener("taler-load",
-                                   signal_me,
-                                   false);
+    document.addEventListener("taler-load",
+                              signal_me,
+                              false);
   </script>
 </body>
 </html>

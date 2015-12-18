@@ -106,7 +106,7 @@ function handle_contract(json_contract)
 {
   var cEvent = new CustomEvent('taler-contract', { detail: json_contract });
 
-  document.body.dispatchEvent(cEvent);
+  document.dispatchEvent(cEvent);
 };
 
 
@@ -211,7 +211,7 @@ function taler_wallet_unload_cb(aEvent)
 function signal_taler_wallet_onload()
 {
   var eve = new Event('taler-checkout-probe');
-  document.body.dispatchEvent(eve);
+  document.dispatchEvent(eve);
 };
 
 
@@ -228,21 +228,20 @@ function test_without_wallet(){
 
 // Register event to be triggered by the wallet as a response to our
 // first event
-document.body.addEventListener("taler-wallet-present",
-                               has_taler_wallet_cb,
-			       false);
+document.addEventListener("taler-wallet-present",
+                          has_taler_wallet_cb,
+			  false);
 
 // Register event to be triggered by the wallet when it gets enabled while
 // the user is on the payment page
-document.body.addEventListener("taler-load",
-                               signal_taler_wallet_onload,
-			       false);
+document.addEventListener("taler-load",
+                          signal_taler_wallet_onload,
+			  false);
 
 // Register event to be triggered by the wallet when it is unloaded
-document.body.addEventListener("taler-unload",
-                               taler_wallet_unload_cb,
-			       false);
-
+document.addEventListener("taler-unload",
+                          taler_wallet_unload_cb,
+	                  false);
 </script>
 </body>
 </html>
