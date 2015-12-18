@@ -28,28 +28,18 @@
 $cli_debug = false;
 $backend_test = true;
 
-if ($_GET['cli_debug'] == 'yes')
+if (isset($_GET['cli_debug']) && $_GET['cli_debug'] == 'yes')
+{
   $cli_debug = true;
+}
 
-if ($_GET['backend_test'] == 'no')
+if (isset($_GET['backend_test']) &&  $_GET['backend_test'] == 'no')
 {
   $cli_debug = true;
   $backend_test = false;
 }
 
 session_start();
-
-$cli_debug = false;
-$backend_test = true;
-
-if ($_GET['cli_debug'] == 'yes')
-  $cli_debug = true;
-
-if ($_GET['backend_test'] == 'no')
-{
-  $cli_debug = true;
-  $backend_test = false;
-}
 
 $post_body = file_get_contents('php://input');
 
@@ -105,8 +95,8 @@ if ($status_code != 200)
   /* error: just forwarding to the wallet what
     gotten from the backend (which is forwarding 'as is'
     the error gotten from the mint) */
-  echo "Error came from the backend\n";
-  echo "json_encode ($new_deposit_permission)"
+  echo json_encode ($new_deposit_permission);
+  echo "Error came from the backend, status $status_code\n";
   echo "\n";
   echo $resp->body->toString ();
 }
