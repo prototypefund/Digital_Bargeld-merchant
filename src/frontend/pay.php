@@ -105,7 +105,9 @@ if ($status_code != 200)
   /* error: just forwarding to the wallet what
     gotten from the backend (which is forwarding 'as is'
     the error gotten from the mint) */
-  echo "Error came from the backend";
+  echo "Error came from the backend\n";
+  echo "json_encode ($new_deposit_permission)"
+  echo "\n";
   echo $resp->body->toString ();
 }
 else
