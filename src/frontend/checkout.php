@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Taler's "Demo" Shop: Choose payment method</title>
+  <title>Toy Store - Payment method - Taler Demo</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
     <script>
         /*
         @licstart  The following is the entire license notice for the
@@ -31,7 +32,7 @@
 </head>
 <body onload="signal_taler_wallet_onload()">
 <!--
-  This page's main aim is to show to the customer all the accepted
+  This main goal of this page is to show to the customer all the accepted
   payments methods and actually implementing just Taler; technically
   the steps are:
 
@@ -59,43 +60,68 @@
   $_SESSION['amount_fraction'] = (int) ($donation_fraction * 1000000);
   $_SESSION['currency'] = $donation_currency;
 ?>
-<h2>Select your payment option</h2>
-<div>
-This is an example for a "checkout" page of a Web shop.
-On the previous page, you have created the shopping cart
-and decided which product to buy (i.e. which project to
-donate KUDOS to).  Now in this page, you are asked to
-select a payment option.  As Taler is not yet universally
-used, we expect merchants will offer various payment options.
-<p>
-The page also demonstrates how to only enable (or show) the Taler
-option if Taler is actually supported by the browser.  For example,
-if you disable the Taler extension now, the Taler payment option
-will be disabled in the page.  Naturally, you could also trivially
-hide the Taler option entirely by changing the visibility instead.
-<p>
-Note that you MUST select Taler here for the demo to continue,
-as the other payment options are just placeholders and not
-really working in the demonstration.  Also, it is of course
-possible to ask the user to make this choice already on the
-previous page (with the shopping cart), we just separated the
-two steps to keep each step as simple as possible.
-</div>
-<form name="tform" action="" method="POST">
-  <div id="opt-form" align="left"><br>
-    <input type="radio" name="payment_system" value="lisa"
-           id="lisa-radio-button-id">Lisa</input>
-    <br>
-    <input type="radio" name="payment_system" value="ycard">You Card</input>
-    <br>
-    <input type="radio" name="payment_system" value="cardme">Card Me</input>
-    <br>
-    <input type="radio" name="payment_system" value="taler"
-           id="taler-radio-button-id" disabled="true">Taler</input>
-    <br>
-    <input type="button" onclick="pay(this.form)" value="Ok">
-  </div>
-</form>
+
+  <header>
+    <div id="logo">
+      <svg height="100" width="100">
+        <circle cx="50" cy="50" r="40" stroke="black" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="black">S</text>
+      </svg>
+    </div>
+
+    <h1>Toy Store - Select payment method</h1>
+  </header>
+
+  <aside class="sidebar" id="left">
+  </aside>
+
+  <section id="main">
+    <article>
+
+      <h1>Select your payment method</h1>
+
+      <p>
+        This is an example for a "checkout" page of a Web shop.
+        On the previous page, you have created the shopping cart
+        and decided which product to buy (i.e. which project to
+        donate KUDOS to).  Now in this page, you are asked to
+        select a payment option.  As Taler is not yet universally
+        used, we expect merchants will offer various payment options.
+      </p>
+      <p>
+        The page also demonstrates how to only enable (or show) the Taler
+        option if Taler is actually supported by the browser.  For example,
+        if you disable the Taler extension now, the Taler payment option
+        will be disabled in the page.  Naturally, you could also trivially
+        hide the Taler option entirely by changing the visibility instead.
+      </p>
+      <p>
+        Note that you MUST select Taler here for the demo to continue,
+        as the other payment options are just placeholders and not
+        really working in the demonstration.  Also, it is of course
+        possible to ask the user to make this choice already on the
+        previous page (with the shopping cart), we just separated the
+        two steps to keep each step as simple as possible.
+      </p>
+
+      <form name="tform" action="" method="POST">
+        <div id="opt-form" align="left"><br>
+          <input type="radio" name="payment_system" value="lisa"
+                 id="lisa-radio-button-id">Lisa</input>
+          <br/>
+          <input type="radio" name="payment_system" value="ycard">You Card</input>
+          <br/>
+          <input type="radio" name="payment_system" value="cardme">Card Me</input>
+          <br/>
+          <input type="radio" name="payment_system" value="taler"
+                 id="taler-radio-button-id" disabled="true">Taler</input>
+          <br/>
+          <input type="button" onclick="pay(this.form)" value="Ok">
+        </div>
+      </form>
+
+    </article>
+  </section>
 
 <script type="text/javascript">
 
