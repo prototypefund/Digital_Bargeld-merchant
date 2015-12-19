@@ -66,6 +66,10 @@ struct TALER_MERCHANT_Pay
    */
   struct MAC_DownloadBuffer db;
 
+  /**
+   * Reference to the merchant.
+   */
+  struct TALER_MERCHANT_Context *merchant;
 };
 
 
@@ -125,6 +129,7 @@ handle_pay_finished (void *cls,
   }
   ph->cb (ph->cb_cls,
           response_code,
+	  "FIXME-redirect-URI",
           json);
   json_decref (json);
   TALER_MERCHANT_pay_cancel (ph);
@@ -145,12 +150,15 @@ handle_pay_finished (void *cls,
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
+ * @param max_fee maximum fee covered by the merchant (according to the contract)
+ * @param amount total value of the contract to be paid to the merchant
  * @param pay_cb the callback to call when a reply for this request is available
  * @param pay_cb_cls closure for @a pay_cb
  * @return a handle for this request
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
+			   const char *merchant_uri,
 			   const char *mint_uri,
                            const struct GNUNET_HashCode *h_wire,
                            const struct GNUNET_HashCode *h_contract,
@@ -159,18 +167,15 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
                            const struct TALER_MerchantPublicKeyP *merchant_pub,
                            struct GNUNET_TIME_Absolute refund_deadline,
                            unsigned int num_coins,
-                           const struct TLAER_MERCHANT_PayCoin *coins,
+                           const struct TALER_MERCHANT_PayCoin *coins,
+			   const struct TALER_Amount *max_fee,
+			   const struct TALER_Amount *amount,
                            TALER_MERCHANT_PayCallback pay_cb,
                            void *pay_cb_cls)
 {
-  struct TALER_MERCHANT_Pay *ph;
-  json_t *pay_obj;
-  json_t *j_coins;
-  CURL *eh;
-  struct GNUNET_HashCode h_wire;
-  struct TALER_Amount amount_without_fee;
   unsigned int i;
   struct TALER_DepositRequestPS dr;
+  struct TALER_MERCHANT_PaidCoin pc[num_coins];
   
   dr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_COIN_DEPOSIT);
   dr.purpose.size = htonl (sizeof (struct TALER_DepositRequestPS));
@@ -180,23 +185,123 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
   dr.refund_deadline = GNUNET_TIME_absolute_hton (refund_deadline);
   dr.transaction_id = GNUNET_htonll (transaction_id);
   dr.merchant = *merchant_pub;
-  j_coins = json_array ();
   for (i=0;i<num_coins;i++)
   {
-    json_t *j_coin;
-    const struct TALER_MERCHANT_PayCoin *pc = &coins[i];
-    struct TALER_CoinSpendSignatureP coin_sig;
+    const struct TALER_MERCHANT_PayCoin *coin = &coins[i];
+    struct TALER_MERCHANT_PaidCoin *p = &pc[i];
     struct TALER_Amount fee;
 
     /* prepare 'dr' for this coin to generate coin signature */
-    GNUNET_CRYPTO_ecdhe_key_get_public (&pc->coin_priv.edche_priv,
-					&dr.coin_pub.ecdhe_pub);
+    GNUNET_CRYPTO_eddsa_key_get_public (&coin->coin_priv.eddsa_priv,
+					&dr.coin_pub.eddsa_pub);
     TALER_amount_hton (&dr.amount_with_fee,
 		       &pc->amount_with_fee);
     if (GNUNET_SYSERR ==
 	TALER_amount_subtract (&fee,
 			       &pc->amount_with_fee,
-			       &pc->fee))
+			       &pc->amount_without_fee))
+    {
+      /* Integer underflow, fee larger than total amount?
+	 This should not happen (client violated API!) */
+      GNUNET_break (0);
+      return NULL;
+    }
+    TALER_amount_hton (&dr.deposit_fee,
+		       &fee);
+    GNUNET_CRYPTO_eddsa_sign (&coin->coin_priv.eddsa_priv,
+			      &dr.purpose,			      
+			      &p->coin_sig.eddsa_signature);
+    p->denom_pub = coin->denom_pub;
+    p->denom_sig = coin->denom_sig;
+    p->coin_pub = dr.coin_pub;
+    p->amount_with_fee = pc->amount_with_fee;
+    p->amount_without_fee = pc->amount_without_fee;
+  }
+  return TALER_MERCHANT_pay_frontend (merchant,
+				      merchant_uri,
+				      mint_uri,
+				      h_wire,
+				      h_contract,
+				      timestamp,
+				      transaction_id,
+				      merchant_pub,
+				      refund_deadline,
+				      GNUNET_TIME_UNIT_ZERO_ABS,
+				      num_coins,
+				      pc,
+				      max_fee,
+				      amount,
+				      pay_cb,
+				      pay_cb_cls);
+}
+
+
+/**
+ * Pay a merchant.  API for frontends talking to backends. Here,
+ * the frontend does not have the coin's private keys, but just
+ * the public keys and signatures.  Note the sublte difference
+ * in the type of @a coins compared to #TALER_MERCHANT_pay().
+ *
+ * @param merchant the merchant context
+ * @param mint_uri URI of the mint that the coins belong to
+ * @param h_wire hash of the merchant’s account details
+ * @param h_contract hash of the contact of the merchant with the customer
+ * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
+ * @param transaction_id transaction id for the transaction between merchant and customer
+ * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
+ * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
+ * @param execution_deadline date by which the merchant would like the mint to execute the transaction (can be zero if there is no specific date desired by the frontend)
+ * @param num_coins number of coins used to pay
+ * @param coins array of coins we use to pay
+ * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
+ * @param max_fee maximum fee covered by the merchant (according to the contract)
+ * @param amount total value of the contract to be paid to the merchant
+ * @param pay_cb the callback to call when a reply for this request is available
+ * @param pay_cb_cls closure for @a pay_cb
+ * @return a handle for this request
+ */
+struct TALER_MERCHANT_Pay *
+TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
+			     const char *merchant_uri,
+			     const char *mint_uri,
+                             const struct GNUNET_HashCode *h_wire,
+                             const struct GNUNET_HashCode *h_contract,
+                             struct GNUNET_TIME_Absolute timestamp,
+                             uint64_t transaction_id,
+                             const struct TALER_MerchantPublicKeyP *merchant_pub,
+                             struct GNUNET_TIME_Absolute refund_deadline,
+                             struct GNUNET_TIME_Absolute execution_deadline,
+                             unsigned int num_coins,
+                             const struct TALER_MERCHANT_PaidCoin *coins,
+			     const struct TALER_Amount *max_fee,
+			     const struct TALER_Amount *amount,
+                             TALER_MERCHANT_PayCallback pay_cb,
+                             void *pay_cb_cls)
+{
+  struct TALER_MERCHANT_Pay *ph;
+  json_t *pay_obj;
+  json_t *j_coins;
+  CURL *eh;
+  struct TALER_Amount total_fee;
+  struct TALER_Amount total_amount;
+  unsigned int i;
+  
+  if (0 == num_coins)
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+  j_coins = json_array ();
+  for (i=0;i<num_coins;i++)
+  {
+    json_t *j_coin;
+    const struct TALER_MERCHANT_PaidCoin *pc = &coins[i];
+    struct TALER_Amount fee;
+
+    if (GNUNET_SYSERR ==
+	TALER_amount_subtract (&fee,
+			       &pc->amount_with_fee,
+			       &pc->amount_without_fee))
     {
       /* Integer underflow, fee larger than total amount?
 	 This should not happen (client violated API!) */
@@ -204,28 +309,47 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
       json_decref (j_coins);
       return NULL;
     }
-    TALER_amount_hton (&dr.deposit_fee,
-		       &fee);
-    GNUNET_CRYPTO_eddsa_sign (&pc->coin_priv.eddsa_priv,
-			      &dr.purpose,			      
-			      &coin_sig.eddsa_sig);
+    if (0 == i)
+    {
+      total_fee = fee;
+      total_amount = pc->amount_with_fee;
+    }
+    else
+    {
+      if ( (GNUNET_OK != 
+	    TALER_amount_add (&total_fee,
+			      &total_fee,
+			      &fee)) ||
+	   (GNUNET_OK !=
+	    TALER_amount_add (&total_amount,
+			      &total_amount,
+			      &pc->amount_with_fee)) )
+      {
+	/* integer overflow */
+	GNUNET_break (0);
+	json_decref (j_coins);
+	return NULL;
+      }
+    }
 
     /* create JSON for this coin */
     j_coin = json_pack ("{s:o, s:o," /* f/coin_pub */
 			" s:o, s:o," /* denom_pub / ub_sig */
 			" s:o}",     /* coin_sig */
 			"f", TALER_json_from_amount (&pc->amount_with_fee),
-			"coin_pub", TALER_json_from_data (&dr.coin_pub,
+			"coin_pub", TALER_json_from_data (&pc->coin_pub,
 							  sizeof (struct TALER_CoinSpendPublicKeyP)),
 			"denom_pub", TALER_json_from_rsa_public_key (pc->denom_pub.rsa_public_key),
 			"ub_sig", TALER_json_from_rsa_signature (pc->denom_sig.rsa_signature),
-			"coin_sig", TALER_json_from_data (&coin_sig,
-							  sizeof (coin_sig))
+			"coin_sig", TALER_json_from_data (&pc->coin_sig,
+							  sizeof (struct TALER_CoinSpendSignatureP))
 			);
     json_array_append (j_coins,
 		       j_coin);
   }
-  
+
+  /* FIXME: check total_amount and total_fee
+     match amount/max_fee */
 
   pay_obj = json_pack ("{s:o, s:o," /* H_wire/H_contract */
                        " s:I, s:o," /* transaction id, timestamp */
@@ -245,30 +369,19 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
                        "amount", TALER_json_from_amount (amount)
                        );
 
-  // optionally: add edate! "edate", TALER_json_from_abs (wire_deadline),
+  if (0 != execution_deadline.abs_value_us)
+  {
+    /* Frontend did have an execution date in mind, add it */
+    json_object_set_new (pay_obj,
+			 "edate",
+			 TALER_json_from_abs (execution_deadline));
+  }
 
   ph = GNUNET_new (struct TALER_MERCHANT_Pay);
-#if 0
   ph->merchant = merchant;
-  ph->cb = cb;
-  ph->cb_cls = cb_cls;
-  ph->url = MAH_path_to_url (merchant, "/pay");
-  ph->depconf.purpose.size = htonl (sizeof (struct TALER_PayConfirmationPS));
-  ph->depconf.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONFIRM_PAY);
-  ph->depconf.h_contract = *h_contract;
-  ph->depconf.h_wire = h_wire;
-  ph->depconf.transaction_id = GNUNET_htonll (transaction_id);
-  ph->depconf.timestamp = GNUNET_TIME_absolute_hton (timestamp);
-  ph->depconf.refund_deadline = GNUNET_TIME_absolute_hton (refund_deadline);
-  TALER_amount_subtract (&amount_without_fee,
-                         amount,
-                         &dki->fee_pay);
-  TALER_amount_hton (&ph->depconf.amount_without_fee,
-                     &amount_without_fee);
-  ph->depconf.coin_pub = *coin_pub;
-  ph->depconf.merchant = *merchant_pub;
-  ph->amount_with_fee = *amount;
-  ph->coin_value = dki->value;
+  ph->cb = pay_cb;
+  ph->cb_cls = pay_cb_cls;
+  ph->url = GNUNET_strdup (merchant_uri);
 
   eh = curl_easy_init ();
   GNUNET_assert (NULL != (ph->json_enc =
@@ -295,56 +408,12 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
                  curl_easy_setopt (eh,
                                    CURLOPT_WRITEDATA,
                                    &ph->db));
-  ctx = MAH_handle_to_context (merchant);
-  ph->job = MAC_job_add (ctx,
+  ph->job = MAC_job_add (merchant,
                          eh,
                          GNUNET_YES,
                          &handle_pay_finished,
                          ph);
   return ph;
-#endif
-  return NULL;
-}
-
-
-
-/**
- * Pay a merchant.  API for frontends talking to backends. Here,
- * the frontend does not have the coin's private keys, but just
- * the public keys and signatures.  Note the sublte difference
- * in the type of @a coins compared to #TALER_MERCHANT_pay().
- *
- * @param merchant the merchant context
- * @param mint_uri URI of the mint that the coins belong to
- * @param h_wire hash of the merchant’s account details
- * @param h_contract hash of the contact of the merchant with the customer
- * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
- * @param transaction_id transaction id for the transaction between merchant and customer
- * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
- * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
- * @param num_coins number of coins used to pay
- * @param coins array of coins we use to pay
- * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
- * @param pay_cb the callback to call when a reply for this request is available
- * @param pay_cb_cls closure for @a pay_cb
- * @return a handle for this request
- */
-struct TALER_MERCHANT_Pay *
-TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
-			     const char *mint_uri,
-                             const struct GNUNET_HashCode *h_wire,
-                             const struct GNUNET_HashCode *h_contract,
-                             struct GNUNET_TIME_Absolute timestamp,
-                             uint64_t transaction_id,
-                             const struct TALER_MerchantPublicKeyP *merchant_pub,
-                             struct GNUNET_TIME_Absolute refund_deadline,
-                             unsigned int num_coins,
-                             const struct TALER_MERCHANT_PaidCoin *coins,
-                             TALER_MERCHANT_PayCallback pay_cb,
-                             void *pay_cb_cls)
-{
-  GNUNET_break (0); // FIXME: not implemented!
-  return NULL;
 }
 
 
