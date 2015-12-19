@@ -327,21 +327,29 @@ TALER_MERCHANT_perform (struct TALER_MERCHANT_Context *ctx)
  */
 void
 TALER_MERCHANT_get_select_info (struct TALER_MERCHANT_Context *ctx,
-                            fd_set *read_fd_set,
-                            fd_set *write_fd_set,
-                            fd_set *except_fd_set,
-                            int *max_fd,
-                            long *timeout)
+				fd_set *read_fd_set,
+				fd_set *write_fd_set,
+				fd_set *except_fd_set,
+				int *max_fd,
+				long *timeout)
 {
+  long to;
+
   GNUNET_assert (CURLM_OK ==
                  curl_multi_fdset (ctx->multi,
                                    read_fd_set,
                                    write_fd_set,
                                    except_fd_set,
                                    max_fd));
+  to = *timeout;
   GNUNET_assert (CURLM_OK ==
                  curl_multi_timeout (ctx->multi,
-                                     timeout));
+                                     &to));
+  /* Only if what we got back from curl is smaller than what we
+     already had (-1 == infinity!), then update timeout */
+  if ( (to < *timeout) &&
+       (-1 != to) )
+    *timeout = to;
   if ( (-1 == (*timeout)) &&
        (NULL != ctx->jobs_head) )
     *timeout = 1000 * 60 * 5; /* curl is not always good about giving timeouts */

@@ -19,9 +19,9 @@
  * @author Christian Grothoff
  */
 #include "platform.h"
-#include "taler_util.h"
-#include "taler_signatures.h"
-#include "taler_mint_service.h"
+#include <taler/taler_util.h>
+#include <taler/taler_signatures.h>
+#include <taler/taler_mint_service.h>
 #include "taler_merchant_service.h"
 #include <gnunet/gnunet_util_lib.h>
 #include <microhttpd.h>
@@ -326,7 +326,7 @@ struct Command
       /**
        * Deposit handle while operation is running.
        */
-      struct TALER_MINT_DepositHandle *dh;
+      struct TALER_MERACHANT_Pay *ph;
 
     } pay;
 
@@ -733,7 +733,7 @@ pay_cb (void *cls,
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
 
-  cmd->details.deposit.dh = NULL;
+  cmd->details.pay.ph = NULL;
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1063,6 +1063,7 @@ do_shutdown (void *cls,
       break;
     case OC_PAY:
       GNUNET_break (0); // FIXME: not implemented
+      GNUNET_SCHEDULER_shutdown ();
       break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1088,6 +1089,11 @@ do_shutdown (void *cls,
   {
     TALER_MINT_disconnect (mint);
     mint = NULL;
+  }
+  if (NULL != merchant)
+  {
+    TALER_MERCHANT_fini (merchant);
+    merchant = NULL;
   }
   if (NULL != ctx)
   {
@@ -1152,6 +1158,7 @@ context_task (void *cls,
 
   ctx_task = NULL;
   TALER_MINT_perform (ctx);
+  TALER_MERCHANT_perform (merchant);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
@@ -1163,6 +1170,12 @@ context_task (void *cls,
                               &except_fd_set,
                               &max_fd,
                               &timeout);
+  TALER_MERCHANT_get_select_info (merchant,
+				  &read_fd_set,
+				  &write_fd_set,
+				  &except_fd_set,
+				  &max_fd,
+				  &timeout);
   if (timeout >= 0)
     delay = GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS,
                                            timeout);
@@ -1225,41 +1238,41 @@ run (void *cls,
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
-      .details.deposit.amount = "EUR:5",
-      .details.deposit.coin_ref = "withdraw-coin-1",
-      .details.deposit.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
-      .details.deposit.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
-      .details.deposit.transaction_id = 1 },
+      .details.pay.amount = "EUR:5",
+      .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
+      .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
+      .details.pay.transaction_id = 1 },
 
     /* Try to double-spend the 5 EUR coin with different wire details */
     { .oc = OC_PAY,
       .label = "deposit-double-1",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.deposit.amount = "EUR:5",
-      .details.deposit.coin_ref = "withdraw-coin-1",
-      .details.deposit.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":43 }",
-      .details.deposit.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
-      .details.deposit.transaction_id = 1 },
+      .details.pay.amount = "EUR:5",
+      .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":43 }",
+      .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
+      .details.pay.transaction_id = 1 },
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        transaction ID) */
     { .oc = OC_PAY,
       .label = "deposit-double-2",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.deposit.amount = "EUR:5",
-      .details.deposit.coin_ref = "withdraw-coin-1",
-      .details.deposit.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
-      .details.deposit.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
-      .details.deposit.transaction_id = 2 },
+      .details.pay.amount = "EUR:5",
+      .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
+      .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
+      .details.pay.transaction_id = 2 },
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        contract) */
     { .oc = OC_PAY,
       .label = "deposit-double-3",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.deposit.amount = "EUR:5",
-      .details.deposit.coin_ref = "withdraw-coin-1",
-      .details.deposit.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
-      .details.deposit.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":2 } }",
-      .details.deposit.transaction_id = 1 },
+      .details.pay.amount = "EUR:5",
+      .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
+      .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":2 } }",
+      .details.pay.transaction_id = 1 },
 
     { .oc = OC_END }
   };
@@ -1269,6 +1282,8 @@ run (void *cls,
 
   ctx = TALER_MINT_init ();
   GNUNET_assert (NULL != ctx);
+  merchant = TALER_MERCHANT_init ();
+  GNUNET_assert (NULL != merchant);
   ctx_task = GNUNET_SCHEDULER_add_now (&context_task,
                                        ctx);
   mint = TALER_MINT_connect (ctx,
@@ -1335,6 +1350,10 @@ main (int argc,
   fprintf (stderr, "\n");
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_run (&run, NULL);
+  GNUNET_OS_process_kill (merchantd,
+                          SIGTERM);
+  GNUNET_OS_process_wait (merchantd);
+  GNUNET_OS_process_destroy (merchantd);
   GNUNET_OS_process_kill (mintd,
                           SIGTERM);
   GNUNET_OS_process_wait (mintd);
