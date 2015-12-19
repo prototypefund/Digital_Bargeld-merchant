@@ -46,3 +46,6 @@ test_merchant_api_LDADD = \
   -ltalerutil \
   -lgnunetutil \
   -ljansson
+
+EXTRA_DIST = \
+  test_merchant.conf

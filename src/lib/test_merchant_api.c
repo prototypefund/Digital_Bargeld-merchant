@@ -27,6 +27,11 @@
 #include <microhttpd.h>
 
 /**
+ * URI under which the merchant is reachable during the testcase.
+ */
+#define MERCHANT_URI "http://localhost:8082/"
+
+/**
  * Main execution context for the main loop of the mint.
  */
 static struct TALER_MINT_Context *ctx;
@@ -1337,7 +1342,7 @@ main (int argc,
                                        NULL, NULL, NULL,
                                        "taler-merchant-httpd",
                                        "taler-merchant-httpd",
-                                       "-c", "test-merchant-home",
+                                       "-c", "test_merchant.conf",
                                        NULL);
   /* give child time to start and bind against the socket */
   fprintf (stderr, "Waiting for taler-mint-httpd to be ready");
