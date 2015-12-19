@@ -32,6 +32,11 @@
 #define MERCHANT_URI "http://localhost:8082/"
 
 /**
+ * URI under which the mint is reachable during the testcase.
+ */
+#define MINT_URI "http://localhost:8081"
+
+/**
  * Main execution context for the main loop of the mint.
  */
 static struct TALER_MINT_Context *ctx;
@@ -331,7 +336,7 @@ struct Command
       /**
        * Deposit handle while operation is running.
        */
-      struct TALER_MERACHANT_Pay *ph;
+      struct TALER_MERCHANT_Pay *ph;
 
     } pay;
 
@@ -981,11 +986,31 @@ interpreter_run (void *cls,
     trigger_context_task ();
     return;
   case OC_PAY:
+    /* FIXME: fill in rest of arguments properly! */
+    cmd->details.pay.ph 
+      = TALER_MERCHANT_pay_wallet (merchant,
+				   MERCHANT_URI,
+				   MINT_URI,
+				   NULL /* h_wire */,
+				   NULL /* h_contract */,
+				   GNUNET_TIME_absolute_get (),
+				   1 /* transaction_id */,
+				   NULL /* merchant_pub */,
+				   GNUNET_TIME_UNIT_ZERO_ABS /* refund dead */,
+				   1 /* num_coins */,
+				   NULL /* coins */,
+				   NULL /* max_fee */,
+				   NULL /* amount */,
+				   &pay_cb,
+				   is);
+    if (NULL == cmd->details.pay.ph)
     {
-      GNUNET_break (0); // FIXME: not implemented!
-      trigger_context_task ();
+      GNUNET_break (0);
+      fail (is);
       return;
     }
+    trigger_context_task ();
+    return;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
@@ -1067,8 +1092,15 @@ do_shutdown (void *cls,
       }
       break;
     case OC_PAY:
-      GNUNET_break (0); // FIXME: not implemented
-      GNUNET_SCHEDULER_shutdown ();
+      if (NULL != cmd->details.pay.ph)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_pay_cancel (cmd->details.pay.ph);
+        cmd->details.pay.ph = NULL;
+      }
       break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1292,7 +1324,7 @@ run (void *cls,
   ctx_task = GNUNET_SCHEDULER_add_now (&context_task,
                                        ctx);
   mint = TALER_MINT_connect (ctx,
-                             "http://localhost:8081",
+                             MINT_URI,
                              &cert_cb, is,
                              TALER_MINT_OPTION_END);
   GNUNET_assert (NULL != mint);
@@ -1351,7 +1383,7 @@ main (int argc,
       fprintf (stderr, ".");
       sleep (1);
     }
-  while (0 != system ("wget -q -t 1 -T 1 http://127.0.0.1:8081/keys -o /dev/null -O /dev/null"));
+  while (0 != system ("wget -q -t 1 -T 1 " MINT_URI "/keys -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_run (&run, NULL);
