@@ -295,6 +295,11 @@ struct Command
       const char *amount;
 
       /**
+       * Maximum fee covered by merchant.
+       */
+      const char *max_fee;
+
+      /**
        * Reference to a reserve_withdraw operation for a coin to
        * be used for the /deposit operation.
        */
@@ -326,12 +331,6 @@ struct Command
        * Zero for no refunds.
        */
       struct GNUNET_TIME_Relative refund_deadline;
-
-      /**
-       * Set (by the interpreter) to a fresh private key of the merchant,
-       * if @e refund_deadline is non-zero.
-       */
-      struct TALER_MerchantPrivateKeyP merchant_priv;
 
       /**
        * Deposit handle while operation is running.
@@ -986,23 +985,95 @@ interpreter_run (void *cls,
     trigger_context_task ();
     return;
   case OC_PAY:
-    /* FIXME: fill in rest of arguments properly! */
-    cmd->details.pay.ph 
-      = TALER_MERCHANT_pay_wallet (merchant,
-				   MERCHANT_URI,
-				   MINT_URI,
-				   NULL /* h_wire */,
-				   NULL /* h_contract */,
-				   GNUNET_TIME_absolute_get (),
-				   1 /* transaction_id */,
-				   NULL /* merchant_pub */,
-				   GNUNET_TIME_UNIT_ZERO_ABS /* refund dead */,
-				   1 /* num_coins */,
-				   NULL /* coins */,
-				   NULL /* max_fee */,
-				   NULL /* amount */,
-				   &pay_cb,
-				   is);
+    {
+      struct TALER_MERCHANT_PayCoin pc;
+      struct TALER_Amount amount;
+      struct TALER_Amount max_fee;
+      json_t *wire;
+      json_t *contract;
+      struct GNUNET_HashCode h_wire;
+      struct GNUNET_HashCode h_contract;
+
+      /* get amount */
+      if (GNUNET_OK !=
+	  TALER_string_to_amount (cmd->details.pay.amount,
+				  &amount))
+      {
+	GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		    "Failed to parse amount `%s' at %u\n",
+		    cmd->details.pay.amount,
+		    is->ip);
+	fail (is);
+	return;
+      }
+
+      /* get max_fee */
+      if (GNUNET_OK !=
+	  TALER_string_to_amount (cmd->details.pay.max_fee,
+				  &max_fee))
+      {
+	GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		    "Failed to parse max_fee `%s' at %u\n",
+		    cmd->details.pay.max_fee,
+		    is->ip);
+	fail (is);
+	return;
+      }
+      
+      /* parse wire details */
+      wire = json_loads (cmd->details.pay.wire_details,
+                         JSON_REJECT_DUPLICATES,
+                         NULL);
+      if (NULL == wire)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse wire details `%s' at %u\n",
+                    cmd->details.pay.wire_details,
+                    is->ip);
+        fail (is);
+        return;
+      }
+      TALER_hash_json (wire,
+		       &h_wire);
+      json_decref (wire);
+
+      /* parse contract */
+      contract = json_loads (cmd->details.pay.contract,
+			     JSON_REJECT_DUPLICATES,
+			     NULL);
+      if (NULL == contract)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse contract details `%s' at %u\n",
+                    cmd->details.pay.contract,
+                    is->ip);
+        fail (is);
+        return;
+      }
+      TALER_hash_json (contract,
+		       &h_contract);
+      json_decref (contract);
+
+      /* FIXME: fill in rest of arguments properly,
+	 in particular merchant_pub and refund_deadline are
+	 not correct right now... */
+      cmd->details.pay.ph 
+	= TALER_MERCHANT_pay_wallet (merchant,
+				     MERCHANT_URI,
+				     MINT_URI,
+				     &h_wire,
+				     &h_contract,
+				     GNUNET_TIME_absolute_get (),
+				     cmd->details.pay.transaction_id,
+				     NULL /* FIXME: merchant_pub */,
+				     GNUNET_TIME_UNIT_ZERO_ABS /* refund dead */,
+				     1 /* num_coins */,
+				     &pc /* coins */,
+				     &max_fee,
+				     &amount,
+				     &pay_cb,
+				     is);
+    }
     if (NULL == cmd->details.pay.ph)
     {
       GNUNET_break (0);
