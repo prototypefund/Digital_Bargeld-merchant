@@ -85,6 +85,7 @@ static void
 handle_pay_finished (void *cls,
                      CURL *eh)
 {
+  /* FIXME: this function is not yet implemented!!! */
   struct TALER_MERCHANT_Pay *ph = cls;
   long response_code;
   json_t *json;
@@ -348,9 +349,57 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
 		       j_coin);
   }
 
-  /* FIXME: check total_amount and total_fee
-     match amount/max_fee */
+  { /* Sanity check that total_amount and total_fee
+       match amount/max_fee requirements */
+    struct TALER_Amount fee_left;
 
+    if (GNUNET_OK ==
+	TALER_amount_subtract (&fee_left,
+			       &total_fee,
+			       &max_fee))
+    {
+      /* Wallet must cover part of the fee! */
+      struct TALER_Amount new_amount;
+
+      if (GNUNET_OK != 
+	  TALER_amount_add (&new_amount,
+			    &fee_left,
+			    &amount))
+      {
+	/* integer overflow */
+	GNUNET_break (0);
+	json_decref (j_coins);
+	return NULL;
+      }
+      if (1 ==
+	  TALER_amount_cmp (&new_amount,
+			    &total_amount))
+      {
+	/* new_amount > total_amount: all of the coins (total_amount)
+	   do not add up to at least the new_amount owed to the
+	   merchant, this request is bogus, abort */
+	GNUNET_break (0);
+	json_decref (j_coins);
+	return NULL;
+      }
+    }
+    else
+    {
+      /* Full fee covered by merchant, but our total
+	 must at least cover the total contract amount */
+      if (1 ==
+	  TALER_amount_cmp (&amount,
+			    &total_amount))
+	{
+	  /* amount > total_amount: all of the coins (total_amount) do
+	   not add up to at least the amount owed to the merchant,
+	   this request is bogus, abort */
+	GNUNET_break (0);
+	json_decref (j_coins);
+	return NULL;
+      }
+    }
+  } /* end of sanity check */
   pay_obj = json_pack ("{s:o, s:o," /* H_wire/H_contract */
                        " s:I, s:o," /* transaction id, timestamp */
                        " s:o, s:s," /* refund_deadline, mint */
