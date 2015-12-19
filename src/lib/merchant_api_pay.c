@@ -356,7 +356,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
     if (GNUNET_OK ==
 	TALER_amount_subtract (&fee_left,
 			       &total_fee,
-			       &max_fee))
+			       max_fee))
     {
       /* Wallet must cover part of the fee! */
       struct TALER_Amount new_amount;
@@ -364,7 +364,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
       if (GNUNET_OK != 
 	  TALER_amount_add (&new_amount,
 			    &fee_left,
-			    &amount))
+			    amount))
       {
 	/* integer overflow */
 	GNUNET_break (0);
@@ -388,7 +388,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
       /* Full fee covered by merchant, but our total
 	 must at least cover the total contract amount */
       if (1 ==
-	  TALER_amount_cmp (&amount,
+	  TALER_amount_cmp (amount,
 			    &total_amount))
 	{
 	  /* amount > total_amount: all of the coins (total_amount) do
