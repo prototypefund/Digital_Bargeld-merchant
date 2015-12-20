@@ -102,7 +102,7 @@ $now = new DateTime('now');
 
 // pack the JSON for the contract 
 // --- FIXME: exact format needs review!
-$json = json_encode (array ('amount' => array ('value' => $amount_value,
+$contract = array ('amount' => array ('value' => $amount_value,
 			                       'fraction' => $amount_fraction,
                                                'currency' => $currency),
 			    'max_fee' => array ('value' => 3,
@@ -120,7 +120,6 @@ $json = json_encode (array ('amount' => array ('value' => $amount_value,
 			              'delivery_date' => "Some Date Format",
 			              'delivery_location' => 'LNAME1')),
 			    'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
-			    'pay_url' => "/taler/pay",
 			    'expiry' => "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
 			    'refund_deadline' => "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
 			    'merchant' => array ('address' => 'LNAME2',
@@ -148,7 +147,9 @@ $json = json_encode (array ('amount' => array ('value' => $amount_value,
 						                     'state' => 'Test State',
 							             'region' => 'Test Region',
 								     'province' => 'Test Province',
-								     'ZIP code' => 4908))), JSON_PRETTY_PRINT);
+                                                                     'ZIP code' => 4908)));
+
+$json = json_encode (array ("contract" => $contract, "pay_url" => "pay.php", "exec_url" => "execute.php"));
 if ($cli_debug && !$backend_test)
 {
   echo $json . "\n";
@@ -180,10 +181,14 @@ http_response_code ($status_code);
 // Now generate our body  
 if ($status_code != 200)
 {
-  echo "Error while generating the contract";
+  echo "Error while generating the contract:";
+  echo "$resp";
 }
 else
 {
+
+  $json = json_decode($resp->body->toString (), true);
+  $_SESSION["H_contract"] = $json["H_contract"];
   // send the contract back to the wallet without touching it
   echo $resp->body->toString ();
 }
