@@ -42,6 +42,10 @@ test_merchant_api_SOURCES = \
 test_merchant_api_LDADD = \
   libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
-  $(top_builddir)/src/util/libtalerutil.la \
+  -ltalermint \
+  -ltalerutil \
   -lgnunetutil \
   -ljansson
+
+EXTRA_DIST = \
+  test_merchant.conf

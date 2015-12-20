@@ -171,6 +171,7 @@ struct TALER_MERCHANT_PayCoin
  * Pay a merchant.  API for wallets that have the coin's private keys.
  *
  * @param merchant the merchant context
+ * @param merchant_uri URI of the merchant
  * @param mint_uri URI of the mint that the coins belong to
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
@@ -181,12 +182,15 @@ struct TALER_MERCHANT_PayCoin
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
+ * @param max_fee maximum fee covered by the merchant (according to the contract)
+ * @param amount total value of the contract to be paid to the merchant
  * @param pay_cb the callback to call when a reply for this request is available
  * @param pay_cb_cls closure for @a pay_cb
  * @return a handle for this request
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
+			   const char *merchant_uri,
 			   const char *mint_uri,
                            const struct GNUNET_HashCode *h_wire,
                            const struct GNUNET_HashCode *h_contract,
@@ -196,6 +200,8 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
                            struct GNUNET_TIME_Absolute refund_deadline,
                            unsigned int num_coins,
                            const struct TALER_MERCHANT_PayCoin *coins,
+			   const struct TALER_Amount *max_fee,
+			   const struct TALER_Amount *amount,
                            TALER_MERCHANT_PayCallback pay_cb,
                            void *pay_cb_cls);
 
@@ -219,7 +225,7 @@ struct TALER_MERCHANT_PaidCoin
   /**
    * Coin's public key.
    */
-  struct TALER_CoinSpendPrivateKeyP coin_pub;
+  struct TALER_CoinSpendPublicKeyP coin_pub;
 
   /**
    * Coin's signature key.
@@ -246,6 +252,7 @@ struct TALER_MERCHANT_PaidCoin
  * in the type of @a coins compared to #TALER_MERCHANT_pay().
  *
  * @param merchant the merchant context
+ * @param merchant_uri URI of the merchant
  * @param mint_uri URI of the mint that the coins belong to
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
@@ -253,15 +260,19 @@ struct TALER_MERCHANT_PaidCoin
  * @param transaction_id transaction id for the transaction between merchant and customer
  * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
+ * @param execution_deadline date by which the merchant would like the mint to execute the transaction (can be zero if there is no specific date desired by the frontend)
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
+ * @param max_fee maximum fee covered by the merchant (according to the contract)
+ * @param amount total value of the contract to be paid to the merchant
  * @param pay_cb the callback to call when a reply for this request is available
  * @param pay_cb_cls closure for @a pay_cb
  * @return a handle for this request
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
+			     const char *merchant_uri,
 			     const char *mint_uri,
                              const struct GNUNET_HashCode *h_wire,
                              const struct GNUNET_HashCode *h_contract,
@@ -269,8 +280,11 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
                              uint64_t transaction_id,
                              const struct TALER_MerchantPublicKeyP *merchant_pub,
                              struct GNUNET_TIME_Absolute refund_deadline,
+                             struct GNUNET_TIME_Absolute execution_deadline,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
+			     const struct TALER_Amount *max_fee,
+			     const struct TALER_Amount *amount,
                              TALER_MERCHANT_PayCallback pay_cb,
                              void *pay_cb_cls);
 
