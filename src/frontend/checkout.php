@@ -147,7 +147,7 @@ function taler_pay(form)
      have its own way of generating and transmitting the
      contract, there just must be a way to get the contract
      and to pass it to the wallet when the user selects 'Pay'. */
-  contract_request.open("GET", "/generate_taler_contract.php", true);
+  contract_request.open("GET", "generate_taler_contract.php", true);
   contract_request.onload = function (e)
   {
     if (contract_request.readyState == 4)
@@ -157,7 +157,6 @@ function taler_pay(form)
         /* display contract_requestificate (i.e. it sends the JSON string
            to the extension) alert (contract_request.responseText); */
         handle_contract(contract_request.responseText);
-
       }
       else
       {
