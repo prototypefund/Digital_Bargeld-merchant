@@ -46,10 +46,10 @@ register_shutdown_function(function() {
 $cli_debug = false;
 $backend_test = true;
 
-if ($_GET['cli_debug'] == 'yes')
+if (isset($_GET['cli_debug']) && $_GET['cli_debug'] == 'yes')
   $cli_debug = true;
 
-if ($_GET['backend_test'] == 'no')
+if (isset($_GET['backend_test']) && $_GET['backend_test'] == 'no')
 {
   $cli_debug = true;
   $backend_test = false;
@@ -61,7 +61,6 @@ if (!$cli_debug && (! isset($_SESSION['receiver'])))
 {
   http_response_code (404);
   echo "Please select a contract before getting to this page...";
-  echo "attempted : " . $_SESSION['receiver'];
   exit (0);
 }
 
