@@ -30,7 +30,18 @@
     if the whole "journey" to the backend is begin tested
   - $ curl http://merchant_url/generate_taler_contract.php?backend_test=no
     if just the frontend job is being tested
-*/
+ */
+
+
+register_shutdown_function(function() {
+  $lastError = error_get_last();
+
+  if (!empty($lastError) && $lastError['type'] == E_ERROR) {
+    header('Status: 500 Internal Server Error');
+    header('HTTP/1.0 500 Internal Server Error');
+  }
+});
+
 
 $cli_debug = false;
 $backend_test = true;
