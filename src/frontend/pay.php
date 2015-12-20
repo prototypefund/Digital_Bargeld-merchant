@@ -118,7 +118,9 @@ else
 {
   $_SESSION['payment_ok'] = true;
   http_response_code (301);
-  header("Location: http://" . $_SERVER["SERVER_NAME"] . "/fullfillment");
+  $url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
+    ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
+  header("Location: $url");
   die();
 }
 
