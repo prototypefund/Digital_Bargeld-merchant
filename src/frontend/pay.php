@@ -23,7 +23,9 @@
   NOTE: 'max_fee' must be consistent with the same value indicated within
   the contract; thus, a "real" merchant must implement such a mapping
 
-*/
+ */
+
+session_start();
 
 $cli_debug = false;
 $backend_test = true;
@@ -39,14 +41,14 @@ if (isset($_GET['backend_test']) &&  $_GET['backend_test'] == 'no')
   $backend_test = false;
 }
 
-if (!isset($_SESSION['receiver']))
+
+
+if (!isset($_SESSION['H_contract']))
 {
   echo "No session active.";
   http_response_code (301);
   return;
 }
-
-session_start();
 
 $post_body = file_get_contents('php://input');
 
@@ -80,8 +82,13 @@ if ($cli_debug && !$backend_test)
   exit;
 }
 
+
+// Backend is relative to the shop site.
+$url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
+  ->mod(array ("path" => "backend/pay"), http\Url::JOIN_PATH);
+
 $req = new http\Client\Request("POST",
-                               "http://" . $_SERVER["SERVER_NAME"] . "/backend/pay",
+                               $url,
                                array ("Content-Type" => "application/json"));
 $req->getBody()->append (json_encode ($new_deposit_permission));
 
