@@ -116,7 +116,7 @@
           <input type="radio" name="payment_system" value="taler"
                  id="taler-radio-button-id" disabled="true">Taler</input>
           <br/>
-          <input type="button" onclick="pay(this.form)" value="Ok">
+          <input type="button" onclick="pay(this.form)" value="Ok"></input>
         </div>
       </form>
 
@@ -155,7 +155,8 @@ function taler_pay(form)
       if (contract_request.status == 200)
       {
         /* display contract_requestificate (i.e. it sends the JSON string
-           to the extension) alert (contract_request.responseText); */
+          to the extension) alert (contract_request.responseText); */
+        console.log("response text:", contract_request.responseText);
         handle_contract(contract_request.responseText);
       }
       else

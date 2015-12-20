@@ -155,11 +155,14 @@ if ($cli_debug && !$backend_test)
   exit;
 }
 
-// Craft the HTTP request, note that the backend
-// could be on an entirely different machine if
-// desired.
+
+
+// Backend is relative to the shop site.
+$url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
+  ->mod(array ("path" => "backend/contract"), http\Url::JOIN_PATH);
+
 $req = new http\Client\Request ("POST",
-                                "http://" . $_SERVER["SERVER_NAME"] . "/backend/contract",
+                                $url,
 				array ("Content-Type" => "application/json"));
 $req->getBody()->append ($json);
 
