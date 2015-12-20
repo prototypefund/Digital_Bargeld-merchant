@@ -30,15 +30,26 @@
     if the whole "journey" to the backend is begin tested
   - $ curl http://merchant_url/generate_taler_contract.php?backend_test=no
     if just the frontend job is being tested
-*/
+ */
+
+
+register_shutdown_function(function() {
+  $lastError = error_get_last();
+
+  if (!empty($lastError) && $lastError['type'] == E_ERROR) {
+    header('Status: 500 Internal Server Error');
+    header('HTTP/1.0 500 Internal Server Error');
+  }
+});
+
 
 $cli_debug = false;
 $backend_test = true;
 
-if ($_GET['cli_debug'] == 'yes')
+if (isset($_GET['cli_debug']) && $_GET['cli_debug'] == 'yes')
   $cli_debug = true;
 
-if ($_GET['backend_test'] == 'no')
+if (isset($_GET['backend_test']) && $_GET['backend_test'] == 'no')
 {
   $cli_debug = true;
   $backend_test = false;
@@ -50,7 +61,6 @@ if (!$cli_debug && (! isset($_SESSION['receiver'])))
 {
   http_response_code (404);
   echo "Please select a contract before getting to this page...";
-  echo "attempted : " . $_SESSION['receiver'];
   exit (0);
 }
 
@@ -145,11 +155,14 @@ if ($cli_debug && !$backend_test)
   exit;
 }
 
-// Craft the HTTP request, note that the backend
-// could be on an entirely different machine if
-// desired.
+
+
+// Backend is relative to the shop site.
+$url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
+  ->mod(array ("path" => "backend/contract"), http\Url::JOIN_PATH);
+
 $req = new http\Client\Request ("POST",
-                                "http://" . $_SERVER["SERVER_NAME"] . "/backend/contract",
+                                $url,
 				array ("Content-Type" => "application/json"));
 $req->getBody()->append ($json);
 

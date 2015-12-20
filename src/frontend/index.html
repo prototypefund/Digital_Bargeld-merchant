@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Taler's "Demo" Shop</title>
+  <title>Toy Store - Taler Demo</title>
   <link rel="stylesheet" type="text/css" href="style.css">
     <script> /* @licstart  The following is the entire license notice for the
         JavaScript code in this page.
@@ -27,10 +27,26 @@
         */
     </script>
 </head>
-<body id="css-zen-garden" onload="signal_me()">
-  <div class="supporting" id="welcome" role="main">
-    <div class="explanation" id="zen-explanation" role="article">
-      <h1>Welcome to the Taler "Demo" Shop</h1>
+
+<body onload="signal_me()">
+  <header>
+    <div id="logo">
+      <svg height="100" width="100">
+        <circle cx="50" cy="50" r="40" stroke="black" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="black">S</text>
+      </svg>
+    </div>
+
+    <h1>Toy Store - Taler Demo</h1>
+  </header>
+
+  <aside class="sidebar" id="left">
+  </aside>
+
+  <section id="main">
+    <article>
+      <h1>Welcome to the Taler Demo Shop</h1>
+
       <p>This "toy" website provides you with the ability to
         experience using the
         <a href="https://www.taler.net/">GNU Taler</a>
@@ -48,95 +64,103 @@
         <!-- TODO: maybe offer the wallet at 'taler.net/extension' in the
              future, instead of at 'demo.taler.net/'? -->
       </p>
-    </div>
-  </div>
-  <div class="supporting" id="instructions" role="main">
-    <div class="explanation" id="installation" role="article">
-      <h2>Step 1: Installing the Taler wallet (once)</h2>
-      <p>First, you need to install the Taler wallet browser extension.
-         It is currently only available for Firefox.  If you run
-         Firefox, simply click <a href="http://demo.taler.net/extension">here</a>
-         to download and install the extension.  You will then have to
-         click on "allow" and "install" dialogs shown by Firefox.
-         After that, the Taler logo should appear on the right side
-         of your navigation bar.
-        <!-- TODO: insert screenshot highlighting the icon? -->
-      </p>
-    </div>
-    <div class="explanation" id="installation-done" role="article" style="display:none;">
-      <h2>Step 1: Installing the Taler wallet (done!)</h2>
-      <p>Congratulations, you have installed the Taler wallet correctly.
-         You can now proceed with the next steps.
-      </p>
-    </div>
-    <div class="explanation" id="wire" role="article" style="display:none;">
-      <h2>Step 2: Withdraw coins (occasionally)</h2>
-      <p>The next step is to withdraw coins, after all you cannot
-         pay with an empty wallet.  To be allowed to withdraw
-         coins from a mint, you first need to transfer currency to the mint
-         using the normal banking system, for example by using a
-         wire transfer.  If the bank offers a tight integration with Taler, it
-         may also support this directly over the home banking online interface.
-         <br>
-         For the demonstration, we have created a "bank" that
-         allows you to "wire" funds (in KUDOS) to the mint simply by
-         filling in the desired amount into a form.  Naturally, when
-         using a real bank with real money, you would have to authenticate
-         and authorize the transfer.
-         <br>
-         Note that you would not do this step for each purchase or each shop.
-         Payment with Taler is like paying
-         with cash: you withdraw currency at the bank (or an ATM) and then
-         pay at many merchants without having to authenticate each time.
-         <br>
-         So, unless you have already done so, please go ahead and withdraw
-         KUDOS at the
-         <a href="http://bank.demo.taler.net/" target="_blank">Demo bank</a>
-	 (opens in a new tab).</p>
-      </p>
-    </div>
-    <div class="explanation" id="payment" role="article" style="display:none;">
-      <h2>Step 3: Shop! (as long as you have KUDOS left in the wallet)</h2>
-      <p>Now it is time to spend your hard earned KUDOS.
-         Note that we cannot really tell if you got any yet,
-         as your Taler wallet balance is visible to you, but
-         of course is hidden entirely from the shop.</p>
-      <p>The form that follows corresponds to the shopping
-         cart of a real Web shop; however, we kept it
-         very simple for the demonstration.</p>
-      <p>So, please choose a project and the amount of KUDOS you
-         wish to donate:</p>
-      <form name="tform" action="/checkout.php" method="POST">
-        <div class="participation" id="fake-shop">
+    </article>
+
+    <section id="instructions">
+
+      <article id="installation">
+        <h2>Step 1: Installing the Taler wallet <sup>(once)</sup></h2>
+        <p>First, you need to install the Taler wallet browser extension.
+          It is currently only available for Firefox.  If you run
+          Firefox, simply click <a href="http://demo.taler.net/extension">here</a>
+          to download and install the extension.  You will then have to
+          click on "allow" and "install" dialogs shown by Firefox.
+          After that, the Taler logo should appear on the right side
+          of your navigation bar.
+          <!-- TODO: insert screenshot highlighting the icon? -->
+        </p>
+      </article>
+
+      <article id="installation-done" style="display:none;">
+        <h2>Step 1: Installing the Taler wallet <sup>(done!)</sup></h2>
+
+        <p>Congratulations, you have installed the Taler wallet correctly.
+          You can now proceed with the next steps.
+        </p>
+      </article>
+
+      <article id="wire" style="display:none;">
+        <h2>Step 2: Withdraw coins <sup>(occasionally)</sup></h2>
+
+        <p>The next step is to withdraw coins, after all you cannot
+          pay with an empty wallet.  To be allowed to withdraw
+          coins from a mint, you first need to transfer currency to the mint
+          using the normal banking system, for example by using a
+          wire transfer.  If the bank offers a tight integration with Taler, it
+          may also support this directly over the home banking online interface.
           <br>
-          <input type="radio" name="donation_receiver" value="Taler" checked="true">GNU Taler</input>
+          For the demonstration, we have created a "bank" that
+          allows you to "wire" funds (in KUDOS) to the mint simply by
+          filling in the desired amount into a form.  Naturally, when
+          using a real bank with real money, you would have to authenticate
+          and authorize the transfer.
           <br>
-          <input type="radio" name="donation_receiver" value="Tor">Tor</input>
+          Note that you would not do this step for each purchase or each shop.
+          Payment with Taler is like paying
+          with cash: you withdraw currency at the bank (or an ATM) and then
+          pay at many merchants without having to authenticate each time.
           <br>
-          <input type="radio" name="donation_receiver" value="GNUnet">GNUnet</input>
-          <br>
-          <select id="taler-donation" name="donation_amount">
-            <option value="0.1">0.1 KUDOS</option>
-            <option value="1.0">1 KUDOS</option>
-            <option value="6.0">5 KUDOS (*)</option>
-            <option value="10.0">10 KUDOS</option>
-          </select>
-          <input type="hidden" name="donation_currency" value="KUDOS"/>
-          <input type="submit" name="keyName" value="Donate!"/>
-          <br>
-          <br>
-        </div>
-      </form>
-      <p>(*) To make it a bit more fun, the 5 KUDOS option
-         is deliberately implemented with a fault: the merchant will try to
-         make you donate 6 KUDOS instead of the 5 KUDOS you got to see.  But do
-         not worry, you will be given the opportunity to review the
-         final offer from the merchant in a window secured
-         by the Taler extension.  That way, you can spot the
-         error before committing to an incorrect contract.</p>
-      </p>
-    </div>
-  </div>
+          So, unless you have already done so, please go ahead and withdraw
+          KUDOS at the
+          <a href="http://bank.demo.taler.net/" target="_blank">Demo bank</a>
+	  (opens in a new tab).</p>
+      </article>
+
+      <article id="payment" style="display:none;">
+        <h2>Step 3: Shop! <sup>(as long as you have KUDOS left)</sup></h2>
+
+        <p>Now it is time to spend your hard earned KUDOS.
+          Note that we cannot really tell if you got any yet,
+          as your Taler wallet balance is visible to you, but
+          of course is hidden entirely from the shop.</p>
+        <p>The form that follows corresponds to the shopping
+          cart of a real Web shop; however, we kept it
+          very simple for the demonstration.</p>
+        <p>So, please choose a project and the amount of KUDOS you
+          wish to donate:</p>
+
+        <form name="tform" action="checkout.php" method="POST">
+          <div class="participation" id="fake-shop">
+            <br>
+            <input type="radio" name="donation_receiver" value="Taler" checked="true">GNU Taler</input>
+            <br>
+            <input type="radio" name="donation_receiver" value="Tor">Tor</input>
+            <br>
+            <input type="radio" name="donation_receiver" value="GNUnet">GNUnet</input>
+            <br>
+            <select id="taler-donation" name="donation_amount">
+              <option value="0.1">0.1 KUDOS</option>
+              <option value="1.0">1 KUDOS</option>
+              <option value="6.0">5 KUDOS (*)</option>
+              <option value="10.0">10 KUDOS</option>
+            </select>
+            <input type="hidden" name="donation_currency" value="KUDOS"/>
+            <input type="submit" name="keyName" value="Donate!"/>
+            <br>
+            <br>
+          </div>
+        </form>
+        <p>(*) To make it a bit more fun, the 5 KUDOS option
+          is deliberately implemented with a fault: the merchant will try to
+          make you donate 6 KUDOS instead of the 5 KUDOS you got to see.  But do
+          not worry, you will be given the opportunity to review the
+          final offer from the merchant in a window secured
+          by the Taler extension.  That way, you can spot the
+          error before committing to an incorrect contract.</p>
+      </article>
+    </section>
+  </section>
+
   <script type="text/javascript">
     /* This function is called if/when a Wallet is installed.
        It should enable the parts of the page that only make
@@ -168,7 +192,7 @@
     function signal_me()
     {
       var eve = new Event('taler-checkout-probe');
-      document.body.dispatchEvent(eve);
+      document.dispatchEvent(eve);
       //alert("signaling");
     };
 
@@ -176,21 +200,21 @@
         wallet_installed_cb();
     }
 
-    document.body.addEventListener("taler-unload",
-                                   wallet_uninstalled_cb,
-                                   false, false);
+    document.addEventListener("taler-unload",
+                              wallet_uninstalled_cb,
+                              false, false);
 
     /* Set up a listener to be called whenever a Wallet gets installed
        so that the user is led towards the demo's steps progressively */
-    document.body.addEventListener("taler-wallet-present",
-                                   wallet_installed_cb,
-                                   false, false);
+    document.addEventListener("taler-wallet-present",
+                              wallet_installed_cb,
+                              false, false);
 
     /* Setup callback to be called whenever the wallet is loaded/enabled
       while the browser is already on this page */
-    document.body.addEventListener("taler-load",
-                                   signal_me,
-                                   false);
+    document.addEventListener("taler-load",
+                              signal_me,
+                              false);
   </script>
 </body>
 </html>
