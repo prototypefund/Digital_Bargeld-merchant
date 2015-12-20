@@ -36,7 +36,11 @@ document.addEventListener("DOMContentLoaded", function (e) {
   document.dispatchEvent(eve);
 });
 document.addEventListener("taler-payment-result", function (e) {
+  if (!e.detail.success) {
+    alert("Payment failed\n" + JSON.strinfigy(e.detail));
+  }
   console.log("finished payment");
+  document.getElementById("loading").innerHTML = "success!";
 });
     </script>
 </head>
@@ -57,6 +61,6 @@ document.addEventListener("taler-payment-result", function (e) {
 
   <section id="main">
       <h1>Executing Payment ...</h1>
-      <div class="loader">Loading...</div>
+      <div id="loading">Loading...</div>
 </body>
 </html>
