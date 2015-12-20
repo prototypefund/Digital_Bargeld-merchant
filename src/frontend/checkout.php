@@ -51,7 +51,7 @@
   $donation_currency = $_POST['donation_currency'];
 
   // get frational part
-  list ($donation_value, $donation_fraction) = split ("\.", $donation_amount, 2);
+  list ($donation_value, $donation_fraction) = explode (".", $donation_amount, 2);
   // create PHP session and store donation information in session
   $donation_fraction = (float) ("0." . $donation_fraction);
   session_start();
