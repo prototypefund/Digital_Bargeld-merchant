@@ -64,8 +64,8 @@
   <header>
     <div id="logo">
       <svg height="100" width="100">
-        <circle cx="50" cy="50" r="40" stroke="black" stroke-width="6" fill="white" />
-        <text x="19" y="82" font-family="Verdana" font-size="90" fill="black">S</text>
+        <circle cx="50" cy="50" r="40" stroke="darkcyan" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
       </svg>
     </div>
 
