@@ -84,7 +84,7 @@ if ($cli_debug && !$backend_test)
 
 
 // Backend is relative to the shop site.
-$url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
+$url = (new http\URL("http://".$_SERVER["HTTP_HOST"].$_SERVER["REQUEST_URI"]))
   ->mod(array ("path" => "backend/pay"), http\Url::JOIN_PATH);
 
 $req = new http\Client\Request("POST",
