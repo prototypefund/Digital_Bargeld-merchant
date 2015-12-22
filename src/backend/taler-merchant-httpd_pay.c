@@ -543,11 +543,12 @@ process_pay_with_mint (void *cls,
                                  dc);
     if (NULL == dc->dh)
     {
+      /* Signature was invalid.  If the mint was unavailable,
+       * we'd get that information in the callback. */
       resume_pay_with_response (pc,
-                                MHD_HTTP_SERVICE_UNAVAILABLE,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:i}",
-                                                             "mint", pc->chosen_mint,
-                                                             "transaction_id", pc->transaction_id));
+                                MHD_HTTP_UNAUTHORIZED,
+                                TMH_RESPONSE_make_json_pack ("{s:s}",
+                                                             "hint", "Coin signature invalid."));
       return;
     }
   }
@@ -577,6 +578,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   int res;
   json_t *root;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "In handler for /pay.\n");
+
   if (NULL == *connection_cls)
   {
     pc = GNUNET_new (struct PayContext);
@@ -594,6 +597,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     /* We are *done* processing the request, just queue the response (!) */
     if (UINT_MAX == pc->response_code)
       return MHD_NO; /* hard error */
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Queueing response for /pay.\n");
     res = MHD_queue_response (connection,
                               pc->response_code,
                               pc->response);
@@ -635,11 +639,14 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     res = TMH_PARSE_json_data (connection,
                                root,
                                spec);
+
     if (GNUNET_YES != res)
     {
       json_decref (root);
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
+
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Parsed JSON for /pay.\n");
 
     /* 'edate' is optional, if it is not present, generate it here; it
        will be timestamp plus the edate_delay supplied in config
@@ -702,6 +709,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       dc->pc = pc;
     }
   }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Looking up chosen mint '%s'\n", pc->chosen_mint);
 
   /* Find the responsible mint, this may take a while... */
   pc->pending = pc->coins_cnt;

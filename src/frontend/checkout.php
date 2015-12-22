@@ -51,7 +51,7 @@
   $donation_currency = $_POST['donation_currency'];
 
   // get frational part
-  list ($donation_value, $donation_fraction) = split ("\.", $donation_amount, 2);
+  list ($donation_value, $donation_fraction) = explode (".", $donation_amount, 2);
   // create PHP session and store donation information in session
   $donation_fraction = (float) ("0." . $donation_fraction);
   session_start();
@@ -64,8 +64,8 @@
   <header>
     <div id="logo">
       <svg height="100" width="100">
-        <circle cx="50" cy="50" r="40" stroke="black" stroke-width="6" fill="white" />
-        <text x="19" y="82" font-family="Verdana" font-size="90" fill="black">S</text>
+        <circle cx="50" cy="50" r="40" stroke="darkcyan" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
       </svg>
     </div>
 
@@ -116,7 +116,7 @@
           <input type="radio" name="payment_system" value="taler"
                  id="taler-radio-button-id" disabled="true">Taler</input>
           <br/>
-          <input type="button" onclick="pay(this.form)" value="Ok">
+          <input type="button" onclick="pay(this.form)" value="Ok"></input>
         </div>
       </form>
 
@@ -147,7 +147,7 @@ function taler_pay(form)
      have its own way of generating and transmitting the
      contract, there just must be a way to get the contract
      and to pass it to the wallet when the user selects 'Pay'. */
-  contract_request.open("GET", "/generate_taler_contract.php", true);
+  contract_request.open("GET", "generate_taler_contract.php", true);
   contract_request.onload = function (e)
   {
     if (contract_request.readyState == 4)
@@ -155,9 +155,9 @@ function taler_pay(form)
       if (contract_request.status == 200)
       {
         /* display contract_requestificate (i.e. it sends the JSON string
-           to the extension) alert (contract_request.responseText); */
+          to the extension) alert (contract_request.responseText); */
+        console.log("response text:", contract_request.responseText);
         handle_contract(contract_request.responseText);
-
       }
       else
       {

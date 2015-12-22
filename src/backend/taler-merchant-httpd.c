@@ -334,6 +334,7 @@ parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg)
   unsigned long long salt;
   char *iban;
   char *name;
+  char *address;
   char *bic;
 
   if (GNUNET_OK !=
@@ -366,21 +367,35 @@ parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg)
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              "wire-sepa",
+                                             "ADDRESS",
+                                             &address))
+  {
+    GNUNET_free (iban);
+    GNUNET_free (name);
+    return GNUNET_SYSERR;
+  }
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             "wire-sepa",
                                              "BIC",
                                              &bic))
   {
     GNUNET_free (iban);
     GNUNET_free (name);
     GNUNET_free (bic);
+    GNUNET_free (address);
+    return GNUNET_SYSERR;
   }
-  j_wire = json_pack ("{s:s, s:s, s:s, s:s, s:o}",
+  j_wire = json_pack ("{s:s, s:s, s:s, s:s, s:o, s:s}",
                       "type", "SEPA",
                       "IBAN", iban,
                       "name", name,
                       "bic", bic,
-                      "r", json_integer (salt));
+                      "r", json_integer (salt),
+		      "address", address);
   GNUNET_free (iban);
   GNUNET_free (name);
+  GNUNET_free (address);
   GNUNET_free (bic);
   if (NULL == j_wire)
     return GNUNET_SYSERR;
@@ -491,7 +506,7 @@ run (void *cls,
           TMH_AUDITORS_init (config));
   /* FIXME: for now, we just support SEPA here: */
   EXITIF (GNUNET_OK !=
-           parse_wireformat_sepa (config));
+	  parse_wireformat_sepa (config));
   EXITIF (GNUNET_OK !=
           validate_and_hash_wireformat ("SEPA"));
   EXITIF (GNUNET_OK !=

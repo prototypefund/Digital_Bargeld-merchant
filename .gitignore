@@ -25,3 +25,7 @@ GPATH
 GRTAGS
 GTAGS
 *.swp
+src/backend/taler-merchant-httpd
+src/lib/test_merchant_api
+taler_merchant_config.h
+taler_merchant_config.h.in
