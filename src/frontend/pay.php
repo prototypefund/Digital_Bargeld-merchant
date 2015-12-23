@@ -48,6 +48,17 @@ if (!isset($_SESSION['H_contract']))
   return;
 }
 
+if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
+{
+  $_SESSION['payment_ok'] = true;
+  http_response_code (301);
+  //$url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
+  $url = (new http\URL("http://$_SERVER[HTTP_HOST]"))
+    ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
+  header("Location: $url");
+  die();
+}
+
 $post_body = file_get_contents('php://input');
 
 $now = new DateTime('now');
