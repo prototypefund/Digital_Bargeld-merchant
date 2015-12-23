@@ -230,6 +230,8 @@ context_task (void *cls,
   struct GNUNET_NETWORK_FDSet *ws;
   struct GNUNET_TIME_Relative delay;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "In mint context polling task\n");
+
   poller_task = NULL;
   TALER_MINT_perform (ctx);
   max_fd = -1;
@@ -319,6 +321,11 @@ TMH_MINTS_find_mint (const char *chosen_mint,
     GNUNET_break (0);
     return NULL;
   }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Trying to find chosen mint `%s'",
+              chosen_mint);
+
   /* Check if the mint is known */
   for (mint = mint_head; NULL != mint; mint = mint->next)
     /* test it by checking public key --- FIXME: hostname or public key!?
