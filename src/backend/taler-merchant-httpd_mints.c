@@ -323,7 +323,7 @@ TMH_MINTS_find_mint (const char *chosen_mint,
   }
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Trying to find chosen mint `%s'",
+              "Trying to find chosen mint `%s'\n",
               chosen_mint);
 
   /* Check if the mint is known */
