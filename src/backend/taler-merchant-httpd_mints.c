@@ -245,6 +245,9 @@ context_task (void *cls,
                               &except_fd_set,
                               &max_fd,
                               &timeout);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "In mint context polling task, max_fd=%d, timeout=%ld\n",
+              max_fd, timeout);
   if (timeout >= 0)
     delay =
     GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS,
