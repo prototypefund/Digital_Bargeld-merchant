@@ -41,8 +41,6 @@ if (isset($_GET['backend_test']) &&  $_GET['backend_test'] == 'no')
   $backend_test = false;
 }
 
-
-
 if (!isset($_SESSION['H_contract']))
 {
   echo "No session active.";
@@ -84,7 +82,13 @@ if ($cli_debug && !$backend_test)
 
 
 // Backend is relative to the shop site.
-$url = (new http\URL("http://".$_SERVER["HTTP_HOST"].$_SERVER["REQUEST_URI"]))
+/**
+ * WARNING: the "shop site" is '"http://".$_SERVER["HTTP_HOST"]'
+ * So do not attach $_SERVER["HTTP_HOST"] before proxying requests
+ * to the backend
+ */
+//$url = (new http\URL("http://".$_SERVER["HTTP_HOST"].$_SERVER["REQUEST_URI"]))
+$url = (new http\URL("http://".$_SERVER["HTTP_HOST"]))
   ->mod(array ("path" => "backend/pay"), http\Url::JOIN_PATH);
 
 $req = new http\Client\Request("POST",
@@ -118,7 +122,8 @@ else
 {
   $_SESSION['payment_ok'] = true;
   http_response_code (301);
-  $url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
+  //$url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
+  $url = (new http\URL("http://$_SERVER[HTTP_HOST]"))
     ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
   header("Location: $url");
   die();
