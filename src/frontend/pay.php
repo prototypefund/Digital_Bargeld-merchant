@@ -95,7 +95,7 @@ if ($cli_debug && !$backend_test)
 // Backend is relative to the shop site.
 /**
  * WARNING: the "shop site" is '"http://".$_SERVER["HTTP_HOST"]'
- * So do not attach $_SERVER["HTTP_HOST"] before proxying requests
+ * So do not attach $_SERVER["REQUEST_URI"] before proxying requests
  * to the backend
  */
 //$url = (new http\URL("http://".$_SERVER["HTTP_HOST"].$_SERVER["REQUEST_URI"]))
@@ -133,6 +133,11 @@ else
 {
   $_SESSION['payment_ok'] = true;
   http_response_code (301);
+  /**
+   * WARNING: the "shop site" is '"http://".$_SERVER["HTTP_HOST"]'
+   * So do not attach $_SERVER["REQUEST_URI"] before proxying requests
+   * to the backend
+   */
   //$url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
   $url = (new http\URL("http://$_SERVER[HTTP_HOST]"))
     ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
