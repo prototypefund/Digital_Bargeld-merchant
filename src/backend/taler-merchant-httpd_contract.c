@@ -103,13 +103,13 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                             &contract.purpose,
                             &contract_sig);
 
-  pay_url = json_object_get (root, "pay_url");
+  pay_url = json_object_get (jcontract, "pay_url");
   if (NULL == pay_url)
   {
     return TMH_RESPONSE_reply_internal_error (connection,
                                               "pay url missing");
   }
-  exec_url = json_object_get (root, "exec_url");
+  exec_url = json_object_get (jcontract, "exec_url");
   if (NULL == exec_url)
   {
     return TMH_RESPONSE_reply_internal_error (connection,

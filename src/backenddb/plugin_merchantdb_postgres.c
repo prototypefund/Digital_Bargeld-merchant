@@ -70,7 +70,7 @@ postgres_initialize (void *cls,
                    "CREATE %1$s TABLE IF NOT EXISTS payments ("
                    "h_contract BYTEA NOT NULL,"
                    "h_wire BYTEA NOT NULL,"
-                   "transaction_id INT8 PRIMARY KEY,"
+                   "transaction_id INT8," /*WARNING: this column used to be primary key, but that wrong since multiple coins belong to the same id*/
                    "timestamp INT8 NOT NULL,"
                    "refund_deadline INT8 NOT NULL,"
                    "amount_without_fee_val INT8 NOT NULL,"
@@ -108,6 +108,22 @@ postgres_initialize (void *cls,
     }
     return GNUNET_SYSERR;
   }
+  if ( (NULL == (res = PQprepare (pg->conn,
+                                  "check_payment",
+                                  "SELECT * "
+				  "FROM payments "
+				  "WHERE transaction_id=$1",
+                                  1, NULL))) ||
+       (PGRES_COMMAND_OK != (status = PQresultStatus(res))) )
+  {
+    if (NULL != res)
+    {
+      PQSQL_strerror (GNUNET_ERROR_TYPE_ERROR, "PQprepare", res);
+      PQclear (res);
+    }
+    return GNUNET_SYSERR;
+  }
+
   PQclear (res);
   return GNUNET_OK;
 }
@@ -190,7 +206,61 @@ postgres_store_payment (void *cls,
   return GNUNET_OK;
 }
 
+/**
+ * Check whether a payment has already been stored
+ *
+ * @param cls our plugin handle
+ * @param transaction_id the transaction id to search into
+ * the db
+ *
+ * @return GNUNET_OK if found, GNUNET_NO if not, GNUNET_SYSERR
+ * upon error
+ */
+static int
+postgres_check_payment(void *cls,
+                       uint64_t transaction_id)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *res;
+  ExecStatusType status;
 
+  struct TALER_PQ_QueryParam params[] = {
+    TALER_PQ_query_param_uint64 (&transaction_id),
+    TALER_PQ_query_param_end
+  };
+  res = TALER_PQ_exec_prepared (pg->conn,
+                                "check_payment",
+				params);
+  
+  status = PQresultStatus (res);
+  if (PGRES_TUPLES_OK != status)
+  {
+    const char *sqlstate;
+
+    sqlstate = PQresultErrorField (res, PG_DIAG_SQLSTATE);
+    if (NULL == sqlstate)
+    {
+      /* very unexpected... */
+      GNUNET_break (0);
+      PQclear (res);
+      return GNUNET_SYSERR;
+    }
+
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not check if contract %llu is in DB: %s\n",
+                transaction_id,
+		sqlstate);
+    PQclear (res);
+    return GNUNET_SYSERR;
+  }
+  /* count rows */
+  if (PQntuples (res) > 0)
+    return GNUNET_OK;
+  return GNUNET_NO;
+
+
+
+}
 /**
  * Initialize Postgres database subsystem.
  *
@@ -220,6 +290,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->cls = pg;
   plugin->initialize = &postgres_initialize;
   plugin->store_payment = &postgres_store_payment;
+  plugin->check_payment = &postgres_check_payment;
 
   return plugin;
 }

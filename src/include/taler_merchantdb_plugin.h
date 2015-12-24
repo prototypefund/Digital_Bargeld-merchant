@@ -83,6 +83,19 @@ struct TALER_MERCHANTDB_Plugin
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
 		    json_t *mint_proof);
 
-};
+  /**
+   * Check whether a payment has already been stored
+   *
+   * @param cls our plugin handle
+   * @param transaction_id the transaction id to search into
+   * the db
+   *
+   * @return GNUNET_OK if found, GNUNET_NO if not, GNUNET_SYSERR
+   * upon error
+   */
+  int
+  (*check_payment) (void *cls,
+                    uint64_t transaction_id);
 
+};
 #endif

@@ -55,6 +55,7 @@
   // create PHP session and store donation information in session
   $donation_fraction = (float) ("0." . $donation_fraction);
   session_start();
+  session_unset();
   $_SESSION['receiver'] = $donation_receiver;
   $_SESSION['amount_value'] = (int) $donation_amount;
   $_SESSION['amount_fraction'] = (int) ($donation_fraction * 1000000);
@@ -64,8 +65,8 @@
   <header>
     <div id="logo">
       <svg height="100" width="100">
-        <circle cx="50" cy="50" r="40" stroke="black" stroke-width="6" fill="white" />
-        <text x="19" y="82" font-family="Verdana" font-size="90" fill="black">S</text>
+        <circle cx="50" cy="50" r="40" stroke="darkcyan" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
       </svg>
     </div>
 

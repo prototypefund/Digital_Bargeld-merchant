@@ -31,26 +31,16 @@
 session_start();
 echo "var h_contract=\"$_SESSION[H_contract]\";\n";
 ?>
-document.addEventListener("DOMContentLoaded", function (e) {
-  var eve = new CustomEvent('taler-execute-payment', {detail: {H_contract: h_contract}});
-  document.dispatchEvent(eve);
-});
-document.addEventListener("taler-payment-result", function (e) {
-  if (!e.detail.success) {
-    alert("Payment failed\n" + JSON.strinfigy(e.detail));
-  }
-  console.log("finished payment");
-  document.getElementById("loading").innerHTML = "success!";
-});
     </script>
+    <script type="text/javascript" src="execute.js"></script>
 </head>
 
 <body>
   <header>
     <div id="logo">
       <svg height="100" width="100">
-        <circle cx="50" cy="50" r="40" stroke="black" stroke-width="6" fill="white" />
-        <text x="19" y="82" font-family="Verdana" font-size="90" fill="black">S</text>
+        <circle cx="50" cy="50" r="40" stroke="darkcyan" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
       </svg>
     </div>
     <h1>Toy Store - Taler Demo</h1>
