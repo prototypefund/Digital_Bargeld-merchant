@@ -710,6 +710,10 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     }
   }
 
+  /* Check if this payment attempt has already taken place */
+  if (GNUNET_OK == db->check_payment (db->cls, pc->transaction_id))
+    return TMH_RESPONSE_reply_external_error (connection, "payment already attempted");
+
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Looking up chosen mint '%s'\n", pc->chosen_mint);
 
   /* Find the responsible mint, this may take a while... */
