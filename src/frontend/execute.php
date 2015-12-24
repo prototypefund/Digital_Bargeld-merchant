@@ -32,7 +32,7 @@ session_start();
 echo "var h_contract=\"$_SESSION[H_contract]\";\n";
 ?>
     </script>
-    <script type="text/javascript" src="execute.js" />
+    <script type="text/javascript" src="execute.js"></script>
 </head>
 
 <body>
