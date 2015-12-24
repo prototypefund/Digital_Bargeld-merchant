@@ -32,6 +32,7 @@ function replace(el, r) {
 document.addEventListener("taler-payment-result", function (e: CustomEvent) {
   if (!e.detail.success) {
     alert("Payment failed\n" + JSON.stringify(e.detail));
+    return;
   }
   console.log("finished payment");
   let msg = 
