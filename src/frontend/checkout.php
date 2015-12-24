@@ -55,6 +55,7 @@
   // create PHP session and store donation information in session
   $donation_fraction = (float) ("0." . $donation_fraction);
   session_start();
+  session_unset();
   $_SESSION['receiver'] = $donation_receiver;
   $_SESSION['amount_value'] = (int) $donation_amount;
   $_SESSION['amount_fraction'] = (int) ($donation_fraction * 1000000);
