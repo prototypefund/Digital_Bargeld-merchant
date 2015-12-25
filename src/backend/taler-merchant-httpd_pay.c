@@ -468,7 +468,10 @@ process_pay_with_mint (void *cls,
       /* fee higher than residual coin value, makes no sense. */
       resume_pay_with_response (pc,
 				MHD_HTTP_BAD_REQUEST,
-				TMH_RESPONSE_make_internal_error ("Fee higher than coin value"));
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:o, s:o}",
+                                                             "hint", "fee higher than coin value",
+                                                             "f", TALER_json_from_amount (&dc->percoin_amount),
+                                                             "fee_deposit", TALER_json_from_amount (&denom_details->fee_deposit)));
       return;
     }
   }
@@ -547,8 +550,9 @@ process_pay_with_mint (void *cls,
        * we'd get that information in the callback. */
       resume_pay_with_response (pc,
                                 MHD_HTTP_UNAUTHORIZED,
-                                TMH_RESPONSE_make_json_pack ("{s:s}",
-                                                             "hint", "Coin signature invalid."));
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:i}",
+                                                             "hint", "Coin signature invalid.",
+                                                             "coin_idx", i));
       return;
     }
   }
@@ -685,6 +689,11 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     pc->dc = GNUNET_new_array (pc->coins_cnt,
                                struct MERCHANT_DepositConfirmation);
 
+    {
+      char *s = json_dumps (coins, JSON_INDENT(2));
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Coins json is: %s\n", s);
+    }
+
     json_array_foreach (coins, coins_index, coin)
     {
       struct MERCHANT_DepositConfirmation *dc = &pc->dc[coins_index];
@@ -705,6 +714,15 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
         json_decref (root);
         return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
       }
+      
+      {
+        char *s;
+        s = TALER_amount_to_string (&dc->percoin_amount);
+        GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                    "Coin #%i has f %s\n", coins_index, s);
+        GNUNET_free (s);
+      }
+
       dc->index = coins_index;
       dc->pc = pc;
     }
