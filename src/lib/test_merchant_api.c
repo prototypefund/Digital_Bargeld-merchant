@@ -290,7 +290,8 @@ struct Command
     } reserve_withdraw;
 
     /**
-     * Information for a #OC_DEPOSIT command.
+     * Information for a #OC_PAY command.
+     * FIXME: support tests where we pay with multiple coins at once.
      */
     struct
     {
@@ -997,6 +998,7 @@ interpreter_run (void *cls,
       json_t *contract;
       struct GNUNET_HashCode h_wire;
       struct GNUNET_HashCode h_contract;
+      struct GNUNET_TIME_Absolute refund_deadline;
 
       /* get amount */
       if (GNUNET_OK !=
@@ -1057,9 +1059,11 @@ interpreter_run (void *cls,
       TALER_hash_json (contract,
 		       &h_contract);
       json_decref (contract);
-
-      /* FIXME: fill in rest of arguments properly, in particular
-	 refund_deadline is not correct right now... */
+      
+      if (0 == cmd->details.pay.refund_deadline.rel_value_us)
+	refund_deadline = GNUNET_TIME_UNIT_ZERO_ABS; /* no refunds */
+      else
+	refund_deadline = GNUNET_TIME_relative_to_absolute (cmd->details.pay.refund_deadline);
       cmd->details.pay.ph 
 	= TALER_MERCHANT_pay_wallet (merchant,
 				     MERCHANT_URI,
@@ -1069,7 +1073,7 @@ interpreter_run (void *cls,
 				     GNUNET_TIME_absolute_get (),
 				     cmd->details.pay.transaction_id,
 				     &merchant_pub,
-				     GNUNET_TIME_UNIT_ZERO_ABS /* refund dead */,
+				     refund_deadline,
 				     1 /* num_coins */,
 				     &pc /* coins */,
 				     &max_fee,
