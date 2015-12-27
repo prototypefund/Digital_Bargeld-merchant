@@ -52,6 +52,12 @@ static struct TALER_MINT_Handle *mint;
 static struct TALER_MERCHANT_Context *merchant;
 
 /**
+ * Public key of the merchant, matches the private
+ * key from "test_merchant.priv".
+ */
+static struct TALER_MerchantPublicKeyP merchant_pub;
+
+/**
  * Task run on shutdown.
  */
 static struct GNUNET_SCHEDULER_Task *shutdown_task;
@@ -591,8 +597,6 @@ reserve_status_cb (void *cls,
   switch (http_status)
   {
   case MHD_HTTP_OK:
-    /* FIXME: note that history events may come in a different
-       order than the commands. However, for now this works... */
     j = 0;
     for (i=0;i<is->ip;i++)
     {
@@ -1054,9 +1058,8 @@ interpreter_run (void *cls,
 		       &h_contract);
       json_decref (contract);
 
-      /* FIXME: fill in rest of arguments properly,
-	 in particular merchant_pub and refund_deadline are
-	 not correct right now... */
+      /* FIXME: fill in rest of arguments properly, in particular
+	 refund_deadline is not correct right now... */
       cmd->details.pay.ph 
 	= TALER_MERCHANT_pay_wallet (merchant,
 				     MERCHANT_URI,
@@ -1065,7 +1068,7 @@ interpreter_run (void *cls,
 				     &h_contract,
 				     GNUNET_TIME_absolute_get (),
 				     cmd->details.pay.transaction_id,
-				     NULL /* FIXME: merchant_pub */,
+				     &merchant_pub,
 				     GNUNET_TIME_UNIT_ZERO_ABS /* refund dead */,
 				     1 /* num_coins */,
 				     &pc /* coins */,
@@ -1416,13 +1419,21 @@ int
 main (int argc,
       char * const *argv)
 {
+  /* Value from "gnunet-ecc -p test_merchant.priv" */
+  const char *merchant_pub_str 
+    = "5TRNSWAWHKBJ7G4T3PKRCQA6MCB3MX82F4M2XXS1653KE1V8RFPG";
   struct GNUNET_OS_Process *proc;
   struct GNUNET_OS_Process *mintd;
   struct GNUNET_OS_Process *merchantd;
-
+  
   GNUNET_log_setup ("test-mint-api",
                     "WARNING",
                     NULL);
+  GNUNET_assert (GNUNET_OK ==
+		 GNUNET_STRINGS_string_to_data (merchant_pub_str,
+						strlen (merchant_pub_str),
+						&merchant_pub,
+						sizeof (merchant_pub)));
   proc = GNUNET_OS_start_process (GNUNET_NO,
                                   GNUNET_OS_INHERIT_STD_ALL,
                                   NULL, NULL, NULL,
