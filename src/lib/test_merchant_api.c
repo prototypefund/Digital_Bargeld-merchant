@@ -1018,6 +1018,7 @@ interpreter_run (void *cls,
       struct GNUNET_HashCode h_wire;
       struct GNUNET_HashCode h_contract;
       struct GNUNET_TIME_Absolute refund_deadline;
+      struct GNUNET_TIME_Absolute timestamp;
 
       /* get amount */
       if (GNUNET_OK !=
@@ -1127,13 +1128,16 @@ interpreter_run (void *cls,
 	refund_deadline = GNUNET_TIME_UNIT_ZERO_ABS; /* no refunds */
       else
 	refund_deadline = GNUNET_TIME_relative_to_absolute (cmd->details.pay.refund_deadline);
+      TALER_round_abs_time (&refund_deadline);
+      timestamp = GNUNET_TIME_absolute_get ();
+      TALER_round_abs_time (&timestamp);
       cmd->details.pay.ph 
 	= TALER_MERCHANT_pay_wallet (merchant,
 				     MERCHANT_URI,
 				     MINT_URI,
 				     &h_wire,
 				     &h_contract,
-				     GNUNET_TIME_absolute_get (),
+				     timestamp,
 				     cmd->details.pay.transaction_id,
 				     &merchant_pub,
 				     refund_deadline,

@@ -215,8 +215,8 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
     p->denom_pub = coin->denom_pub;
     p->denom_sig = coin->denom_sig;
     p->coin_pub = dr.coin_pub;
-    p->amount_with_fee = pc->amount_with_fee;
-    p->amount_without_fee = pc->amount_without_fee;
+    p->amount_with_fee = coin->amount_with_fee;
+    p->amount_without_fee = coin->amount_without_fee;
   }
   return TALER_MERCHANT_pay_frontend (merchant,
 				      merchant_uri,
