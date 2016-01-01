@@ -34,7 +34,7 @@
 /**
  * URI under which the mint is reachable during the testcase.
  */
-#define MINT_URI "http://localhost:8081"
+#define MINT_URI "http://localhost:8081/"
 
 /**
  * Main execution context for the main loop of the mint.
@@ -845,6 +845,11 @@ interpreter_run (void *cls,
     fail (is);
     return;
   }
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+	      "Interpreter runs command %u/%s(%u)\n",
+	      is->ip,
+	      cmd->label,
+	      cmd->oc);
   switch (cmd->oc)
   {
   case OC_END:
@@ -1117,8 +1122,10 @@ do_shutdown (void *cls,
   struct InterpreterState *is = cls;
   struct Command *cmd;
   unsigned int i;
-
+  
   shutdown_task = NULL;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+	      "Shutdown executing\n");
   for (i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
   {
     switch (cmd->oc)
@@ -1246,6 +1253,8 @@ cert_cb (void *cls,
 #undef ERR
 
   /* run actual tests via interpreter-loop */
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+	      "Certificate callback invoked, starting interpreter\n");
   is->keys = keys;
   is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
                                        is);
@@ -1272,6 +1281,8 @@ context_task (void *cls,
   struct GNUNET_TIME_Relative delay;
 
   ctx_task = NULL;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+	      "Event loop running\n");
   TALER_MINT_perform (ctx);
   TALER_MERCHANT_perform (merchant);
   max_fd = -1;
@@ -1364,6 +1375,7 @@ run (void *cls,
       .label = "deposit-double-1",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
       .details.pay.amount = "EUR:5",
+      .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":43 }",
       .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
@@ -1374,6 +1386,7 @@ run (void *cls,
       .label = "deposit-double-2",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
       .details.pay.amount = "EUR:5",
+      .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
       .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
@@ -1384,6 +1397,7 @@ run (void *cls,
       .label = "deposit-double-3",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
       .details.pay.amount = "EUR:5",
+      .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
       .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":2 } }",
@@ -1392,6 +1406,8 @@ run (void *cls,
     { .oc = OC_END }
   };
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+	      "Interpreter initializing\n");
   is = GNUNET_new (struct InterpreterState);
   is->commands = commands;
 
@@ -1430,7 +1446,7 @@ main (int argc,
   struct GNUNET_OS_Process *mintd;
   struct GNUNET_OS_Process *merchantd;
   
-  GNUNET_log_setup ("test-mint-api",
+  GNUNET_log_setup ("test-merchant-api",
                     "WARNING",
                     NULL);
   GNUNET_assert (GNUNET_OK ==
@@ -1469,7 +1485,7 @@ main (int argc,
       fprintf (stderr, ".");
       sleep (1);
     }
-  while (0 != system ("wget -q -t 1 -T 1 " MINT_URI "/keys -o /dev/null -O /dev/null"));
+  while (0 != system ("wget -q -t 1 -T 1 " MINT_URI "keys -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_run (&run, NULL);
