@@ -297,9 +297,9 @@ struct Command
     {
 
       /**
-       * Amount to pay.
+       * Amount to pay (total for the entire contract).
        */
-      const char *amount;
+      const char *total_amount;
 
       /**
        * Maximum fee covered by merchant.
@@ -317,6 +317,20 @@ struct Command
        * an array of coins, this value determines which coin to use.
        */
       unsigned int coin_idx;
+
+      /**
+       * Amount to pay (from the coin, including fee).
+       */
+      const char *amount_with_fee;
+
+      /**
+       * Amount to pay (from the coin, excluding fee).  The sum of the
+       * deltas between all @e amount_with_fee and the @e
+       * amount_without_fee must be less than max_fee, and the sum of
+       * the @e amount_with_fee must be larger than the @e
+       * total_amount.
+       */
+      const char *amount_without_fee;
 
       /**
        * JSON string describing the merchant's "wire details".
@@ -1007,12 +1021,12 @@ interpreter_run (void *cls,
 
       /* get amount */
       if (GNUNET_OK !=
-	  TALER_string_to_amount (cmd->details.pay.amount,
+	  TALER_string_to_amount (cmd->details.pay.total_amount,
 				  &amount))
       {
 	GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		    "Failed to parse amount `%s' at %u\n",
-		    cmd->details.pay.amount,
+		    "Failed to parse total amount `%s' at %u\n",
+		    cmd->details.pay.total_amount,
 		    is->ip);
 	fail (is);
 	return;
@@ -1064,6 +1078,50 @@ interpreter_run (void *cls,
       TALER_hash_json (contract,
 		       &h_contract);
       json_decref (contract);
+
+      /* initialize 'pc' (FIXME: to do in a loop later...) */
+      {
+	const struct Command *ref;
+
+	memset (&pc, 0, sizeof (pc));
+	ref = find_command (is,
+			    cmd->details.pay.coin_ref);
+	GNUNET_assert (NULL != ref);
+	switch (ref->oc)
+	{
+	case OC_WITHDRAW_SIGN:
+	  pc.coin_priv = ref->details.reserve_withdraw.coin_priv;
+	  pc.denom_pub = ref->details.reserve_withdraw.pk->key;
+	  pc.denom_sig = ref->details.reserve_withdraw.sig;
+	  break;
+	default:
+	  GNUNET_assert (0);
+	}
+
+	if (GNUNET_OK !=
+	    TALER_string_to_amount (cmd->details.pay.amount_without_fee,
+				    &pc.amount_without_fee))
+	{
+	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		      "Failed to parse amount `%s' at %u\n",
+		      cmd->details.pay.amount_without_fee,
+		      is->ip);
+	  fail (is);
+	  return;
+	}
+
+	if (GNUNET_OK !=
+	    TALER_string_to_amount (cmd->details.pay.amount_with_fee,
+				    &pc.amount_with_fee))
+	{
+	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		      "Failed to parse amount `%s' at %u\n",
+		      cmd->details.pay.amount_with_fee,
+		      is->ip);
+	  fail (is);
+	  return;
+	}	
+      }
       
       if (0 == cmd->details.pay.refund_deadline.rel_value_us)
 	refund_deadline = GNUNET_TIME_UNIT_ZERO_ABS; /* no refunds */
@@ -1364,9 +1422,11 @@ run (void *cls,
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
-      .details.pay.amount = "EUR:5",
+      .details.pay.total_amount = "EUR:5",
       .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
       .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":1} ] }",
       .details.pay.transaction_id = 1 },
@@ -1375,9 +1435,11 @@ run (void *cls,
     { .oc = OC_PAY,
       .label = "deposit-double-1",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.pay.amount = "EUR:5",
+      .details.pay.total_amount = "EUR:5",
       .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":43 }",
       .details.pay.contract = "{ \"items\":[{ \"name\":\"ice cream\", \"value\":1} ] }",
       .details.pay.transaction_id = 1 },
@@ -1386,9 +1448,11 @@ run (void *cls,
     { .oc = OC_PAY,
       .label = "deposit-double-2",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.pay.amount = "EUR:5",
+      .details.pay.total_amount = "EUR:5",
       .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
       .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":1} ] }",
       .details.pay.transaction_id = 2 },
@@ -1397,9 +1461,11 @@ run (void *cls,
     { .oc = OC_PAY,
       .label = "deposit-double-3",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.pay.amount = "EUR:5",
+      .details.pay.total_amount = "EUR:5",
       .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
       .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":2} ] }",
       .details.pay.transaction_id = 1 },
