@@ -282,6 +282,9 @@ deposit_cb (void *cls,
   {
     /* Transaction failed; stop all other ongoing deposits */
     abort_deposit (pc);
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+		"Deposit operation failed with HTTP code %u\n",
+		http_status);
     /* Forward error including 'proof' for the body */
     resume_pay_with_response (pc,
                               http_status,
@@ -300,6 +303,7 @@ deposit_cb (void *cls,
 			 &dc->coin_pub,
 			 proof))
   {
+    GNUNET_break (0);
     /* internal error */
     abort_deposit (pc);
     /* Forward error including 'proof' for the body */
@@ -416,6 +420,7 @@ process_pay_with_mint (void *cls,
                                                      &dc->denom);
     if (NULL == denom_details)
     {
+      GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
@@ -428,6 +433,7 @@ process_pay_with_mint (void *cls,
                                denom_details,
                                mint_trusted))
     {
+      GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
@@ -505,6 +511,7 @@ process_pay_with_mint (void *cls,
     if (-1 == TALER_amount_cmp (&acc_amount,
                                 &total_needed))
     {
+      GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_NOT_ACCEPTABLE,
                                 TMH_RESPONSE_make_external_error ("insufficient funds (including excessive mint fees to be covered by customer)"));
@@ -517,6 +524,7 @@ process_pay_with_mint (void *cls,
     if (-1 == TALER_amount_cmp (&acc_amount,
                                 &pc->amount))
     {
+      GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_NOT_ACCEPTABLE,
                                 TMH_RESPONSE_make_external_error ("insufficient funds"));
@@ -548,6 +556,7 @@ process_pay_with_mint (void *cls,
     {
       /* Signature was invalid.  If the mint was unavailable,
        * we'd get that information in the callback. */
+      GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_UNAUTHORIZED,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:i}",
