@@ -1368,7 +1368,7 @@ run (void *cls,
       .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
-      .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
+      .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":1} ] }",
       .details.pay.transaction_id = 1 },
 
     /* Try to double-spend the 5 EUR coin with different wire details */
@@ -1379,7 +1379,7 @@ run (void *cls,
       .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":43 }",
-      .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
+      .details.pay.contract = "{ \"items\":[{ \"name\":\"ice cream\", \"value\":1} ] }",
       .details.pay.transaction_id = 1 },
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        transaction ID) */
@@ -1390,7 +1390,7 @@ run (void *cls,
       .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
-      .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":1 } }",
+      .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":1} ] }",
       .details.pay.transaction_id = 2 },
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        contract) */
@@ -1401,7 +1401,7 @@ run (void *cls,
       .details.pay.max_fee = "EUR:0.5",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.wire_details = "{ \"type\":\"TEST\", \"bank\":\"dest bank\", \"account\":42 }",
-      .details.pay.contract = "{ \"items\"={ \"name\":\"ice cream\", \"value\":2 } }",
+      .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":2} ] }",
       .details.pay.transaction_id = 1 },
 
     { .oc = OC_END }
