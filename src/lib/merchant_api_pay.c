@@ -196,11 +196,11 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
     GNUNET_CRYPTO_eddsa_key_get_public (&coin->coin_priv.eddsa_priv,
 					&dr.coin_pub.eddsa_pub);
     TALER_amount_hton (&dr.amount_with_fee,
-		       &pc->amount_with_fee);
+		       &coin->amount_with_fee);
     if (GNUNET_SYSERR ==
 	TALER_amount_subtract (&fee,
-			       &pc->amount_with_fee,
-			       &pc->amount_without_fee))
+			       &coin->amount_with_fee,
+			       &coin->amount_without_fee))
     {
       /* Integer underflow, fee larger than total amount?
 	 This should not happen (client violated API!) */
