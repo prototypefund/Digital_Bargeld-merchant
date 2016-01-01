@@ -469,6 +469,7 @@ prepare_daemon ()
     tv = GNUNET_TIME_UNIT_FOREVER_REL;
   GNUNET_NETWORK_fdset_copy_native (wrs, &rs, max + 1);
   GNUNET_NETWORK_fdset_copy_native (wws, &ws, max + 1);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Adding run_daemon select task\n");
   ret =
       GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_HIGH,
 				   tv, wrs, wws,

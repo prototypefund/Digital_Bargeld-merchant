@@ -95,7 +95,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                                              sizeof (pubkey)));
   /* create contract signature */
   GNUNET_assert (GNUNET_OK ==
-                 TALER_hash_json (root,
+                 TALER_hash_json (jcontract,
                                   &contract.h_contract));
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract.purpose.size = htonl (sizeof (contract));
@@ -103,30 +103,31 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                             &contract.purpose,
                             &contract_sig);
 
-  pay_url = json_object_get (jcontract, "pay_url");
+  pay_url = json_object_get (root, "pay_url");
   if (NULL == pay_url)
   {
     return TMH_RESPONSE_reply_internal_error (connection,
                                               "pay url missing");
   }
-  exec_url = json_object_get (jcontract, "exec_url");
+  exec_url = json_object_get (root, "exec_url");
   if (NULL == exec_url)
   {
     return TMH_RESPONSE_reply_internal_error (connection,
                                               "exec url missing");
   }
-
   /* return final response */
-  return TMH_RESPONSE_reply_json_pack (connection,
-				       MHD_HTTP_OK,
-				       "{s:o, s:o, s:o, s:o, s:o}",
-				       "contract", jcontract,
-                                       "exec_url", exec_url,
-                                       "pay_url", pay_url,
-				       "sig", TALER_json_from_data (&contract_sig,
-                                                                    sizeof (contract_sig)),
-				       "H_contract", TALER_json_from_data (&contract.h_contract,
-                                                                           sizeof (contract.h_contract)));
+  res = TMH_RESPONSE_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
+                                      "{s:O, s:O, s:O, s:o, s:o}",
+                                      "contract", jcontract,
+                                      "exec_url", exec_url,
+                                      "pay_url", pay_url,
+                                      "sig", TALER_json_from_data (&contract_sig,
+                                                                   sizeof (contract_sig)),
+                                      "H_contract", TALER_json_from_data (&contract.h_contract,
+                                                                          sizeof (contract.h_contract)));
+  json_decref (root);
+  return res;
 }
 
 /* end of taler-merchant-httpd_contract.c */

@@ -52,8 +52,7 @@ if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
 {
   $_SESSION['payment_ok'] = true;
   http_response_code (301);
-  //$url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
-  $url = (new http\URL("http://$_SERVER[HTTP_HOST]"))
+  $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
     ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
   header("Location: $url");
   die();
@@ -133,13 +132,7 @@ else
 {
   $_SESSION['payment_ok'] = true;
   http_response_code (301);
-  /**
-   * WARNING: the "shop site" is '"http://".$_SERVER["HTTP_HOST"]'
-   * So do not attach $_SERVER["REQUEST_URI"] before proxying requests
-   * to the backend
-   */
-  //$url = (new http\URL("http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]"))
-  $url = (new http\URL("http://$_SERVER[HTTP_HOST]"))
+  $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
     ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
   header("Location: $url");
   die();

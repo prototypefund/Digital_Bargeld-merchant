@@ -25,6 +25,7 @@ function replace(el, r) {
 document.addEventListener("taler-payment-result", function (e) {
     if (!e.detail.success) {
         alert("Payment failed\n" + JSON.stringify(e.detail));
+        return;
     }
     console.log("finished payment");
     let msg = React.createElement("div", null, "Payment successful.  View your ", React.createElement("a", {"href": e.detail.fulfillmentUrl}, "product"), ".");
