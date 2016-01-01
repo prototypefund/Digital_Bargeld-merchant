@@ -1542,13 +1542,6 @@ main (int argc,
                                    "taler-mint-httpd",
                                    "-d", "test-mint-home",
                                    NULL);
-  merchantd = GNUNET_OS_start_process (GNUNET_NO,
-                                       GNUNET_OS_INHERIT_STD_ALL,
-                                       NULL, NULL, NULL,
-                                       "taler-merchant-httpd",
-                                       "taler-merchant-httpd",
-                                       "-c", "test_merchant.conf",
-                                       NULL);
   /* give child time to start and bind against the socket */
   fprintf (stderr, "Waiting for taler-mint-httpd to be ready");
   do
@@ -1557,6 +1550,22 @@ main (int argc,
       sleep (1);
     }
   while (0 != system ("wget -q -t 1 -T 1 " MINT_URI "keys -o /dev/null -O /dev/null"));
+  fprintf (stderr, "\n");
+  merchantd = GNUNET_OS_start_process (GNUNET_NO,
+                                       GNUNET_OS_INHERIT_STD_ALL,
+                                       NULL, NULL, NULL,
+                                       "taler-merchant-httpd",
+                                       "taler-merchant-httpd",
+                                       "-c", "test_merchant.conf",
+                                       NULL);
+  /* give child time to start and bind against the socket */
+  fprintf (stderr, "Waiting for taler-merchant-httpd to be ready");
+  do
+    {
+      fprintf (stderr, ".");
+      sleep (1);
+    }
+  while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URI " -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_run (&run, NULL);
