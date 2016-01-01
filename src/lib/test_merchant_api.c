@@ -1133,7 +1133,7 @@ interpreter_run (void *cls,
       TALER_round_abs_time (&timestamp);
       cmd->details.pay.ph 
 	= TALER_MERCHANT_pay_wallet (merchant,
-				     MERCHANT_URI,
+				     MERCHANT_URI "pay",
 				     MINT_URI,
 				     &h_wire,
 				     &h_contract,
