@@ -1055,7 +1055,7 @@ interpreter_run (void *cls,
       if (NULL == contract)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse contract details `%s' at %u\n",
+                    "Failed to parse contract details `%s' at instruction %u\n",
                     cmd->details.pay.contract,
                     is->ip);
         fail (is);
