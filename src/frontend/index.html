@@ -3,32 +3,63 @@
 <head>
   <title>Toy &quot;Store&quot; - Taler Demo</title>
   <link rel="stylesheet" type="text/css" href="style.css">
-    <script> /* @licstart  The following is the entire license notice for the
-        JavaScript code in this page.
+  <script type="text/javascript">
+    /* @licstart  The following is the entire license notice for the
+      JavaScript code in this page.
 
-        Copyright (C) 2015 GNUnet e.V.
+      Copyright (C) 2015 GNUnet e.V.
 
-        The JavaScript code in this page is free software: you can
-        redistribute it and/or modify it under the terms of the GNU
-        Lesser General Public License (GNU LGPL) as published by the Free Software
-        Foundation, either version 2.1 of the License, or (at your option)
-        any later version.  The code is distributed WITHOUT ANY WARRANTY;
-        without even the implied warranty of MERCHANTABILITY or FITNESS
-        FOR A PARTICULAR PURPOSE.  See the GNU LGPL for more details.
+      The JavaScript code in this page is free software: you can
+      redistribute it and/or modify it under the terms of the GNU
+      Lesser General Public License (GNU LGPL) as published by the Free Software
+      Foundation, either version 2.1 of the License, or (at your option)
+      any later version.  The code is distributed WITHOUT ANY WARRANTY;
+      without even the implied warranty of MERCHANTABILITY or FITNESS
+      FOR A PARTICULAR PURPOSE.  See the GNU LGPL for more details.
 
-        As additional permission under GNU LGPL version 2.1 section 7, you
-        may distribute non-source (e.g., minimized or compacted) forms of
-        that code without the copy of the GNU LGPL normally required by
-        section 4, provided you include this license notice and a URL
-        through which recipients can access the Corresponding Source.
+      As additional permission under GNU LGPL version 2.1 section 7, you
+      may distribute non-source (e.g., minimized or compacted) forms of
+      that code without the copy of the GNU LGPL normally required by
+      section 4, provided you include this license notice and a URL
+      through which recipients can access the Corresponding Source.
 
-        @licend  The above is the entire license notice
-        for the JavaScript code in this page.
-        */
-    </script>
+      @licend  The above is the entire license notice
+      for the JavaScript code in this page.
+    */
+    function handleInstall() {
+      var b = document.getElementById("main");
+      b.classList.add("installed");
+    };
+
+    function handleUninstall() {
+      var b = document.getElementById("main");
+      b.classList.remove("installed");
+    };
+
+    function probeTaler() {
+      var eve = new Event("taler-probe");
+      document.dispatchEvent(eve);
+    }
+
+
+    // Only probe taler once the DOM is ready and
+    // we can manipulate it.
+    window.addEventListener("load", probeTaler, false);
+
+    document.addEventListener("taler-wallet-present", handleInstall, false);
+    document.addEventListener("taler-unload", handleUninstall, false);
+    document.addEventListener("taler-load", handleInstall, false);
+
+  </script>
+  <style>
+    *:not(.installed) .if-installed { display: none } 
+    .installed .if-not-installed { display: none } 
+    *:not(.installed) .if-not-installed { display: initial } 
+    .installed .if-installed { display: initial } 
+  </style>
 </head>
 
-<body onload="signal_me()">
+<body>
   <header>
     <div id="logo">
       <svg height="100" width="100">
@@ -64,24 +95,21 @@
       </p>
     </article>
 
-    <section id="instructions">
+    <section>
 
-      <article id="installation">
-        <h2>Step 1: Installing the Taler wallet <sup>(once)</sup></h2>
-        <p>First, you need to <a href="http://demo.taler.net/">install</a>
+      <article>
+        <h2>Step 1: Installing the Taler wallet</h2>
+        <p class="if-not-installed">
+          First, you need to <a href="http://demo.taler.net/">install</a>
           the Taler wallet browser extension.
         </p>
-      </article>
-
-      <article id="installation-done" style="display:none;">
-        <h2>Step 1: Installing the Taler wallet <sup>(done!)</sup></h2>
-
-        <p>Congratulations, you have installed the Taler wallet correctly.
+        <p class="if-installed">
+          Congratulations, you have installed the Taler wallet correctly.
           You can now proceed with the next steps.
         </p>
       </article>
 
-      <article id="wire" style="display:none;">
+      <article class="if-installed">
         <h2>Step 2: Withdraw coins <sup>(occasionally)</sup></h2>
 
         <p>The next step is to withdraw coins, after all you cannot
@@ -108,7 +136,7 @@
 	  (opens in a new tab).</p>
       </article>
 
-      <article id="payment" style="display:none;">
+      <article class="if-installed">
         <h2>Step 3: Shop! <sup>(as long as you have KUDOS left)</sup></h2>
 
         <p>Now it is time to spend your hard earned KUDOS.
@@ -152,61 +180,5 @@
       </article>
     </section>
   </section>
-
-  <script type="text/javascript">
-    /* This function is called if/when a Wallet is installed.
-       It should enable the parts of the page that only make
-       sense after the Wallet has been loaded.
-    */
-    function wallet_installed_cb(){
-	b = document.getElementById("installation");
-        b.style.display = 'none';
-	b = document.getElementById("installation-done");
-        b.style.display = '';
-	b = document.getElementById("wire");
-        b.style.display = '';
-	b = document.getElementById("payment");
-        b.style.display = '';
-    };
-
-    function wallet_uninstalled_cb(){
-	b = document.getElementById("installation");
-        b.style.display = '';
-	b = document.getElementById("installation-done");
-        b.style.display = 'none';
-	b = document.getElementById("wire");
-        b.style.display = 'none';
-	b = document.getElementById("payment");
-        b.style.display = 'none';
-    };
-
-    /* The merchant signals its taler-friendlyness to the client */
-    function signal_me()
-    {
-      var eve = new Event('taler-checkout-probe');
-      document.dispatchEvent(eve);
-      //alert("signaling");
-    };
-
-    function test_without_wallet(){
-        wallet_installed_cb();
-    }
-
-    document.addEventListener("taler-unload",
-                              wallet_uninstalled_cb,
-                              false, false);
-
-    /* Set up a listener to be called whenever a Wallet gets installed
-       so that the user is led towards the demo's steps progressively */
-    document.addEventListener("taler-wallet-present",
-                              wallet_installed_cb,
-                              false, false);
-
-    /* Setup callback to be called whenever the wallet is loaded/enabled
-      while the browser is already on this page */
-    document.addEventListener("taler-load",
-                              signal_me,
-                              false);
-  </script>
 </body>
 </html>
