@@ -136,18 +136,28 @@ extern json_t *j_wire;
  */
 extern struct GNUNET_HashCode h_wire;
 
-
+/**
+ * Our private key (for the merchant to sign contracts).
+ */
 extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 
+/**
+ * Our public key, corresponds to #privkey.
+ */ 
 extern struct TALER_MerchantPublicKeyP pubkey;
 
-
+/**
+ * Handle to the database backend.
+ */ 
 extern struct TALER_MERCHANTDB_Plugin *db;
 
-
-
+/**
+ * If the frontend does NOT specify an execution date, how long should
+ * we tell the mint to wait to aggregate transactions before
+ * executing?  This delay is added to the current time when we
+ * generate the advisory execution time for the mint.
+ */
 extern struct GNUNET_TIME_Relative edate_delay;
-
 
 /**
  * Kick MHD to run now, to be called after MHD_resume_connection().

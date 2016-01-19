@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Taler's "Demo" Shop: Choose payment method</title>
+  <title>Toy Store - Payment method - Taler Demo</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
     <script>
         /*
         @licstart  The following is the entire license notice for the
@@ -31,7 +32,7 @@
 </head>
 <body onload="signal_taler_wallet_onload()">
 <!--
-  This page's main aim is to show to the customer all the accepted
+  This main goal of this page is to show to the customer all the accepted
   payments methods and actually implementing just Taler; technically
   the steps are:
 
@@ -50,52 +51,78 @@
   $donation_currency = $_POST['donation_currency'];
 
   // get frational part
-  list ($donation_value, $donation_fraction) = split ("\.", $donation_amount, 2);
+  list ($donation_value, $donation_fraction) = explode (".", $donation_amount, 2);
   // create PHP session and store donation information in session
   $donation_fraction = (float) ("0." . $donation_fraction);
   session_start();
+  session_unset();
   $_SESSION['receiver'] = $donation_receiver;
   $_SESSION['amount_value'] = (int) $donation_amount;
   $_SESSION['amount_fraction'] = (int) ($donation_fraction * 1000000);
   $_SESSION['currency'] = $donation_currency;
 ?>
-<h2>Select your payment option</h2>
-<div>
-This is an example for a "checkout" page of a Web shop.
-On the previous page, you have created the shopping cart
-and decided which product to buy (i.e. which project to
-donate KUDOS to).  Now in this page, you are asked to
-select a payment option.  As Taler is not yet universally
-used, we expect merchants will offer various payment options.
-<p>
-The page also demonstrates how to only enable (or show) the Taler
-option if Taler is actually supported by the browser.  For example,
-if you disable the Taler extension now, the Taler payment option
-will be disabled in the page.  Naturally, you could also trivially
-hide the Taler option entirely by changing the visibility instead.
-<p>
-Note that you MUST select Taler here for the demo to continue,
-as the other payment options are just placeholders and not
-really working in the demonstration.  Also, it is of course
-possible to ask the user to make this choice already on the
-previous page (with the shopping cart), we just separated the
-two steps to keep each step as simple as possible.
-</div>
-<form name="tform" action="" method="POST">
-  <div id="opt-form" align="left"><br>
-    <input type="radio" name="payment_system" value="lisa"
-           id="lisa-radio-button-id">Lisa</input>
-    <br>
-    <input type="radio" name="payment_system" value="ycard">You Card</input>
-    <br>
-    <input type="radio" name="payment_system" value="cardme">Card Me</input>
-    <br>
-    <input type="radio" name="payment_system" value="taler"
-           id="taler-radio-button-id" disabled="true">Taler</input>
-    <br>
-    <input type="button" onclick="pay(this.form)" value="Ok">
-  </div>
-</form>
+
+  <header>
+    <div id="logo">
+      <svg height="100" width="100">
+        <circle cx="50" cy="50" r="40" stroke="darkcyan" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
+      </svg>
+    </div>
+
+    <h1>Toy Store - Select payment method</h1>
+  </header>
+
+  <aside class="sidebar" id="left">
+  </aside>
+
+  <section id="main">
+    <article>
+
+      <h1>Select your payment method</h1>
+
+      <p>
+        This is an example for a "checkout" page of a Web shop.
+        On the previous page, you have created the shopping cart
+        and decided which product to buy (i.e. which project to
+        donate KUDOS to).  Now in this page, you are asked to
+        select a payment option.  As Taler is not yet universally
+        used, we expect merchants will offer various payment options.
+      </p>
+      <p>
+        The page also demonstrates how to only enable (or show) the Taler
+        option if Taler is actually supported by the browser.  For example,
+        if you disable the Taler extension now, the Taler payment option
+        will be disabled in the page.  Naturally, you could also trivially
+        hide the Taler option entirely by changing the visibility instead.
+      </p>
+      <p>
+        Note that you MUST select Taler here for the demo to continue,
+        as the other payment options are just placeholders and not
+        really working in the demonstration.  Also, it is of course
+        possible to ask the user to make this choice already on the
+        previous page (with the shopping cart), we just separated the
+        two steps to keep each step as simple as possible.
+      </p>
+
+      <form name="tform" action="" method="POST">
+        <div id="opt-form" align="left"><br>
+          <input type="radio" name="payment_system" value="lisa"
+                 id="lisa-radio-button-id">Lisa</input>
+          <br/>
+          <input type="radio" name="payment_system" value="ycard">You Card</input>
+          <br/>
+          <input type="radio" name="payment_system" value="cardme">Card Me</input>
+          <br/>
+          <input type="radio" name="payment_system" value="taler"
+                 id="taler-radio-button-id" disabled="true">Taler</input>
+          <br/>
+          <input type="button" onclick="pay(this.form)" value="Ok"></input>
+        </div>
+      </form>
+
+    </article>
+  </section>
 
 <script type="text/javascript">
 
@@ -106,7 +133,7 @@ function handle_contract(json_contract)
 {
   var cEvent = new CustomEvent('taler-contract', { detail: json_contract });
 
-  document.body.dispatchEvent(cEvent);
+  document.dispatchEvent(cEvent);
 };
 
 
@@ -121,7 +148,7 @@ function taler_pay(form)
      have its own way of generating and transmitting the
      contract, there just must be a way to get the contract
      and to pass it to the wallet when the user selects 'Pay'. */
-  contract_request.open("GET", "/generate_taler_contract.php", true);
+  contract_request.open("GET", "generate_taler_contract.php", true);
   contract_request.onload = function (e)
   {
     if (contract_request.readyState == 4)
@@ -129,9 +156,9 @@ function taler_pay(form)
       if (contract_request.status == 200)
       {
         /* display contract_requestificate (i.e. it sends the JSON string
-           to the extension) alert (contract_request.responseText); */
+          to the extension) alert (contract_request.responseText); */
+        console.log("response text:", contract_request.responseText);
         handle_contract(contract_request.responseText);
-
       }
       else
       {
@@ -211,7 +238,7 @@ function taler_wallet_unload_cb(aEvent)
 function signal_taler_wallet_onload()
 {
   var eve = new Event('taler-checkout-probe');
-  document.body.dispatchEvent(eve);
+  document.dispatchEvent(eve);
 };
 
 
@@ -228,21 +255,20 @@ function test_without_wallet(){
 
 // Register event to be triggered by the wallet as a response to our
 // first event
-document.body.addEventListener("taler-wallet-present",
-                               has_taler_wallet_cb,
-			       false);
+document.addEventListener("taler-wallet-present",
+                          has_taler_wallet_cb,
+			  false);
 
 // Register event to be triggered by the wallet when it gets enabled while
 // the user is on the payment page
-document.body.addEventListener("taler-load",
-                               signal_taler_wallet_onload,
-			       false);
+document.addEventListener("taler-load",
+                          signal_taler_wallet_onload,
+			  false);
 
 // Register event to be triggered by the wallet when it is unloaded
-document.body.addEventListener("taler-unload",
-                               taler_wallet_unload_cb,
-			       false);
-
+document.addEventListener("taler-unload",
+                          taler_wallet_unload_cb,
+	                  false);
 </script>
 </body>
 </html>

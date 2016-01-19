@@ -52,8 +52,10 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                      size_t *upload_data_size)
 {
   json_t *root;
+  json_t *jcontract;
+  json_t *pay_url;
+  json_t *exec_url;
   int res;
-  struct GNUNET_HashCode h_wire;
   struct TALER_ContractPS contract;
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
 
@@ -68,39 +70,64 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
-  /* add fields to the "root" that the backend should provide */
-  json_object_set (root,
+  jcontract = json_object_get (root, "contract");
+
+  if (NULL == jcontract)
+  {
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              "contract request malformed");
+  }
+
+  /* add fields to the contract that the backend should provide */
+  json_object_set (jcontract,
                    "mints",
                    trusted_mints);
-  json_object_set (root,
+  json_object_set (jcontract,
                    "auditors",
                    j_auditors);
-  json_object_set_new (root,
+  json_object_set_new (jcontract,
                        "H_wire",
 		       TALER_json_from_data (&h_wire,
                                              sizeof (h_wire)));
-  json_object_set_new (root,
+  json_object_set_new (jcontract,
                        "merchant_pub",
 		       TALER_json_from_data (&pubkey,
                                              sizeof (pubkey)));
   /* create contract signature */
   GNUNET_assert (GNUNET_OK ==
-                 TALER_hash_json (root,
+                 TALER_hash_json (jcontract,
                                   &contract.h_contract));
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract.purpose.size = htonl (sizeof (contract));
   GNUNET_CRYPTO_eddsa_sign (privkey,
                             &contract.purpose,
                             &contract_sig);
+
+  pay_url = json_object_get (root, "pay_url");
+  if (NULL == pay_url)
+  {
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              "pay url missing");
+  }
+  exec_url = json_object_get (root, "exec_url");
+  if (NULL == exec_url)
+  {
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              "exec url missing");
+  }
   /* return final response */
-  return TMH_RESPONSE_reply_json_pack (connection,
-				       MHD_HTTP_OK,
-				       "{s:o, s:o, s:o}",
-				       "contract", root,
-				       "sig", TALER_json_from_data (&contract_sig,
-                                                                    sizeof (contract_sig)),
-				       "H_contract", TALER_json_from_data (&contract.h_contract,
-                                                                           sizeof (contract.h_contract)));
+  res = TMH_RESPONSE_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
+                                      "{s:O, s:O, s:O, s:o, s:o}",
+                                      "contract", jcontract,
+                                      "exec_url", exec_url,
+                                      "pay_url", pay_url,
+                                      "sig", TALER_json_from_data (&contract_sig,
+                                                                   sizeof (contract_sig)),
+                                      "H_contract", TALER_json_from_data (&contract.h_contract,
+                                                                          sizeof (contract.h_contract)));
+  json_decref (root);
+  return res;
 }
 
 /* end of taler-merchant-httpd_contract.c */

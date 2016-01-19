@@ -23,39 +23,39 @@
   NOTE: 'max_fee' must be consistent with the same value indicated within
   the contract; thus, a "real" merchant must implement such a mapping
 
-*/
-
-$cli_debug = false;
-$backend_test = true;
-
-if ($_GET['cli_debug'] == 'yes')
-  $cli_debug = true;
-
-if ($_GET['backend_test'] == 'no')
-{
-  $cli_debug = true;
-  $backend_test = false;
-}
+ */
 
 session_start();
 
-if (!$cli_debug && (! isset($_SESSION['receiver'])))
-{
-  http_response_code(400);
-  echo "Please, donate to someone before landing here!";
-  exit();
-}
-
 $cli_debug = false;
 $backend_test = true;
 
-if ($_GET['cli_debug'] == 'yes')
+if (isset($_GET['cli_debug']) && $_GET['cli_debug'] == 'yes')
+{
   $cli_debug = true;
+}
 
-if ($_GET['backend_test'] == 'no')
+if (isset($_GET['backend_test']) &&  $_GET['backend_test'] == 'no')
 {
   $cli_debug = true;
   $backend_test = false;
+}
+
+if (!isset($_SESSION['H_contract']))
+{
+  echo "No session active.";
+  http_response_code (301);
+  return;
+}
+
+if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
+{
+  $_SESSION['payment_ok'] = true;
+  http_response_code (301);
+  $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
+    ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
+  header("Location: $url");
+  die();
 }
 
 $post_body = file_get_contents('php://input');
@@ -66,15 +66,15 @@ $edate = array ('edate' =>
 
 $deposit_permission = json_decode ($post_body, true);
 
-$to_add = array ('max_fee' => array ('value' => 3,
-		                      'fraction' => 8,
-		                      'currency' => $_SESSION['currency']),
-                 'amount' => array ('value' => $_SESSION['amount_value'],
-                                     'fraction' => $_SESSION['amount_fraction'],
-		                     'currency' => $_SESSION['currency']));
+$to_add = array('max_fee' => array('value' => 3,
+                                   'fraction' => 8,
+                                   'currency' => $_SESSION['currency']),
+                'amount' => array('value' => $_SESSION['amount_value'],
+                                  'fraction' => $_SESSION['amount_fraction'],
+		                  'currency' => $_SESSION['currency']));
 
-$new_deposit_permission = array_merge ($deposit_permission, $to_add);
-$new_deposit_permission_edate = array_merge ($new_deposit_permission, $edate);
+$new_deposit_permission = array_merge($deposit_permission, $to_add);
+$new_deposit_permission_edate = array_merge($new_deposit_permission, $edate);
 
 /* Craft the HTTP request, note that the backend
   could be on an entirely different machine if
@@ -85,14 +85,25 @@ if ($cli_debug && !$backend_test)
 
   /* DO NOTE the newline at the end of 'echo's argument */
   //echo json_encode ($new_deposit_permission_edate, JSON_PRETTY_PRINT)
-  echo json_encode ($new_deposit_permission, JSON_PRETTY_PRINT)
+  echo json_encode($new_deposit_permission, JSON_PRETTY_PRINT)
   . "\n";
   exit;
 }
 
-$req = new http\Client\Request ("POST",
-                                "http://" . $_SERVER["SERVER_NAME"] . "/backend/pay",
-				array ("Content-Type" => "application/json"));
+
+// Backend is relative to the shop site.
+/**
+ * WARNING: the "shop site" is '"http://".$_SERVER["HTTP_HOST"]'
+ * So do not attach $_SERVER["REQUEST_URI"] before proxying requests
+ * to the backend
+ */
+//$url = (new http\URL("http://".$_SERVER["HTTP_HOST"].$_SERVER["REQUEST_URI"]))
+$url = (new http\URL("http://".$_SERVER["HTTP_HOST"]))
+  ->mod(array ("path" => "backend/pay"), http\Url::JOIN_PATH);
+
+$req = new http\Client\Request("POST",
+                               $url,
+                               array ("Content-Type" => "application/json"));
 $req->getBody()->append (json_encode ($new_deposit_permission));
 
 // Execute the HTTP request
@@ -112,15 +123,19 @@ if ($status_code != 200)
   /* error: just forwarding to the wallet what
     gotten from the backend (which is forwarding 'as is'
     the error gotten from the mint) */
+  echo json_encode ($new_deposit_permission);
+  echo "Error came from the backend, status $status_code\n";
+  echo "\n";
   echo $resp->body->toString ();
-  
 }
 else
 {
-$_SESSION['payment_ok'] = true;
-http_response_code (301);
-header("Location: http://" . $_SERVER["SERVER_NAME"] . "/fullfillment");
-die();
+  $_SESSION['payment_ok'] = true;
+  http_response_code (301);
+  $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
+    ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
+  header("Location: $url");
+  die();
 }
 
 ?>

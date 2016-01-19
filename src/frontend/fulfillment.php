@@ -6,7 +6,23 @@
 </head>
 <body>
 
-<?php 
+  <header>
+    <div id="logo">
+      <svg height="100" width="100">
+        <circle cx="50" cy="50" r="40" stroke="darkcyan" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
+      </svg>
+    </div>
+
+    <h1>Toy Store - Payment succeeded</h1>
+  </header>
+
+  <aside class="sidebar" id="left">
+  </aside>
+
+  <section id="main">
+    <article>
+<?php
 /*
   This file is part of GNU TALER.
   Copyright (C) 2014, 2015 GNUnet e.V.
@@ -27,6 +43,13 @@
 $cli_debug = false;
 $backend_test = true;
 
+function generate_msg ($link){
+  $msg = "<p>Thanks for donating to " . $_SESSION['receiver'] . ".</p>";
+  if (false != $link)
+    $msg .= "<p>Check our latest <a href=\"" . $link . "\">news!</a></p>";
+  return $msg;
+}
+
 if ($_GET['cli_debug'] == 'yes')
   $cli_debug = true;
 
@@ -38,13 +61,26 @@ if ($_GET['backend_test'] == 'no')
 
 session_start();
 
-
 if (! isset ($_SESSION['payment_ok']))
-  echo "Please land here after a successful payment!";
-else
-  echo "Thanks for donating to " . $_SESSION['receiver'];
+  echo "<p>Please land here after a successful payment!</p>";
+else{
+  $news = false;
+  switch ($_SESSION['receiver']){
+    case "Taler":
+      $news = "https://taler.net/news";
+      break;
+    case "GNUnet":
+      $news = "https://gnunet.org/";
+      break;
+    case "Tor":
+      $news = "https://www.torproject.org/press/press.html.en";
+      break;
+ }
+  echo generate_msg ($news);
+}
 
 ?>
-
+    </article>
+  </section>
 </body>
 </html>

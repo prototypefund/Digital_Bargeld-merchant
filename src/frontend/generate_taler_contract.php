@@ -35,10 +35,10 @@
 $cli_debug = false;
 $backend_test = true;
 
-if ($_GET['cli_debug'] == 'yes')
+if (isset($_GET['cli_debug']) && $_GET['cli_debug'] == 'yes')
   $cli_debug = true;
 
-if ($_GET['backend_test'] == 'no')
+if (isset($_GET['backend_test']) && $_GET['backend_test'] == 'no')
 {
   $cli_debug = true;
   $backend_test = false;
@@ -90,9 +90,12 @@ $teatax = array ('value' => 1,
 // Take a timestamp
 $now = new DateTime('now');
 
+$PAY_URL = "pay.php";
+$EXEC_URL = "execute.php";
+
 // pack the JSON for the contract 
 // --- FIXME: exact format needs review!
-$json = json_encode (array ('amount' => array ('value' => $amount_value,
+$contract = array ('amount' => array ('value' => $amount_value,
 			                       'fraction' => $amount_fraction,
                                                'currency' => $currency),
 			    'max_fee' => array ('value' => 3,
@@ -110,7 +113,8 @@ $json = json_encode (array ('amount' => array ('value' => $amount_value,
 			              'delivery_date' => "Some Date Format",
 			              'delivery_location' => 'LNAME1')),
 			    'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
-			    'pay_url' => "/taler/pay",
+			    'pay_url' => $PAY_URL,
+			    'exec_url' => $EXEC_URL, 
 			    'expiry' => "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
 			    'refund_deadline' => "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
 			    'merchant' => array ('address' => 'LNAME2',
@@ -138,19 +142,22 @@ $json = json_encode (array ('amount' => array ('value' => $amount_value,
 						                     'state' => 'Test State',
 							             'region' => 'Test Region',
 								     'province' => 'Test Province',
-								     'ZIP code' => 4908))), JSON_PRETTY_PRINT);
+								     'ZIP code' => 4908)));
+$json = json_encode (array ('contract' => $contract, 'exec_url' => $EXEC_URL, 'pay_url' => $PAY_URL), JSON_PRETTY_PRINT);
 if ($cli_debug && !$backend_test)
 {
   echo $json . "\n";
   exit;
 }
 
-// Craft the HTTP request, note that the backend
-// could be on an entirely different machine if
-// desired.
-$req = new http\Client\Request ("POST",
-                                "http://" . $_SERVER["SERVER_NAME"] . "/backend/contract",
-				array ("Content-Type" => "application/json"));
+
+$url = (new http\URL("http://".$_SERVER["HTTP_HOST"]))
+  ->mod(array ("path" => "backend/contract"), http\Url::JOIN_PATH);
+
+$req = new http\Client\Request("POST",
+                               $url,
+                               array ("Content-Type" => "application/json"));
+
 $req->getBody()->append ($json);
 
 // Execute the HTTP request
@@ -168,10 +175,11 @@ http_response_code ($status_code);
 if ($status_code != 200)
 {
   echo "Error while generating the contract";
+  echo $resp->body->toString ();
 }
 else
-{
-  // send the contract back to the wallet without touching it
+{ $got_json = json_decode ($resp->body->toString ());
+  $_SESSION['H_contract'] = $got_json->H_contract;
   echo $resp->body->toString ();
 }
 ?>
