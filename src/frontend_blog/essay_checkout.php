@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Toy Store - Payment method - Taler Demo</title>
+  <title>Blog - Payment method - Taler Demo</title>
   <link rel="stylesheet" type="text/css" href="style.css">
     <script>
         /*
@@ -31,36 +31,6 @@
     </script>
 </head>
 <body onload="signal_taler_wallet_onload()">
-<!--
-  This main goal of this page is to show to the customer all the accepted
-  payments methods and actually implementing just Taler; technically
-  the steps are:
-
-  1. retrieve the information about the donation from the
-     form and remember it in a PHP session
-  2. show a menu with all the required payments system options,
-     only showing "Taler" if the wallet is present
-  3. (JavaScript) implement the "checkout" button for Taler,
-     for the demo we ignore the other payment options.
--->
-
-<?php
-  // get the donation information from form
-  $donation_receiver = $_POST['donation_receiver'];
-  $donation_amount = $_POST['donation_amount'];
-  $donation_currency = $_POST['donation_currency'];
-
-  // get frational part
-  list ($donation_value, $donation_fraction) = explode (".", $donation_amount, 2);
-  // create PHP session and store donation information in session
-  $donation_fraction = (float) ("0." . $donation_fraction);
-  session_start();
-  session_unset();
-  $_SESSION['receiver'] = $donation_receiver;
-  $_SESSION['amount_value'] = (int) $donation_amount;
-  $_SESSION['amount_fraction'] = (int) ($donation_fraction * 1000000);
-  $_SESSION['currency'] = $donation_currency;
-?>
 
   <header>
     <div id="logo">
@@ -70,7 +40,7 @@
       </svg>
     </div>
 
-    <h1>Toy Store - Select payment method</h1>
+    <h1>Blog - Select payment method</h1>
   </header>
 
   <aside class="sidebar" id="left">
@@ -148,7 +118,7 @@ function taler_pay(form)
      have its own way of generating and transmitting the
      contract, there just must be a way to get the contract
      and to pass it to the wallet when the user selects 'Pay'. */
-  contract_request.open("GET", "generate_taler_contract.php", true);
+  contract_request.open("GET", "essay_contract.php", true);
   contract_request.onload = function (e)
   {
     if (contract_request.readyState == 4)

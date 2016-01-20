@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Blog site demonstration</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <script type="text/javascript">
+    /* @licstart  The following is the entire license notice for the
+      JavaScript code in this page.
+
+      Copyright (C) 2015 GNUnet e.V.
+
+      The JavaScript code in this page is free software: you can
+      redistribute it and/or modify it under the terms of the GNU
+      Lesser General Public License (GNU LGPL) as published by the Free Software
+      Foundation, either version 2.1 of the License, or (at your option)
+      any later version.  The code is distributed WITHOUT ANY WARRANTY;
+      without even the implied warranty of MERCHANTABILITY or FITNESS
+      FOR A PARTICULAR PURPOSE.  See the GNU LGPL for more details.
+
+      As additional permission under GNU LGPL version 2.1 section 7, you
+      may distribute non-source (e.g., minimized or compacted) forms of
+      that code without the copy of the GNU LGPL normally required by
+      section 4, provided you include this license notice and a URL
+      through which recipients can access the Corresponding Source.
+
+      @licend  The above is the entire license notice
+      for the JavaScript code in this page.
+    */
+  </script>
+</head>
+
+<body>
+  <header>
+    <div id="logo">
+      <svg height="100" width="100">
+        <circle cx="50" cy="50" r="40" stroke="darkcyan" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">B</text>
+      </svg>
+    </div>
+
+    <h1>Blog site demonstration</h1>
+  </header>
+
+  <aside class="sidebar" id="left">
+  </aside>
+
+  <section id="main">
+    <article>
+      <h1>Welcome to the Taler blog</h1>
+      <p>This blog simulates how a website selling articles which integrates
+         Taler should work. If you don't have a Taler wallet installed,
+	 please visit <a href="https://demo.taler.net">demo.taler.net</a>.
+         By clicking on some article below, you get its teaser shown, but the
+	 actual purchase happens once you will click on the 'read more' link
+	 associated with that teaser.
+      </p>
+    </article>
+    <section>
+
+      <article>
+        <h2>Articles list</h2>
+      </article>
+
+      <article class="articles">
+        <ul style="list-style-type:none">
+	  <li>
+	    <a href="/teaser.php?article=essay-x">
+	      <div class="teasers_item">
+	        <h3>Essay x</h3>
+	        <p>In essay x, we will ...</p>
+	      </div>
+	    </a>
+	    </li>
+	</ul>
+      </article>
+    </section>
+  </section>
+</body>
+</html>
