@@ -29,6 +29,16 @@ if (!isset($_SESSION['H_contract']))
   return;
 }
 
+if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
+{
+  $_SESSION['payment_ok'] = true;
+  http_response_code (301);
+  $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
+    ->mod(array ("path" => "essay_fulfillment.php"), http\Url::JOIN_PATH);
+  header("Location: $url");
+  die();
+}
+
 $article = $_SESSION['article'];
 $post_body = file_get_contents('php://input');
 $deposit_permission = json_decode ($post_body, true);
@@ -45,7 +55,6 @@ $resp = give_to_backend($_SERVER['HTTP_HOST'],
 $status_code = $resp->getResponseCode();
 // Our response code is the same we got from the backend:
 http_response_code ($status_code);
-
 // Now generate our body  
 if ($status_code != 200)
 {
@@ -60,16 +69,12 @@ if ($status_code != 200)
 else
 {
   $_SESSION['payment_ok'] = true;
-  if (!isset($_SESSION['allowed_articles'])){
+  if (!isset($_SESSION['allowed_articles']))
     $_SESSION['allowed_articles'] = array ($_SESSION['article'] => true);
-  else $_SESSION['allowed_articles'] =
-    array_push($_SESSION['allowed_articles'], array ($article => true));
-  }
-
+  else $_SESSION['allowed_articles'] = array_merge($_SESSION['allowed_articles'], array ($article => true));
   http_response_code (301);
   $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
-    ->mod(array ("path" => "essay_fulfillment.php?article=$article"), http\Url::JOIN_PATH);
+    ->mod(array ("path" => "essay_fulfillment.php"), http\Url::JOIN_PATH);
   header("Location: $url");
   die();
 }
-
