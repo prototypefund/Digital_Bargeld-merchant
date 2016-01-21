@@ -21,7 +21,10 @@
  * 2. augment the deposit permission with missin values
  * 3. forward payment to backend
  */
+include("../frontend_lib/merchants.php");
+include("./blog_lib.php");
 
+session_start();
 if (!isset($_SESSION['H_contract']))
 {
   echo "No session active.";
@@ -33,8 +36,8 @@ if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
 {
   $_SESSION['payment_ok'] = true;
   http_response_code (301);
-  $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
-    ->mod(array ("path" => "essay_fulfillment.php"), http\Url::JOIN_PATH);
+  $url = (new http\URL($_SERVER['REQUEST_SCHEME'].'://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
+    ->mod(array ("path" => "essay_fulfillment.php?article=".$_SESSION['article']), http\Url::JOIN_PATH);
   header("Location: $url");
   die();
 }
@@ -44,15 +47,17 @@ $post_body = file_get_contents('php://input');
 $deposit_permission = json_decode ($post_body, true);
 $to_add = array('max_fee' => array('value' => 3,
                                    'fraction' => 8,
-                                   'currency' => $_SESSION['currency']),
+                                   'currency' => $_SESSION['article_currency']),
                 'amount' => array('value' => $_SESSION['article_value'],
                                   'fraction' => $_SESSION['article_fraction'],
 		                  'currency' => $_SESSION['article_currency']));
 $complete_deposit_permission = array_merge($deposit_permission, $to_add);
+
 $resp = give_to_backend($_SERVER['HTTP_HOST'],
                         "backend/pay",
-			$complete_deposit_permission);
+			json_encode($complete_deposit_permission, JSON_PRETTY_PRINT));
 $status_code = $resp->getResponseCode();
+file_put_contents("/tmp/log", "gotten smth from backend, status: " . $status_code);
 // Our response code is the same we got from the backend:
 http_response_code ($status_code);
 // Now generate our body  
@@ -74,7 +79,7 @@ else
   else $_SESSION['allowed_articles'] = array_merge($_SESSION['allowed_articles'], array ($article => true));
   http_response_code (301);
   $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
-    ->mod(array ("path" => "essay_fulfillment.php"), http\Url::JOIN_PATH);
+    ->mod(array ("path" => "essay_fulfillment.php?article=$article"), http\Url::JOIN_PATH);
   header("Location: $url");
   die();
 }

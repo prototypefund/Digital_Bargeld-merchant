@@ -158,7 +158,7 @@ function taler_pay(form)
         /* display contract_requestificate (i.e. it sends the JSON string
           to the extension) alert (contract_request.responseText); */
         console.log("response text:", contract_request.responseText);
-        handle_contract(contract_request.responseText);
+        //handle_contract(contract_request.responseText);
       }
       else
       {

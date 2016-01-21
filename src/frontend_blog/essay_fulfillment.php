@@ -1,5 +1,6 @@
 <?php
 
+include("./blog_lib.php");
 session_start();
 
 if (!isset($_GET['article'])){
