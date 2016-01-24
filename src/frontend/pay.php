@@ -27,21 +27,28 @@
 
 include 'util.php';
 
+function respond_success() {
+  $_SESSION['payment_ok'] = true;
+  $json = json_encode(
+    array(
+      "fulfillment_url" => url_rel("fulfillment.php")));
+  echo $json;
+}
+
 session_start();
 
 if (!isset($_SESSION['H_contract']))
 {
-  echo "No session active.";
-  http_response_code (301);
-  return;
+  $json = json_encode(
+    array("error" => "No session active"));
+  echo $json;
+  http_response_code (401);
+  die();
 }
 
 if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
 {
-  $_SESSION['payment_ok'] = true;
-  http_response_code (301);
-  $url = $url_rel("fulfillment.php");
-  header("Location: $url");
+  respond_success();
   die();
 }
 
@@ -94,20 +101,16 @@ http_response_code ($status_code);
 // Now generate our body  
 if ($status_code != 200)
 {
-  /* error: just forwarding to the wallet what
-    gotten from the backend (which is forwarding 'as is'
-    the error gotten from the mint) */
-  echo json_encode ($new_deposit_permission);
-  echo "Error came from the backend, status $status_code\n";
-  echo "\n";
-  echo $resp->body->toString ();
+  $json = json_encode(
+    array(
+      "error" => "backend error",
+      "status" => $status_code,
+      "detail" => $resp->body->toString ()));
+  echo $json;
 }
 else
 {
-  $_SESSION['payment_ok'] = true;
-  http_response_code (301);
-  $url = url_rel("fulfillment.php");
-  header("Location: $url");
+  respond_success();
   die();
 }
 
