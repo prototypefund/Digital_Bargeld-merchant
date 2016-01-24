@@ -184,7 +184,7 @@ function pay(form) {
          taler_pay(form);
   }
   else {
-   alert("You selected '" +choice.value + "', but we do not support this payment system in the demo".);
+   alert("You selected '" + choice.value + "', but we do not support this payment system in the demo.");
   }
 };
 
