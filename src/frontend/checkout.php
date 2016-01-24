@@ -116,6 +116,7 @@
           <input type="radio" name="payment_system" value="cardme">Card Me</input>
           <br/>
           <input type="radio" name="payment_system" value="taler"
+                 selected
                  id="taler-radio-button-id" class="taler-installed-enable">Taler</input>
           <br/>
           <input type="button" onclick="pay(this.form)" value="Ok"></input>
