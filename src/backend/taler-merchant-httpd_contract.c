@@ -104,7 +104,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   /* return final response */
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:O, s:O, s:O, s:o, s:o}",
+                                      "{s:O, s:O, s:O}",
                                       "contract", jcontract,
                                       "sig", TALER_json_from_data (&contract_sig,
                                                                    sizeof (contract_sig)),
