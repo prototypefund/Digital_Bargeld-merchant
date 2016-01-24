@@ -19,13 +19,19 @@
 
 include 'util.php';
 
-// recover the session information
 session_start();
+
 if (!isset($_SESSION['receiver']))
 {
   http_response_code (400);
   die();
 }
+
+$receiver = $_SESSION['receiver'];
+$receiver = $_SESSION['receiver'];
+$amount_value = intval ($_SESSION['amount_value']);
+$amount_fraction = intval ($_SESSION['amount_fraction']);
+$currency = $_SESSION['currency'];
 
 /* Fill in variables for simple JSON contract */
 // fake product id 
