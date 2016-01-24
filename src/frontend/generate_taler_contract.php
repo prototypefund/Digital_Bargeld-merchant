@@ -131,8 +131,8 @@ if ($status_code != 200)
 else
 {
   $got_json = json_decode ($resp->body->toString ());
-  $got_json['pay_url'] = $url_rel("pay.php");
-  $got_json['exec_url'] = $url_rel("execute.php") . "?H_contract=" . $got_json->H_contract;
+  $got_json['pay_url'] = url_rel("pay.php");
+  $got_json['exec_url'] = url_rel("execute.php") . "?H_contract=" . $got_json->H_contract;
   $_SESSION['H_contract'] = $got_json->H_contract;
   echo json_encode ($got_json, JSON_PRETTY_PRINT);
 }
