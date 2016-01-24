@@ -53,8 +53,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 {
   json_t *root;
   json_t *jcontract;
-  json_t *pay_url;
-  json_t *exec_url;
   int res;
   struct TALER_ContractPS contract;
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
@@ -103,25 +101,11 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                             &contract.purpose,
                             &contract_sig);
 
-  pay_url = json_object_get (root, "pay_url");
-  if (NULL == pay_url)
-  {
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              "pay url missing");
-  }
-  exec_url = json_object_get (root, "exec_url");
-  if (NULL == exec_url)
-  {
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              "exec url missing");
-  }
   /* return final response */
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
                                       "{s:O, s:O, s:O, s:o, s:o}",
                                       "contract", jcontract,
-                                      "exec_url", exec_url,
-                                      "pay_url", pay_url,
                                       "sig", TALER_json_from_data (&contract_sig,
                                                                    sizeof (contract_sig)),
                                       "H_contract", TALER_json_from_data (&contract.h_contract,
