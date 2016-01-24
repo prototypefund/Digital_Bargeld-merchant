@@ -182,10 +182,10 @@ function taler_pay(form) {
 function pay(form) {
   var choice = form.elements["payment_system"].value;
   if (choice == "taler") {
-         taler_pay(form);
+    taler_pay(form);
   }
   else {
-   alert("You selected '" + choice + "', but we do not support this payment system in the demo.");
+    alert("You selected '" + choice + "', but we do not support this payment system in the demo.");
   }
 };
 
