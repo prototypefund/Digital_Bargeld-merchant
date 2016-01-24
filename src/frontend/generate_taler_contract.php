@@ -97,7 +97,7 @@ $contract = array ('amount' => array ('value' => $amount_value,
 								     'province' => 'Test Province',
                                                                      'ZIP code' => 4908)));
 
-$json = json_encode(array('contract' => $contract, JSON_PRETTY_PRINT);
+$json = json_encode(array('contract' => $contract, JSON_PRETTY_PRINT));
 
 $url = url_join("http://".$_SERVER["HTTP_HOST"], "backend/contract");
 
