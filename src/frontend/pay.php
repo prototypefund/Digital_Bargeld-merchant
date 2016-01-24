@@ -25,21 +25,9 @@
 
  */
 
+include 'util.php';
+
 session_start();
-
-$cli_debug = false;
-$backend_test = true;
-
-if (isset($_GET['cli_debug']) && $_GET['cli_debug'] == 'yes')
-{
-  $cli_debug = true;
-}
-
-if (isset($_GET['backend_test']) &&  $_GET['backend_test'] == 'no')
-{
-  $cli_debug = true;
-  $backend_test = false;
-}
 
 if (!isset($_SESSION['H_contract']))
 {
@@ -52,8 +40,7 @@ if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
 {
   $_SESSION['payment_ok'] = true;
   http_response_code (301);
-  $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
-    ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
+  $url = $url_rel("fulfillment.php");
   header("Location: $url");
   die();
 }
@@ -80,26 +67,13 @@ $new_deposit_permission_edate = array_merge($new_deposit_permission, $edate);
   could be on an entirely different machine if
   desired. */
 
-if ($cli_debug && !$backend_test)
-{
-
-  /* DO NOTE the newline at the end of 'echo's argument */
-  //echo json_encode ($new_deposit_permission_edate, JSON_PRETTY_PRINT)
-  echo json_encode($new_deposit_permission, JSON_PRETTY_PRINT)
-  . "\n";
-  exit;
-}
-
-
 // Backend is relative to the shop site.
 /**
  * WARNING: the "shop site" is '"http://".$_SERVER["HTTP_HOST"]'
  * So do not attach $_SERVER["REQUEST_URI"] before proxying requests
  * to the backend
  */
-//$url = (new http\URL("http://".$_SERVER["HTTP_HOST"].$_SERVER["REQUEST_URI"]))
-$url = (new http\URL("http://".$_SERVER["HTTP_HOST"]))
-  ->mod(array ("path" => "backend/pay"), http\Url::JOIN_PATH);
+$url = url_join("http://".$_SERVER["HTTP_HOST"], "backend/pay");
 
 $req = new http\Client\Request("POST",
                                $url,
@@ -132,8 +106,7 @@ else
 {
   $_SESSION['payment_ok'] = true;
   http_response_code (301);
-  $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
-    ->mod(array ("path" => "fulfillment.php"), http\Url::JOIN_PATH);
+  $url = url_rel("fulfillment.php");
   header("Location: $url");
   die();
 }

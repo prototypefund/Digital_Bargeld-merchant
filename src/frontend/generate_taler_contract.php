@@ -14,61 +14,17 @@
   You should have received a copy of the GNU Lesser General Public License along with
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 
-*/
+ */
 
-/*  
-  This code generates a Taler contract in JSON format. Key steps are:
 
-  1. recover the PHP session with the contract information
-  2. generate the JSON to forward to the backend
-  3. forward the response with the contract from the backend to
-     to the wallet
+include 'util.php';
 
-  To test this feature from the command line, issue:
-
-  - $ curl http://merchant_url/generate_taler_contract.php?cli_debug=yes
-    if the whole "journey" to the backend is begin tested
-  - $ curl http://merchant_url/generate_taler_contract.php?backend_test=no
-    if just the frontend job is being tested
-*/
-
-$cli_debug = false;
-$backend_test = true;
-
-if (isset($_GET['cli_debug']) && $_GET['cli_debug'] == 'yes')
-  $cli_debug = true;
-
-if (isset($_GET['backend_test']) && $_GET['backend_test'] == 'no')
-{
-  $cli_debug = true;
-  $backend_test = false;
-}
-
-// 1) recover the session information
+// recover the session information
 session_start();
-if (!$cli_debug && (! isset($_SESSION['receiver'])))
+if (!isset($_SESSION['receiver']))
 {
-  http_response_code (404);
-  echo "Please select a contract before getting to this page...";
-  echo "attempted : " . $_SESSION['receiver'];
-  exit (0);
-}
-
-/* Obtain session state */
-if (!$cli_debug)
-{
-  $receiver = $_SESSION['receiver'];
-  $amount_value = intval ($_SESSION['amount_value']);
-  $amount_fraction = intval ($_SESSION['amount_fraction']);
-  $currency = $_SESSION['currency'];
-}
-else
-{
-  $receiver = "Test Receiver";
-  $amount_value = 5;
-  $amount_fraction = 5;
-  $currency = "KUDOS";
-
+  http_response_code (400);
+  die();
 }
 
 /* Fill in variables for simple JSON contract */
@@ -89,9 +45,6 @@ $teatax = array ('value' => 1,
 
 // Take a timestamp
 $now = new DateTime('now');
-
-$PAY_URL = "pay.php";
-$EXEC_URL = "execute.php";
 
 // pack the JSON for the contract 
 // --- FIXME: exact format needs review!
@@ -142,17 +95,11 @@ $contract = array ('amount' => array ('value' => $amount_value,
 						                     'state' => 'Test State',
 							             'region' => 'Test Region',
 								     'province' => 'Test Province',
-								     'ZIP code' => 4908)));
-$json = json_encode (array ('contract' => $contract, 'exec_url' => $EXEC_URL, 'pay_url' => $PAY_URL), JSON_PRETTY_PRINT);
-if ($cli_debug && !$backend_test)
-{
-  echo $json . "\n";
-  exit;
-}
+                                                                     'ZIP code' => 4908)));
 
+$json = json_encode(array('contract' => $contract, JSON_PRETTY_PRINT);
 
-$url = (new http\URL("http://".$_SERVER["HTTP_HOST"]))
-  ->mod(array ("path" => "backend/contract"), http\Url::JOIN_PATH);
+$url = url_join("http://".$_SERVER["HTTP_HOST"], "backend/contract");
 
 $req = new http\Client\Request("POST",
                                $url,
@@ -176,9 +123,12 @@ if ($status_code != 200)
 {
   echo "Error while generating the contract";
   echo $resp->body->toString ();
-}
 else
-{ $got_json = json_decode ($resp->body->toString ());
+{
+  $got_json = json_decode ($resp->body->toString ());
+  $PAY_URL = "pay.php";
+  $EXEC_URL = "execute.php";
+  $got_json['pay_url'] = 
   $_SESSION['H_contract'] = $got_json->H_contract;
   echo $resp->body->toString ();
 }
