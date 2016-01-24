@@ -123,13 +123,13 @@ if ($status_code != 200)
 {
   echo "Error while generating the contract";
   echo $resp->body->toString ();
+}
 else
 {
   $got_json = json_decode ($resp->body->toString ());
-  $PAY_URL = "pay.php";
-  $EXEC_URL = "execute.php";
-  $got_json['pay_url'] = 
+  $got_json['pay_url'] = $url_rel("pay.php");
+  $got_json['exec_url'] = $url_rel("execute.php") . "?H_contract=" . $got_json->H_contract;
   $_SESSION['H_contract'] = $got_json->H_contract;
-  echo $resp->body->toString ();
+  echo json_encode ($got_json, JSON_PRETTY_PRINT);
 }
 ?>
