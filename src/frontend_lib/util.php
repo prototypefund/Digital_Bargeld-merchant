@@ -5,12 +5,10 @@ function get(&$var, $default=null) {
 }
 
 function url_join($base, $path, $strip=false) {
-  $url = new http\URL($base);
-  if ($strip === true) {
-    $url = $url->mod(null, http\Url::STRIP_QUERY|http\Url::STRIP_FRAGMENT);
-  }
-  $url = $url->mod(array ("path" => $path), http\Url::JOIN_PATH|http\URL::SANITIZE_PATH);
-  return $url->toString();
+  $flags = strip ? (http\Url::JOIN_PATH|http\URL::SANITIZE_PATH) : 0;
+  return (new http\URL($base, null, flags))
+    ->mod(array ("path" => $path), http\Url::JOIN_PATH|http\URL::SANITIZE_PATH)
+    ->toString();
 }
 
 // Get a url with a path relative to the
