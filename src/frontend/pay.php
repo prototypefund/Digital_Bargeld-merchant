@@ -34,7 +34,7 @@ session_start();
 
 $payments = &pull($_SESSION, 'payments', array());
 
-if (!isset($payments[$hc])
+if (!isset($payments[$hc]))
 {
   http_response_code(400);
   echo json_encode(array(
