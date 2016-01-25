@@ -37,7 +37,6 @@
 
   You should have received a copy of the GNU Lesser General Public License along with
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
-
 */
 
 function generate_msg ($link){
