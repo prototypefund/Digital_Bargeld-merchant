@@ -16,15 +16,6 @@
 
 */
 
-/*
-  This serving module adds the 'max_fee' field to the object which
-  sends to the backend, and optionally the field 'edate' (indicating
-  to the mint the tollerated deadline to receive funds for this payment)
-  NOTE: 'max_fee' must be consistent with the same value indicated within
-  the contract; thus, a "real" merchant must implement such a mapping
-
- */
-
 include '../frontend_lib/util.php';
 
 function respond_success() {
@@ -42,7 +33,7 @@ if (!isset($_SESSION['H_contract']))
   $json = json_encode(
     array("error" => "No session active"));
   echo $json;
-  http_response_code (401);
+  http_response_code(401);
   die();
 }
 
@@ -55,17 +46,20 @@ if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
 $post_body = file_get_contents('php://input');
 
 $now = new DateTime('now');
-$edate = array ('edate' =>
-               "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/");
+$edate = array (
+  'edate' =>
+  "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/");
 
 $deposit_permission = json_decode ($post_body, true);
 
-$to_add = array('max_fee' => array('value' => 3,
-                                   'fraction' => 8,
-                                   'currency' => $_SESSION['currency']),
-                'amount' => array('value' => $_SESSION['amount_value'],
-                                  'fraction' => $_SESSION['amount_fraction'],
-		                  'currency' => $_SESSION['currency']));
+$to_add = array(
+  'max_fee' => array(
+    'value' => 3,
+    'fraction' => 8,
+    'currency' => $_SESSION['currency']),
+  'amount' => array('value' => $_SESSION['amount_value'],
+  'fraction' => $_SESSION['amount_fraction'],
+  'currency' => $_SESSION['currency']));
 
 $new_deposit_permission = array_merge($deposit_permission, $to_add);
 $new_deposit_permission_edate = array_merge($new_deposit_permission, $edate);
@@ -75,25 +69,20 @@ $new_deposit_permission_edate = array_merge($new_deposit_permission, $edate);
   desired. */
 
 // Backend is relative to the shop site.
-/**
- * WARNING: the "shop site" is '"http://".$_SERVER["HTTP_HOST"]'
- * So do not attach $_SERVER["REQUEST_URI"] before proxying requests
- * to the backend
- */
-$url = url_join("http://".$_SERVER["HTTP_HOST"], "backend/pay");
+$url = url_rel("backend/pay");
 
 $req = new http\Client\Request("POST",
                                $url,
-                               array ("Content-Type" => "application/json"));
+                               array("Content-Type" => "application/json"));
 $req->getBody()->append (json_encode ($new_deposit_permission));
 
 // Execute the HTTP request
 $client = new http\Client;
-$client->enqueue($req)->send ();
+$client->enqueue($req)->send();
 
 // Fetch the response
-$resp = $client->getResponse ();
-$status_code = $resp->getResponseCode ();
+$resp = $client->getResponse();
+$status_code = $resp->getResponseCode();
 
 // Our response code is the same we got from the backend:
 http_response_code ($status_code);
@@ -105,7 +94,7 @@ if ($status_code != 200)
     array(
       "error" => "backend error",
       "status" => $status_code,
-      "detail" => $resp->body->toString ()));
+      "detail" => $resp->body->toString()));
   echo $json;
 }
 else
