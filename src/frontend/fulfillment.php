@@ -3,7 +3,7 @@
 <head>
   <title>Taler's "Demo" Shop</title>
   <link rel="stylesheet" type="text/css" href="style.css">
-  <script type="application/javascript" src="taler-presence.js">
+  <script type="application/javascript" src="taler-presence.js"></script>
   <script type="application/javascript">
   function executePayment(H_contract, pay_url) {
     var detail = {
