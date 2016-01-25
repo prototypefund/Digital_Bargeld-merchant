@@ -49,10 +49,15 @@ function generate_msg ($link){
 
 $hc = get($_GET["UUID"]);
 
-if (!$hc)
+if (empty($hc))
 {
   http_response_code(400);
   echo "<p>Bad request (UUID missing)</p>";
+  return;
+}
+else
+{
+  echo "yay!";
   return;
 }
 
@@ -73,7 +78,7 @@ if (isset($_SESSION['payment_ok']))
       $news = "https://www.torproject.org/press/press.html.en";
       break;
   }
-  echo generate_msg ($news);
+  echo generate_msg($news);
   die();
 }
 
