@@ -6,7 +6,7 @@ function get(&$var, $default=null) {
 
 function url_join($base, $path, $strip=false) {
   $flags = strip ? (http\Url::JOIN_PATH|http\URL::SANITIZE_PATH) : 0;
-  return (new http\URL($base, null, flags))
+  return (new http\URL($base, null, $flags))
     ->mod(array ("path" => $path), http\Url::JOIN_PATH|http\URL::SANITIZE_PATH)
     ->toString();
 }
