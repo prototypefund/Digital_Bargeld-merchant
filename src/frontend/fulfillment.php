@@ -47,6 +47,7 @@ function generate_msg ($link){
 }
 
 
+include '../frontend_lib/util.php';
 $hc = get($_GET["UUID"]);
 
 if (empty($hc))
