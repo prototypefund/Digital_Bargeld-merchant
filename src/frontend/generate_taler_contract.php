@@ -54,6 +54,7 @@ $now = new DateTime('now');
 
 // pack the JSON for the contract 
 $contract = array(
+  'fulfillment_url' => (url_rel("fulfillment.php") . '?uuid=${H_contract}'),
   'amount' => array(
     'value' => $amount_value,
     'fraction' => $amount_fraction,
@@ -142,7 +143,6 @@ if ($status_code != 200)
 else
 {
   $got_json = json_decode($resp->body->toString(), true);
-  $got_json['fulfillment_url']= url_rel("fulfillment.php") . '?uuid=${H_contract}';
   $_SESSION['H_contract'] = $got_json["H_contract"];
   echo json_encode ($got_json, JSON_PRETTY_PRINT);
 }
