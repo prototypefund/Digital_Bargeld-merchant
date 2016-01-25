@@ -40,9 +40,6 @@
 
 */
 
-$cli_debug = false;
-$backend_test = true;
-
 function generate_msg ($link){
   $msg = "<p>Thanks for donating to " . $_SESSION['receiver'] . ".</p>";
   if (false != $link)
@@ -50,22 +47,17 @@ function generate_msg ($link){
   return $msg;
 }
 
-if ($_GET['cli_debug'] == 'yes')
-  $cli_debug = true;
-
-if ($_GET['backend_test'] == 'no')
-{
-  $cli_debug = true;
-  $backend_test = false;
-}
-
 session_start();
 
-if (! isset ($_SESSION['payment_ok']))
-  echo "<p>Please land here after a successful payment!</p>";
-else{
+if (!isset ($_SESSION['payment_ok']))
+{
+  echo "<p>Please come here after a successful payment!</p>";
+}
+else
+{
   $news = false;
-  switch ($_SESSION['receiver']){
+  switch ($_SESSION['receiver'])
+  {
     case "Taler":
       $news = "https://taler.net/news";
       break;
