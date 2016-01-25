@@ -591,8 +591,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   int res;
   json_t *root;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "In handler for /pay.\n");
-
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "In handler for /pay.\n");
   if (NULL == *connection_cls)
   {
     pc = GNUNET_new (struct PayContext);
@@ -700,7 +700,10 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     {
       char *s = json_dumps (coins, JSON_INDENT(2));
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Coins json is: %s\n", s);
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Coins json is: %s\n",
+                  s);
+      free (s);
     }
 
     json_array_foreach (coins, coins_index, coin)
@@ -728,7 +731,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
         char *s;
         s = TALER_amount_to_string (&dc->percoin_amount);
         GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                    "Coin #%i has f %s\n", coins_index, s);
+                    "Coin #%i has f %s\n",
+                    coins_index,
+                    s);
         GNUNET_free (s);
       }
 
@@ -738,8 +743,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
 
   /* Check if this payment attempt has already taken place */
-  if (GNUNET_OK == db->check_payment (db->cls,
-                                      pc->transaction_id))
+  if (GNUNET_OK ==
+      db->check_payment (db->cls,
+                         pc->transaction_id))
   {
     struct MHD_Response *resp;
     int ret;
@@ -755,9 +761,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     MHD_destroy_response (resp);
     return ret;
   }
-
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "payment already attempted");
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Looking up chosen mint '%s'\n",
