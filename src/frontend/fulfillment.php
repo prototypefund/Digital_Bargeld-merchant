@@ -14,7 +14,7 @@
       </svg>
     </div>
 
-    <h1>Toy Store - Payment succeeded</h1>
+    <h1>Toy Store - Product Page</h1>
   </header>
 
   <aside class="sidebar" id="left">
@@ -52,7 +52,7 @@ $hc = get($_GET["UUID"]);
 if (!$hc)
 {
   http_response_code(400);
-  echo "<p>Bad request (UUID missing)";
+  echo "<p>Bad request (UUID missing)</p>";
   die();
 }
 
