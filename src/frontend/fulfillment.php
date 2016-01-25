@@ -82,7 +82,7 @@ if (null === $my_payment)
 
 if (true !== get($my_payment["is_payed"], false))
 {
-  $pay_url = url_rel("pay.php", true);
+  $pay_url = url_rel("pay.php");
   echo "<p>you have not payed for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";
   echo "<script>executePayment('$hc', '$pay_url');</script>";

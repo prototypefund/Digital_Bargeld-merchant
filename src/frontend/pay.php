@@ -18,29 +18,30 @@
 
 include '../frontend_lib/util.php';
 
-function respond_success() {
-  $_SESSION['payment_ok'] = true;
-  $json = json_encode(
-    array(
-      "fulfillment_url" => url_rel("fulfillment.php")));
-  echo $json;
+$hc = get($_GET["uuid"]);
+
+if (empty($hc))
+{
+  http_response_code(400);
+  echo json_encode(array(
+    "error" => "missing parameter",
+    "parameter" => "uuid"
+  ));
+  return;
 }
 
 session_start();
 
-if (!isset($_SESSION['H_contract']))
-{
-  $json = json_encode(
-    array("error" => "No session active"));
-  echo $json;
-  http_response_code(401);
-  die();
-}
+$payments = get($_SESSION['payments'], array());
+$my_payment = get($payments[$hc]);
 
-if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
+if (null === $my_payment)
 {
-  respond_success();
-  die();
+  http_response_code(400);
+  echo json_encode(array(
+    "error" => "no session active",
+  ));
+  return;
 }
 
 $post_body = file_get_contents('php://input');
@@ -96,11 +97,9 @@ if ($status_code != 200)
       "status" => $status_code,
       "detail" => $resp->body->toString()));
   echo $json;
+  die()
 }
-else
-{
-  respond_success();
-  die();
-}
+
+$my_payment["is_payed"] = true;
 
 ?>
