@@ -85,7 +85,7 @@ $resp = $client->getResponse();
 $status_code = $resp->getResponseCode();
 
 // Our response code is the same we got from the backend:
-http_response_code ($status_code);
+http_response_code($status_code);
 
 // Now generate our body  
 if ($status_code != 200)

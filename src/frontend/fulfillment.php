@@ -46,13 +46,19 @@ function generate_msg ($link){
   return $msg;
 }
 
+
+$hc = get($_GET["UUID"]);
+
+if (!$hc)
+{
+  http_response_code(400);
+  echo "<p>Bad request (UUID missing)";
+  die();
+}
+
 session_start();
 
-if (!isset ($_SESSION['payment_ok']))
-{
-  echo "<p>Please come here after a successful payment!</p>";
-}
-else
+if (isset($_SESSION['payment_ok']))
 {
   $news = false;
   switch ($_SESSION['receiver'])
@@ -66,9 +72,11 @@ else
     case "Tor":
       $news = "https://www.torproject.org/press/press.html.en";
       break;
- }
+  }
   echo generate_msg ($news);
+  die();
 }
+
 
 ?>
     </article>
