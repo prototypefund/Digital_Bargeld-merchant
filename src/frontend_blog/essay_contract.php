@@ -26,11 +26,12 @@
 include("../frontend_lib/merchants.php");
 include("./blog_lib.php");
 session_start();
-if (!isset($_SESSION['article'])){
+if (!isset($_GET['article'])){
   echo "Please land here just to buy articles";
   die();
   }
-$article = $_SESSION['article'];
+$article = $_GET['article'];
+$_SESSION['article'] = $article;
 // 2 to-do
 
 // send contract

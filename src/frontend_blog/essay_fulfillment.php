@@ -2,7 +2,6 @@
 
 include("./blog_lib.php");
 session_start();
-
 if (!isset($_GET['article'])){
   http_response_code(400);
   echo "No article specified";

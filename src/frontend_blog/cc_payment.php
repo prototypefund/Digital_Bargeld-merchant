@@ -4,6 +4,17 @@
   <title>Enter your details</title>
   <link rel="stylesheet" type="text/css" href="style.css">
 </head>
+<?php
+  if (!isset($_GET['article'])){
+    echo "Please select an article to buy";
+    die();
+  }
+  else {
+    session_start();
+    $_SESSION['cc_payment'] = true;
+    $article = $_GET['article'];
+    }
+?>
 
 <body>
   <header>
@@ -31,8 +42,10 @@
       Nationality<br> <input type="text"></input><br>
       Gender<br> <input type="radio" name"gender">Male</input>
              <input type="radio" name="gender">Female</input><br>
-      <input type="submit"></input>
     </form>
+    <?php
+      echo "<form method=\"post\" action=\"essay_cc_pay.php?article=$article\"><input type=\"submit\"></input></form>";
+    ?>
     </article>
   </section>
 </body>

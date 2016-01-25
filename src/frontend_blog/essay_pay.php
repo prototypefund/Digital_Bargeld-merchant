@@ -18,7 +18,7 @@
 /**
  * This file should:
  * 1. Check if the session is valid
- * 2. augment the deposit permission with missin values
+ * 2. augment the deposit permission with missing values
  * 3. forward payment to backend
  */
 include("../frontend_lib/merchants.php");
@@ -75,7 +75,7 @@ else
 {
   $_SESSION['payment_ok'] = true;
   if (!isset($_SESSION['allowed_articles']))
-    $_SESSION['allowed_articles'] = array ($_SESSION['article'] => true);
+    $_SESSION['allowed_articles'] = array ($article => true);
   else $_SESSION['allowed_articles'] = array_merge($_SESSION['allowed_articles'], array ($article => true));
   http_response_code (301);
   $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
