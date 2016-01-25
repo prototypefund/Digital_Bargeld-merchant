@@ -107,9 +107,8 @@ $contract = array(
       'province' => 'Test Province',
       'ZIP code' => 4908)));
 
-$json = json_encode( array(
-  'contract' => $contract,
-  'fulfillment_url' => (url_rel("fulfillment.php") . '?uuid=${H_contract}')
+$json = json_encode(array(
+  'contract' => $contract
 ), JSON_PRETTY_PRINT);
 
 $url = url_join("http://".$_SERVER["HTTP_HOST"], "backend/contract");
@@ -143,6 +142,7 @@ if ($status_code != 200)
 else
 {
   $got_json = json_decode($resp->body->toString(), true);
+  $got_json['fulfillment_url']= url_rel("fulfillment.php") . '?uuid=${H_contract}';
   $_SESSION['H_contract'] = $got_json["H_contract"];
   echo json_encode ($got_json, JSON_PRETTY_PRINT);
 }
