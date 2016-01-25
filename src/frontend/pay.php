@@ -97,7 +97,7 @@ if ($status_code != 200)
       "status" => $status_code,
       "detail" => $resp->body->toString()));
   echo $json;
-  die()
+  die();
 }
 
 $my_payment["is_payed"] = true;
