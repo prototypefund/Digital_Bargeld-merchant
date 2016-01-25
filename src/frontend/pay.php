@@ -32,10 +32,9 @@ if (empty($hc))
 
 session_start();
 
-$payments = get($_SESSION['payments'], array());
-$my_payment = get($payments[$hc]);
+$payments = &pull($_SESSION, 'payments', array());
 
-if (null === $my_payment)
+if (!isset($payments[$hc])
 {
   http_response_code(400);
   echo json_encode(array(
@@ -43,6 +42,8 @@ if (null === $my_payment)
   ));
   return;
 }
+
+$my_payment = &$payments[$hc];
 
 $post_body = file_get_contents('php://input');
 

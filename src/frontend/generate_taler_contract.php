@@ -143,11 +143,11 @@ else
 {
   $got_json = json_decode($resp->body->toString(), true);
   $hc = $got_json["H_contract"];
-  $payments = get($_SESSION['payments'], array());
+
+  $payments = &pull($_SESSION, "payments", array());
   $payments[$hc] = array(
     'receiver' => $receiver,
   );
-  $_SESSION['payments'] = $payments;
 
   echo json_encode ($got_json, JSON_PRETTY_PRINT);
 }

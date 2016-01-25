@@ -4,6 +4,13 @@ function get(&$var, $default=null) {
   return isset($var) ? $var : $default;
 }
 
+function &pull(&$arr, $idx, $default) {
+  if (!isset($arr[$idx]) {
+    $arr[idx] = $default;
+  }
+  return $arr[$idx];
+}
+
 function url_join($base, $path, $strip=false) {
   $flags = $strip ? (http\Url::STRIP_PATH|http\URL::STRIP_QUERY) : 0;
   return (new http\URL($base, null, $flags))
