@@ -15,7 +15,7 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
  */
 
-include 'util.php';
+include '../frontend_lib/util.php';
 
 session_start();
 
@@ -25,7 +25,6 @@ if (!isset($_SESSION['receiver']))
   die();
 }
 
-$receiver = $_SESSION['receiver'];
 $receiver = $_SESSION['receiver'];
 $amount_value = intval($_SESSION['amount_value']);
 $amount_fraction = intval($_SESSION['amount_fraction']);
@@ -143,7 +142,13 @@ if ($status_code != 200)
 else
 {
   $got_json = json_decode($resp->body->toString(), true);
-  $_SESSION['H_contract'] = $got_json["H_contract"];
+  $hc = $got_json["H_contract"];
+  $payments = get($_SESSION['payments'], array());
+  $payments[$hc] = array(
+    'receiver' => $receiver,
+  );
+  $_SESSION['payments'] = $payments;
+
   echo json_encode ($got_json, JSON_PRETTY_PRINT);
 }
 ?>
