@@ -48,7 +48,7 @@ function generate_msg ($link){
 
 
 include '../frontend_lib/util.php';
-$hc = get($_GET["UUID"]);
+$hc = get($_GET["uuid"]);
 
 if (empty($hc))
 {
@@ -56,33 +56,38 @@ if (empty($hc))
   echo "<p>Bad request (UUID missing)</p>";
   return;
 }
-else
-{
-  echo "yay!";
-  return;
-}
 
 session_start();
 
-if (isset($_SESSION['payment_ok']))
+$payments = get($_SESSION['payments'], array());
+$my_payment = get($payments[$hc]);
+
+if (null === $my_payment)
 {
-  $news = false;
-  switch ($_SESSION['receiver'])
-  {
-    case "Taler":
-      $news = "https://taler.net/news";
-      break;
-    case "GNUnet":
-      $news = "https://gnunet.org/";
-      break;
-    case "Tor":
-      $news = "https://www.torproject.org/press/press.html.en";
-      break;
-  }
-  echo generate_msg($news);
-  die();
+  echo "<p>you do not have the session state for this contract: " . $hc . "</p>";
+  return;
 }
 
+if (true !== get($my_payment["is_payed"], false))
+{
+  echo "<p>you have not payed for this contract: " . $hc . "</p>";
+  return;
+}
+
+$news = false;
+switch ($_SESSION['receiver'])
+{
+  case "Taler":
+    $news = "https://taler.net/news";
+    break;
+  case "GNUnet":
+    $news = "https://gnunet.org/";
+    break;
+  case "Tor":
+    $news = "https://www.torproject.org/press/press.html.en";
+    break;
+}
+echo generate_msg($news);
 
 ?>
     </article>
