@@ -25,7 +25,7 @@
 
  */
 
-include 'util.php';
+include '../frontend_lib/util.php';
 
 function respond_success() {
   $_SESSION['payment_ok'] = true;

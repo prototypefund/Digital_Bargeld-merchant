@@ -22,6 +22,7 @@
  * 3. forward payment to backend
  */
 include("../frontend_lib/merchants.php");
+include("../frontend_lib/util.php");
 include("./blog_lib.php");
 
 session_start();
@@ -57,7 +58,8 @@ $resp = give_to_backend($_SERVER['HTTP_HOST'],
                         "backend/pay",
 			json_encode($complete_deposit_permission, JSON_PRETTY_PRINT));
 $status_code = $resp->getResponseCode();
-file_put_contents("/tmp/log", "gotten smth from backend, status: " . $status_code);
+
+
 // Our response code is the same we got from the backend:
 http_response_code ($status_code);
 // Now generate our body  
