@@ -3,6 +3,16 @@
 <head>
   <title>Taler's "Demo" Shop</title>
   <link rel="stylesheet" type="text/css" href="style.css">
+  <script type="application/javascript">
+  function executePayment(H_contract, pay_url) {
+    var detail = {
+      H_contract: H_contract,
+      pay_url: pay_url
+    };
+    var eve = new CustomEvent('taler-execute-payment', {detail: detail});
+    document.dispatchEvent(eve);
+  }
+  </script>
 </head>
 <body>
 
@@ -41,7 +51,8 @@
 
 include '../frontend_lib/util.php';
 
-function generate_msg ($link){
+function generate_msg ($link)
+{
   $msg = "<p>Thanks for donating to " . $_SESSION['receiver'] . ".</p>";
   if (false != $link)
     $msg .= "<p>Check our latest <a href=\"" . $link . "\">news!</a></p>";
@@ -64,7 +75,10 @@ $my_payment = get($payments[$hc]);
 
 if (null === $my_payment)
 {
+  $pay_url = url_rel("pay");
   echo "<p>you do not have the session state for this contract: " . $hc . "</p>";
+  echo "<p>Asking the wallet to re-execute it ... </p>";
+  echo "<script>executePayment('$hc', '$pay_url');</script?";
   return;
 }
 
