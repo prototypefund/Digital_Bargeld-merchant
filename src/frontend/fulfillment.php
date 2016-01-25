@@ -53,7 +53,7 @@ if (!$hc)
 {
   http_response_code(400);
   echo "<p>Bad request (UUID missing)</p>";
-  die();
+  return;
 }
 
 session_start();
