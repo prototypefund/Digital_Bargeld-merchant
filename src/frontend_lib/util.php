@@ -5,7 +5,7 @@ function get(&$var, $default=null) {
 }
 
 function &pull(&$arr, $idx, $default) {
-  if (!isset($arr[$idx]) {
+  if (!isset($arr[$idx])) {
     $arr[idx] = $default;
   }
   return $arr[$idx];
