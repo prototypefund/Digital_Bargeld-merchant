@@ -3,6 +3,7 @@
 <head>
   <title>Taler's "Demo" Shop</title>
   <link rel="stylesheet" type="text/css" href="style.css">
+  <script type="application/javascript" src="taler-presence.js">
   <script type="application/javascript">
   function executePayment(H_contract, pay_url) {
     var detail = {
@@ -81,7 +82,7 @@ if (null === $my_payment)
 
 if (true !== get($my_payment["is_payed"], false))
 {
-  $pay_url = url_rel("pay");
+  $pay_url = url_rel("pay", true);
   echo "<p>you have not payed for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";
   echo "<script>executePayment('$hc', '$pay_url');</script?";
