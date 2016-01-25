@@ -723,7 +723,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
         json_decref (root);
         return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
       }
-      
+
       {
         char *s;
         s = TALER_amount_to_string (&dc->percoin_amount);
@@ -738,10 +738,30 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
 
   /* Check if this payment attempt has already taken place */
-  if (GNUNET_OK == db->check_payment (db->cls, pc->transaction_id))
-    return TMH_RESPONSE_reply_external_error (connection, "payment already attempted");
+  if (GNUNET_OK == db->check_payment (db->cls,
+                                      pc->transaction_id))
+  {
+    struct MHD_Response *resp;
+    int ret;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Looking up chosen mint '%s'\n", pc->chosen_mint);
+    /* Payment succeeded in the past; take short cut
+       and accept immediately */
+    resp = MHD_create_response_from_buffer (0,
+                                            NULL,
+                                            MHD_RESPMEM_PERSISTENT);
+    ret = MHD_queue_response (connection,
+                              MHD_HTTP_OK,
+                              resp);
+    MHD_destroy_response (resp);
+    return ret;
+  }
+
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "payment already attempted");
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Looking up chosen mint '%s'\n",
+              pc->chosen_mint);
 
   /* Find the responsible mint, this may take a while... */
   pc->pending = pc->coins_cnt;
