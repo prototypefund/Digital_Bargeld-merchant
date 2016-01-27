@@ -610,7 +610,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     /* We are *done* processing the request, just queue the response (!) */
     if (UINT_MAX == pc->response_code)
       return MHD_NO; /* hard error */
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Queueing response for /pay.\n");
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Queueing response for /pay.\n");
     res = MHD_queue_response (connection,
                               pc->response_code,
                               pc->response);
@@ -637,6 +638,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     json_t *coins;
     json_t *coin;
     unsigned int coins_index;
+    struct TALER_MerchantSignatureP merchant_sig;
+    struct TALER_ContractPS cp;
     struct TMH_PARSE_FieldSpecification spec[] = {
       TMH_PARSE_member_array ("coins", &coins),
       TMH_PARSE_member_string ("mint", &pc->chosen_mint),
@@ -646,6 +649,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       TMH_PARSE_member_time_abs ("timestamp", &pc->timestamp),
       TMH_PARSE_member_time_abs ("refund_deadline", &pc->refund_deadline),
       TMH_PARSE_member_fixed ("H_contract", &pc->h_contract),
+      TMH_PARSE_member_fixed ("merchant_sig", &merchant_sig),
       TMH_PARSE_MEMBER_END
     };
 
@@ -659,7 +663,27 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
 
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Parsed JSON for /pay.\n");
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Parsed JSON for /pay.\n");
+    cp.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
+    cp.purpose.size = htonl (sizeof (struct TALER_ContractPS));
+    cp.transaction_id = GNUNET_htonll (pc->transaction_id);
+    TALER_amount_hton (&cp.total_amount,
+                       &pc->amount);
+    TALER_amount_hton (&cp.max_fee,
+                       &pc->max_fee);
+    cp.h_contract = pc->h_contract;
+    if (GNUNET_OK !=
+        GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_CONTRACT,
+                                    &cp.purpose,
+                                    &merchant_sig.eddsa_sig,
+                                    &pubkey.eddsa_pub))
+    {
+      GNUNET_break (0);
+      json_decref (root);
+      return TMH_RESPONSE_reply_external_error (connection,
+                                                "invalid merchant signature supplied");
+    }
 
     /* 'edate' is optional, if it is not present, generate it here; it
        will be timestamp plus the edate_delay supplied in config
