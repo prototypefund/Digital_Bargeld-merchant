@@ -90,7 +90,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param transaction_id the transaction id to search into
    * the db
    *
-   * @return GNUNET_OK if found, GNUNET_NO if not, GNUNET_SYSERR
+   * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
    * upon error
    */
   int
