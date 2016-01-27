@@ -283,6 +283,8 @@ TMH_PARSE_member_variable (const char *field,
 struct TMH_PARSE_FieldSpecification
 TMH_PARSE_member_string (const char *field,
                          char **out);
+
+
 /**
  * Generate line in parser specification for 64-bit integer
  * given as an integer in JSON.

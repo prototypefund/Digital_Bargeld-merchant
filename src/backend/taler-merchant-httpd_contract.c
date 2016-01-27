@@ -56,6 +56,15 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   int res;
   struct TALER_ContractPS contract;
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
+  struct TALER_Amount total;
+  struct TALER_Amount max_fee;
+  uint64_t transaction_id;
+  struct TMH_PARSE_FieldSpecification spec[] = {
+    TMH_PARSE_member_amount ("amount", &total),
+    TMH_PARSE_member_amount ("max_fee", &total),
+    TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
+    TMH_PARSE_MEMBER_END
+  };
 
   res = TMH_PARSE_post_json (connection,
                              connection_cls,
@@ -75,6 +84,15 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_internal_error (connection,
                                               "contract request malformed");
   }
+  /* extract fields we need to sign separately */
+  res = TMH_PARSE_json_data (connection,
+                             jcontract,
+                             spec);
+  if (GNUNET_NO == res)
+    return MHD_YES;
+  if (GNUNET_SYSERR == res)
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              "contract request malformed");
 
   /* add fields to the contract that the backend should provide */
   json_object_set (jcontract,
@@ -91,12 +109,18 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                        "merchant_pub",
 		       TALER_json_from_data (&pubkey,
                                              sizeof (pubkey)));
+
   /* create contract signature */
   GNUNET_assert (GNUNET_OK ==
                  TALER_hash_json (jcontract,
                                   &contract.h_contract));
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract.purpose.size = htonl (sizeof (contract));
+  contract.transaction_id = GNUNET_htonll (transaction_id);
+  TALER_amount_hton (&contract.total_amount,
+                     &total);
+  TALER_amount_hton (&contract.max_fee,
+                     &max_fee);
   GNUNET_CRYPTO_eddsa_sign (privkey,
                             &contract.purpose,
                             &contract_sig);
