@@ -77,6 +77,8 @@ $my_payment = get($payments[$hc]);
 if (null === $my_payment)
 {
   echo "<p>you do not have the session state for this contract: " . $hc . "</p>";
+  echo "<p>Asking the wallet to re-execute it ... </p>";
+  echo "<script>executePayment('$hc', '$pay_url');</script>";
   return;
 }
 

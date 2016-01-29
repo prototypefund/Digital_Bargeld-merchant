@@ -58,9 +58,10 @@ $contract = array(
     'value' => $amount_value,
     'fraction' => $amount_fraction,
     'currency' => $currency),
-  'max_fee' => array('value' => 3,
-  'fraction' => 01010,
-  'currency' => $currency),
+  'max_fee' => array(
+    'value' => 3,
+    'fraction' => 01010,
+    'currency' => $currency),
   'transaction_id' => $transaction_id,
   'products' => array(
     array(
