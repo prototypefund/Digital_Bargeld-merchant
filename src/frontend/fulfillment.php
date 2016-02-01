@@ -102,8 +102,10 @@ switch ($receiver)
 }
 
 $msg = "<p>Thanks for donating to " . $receiver . ".</p>";
-if (false != $link)
-  $msg .= "<p>Check our latest <a href=\"" . $link . "\">news!</a></p>";
+if ($news)
+{
+  $msg .= "<p>Check our latest <a href=\"" . $news . "\">news!</a></p>";
+}
 
 echo $msg;
 
