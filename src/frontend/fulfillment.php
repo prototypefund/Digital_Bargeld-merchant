@@ -74,6 +74,7 @@ session_start();
 $payments = get($_SESSION['payments'], array());
 $my_payment = get($payments[$hc]);
 
+// This will keep the query parameters.
 $pay_url = url_rel("pay.php");
 
 if (null === $my_payment)

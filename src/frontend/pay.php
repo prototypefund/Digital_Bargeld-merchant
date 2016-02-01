@@ -19,7 +19,6 @@
 include '../frontend_lib/util.php';
 
 $hc = get($_GET["uuid"]);
-
 if (empty($hc))
 {
   http_response_code(400);
@@ -30,20 +29,19 @@ if (empty($hc))
   return;
 }
 
-session_start();
-
-$payments = &pull($_SESSION, 'payments', array());
-
-if (!isset($payments[$hc]))
+// TODO: check if contract body matches URL parameters,
+// so we won't generate a response for the wrong receiver.
+$receiver = get($_GET["receiver"]);
+if (empty($receiver))
 {
   http_response_code(400);
   echo json_encode(array(
-    "error" => "no session active",
+    "error" => "missing parameter",
+    "parameter" => "receiver"
   ));
   return;
 }
 
-$my_payment = &$payments[$hc];
 
 $post_body = file_get_contents('php://input');
 $deposit_permission = json_decode ($post_body, true);
@@ -83,6 +81,12 @@ if ($status_code != 200)
   die();
 }
 
-$my_payment["is_payed"] = true;
+session_start();
+
+$payments = &pull($_SESSION, "payments", array());
+$payments[$hc] = array(
+  'receiver' => $receiver,
+  'is_payed' => true
+);
 
 ?>

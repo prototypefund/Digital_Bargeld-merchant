@@ -59,7 +59,8 @@ $fulfillment_url = url_rel("fulfillment.php")
   . '&receiver=' . urlencode($receiver)
   . '&aval=' . urlencode($amount_value)
   . '&afrac=' . urlencode($amount_fraction)
-  . '&acurr=' . urlencode($currency);
+  . '&acurr=' . urlencode($currency)
+  . '&tid=' . $transaction_id;
 
 // pack the JSON for the contract 
 $contract = array(
