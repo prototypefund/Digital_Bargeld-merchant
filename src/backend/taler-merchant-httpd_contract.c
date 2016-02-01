@@ -61,7 +61,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   uint64_t transaction_id;
   struct TMH_PARSE_FieldSpecification spec[] = {
     TMH_PARSE_member_amount ("amount", &total),
-    TMH_PARSE_member_amount ("max_fee", &total),
+    TMH_PARSE_member_amount ("max_fee", &max_fee),
     TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
     TMH_PARSE_MEMBER_END
   };
