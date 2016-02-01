@@ -63,7 +63,7 @@ $fulfillment_url = url_rel("fulfillment.php")
 
 // pack the JSON for the contract 
 $contract = array(
-  'fulfillment_url' => fulfillment_url,
+  'fulfillment_url' => $fulfillment_url,
   'amount' => array(
     'value' => $amount_value,
     'fraction' => $amount_fraction,
