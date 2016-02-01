@@ -52,14 +52,6 @@
 
 include '../frontend_lib/util.php';
 
-function generate_msg ($link)
-{
-  $msg = "<p>Thanks for donating to " . $_SESSION['receiver'] . ".</p>";
-  if (false != $link)
-    $msg .= "<p>Check our latest <a href=\"" . $link . "\">news!</a></p>";
-  return $msg;
-}
-
 $hc = get($_GET["uuid"]);
 
 if (empty($hc))
@@ -93,8 +85,10 @@ if (true !== get($my_payment["is_payed"], false))
   return;
 }
 
+$receiver = $my_payment["receiver"];
+
 $news = false;
-switch ($_SESSION['receiver'])
+switch ($receiver)
 {
   case "Taler":
     $news = "https://taler.net/news";
@@ -106,7 +100,12 @@ switch ($_SESSION['receiver'])
     $news = "https://www.torproject.org/press/press.html.en";
     break;
 }
-echo generate_msg($news);
+
+$msg = "<p>Thanks for donating to " . $receiver . ".</p>";
+if (false != $link)
+  $msg .= "<p>Check our latest <a href=\"" . $link . "\">news!</a></p>";
+
+echo $msg;
 
 ?>
     </article>
