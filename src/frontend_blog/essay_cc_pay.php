@@ -11,7 +11,7 @@ if (!isset($_SESSION['allowed_articles']))
   $_SESSION['allowed_articles'] = array ($article => true);
 else $_SESSION['allowed_articles'] = array_merge($_SESSION['allowed_articles'], array ($article => true));
 http_response_code (301);
-$url =  'http://' . $_SERVER['HTTP_HOST'] . "/essay_fulfillment.php?article=$article";
+$url =  'http://' . $_SERVER['HTTP_HOST'] . "/essay_cc_fulfillment.php?article=$article";
 header("Location: " . $url);
 echo $url;
 die();

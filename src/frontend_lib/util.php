@@ -12,6 +12,7 @@ function &pull(&$arr, $idx, $default) {
 }
 
 function url_join($base, $path, $strip=false) {
+  file_put_contents('/tmp/debug2', "Iteration:\n" . $base . "\n" . $path . "\n" . $strip, FILE_APPEND);
   $flags = $strip ? (http\Url::STRIP_PATH|http\URL::STRIP_QUERY) : 0;
   return (new http\URL($base, null, $flags))
     ->mod(array ("path" => $path), http\Url::JOIN_PATH|http\URL::SANITIZE_PATH)

@@ -24,6 +24,7 @@
  *
  */
 include("../frontend_lib/merchants.php");
+include("../frontend_lib/util.php");
 include("./blog_lib.php");
 session_start();
 if (!isset($_GET['article'])){
@@ -42,18 +43,30 @@ $teatax = array ('value' => 1,
 		 'currency' => "KUDOS");
 $now = new DateTime('now');
 $teaser = get_teaser($article);
-$pay_url = "essay_pay.php";
-$exec_url = "execute.php";
-$contract_json = generate_contract(1,
-                                   0,
-				   "KUDOS",
+
+$amount_value = 1;
+$amount_fraction = 0;
+$currency = "KUDOS";
+$transaction_id = rand(0, 1001);
+// Include all information so we can
+// restore the contract without storing it
+$fulfillment_url = url_rel("essay_fulfillment.php")
+  . '?uuid=${H_contract}'
+  . '&article=' . urlencode($article)
+  . '&aval=' . urlencode($amount_value)
+  . '&afrac=' . urlencode($amount_fraction)
+  . '&acurr=' . urlencode($currency)
+  . '&tid=' . $transaction_id;
+file_put_contents("/tmp/debg1", $fulfillment_url);
+$contract_json = generate_contract($amount_value,
+                                   $amount_fraction,
+				   $currency,
 				   $transaction_id,
 				   trim($teaser->nodeValue),
 				   $p_id,
 				   $teatax,
 				   $now,
-				   $pay_url,
-				   $exec_url);
+				   $fulfillment_url);
 $resp = give_to_backend($_SERVER["HTTP_HOST"],
                         "backend/contract",
 	                $contract_json);
