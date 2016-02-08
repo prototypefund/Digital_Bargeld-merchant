@@ -26,62 +26,57 @@ include("../frontend_lib/util.php");
 include("./blog_lib.php");
 
 session_start();
-if (!isset($_SESSION['H_contract']))
+
+$hc = get($_GET["uuid"]);
+if (empty($hc))
 {
-  echo "No session active.";
-  http_response_code (301);
+  http_response_code(400);
+  echo json_encode(array(
+    "error" => "missing parameter",
+    "parameter" => "uuid"
+  ));
   return;
 }
 
-if (isset($_SESSION['payment_ok']) && $_SESSION['payment_ok'] == true)
+// TODO: check if contract body matches URL parameters,
+// so we won't generate a response for the wrong receiver.
+$article = get($_GET["article"]);
+if (empty($article))
 {
-  $_SESSION['payment_ok'] = true;
-  http_response_code (301);
-  $url = (new http\URL($_SERVER['REQUEST_SCHEME'].'://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
-    ->mod(array ("path" => "essay_fulfillment.php?article=".$_SESSION['article']), http\Url::JOIN_PATH);
-  header("Location: $url");
-  die();
+  http_response_code(400);
+  echo json_encode(array(
+    "error" => "missing parameter",
+    "parameter" => "article"
+  ));
+  return;
 }
 
-$article = $_SESSION['article'];
-$post_body = file_get_contents('php://input');
-$deposit_permission = json_decode ($post_body, true);
-$to_add = array('max_fee' => array('value' => 3,
-                                   'fraction' => 8,
-                                   'currency' => $_SESSION['article_currency']),
-                'amount' => array('value' => $_SESSION['article_value'],
-                                  'fraction' => $_SESSION['article_fraction'],
-		                  'currency' => $_SESSION['article_currency']));
-$complete_deposit_permission = array_merge($deposit_permission, $to_add);
-
+$deposit_permission = file_get_contents('php://input');
+file_put_contents('/tmp/pay.dbg', 'about to pay', FILE_APPEND);
 $resp = give_to_backend($_SERVER['HTTP_HOST'],
                         "backend/pay",
-			json_encode($complete_deposit_permission, JSON_PRETTY_PRINT));
+			$deposit_permission);
 $status_code = $resp->getResponseCode();
-
 
 // Our response code is the same we got from the backend:
 http_response_code ($status_code);
 // Now generate our body  
 if ($status_code != 200)
 {
-  /* error: just forwarding to the wallet what
-    gotten from the backend (which is forwarding 'as is'
-    the error gotten from the mint) */
-  echo json_encode ($new_deposit_permission);
-  echo "Error came from the backend, payment undone. Status $status_code\n";
-  echo "\n";
-  echo $resp->body->toString ();
-}
-else
-{
-  $_SESSION['payment_ok'] = true;
-  if (!isset($_SESSION['allowed_articles']))
-    $_SESSION['allowed_articles'] = array ($article => true);
-  else $_SESSION['allowed_articles'] = array_merge($_SESSION['allowed_articles'], array ($article => true));
-  http_response_code (301);
-  $url = (new http\URL($_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']))
-    ->mod(array ("path" => "essay_fulfillment.php?article=$article"), http\Url::JOIN_PATH);
-  header("Location: $url");
+  $json = json_encode(
+    array(
+      "error" => "backend error",
+      "status" => $status_code,
+      "detail" => $resp->body->toString()));
+  echo $json;
   die();
 }
+
+session_start();
+
+$payments = &pull($_SESSION, "payments", array());
+$payments[$hc] = array(
+  'article' => $article,
+  'is_payed' => true
+);
+?>

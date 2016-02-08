@@ -61,7 +61,7 @@ function generate_contract($amount_value,
   							             'region' => 'Test Region',
   								     'province' => 'Test Province',
   								     'ZIP code' => 4908)));
-  $json = json_encode (array ('contract' => $contract, 'exec_url' => $exec_url, 'pay_url' => $pay_url), JSON_PRETTY_PRINT);
+  $json = json_encode (array ('contract' => $contract, JSON_PRETTY_PRINT));
   return $json;
 }
 

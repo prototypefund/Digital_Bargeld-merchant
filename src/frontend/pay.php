@@ -42,7 +42,6 @@ if (empty($receiver))
   return;
 }
 
-
 $post_body = file_get_contents('php://input');
 $deposit_permission = json_decode ($post_body, true);
 

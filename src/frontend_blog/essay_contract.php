@@ -51,13 +51,12 @@ $transaction_id = rand(0, 1001);
 // Include all information so we can
 // restore the contract without storing it
 $fulfillment_url = url_rel("essay_fulfillment.php")
-  . '?uuid=${H_contract}'
-  . '&article=' . urlencode($article)
+  . '&uuid=${H_contract}' //<= super weird: that should be a '?', not '&', but works
   . '&aval=' . urlencode($amount_value)
   . '&afrac=' . urlencode($amount_fraction)
   . '&acurr=' . urlencode($currency)
   . '&tid=' . $transaction_id;
-file_put_contents("/tmp/debg1", $fulfillment_url);
+//file_put_contents("/tmp/debg1", $fulfillment_url);
 $contract_json = generate_contract($amount_value,
                                    $amount_fraction,
 				   $currency,
@@ -78,15 +77,22 @@ http_response_code ($status_code);
 // Now generate our body  
 if ($status_code != 200)
 {
-  echo "Error while generating the contract";
-  echo $resp->body->toString ();
+  echo json_encode(array(
+    'error' => "internal error",
+    'hint' => "backend indicated error",
+    'detail' => $resp->body->toString()
+  ), JSON_PRETTY_PRINT);
 }
 else
-{ $got_json = json_decode ($resp->body->toString ());
-  $_SESSION['H_contract'] = $got_json->H_contract;
-  $_SESSION['article_value'] = 1;
-  $_SESSION['article_fraction'] = 0;
-  $_SESSION['article_currency'] = "KUDOS";
-  echo $resp->body->toString ();
+{
+  $got_json = json_decode($resp->body->toString(), true);
+  $hc = $got_json["H_contract"];
+
+  $payments = &pull($_SESSION, "payments", array());
+  $payments[$hc] = array(
+    'article' => $article,
+  );
+
+  echo json_encode ($got_json, JSON_PRETTY_PRINT);
 }
 ?>

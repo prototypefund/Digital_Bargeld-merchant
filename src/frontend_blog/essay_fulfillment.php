@@ -52,6 +52,7 @@
  */
 
 include '../frontend_lib/util.php';
+include './blog_lib.php';
 
 $hc = get($_GET["uuid"]);
 
@@ -85,34 +86,15 @@ if (null === $my_payment)
 if (true !== get($my_payment["is_payed"], false))
 {
   echo "<p>you have not payed for this contract: " . $hc . "</p>";
-  echo "<p>Asking the wallet to re-execute it ... </p>";
+  echo "<p>Asking the wallet to re-execute it ... at $pay_url </p>";
   echo "<script>executePayment('$hc', '$pay_url');</script>";
   return;
 }
 
 $article = $my_payment["article"];
 
-$news = false;
-switch ($receiver)
-{
-  case "Taler":
-    $news = "https://taler.net/news";
-    break;
-  case "GNUnet":
-    $news = "https://gnunet.org/";
-    break;
-  case "Tor":
-    $news = "https://www.torproject.org/press/press.html.en";
-    break;
-}
-
-$msg = "<p>Thanks for donating to " . $receiver . ".</p>";
-if ($news)
-{
-  $msg .= "<p>Check our latest <a href=\"" . $news . "\">news!</a></p>";
-}
-
-echo $msg;
+$article_doc = get_article($article);
+echo $article_doc->saveHTML();
 
 ?>
     </article>
