@@ -91,6 +91,8 @@ if (true !== get($my_payment["is_payed"], false))
   return;
 }
 
+// control here = article payed
+
 $article = $my_payment["article"];
 
 $article_doc = get_article($article);
