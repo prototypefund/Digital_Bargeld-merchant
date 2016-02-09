@@ -32,8 +32,6 @@ if (!isset($_GET['article'])){
   die();
   }
 $article = $_GET['article'];
-$_SESSION['article'] = $article;
-// 2 to-do
 
 // send contract
 $transaction_id = rand(0, 1001);

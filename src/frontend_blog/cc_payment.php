@@ -44,7 +44,7 @@
              <input type="radio" name="gender">Female</input><br>
     </form>
     <?php
-      echo "<form method=\"post\" action=\"essay_cc_pay.php?article=$article\"><input type=\"submit\"></input></form>";
+      echo "<form method=\"post\" action=\"essay_cc_pay-fulfillment.php?article=$article\"><input type=\"submit\"></input></form>";
     ?>
     </article>
   </section>
