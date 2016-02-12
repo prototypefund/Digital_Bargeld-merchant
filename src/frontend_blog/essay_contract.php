@@ -27,11 +27,11 @@ include("../frontend_lib/merchants.php");
 include("../frontend_lib/util.php");
 include("./blog_lib.php");
 session_start();
-if (!isset($_GET['article'])){
+$article = get($_GET['article']);
+if (null == $article){
   echo "Please land here just to buy articles";
   die();
   }
-$article = $_GET['article'];
 
 // send contract
 $transaction_id = rand(0, 1001);
@@ -49,11 +49,7 @@ $transaction_id = rand(0, 1001);
 // Include all information so we can
 // restore the contract without storing it
 $fulfillment_url = url_rel("essay_fulfillment.php")
-  . '&uuid=${H_contract}' //<= super weird: that should be a '?', not '&', but works
-  . '&aval=' . urlencode($amount_value)
-  . '&afrac=' . urlencode($amount_fraction)
-  . '&acurr=' . urlencode($currency)
-  . '&tid=' . $transaction_id;
+  . '&uuid=${H_contract}'; //<= super weird: that should be a '?', not '&', but works
 //file_put_contents("/tmp/debg1", $fulfillment_url);
 $contract_json = generate_contract($amount_value,
                                    $amount_fraction,

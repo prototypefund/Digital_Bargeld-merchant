@@ -52,10 +52,11 @@ if (empty($article))
 }
 
 $deposit_permission = file_get_contents('php://input');
-file_put_contents('/tmp/pay.dbg', 'about to pay', FILE_APPEND);
+file_put_contents('/tmp/pay.dbg', 'about to pay\n', FILE_APPEND);
 $resp = give_to_backend($_SERVER['HTTP_HOST'],
                         "backend/pay",
 			$deposit_permission);
+file_put_contents('/tmp/pay.dbg', 'backend respd\n', FILE_APPEND);
 $status_code = $resp->getResponseCode();
 
 // Our response code is the same we got from the backend:

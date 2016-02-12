@@ -63,6 +63,13 @@ if (empty($hc))
   return;
 }
 
+$article = get($_GET["article"]);
+if (null == $article){
+  http_response_code(400);
+  echo "<p>Bad request (article missing)</p>";
+  return;
+}
+
 session_start();
 
 $payments = get($_SESSION['payments'], array());
@@ -70,28 +77,17 @@ $my_payment = get($payments[$hc]);
 
 // This will keep the query parameters.
 $pay_url = url_rel("essay_pay.php");
+$offering_url = url_rel("essay_offer.php");
+$offering_url .= "?article=" . $_GET["article"];
 
-/*
-FIXME: in the blog's case, that should be just the homepage
-$offering_url = url_rel("checkout.php", true);
-
-if (null === $my_payment)
+if (true !== get($my_payment["is_payed"], false) || null === $my_payment)
 {
-  echo "<p>you do not have the session state for this contract: " . $hc . "</p>";
-  echo "<p>Asking the wallet to re-execute it ... </p>";
+  echo "<p>Paying ... at $pay_url </p>";
   echo "<script>executePayment('$hc', '$pay_url', '$offering_url');</script>";
-  return;
-}*/
-
-if (true !== get($my_payment["is_payed"], false))
-{
-  echo "<p>you have not payed for this contract: " . $hc . "</p>";
-  echo "<p>Asking the wallet to re-execute it ... at $pay_url </p>";
-  echo "<script>executePayment('$hc', '$pay_url');</script>";
   return;
 }
 
-// control here = article payed
+// control here == article payed
 
 $article = $my_payment["article"];
 

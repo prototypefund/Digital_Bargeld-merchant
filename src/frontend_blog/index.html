@@ -139,7 +139,7 @@ function has_taler_wallet_cb(aEvent)
   var articles_links = document.getElementsByClassName("read-more");
   for(var i=0; i < articles_links.length; i++)
     //console.log(link);
-    articles_links[i].setAttribute("href", "javascript:taler_pay(\"" + articles_links[i].id + "\")");
+    articles_links[i].setAttribute("href", "/essay_offer.php?article=" + articles_links[i].id);
 };
 
 /* Function called when the Taler extension was unloaded;
