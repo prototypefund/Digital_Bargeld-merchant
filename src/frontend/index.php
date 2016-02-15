@@ -4,7 +4,7 @@ require_once "../frontend_lib/config.php";
 ?>
 <html lang="en">
 <head>
-  <title>Toy &quot;Store&quot; - Taler Demo</title>
+  <title>Taler Donation Demo</title>
   <link rel="stylesheet" type="text/css" href="style.css">
   <script src="taler-presence.js" type="text/javascript"></script>
 <script type="text/javascript">
@@ -51,7 +51,7 @@ echo "\tvar shop_currency = '$SHOP_CURRENCY';\n";
 
   <section id="main">
     <article>
-      <h1>Welcome to the Taler Demo Shop</h1>
+      <h1>Welcome to the Taler Donation Demo</h1>
 
       <p>This "toy" website provides you with the ability to
         experience using the

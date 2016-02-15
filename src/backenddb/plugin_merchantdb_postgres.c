@@ -158,21 +158,21 @@ postgres_store_payment (void *cls,
   PGresult *res;
   ExecStatusType status;
 
-  struct TALER_PQ_QueryParam params[] = {
-    TALER_PQ_query_param_auto_from_type (h_contract),
-    TALER_PQ_query_param_auto_from_type (h_wire),
-    TALER_PQ_query_param_uint64 (&transaction_id),
-    TALER_PQ_query_param_absolute_time (&timestamp),
-    TALER_PQ_query_param_absolute_time (&refund),
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract),
+    GNUNET_PQ_query_param_auto_from_type (h_wire),
+    GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_absolute_time (&timestamp),
+    GNUNET_PQ_query_param_absolute_time (&refund),
     TALER_PQ_query_param_amount (amount_without_fee),
-    TALER_PQ_query_param_auto_from_type (coin_pub),
+    GNUNET_PQ_query_param_auto_from_type (coin_pub),
     TALER_PQ_query_param_json (mint_proof),
-    TALER_PQ_query_param_end
+    GNUNET_PQ_query_param_end
   };
 
-  res = TALER_PQ_exec_prepared (pg->conn,
-                                "insert_payment",
-                                params);
+  res = GNUNET_PQ_exec_prepared (pg->conn,
+                                 "insert_payment",
+                                 params);
   status = PQresultStatus (res);
 
   if (PGRES_COMMAND_OK != status)
@@ -224,13 +224,13 @@ postgres_check_payment(void *cls,
   PGresult *res;
   ExecStatusType status;
 
-  struct TALER_PQ_QueryParam params[] = {
-    TALER_PQ_query_param_uint64 (&transaction_id),
-    TALER_PQ_query_param_end
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_end
   };
-  res = TALER_PQ_exec_prepared (pg->conn,
-                                "check_payment",
-				params);
+  res = GNUNET_PQ_exec_prepared (pg->conn,
+                                 "check_payment",
+                                 params);
   
   status = PQresultStatus (res);
   if (PGRES_TUPLES_OK != status)
