@@ -16,6 +16,7 @@
  */
 
 include '../frontend_lib/util.php';
+include "../frontend_lib/config.php";
 
 session_start();
 

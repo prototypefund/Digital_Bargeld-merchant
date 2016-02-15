@@ -115,7 +115,7 @@ require_once "../frontend_lib/config.php";
               <option value="6.0">5 <?php echo $MERCHANT_CURRENCY; ?> (*)</option>
               <option value="10.0">10 <?php echo $MERCHANT_CURRENCY; ?></option>
             </select>
-            <input type="hidden" name="donation_currency" value="KUDOS"/>
+            <input type="hidden" name="donation_currency" value=<?php echo $MERCHANT_CURRENCY; ?>/>
             <input type="submit" name="keyName" value="Donate!"/>
             <br>
             <br>
