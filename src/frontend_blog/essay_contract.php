@@ -36,15 +36,15 @@ if (null == $article){
 // send contract
 $transaction_id = rand(0, 1001);
 $p_id = hexdec(substr(sha1($article), -5));
-$teatax = array ('value' => 1,
-                 'fraction' => 0,
-		 'currency' => "KUDOS");
+
 $now = new DateTime('now');
 $teaser = get_teaser($article);
-
-$amount_value = 1;
-$amount_fraction = 0;
-$currency = "KUDOS";
+$amount_value = 0;
+$amount_fraction = 50000;
+$currency = "EUR";
+$teatax = array ('value' => 1,
+                 'fraction' => 0,
+		 'currency' => $currency);
 $transaction_id = rand(0, 1001);
 // Include all information so we can
 // restore the contract without storing it
