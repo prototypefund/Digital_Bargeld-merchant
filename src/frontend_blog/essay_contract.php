@@ -25,6 +25,7 @@
  */
 include("../frontend_lib/merchants.php");
 include("../frontend_lib/util.php");
+include("../frontend_lib/config.php");
 include("./blog_lib.php");
 session_start();
 $article = get($_GET['article']);
@@ -41,10 +42,9 @@ $now = new DateTime('now');
 $teaser = get_teaser($article);
 $amount_value = 0;
 $amount_fraction = 50000;
-$currency = "EUR";
 $teatax = array ('value' => 1,
                  'fraction' => 0,
-		 'currency' => $currency);
+		 'currency' => $MERCHANT_CURRENCY);
 $transaction_id = rand(0, 1001);
 // Include all information so we can
 // restore the contract without storing it
@@ -53,7 +53,7 @@ $fulfillment_url = url_rel("essay_fulfillment.php")
 //file_put_contents("/tmp/debg1", $fulfillment_url);
 $contract_json = generate_contract($amount_value,
                                    $amount_fraction,
-				   $currency,
+				   $MERCHANT_CURRENCY,
 				   $transaction_id,
 				   trim($teaser->nodeValue),
 				   $p_id,

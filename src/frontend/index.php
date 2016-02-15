@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<?php
+require_once "../frontend_lib/config.php";
+?>
 <html lang="en">
 <head>
   <title>Toy &quot;Store&quot; - Taler Demo</title>
@@ -107,10 +110,10 @@
             <input type="radio" name="donation_receiver" value="GNUnet">GNUnet</input>
             <br>
             <select id="taler-donation" name="donation_amount">
-              <option value="0.1">0.1 KUDOS</option>
-              <option value="1.0">1 KUDOS</option>
-              <option value="6.0">5 KUDOS (*)</option>
-              <option value="10.0">10 KUDOS</option>
+              <option value="0.1">0.1 <?php echo $MERCHANT_CURRENCY; ?></option>
+              <option value="1.0">1 <?php echo $MERCHANT_CURRENCY; ?></option>
+              <option value="6.0">5 <?php echo $MERCHANT_CURRENCY; ?> (*)</option>
+              <option value="10.0">10 <?php echo $MERCHANT_CURRENCY; ?></option>
             </select>
             <input type="hidden" name="donation_currency" value="KUDOS"/>
             <input type="submit" name="keyName" value="Donate!"/>

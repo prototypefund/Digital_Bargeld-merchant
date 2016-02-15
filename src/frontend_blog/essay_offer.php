@@ -1,13 +1,30 @@
 <!DOCTYPE html>
 <html>
-<head>
-<script type="text/javascript">
+<body onload="signal_taler_wallet_onload()">
+<?php
   
+  include("../frontend_lib/merchants.php");
+  include("../frontend_lib/util.php");
+  include("./blog_lib.php");
+  session_start();
+  $article = get($_GET['article']);
+  if (null == $article){
+    echo "Please land here just to buy articles";
+    die();
+    }
+  echo "<h3>No Taler installed</h3>";
+  echo "<p>activate it or pay by <a href='/cc_payment.php?article=$article'>credit card</a></p>";
+  echo "<p id=article-name style='display: none;'>$article</input>";
+?>
+</body>
+<script type="text/javascript">
+
   function handle_contract(json_contract) {
     var cEvent = new CustomEvent('taler-contract',
                                  {detail: json_contract});
     document.dispatchEvent(cEvent);
   };
+
   function get_contract(article) {
   var contract_request = new XMLHttpRequest();
 
@@ -32,22 +49,29 @@
           + contract_request.statusText);
   };
   contract_request.send();
-}
-</script>
-</head>
-<body>
-<?php
+  }
+
+  function has_taler_wallet_cb(aEvent)
+  {
+    var article = document.getElementById('article-name');
+    get_contract(article.firstChild.nodeValue); 
+  };
   
-  include("../frontend_lib/merchants.php");
-  include("../frontend_lib/util.php");
-  include("./blog_lib.php");
-  session_start();
-  $article = get($_GET['article']);
-  if (null == $article){
-    echo "Please land here just to buy articles";
-    die();
-    }
-  echo "<script>get_contract('$article');</script>"
-?>
-</body>
+  function signal_taler_wallet_onload()
+  {
+    var eve = new Event('taler-probe');
+    document.dispatchEvent(eve);
+  };
+  
+  document.addEventListener("taler-wallet-present",
+                            has_taler_wallet_cb,
+  			  false);
+  
+  // Register event to be triggered by the wallet when it gets enabled while
+  // the user is on the payment page
+  document.addEventListener("taler-load",
+                            signal_taler_wallet_onload,
+  			  false);
+
+</script>
 </html>
