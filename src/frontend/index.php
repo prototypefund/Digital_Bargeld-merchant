@@ -134,18 +134,9 @@ echo "\tvar shop_currency = '$SHOP_CURRENCY';\n";
             <input type="radio" name="donation_receiver" value="GNUnet">GNUnet</input>
             <br>
             <select id="taler-donation" name="donation_amount">
-<<<<<<< HEAD:src/frontend/index.php
-              <option value="0.1">0.1 <?php echo $MERCHANT_CURRENCY; ?></option>
-              <option value="1.0">1 <?php echo $MERCHANT_CURRENCY; ?></option>
-              <option value="6.0">5 <?php echo $MERCHANT_CURRENCY; ?> (*)</option>
-              <option value="10.0">10 <?php echo $MERCHANT_CURRENCY; ?></option>
-            </select>
-            <input type="hidden" name="donation_currency" value=<?php echo $MERCHANT_CURRENCY; ?>/>
-=======
               <!-- options will be added dynamically -->
             </select>
             <input id="currency-input" type="hidden" name="donation_currency"/>
->>>>>>> 57e59c69c1196ae882f02f2b9747cdae52491549:src/frontend/index.php
             <input type="submit" name="keyName" value="Donate!"/>
             <br>
             <br>
