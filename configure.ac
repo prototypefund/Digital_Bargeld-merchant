@@ -74,12 +74,12 @@ AS_CASE([$with_mint],
 CPPFLAGS="$CPPFLAGS $POSTGRESQL_CPPFLAGS"
 LDFLAGS="$LDFLAGS -L/usr/local/lib"
 
-AC_CHECK_HEADERS([taler/taler_pq_lib.h],
- [AC_CHECK_LIB([talerpq], [TALER_PQ_exec_prepared], libtalerpq=1)],
+AC_CHECK_HEADERS([gnunet/gnunet_pq_lib.h],
+ [AC_CHECK_LIB([gnunetpq], [GNUNET_PQ_exec_prepared], libgnunetpq=1)],
    [], [#ifdef HAVE_GNUNET_PLATFORM_H
         #include <gnunet/platform.h>
        #endif])
-AM_CONDITIONAL(HAVE_TALERPQ, test x$libtalerpq = x1)
+AM_CONDITIONAL(HAVE_GNUNETPQ, test x$libgnunetpq = x1)
 
 
 # check for libmicrohttpd
