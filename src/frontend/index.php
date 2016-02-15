@@ -6,8 +6,32 @@ require_once "../frontend_lib/config.php";
 <head>
   <title>Toy &quot;Store&quot; - Taler Demo</title>
   <link rel="stylesheet" type="text/css" href="style.css">
-  <script src="taler-presence.js" type="text/javascript">
-  </script>
+  <script src="taler-presence.js" type="text/javascript"></script>
+<script type="text/javascript">
+<?php
+echo "\tvar shop_currency = '$SHOP_CURRENCY';\n";
+?>
+
+  function addOption(value, label) {
+    var s = document.getElementById("taler-donation");
+    let e = document.createElement("option");
+    e.textContent = label ? label : ("".concat(value, " ", shop_currency));
+    e.value = value;
+    s.appendChild(e);
+  }
+
+  function init() {
+    let e = document.getElementById("currency-input"); 
+    e.value = shop_currency;
+    addOption("0.1");
+    addOption("1.0");
+    addOption("6.0", "".concat(5, " ", shop_currency));
+    addOption("10");
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  
+</script>
 </head>
 
 <body>
@@ -110,12 +134,18 @@ require_once "../frontend_lib/config.php";
             <input type="radio" name="donation_receiver" value="GNUnet">GNUnet</input>
             <br>
             <select id="taler-donation" name="donation_amount">
+<<<<<<< HEAD:src/frontend/index.php
               <option value="0.1">0.1 <?php echo $MERCHANT_CURRENCY; ?></option>
               <option value="1.0">1 <?php echo $MERCHANT_CURRENCY; ?></option>
               <option value="6.0">5 <?php echo $MERCHANT_CURRENCY; ?> (*)</option>
               <option value="10.0">10 <?php echo $MERCHANT_CURRENCY; ?></option>
             </select>
             <input type="hidden" name="donation_currency" value=<?php echo $MERCHANT_CURRENCY; ?>/>
+=======
+              <!-- options will be added dynamically -->
+            </select>
+            <input id="currency-input" type="hidden" name="donation_currency"/>
+>>>>>>> 57e59c69c1196ae882f02f2b9747cdae52491549:src/frontend/index.php
             <input type="submit" name="keyName" value="Donate!"/>
             <br>
             <br>

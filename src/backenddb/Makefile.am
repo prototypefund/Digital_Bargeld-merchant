@@ -4,7 +4,7 @@ AM_CPPFLAGS = -I$(top_srcdir)/src/include
 plugindir = $(libdir)/taler
 
 if HAVE_POSTGRESQL
-if HAVE_TALERPQ
+if HAVE_GNUNETPQ
 plugin_LTLIBRARIES = \
   libtaler_plugin_merchantdb_postgres.la
 endif
@@ -32,7 +32,7 @@ libtaler_plugin_merchantdb_postgres_la_LIBADD = \
   $(LTLIBINTL)
 libtaler_plugin_merchantdb_postgres_la_LDFLAGS = \
   $(TALER_PLUGIN_LDFLAGS) \
-  -ltalerpq \
+  -lgnunetpq \
   -ltalerutil \
   -lpq \
   -lgnunetpostgres \
