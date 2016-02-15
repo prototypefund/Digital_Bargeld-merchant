@@ -19,6 +19,7 @@ libtalermerchantdb_la_SOURCES = \
 libtalermerchantdb_la_LIBADD = \
   $(LIBGCRYPT_LIBS) \
   -ltalerutil \
+  -ltalerpq \
   -lgnunetutil
 
 libtalermerchantdb_la_LDFLAGS = \

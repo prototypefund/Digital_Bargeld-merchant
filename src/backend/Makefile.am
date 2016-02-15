@@ -18,6 +18,7 @@ taler_merchant_httpd_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   -ltalermint \
   -ltalerutil \
+  -ltalerpq \
   -lmicrohttpd \
   -ljansson \
   -lgnunetutil
