@@ -5,10 +5,11 @@
   <link rel="stylesheet" type="text/css" href="style.css">
   <script type="application/javascript" src="taler-presence.js"></script>
   <script type="application/javascript">
-  function executePayment(H_contract, pay_url) {
+  function executePayment(H_contract, pay_url, offering_url) {
     var detail = {
       H_contract: H_contract,
-      pay_url: pay_url
+      pay_url: pay_url,
+      offering_url: offering_url
     };
     var eve = new CustomEvent('taler-execute-payment', {detail: detail});
     document.dispatchEvent(eve);
@@ -52,14 +53,6 @@
 
 include '../frontend_lib/util.php';
 
-function generate_msg ($link)
-{
-  $msg = "<p>Thanks for donating to " . $_SESSION['receiver'] . ".</p>";
-  if (false != $link)
-    $msg .= "<p>Check our latest <a href=\"" . $link . "\">news!</a></p>";
-  return $msg;
-}
-
 $hc = get($_GET["uuid"]);
 
 if (empty($hc))
@@ -74,23 +67,31 @@ session_start();
 $payments = get($_SESSION['payments'], array());
 $my_payment = get($payments[$hc]);
 
+// This will keep the query parameters.
+$pay_url = url_rel("pay.php");
+
+$offering_url = url_rel("checkout.php", true);
+
 if (null === $my_payment)
 {
   echo "<p>you do not have the session state for this contract: " . $hc . "</p>";
+  echo "<p>Asking the wallet to re-execute it ... </p>";
+  echo "<script>executePayment('$hc', '$pay_url', '$offering_url');</script>";
   return;
 }
 
 if (true !== get($my_payment["is_payed"], false))
 {
-  $pay_url = url_rel("pay.php");
   echo "<p>you have not payed for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";
   echo "<script>executePayment('$hc', '$pay_url');</script>";
   return;
 }
 
+$receiver = $my_payment["receiver"];
+
 $news = false;
-switch ($_SESSION['receiver'])
+switch ($receiver)
 {
   case "Taler":
     $news = "https://taler.net/news";
@@ -102,7 +103,14 @@ switch ($_SESSION['receiver'])
     $news = "https://www.torproject.org/press/press.html.en";
     break;
 }
-echo generate_msg($news);
+
+$msg = "<p>Thanks for donating to " . $receiver . ".</p>";
+if ($news)
+{
+  $msg .= "<p>Check our latest <a href=\"" . $news . "\">news!</a></p>";
+}
+
+echo $msg;
 
 ?>
     </article>

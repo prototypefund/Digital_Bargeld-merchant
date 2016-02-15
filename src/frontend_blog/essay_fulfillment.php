@@ -1,20 +1,101 @@
-<?php
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Taler's "Demo" Shop</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <script type="application/javascript" src="taler-presence.js"></script>
+  <script type="application/javascript">
+  function executePayment(H_contract, pay_url, offering_url) {
+    var detail = {
+      H_contract: H_contract,
+      pay_url: pay_url,
+      offering_url: offering_url
+    };
+    var eve = new CustomEvent('taler-execute-payment', {detail: detail});
+    document.dispatchEvent(eve);
+  }
+  </script>
+</head>
+<body>
 
-include("./blog_lib.php");
-session_start();
-if (!isset($_GET['article'])){
+  <header>
+    <div id="logo">
+      <svg height="100" width="100">
+        <circle cx="50" cy="50" r="40" stroke="darkcyan" stroke-width="6" fill="white" />
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
+      </svg>
+    </div>
+
+    <h1>Toy Store - Product Page</h1>
+  </header>
+
+  <aside class="sidebar" id="left">
+  </aside>
+
+  <section id="main">
+    <article>
+<?php
+/*
+  This file is part of GNU TALER.
+  Copyright (C) 2014, 2015 GNUnet e.V.
+
+  TALER is free software; you can redistribute it and/or modify it under the
+  terms of the GNU Lesser General Public License as published by the Free Software
+  Foundation; either version 2.1, or (at your option) any later version.
+
+  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+  A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License along with
+  TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
+ */
+
+include '../frontend_lib/util.php';
+include './blog_lib.php';
+
+$hc = get($_GET["uuid"]);
+
+if (empty($hc))
+{
   http_response_code(400);
-  echo "No article specified";
-  die();
+  echo "<p>Bad request (UUID missing)</p>";
+  return;
 }
-$article = $_GET['article']; 
-/* check if the client is allowed to get the wanted article */
-if(!isset($_SESSION['allowed_articles'][$article])){
-  http_response_code(401); // unauthorized
-  echo "Not allowed to read this article";
-  die();
+
+$article = get($_GET["article"]);
+if (null == $article){
+  http_response_code(400);
+  echo "<p>Bad request (article missing)</p>";
+  return;
 }
-// get the article
+
+session_start();
+
+$payments = get($_SESSION['payments'], array());
+$my_payment = get($payments[$hc]);
+
+// This will keep the query parameters.
+$pay_url = url_rel("essay_pay.php");
+$offering_url = url_rel("essay_offer.php");
+$offering_url .= "?article=" . $_GET["article"];
+
+if (true !== get($my_payment["is_payed"], false) || null === $my_payment)
+{
+  echo "<p>Paying ... at $pay_url </p>";
+  echo "<script>executePayment('$hc', '$pay_url', '$offering_url');</script>";
+  return;
+}
+
+// control here == article payed
+
+$article = $my_payment["article"];
+
 $article_doc = get_article($article);
 echo $article_doc->saveHTML();
+
 ?>
+    </article>
+  </section>
+</body>
+</html>

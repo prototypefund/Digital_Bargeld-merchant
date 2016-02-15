@@ -40,10 +40,15 @@
       <article class="articles">
         <ul style="list-style-type:none">
 	  <li>
-	    <a href="/cc_payment.php?article=essay-x" class="read-more" id="essay-x">
+	    <a href="/cc_payment.php?article=fs-essay" class="read-more" id="fs-essay">
 	      <div class="teasers_item">
-	        <h3>Essay x</h3>
-	        <p>In essay x, we will ...</p>
+	        <h3>What is Free Software</h3>
+	        <p>
+	  The free software definition presents the criteria for whether a
+          particular software program qualifies as free software.  From time to
+          time we revise this definition, to clarify it or to resolve questions
+          about subtle issues.
+		</p>
 	      </div>
 	    </a>
 	    </li>
@@ -139,7 +144,7 @@ function has_taler_wallet_cb(aEvent)
   var articles_links = document.getElementsByClassName("read-more");
   for(var i=0; i < articles_links.length; i++)
     //console.log(link);
-    articles_links[i].setAttribute("href", "javascript:taler_pay(\"" + articles_links[i].id + "\")");
+    articles_links[i].setAttribute("href", "/essay_offer.php?article=" + articles_links[i].id);
 };
 
 /* Function called when the Taler extension was unloaded;

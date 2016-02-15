@@ -13,8 +13,7 @@ function generate_contract($amount_value,
 			   $p_id,
 			   $teatax,
 			   $now,
-			   $pay_url,
-			   $exec_url){
+			   $fulfillment_url){
   $contract = array ('amount' => array ('value' => $amount_value,
   			                       'fraction' => $amount_fraction,
                                                  'currency' => $currency),
@@ -33,8 +32,7 @@ function generate_contract($amount_value,
   			              'delivery_date' => "Some Date Format",
   			              'delivery_location' => 'LNAME1')),
   			    'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
-  			    'pay_url' => $pay_url,
-  			    'exec_url' => $exec_url, 
+  			    'fulfillment_url' => $fulfillment_url,
   			    'expiry' => "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
   			    'refund_deadline' => "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
   			    'merchant' => array ('address' => 'LNAME2',
@@ -63,7 +61,7 @@ function generate_contract($amount_value,
   							             'region' => 'Test Region',
   								     'province' => 'Test Province',
   								     'ZIP code' => 4908)));
-  $json = json_encode (array ('contract' => $contract, 'exec_url' => $exec_url, 'pay_url' => $pay_url), JSON_PRETTY_PRINT);
+  $json = json_encode (array ('contract' => $contract, JSON_PRETTY_PRINT));
   return $json;
 }
 

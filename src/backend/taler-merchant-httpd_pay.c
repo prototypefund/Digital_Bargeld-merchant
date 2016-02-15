@@ -641,15 +641,15 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     struct TALER_MerchantSignatureP merchant_sig;
     struct TALER_ContractPS cp;
     struct TMH_PARSE_FieldSpecification spec[] = {
-      TMH_PARSE_member_array ("coins", &coins),
-      TMH_PARSE_member_string ("mint", &pc->chosen_mint),
-      TMH_PARSE_member_uint64 ("transaction_id", &pc->transaction_id),
-      TMH_PARSE_member_amount ("max_fee", &pc->max_fee),
       TMH_PARSE_member_amount ("amount", &pc->amount),
-      TMH_PARSE_member_time_abs ("timestamp", &pc->timestamp),
-      TMH_PARSE_member_time_abs ("refund_deadline", &pc->refund_deadline),
+      TMH_PARSE_member_array ("coins", &coins),
       TMH_PARSE_member_fixed ("H_contract", &pc->h_contract),
+      TMH_PARSE_member_amount ("max_fee", &pc->max_fee),
       TMH_PARSE_member_fixed ("merchant_sig", &merchant_sig),
+      TMH_PARSE_member_string ("mint", &pc->chosen_mint),
+      TMH_PARSE_member_time_abs ("refund_deadline", &pc->refund_deadline),
+      TMH_PARSE_member_time_abs ("timestamp", &pc->timestamp),
+      TMH_PARSE_member_uint64 ("transaction_id", &pc->transaction_id),
       TMH_PARSE_MEMBER_END
     };
 

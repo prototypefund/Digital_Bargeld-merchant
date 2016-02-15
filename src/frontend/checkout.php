@@ -142,7 +142,7 @@ function taler_pay(form) {
   var contract_request = new XMLHttpRequest();
 
   /* Note that the URL we give here is specific to the Demo-shop
-     and not required by the protocol: each web shop can
+     and not dictated by the protocol: each web shop can
      have its own way of generating and transmitting the
      contract, there just must be a way to get the contract
      and to pass it to the wallet when the user selects 'Pay'. */

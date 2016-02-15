@@ -61,7 +61,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   uint64_t transaction_id;
   struct TMH_PARSE_FieldSpecification spec[] = {
     TMH_PARSE_member_amount ("amount", &total),
-    TMH_PARSE_member_amount ("max_fee", &total),
+    TMH_PARSE_member_amount ("max_fee", &max_fee),
     TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
     TMH_PARSE_MEMBER_END
   };
@@ -130,7 +130,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                                       MHD_HTTP_OK,
                                       "{s:O, s:O, s:O}",
                                       "contract", jcontract,
-                                      "sig", TALER_json_from_data (&contract_sig,
+                                      "merchant_sig", TALER_json_from_data (&contract_sig,
                                                                    sizeof (contract_sig)),
                                       "H_contract", TALER_json_from_data (&contract.h_contract,
                                                                           sizeof (contract.h_contract)));

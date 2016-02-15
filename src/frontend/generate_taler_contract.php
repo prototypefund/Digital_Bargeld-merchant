@@ -51,16 +51,28 @@ $teatax = array('value' => 1,
 // Take a timestamp
 $now = new DateTime('now');
 
+
+// Include all information so we can
+// restore the contract without storing it
+$fulfillment_url = url_rel("fulfillment.php")
+  . '?uuid=${H_contract}'
+  . '&receiver=' . urlencode($receiver)
+  . '&aval=' . urlencode($amount_value)
+  . '&afrac=' . urlencode($amount_fraction)
+  . '&acurr=' . urlencode($currency)
+  . '&tid=' . $transaction_id;
+
 // pack the JSON for the contract 
 $contract = array(
-  'fulfillment_url' => (url_rel("fulfillment.php") . '?uuid=${H_contract}'),
+  'fulfillment_url' => $fulfillment_url,
   'amount' => array(
     'value' => $amount_value,
     'fraction' => $amount_fraction,
     'currency' => $currency),
-  'max_fee' => array('value' => 3,
-  'fraction' => 01010,
-  'currency' => $currency),
+  'max_fee' => array(
+    'value' => 3,
+    'fraction' => 01010,
+    'currency' => $currency),
   'transaction_id' => $transaction_id,
   'products' => array(
     array(

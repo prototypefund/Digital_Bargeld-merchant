@@ -24,36 +24,42 @@
  *
  */
 include("../frontend_lib/merchants.php");
+include("../frontend_lib/util.php");
 include("./blog_lib.php");
 session_start();
-if (!isset($_GET['article'])){
+$article = get($_GET['article']);
+if (null == $article){
   echo "Please land here just to buy articles";
   die();
   }
-$article = $_GET['article'];
-$_SESSION['article'] = $article;
-// 2 to-do
 
 // send contract
 $transaction_id = rand(0, 1001);
 $p_id = hexdec(substr(sha1($article), -5));
-$teatax = array ('value' => 1,
-                 'fraction' => 0,
-		 'currency' => "KUDOS");
+
 $now = new DateTime('now');
 $teaser = get_teaser($article);
-$pay_url = "essay_pay.php";
-$exec_url = "execute.php";
-$contract_json = generate_contract(1,
-                                   0,
-				   "KUDOS",
+$amount_value = 0;
+$amount_fraction = 50000;
+$currency = "EUR";
+$teatax = array ('value' => 1,
+                 'fraction' => 0,
+		 'currency' => $currency);
+$transaction_id = rand(0, 1001);
+// Include all information so we can
+// restore the contract without storing it
+$fulfillment_url = url_rel("essay_fulfillment.php")
+  . '&uuid=${H_contract}'; //<= super weird: that should be a '?', not '&', but works
+//file_put_contents("/tmp/debg1", $fulfillment_url);
+$contract_json = generate_contract($amount_value,
+                                   $amount_fraction,
+				   $currency,
 				   $transaction_id,
 				   trim($teaser->nodeValue),
 				   $p_id,
 				   $teatax,
 				   $now,
-				   $pay_url,
-				   $exec_url);
+				   $fulfillment_url);
 $resp = give_to_backend($_SERVER["HTTP_HOST"],
                         "backend/contract",
 	                $contract_json);
@@ -65,15 +71,22 @@ http_response_code ($status_code);
 // Now generate our body  
 if ($status_code != 200)
 {
-  echo "Error while generating the contract";
-  echo $resp->body->toString ();
+  echo json_encode(array(
+    'error' => "internal error",
+    'hint' => "backend indicated error",
+    'detail' => $resp->body->toString()
+  ), JSON_PRETTY_PRINT);
 }
 else
-{ $got_json = json_decode ($resp->body->toString ());
-  $_SESSION['H_contract'] = $got_json->H_contract;
-  $_SESSION['article_value'] = 1;
-  $_SESSION['article_fraction'] = 0;
-  $_SESSION['article_currency'] = "KUDOS";
-  echo $resp->body->toString ();
+{
+  $got_json = json_decode($resp->body->toString(), true);
+  $hc = $got_json["H_contract"];
+
+  $payments = &pull($_SESSION, "payments", array());
+  $payments[$hc] = array(
+    'article' => $article,
+  );
+
+  echo json_encode ($got_json, JSON_PRETTY_PRINT);
 }
 ?>
