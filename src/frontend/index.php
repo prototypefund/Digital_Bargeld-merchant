@@ -9,7 +9,7 @@ require_once "../frontend_lib/config.php";
   <script src="taler-presence.js" type="text/javascript"></script>
 <script type="text/javascript">
 <?php
-echo "\tvar shop_currency = '$SHOP_CURRENCY';\n";
+echo "\tvar shop_currency = '$MERCHANT_CURRENCY';\n";
 ?>
 
   function addOption(value, label) {
