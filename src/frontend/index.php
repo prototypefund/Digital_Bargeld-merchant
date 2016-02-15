@@ -25,7 +25,7 @@ echo "\tvar shop_currency = '$SHOP_CURRENCY';\n";
     e.value = shop_currency;
     addOption("0.1");
     addOption("1.0");
-    addOption("6.0", ("".concat(5, " ", shop_currency));
+    addOption("6.0", "".concat(5, " ", shop_currency));
     addOption("10");
   }
 
