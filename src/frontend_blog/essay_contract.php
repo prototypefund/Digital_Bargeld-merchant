@@ -15,19 +15,11 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 
-/**
- * This file should:
- *
- * 1. check if some article is going to be bought
- * 2. check if the wallet is installed TODO
- * 3. get the contract (having the teaser as product detail) to the wallet
- *
- */
 include("../frontend_lib/merchants.php");
 include("../frontend_lib/util.php");
 include("../frontend_lib/config.php");
 include("./blog_lib.php");
-session_start();
+
 $article = get($_GET['article']);
 if (null == $article){
   echo "Please land here just to buy articles";
@@ -81,7 +73,7 @@ else
 {
   $got_json = json_decode($resp->body->toString(), true);
   $hc = $got_json["H_contract"];
-
+  session_start();
   $payments = &pull($_SESSION, "payments", array());
   $payments[$hc] = array(
     'article' => $article,

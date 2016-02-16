@@ -14,14 +14,14 @@ echo "\tvar shop_currency = '$MERCHANT_CURRENCY';\n";
 
   function addOption(value, label) {
     var s = document.getElementById("taler-donation");
-    let e = document.createElement("option");
+    var e = document.createElement("option");
     e.textContent = label ? label : ("".concat(value, " ", shop_currency));
     e.value = value;
     s.appendChild(e);
   }
 
   function init() {
-    let e = document.getElementById("currency-input"); 
+    var e = document.getElementById("currency-input"); 
     e.value = shop_currency;
     addOption("0.1");
     addOption("1.0");

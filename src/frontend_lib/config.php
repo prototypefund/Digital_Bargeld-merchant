@@ -1,7 +1,7 @@
 <?php
 
-//$explicit_currency = false;
-$explicit_currency = "EUR";
+$explicit_currency = false;
+//$explicit_currency = "PUDOS";
 
 $host = $_SERVER["HTTP_HOST"];
 switch ($host) {
