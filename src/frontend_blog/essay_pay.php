@@ -25,8 +25,6 @@ include("../frontend_lib/merchants.php");
 include("../frontend_lib/util.php");
 include("./blog_lib.php");
 
-session_start();
-
 $hc = get($_GET["uuid"]);
 if (empty($hc))
 {

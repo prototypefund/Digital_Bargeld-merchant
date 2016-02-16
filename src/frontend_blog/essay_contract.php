@@ -41,7 +41,7 @@ $transaction_id = rand(0, 1001);
 // Include all information so we can
 // restore the contract without storing it
 $fulfillment_url = url_rel("essay_fulfillment.php")
-  . '&uuid=${H_contract}'; //<= super weird: that should be a '?', not '&', but works
+  . '&uuid=${H_contract}';
 //file_put_contents("/tmp/debg1", $fulfillment_url);
 $contract_json = generate_contract($amount_value,
                                    $amount_fraction,
