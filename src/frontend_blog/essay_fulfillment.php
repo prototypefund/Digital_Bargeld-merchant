@@ -26,7 +26,7 @@
       </svg>
     </div>
 
-    <h1>Toy Store - Product Page</h1>
+    <h3>Toy Store - Product Page</h3>
   </header>
 
   <aside class="sidebar" id="left">
@@ -75,10 +75,11 @@ session_start();
 $payments = get($_SESSION['payments'], array());
 $my_payment = get($payments[$hc]);
 
-// This will keep the query parameters.
+// This will keep the query parameters, so the paying script
+// can reconstruct the contract
 $pay_url = url_rel("essay_pay.php");
-$offering_url = url_rel("essay_offer.php");
-$offering_url .= "?article=" . $_GET["article"];
+$offering_url = url_rel("essay_offer.php", true);
+$offering_url .= "?article=$article";
 
 if (true !== get($my_payment["is_payed"], false) || null === $my_payment)
 {
