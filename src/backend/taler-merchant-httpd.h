@@ -127,6 +127,26 @@ struct TM_HandlerContext
 
 
 /**
+ * Information we keep for an individual calls
+ * to requests that parse JSON, but keep no other state.
+ */
+struct TMH_JsonParseContext
+{
+
+  /**
+   * This field MUST be first.
+   * FIXME: Explain why!
+   */
+  struct TM_HandlerContext hc;
+
+  /**
+   * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
+   */
+  void *json_parse_context;
+};
+
+
+/**
  * Our wire format details in JSON format (with salt).
  */
 extern json_t *j_wire;
@@ -167,6 +187,14 @@ extern struct GNUNET_TIME_Relative edate_delay;
  */
 void
 TMH_trigger_daemon (void);
+
+/**
+ * Custom cleanup routine for a `struct PayContext`.
+ *
+ * @param hc the `struct PayContext` to clean up.
+ */
+void
+TMH_json_parse_cleanup (struct TM_HandlerContext *hc);
 
 
 #endif

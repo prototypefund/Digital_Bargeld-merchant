@@ -54,6 +54,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   json_t *root;
   json_t *jcontract;
   int res;
+  struct TMH_JsonParseContext *ctx;
   struct TALER_ContractPS contract;
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
   struct TALER_Amount total;
@@ -66,8 +67,19 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
     TMH_PARSE_MEMBER_END
   };
 
+  if (NULL == *connection_cls)
+  {
+    ctx = GNUNET_new (struct TMH_JsonParseContext);
+    ctx->hc.cc = &TMH_json_parse_cleanup;
+    *connection_cls = ctx;
+  }
+  else
+  {
+    ctx = *connection_cls;
+  }
+
   res = TMH_PARSE_post_json (connection,
-                             connection_cls,
+                             &ctx->json_parse_context,
                              upload_data,
                              upload_data_size,
                              &root);

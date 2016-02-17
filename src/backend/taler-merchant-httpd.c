@@ -437,6 +437,20 @@ validate_and_hash_wireformat (const char *allowed)
 
 
 /**
+ * Custom cleanup routine for a `struct PayContext`.
+ *
+ * @param hc the `struct PayContext` to clean up.
+ */
+void
+TMH_json_parse_cleanup (struct TM_HandlerContext *hc)
+{
+  struct TMH_JsonParseContext *jpc = (struct TMH_JsonParseContext *) hc;
+
+  TMH_PARSE_post_cleanup_callback (jpc->json_parse_context);
+}
+
+
+/**
  * Function that queries MHD's select sets and
  * starts the task waiting for them.
  *

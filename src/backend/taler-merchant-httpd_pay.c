@@ -104,6 +104,7 @@ struct PayContext
 
   /**
    * This field MUST be first.
+   * FIXME: Explain why!
    */
   struct TM_HandlerContext hc;
 
