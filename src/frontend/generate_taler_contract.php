@@ -31,10 +31,6 @@ $amount_value = intval($_SESSION['amount_value']);
 $amount_fraction = intval($_SESSION['amount_fraction']);
 $currency = $_SESSION['currency'];
 
-/* Fill in variables for simple JSON contract */
-// fake product id 
-$p_id = rand(0,1001);
-
 // generate a front-end transaction id. 
 // In production context, we might want to
 // record this value somewhere together
@@ -44,14 +40,8 @@ $transaction_id = rand(0, 1001);
 // Human-readable description of this deal
 $desc = "Donation to " . $receiver;
 
-// The tax for this deal
-$teatax = array('value' => 1,
-                'fraction' => 0,
-                'currency' => $currency);
-
 // Take a timestamp
 $now = new DateTime('now');
-
 
 // Include all information so we can
 // restore the contract without storing it
@@ -69,56 +59,33 @@ $contract = array(
   'amount' => array(
     'value' => $amount_value,
     'fraction' => $amount_fraction,
-    'currency' => $currency),
+    'currency' => $currency
+  ),
   'max_fee' => array(
     'value' => 3,
     'fraction' => 01010,
-    'currency' => $currency),
+    'currency' => $currency
+  ),
   'transaction_id' => $transaction_id,
   'products' => array(
     array(
       'description' => $desc,
       'quantity' => 1,
-      'price' => array ('value' => $amount_value,
-      'fraction' => $amount_fraction,
-      'currency' => $currency),
+      'price' => array (
+        'value' => $amount_value,
+        'fraction' => $amount_fraction,
+        'currency' => $currency
+      ),
       'product_id' => $p_id,
-      'taxes' => array(array('teatax' => $teatax)),
-      'delivery_date' => "Some Date Format",
-      'delivery_location' => 'LNAME1')),
+    )
+  ),
   'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
   'expiry' => "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
   'refund_deadline' => "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
   'merchant' => array(
-    'address' => 'LNAME2',
-    'name' => 'test merchant',
-    'jurisdiction' => 'LNAME3'),
-  'locations' => array(
-    'LNAME1' => array(
-      'country' => 'Test Country',
-      'city' => 'Test City',
-      'state' => 'Test State',
-      'region' => 'Test Region',
-      'province' => 'Test Province',
-      'ZIP code' => 4908,
-      'street' => 'test street',
-      'street number' => 20),
-    'LNAME2' => array(
-      'country' => 'Test Country',
-      'city' => 'Test City',
-      'state' => 'Test State',
-      'region' => 'Test Region',
-      'province' => 'Test Province',
-      'ZIP code' => 4908,
-      'street' => 'test street',
-      'street number' => 20),
-    'LNAME3' => array(
-      'country' => 'Test Country',
-      'city' => 'Test City',
-      'state' => 'Test State',
-      'region' => 'Test Region',
-      'province' => 'Test Province',
-      'ZIP code' => 4908)));
+    'name' => 'Kudos Inc.'
+  )
+);
 
 $json = json_encode(array(
   'contract' => $contract
