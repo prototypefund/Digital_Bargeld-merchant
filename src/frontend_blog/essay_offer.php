@@ -6,15 +6,13 @@
   include("../frontend_lib/merchants.php");
   include("../frontend_lib/util.php");
   include("./blog_lib.php");
-  session_start();
   $article = get($_GET['article']);
   if (null == $article){
     echo "Please land here just to buy articles";
     die();
     }
-  echo "<h3>No Taler installed</h3>";
-  echo "<p>activate it or pay by <a href='/cc_payment.php?article=$article'>credit card</a></p>";
-  echo "<p id=article-name style='display: none;'>$article</input>";
+  $cc_page = template("./essay_cc-payment.html", array('article' => $article));
+  echo $cc_page;
 ?>
 </body>
 <script type="text/javascript">
@@ -54,7 +52,7 @@
   function has_taler_wallet_cb(aEvent)
   {
     var article = document.getElementById('article-name');
-    get_contract(article.firstChild.nodeValue); 
+    get_contract(article.value); 
   };
   
   function signal_taler_wallet_onload()
@@ -71,7 +69,7 @@
   // the user is on the payment page
   document.addEventListener("taler-load",
                             signal_taler_wallet_onload,
-  			  false);
+                            false);
 
 </script>
 </html>

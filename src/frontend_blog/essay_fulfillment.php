@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!--
+  This file is part of GNU TALER.
+  Copyright (C) 2014, 2015 GNUnet e.V.
+
+  TALER is free software; you can redistribute it and/or modify it under the
+  terms of the GNU Lesser General Public License as published by the Free Software
+  Foundation; either version 2.1, or (at your option) any later version.
+
+  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+  A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License along with
+  TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
+-->
 <html lang="en">
 <head>
   <title>Taler's "Demo" Shop</title>
@@ -35,34 +50,10 @@
   <section id="main">
     <article>
 <?php
-/*
-  This file is part of GNU TALER.
-  Copyright (C) 2014, 2015 GNUnet e.V.
-
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Lesser General Public License as published by the Free Software
-  Foundation; either version 2.1, or (at your option) any later version.
-
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
-
-  You should have received a copy of the GNU Lesser General Public License along with
-  TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
- */
-
+// TODO return a mock CC payment page if no wallet in place
 include '../frontend_lib/util.php';
 include './blog_lib.php';
-
-$hc = get($_GET["uuid"]);
-
-if (empty($hc))
-{
-  http_response_code(400);
-  echo "<p>Bad request (UUID missing)</p>";
-  return;
-}
-
+file_put_contents("/tmp/essayffil.dbg", "called");
 $article = get($_GET["article"]);
 if (null == $article){
   http_response_code(400);
@@ -75,14 +66,27 @@ session_start();
 $payments = get($_SESSION['payments'], array());
 $my_payment = get($payments[$hc]);
 
-// This will keep the query parameters, so the paying script
-// can reconstruct the contract
 $pay_url = url_rel("essay_pay.php");
 $offering_url = url_rel("essay_offer.php", true);
 $offering_url .= "?article=$article";
+file_put_contents("/tmp/ffilproc", $offering_url);
 
 if (true !== get($my_payment["is_payed"], false) || null === $my_payment)
+    
 {
+  $tid = get('tid');
+  $timestamp = get('timestamp');
+  // FIXME article name should be "melted" in the hash
+  // TODO reconstruct *here* the contract, hash it, and save it in the state
+
+  if (null == $tid || null == $timestamp){
+    // CC case
+    $_SESSION['cc_payment'] = true;
+    $cc_page = template("./essay_cc-payment.html", array('article' => $article));
+    echo $cc_page;
+    die();
+  
+  }
   echo "<p>Paying ... at $pay_url </p>";
   echo "<script>executePayment('$hc', '$pay_url', '$offering_url');</script>";
   return;

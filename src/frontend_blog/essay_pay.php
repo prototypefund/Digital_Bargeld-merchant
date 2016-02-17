@@ -16,10 +16,8 @@
 */
 
 /**
- * This file should:
- * 1. Check if the session is valid
- * 2. augment the deposit permission with missing values
- * 3. forward payment to backend
+ * TODO check the hashed contract in the state against the hashed contract
+ * actually bundled in the deposit permission
  */
 include("../frontend_lib/merchants.php");
 include("../frontend_lib/util.php");
@@ -36,8 +34,6 @@ if (empty($hc))
   return;
 }
 
-// TODO: check if contract body matches URL parameters,
-// so we won't generate a response for the wrong receiver.
 $article = get($_GET["article"]);
 if (empty($article))
 {

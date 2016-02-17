@@ -23,4 +23,15 @@ function get_article($name){
   return $doc;
 }
 
+/**
+ * Fetch the page $page and return its
+ * DOM.
+ */
+function get_page($page){
+  $content = file_get_contents($page);
+  $doc = new DOMDocument();
+  $doc->loadHTML($content);
+  return $doc;
+}
+
 ?>

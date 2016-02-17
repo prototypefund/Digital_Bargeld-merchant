@@ -11,9 +11,12 @@ function generate_contract($amount_value,
 			   $transaction_id,
 			   $desc,
 			   $p_id,
-			   $teatax,
+			   $corr_id,
+			   $taxes,
 			   $now,
 			   $fulfillment_url){
+  include("../frontend_lib/config.php");
+  file_put_contents("/tmp/ddd", $REFUND_DELTA);
   $contract = array ('amount' => array ('value' => $amount_value,
   			                       'fraction' => $amount_fraction,
                                                  'currency' => $currency),
@@ -28,13 +31,14 @@ function generate_contract($amount_value,
   			                                'fraction' => $amount_fraction,
                                                           'currency' => $currency),
   				      'product_id' => $p_id,
-  				      'taxes' => array (array ('teatax' => $teatax)),
+  				      'taxes' => $taxes,
   			              'delivery_date' => "Some Date Format",
   			              'delivery_location' => 'LNAME1')),
   			    'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
-  			    'fulfillment_url' => $fulfillment_url,
   			    'expiry' => "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
-  			    'refund_deadline' => "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
+  			    'refund_deadline' => "/Date(" . $now->add(new DateInterval($REFUND_DELTA))->getTimestamp() . ")/",
+			    'repurchase_correlation_id' => $corr_id,
+			    'fulfillment_url' => $fulfillment_url,
   			    'merchant' => array ('address' => 'LNAME2',
   			                         'name' => 'test merchant',
   					         'jurisdiction' => 'LNAME3'),
@@ -61,7 +65,7 @@ function generate_contract($amount_value,
   							             'region' => 'Test Region',
   								     'province' => 'Test Province',
   								     'ZIP code' => 4908)));
-  $json = json_encode (array ('contract' => $contract, JSON_PRETTY_PRINT));
+  $json = json_encode (array ('contract' => $contract), JSON_PRETTY_PRINT);
   return $json;
 }
 

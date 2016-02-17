@@ -26,4 +26,22 @@ function url_rel($path, $strip=false) {
     $path,
     $strip);
 }
+
+function template($file, $array) {
+  if (file_exists($file)) {
+    $output = file_get_contents($file);
+    foreach ($array as $key => $val) {
+      $replace = '{'.$key.'}';
+      $output = str_replace($replace, $val, $output);
+    }
+    return $output;
+  }
+}
+
+function str_to_dom($str){
+  $doc = new DOMDocument();
+  $doc->loadHTML($str);
+  return $doc;
+
+}
 ?>

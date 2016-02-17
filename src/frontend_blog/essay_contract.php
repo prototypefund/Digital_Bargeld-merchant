@@ -28,27 +28,29 @@ if (null == $article){
 
 // send contract
 $transaction_id = rand(0, 1001);
-$p_id = hexdec(substr(sha1($article), -5));
-
+//$p_id = hexdec(substr(sha1($article), -5));
+file_put_contents('/tmp/yyy', "bogus");
+file_put_contents('/tmp/yyy', $MERCHANT_CURRENCY);
 $now = new DateTime('now');
 $teaser = get_teaser($article);
 $amount_value = 0;
 $amount_fraction = 50000;
-$teatax = array ('value' => 1,
-                 'fraction' => 0,
-		 'currency' => $MERCHANT_CURRENCY);
+$teatax = array ();
 $transaction_id = rand(0, 1001);
-// Include all information so we can
-// restore the contract without storing it
+
 $fulfillment_url = url_rel("essay_fulfillment.php")
-  . '&uuid=${H_contract}';
-//file_put_contents("/tmp/debg1", $fulfillment_url);
+  . '&uuid=${H_contract}'
+  . '&timestamp=' . $now->getTimestamp()
+  . '&tid=' . $transaction_id;
+  
+file_put_contents("/tmp/ffil", $fulfillment_url);
 $contract_json = generate_contract($amount_value,
                                    $amount_fraction,
 				   $MERCHANT_CURRENCY,
 				   $transaction_id,
 				   trim($teaser->nodeValue),
-				   $p_id,
+				   $article,
+				   $article,
 				   $teatax,
 				   $now,
 				   $fulfillment_url);
@@ -78,7 +80,6 @@ else
   $payments[$hc] = array(
     'article' => $article,
   );
-
-  echo json_encode ($got_json, JSON_PRETTY_PRINT);
+  echo $resp->body->toString();
 }
 ?>
