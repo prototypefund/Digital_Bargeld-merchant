@@ -81,19 +81,15 @@ MH_handler_hash_contract (struct TMH_RequestHandler *rh,
 
   if (NULL == jcontract)
   {
-    return TMH_RESPONSE_reply_internal_error (connection,
+    return TMH_RESPONSE_reply_external_error (connection,
                                               "missing 'contract' field");
   }
 
   if (GNUNET_OK != TALER_hash_json (jcontract,
                                     &hc))
   {
-    res = TMH_RESPONSE_reply_json_pack (connection,
-                                        MHD_HTTP_BAD_REQUEST,
-                                        "{s:s, s:s}",
-                                        "error", "invalid contract",
-                                        "hint", "expected object");
-    return res;
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "expected object as contract");
   }
 
   GNUNET_assert (GNUNET_OK ==

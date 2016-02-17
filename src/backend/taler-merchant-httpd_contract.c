@@ -93,7 +93,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 
   if (NULL == jcontract)
   {
-    return TMH_RESPONSE_reply_internal_error (connection,
+    return TMH_RESPONSE_reply_external_error (connection,
                                               "contract request malformed");
   }
   /* extract fields we need to sign separately */
@@ -103,7 +103,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   if (GNUNET_NO == res)
     return MHD_YES;
   if (GNUNET_SYSERR == res)
-    return TMH_RESPONSE_reply_internal_error (connection,
+    return TMH_RESPONSE_reply_external_error (connection,
                                               "contract request malformed");
 
   /* add fields to the contract that the backend should provide */
