@@ -85,6 +85,17 @@ MH_handler_hash_contract (struct TMH_RequestHandler *rh,
                                               "missing 'contract' field");
   }
 
+  if (GNUNET_OK != TALER_hash_json (jcontract,
+                                    &hc))
+  {
+    res = TMH_RESPONSE_reply_json_pack (connection,
+                                        MHD_HTTP_BAD_REQUEST,
+                                        "{s:s, s:s}",
+                                        "error", "invalid contract",
+                                        "hint", "expected object");
+    return res;
+  }
+
   GNUNET_assert (GNUNET_OK ==
                  TALER_hash_json (jcontract,
                                   &hc));
