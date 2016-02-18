@@ -23,17 +23,6 @@ include("../frontend_lib/merchants.php");
 include("../frontend_lib/util.php");
 include("./blog_lib.php");
 
-$hc = get($_GET["uuid"]);
-if (empty($hc))
-{
-  http_response_code(400);
-  echo json_encode(array(
-    "error" => "missing parameter",
-    "parameter" => "uuid"
-  ));
-  return;
-}
-
 $article = get($_GET["article"]);
 if (empty($article))
 {
@@ -46,11 +35,9 @@ if (empty($article))
 }
 
 $deposit_permission = file_get_contents('php://input');
-file_put_contents('/tmp/pay.dbg', 'about to pay\n', FILE_APPEND);
 $resp = give_to_backend($_SERVER['HTTP_HOST'],
                         "backend/pay",
 			$deposit_permission);
-file_put_contents('/tmp/pay.dbg', 'backend respd\n', FILE_APPEND);
 $status_code = $resp->getResponseCode();
 
 // Our response code is the same we got from the backend:
@@ -70,8 +57,5 @@ if ($status_code != 200)
 session_start();
 
 $payments = &pull($_SESSION, "payments", array());
-$payments[$hc] = array(
-  'article' => $article,
-  'is_payed' => true
-);
+$payments[$article] = "payed";
 ?>

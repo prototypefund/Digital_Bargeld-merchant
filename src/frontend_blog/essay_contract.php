@@ -39,11 +39,18 @@ $teatax = array ();
 $transaction_id = rand(0, 1001);
 
 $fulfillment_url = url_rel("essay_fulfillment.php")
-  . '&uuid=${H_contract}'
   . '&timestamp=' . $now->getTimestamp()
   . '&tid=' . $transaction_id;
   
 file_put_contents("/tmp/ffil", $fulfillment_url);
+
+  $dump = "curr: " . $MERCHANT_CURRENCY . " tid: " . $transaction_id
+          . " desc: " . trim($teaser->nodeValue)
+	  . " article: " . $article . " now: " . $now->getTimestamp()
+	  . " ffil: " . $fulfillment_url . "\n";
+
+file_put_contents("/tmp/dumpster_contr", $dump, FILE_APPEND);
+
 $contract_json = generate_contract($amount_value,
                                    $amount_fraction,
 				   $MERCHANT_CURRENCY,
@@ -54,7 +61,7 @@ $contract_json = generate_contract($amount_value,
 				   $teatax,
 				   $now,
 				   $fulfillment_url);
-$resp = give_to_backend($_SERVER["HTTP_HOST"],
+$resp = give_to_backend($_SERVER['HTTP_HOST'],
                         "backend/contract",
 	                $contract_json);
 
@@ -77,9 +84,7 @@ else
   $hc = $got_json["H_contract"];
   session_start();
   $payments = &pull($_SESSION, "payments", array());
-  $payments[$hc] = array(
-    'article' => $article,
-  );
+  $payments[$article] = "inprogress";
   echo $resp->body->toString();
 }
 ?>

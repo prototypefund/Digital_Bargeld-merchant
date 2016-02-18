@@ -16,10 +16,67 @@
 -->
 <html lang="en">
 <head>
-  <title>Taler's "Demo" Shop</title>
-  <link rel="stylesheet" type="text/css" href="style.css">
+  <title>Taler's "Demo" Blog</title>
+  <link rel="stylesheet" type="text/css" href="style.css"-->
   <script type="application/javascript" src="taler-presence.js"></script>
   <script type="application/javascript">
+  function handle_contract(json_contract) {
+    var cEvent = new CustomEvent('taler-contract',
+                                 {detail: json_contract});
+    document.dispatchEvent(cEvent);
+  };
+
+  function get_contract(article) {
+  var contract_request = new XMLHttpRequest();
+
+  contract_request.open("GET",
+                        "essay_contract.php?article=" + article,
+			true);
+  contract_request.onload = function (e) {
+    if (contract_request.readyState == 4) {
+      if (contract_request.status == 200) {
+        console.log("response text:",
+	            contract_request.responseText);
+        handle_contract(contract_request.responseText);
+      } else {
+        alert("Failure to download contract from merchant " +
+              "(" + contract_request.status + "):\n" +
+              contract_request.responseText);
+      }
+    }
+  };
+  contract_request.onerror = function (e) {
+    alert("Failure requesting the contract:\n"
+          + contract_request.statusText);
+  };
+  contract_request.send();
+  }
+
+  function has_taler_wallet_cb(aEvent)
+  {
+    var article = document.getElementById('article-name');
+    get_contract(article.value); 
+  };
+  
+  function signal_taler_wallet_onload()
+  {
+    var eve = new Event('taler-probe');
+    document.dispatchEvent(eve);
+  };
+  
+  document.addEventListener("taler-wallet-present",
+                            has_taler_wallet_cb,
+  			  false);
+  
+  // Register event to be triggered by the wallet when it gets enabled while
+  // the user is on the payment page
+  document.addEventListener("taler-load",
+                            signal_taler_wallet_onload,
+                            false);
+
+
+
+
   function executePayment(H_contract, pay_url, offering_url) {
     var detail = {
       H_contract: H_contract,
@@ -32,16 +89,15 @@
   </script>
 </head>
 <body>
-<!--
   <header>
     <div id="logo">
       <svg height="100" width="100">
         <circle cx="50" cy="50" r="40" stroke="darkcyan" stroke-width="6" fill="white" />
-        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
+        <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">B</text>
       </svg>
     </div>
 
-    <h3>Toy Store - Product Page</h3>
+    <h1>Taler's "Demo" Blog</h1>
   </header>
 
   <aside class="sidebar" id="left">
@@ -49,10 +105,10 @@
 
   <section id="main">
     <article>
-  -->
 <?php
-// TODO return a mock CC payment page if no wallet in place
 include '../frontend_lib/util.php';
+include '../frontend_lib/merchants.php';
+include '../frontend_lib/config.php';
 include './blog_lib.php';
 
 $article = get($_GET['article']);
@@ -61,54 +117,67 @@ if (null == $article){
   echo "<p>Bad request (article missing)</p>";
   return;
 }
-$hc = get($_GET['uuid']);
-if (null == $article){
-  http_response_code(400);
-  echo "<p>Bad request (UUID missing)</p>";
-  return;
-}
 
 session_start();
 
 $payments = get($_SESSION['payments'], array());
-$my_payment = get($payments[$hc]);
+$my_payment = get($payments[$article]);
 
 $pay_url = url_rel("essay_pay.php");
 $offering_url = url_rel("essay_offer.php", true);
 $offering_url .= "?article=$article";
-file_put_contents("/tmp/essay_pay-offer", "pay URL:" . $payurl . "\noffer URL:" . $offering_url);
-if (true !== get($my_payment["is_payed"], false) || null === $my_payment)
+if ("payed" != $my_payment || null === $my_payment)
     
 {
   $tid = get($_GET['tid']);
   $timestamp = get($_GET['timestamp']);
-  // FIXME article name should be "melted" in the hash
-  // TODO reconstruct *here* the contract, hash it, and save it in the state
-
+  // 1st time
   if (null == $tid || null == $timestamp){
-    // CC case
-    $_SESSION['cc_payment'] = true;
-    $cc_page = template("./essay_cc-payment.html", array('article' => $article));
+    $js_code = "get_contract(\"$article\")";
+    $cc_page = template("./essay_cc-payment.html", array('article' => $article, 'jscode' => $js_code));
     echo $cc_page;
     die();
-  
   }
-  echo "<p>Paying ... at $pay_url </p>";
-  echo "<script>executePayment('$hc', '$pay_url', '$offering_url');</script>";
+  // restore
+  $now = new DateTime();
+  $now->setTimestamp(intval($timestamp));
+  
+  $contract_rec = generate_contract(0,
+                                    50000,
+				    $MERCHANT_CURRENCY,
+				    intval($tid),
+				    trim(get_teaser($article)->nodeValue),
+				    $article,
+				    $article,
+				    array(),
+				    $now,
+				    get_full_uri());
+
+  $resp = give_to_backend($_SERVER['HTTP_HOST'],
+                          "backend/contract",
+                          $contract_rec);
+  if ($resp->getResponseCode() != 200)
+  {
+    echo json_encode(array(
+      'error' => "internal error",
+      'hint' => "non hashable contract",
+      'detail' => $resp->body->toString()
+    ), JSON_PRETTY_PRINT);
+    die();
+  }
+  $hc = json_decode($resp->body->toString(), true)['H_contract'];
+  $js_code = "executePayment('$hc', '$pay_url', '$offering_url')";
+  $cc_page = template("./essay_cc-payment.html", array('article' => $article, 'jscode' => $js_code));
+  echo $cc_page;
   return;
-}
+  }
 
 // control here == article payed
 
-$article = $my_payment["article"];
-
 $article_doc = get_article($article);
-echo $article_doc->saveHTML();
-
+echo $article_doc->saveHTML($article_doc->getElementById("full-article"));
 ?>
-    <!--
     </article>
   </section>
-  -->
 </body>
 </html>

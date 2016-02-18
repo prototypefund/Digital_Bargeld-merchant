@@ -11,6 +11,13 @@ function &pull(&$arr, $idx, $default) {
   return $arr[$idx];
 }
 
+function get_full_uri(){
+
+  return $_SERVER['REQUEST_SCHEME'] . '://'
+	 . $_SERVER['HTTP_HOST']
+         . $_SERVER['REQUEST_URI'];
+}
+
 function url_join($base, $path, $strip=false) {
   $flags = $strip ? (http\Url::STRIP_PATH|http\URL::STRIP_QUERY) : 0;
   return (new http\URL($base, null, $flags))
