@@ -2,7 +2,7 @@
 
 $REFUND_DELTA = 'P3M';
 // set to false when done with local tests
-$explicit_currency = "EUR";
+$explicit_currency = "PUDOS";
 $MERCHANT_CURRENCY = $explicit_currency;
 
 $host = $_SERVER["HTTP_HOST"];

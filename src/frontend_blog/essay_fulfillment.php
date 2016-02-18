@@ -32,7 +32,7 @@
   </script>
 </head>
 <body>
-
+<!--
   <header>
     <div id="logo">
       <svg height="100" width="100">
@@ -49,15 +49,22 @@
 
   <section id="main">
     <article>
+  -->
 <?php
 // TODO return a mock CC payment page if no wallet in place
 include '../frontend_lib/util.php';
 include './blog_lib.php';
-file_put_contents("/tmp/essayffil.dbg", "called");
-$article = get($_GET["article"]);
+
+$article = get($_GET['article']);
 if (null == $article){
   http_response_code(400);
   echo "<p>Bad request (article missing)</p>";
+  return;
+}
+$hc = get($_GET['uuid']);
+if (null == $article){
+  http_response_code(400);
+  echo "<p>Bad request (UUID missing)</p>";
   return;
 }
 
@@ -69,13 +76,12 @@ $my_payment = get($payments[$hc]);
 $pay_url = url_rel("essay_pay.php");
 $offering_url = url_rel("essay_offer.php", true);
 $offering_url .= "?article=$article";
-file_put_contents("/tmp/ffilproc", $offering_url);
-
+file_put_contents("/tmp/essay_pay-offer", "pay URL:" . $payurl . "\noffer URL:" . $offering_url);
 if (true !== get($my_payment["is_payed"], false) || null === $my_payment)
     
 {
-  $tid = get('tid');
-  $timestamp = get('timestamp');
+  $tid = get($_GET['tid']);
+  $timestamp = get($_GET['timestamp']);
   // FIXME article name should be "melted" in the hash
   // TODO reconstruct *here* the contract, hash it, and save it in the state
 
@@ -100,7 +106,9 @@ $article_doc = get_article($article);
 echo $article_doc->saveHTML();
 
 ?>
+    <!--
     </article>
   </section>
+  -->
 </body>
 </html>
