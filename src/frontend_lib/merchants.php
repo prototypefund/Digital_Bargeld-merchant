@@ -31,7 +31,7 @@ function _generate_contract($args){
 			    'repurchase_correlation_id' => $args['corr_id'],
 			    'fulfillment_url' => $args['fulfillment_url'],
   			    'merchant' => array ('address' => 'LNAME2',
-  			                         'name' => 'test merchant',
+  			                         'name' => 'Free Software Foundations (demo)',
   					         'jurisdiction' => 'LNAME3'),
   
                               'locations' => array ('LNAME1' => array ('country' => 'Test Country',
@@ -100,7 +100,7 @@ function generate_contract($amount_value,
 			    'repurchase_correlation_id' => $corr_id,
 			    'fulfillment_url' => $fulfillment_url,
   			    'merchant' => array ('address' => 'LNAME2',
-  			                         'name' => 'test merchant',
+  			                         'name' => 'Free Software Foundation (demo)',
   					         'jurisdiction' => 'LNAME3'),
   
                               'locations' => array ('LNAME1' => array ('country' => 'Test Country',
