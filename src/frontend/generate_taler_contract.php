@@ -35,7 +35,7 @@ $currency = $_SESSION['currency'];
 // In production context, we might want to
 // record this value somewhere together
 // with the rest of the contract data.
-$transaction_id = rand(0, 1001);
+$transaction_id = rand(0, 2<<40);
 
 // Human-readable description of this deal
 $desc = "Donation to " . $receiver;
