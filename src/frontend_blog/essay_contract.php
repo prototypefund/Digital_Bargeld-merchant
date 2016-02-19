@@ -63,7 +63,6 @@
     session_start();
     $payments = &pull($_SESSION, "payments", array());
     $payments[$article] = array("ispayed" => false);
-    log_string("ctr ".article_state_to_str($payments[$article]));
     echo $resp->body->toString();
   }
 ?>

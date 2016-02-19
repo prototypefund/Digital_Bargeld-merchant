@@ -26,13 +26,12 @@
     return;
   }
   session_start();
-  $payments = get($_SESSION['payments'], array());
-  $my_payment = get($payments[$article]);
-  log_string("ffil " . article_state_to_str($my_payment)); 
+  $payments = &pull($_SESSION, 'payments', array());
+  $my_payment = &pull($payments, $article, array());
   $pay_url = url_rel("essay_pay.php");
   $offering_url = url_rel("essay_offer.php", true);
   $offering_url .= "?article=$article";
-  if (false == $my_payment['ispayed'] || null === $my_payment){
+  if (false == $payments[$article]['ispayed'] || null === $my_payment){
     $tid = get($_GET['tid']);
     $timestamp = get($_GET['timestamp']);
     // 1st time

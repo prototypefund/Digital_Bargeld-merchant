@@ -29,6 +29,22 @@
   }
   $deposit_permission = file_get_contents('php://input');
   // FIXME check here if the deposit permission is associated
+  session_start();
+  $payments = &pull($_SESSION, "payments", array());
+  $dec_dep_perm = json_decode($deposit_permission, true);
+  if ($dec_dep_perm['H_contract'] != $payments[$article]['hc']){
+    $json = json_encode(
+      array(
+        "error" => "ill behaved wallet",
+        "status" => 400,
+        "detail" => "article payed differs from article to be shown"
+      )
+    );
+    echo $json;
+    die();
+  }
+  // FIXME put some control below
+
   // with the article that's going to be payed
   $resp = give_to_backend($_SERVER['HTTP_HOST'],
                           "backend/pay",
@@ -45,8 +61,5 @@
     echo $json;
     die();
   }
-  session_start();
-  $payments = &pull($_SESSION, "payments", array());
   $payments[$article]['ispayed'] = true;
-  log_string("ispayed == true");
 ?>
