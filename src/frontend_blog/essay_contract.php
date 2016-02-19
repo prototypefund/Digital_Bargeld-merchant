@@ -32,7 +32,7 @@ $transaction_id = rand(0, 1001);
 file_put_contents('/tmp/yyy', "bogus");
 file_put_contents('/tmp/yyy', $MERCHANT_CURRENCY);
 $now = new DateTime('now');
-$teaser = get_teaser($article);
+$teaser = get_title($article);
 $amount_value = 0;
 $amount_fraction = 50000;
 $teatax = array ();
@@ -42,20 +42,11 @@ $fulfillment_url = url_rel("essay_fulfillment.php")
   . '&timestamp=' . $now->getTimestamp()
   . '&tid=' . $transaction_id;
   
-file_put_contents("/tmp/ffil", $fulfillment_url);
-
-  $dump = "curr: " . $MERCHANT_CURRENCY . " tid: " . $transaction_id
-          . " desc: " . trim($teaser->nodeValue)
-	  . " article: " . $article . " now: " . $now->getTimestamp()
-	  . " ffil: " . $fulfillment_url . "\n";
-
-file_put_contents("/tmp/dumpster_contr", $dump, FILE_APPEND);
-
 $contract_json = generate_contract($amount_value,
                                    $amount_fraction,
 				   $MERCHANT_CURRENCY,
 				   $transaction_id,
-				   trim($teaser->nodeValue),
+				   trim($teaser),
 				   $article,
 				   $article,
 				   $teatax,

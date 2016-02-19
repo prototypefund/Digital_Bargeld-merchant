@@ -4,12 +4,16 @@
  * Take a (article's) filename and return its
  * teaser. It has the articles folder hardcoded
  */
-function get_teaser($name){
+function get_title($name){
   $content = file_get_contents("articles/$name.html");
   $doc = new DOMDocument();
   $doc->loadHTML($content);
-  $teaser = $doc->getElementById("teaser");
-  return $teaser;
+  $finder = new DOMXPath($doc);
+  $query_set = $finder->query("//h1[@class='chapter' or @class='unnumbered']");
+  if (1 != $query_set->length)
+    return "No title for this item";
+  // assuming all the articles are well-formed..
+  return $query_set->item(0)->nodeValue;
 }
 
 /**
@@ -17,10 +21,11 @@ function get_teaser($name){
  * DOM. It has the articles folder hardcoded
  */
 function get_article($name){
-  $content = file_get_contents("articles/$name.html");
-  $doc = new DOMDocument();
+  $raw_content = file_get_contents("articles/$name.html");
+  return $raw_content;
+  /*$doc = new DOMDocument();
   $doc->loadHTML($content);
-  return $doc;
+  return $doc;*/
 }
 
 /**
