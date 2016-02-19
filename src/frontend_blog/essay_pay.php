@@ -15,47 +15,37 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 
-/**
- * TODO check the hashed contract in the state against the hashed contract
- * actually bundled in the deposit permission
- */
-include("../frontend_lib/merchants.php");
-include("../frontend_lib/util.php");
-include("./blog_lib.php");
-
-$article = get($_GET["article"]);
-if (empty($article))
-{
-  http_response_code(400);
-  echo json_encode(array(
-    "error" => "missing parameter",
-    "parameter" => "article"
-  ));
-  return;
-}
-
-$deposit_permission = file_get_contents('php://input');
-$resp = give_to_backend($_SERVER['HTTP_HOST'],
-                        "backend/pay",
-			$deposit_permission);
-$status_code = $resp->getResponseCode();
-
-// Our response code is the same we got from the backend:
-http_response_code ($status_code);
-// Now generate our body  
-if ($status_code != 200)
-{
-  $json = json_encode(
-    array(
-      "error" => "backend error",
-      "status" => $status_code,
-      "detail" => $resp->body->toString()));
-  echo $json;
-  die();
-}
-
-session_start();
-
-$payments = &pull($_SESSION, "payments", array());
-$payments[$article] = "payed";
+  include("../frontend_lib/merchants.php");
+  include("../frontend_lib/util.php");
+  include("./blog_lib.php");
+  $article = get($_GET["article"]);
+  if (empty($article)){
+    http_response_code(400);
+    echo json_encode(array(
+      "error" => "missing parameter",
+      "parameter" => "article"
+    ));
+    return;
+  }
+  $deposit_permission = file_get_contents('php://input');
+  // FIXME check here if the deposit permission is associated
+  // with the article that's going to be payed
+  $resp = give_to_backend($_SERVER['HTTP_HOST'],
+                          "backend/pay",
+                          $deposit_permission);
+  $status_code = $resp->getResponseCode();
+  http_response_code ($status_code);
+  if ($status_code != 200)
+  {
+    $json = json_encode(
+      array(
+        "error" => "backend error",
+        "status" => $status_code,
+        "detail" => $resp->body->toString()));
+    echo $json;
+    die();
+  }
+  session_start();
+  $payments = &pull($_SESSION, "payments", array());
+  $payments[$article] = "payed";
 ?>
