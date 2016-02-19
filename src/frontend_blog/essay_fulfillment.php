@@ -18,75 +18,6 @@
 <head>
   <title>Taler's "Demo" Blog</title>
   <link rel="stylesheet" type="text/css" href="style.css"-->
-  <script type="application/javascript" src="taler-presence.js"></script>
-  <script type="application/javascript">
-  function handle_contract(json_contract) {
-    var cEvent = new CustomEvent('taler-contract',
-                                 {detail: json_contract});
-    document.dispatchEvent(cEvent);
-  };
-
-  function get_contract(article) {
-  var contract_request = new XMLHttpRequest();
-
-  contract_request.open("GET",
-                        "essay_contract.php?article=" + article,
-			true);
-  contract_request.onload = function (e) {
-    if (contract_request.readyState == 4) {
-      if (contract_request.status == 200) {
-        console.log("response text:",
-	            contract_request.responseText);
-        handle_contract(contract_request.responseText);
-      } else {
-        alert("Failure to download contract from merchant " +
-              "(" + contract_request.status + "):\n" +
-              contract_request.responseText);
-      }
-    }
-  };
-  contract_request.onerror = function (e) {
-    alert("Failure requesting the contract:\n"
-          + contract_request.statusText);
-  };
-  contract_request.send();
-  }
-
-  function has_taler_wallet_cb(aEvent)
-  {
-    var article = document.getElementById('article-name');
-    get_contract(article.value); 
-  };
-  
-  function signal_taler_wallet_onload()
-  {
-    var eve = new Event('taler-probe');
-    document.dispatchEvent(eve);
-  };
-  
-  document.addEventListener("taler-wallet-present",
-                            has_taler_wallet_cb,
-  			  false);
-  
-  // Register event to be triggered by the wallet when it gets enabled while
-  // the user is on the payment page
-  document.addEventListener("taler-load",
-                            signal_taler_wallet_onload,
-                            false);
-
-
-
-
-  function executePayment(H_contract, pay_url, offering_url) {
-    var detail = {
-      H_contract: H_contract,
-      pay_url: pay_url,
-      offering_url: offering_url
-    };
-    var eve = new CustomEvent('taler-execute-payment', {detail: detail});
-    document.dispatchEvent(eve);
-  }
-  </script>
 </head>
 <body>
   <header>
@@ -180,4 +111,74 @@ echo $article_doc->saveHTML($article_doc->getElementById("full-article"));
     </article>
   </section>
 </body>
+  <script type="application/javascript" src="taler-presence.js"></script>
+  <script type="application/javascript">
+  function handle_contract(json_contract) {
+    var cEvent = new CustomEvent('taler-contract',
+                                 {detail: json_contract});
+    document.dispatchEvent(cEvent);
+  };
+
+  function get_contract(article) {
+  var contract_request = new XMLHttpRequest();
+
+  contract_request.open("GET",
+                        "essay_contract.php?article=" + article,
+			true);
+  contract_request.onload = function (e) {
+    if (contract_request.readyState == 4) {
+      if (contract_request.status == 200) {
+        console.log("response text:",
+	            contract_request.responseText);
+        handle_contract(contract_request.responseText);
+      } else {
+        alert("Failure to download contract from merchant " +
+              "(" + contract_request.status + "):\n" +
+              contract_request.responseText);
+      }
+    }
+  };
+  contract_request.onerror = function (e) {
+    alert("Failure requesting the contract:\n"
+          + contract_request.statusText);
+  };
+  contract_request.send();
+  }
+
+  function has_taler_wallet_cb(aEvent)
+  {
+    var article = document.getElementById('article-name');
+    get_contract(article.value); 
+  };
+  
+  function signal_taler_wallet_onload()
+  {
+    var eve = new Event('taler-probe');
+    document.dispatchEvent(eve);
+  };
+  
+  document.addEventListener("taler-wallet-present",
+                            has_taler_wallet_cb,
+  			  false);
+  
+  // Register event to be triggered by the wallet when it gets enabled while
+  // the user is on the payment page
+  document.addEventListener("taler-load",
+                            signal_taler_wallet_onload,
+                            false);
+
+
+
+
+  function executePayment(H_contract, pay_url, offering_url) {
+    var detail = {
+      H_contract: H_contract,
+      pay_url: pay_url,
+      offering_url: offering_url
+    };
+    var eve = new CustomEvent('taler-execute-payment', {detail: detail});
+    document.dispatchEvent(eve);
+  }
+  </script>
+
 </html>
