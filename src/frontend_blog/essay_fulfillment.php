@@ -28,10 +28,11 @@
   session_start();
   $payments = get($_SESSION['payments'], array());
   $my_payment = get($payments[$article]);
+  log_string("ffil " . article_state_to_str($my_payment)); 
   $pay_url = url_rel("essay_pay.php");
   $offering_url = url_rel("essay_offer.php", true);
   $offering_url .= "?article=$article";
-  if ("payed" != $my_payment || null === $my_payment){
+  if (false == $my_payment['ispayed'] || null === $my_payment){
     $tid = get($_GET['tid']);
     $timestamp = get($_GET['timestamp']);
     // 1st time
@@ -66,12 +67,12 @@
       die();
     }
     $hc = json_decode($resp->body->toString(), true)['H_contract'];
+    $my_payment['hc'] = $hc;
     $js_code = "executePayment('$hc', '$pay_url', '$offering_url')";
     $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => $js_code));
     echo $cc_page;
     return;
     }
-  
   // control here == article payed
   $article = get_article($article);
   echo $article;

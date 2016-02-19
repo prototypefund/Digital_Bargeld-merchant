@@ -19,7 +19,6 @@
   include("../frontend_lib/util.php");
   include("../frontend_lib/config.php");
   include("./blog_lib.php");
-  
   $article = get($_GET['article']);
   if (null == $article){
     echo "Please land here just to buy articles";
@@ -63,7 +62,8 @@
     $hc = $got_json["H_contract"];
     session_start();
     $payments = &pull($_SESSION, "payments", array());
-    $payments[$article] = "inprogress";
+    $payments[$article] = array("ispayed" => false);
+    log_string("ctr ".article_state_to_str($payments[$article]));
     echo $resp->body->toString();
   }
 ?>

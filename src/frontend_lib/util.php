@@ -6,9 +6,24 @@ function get(&$var, $default=null) {
 
 function &pull(&$arr, $idx, $default) {
   if (!isset($arr[$idx])) {
-    $arr[idx] = $default;
+    $arr[$idx] = $default;
   }
   return $arr[$idx];
+}
+
+function article_state_to_str($article_state){
+  if(null == $article_state || !isset($article_state))
+    return "undefined state";
+  $str = "Is payed? ";
+  $str .= $article_state['ispayed'] ? "true," : "false,";
+  if(!isset($article_state['hc']))
+    $str .= " no hashcode for this article";
+  else $str .= " " . $article_state['hc'];
+  return $str;
+}
+
+function log_string($str){
+  file_put_contents("/tmp/blog.dbg", $str . "\n", FILE_APPEND);
 }
 
 function get_full_uri(){

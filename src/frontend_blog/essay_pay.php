@@ -47,5 +47,6 @@
   }
   session_start();
   $payments = &pull($_SESSION, "payments", array());
-  $payments[$article] = "payed";
+  $payments[$article]['ispayed'] = true;
+  log_string("ispayed == true");
 ?>

@@ -11,7 +11,7 @@
 
   session_start();
   $payments = &pull($_SESSION, "payments", array());
-  $payments[$article] = "payed";
+  $payments[$article] = array("ispayed" => true);
   $fulfillment_url = url_rel("essay_fulfillment.php");
   header("Location: $fulfillment_url");
   die();
