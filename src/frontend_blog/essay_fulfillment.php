@@ -22,15 +22,16 @@
   $article = get($_GET['article']);
   if (null == $article){
     http_response_code(400);
-    echo "<p>Bad request (article missing)</p>";
+    echo message_from_missing_param("article", "/");
     return;
   }
   session_start();
   $payments = &pull($_SESSION, 'payments', array());
   $my_payment = &pull($payments, $article, array());
   $pay_url = url_rel("essay_pay.php");
-  $offering_url = url_rel("essay_offer.php", true);
+  $offering_url = url_rel("essay_fulfillment.php", true);
   $offering_url .= "?article=$article";
+  //FIXME ispayed not always defined; wrap around some check
   if (false == $payments[$article]['ispayed'] || null === $my_payment){
     $tid = get($_GET['tid']);
     $timestamp = get($_GET['timestamp']);
@@ -44,6 +45,18 @@
     // restore contract
     $now = new DateTime();
     $now->setTimestamp(intval($timestamp));
+
+    $contract_rec = _generate_contract(array("amount_value" => 0,
+                                         "amount_fraction" => 50000,
+                                         "currency" => $MERCHANT_CURRENCY,
+  		 	                 "transaction_id" => intval($tid),
+  				         "description" => trim(get_title($article)),
+  				         "product_id" => $article,
+  				         "correlation_id" => $article,
+  				         "taxes" => array(),
+  				         "now" => $now,
+  				         "fulfillment_url" => get_full_uri()));
+    /*
     $contract_rec = generate_contract(0,
                                       50000,
   		                      $MERCHANT_CURRENCY,
@@ -53,7 +66,7 @@
   				      $article,
   				      array(),
   				      $now,
-  				      get_full_uri());
+  				      get_full_uri());*/
     $resp = give_to_backend($_SERVER['HTTP_HOST'],
                             "backend/contract",
                             $contract_rec);

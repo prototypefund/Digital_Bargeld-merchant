@@ -11,6 +11,10 @@ function &pull(&$arr, $idx, $default) {
   return $arr[$idx];
 }
 
+function message_from_missing_param($missing, $link, $link_name="home page"){
+  return "<p>Bad request, no $missing given. Return to <a href=\"$link\">$link_name</a></p>";
+}
+
 function article_state_to_str($article_state){
   if(null == $article_state || !isset($article_state))
     return "undefined state";

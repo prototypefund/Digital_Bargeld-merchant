@@ -21,7 +21,7 @@
   include("./blog_lib.php");
   $article = get($_GET['article']);
   if (null == $article){
-    echo "Please land here just to buy articles";
+    echo message_from_missing_param("article", "/");
     die();
     }
   // send contract
@@ -35,7 +35,8 @@
   $fulfillment_url = url_rel("essay_fulfillment.php")
     . '&timestamp=' . $now->getTimestamp()
     . '&tid=' . $transaction_id;
-  $contract_json = generate_contract($amount_value,
+
+/*  $contract_json = generate_contract($amount_value,
                                      $amount_fraction,
                                      $MERCHANT_CURRENCY,
   				     $transaction_id,
@@ -44,7 +45,18 @@
   				     $article,
   				     $teatax,
   				     $now,
-  				     $fulfillment_url);
+  				     $fulfillment_url);*/
+
+  $contract_json = _generate_contract(array("amount_value" => $amount_value,
+                                            "amount_fraction" => $amount_fraction,
+                                            "currency" => $MERCHANT_CURRENCY,
+  		 	                    "transaction_id" => $transaction_id,
+  				            "description" => trim($teaser),
+  				            "product_id" => $article,
+  				            "correlation_id" => $article,
+  				            "taxes" => $teatax,
+  				            "now" => $now,
+  				            "fulfillment_url" => $fulfillment_url));
   $resp = give_to_backend($_SERVER['HTTP_HOST'],
                           "backend/contract",
   	                  $contract_json);
