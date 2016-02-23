@@ -51,7 +51,7 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
  */
 
-include '../frontend_lib/util.php';
+include '../../copylib/util.php';
 
 $hc = get($_GET["uuid"]);
 

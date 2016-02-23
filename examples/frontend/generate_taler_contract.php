@@ -15,8 +15,9 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
  */
 
-include '../frontend_lib/util.php';
-include "../frontend_lib/config.php";
+include '../../copylib/util.php';
+include "../../copylib/config.php";
+include "../../copylib/merchants.php";
 
 session_start();
 
@@ -53,7 +54,24 @@ $fulfillment_url = url_rel("fulfillment.php")
   . '&acurr=' . urlencode($currency)
   . '&tid=' . $transaction_id;
 
+
+  $contract = _generate_contract(array("amount_value" => $amount_value,
+                                       "amount_fraction" => $amount_fraction,
+                                       "currency" => $currency,
+				       "refund_delta" => 'P3M',
+  		 	               "transaction_id" => $transaction_id,
+  				       "description" => $desc,
+  				       "product_id" => $p_id,
+  				       "correlation_id" => "",
+				       "merchant_name" => "Kudos Inc.",
+  				       "taxes" => array(),
+  				       "now" => $now,
+  				       "fulfillment_url" => $fulfillment_url));
+
+
 // pack the JSON for the contract 
+
+/*
 $contract = array(
   'fulfillment_url' => $fulfillment_url,
   'amount' => array(
@@ -86,6 +104,7 @@ $contract = array(
     'name' => 'Kudos Inc.'
   )
 );
+*/
 
 $json = json_encode(array(
   'contract' => $contract
@@ -97,7 +116,7 @@ $req = new http\Client\Request("POST",
                                $url,
                                array ("Content-Type" => "application/json"));
 
-$req->getBody()->append($json);
+$req->getBody()->append($contract);
 
 // Execute the HTTP request
 $client = new http\Client;

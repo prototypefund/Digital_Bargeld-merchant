@@ -14,9 +14,9 @@
   You should have received a copy of the GNU Lesser General Public License along with
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
-  include '../frontend_lib/util.php';
-  include '../frontend_lib/merchants.php';
-  include '../frontend_lib/config.php';
+  include '../../copylib/util.php';
+  include '../../copylib/merchants.php';
+  include '../../copylib/config.php';
   include './blog_lib.php';
   
   $article = get($_GET['article']);
@@ -32,7 +32,7 @@
   $offering_url = url_rel("essay_fulfillment.php", true);
   $offering_url .= "?article=$article";
   //FIXME ispayed not always defined; wrap around some check
-  if (false == $payments[$article]['ispayed'] || null === $my_payment){
+  if (null === get($payments[$article]['ispayed']) || null === $my_payment){
     $tid = get($_GET['tid']);
     $timestamp = get($_GET['timestamp']);
     // 1st time
@@ -49,6 +49,8 @@
     $contract_rec = _generate_contract(array("amount_value" => 0,
                                          "amount_fraction" => 50000,
                                          "currency" => $MERCHANT_CURRENCY,
+					 "refund_delta" => $REFUND_DELTA,
+					 "merchant_name" => "Free Software Foundation (demo)",
   		 	                 "transaction_id" => intval($tid),
   				         "description" => trim(get_title($article)),
   				         "product_id" => $article,

@@ -15,8 +15,8 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 
-  include("../frontend_lib/merchants.php");
-  include("../frontend_lib/util.php");
+  include("../../copylib/merchants.php");
+  include("../../copylib/util.php");
   include("./blog_lib.php");
   $article = get($_GET["article"]);
   if (empty($article)){

@@ -1,5 +1,5 @@
 <?php
-  include '../frontend_lib/util.php';
+  include '../../copylib/util.php';
   include './blog_lib.php';
 
   $article = get($_GET['article']);

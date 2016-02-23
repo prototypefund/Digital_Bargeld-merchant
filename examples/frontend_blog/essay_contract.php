@@ -15,9 +15,9 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 
-  include("../frontend_lib/merchants.php");
-  include("../frontend_lib/util.php");
-  include("../frontend_lib/config.php");
+  include("../../copylib/merchants.php");
+  include("../../copylib/util.php");
+  include("../../copylib/config.php");
   include("./blog_lib.php");
   $article = get($_GET['article']);
   if (null == $article){
@@ -50,8 +50,10 @@
   $contract_json = _generate_contract(array("amount_value" => $amount_value,
                                             "amount_fraction" => $amount_fraction,
                                             "currency" => $MERCHANT_CURRENCY,
+					    "refund_delta" => $REFUND_DELTA,
   		 	                    "transaction_id" => $transaction_id,
   				            "description" => trim($teaser),
+					    "merchant_name" => "Free Software Foundation (demo)",
   				            "product_id" => $article,
   				            "correlation_id" => $article,
   				            "taxes" => $teatax,

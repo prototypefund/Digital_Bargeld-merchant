@@ -7,7 +7,6 @@
  * triple). Moreover, `teatax` should be a *list* of taxes
  */
 function _generate_contract($args){
-  include("../frontend_lib/config.php");
   $contract = array ('amount' =>
                 array ('value' => $args['amount_value'],
   		       'fraction' => $args['amount_fraction'],
@@ -32,12 +31,12 @@ function _generate_contract($args){
   		'expiry' =>
 		  "/Date(" . $args['now']->add(new DateInterval('P2W'))->getTimestamp() . ")/",
   		'refund_deadline' =>
-		  "/Date(" . $args['now']->add(new DateInterval($REFUND_DELTA))->getTimestamp() . ")/",
+		  "/Date(" . $args['now']->add(new DateInterval($args['refund_delta']))->getTimestamp() . ")/",
 		'repurchase_correlation_id' => $args['correlation_id'],
 		'fulfillment_url' => $args['fulfillment_url'],
   		'merchant' =>
 		  array ('address' => 'LNAME2',
-  		         'name' => 'Free Software Foundations (demo)',
+  		         'name' => $args['merchant_name'],
   		         'jurisdiction' => 'LNAME3'),
                 'locations' =>
 		  array ('LNAME1' =>

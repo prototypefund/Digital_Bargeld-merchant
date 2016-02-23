@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <?php
-require_once "../frontend_lib/config.php";
+require_once "../../copylib/config.php";
 ?>
 <html lang="en">
 <head>
