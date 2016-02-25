@@ -20,7 +20,6 @@
         Nationality<br> <input type="text"></input><br>
         Gender<br> <input type="radio" name"gender">Male</input>
         <input type="radio" name="gender">Female</input><br>
-        <input id='article-name' type="hidden" value="{article}"></input>
       </form>
       <form method="post" action="essay_cc-fulfillment.php?article={article}">
         <input type="submit"></input>
@@ -59,8 +58,9 @@
     }
 
     function has_taler_wallet_cb(aEvent){
-      var article = document.getElementById('article-name');
-      get_contract(article.value); 
+      //var article = document.getElementById('article-name');
+      //get_contract(article.value); 
+      get_contract("{article}"); 
     };
   
     function signal_taler_wallet_onload(){
@@ -89,7 +89,7 @@
     }
     </script>
     <script type="application/javascript" src="taler-presence.js"></script>
-    <script type="text/javascript">
+    <script type="application/javascript">
       {jscode}
     </script>
   </body>

@@ -26,22 +26,31 @@
     return;
   }
   session_start();
+
   $payments = &pull($_SESSION, 'payments', array());
-  $my_payment = &pull($payments, $article, array());
+  $my_payment = &pull($payments, $article, false);
+
+  // BUGGY
+  //$payments = &pull($_SESSION, 'payments', array());
+  //$my_payment = &pull($payments, $article, array());
+  
   $pay_url = url_rel("essay_pay.php");
   $offering_url = url_rel("essay_fulfillment.php", true);
   $offering_url .= "?article=$article";
-  //FIXME ispayed not always defined; wrap around some check
-  if (null === get($payments[$article]['ispayed']) || null === $my_payment){
+
+  //if (null === get($payments[$article]['ispayed']) || null === $my_payment){ # BUGGY
+  // In PHP false == null
+  if (null == get($payments[$article]['ispayed']) || false == $my_payment){
     $tid = get($_GET['tid']);
     $timestamp = get($_GET['timestamp']);
     // 1st time
     if (null == $tid || null == $timestamp){
-      $js_code = "get_contract(\"$article\")";
-      $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => $js_code));
+      $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => null));
       echo $cc_page;
-      die();
+      log_string("cnt blog");
+      return;
     }
+    log_string("restoring blog");
     // restore contract
     $now = new DateTime();
     $now->setTimestamp(intval($timestamp));
@@ -85,9 +94,11 @@
     $js_code = "executePayment('$hc', '$pay_url', '$offering_url')";
     $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => $js_code));
     echo $cc_page;
+    log_string("pay blog");
     return;
     }
   // control here == article payed
+  log_string("arti blog");
   $article = get_article($article);
   echo $article;
 ?>
