@@ -58,12 +58,7 @@
     }
 
     function has_taler_wallet_cb(aEvent){
-      //{jscode}
-    };
-  
-    function signal_taler_wallet_onload(){
-      var eve = new Event('taler-probe');
-      document.dispatchEvent(eve);
+      {jscode}
     };
   
     document.addEventListener("taler-wallet-present",
@@ -85,11 +80,8 @@
       var eve = new CustomEvent('taler-execute-payment', {detail: detail});
       document.dispatchEvent(eve);
     }
+
     </script>
     <script type="application/javascript" src="taler-presence.js"></script>
-    <script type="application/javascript">
-      {jscode} 
-    </script>
-
   </body>
 </html>
