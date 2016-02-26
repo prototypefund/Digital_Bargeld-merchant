@@ -18,6 +18,9 @@
   include("../../copylib/merchants.php");
   include("../../copylib/util.php");
   include("./blog_lib.php");
+  
+  log_string("paying");
+
   $article = get($_GET["article"]);
   if (empty($article)){
     http_response_code(400);
@@ -30,6 +33,17 @@
   $deposit_permission = file_get_contents('php://input');
   // FIXME check here if the deposit permission is associated
   session_start();
+  if (!isset($_SESSION["payments"])) {
+    $json = json_encode(
+      array(
+        "error" => "no payments ongoing",
+        "status" => 500,
+        "detail" => "the shop has no state for any article"
+      )
+    );
+    echo $json;
+    die();
+  }
   $payments = &pull($_SESSION, "payments", array());
   $dec_dep_perm = json_decode($deposit_permission, true);
   if ($dec_dep_perm['H_contract'] != $payments[$article]['hc']){

@@ -1,6 +1,5 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html401/loose.dtd">
-<html>
-<!-- This is the second edition of Free Software, Free Society: Selected Essays of Richard M. Stallman.
+<html><!-- This is the second edition of Free Software, Free Society: Selected Essays of Richard M. Stallman.
 
 Free Software Foundation
 
@@ -20,8 +19,7 @@ ISBN 978-0-9831592-0-9
 Cover design by Rob Myers.
 
 Cover photograph by Peter Hinely.
- -->
-<!-- Created on February 18, 2016 by texi2html 1.82
+ --><!-- Created on February 18, 2016 by texi2html 1.82
 texi2html was written by: 
             Lionel Cons <Lionel.Cons@cern.ch> (original author)
             Karl Berry  <karl@freefriends.org>
@@ -29,17 +27,7 @@ texi2html was written by:
             and many others.
 Maintained by: Many creative people.
 Send bugs and suggestions to <texi2html-bug@nongnu.org>
--->
-<head>
-<title>Free Software, Free Society, 2nd ed.: 34. Free but Shackled: The Java Trap</title>
-
-<meta name="description" content="This is the second edition of Richard Stallman's collection of essays.">
-<meta name="keywords" content="Free Software, Free Society, 2nd ed.: 34. Free but Shackled: The Java Trap">
-<meta name="resource-type" content="document">
-<meta name="distribution" content="global">
-<meta name="Generator" content="texi2html 1.82">
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<style type="text/css">
+--><head><title>Free Software, Free Society, 2nd ed.: 34. Free but Shackled: The Java Trap</title><meta name="description" content="This is the second edition of Richard Stallman's collection of essays."><meta name="keywords" content="Free Software, Free Society, 2nd ed.: 34. Free but Shackled: The Java Trap"><meta name="resource-type" content="document"><meta name="distribution" content="global"><meta name="Generator" content="texi2html 1.82"><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><style type="text/css">
 <!--
 a.summary-letter {text-decoration: none}
 blockquote.smallquotation {font-size: smaller}
@@ -55,48 +43,36 @@ span.roman {font-family:serif; font-weight:normal;}
 span.sansserif {font-family:sans-serif; font-weight:normal;}
 ul.toc {list-style: none}
 -->
-</style>
-<link rel="stylesheet" type="text/css" href="../style.css">
-
-
-</head>
-
-<body lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
+</style><link rel="stylesheet" type="text/css" href="../style.css"></head><body lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
 
 <a name="Java-Trap"></a>
-<header><div id="logo"><img src="../gnu.svg" height="100" width="100"></div><h1>Free Software, Free Society, 2nd ed.</h1></header><section id="main"><a name="Free-but-Shackled_003a-The-Java-Trap"></a>
+<header><div id="logo"><a href="/"><img src="../gnu.svg" height="100" width="100"></a></div><h1>Free Software, Free Society, 2nd ed.</h1></header><section id="main"><a name="Free-but-Shackled_003a-The-Java-Trap"></a>
 <h1 class="chapter"> 34. Free but Shackled: The Java Trap </h1>
 
 
-<blockquote class="smallquotation"><p>Since this article was first published, on 12&nbsp;April&nbsp; 2004, Sun has relicensed most of its Java platform reference
+<blockquote class="smallquotation"><p>Since this article was first published, on 12 April  2004, Sun has relicensed most of its Java platform reference
 implementation under the GNU General Public License, and there is now
 a free development environment for Java. Thus, the Java language as
-such is no longer a trap.<br>
-</p>
+such is no longer a trap.<br></p>
 <p>You must be careful, however, because not every Java platform is
 free. Sun continues distributing an executable Java platform which is
-nonfree, and other companies do so too.<br>
-</p>
+nonfree, and other companies do so too.<br></p>
 <p>The free environment for Java is called IcedTea; the source code Sun
 freed is included in that. So that is the one you should use. Many
 GNU/Linux distributions come with IcedTea, but some include nonfree
-Java platforms.<br>
-</p>
+Java platforms.<br></p>
 <p>To reliably ensure your Java programs run fine in a free environment,
 you need to develop them using IcedTea. Theoretically the Java
-platforms should be compatible, but they are not compatible 100 percent.<br>
-</p>
-<p>In addition, there are nonfree programs with &ldquo;Java&rdquo; in their name,
+platforms should be compatible, but they are not compatible 100 percent.<br></p>
+<p>In addition, there are nonfree programs with “Java” in their name,
 such as JavaFX, and there are nonfree Java packages you might find
 tempting but need to reject. So check the licenses of whatever
 packages you plan to use. If you use Swing, make sure to use the free
-version, which comes with IcedTea.<br>
-</p>
+version, which comes with IcedTea.<br></p>
 <p>Aside from those Java specifics, the general issue described here
 remains important, because any nonfree library or programming platform
 can cause a similar problem. We must learn a lesson from the history
-of Java, so we can avoid other traps in the future.<br>
-</p></blockquote>
+of Java, so we can avoid other traps in the future.<br></p></blockquote>
 
 <a name="index-traps_002c-nonfree-libraries-2"></a>
 <a name="index-libraries-_0028comp_002e_0029_002c-as-traps-1"></a>
@@ -105,7 +81,7 @@ of Java, so we can avoid other traps in the future.<br>
 <a name="index-Swing-library"></a>
 <a name="index-JavaFX"></a>
 <a name="index-IcedTea-_0028see-also-Java_0029"></a>
-<p>If your program is free software, it is basically ethical&mdash;but
+<p>If your program is free software, it is basically ethical—but
 there is a trap you must be on guard for. Your program, though in
 itself free, may be restricted by nonfree software that it depends
 on. Since the problem is most prominent today for Java programs, we
@@ -115,13 +91,13 @@ call it the Java Trap.
 freedoms. Roughly speaking, they are: the freedom to run the program,
 the freedom to study and change the source, the freedom to
 redistribute the source and binaries, and the freedom to publish
-improved versions. (See &ldquo;The Free Software Definition,&rdquo; on p.&nbsp;@refx{Definition-pg}{.) Whether any given program in source form is free software
+improved versions. (See “The Free Software Definition,” on p. @refx{Definition-pg}{.) Whether any given program in source form is free software
 depends solely on the meaning of its license.
 </p>
 <a name="index-traps_002c-nonfree-dependencies"></a>
 <p>Whether the program can be used in the Free World, used by people
 who mean to live in freedom, is a more complex question. This is not
-determined by the program&rsquo;s own license alone, because no program
+determined by the program’s own license alone, because no program
 works in isolation. Every program depends on other programs. For
 instance, a program needs to be compiled or interpreted, so it depends
 on a compiler or interpreter. If compiled into byte code, it depends
@@ -132,11 +108,11 @@ be necessary for the program to run at all, or they may be necessary
 only for certain features. Either way, all or part of the program
 cannot operate without the dependencies.
 </p>
-<p>If some of a program&rsquo;s dependencies are nonfree, this means that all
+<p>If some of a program’s dependencies are nonfree, this means that all
 or part of the program is unable to run in an entirely free
-system&mdash;it is unusable in the Free World. Sure, we could redistribute
-the program and have copies on our machines, but that&rsquo;s not much good
-if it won&rsquo;t run. That program is free software, but it is effectively
+system—it is unusable in the Free World. Sure, we could redistribute
+the program and have copies on our machines, but that’s not much good
+if it won’t run. That program is free software, but it is effectively
 shackled by its nonfree dependencies.
 </p>
 <p>This problem can occur in any kind of software, in any language. For
@@ -159,16 +135,16 @@ overlook the issue of dependencies and fall into the Java Trap.
 </p>
 <a name="index-GNU_002c-GCJ"></a>
 <a name="index-GNU_002c-GNU-Classpath"></a>
-<p>Sun&rsquo;s implementation of Java is nonfree. The standard Java libraries
+<p>Sun’s implementation of Java is nonfree. The standard Java libraries
 are nonfree also. We do have free implementations of Java, such as the
-GNU Compiler for Java (GCJ) and GNU Classpath, but they don&rsquo;t support
+GNU Compiler for Java (GCJ) and GNU Classpath, but they don’t support
 all the features yet. We are still catching up.
 </p>
-<p>If you develop a Java program on Sun&rsquo;s Java platform, you are liable
+<p>If you develop a Java program on Sun’s Java platform, you are liable
 to use Sun-only features without even noticing. By the time you find
 this out, you may have been using them for months, and redoing the
-work could take more months. You might say, &ldquo;It&rsquo;s too much work to
-start over.&rdquo; Then your program will have fallen into the Java Trap;
+work could take more months. You might say, “It’s too much work to
+start over.” Then your program will have fallen into the Java Trap;
 it will be unusable in the Free World.
 </p>
 <p>The reliable way to avoid the Java Trap is to have only a free
@@ -176,9 +152,9 @@ implementation of Java on your system. Then if you use a Java feature
 or library that free software does not yet support, you will find out
 straightaway, and you can rewrite that code immediately.
 </p>
-<p>Sun continues to develop additional &ldquo;standard&rdquo; Java libraries, and
-nearly all of them are nonfree; in many cases, even a library&rsquo;s
-specification is a trade secret, and Sun&rsquo;s latest license for these
+<p>Sun continues to develop additional “standard” Java libraries, and
+nearly all of them are nonfree; in many cases, even a library’s
+specification is a trade secret, and Sun’s latest license for these
 specifications prohibits release of anything less than a full
 implementation of the specification. (See
 <a href="http://jcp.org/aboutJava/communityprocess/JSPA2.pdf">http://jcp.org/aboutJava/communityprocess/JSPA2.pdf</a>
@@ -245,7 +221,7 @@ Classpath. Trying your programs with the GCJ Compiler and GNU
 Classpath, and reporting any problems you encounter in classes already
 implemented, is also useful. However, finishing GNU Classpath will
 take time; if more nonfree libraries continue to be added, we may
-never have all the latest ones. So please don&rsquo;t put your free software
+never have all the latest ones. So please don’t put your free software
 in shackles. When you write an application program today, write it to
 run on free facilities from the start.
 <a name="index-libraries-_0028comp_002e_0029_002c-as-traps-2"></a>
@@ -254,6 +230,4 @@ run on free facilities from the start.
 <a name="index-GNU_002c-GCJ-1"></a>
 <a name="index-traps_002c-nonfree-dependencies-1"></a>
 <a name="index-GNU_002c-GNU-Classpath-1"></a>
-</p><hr size="2">
-</body>
-</html>
+</p><hr size="2"></section></body></html>
