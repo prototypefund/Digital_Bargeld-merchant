@@ -30,27 +30,24 @@
   $payments = &pull($_SESSION, 'payments', array());
   $my_payment = &pull($payments, $article, false);
 
-  // BUGGY
-  //$payments = &pull($_SESSION, 'payments', array());
-  //$my_payment = &pull($payments, $article, array());
-  
   $pay_url = url_rel("essay_pay.php");
   $offering_url = url_rel("essay_fulfillment.php", true);
   $offering_url .= "?article=$article";
 
-  //if (null === get($payments[$article]['ispayed']) || null === $my_payment){ # BUGGY
   // In PHP false == null
   if (null == get($payments[$article]['ispayed']) || false == $my_payment){
     $tid = get($_GET['tid']);
     $timestamp = get($_GET['timestamp']);
     // 1st time
     if (null == $tid || null == $timestamp){
-      $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => null));
+      $js_code = "get_contract(\"$article\");";
+      $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => $js_code));
       echo $cc_page;
       log_string("cnt blog");
       return;
     }
     log_string("restoring blog");
+    //log_string("state: " . print_r($_SESSION, true));
     // restore contract
     $now = new DateTime();
     $now->setTimestamp(intval($timestamp));
@@ -91,10 +88,10 @@
     }
     $hc = json_decode($resp->body->toString(), true)['H_contract'];
     $my_payment['hc'] = $hc;
-    $js_code = "executePayment('$hc', '$pay_url', '$offering_url')";
+    log_string("sending payment event");
+    $js_code = "executePayment(\"$hc\", \"$pay_url\", \"$offering_url\");";
     $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => $js_code));
     echo $cc_page;
-    log_string("pay blog");
     return;
     }
   // control here == article payed
