@@ -176,7 +176,7 @@ function taler_pay(form) {
 
 /* This function is called when the user presses the
    'Ok' button.  We are now supposed to trigger the
-   "corret" payment system logic. For this demo, we
+   "correct" payment system logic. For this demo, we
    only handle "taler". */
 function pay(form) {
   var choice = form.elements["payment_system"].value;
