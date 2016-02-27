@@ -1,3 +1,14 @@
-The new merchant's layout is reflected by the directories 'frontend' and 'backend',
-being respectively the PHP website homepage and the C 'core' which is charge of
-providing all the cryptographic and DB related primitives.
+Files are organized in two main chunks: (1) the ones which implement
+Taler "core" protocol and that must be used 'as is' by the merchants
+willing to use Taler, and (2) examples of mrchants using files of (1).
+
+In particular, the structure is such that:
+
+- 'src/' contains the merchant "backend", a C piece of software which
+  implements cryto routines and communication with the 'exchange'
+- 'examples/' contains examples of merchants using Taler, as may be a
+  simple donation shop or a blog
+- 'copylib/' contains commons routines that any merchant using Taler
+  needs; for example, some JavaScript which detects if the user has a
+  Taler wallet installed
+- 'doc/' contains documentation files, like TeXinfo
