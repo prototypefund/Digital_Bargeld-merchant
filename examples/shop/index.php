@@ -6,7 +6,7 @@ require_once "../../copylib/config.php";
 <head>
   <title>Taler Donation Demo</title>
   <link rel="stylesheet" type="text/css" href="style.css">
-  <script src="taler-presence.js" type="text/javascript"></script>
+  <script src="web-common/taler-presence.js" type="text/javascript"></script>
 <script type="text/javascript">
 <?php
 echo "\tvar shop_currency = '$MERCHANT_CURRENCY';\n";

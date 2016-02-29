@@ -29,7 +29,7 @@
       for the JavaScript code in this page.
       */
   </script>
-  <script type="application/javascript" src="taler-presence.js"></script>
+  <script type="application/javascript" src="web-common/taler-presence.js"></script>
 </head>
 <body>
 <!--
