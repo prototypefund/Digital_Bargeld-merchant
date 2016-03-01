@@ -60,16 +60,16 @@ AM_CONDITIONAL(HAVE_POSTGRESQL, test x$postgres = xtrue)
 # Check for Taler's libtalerpq
 libtalerpq=0
 AC_MSG_CHECKING([for libtalerpq])
-AC_ARG_WITH(mint,
-            [AS_HELP_STRING([--with-mint=PFX], [base of Taler MINT installation])],
-            [AC_MSG_RESULT([given as $with_mint])],
+AC_ARG_WITH(exchange,
+            [AS_HELP_STRING([--with-exchange=PFX], [base of Taler EXCHANGE installation])],
+            [AC_MSG_RESULT([given as $with_exchange])],
             [AC_MSG_RESULT(not given)
-             with_mint=yes])
-AS_CASE([$with_mint],
+             with_exchange=yes])
+AS_CASE([$with_exchange],
         [yes], [],
-        [no], [AC_MSG_ERROR([--with-mint is required])],
-        [LDFLAGS="-L$with_mint/lib $LDFLAGS"
-         CPPFLAGS="-I$with_mint/include $CPPFLAGS $POSTGRESQL_CPPFLAGS"])
+        [no], [AC_MSG_ERROR([--with-exchange is required])],
+        [LDFLAGS="-L$with_exchange/lib $LDFLAGS"
+         CPPFLAGS="-I$with_exchange/include $CPPFLAGS $POSTGRESQL_CPPFLAGS"])
 
 CPPFLAGS="$CPPFLAGS $POSTGRESQL_CPPFLAGS"
 LDFLAGS="$LDFLAGS -L/usr/local/lib"

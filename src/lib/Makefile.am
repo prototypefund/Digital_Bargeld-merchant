@@ -42,7 +42,7 @@ test_merchant_api_SOURCES = \
 test_merchant_api_LDADD = \
   libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
-  -ltalermint \
+  -ltalerexchange \
   -ltalerutil \
   -lgnunetutil \
   -ljansson

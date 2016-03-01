@@ -64,8 +64,8 @@ echo "\tvar shop_currency = '$MERCHANT_CURRENCY';\n";
         <br>
         This page, <tt>shop.demo.taler.net</tt> models the behavior of a
         typical Web shop supporting Taler.  The other pages of the demo,
-        <tt>mint.demo.taler.net</tt> and
-        <tt>bank.demo.taler.net</tt>, correspond to a Taler mint
+        <tt>exchange.demo.taler.net</tt> and
+        <tt>bank.demo.taler.net</tt>, correspond to a Taler exchange
         and bank with tight Taler integration respectively.  You
         may also enjoy visiting the <tt>blog.demo.taler.net</tt>.
       </p>

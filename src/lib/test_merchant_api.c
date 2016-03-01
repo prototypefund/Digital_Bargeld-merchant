@@ -21,7 +21,7 @@
 #include "platform.h"
 #include <taler/taler_util.h>
 #include <taler/taler_signatures.h>
-#include <taler/taler_mint_service.h>
+#include <taler/taler_exchange_service.h>
 #include "taler_merchant_service.h"
 #include <gnunet/gnunet_util_lib.h>
 #include <microhttpd.h>
@@ -32,22 +32,22 @@
 #define MERCHANT_URI "http://localhost:8082/"
 
 /**
- * URI under which the mint is reachable during the testcase.
+ * URI under which the exchange is reachable during the testcase.
  */
-#define MINT_URI "http://localhost:8081/"
+#define EXCHANGE_URI "http://localhost:8081/"
 
 /**
- * Main execution context for the main loop of the mint.
+ * Main execution context for the main loop of the exchange.
  */
-static struct TALER_MINT_Context *ctx;
+static struct TALER_EXCHANGE_Context *ctx;
 
 /**
- * Handle to access the mint.
+ * Handle to access the exchange.
  */
-static struct TALER_MINT_Handle *mint;
+static struct TALER_EXCHANGE_Handle *exchange;
 
 /**
- * Main execution context for the main loop of the mint.
+ * Main execution context for the main loop of the exchange.
  */
 static struct TALER_MERCHANT_Context *merchant;
 
@@ -139,10 +139,10 @@ struct FreshCoin
    * use.  Otherwise, this will be set (by the interpreter) to the
    * denomination PK matching @e amount.
    */
-  const struct TALER_MINT_DenomPublicKey *pk;
+  const struct TALER_EXCHANGE_DenomPublicKey *pk;
 
   /**
-   * Set (by the interpreter) to the mint's signature over the
+   * Set (by the interpreter) to the exchange's signature over the
    * coin's public key.
    */
   struct TALER_DenominationSignature sig;
@@ -156,7 +156,7 @@ struct FreshCoin
 
 
 /**
- * Details for a mint operation to execute.
+ * Details for a exchange operation to execute.
  */
 struct Command
 {
@@ -213,7 +213,7 @@ struct Command
       /**
        * Set to the API's handle during the operation.
        */
-      struct TALER_MINT_AdminAddIncomingHandle *aih;
+      struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
 
     } admin_add_incoming;
 
@@ -232,7 +232,7 @@ struct Command
       /**
        * Set to the API's handle during the operation.
        */
-      struct TALER_MINT_ReserveStatusHandle *wsh;
+      struct TALER_EXCHANGE_ReserveStatusHandle *wsh;
 
       /**
        * Expected reserve balance.
@@ -254,7 +254,7 @@ struct Command
 
       /**
        * String describing the denomination value we should withdraw.
-       * A corresponding denomination key must exist in the mint's
+       * A corresponding denomination key must exist in the exchange's
        * offerings.  Can be NULL if @e pk is set instead.
        */
       const char *amount;
@@ -264,10 +264,10 @@ struct Command
        * use.  Otherwise, this will be set (by the interpreter) to the
        * denomination PK matching @e amount.
        */
-      const struct TALER_MINT_DenomPublicKey *pk;
+      const struct TALER_EXCHANGE_DenomPublicKey *pk;
 
       /**
-       * Set (by the interpreter) to the mint's signature over the
+       * Set (by the interpreter) to the exchange's signature over the
        * coin's public key.
        */
       struct TALER_DenominationSignature sig;
@@ -285,7 +285,7 @@ struct Command
       /**
        * Withdraw handle (while operation is running).
        */
-      struct TALER_MINT_ReserveWithdrawHandle *wsh;
+      struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
 
     } reserve_withdraw;
 
@@ -371,9 +371,9 @@ struct Command
 struct InterpreterState
 {
   /**
-   * Keys from the mint.
+   * Keys from the exchange.
    */
-  const struct TALER_MINT_Keys *keys;
+  const struct TALER_EXCHANGE_Keys *keys;
 
   /**
    * Commands the interpreter will run.
@@ -463,7 +463,7 @@ find_command (const struct InterpreterState *is,
 
 
 /**
- * Run the main interpreter loop that performs mint operations.
+ * Run the main interpreter loop that performs exchange operations.
  *
  * @param cls contains the `struct InterpreterState`
  * @param tc scheduler context
@@ -478,8 +478,8 @@ interpreter_run (void *cls,
  *
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
- *                    0 if the mint's reply is bogus (fails to follow the protocol)
- * @param full_response full response from the mint (for logging, in case of errors)
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param full_response full response from the exchange (for logging, in case of errors)
  */
 static void
 add_incoming_cb (void *cls,
@@ -511,12 +511,12 @@ add_incoming_cb (void *cls,
  * @return #GNUNET_OK if they match, #GNUNET_SYSERR if not
  */
 static int
-compare_admin_add_incoming_history (const struct TALER_MINT_ReserveHistory *h,
+compare_admin_add_incoming_history (const struct TALER_EXCHANGE_ReserveHistory *h,
                                     const struct Command *cmd)
 {
   struct TALER_Amount amount;
 
-  if (TALER_MINT_RTT_DEPOSIT != h->type)
+  if (TALER_EXCHANGE_RTT_DEPOSIT != h->type)
   {
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
@@ -543,13 +543,13 @@ compare_admin_add_incoming_history (const struct TALER_MINT_ReserveHistory *h,
  * @return #GNUNET_OK if they match, #GNUNET_SYSERR if not
  */
 static int
-compare_reserve_withdraw_history (const struct TALER_MINT_ReserveHistory *h,
+compare_reserve_withdraw_history (const struct TALER_EXCHANGE_ReserveHistory *h,
                                   const struct Command *cmd)
 {
   struct TALER_Amount amount;
   struct TALER_Amount amount_with_fee;
 
-  if (TALER_MINT_RTT_WITHDRAWAL != h->type)
+  if (TALER_EXCHANGE_RTT_WITHDRAWAL != h->type)
   {
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
@@ -576,7 +576,7 @@ compare_reserve_withdraw_history (const struct TALER_MINT_ReserveHistory *h,
  *
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
- *                    0 if the mint's reply is bogus (fails to follow the protocol)
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
  * @param[in] json original response in JSON format (useful only for diagnostics)
  * @param balance current balance in the reserve, NULL on error
  * @param history_length number of entries in the transaction history, 0 on error
@@ -588,7 +588,7 @@ reserve_status_cb (void *cls,
                    json_t *json,
                    const struct TALER_Amount *balance,
                    unsigned int history_length,
-                   const struct TALER_MINT_ReserveHistory *history)
+                   const struct TALER_EXCHANGE_ReserveHistory *history)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -692,9 +692,9 @@ reserve_status_cb (void *cls,
  *
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
- *                    0 if the mint's reply is bogus (fails to follow the protocol)
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
  * @param sig signature over the coin, NULL on error
- * @param full_response full response from the mint (for logging, in case of errors)
+ * @param full_response full response from the exchange (for logging, in case of errors)
  */
 static void
 reserve_withdraw_cb (void *cls,
@@ -748,7 +748,7 @@ reserve_withdraw_cb (void *cls,
  *
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
- *                    0 if the mint's reply is bogus (fails to follow the protocol)
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
  * @param obj the received JSON reply, should be kept as proof (and, in case of errors,
  *            be forwarded to the customer)
  */
@@ -785,13 +785,13 @@ pay_cb (void *cls,
  * @param amount coin value to look for
  * @return NULL if no matching key was found
  */
-static const struct TALER_MINT_DenomPublicKey *
-find_pk (const struct TALER_MINT_Keys *keys,
+static const struct TALER_EXCHANGE_DenomPublicKey *
+find_pk (const struct TALER_EXCHANGE_Keys *keys,
          const struct TALER_Amount *amount)
 {
   unsigned int i;
   struct GNUNET_TIME_Absolute now;
-  struct TALER_MINT_DenomPublicKey *pk;
+  struct TALER_EXCHANGE_DenomPublicKey *pk;
   char *str;
 
   now = GNUNET_TIME_absolute_get ();
@@ -833,7 +833,7 @@ find_pk (const struct TALER_MINT_Keys *keys,
 
 
 /**
- * Run the main interpreter loop that performs mint operations.
+ * Run the main interpreter loop that performs exchange operations.
  *
  * @param cls contains the `struct InterpreterState`
  * @param tc scheduler context
@@ -917,7 +917,7 @@ interpreter_run (void *cls,
     execution_date = GNUNET_TIME_absolute_get ();
     TALER_round_abs_time (&execution_date);
     cmd->details.admin_add_incoming.aih
-      = TALER_MINT_admin_add_incoming (mint,
+      = TALER_EXCHANGE_admin_add_incoming (exchange,
                                        &reserve_pub,
                                        &amount,
                                        execution_date,
@@ -942,7 +942,7 @@ interpreter_run (void *cls,
     GNUNET_CRYPTO_eddsa_key_get_public (&ref->details.admin_add_incoming.reserve_priv.eddsa_priv,
                                         &reserve_pub.eddsa_pub);
     cmd->details.reserve_status.wsh
-      = TALER_MINT_reserve_status (mint,
+      = TALER_EXCHANGE_reserve_status (exchange,
                                    &reserve_pub,
                                    &reserve_status_cb,
                                    is);
@@ -993,7 +993,7 @@ interpreter_run (void *cls,
     cmd->details.reserve_withdraw.blinding_key.rsa_blinding_key
       = GNUNET_CRYPTO_rsa_blinding_key_create (GNUNET_CRYPTO_rsa_public_key_len (cmd->details.reserve_withdraw.pk->key.rsa_public_key));
     cmd->details.reserve_withdraw.wsh
-      = TALER_MINT_reserve_withdraw (mint,
+      = TALER_EXCHANGE_reserve_withdraw (exchange,
                                      cmd->details.reserve_withdraw.pk,
                                      &ref->details.admin_add_incoming.reserve_priv,
                                      &cmd->details.reserve_withdraw.coin_priv,
@@ -1134,7 +1134,7 @@ interpreter_run (void *cls,
       cmd->details.pay.ph 
 	= TALER_MERCHANT_pay_wallet (merchant,
 				     MERCHANT_URI "pay",
-				     MINT_URI,
+				     EXCHANGE_URI,
 				     &h_wire,
 				     &h_contract,
 				     timestamp,
@@ -1202,7 +1202,7 @@ do_shutdown (void *cls,
                     "Command %u (%s) did not complete\n",
                     i,
                     cmd->label);
-        TALER_MINT_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
+        TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
         cmd->details.admin_add_incoming.aih = NULL;
       }
       break;
@@ -1213,7 +1213,7 @@ do_shutdown (void *cls,
                     "Command %u (%s) did not complete\n",
                     i,
                     cmd->label);
-        TALER_MINT_reserve_status_cancel (cmd->details.reserve_status.wsh);
+        TALER_EXCHANGE_reserve_status_cancel (cmd->details.reserve_status.wsh);
         cmd->details.reserve_status.wsh = NULL;
       }
       break;
@@ -1224,7 +1224,7 @@ do_shutdown (void *cls,
                     "Command %u (%s) did not complete\n",
                     i,
                     cmd->label);
-        TALER_MINT_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
+        TALER_EXCHANGE_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
         cmd->details.reserve_withdraw.wsh = NULL;
       }
       if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
@@ -1269,10 +1269,10 @@ do_shutdown (void *cls,
     GNUNET_SCHEDULER_cancel (ctx_task);
     ctx_task = NULL;
   }
-  if (NULL != mint)
+  if (NULL != exchange)
   {
-    TALER_MINT_disconnect (mint);
-    mint = NULL;
+    TALER_EXCHANGE_disconnect (exchange);
+    exchange = NULL;
   }
   if (NULL != merchant)
   {
@@ -1281,7 +1281,7 @@ do_shutdown (void *cls,
   }
   if (NULL != ctx)
   {
-    TALER_MINT_fini (ctx);
+    TALER_EXCHANGE_fini (ctx);
     ctx = NULL;
   }
 }
@@ -1289,15 +1289,15 @@ do_shutdown (void *cls,
 
 /**
  * Functions of this type are called to provide the retrieved signing and
- * denomination keys of the mint.  No TALER_MINT_*() functions should be called
+ * denomination keys of the exchange.  No TALER_EXCHANGE_*() functions should be called
  * in this callback.
  *
  * @param cls closure
- * @param keys information about keys of the mint
+ * @param keys information about keys of the exchange
  */
 static void
 cert_cb (void *cls,
-         const struct TALER_MINT_Keys *keys)
+         const struct TALER_EXCHANGE_Keys *keys)
 {
   struct InterpreterState *is = cls;
 
@@ -1345,14 +1345,14 @@ context_task (void *cls,
   ctx_task = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Event loop running\n");
-  TALER_MINT_perform (ctx);
+  TALER_EXCHANGE_perform (ctx);
   TALER_MERCHANT_perform (merchant);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
   FD_ZERO (&write_fd_set);
   FD_ZERO (&except_fd_set);
-  TALER_MINT_get_select_info (ctx,
+  TALER_EXCHANGE_get_select_info (ctx,
                               &read_fd_set,
                               &write_fd_set,
                               &except_fd_set,
@@ -1482,17 +1482,17 @@ run (void *cls,
   is = GNUNET_new (struct InterpreterState);
   is->commands = commands;
 
-  ctx = TALER_MINT_init ();
+  ctx = TALER_EXCHANGE_init ();
   GNUNET_assert (NULL != ctx);
   merchant = TALER_MERCHANT_init ();
   GNUNET_assert (NULL != merchant);
   ctx_task = GNUNET_SCHEDULER_add_now (&context_task,
                                        ctx);
-  mint = TALER_MINT_connect (ctx,
-                             MINT_URI,
+  exchange = TALER_EXCHANGE_connect (ctx,
+                             EXCHANGE_URI,
                              &cert_cb, is,
-                             TALER_MINT_OPTION_END);
-  GNUNET_assert (NULL != mint);
+                             TALER_EXCHANGE_OPTION_END);
+  GNUNET_assert (NULL != exchange);
   shutdown_task
     = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply
                                     (GNUNET_TIME_UNIT_SECONDS, 150),
@@ -1501,7 +1501,7 @@ run (void *cls,
 
 
 /**
- * Main function for the testcase for the mint API.
+ * Main function for the testcase for the exchange API.
  *
  * @param argc expected to be 1
  * @param argv expected to only contain the program name
@@ -1514,7 +1514,7 @@ main (int argc,
   const char *merchant_pub_str 
     = "5TRNSWAWHKBJ7G4T3PKRCQA6MCB3MX82F4M2XXS1653KE1V8RFPG";
   struct GNUNET_OS_Process *proc;
-  struct GNUNET_OS_Process *mintd;
+  struct GNUNET_OS_Process *exchanged;
   struct GNUNET_OS_Process *merchantd;
   
   GNUNET_log_setup ("test-merchant-api",
@@ -1528,28 +1528,28 @@ main (int argc,
   proc = GNUNET_OS_start_process (GNUNET_NO,
                                   GNUNET_OS_INHERIT_STD_ALL,
                                   NULL, NULL, NULL,
-                                  "taler-mint-keyup",
-                                  "taler-mint-keyup",
-                                  "-d", "test-mint-home",
-                                  "-m", "test-mint-home/master.priv",
+                                  "taler-exchange-keyup",
+                                  "taler-exchange-keyup",
+                                  "-d", "test-exchange-home",
+                                  "-m", "test-exchange-home/master.priv",
                                   NULL);
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
-  mintd = GNUNET_OS_start_process (GNUNET_NO,
+  exchanged = GNUNET_OS_start_process (GNUNET_NO,
                                    GNUNET_OS_INHERIT_STD_ALL,
                                    NULL, NULL, NULL,
-                                   "taler-mint-httpd",
-                                   "taler-mint-httpd",
-                                   "-d", "test-mint-home",
+                                   "taler-exchange-httpd",
+                                   "taler-exchange-httpd",
+                                   "-d", "test-exchange-home",
                                    NULL);
   /* give child time to start and bind against the socket */
-  fprintf (stderr, "Waiting for taler-mint-httpd to be ready");
+  fprintf (stderr, "Waiting for taler-exchange-httpd to be ready");
   do
     {
       fprintf (stderr, ".");
       sleep (1);
     }
-  while (0 != system ("wget -q -t 1 -T 1 " MINT_URI "keys -o /dev/null -O /dev/null"));
+  while (0 != system ("wget -q -t 1 -T 1 " EXCHANGE_URI "keys -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
   merchantd = GNUNET_OS_start_process (GNUNET_NO,
                                        GNUNET_OS_INHERIT_STD_ALL,
@@ -1573,10 +1573,10 @@ main (int argc,
                           SIGTERM);
   GNUNET_OS_process_wait (merchantd);
   GNUNET_OS_process_destroy (merchantd);
-  GNUNET_OS_process_kill (mintd,
+  GNUNET_OS_process_kill (exchanged,
                           SIGTERM);
-  GNUNET_OS_process_wait (mintd);
-  GNUNET_OS_process_destroy (mintd);
+  GNUNET_OS_process_wait (exchanged);
+  GNUNET_OS_process_destroy (exchanged);
   return (GNUNET_OK == result) ? 0 : 1;
 }
 

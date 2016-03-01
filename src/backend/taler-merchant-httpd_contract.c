@@ -24,13 +24,13 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_auditors.h"
-#include "taler-merchant-httpd_mints.h"
+#include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
 
 
 /**
  * Manage a contract request. In practical terms, it adds the fields
- * 'mints', 'merchant_pub', and 'H_wire' to the contract 'proposition'
+ * 'exchanges', 'merchant_pub', and 'H_wire' to the contract 'proposition'
  * gotten from the frontend. Finally, it adds (outside of the
  * contract) a signature of the (hashed stringification) of the
  * contract (and the hashed stringification of this contract as well
@@ -108,8 +108,8 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 
   /* add fields to the contract that the backend should provide */
   json_object_set (jcontract,
-                   "mints",
-                   trusted_mints);
+                   "exchanges",
+                   trusted_exchanges);
   json_object_set (jcontract,
                    "auditors",
                    j_auditors);

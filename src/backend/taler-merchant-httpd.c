@@ -16,7 +16,7 @@
 /**
  * @file merchant/backend/taler-merchant-httpd.c
  * @brief HTTP serving layer intended to perform crypto-work and
- * communication with the mint
+ * communication with the exchange
  * @author Marcello Stanisci
  * @author Christian Grothoff
  */
@@ -25,14 +25,14 @@
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_util.h>
-#include <taler/taler_mint_service.h>
+#include <taler/taler_exchange_service.h>
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_auditors.h"
-#include "taler-merchant-httpd_mints.h"
+#include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
 #include "taler-merchant-httpd_util.h"
@@ -75,7 +75,7 @@ static long long unsigned port;
 static char *keyfile;
 
 /**
- * This value tells the mint by which date this merchant would like
+ * This value tells the exchange by which date this merchant would like
  * to receive the funds for a deposited payment
  */
 struct GNUNET_TIME_Relative edate_delay;
@@ -252,7 +252,7 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
     TALER_MERCHANTDB_plugin_unload (db);
     db = NULL;
   }
-  TMH_MINTS_done ();
+  TMH_EXCHANGES_done ();
   TMH_AUDITORS_done ();
   if (NULL != keyfile)
     GNUNET_free (privkey);
@@ -522,7 +522,7 @@ run (void *cls,
                                   &do_shutdown,
                                   NULL);
   EXITIF (GNUNET_SYSERR ==
-          TMH_MINTS_init (config));
+          TMH_EXCHANGES_init (config));
   EXITIF (GNUNET_SYSERR ==
           TMH_AUDITORS_init (config));
   /* FIXME: for now, we just support SEPA here: */

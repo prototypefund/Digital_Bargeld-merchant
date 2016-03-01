@@ -15,7 +15,7 @@
 */
 /**
  * @file taler-merchant-httpd_responses.c
- * @brief API for generating the various replies of the mint; these
+ * @brief API for generating the various replies of the exchange; these
  *        functions are called TMH_RESPONSE_reply_ and they generate
  *        and queue MHD response objects for a given connection.
  * @author Florian Dold
@@ -244,12 +244,12 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection)
 void
 TMH_RESPONSE_add_global_headers (struct MHD_Response *response)
 {
-  int TMH_mint_connection_close;
-  TMH_mint_connection_close = 0;
+  int TMH_exchange_connection_close;
+  TMH_exchange_connection_close = 0;
 
-  /* this test is taken verbatim from the mint's code,
+  /* this test is taken verbatim from the exchange's code,
     so there is no particular need to do that for a merchant */
-  if (TMH_mint_connection_close)
+  if (TMH_exchange_connection_close)
     (void) MHD_add_response_header (response,
                                     MHD_HTTP_HEADER_CONNECTION,
                                     "close");
@@ -290,4 +290,4 @@ TMH_RESPONSE_make_external_error (const char *hint)
 }
 
 
-/* end of taler-mint-httpd_responses.c */
+/* end of taler-exchange-httpd_responses.c */

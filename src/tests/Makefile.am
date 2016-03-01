@@ -17,7 +17,7 @@ test_contract_LDADD = \
   -ltalerutil \
   -ljansson \
   -lgnunetutil \
-  -ltalermint \
+  -ltalerexchange \
   -ltalerpq \
   -lgnunetpostgres \
   -lpq \

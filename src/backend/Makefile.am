@@ -10,14 +10,14 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_responses.c taler-merchant-httpd_responses.h \
   taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
   taler-merchant-httpd_auditors.c taler-merchant-httpd_auditors.h \
-  taler-merchant-httpd_mints.c taler-merchant-httpd_mints.h \
+  taler-merchant-httpd_exchanges.c taler-merchant-httpd_exchanges.h \
   taler-merchant-httpd_contract.c taler-merchant-httpd_contract.h \
   taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h \
   taler-merchant-httpd_util.c taler-merchant-httpd_util.h
 
 taler_merchant_httpd_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
-  -ltalermint \
+  -ltalerexchange \
   -ltalerutil \
   -ltalerpq \
   -lmicrohttpd \

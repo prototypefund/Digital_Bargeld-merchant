@@ -14,14 +14,14 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file taler-mint-httpd_parsing.h
+ * @file taler-exchange-httpd_parsing.h
  * @brief functions to parse incoming requests
  * @author Florian Dold
  * @author Benedikt Mueller
  * @author Christian Grothoff
  */
-#ifndef TALER_MINT_HTTPD_PARSING_H
-#define TALER_MINT_HTTPD_PARSING_H
+#ifndef TALER_EXCHANGE_HTTPD_PARSING_H
+#define TALER_EXCHANGE_HTTPD_PARSING_H
 
 #include <microhttpd.h>
 #include <jansson.h>
@@ -423,4 +423,4 @@ TMH_PARSE_mhd_request_var_arg_data (struct MHD_Connection *connection,
 
 
 
-#endif /* TALER_MINT_HTTPD_PARSING_H */
+#endif /* TALER_EXCHANGE_HTTPD_PARSING_H */

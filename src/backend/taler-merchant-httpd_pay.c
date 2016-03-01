@@ -24,12 +24,12 @@
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_signatures.h>
 #include <taler/taler_json_lib.h>
-#include <taler/taler_mint_service.h>
+#include <taler/taler_exchange_service.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_auditors.h"
-#include "taler-merchant-httpd_mints.h"
+#include "taler-merchant-httpd_exchanges.h"
 #include "taler_merchantdb_lib.h"
 
 
@@ -54,7 +54,7 @@ struct MERCHANT_DepositConfirmation
    * Handle to the deposit operation we are performing for
    * this coin, NULL after the operation is done.
    */
-  struct TALER_MINT_DepositHandle *dh;
+  struct TALER_EXCHANGE_DepositHandle *dh;
 
   /**
    * Denomination of this coin.
@@ -119,17 +119,17 @@ struct PayContext
   struct MHD_Connection *connection;
 
   /**
-   * Handle to the mint that we are doing the payment with.
-   * (initially NULL while @e fo is trying to find a mint).
+   * Handle to the exchange that we are doing the payment with.
+   * (initially NULL while @e fo is trying to find a exchange).
    */
-  struct TALER_MINT_Handle *mh;
+  struct TALER_EXCHANGE_Handle *mh;
 
   /**
    * Handle for operation to lookup /keys (and auditors) from
-   * the mint used for this transaction; NULL if no operation is
+   * the exchange used for this transaction; NULL if no operation is
    * pending.
    */
-  struct TMH_MINTS_FindOperation *fo;
+  struct TMH_EXCHANGES_FindOperation *fo;
 
   /**
    * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
@@ -137,9 +137,9 @@ struct PayContext
   void *json_parse_context;
 
   /**
-   * Mint URI given in @e root.
+   * Exchange URI given in @e root.
    */
-  char *chosen_mint;
+  char *chosen_exchange;
 
   /**
    * Transaction ID given in @e root.
@@ -148,7 +148,7 @@ struct PayContext
 
   /**
    * Maximum fee the merchant is willing to pay, from @e root.
-   * Note that IF the total fee of the mint is higher, that is
+   * Note that IF the total fee of the exchange is higher, that is
    * acceptable to the merchant if the customer is willing to
    * pay the difference (i.e. amount - max_fee <= actual-amount - actual-fee).
    */
@@ -247,7 +247,7 @@ abort_deposit (struct PayContext *pc)
 
     if (NULL != dci->dh)
     {
-      TALER_MINT_deposit_cancel (dci->dh);
+      TALER_EXCHANGE_deposit_cancel (dci->dh);
       dci->dh = NULL;
     }
   }
@@ -263,7 +263,7 @@ abort_deposit (struct PayContext *pc)
  *   that no other confirmations are on the way, and can pack a response
  *   for the wallet
  * @param http_status HTTP response code, #MHD_HTTP_OK
- *   (200) for successful deposit; 0 if the mint's reply is bogus (fails
+ *   (200) for successful deposit; 0 if the exchange's reply is bogus (fails
  *   to follow the protocol)
  * @param proof the received JSON reply,
  *   should be kept as proof (and, in case of errors, be forwarded to
@@ -341,7 +341,7 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
 
     if (NULL != dc->dh)
     {
-      TALER_MINT_deposit_cancel (dc->dh);
+      TALER_EXCHANGE_deposit_cancel (dc->dh);
       dc->dh = NULL;
     }
     if (NULL != dc->denom.rsa_public_key)
@@ -358,7 +358,7 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
   GNUNET_free_non_null (pc->dc);
   if (NULL != pc->fo)
   {
-    TMH_MINTS_find_mint_cancel (pc->fo);
+    TMH_EXCHANGES_find_exchange_cancel (pc->fo);
     pc->fo = NULL;
   }
   if (NULL != pc->response)
@@ -371,37 +371,37 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
 
 
 /**
- * Function called with the result of our mint lookup.
+ * Function called with the result of our exchange lookup.
  *
  * @param cls the `struct PayContext`
- * @param mh NULL if mint was not found to be acceptable
- * @param mint_trusted #GNUNET_YES if this mint is trusted by config
+ * @param mh NULL if exchange was not found to be acceptable
+ * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
  */
 static void
-process_pay_with_mint (void *cls,
-                       struct TALER_MINT_Handle *mh,
-                       int mint_trusted)
+process_pay_with_exchange (void *cls,
+                       struct TALER_EXCHANGE_Handle *mh,
+                       int exchange_trusted)
 {
   struct PayContext *pc = cls;
   struct TALER_Amount acc_fee;
   struct TALER_Amount acc_amount;
-  const struct TALER_MINT_Keys *keys;
+  const struct TALER_EXCHANGE_Keys *keys;
   unsigned int i;
 
   pc->fo = NULL;
   if (NULL == mh)
   {
-    /* The mint on offer is not in the set of our (trusted)
-       mints.  Reject the payment. */
+    /* The exchange on offer is not in the set of our (trusted)
+       exchanges.  Reject the payment. */
     GNUNET_break_op (0);
     resume_pay_with_response (pc,
                               MHD_HTTP_PRECONDITION_FAILED,
-                              TMH_RESPONSE_make_external_error ("mint not supported"));
+                              TMH_RESPONSE_make_external_error ("exchange not supported"));
     return;
   }
   pc->mh = mh;
 
-  keys = TALER_MINT_get_keys (mh);
+  keys = TALER_EXCHANGE_get_keys (mh);
   if (NULL == keys)
   {
     GNUNET_break (0);
@@ -415,9 +415,9 @@ process_pay_with_mint (void *cls,
   for (i=0;i<pc->coins_cnt;i++)
   {
     struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
-    const struct TALER_MINT_DenomPublicKey *denom_details;
+    const struct TALER_EXCHANGE_DenomPublicKey *denom_details;
 
-    denom_details = TALER_MINT_get_denomination_key (keys,
+    denom_details = TALER_EXCHANGE_get_denomination_key (keys,
                                                      &dc->denom);
     if (NULL == denom_details)
     {
@@ -425,14 +425,14 @@ process_pay_with_mint (void *cls,
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
-                                                             "hint", "unknown denom to mint",
+                                                             "hint", "unknown denom to exchange",
                                                              "denom_pub", TALER_json_from_rsa_public_key (dc->denom.rsa_public_key)));
       return;
     }
     if (GNUNET_OK !=
         TMH_AUDITORS_check_dk (mh,
                                denom_details,
-                               mint_trusted))
+                               exchange_trusted))
     {
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
@@ -515,7 +515,7 @@ process_pay_with_mint (void *cls,
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_NOT_ACCEPTABLE,
-                                TMH_RESPONSE_make_external_error ("insufficient funds (including excessive mint fees to be covered by customer)"));
+                                TMH_RESPONSE_make_external_error ("insufficient funds (including excessive exchange fees to be covered by customer)"));
       return;
     }
   }
@@ -538,7 +538,7 @@ process_pay_with_mint (void *cls,
   {
     struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
 
-    dc->dh = TALER_MINT_deposit (mh,
+    dc->dh = TALER_EXCHANGE_deposit (mh,
                                  &dc->percoin_amount,
                                  pc->edate,
                                  j_wire,
@@ -555,7 +555,7 @@ process_pay_with_mint (void *cls,
                                  dc);
     if (NULL == dc->dh)
     {
-      /* Signature was invalid.  If the mint was unavailable,
+      /* Signature was invalid.  If the exchange was unavailable,
        * we'd get that information in the callback. */
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
@@ -647,7 +647,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       TMH_PARSE_member_fixed ("H_contract", &pc->h_contract),
       TMH_PARSE_member_amount ("max_fee", &pc->max_fee),
       TMH_PARSE_member_fixed ("merchant_sig", &merchant_sig),
-      TMH_PARSE_member_string ("mint", &pc->chosen_mint),
+      TMH_PARSE_member_string ("exchange", &pc->chosen_exchange),
       TMH_PARSE_member_time_abs ("refund_deadline", &pc->refund_deadline),
       TMH_PARSE_member_time_abs ("timestamp", &pc->timestamp),
       TMH_PARSE_member_uint64 ("transaction_id", &pc->transaction_id),
@@ -788,13 +788,13 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Looking up chosen mint '%s'\n",
-              pc->chosen_mint);
+              "Looking up chosen exchange '%s'\n",
+              pc->chosen_exchange);
 
-  /* Find the responsible mint, this may take a while... */
+  /* Find the responsible exchange, this may take a while... */
   pc->pending = pc->coins_cnt;
-  pc->fo = TMH_MINTS_find_mint (pc->chosen_mint,
-                                &process_pay_with_mint,
+  pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,
+                                &process_pay_with_exchange,
                                 pc);
 
   /* ... so we suspend connection until the last coin has been ack'd

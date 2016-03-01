@@ -15,7 +15,7 @@
 */
 /**
  * @file taler-merchant-httpd_mhd.c
- * @brief helpers for MHD interaction; these are TALER_MINT_handler_ functions
+ * @brief helpers for MHD interaction; these are TALER_EXCHANGE_handler_ functions
  *        that generate simple MHD replies that do not require any real operations
  *        to be performed (error handling, static pages, etc.)
  * @author Florian Dold
@@ -110,7 +110,7 @@ TMH_MHD_handler_agpl_redirect (struct TMH_RequestHandler *rh,
                                     rh->mime_type);
   MHD_add_response_header (response,
                            MHD_HTTP_HEADER_LOCATION,
-                           "http://www.git.taler.net/?p=mint.git");
+                           "http://www.git.taler.net/?p=exchange.git");
   ret = MHD_queue_response (connection,
                             rh->response_code,
                             response);
@@ -145,4 +145,4 @@ TMH_MHD_handler_send_json_pack_error (struct TMH_RequestHandler *rh,
 }
 
 
-/* end of taler-mint-httpd_mhd.c */
+/* end of taler-exchange-httpd_mhd.c */

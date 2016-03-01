@@ -141,7 +141,7 @@ handle_pay_finished (void *cls,
  * Pay a merchant.  API for wallets that have the coin's private keys.
  *
  * @param merchant the merchant context
- * @param mint_uri URI of the mint that the coins belong to
+ * @param exchange_uri URI of the exchange that the coins belong to
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
@@ -160,7 +160,7 @@ handle_pay_finished (void *cls,
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
 			   const char *merchant_uri,
-			   const char *mint_uri,
+			   const char *exchange_uri,
                            const struct GNUNET_HashCode *h_wire,
                            const struct GNUNET_HashCode *h_contract,
                            struct GNUNET_TIME_Absolute timestamp,
@@ -220,7 +220,7 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
   }
   return TALER_MERCHANT_pay_frontend (merchant,
 				      merchant_uri,
-				      mint_uri,
+				      exchange_uri,
 				      h_wire,
 				      h_contract,
 				      timestamp,
@@ -244,14 +244,14 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
  * in the type of @a coins compared to #TALER_MERCHANT_pay().
  *
  * @param merchant the merchant context
- * @param mint_uri URI of the mint that the coins belong to
+ * @param exchange_uri URI of the exchange that the coins belong to
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param transaction_id transaction id for the transaction between merchant and customer
  * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
- * @param execution_deadline date by which the merchant would like the mint to execute the transaction (can be zero if there is no specific date desired by the frontend)
+ * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend)
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -264,7 +264,7 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
 			     const char *merchant_uri,
-			     const char *mint_uri,
+			     const char *exchange_uri,
                              const struct GNUNET_HashCode *h_wire,
                              const struct GNUNET_HashCode *h_contract,
                              struct GNUNET_TIME_Absolute timestamp,
@@ -402,7 +402,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
   } /* end of sanity check */
   pay_obj = json_pack ("{s:o, s:o," /* H_wire/H_contract */
                        " s:I, s:o," /* transaction id, timestamp */
-                       " s:o, s:s," /* refund_deadline, mint */
+                       " s:o, s:s," /* refund_deadline, exchange */
                        " s:o, s:o," /* coins, max_fee */
                        " s:o}",     /* amount */
                        "H_wire", TALER_json_from_data (&h_wire,
@@ -412,7 +412,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
                        "transaction_id", (json_int_t) transaction_id,
                        "timestamp", TALER_json_from_abs (timestamp),
                        "refund_deadline", TALER_json_from_abs (refund_deadline),
-		       "mint", mint_uri,
+		       "exchange", exchange_uri,
 		       "coins", j_coins,
                        "max_fee", TALER_json_from_amount (max_fee),
                        "amount", TALER_json_from_amount (amount)

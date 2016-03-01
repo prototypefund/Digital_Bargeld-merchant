@@ -18,8 +18,8 @@
  * @brief headers for /contract handler
  * @author Marcello Stanisci
  */
-#ifndef TALER_MINT_HTTPD_CONTRACT_H
-#define TALER_MINT_HTTPD_CONTRACT_H
+#ifndef TALER_EXCHANGE_HTTPD_CONTRACT_H
+#define TALER_EXCHANGE_HTTPD_CONTRACT_H
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 

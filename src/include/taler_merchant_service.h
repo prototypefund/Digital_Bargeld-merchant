@@ -146,7 +146,7 @@ struct TALER_MERCHANT_PayCoin
   struct TALER_DenominationPublicKey denom_pub;
 
   /**
-   * Mint’s unblinded signature of the coin
+   * Exchange’s unblinded signature of the coin
    */
   struct TALER_DenominationSignature denom_sig;
 
@@ -181,7 +181,7 @@ struct TALER_MERCHANT_PayCoin
  * @param merchant_sig signature from the merchant over the original contract
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
- * @param mint_uri URI of the mint that the coins belong to
+ * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -201,7 +201,7 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
                            struct GNUNET_TIME_Absolute timestamp,
                            struct GNUNET_TIME_Absolute refund_deadline,
                            const struct GNUNET_HashCode *h_wire,
-			   const char *mint_uri,
+			   const char *exchange_uri,
                            unsigned int num_coins,
                            const struct TALER_MERCHANT_PayCoin *coins,
                            TALER_MERCHANT_PayCallback pay_cb,
@@ -220,7 +220,7 @@ struct TALER_MERCHANT_PaidCoin
   struct TALER_DenominationPublicKey denom_pub;
 
   /**
-   * Mint’s unblinded signature of the coin
+   * Exchange’s unblinded signature of the coin
    */
   struct TALER_DenominationSignature denom_sig;
 
@@ -263,9 +263,9 @@ struct TALER_MERCHANT_PaidCoin
  * @param merchant_sig the signature of the merchant over the original contract
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
- * @param execution_deadline date by which the merchant would like the mint to execute the transaction (can be zero if there is no specific date desired by the frontend)
+ * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend)
  * @param h_wire hash of the merchant’s account details
- * @param mint_uri URI of the mint that the coins belong to
+ * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -286,7 +286,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
                              struct GNUNET_TIME_Absolute timestamp,
                              struct GNUNET_TIME_Absolute execution_deadline,
                              const struct GNUNET_HashCode *h_wire,
-			     const char *mint_uri,
+			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
                              TALER_MERCHANT_PayCallback pay_cb,

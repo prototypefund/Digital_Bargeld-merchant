@@ -15,7 +15,7 @@
 */
 
 /**
- * @file taler-mint-httpd_parsing.c
+ * @file taler-exchange-httpd_parsing.c
  * @brief functions to parse incoming requests (MHD arguments and JSON snippets)
  * @author Florian Dold
  * @author Benedikt Mueller
@@ -1061,4 +1061,4 @@ TMH_PARSE_json_data (struct MHD_Connection *connection,
 }
 
 
-/* end of taler-mint-httpd_parsing.c */
+/* end of taler-exchange-httpd_parsing.c */

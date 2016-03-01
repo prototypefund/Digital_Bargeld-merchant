@@ -14,13 +14,13 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_mints.c
- * @brief logic this HTTPD keeps for each mint we interact with
+ * @file backend/taler-merchant-httpd_exchanges.c
+ * @brief logic this HTTPD keeps for each exchange we interact with
  * @author Marcello Stanisci
  * @author Christian Grothoff
  */
 #include "platform.h"
-#include "taler-merchant-httpd_mints.h"
+#include "taler-merchant-httpd_exchanges.h"
 
 
 /**
@@ -30,31 +30,31 @@
 
 
 /**
- * Mint
+ * Exchange
  */
-struct Mint;
+struct Exchange;
 
 
 /**
- * Information we keep for a pending #MMH_MINTS_find_mint() operation.
+ * Information we keep for a pending #MMH_EXCHANGES_find_exchange() operation.
  */
-struct TMH_MINTS_FindOperation
+struct TMH_EXCHANGES_FindOperation
 {
 
   /**
    * Kept in a DLL.
    */
-  struct TMH_MINTS_FindOperation *next;
+  struct TMH_EXCHANGES_FindOperation *next;
 
   /**
    * Kept in a DLL.
    */
-  struct TMH_MINTS_FindOperation *prev;
+  struct TMH_EXCHANGES_FindOperation *prev;
 
   /**
    * Function to call with the result.
    */
-  TMH_MINTS_FindContinuation fc;
+  TMH_EXCHANGES_FindContinuation fc;
 
   /**
    * Closure for @e fc.
@@ -62,9 +62,9 @@ struct TMH_MINTS_FindOperation
   void *fc_cls;
 
   /**
-   * Mint we wait for the /keys for.
+   * Exchange we wait for the /keys for.
    */
-  struct Mint *my_mint;
+  struct Exchange *my_exchange;
 
   /**
    * Task scheduled to asynchrnously return the result.
@@ -75,44 +75,44 @@ struct TMH_MINTS_FindOperation
 
 
 /**
- * Mint
+ * Exchange
  */
-struct Mint
+struct Exchange
 {
 
   /**
    * Kept in a DLL.
    */
-  struct Mint *next;
+  struct Exchange *next;
 
   /**
    * Kept in a DLL.
    */
-  struct Mint *prev;
+  struct Exchange *prev;
 
   /**
-   * Head of FOs pending for this mint.
+   * Head of FOs pending for this exchange.
    */
-  struct TMH_MINTS_FindOperation *fo_head;
+  struct TMH_EXCHANGES_FindOperation *fo_head;
 
   /**
-   * Tail of FOs pending for this mint.
+   * Tail of FOs pending for this exchange.
    */
-  struct TMH_MINTS_FindOperation *fo_tail;
+  struct TMH_EXCHANGES_FindOperation *fo_tail;
 
   /**
-   * (base) URI of the mint.
+   * (base) URI of the exchange.
    */
   char *uri;
 
   /**
-   * A connection to this mint
+   * A connection to this exchange
    */
-  struct TALER_MINT_Handle *conn;
+  struct TALER_EXCHANGE_Handle *conn;
 
   /**
    * Master public key, guaranteed to be set ONLY for
-   * trusted mints.
+   * trusted exchanges.
    */
   struct TALER_MasterPublicKeyP master_pub;
 
@@ -123,12 +123,12 @@ struct Mint
 
   /**
    * Flag which indicates whether some HTTP transfer between
-   * this merchant and the mint is still ongoing
+   * this merchant and the exchange is still ongoing
    */
   int pending;
 
   /**
-   * #GNUNET_YES if this mint is from our configuration and
+   * #GNUNET_YES if this exchange is from our configuration and
    * explicitly trusted, #GNUNET_NO if we need to check each
    * key to be sure it is trusted.
    */
@@ -138,83 +138,83 @@ struct Mint
 
 
 /**
- * Context for all mint operations (useful to the event loop)
+ * Context for all exchange operations (useful to the event loop)
  */
-static struct TALER_MINT_Context *ctx;
+static struct TALER_EXCHANGE_Context *ctx;
 
 /**
- * Task we use to drive the interaction with this mint.
+ * Task we use to drive the interaction with this exchange.
  */
 static struct GNUNET_SCHEDULER_Task *poller_task;
 
 /**
- * Head of mints we know about.
+ * Head of exchanges we know about.
  */
-static struct Mint *mint_head;
+static struct Exchange *exchange_head;
 
 /**
- * Tail of mints we know about.
+ * Tail of exchanges we know about.
  */
-static struct Mint *mint_tail;
+static struct Exchange *exchange_tail;
 
 /**
- * List of our trusted mints for inclusion in contracts.
+ * List of our trusted exchanges for inclusion in contracts.
  */
-json_t *trusted_mints;
+json_t *trusted_exchanges;
 
 
 /**
  * Function called with information about who is auditing
- * a particular mint and what key the mint is using.
+ * a particular exchange and what key the exchange is using.
  *
- * @param cls closure, will be `struct Mint` so that
+ * @param cls closure, will be `struct Exchange` so that
  *   when this function gets called, it will change the flag 'pending'
- *   to 'false'. Note: 'keys' is automatically saved inside the mint's
- *   handle, which is contained inside 'struct Mint', when
+ *   to 'false'. Note: 'keys' is automatically saved inside the exchange's
+ *   handle, which is contained inside 'struct Exchange', when
  *   this callback is called. Thus, once 'pending' turns 'false',
- *   it is safe to call 'TALER_MINT_get_keys()' on the mint's handle,
+ *   it is safe to call 'TALER_EXCHANGE_get_keys()' on the exchange's handle,
  *   in order to get the "good" keys.
  * @param keys information about the various keys used
- *        by the mint
+ *        by the exchange
  */
 static void
 keys_mgmt_cb (void *cls,
-              const struct TALER_MINT_Keys *keys)
+              const struct TALER_EXCHANGE_Keys *keys)
 {
-  struct Mint *mint = cls;
-  struct TMH_MINTS_FindOperation *fo;
+  struct Exchange *exchange = cls;
+  struct TMH_EXCHANGES_FindOperation *fo;
 
   if (NULL != keys)
   {
-    mint->pending = GNUNET_NO;
+    exchange->pending = GNUNET_NO;
   }
   else
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Failed to fetch /keys from `%s'\n",
-                mint->uri);
-    TALER_MINT_disconnect (mint->conn);
-    mint->conn = NULL;
-    mint->pending = GNUNET_SYSERR; /* failed hard */
-    mint->retry_time = GNUNET_TIME_relative_to_absolute (KEYS_RETRY_FREQ);
+                exchange->uri);
+    TALER_EXCHANGE_disconnect (exchange->conn);
+    exchange->conn = NULL;
+    exchange->pending = GNUNET_SYSERR; /* failed hard */
+    exchange->retry_time = GNUNET_TIME_relative_to_absolute (KEYS_RETRY_FREQ);
   }
-  while (NULL != (fo = mint->fo_head))
+  while (NULL != (fo = exchange->fo_head))
   {
-    GNUNET_CONTAINER_DLL_remove (mint->fo_head,
-                                 mint->fo_tail,
+    GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
+                                 exchange->fo_tail,
                                  fo);
     fo->fc (fo->fc_cls,
-            (NULL != keys) ? mint->conn : NULL,
-            mint->trusted);
+            (NULL != keys) ? exchange->conn : NULL,
+            exchange->trusted);
     GNUNET_free (fo);
   }
 }
 
 
 /**
- * Task that runs the mint's event loop using the GNUnet scheduler.
+ * Task that runs the exchange's event loop using the GNUnet scheduler.
  *
- * @param cls a `struct Mint *`
+ * @param cls a `struct Exchange *`
  * @param tc scheduler context (unused)
  */
 static void
@@ -230,23 +230,23 @@ context_task (void *cls,
   struct GNUNET_NETWORK_FDSet *ws;
   struct GNUNET_TIME_Relative delay;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "In mint context polling task\n");
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "In exchange context polling task\n");
 
   poller_task = NULL;
-  TALER_MINT_perform (ctx);
+  TALER_EXCHANGE_perform (ctx);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
   FD_ZERO (&write_fd_set);
   FD_ZERO (&except_fd_set);
-  TALER_MINT_get_select_info (ctx,
+  TALER_EXCHANGE_get_select_info (ctx,
                               &read_fd_set,
                               &write_fd_set,
                               &except_fd_set,
                               &max_fd,
                               &timeout);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "In mint context polling task, max_fd=%d, timeout=%ld\n",
+              "In exchange context polling task, max_fd=%d, timeout=%ld\n",
               max_fd, timeout);
   if (timeout >= 0)
     delay =
@@ -277,23 +277,23 @@ context_task (void *cls,
 /**
  * Task to return find operation result asynchronously to caller.
  *
- * @param cls a `struct TMH_MINTS_FindOperation`
+ * @param cls a `struct TMH_EXCHANGES_FindOperation`
  * @param tc unused
  */
 static void
 return_result (void *cls,
                const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
-  struct TMH_MINTS_FindOperation *fo = cls;
-  struct Mint *mint = fo->my_mint;
+  struct TMH_EXCHANGES_FindOperation *fo = cls;
+  struct Exchange *exchange = fo->my_exchange;
 
   fo->at = NULL;
-  GNUNET_CONTAINER_DLL_remove (mint->fo_head,
-                               mint->fo_tail,
+  GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
+                               exchange->fo_tail,
                                fo);
   fo->fc (fo->fc_cls,
-          (GNUNET_SYSERR == mint->pending) ? NULL : mint->conn,
-          mint->trusted);
+          (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
+          exchange->trusted);
   GNUNET_free (fo);
   GNUNET_SCHEDULER_cancel (poller_task);
   GNUNET_SCHEDULER_add_now (&context_task,
@@ -302,22 +302,22 @@ return_result (void *cls,
 
 
 /**
- * Find a mint that matches @a chosen_mint. If we cannot connect
- * to the mint, or if it is not acceptable, @a fc is called with
- * NULL for the mint.
+ * Find a exchange that matches @a chosen_exchange. If we cannot connect
+ * to the exchange, or if it is not acceptable, @a fc is called with
+ * NULL for the exchange.
  *
- * @param chosen_mint URI of the mint we would like to talk to
- * @param fc function to call with the handles for the mint
+ * @param chosen_exchange URI of the exchange we would like to talk to
+ * @param fc function to call with the handles for the exchange
  * @param fc_cls closure for @a fc
  * @return NULL on error
  */
-struct TMH_MINTS_FindOperation *
-TMH_MINTS_find_mint (const char *chosen_mint,
-                     TMH_MINTS_FindContinuation fc,
+struct TMH_EXCHANGES_FindOperation *
+TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
+                     TMH_EXCHANGES_FindContinuation fc,
                      void *fc_cls)
 {
-  struct Mint *mint;
-  struct TMH_MINTS_FindOperation *fo;
+  struct Exchange *exchange;
+  struct TMH_EXCHANGES_FindOperation *fo;
 
   if (NULL == ctx)
   {
@@ -326,42 +326,42 @@ TMH_MINTS_find_mint (const char *chosen_mint,
   }
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Trying to find chosen mint `%s'\n",
-              chosen_mint);
+              "Trying to find chosen exchange `%s'\n",
+              chosen_exchange);
 
-  /* Check if the mint is known */
-  for (mint = mint_head; NULL != mint; mint = mint->next)
+  /* Check if the exchange is known */
+  for (exchange = exchange_head; NULL != exchange; exchange = exchange->next)
     /* test it by checking public key --- FIXME: hostname or public key!?
        Should probably be URI, not hostname anyway! */
-    if (0 == strcmp (mint->uri,
-                     chosen_mint))
+    if (0 == strcmp (exchange->uri,
+                     chosen_exchange))
       break;
-  if (NULL == mint)
+  if (NULL == exchange)
   {
-    /* This is a new mint */
-    mint = GNUNET_new (struct Mint);
-    mint->uri = GNUNET_strdup (chosen_mint);
-    mint->pending = GNUNET_YES;
-    GNUNET_CONTAINER_DLL_insert (mint_head,
-                                 mint_tail,
-                                 mint);
+    /* This is a new exchange */
+    exchange = GNUNET_new (struct Exchange);
+    exchange->uri = GNUNET_strdup (chosen_exchange);
+    exchange->pending = GNUNET_YES;
+    GNUNET_CONTAINER_DLL_insert (exchange_head,
+                                 exchange_tail,
+                                 exchange);
   }
 
-  /* check if we should resume this mint */
-  if ( (GNUNET_SYSERR == mint->pending) &&
-       (0 == GNUNET_TIME_absolute_get_remaining (mint->retry_time).rel_value_us) )
-    mint->pending = GNUNET_YES;
+  /* check if we should resume this exchange */
+  if ( (GNUNET_SYSERR == exchange->pending) &&
+       (0 == GNUNET_TIME_absolute_get_remaining (exchange->retry_time).rel_value_us) )
+    exchange->pending = GNUNET_YES;
 
 
-  fo = GNUNET_new (struct TMH_MINTS_FindOperation);
+  fo = GNUNET_new (struct TMH_EXCHANGES_FindOperation);
   fo->fc = fc;
   fo->fc_cls = fc_cls;
-  fo->my_mint = mint;
-  GNUNET_CONTAINER_DLL_insert (mint->fo_head,
-                               mint->fo_tail,
+  fo->my_exchange = exchange;
+  GNUNET_CONTAINER_DLL_insert (exchange->fo_head,
+                               exchange->fo_tail,
                                fo);
 
-  if (GNUNET_NO == mint->pending)
+  if (GNUNET_NO == exchange->pending)
   {
     /* We are not currently waiting for a reply, immediately
        return result */
@@ -371,15 +371,15 @@ TMH_MINTS_find_mint (const char *chosen_mint,
   }
 
   /* If new or resumed, retry fetching /keys */
-  if ( (NULL == mint->conn) &&
-       (GNUNET_YES == mint->pending) )
+  if ( (NULL == exchange->conn) &&
+       (GNUNET_YES == exchange->pending) )
   {
-    mint->conn = TALER_MINT_connect (ctx,
-                                     mint->uri,
+    exchange->conn = TALER_EXCHANGE_connect (ctx,
+                                     exchange->uri,
                                      &keys_mgmt_cb,
-                                     mint,
-                                     TALER_MINT_OPTION_END);
-    GNUNET_break (NULL != mint->conn);
+                                     exchange,
+                                     TALER_EXCHANGE_OPTION_END);
+    GNUNET_break (NULL != exchange->conn);
   }
   return fo;
 }
@@ -391,17 +391,17 @@ TMH_MINTS_find_mint (const char *chosen_mint,
  * @param fo handle to operation to abort
  */
 void
-TMH_MINTS_find_mint_cancel (struct TMH_MINTS_FindOperation *fo)
+TMH_EXCHANGES_find_exchange_cancel (struct TMH_EXCHANGES_FindOperation *fo)
 {
-  struct Mint *mint = fo->my_mint;
+  struct Exchange *exchange = fo->my_exchange;
 
   if (NULL != fo->at)
   {
     GNUNET_SCHEDULER_cancel (fo->at);
     fo->at = NULL;
   }
-  GNUNET_CONTAINER_DLL_remove (mint->fo_head,
-                               mint->fo_tail,
+  GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
+                               exchange->fo_tail,
                                fo);
   GNUNET_free (fo);
 }
@@ -409,23 +409,23 @@ TMH_MINTS_find_mint_cancel (struct TMH_MINTS_FindOperation *fo)
 
 /**
  * Function called on each configuration section. Finds sections
- * about mints and parses the entries.
+ * about exchanges and parses the entries.
  *
  * @param cls closure, with a `const struct GNUNET_CONFIGURATION_Handle *`
  * @param section name of the section
  */
 static void
-parse_mints (void *cls,
+parse_exchanges (void *cls,
              const char *section)
 {
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   char *uri;
   char *mks;
-  struct Mint *mint;
+  struct Exchange *exchange;
 
   if (0 != strncasecmp (section,
-                        "mint-",
-                        strlen ("mint-")))
+                        "exchange-",
+                        strlen ("exchange-")))
     return;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
@@ -438,8 +438,8 @@ parse_mints (void *cls,
                                "URI");
     return;
   }
-  mint = GNUNET_new (struct Mint);
-  mint->uri = uri;
+  exchange = GNUNET_new (struct Exchange);
+  exchange->uri = uri;
   if (GNUNET_OK ==
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
@@ -449,9 +449,9 @@ parse_mints (void *cls,
     if (GNUNET_OK ==
         GNUNET_CRYPTO_eddsa_public_key_from_string (mks,
                                                     strlen (mks),
-                                                    &mint->master_pub.eddsa_pub))
+                                                    &exchange->master_pub.eddsa_pub))
     {
-      mint->trusted = GNUNET_YES;
+      exchange->trusted = GNUNET_YES;
     }
     else
     {
@@ -462,50 +462,50 @@ parse_mints (void *cls,
     }
     GNUNET_free (mks);
   }
-  GNUNET_CONTAINER_DLL_insert (mint_head,
-                               mint_tail,
-                               mint);
-  mint->pending = GNUNET_YES;
-  mint->conn = TALER_MINT_connect (ctx,
-                                   mint->uri,
+  GNUNET_CONTAINER_DLL_insert (exchange_head,
+                               exchange_tail,
+                               exchange);
+  exchange->pending = GNUNET_YES;
+  exchange->conn = TALER_EXCHANGE_connect (ctx,
+                                   exchange->uri,
                                    &keys_mgmt_cb,
-                                   mint,
-                                   TALER_MINT_OPTION_END);
-  GNUNET_break (NULL != mint->conn);
+                                   exchange,
+                                   TALER_EXCHANGE_OPTION_END);
+  GNUNET_break (NULL != exchange->conn);
 }
 
 
 /**
- * Parses "trusted" mints listed in the configuration.
+ * Parses "trusted" exchanges listed in the configuration.
  *
  * @param cfg the configuration
  * @return #GNUNET_OK on success; #GNUNET_SYSERR upon error in
  *          parsing.
  */
 int
-TMH_MINTS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
+TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
-  struct Mint *mint;
-  json_t *j_mint;
+  struct Exchange *exchange;
+  json_t *j_exchange;
 
-  ctx = TALER_MINT_init ();
+  ctx = TALER_EXCHANGE_init ();
   if (NULL == ctx)
     return GNUNET_SYSERR;
   GNUNET_CONFIGURATION_iterate_sections (cfg,
-                                         &parse_mints,
+                                         &parse_exchanges,
                                          (void *) cfg);
-  /* build JSON with list of trusted mints */
-  trusted_mints = json_array ();
-  for (mint = mint_head; NULL != mint; mint = mint->next)
+  /* build JSON with list of trusted exchanges */
+  trusted_exchanges = json_array ();
+  for (exchange = exchange_head; NULL != exchange; exchange = exchange->next)
   {
-    if (GNUNET_YES != mint->trusted)
+    if (GNUNET_YES != exchange->trusted)
       continue;
-    j_mint = json_pack ("{s:s, s:o}",
-                        "url", mint->uri,
-                        "master_pub", TALER_json_from_data (&mint->master_pub,
+    j_exchange = json_pack ("{s:s, s:o}",
+                        "url", exchange->uri,
+                        "master_pub", TALER_json_from_data (&exchange->master_pub,
                                                             sizeof (struct TALER_MasterPublicKeyP)));
-    json_array_append_new (trusted_mints,
-                           j_mint);
+    json_array_append_new (trusted_exchanges,
+                           j_exchange);
   }
   poller_task = GNUNET_SCHEDULER_add_now (&context_task,
                                           NULL);
@@ -514,27 +514,27 @@ TMH_MINTS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 
 
 /**
- * Function called to shutdown the mints subsystem.
+ * Function called to shutdown the exchanges subsystem.
  */
 void
-TMH_MINTS_done ()
+TMH_EXCHANGES_done ()
 {
-  struct Mint *mint;
+  struct Exchange *exchange;
 
-  while (NULL != (mint = mint_head))
+  while (NULL != (exchange = exchange_head))
   {
-    GNUNET_CONTAINER_DLL_remove (mint_head,
-                                 mint_tail,
-                                 mint);
-    if (NULL != mint->conn)
-      TALER_MINT_disconnect (mint->conn);
-    GNUNET_free (mint->uri);
-    GNUNET_free (mint);
+    GNUNET_CONTAINER_DLL_remove (exchange_head,
+                                 exchange_tail,
+                                 exchange);
+    if (NULL != exchange->conn)
+      TALER_EXCHANGE_disconnect (exchange->conn);
+    GNUNET_free (exchange->uri);
+    GNUNET_free (exchange);
   }
   if (NULL != poller_task)
   {
     GNUNET_SCHEDULER_cancel (poller_task);
     poller_task = NULL;
   }
-  TALER_MINT_fini (ctx);
+  TALER_EXCHANGE_fini (ctx);
 }

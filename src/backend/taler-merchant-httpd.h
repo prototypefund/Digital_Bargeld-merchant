@@ -173,9 +173,9 @@ extern struct TALER_MERCHANTDB_Plugin *db;
 
 /**
  * If the frontend does NOT specify an execution date, how long should
- * we tell the mint to wait to aggregate transactions before
+ * we tell the exchange to wait to aggregate transactions before
  * executing?  This delay is added to the current time when we
- * generate the advisory execution time for the mint.
+ * generate the advisory execution time for the exchange.
  */
 extern struct GNUNET_TIME_Relative edate_delay;
 

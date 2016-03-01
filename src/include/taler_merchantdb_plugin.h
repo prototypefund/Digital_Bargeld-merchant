@@ -59,7 +59,7 @@ struct TALER_MERCHANTDB_Plugin
                  int tmp);
 
   /**
-   * Insert payment confirmation from the mint into the database.
+   * Insert payment confirmation from the exchange into the database.
    *
    * @param cls closure
    * @param h_contract hash of the contract
@@ -67,9 +67,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param transaction_id of the contract
    * @param timestamp time of the confirmation
    * @param refund refund deadline
-   * @param amount_without_fee amount the mint will deposit
+   * @param amount_without_fee amount the exchange will deposit
    * @param coin_pub public key of the coin
-   * @param mint_proof proof from mint that coin was accepted
+   * @param exchange_proof proof from exchange that coin was accepted
    * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
    */
   int
@@ -81,7 +81,7 @@ struct TALER_MERCHANTDB_Plugin
                     struct GNUNET_TIME_Absolute refund,
                     const struct TALER_Amount *amount_without_fee,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
-		    json_t *mint_proof);
+		    json_t *exchange_proof);
 
   /**
    * Check whether a payment has already been stored

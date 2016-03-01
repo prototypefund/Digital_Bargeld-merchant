@@ -81,7 +81,7 @@ run (void *cls, char *const *args, const char *cfgfile,
 {
   json_t *j_fake_contract;
   json_t *j_details;
-  json_t *j_mints;
+  json_t *j_exchanges;
   json_t *j_item;
   json_t *j_amount;
   json_t *j_tax_amount;
@@ -253,8 +253,8 @@ run (void *cls, char *const *args, const char *cfgfile,
 			 "merchant", j_merchant,
 			 "L-names", j_lnames);
 
-  /* Faking out the mints' list */
-  j_mints = json_pack ("[{s:s}]",
+  /* Faking out the exchanges' list */
+  j_exchanges = json_pack ("[{s:s}]",
                        "demo.taler.net",
 		       "Q1WVGRGC1F4W7RYC6M23AEGFEXQEHQ730K3GG0B67VPHQSRR75H0");
 
@@ -262,7 +262,7 @@ run (void *cls, char *const *args, const char *cfgfile,
                                "amount", j_amount,
                                "max fee", j_max_fee,
 		               "trans_id", json_integer_value (j_id),
-		               "mints", j_mints,
+		               "exchanges", j_exchanges,
 		               "details", j_details);
   #if 0
   str = json_dumps (j_fake_contract, JSON_INDENT(2) | JSON_PRESERVE_ORDER);

@@ -21,8 +21,8 @@
  * @author Benedikt Mueller
  * @author Christian Grothoff
  */
-#ifndef TALER_MINT_HTTPD_MHD_H
-#define TALER_MINT_HTTPD_MHD_H
+#ifndef TALER_EXCHANGE_HTTPD_MHD_H
+#define TALER_EXCHANGE_HTTPD_MHD_H
 #include <gnunet/gnunet_util_lib.h>
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"

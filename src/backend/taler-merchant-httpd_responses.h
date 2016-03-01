@@ -16,15 +16,15 @@
 
 /**
  * @file taler-merchant-httpd_responses.h
- * @brief API for generating the various replies of the mint; these
+ * @brief API for generating the various replies of the exchange; these
  *        functions are called TMH_RESPONSE_reply_ and they generate
  *        and queue MHD response objects for a given connection.
  * @author Florian Dold
  * @author Benedikt Mueller
  * @author Christian Grothoff
  */
-#ifndef TALER_MINT_HTTPD_RESPONSES_H
-#define TALER_MINT_HTTPD_RESPONSES_H
+#ifndef TALER_EXCHANGE_HTTPD_RESPONSES_H
+#define TALER_EXCHANGE_HTTPD_RESPONSES_H
 #include <gnunet/gnunet_util_lib.h>
 #include <jansson.h>
 #include <microhttpd.h>

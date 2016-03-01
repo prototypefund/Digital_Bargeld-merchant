@@ -15,7 +15,7 @@
 */
 /**
  * @file backend/taler-merchant-httpd_auditors.h
- * @brief logic this HTTPD keeps for each mint we interact with
+ * @brief logic this HTTPD keeps for each exchange we interact with
  * @author Marcello Stanisci
  * @author Christian Grothoff
  */
@@ -25,12 +25,12 @@
 #include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_util.h>
-#include <taler/taler_mint_service.h>
+#include <taler/taler_exchange_service.h>
 #include "taler-merchant-httpd.h"
 
 
 /**
- * JSON representation of the auditors accepted by this mint.
+ * JSON representation of the auditors accepted by this exchange.
  */
 extern json_t *j_auditors;
 
@@ -47,19 +47,19 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg);
 
 
 /**
- * Check if the given @a dk issued by mint @a mh is audited by
+ * Check if the given @a dk issued by exchange @a mh is audited by
  * an auditor that is acceptable for this merchant. (And if the
  * denomination is not yet expired or something silly like that.)
  *
- * @param mh mint issuing @a dk
+ * @param mh exchange issuing @a dk
  * @param dk a denomination issued by @a mh
- * @param mint_trusted #GNUNET_YES if the mint of @a dk is trusted by config
+ * @param exchange_trusted #GNUNET_YES if the exchange of @a dk is trusted by config
  * @return #GNUNET_OK if we accept this denomination
  */
 int
-TMH_AUDITORS_check_dk (struct TALER_MINT_Handle *mh,
-                       const struct TALER_MINT_DenomPublicKey *dk,
-                       int mint_trusted);
+TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
+                       const struct TALER_EXCHANGE_DenomPublicKey *dk,
+                       int exchange_trusted);
 
 
 /**

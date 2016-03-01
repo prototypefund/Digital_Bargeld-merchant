@@ -18,8 +18,8 @@
  * @brief headers for /pay handler
  * @author Marcello Stanisci
  */
-#ifndef TALER_MINT_HTTPD_PAY_H
-#define TALER_MINT_HTTPD_PAY_H
+#ifndef TALER_EXCHANGE_HTTPD_PAY_H
+#define TALER_EXCHANGE_HTTPD_PAY_H
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 

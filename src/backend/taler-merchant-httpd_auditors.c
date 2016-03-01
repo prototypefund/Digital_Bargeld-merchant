@@ -15,7 +15,7 @@
 */
 /**
  * @file backend/taler-merchant-httpd_auditors.c
- * @brief logic this HTTPD keeps for each mint we interact with
+ * @brief logic this HTTPD keeps for each exchange we interact with
  * @author Marcello Stanisci
  * @author Christian Grothoff
  */
@@ -56,28 +56,28 @@ static struct Auditor *auditors;
 static unsigned int nauditors;
 
 /**
- * JSON representation of the auditors accepted by this mint.
+ * JSON representation of the auditors accepted by this exchange.
  */
 json_t *j_auditors;
 
 
 /**
- * Check if the given @a dk issued by mint @a mh is audited by
+ * Check if the given @a dk issued by exchange @a mh is audited by
  * an auditor that is acceptable for this merchant. (And if the
  * denomination is not yet expired or something silly like that.)
  *
- * @param mh mint issuing @a dk
+ * @param mh exchange issuing @a dk
  * @param dk a denomination issued by @a mh
- * @param mint_trusted #GNUNET_YES if the mint of @a dk is trusted by config
+ * @param exchange_trusted #GNUNET_YES if the exchange of @a dk is trusted by config
  * @return #GNUNET_OK if we accept this denomination
  */
 int
-TMH_AUDITORS_check_dk (struct TALER_MINT_Handle *mh,
-                       const struct TALER_MINT_DenomPublicKey *dk,
-                       int mint_trusted)
+TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
+                       const struct TALER_EXCHANGE_DenomPublicKey *dk,
+                       int exchange_trusted)
 {
-  const struct TALER_MINT_Keys *keys;
-  const struct TALER_MINT_AuditorInformation *ai;
+  const struct TALER_EXCHANGE_Keys *keys;
+  const struct TALER_EXCHANGE_AuditorInformation *ai;
   unsigned int i;
   unsigned int j;
 
@@ -87,9 +87,9 @@ TMH_AUDITORS_check_dk (struct TALER_MINT_Handle *mh,
                 "Denomination key offered by client has expired for deposits\n");
     return GNUNET_SYSERR; /* expired */
   }
-  if (GNUNET_YES == mint_trusted)
+  if (GNUNET_YES == exchange_trusted)
     return GNUNET_OK;
-  keys = TALER_MINT_get_keys (mh);
+  keys = TALER_EXCHANGE_get_keys (mh);
   if (NULL == keys)
   {
     /* this should never happen, keys should have been successfully
@@ -203,7 +203,7 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
                                          &parse_auditors,
                                          (void *) cfg);
 
-  /* Generate preferred mint(s) array. */
+  /* Generate preferred exchange(s) array. */
   j_auditors = json_array ();
   for (cnt = 0; cnt < nauditors; cnt++)
     json_array_append_new (j_auditors,
