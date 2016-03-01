@@ -70,57 +70,57 @@ echo "\tvar shop_currency = '$MERCHANT_CURRENCY';\n";
         may also enjoy visiting the <tt>blog.demo.taler.net</tt>.
       </p>
     </article>
+
+    <div class="taler-installed-hide">
+      <h2>Installing the Taler wallet</h2>
+      First, you need to install the Taler wallet browser extension.
+      Install the wallet
+      <span id="install-done" style="visibility: hidden">(done)</span>
+      <ul>
+        <li>from the app store for <a href="https://chrome.google.com/webstore/detail/gnu-taler-wallet/millncjiddlpgdmkklmhfadpacifaonc">Google
+            Chrome and Chromium</a>
+        </li>
+        <li>via inline install:
+          <button onclick="installWallet()" id="install-button">
+            Add to Chrome
+          </button>
+        </li>
+      </ul>
+      Wallets for other browsers will be provided in the near future.
+    </div>
+
+    <div class="taler-installed-show">
+      <p>Please choose a project and the amount of KUDOS you
+        wish to donate:</p>
+
+      <form name="tform" action="checkout.php" method="POST">
+        <div class="participation" id="fake-shop">
+          <br>
+          <input type="radio" name="donation_receiver" value="Taler" checked="true">GNU Taler</input>
+          <br>
+          <input type="radio" name="donation_receiver" value="Tor">Tor</input>
+          <br>
+          <input type="radio" name="donation_receiver" value="GNUnet">GNUnet</input>
+          <br>
+          <select id="taler-donation" name="donation_amount">
+            <!-- options will be added dynamically -->
+          </select>
+          <input id="currency-input" type="hidden" name="donation_currency"/>
+          <input type="submit" name="keyName" value="Donate!"/>
+          <br>
+          <br>
+        </div>
+      </form>
+      <p>
+        (*) To make it a bit more fun, the 5 KUDOS option
+        is deliberately implemented with a fault: the merchant will try to
+        make you donate 6 KUDOS instead of the 5 KUDOS you got to see.  But do
+        not worry, you will be given the opportunity to review the
+        final offer from the merchant in a window secured
+        by the Taler extension.  That way, you can spot the
+        error before committing to an incorrect contract.
+      </p>
+    </div>
   </section>
-
-  <div class="taler-installed-hide">
-    <h2>Installing the Taler wallet</h2>
-    First, you need to install the Taler wallet browser extension.
-    Install the wallet
-    <span id="install-done" style="visibility: hidden">(done)</span>
-    <ul>
-      <li>from the app store for <a href="https://chrome.google.com/webstore/detail/gnu-taler-wallet/millncjiddlpgdmkklmhfadpacifaonc">Google
-          Chrome and Chromium</a>
-      </li>
-      <li>via inline install:
-        <button onclick="installWallet()" id="install-button">
-          Add to Chrome
-        </button>
-      </li>
-    </ul>
-    Wallets for other browsers will be provided in the near future.
-  </div>
-
-  <div class="taler-installed-show">
-    <p>Please choose a project and the amount of KUDOS you
-      wish to donate:</p>
-
-    <form name="tform" action="checkout.php" method="POST">
-      <div class="participation" id="fake-shop">
-        <br>
-        <input type="radio" name="donation_receiver" value="Taler" checked="true">GNU Taler</input>
-        <br>
-        <input type="radio" name="donation_receiver" value="Tor">Tor</input>
-        <br>
-        <input type="radio" name="donation_receiver" value="GNUnet">GNUnet</input>
-        <br>
-        <select id="taler-donation" name="donation_amount">
-          <!-- options will be added dynamically -->
-        </select>
-        <input id="currency-input" type="hidden" name="donation_currency"/>
-        <input type="submit" name="keyName" value="Donate!"/>
-        <br>
-        <br>
-      </div>
-    </form>
-    <p>
-      (*) To make it a bit more fun, the 5 KUDOS option
-      is deliberately implemented with a fault: the merchant will try to
-      make you donate 6 KUDOS instead of the 5 KUDOS you got to see.  But do
-      not worry, you will be given the opportunity to review the
-      final offer from the merchant in a window secured
-      by the Taler extension.  That way, you can spot the
-      error before committing to an incorrect contract.
-    </p>
-  </div>
 </body>
 </html>
