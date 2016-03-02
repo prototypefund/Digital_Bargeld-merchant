@@ -1,6 +1,6 @@
 <html>
   <head>
-    <link rel="stylesheet" type="text/css" href="../style.css">
+    <link rel="stylesheet" type="text/css" href="style.css">
   </head>
   <body style="display:none;" lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
     <header>
@@ -80,20 +80,15 @@
     function handleTimeout() {
       walletNotPresent = true;
       document.body.style.display = "";
+      document.body.classList.add("fade");
     }
   
     document.addEventListener("taler-wallet-present",
                               has_taler_wallet_cb,
                               false);
 
-    window.setTimeout(handleTimeout, 200);
+    window.setTimeout(handleTimeout, 300);
   
-    // Register event to be triggered by the wallet when it gets enabled while
-    // the user is on the payment page
-    document.addEventListener("taler-load",
-                              signal_taler_wallet_onload,
-                              false);
-
     function executePayment(H_contract, pay_url, offering_url) {
       var detail = {
         H_contract: H_contract,
