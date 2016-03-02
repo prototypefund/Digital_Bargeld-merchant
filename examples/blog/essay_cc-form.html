@@ -67,8 +67,13 @@
     }
 
     var walletNotPresent = false;
+    var timer;
 
     function has_taler_wallet_cb(aEvent){
+      if (timer) {
+        window.clearTimeout(timer);
+        timer = void 0;
+      }
       if (walletNotPresent) {
         return;
       }
@@ -87,7 +92,7 @@
                               has_taler_wallet_cb,
                               false);
 
-    window.setTimeout(handleTimeout, 300);
+    timer = window.setTimeout(handleTimeout, 250);
   
     function executePayment(H_contract, pay_url, offering_url) {
       var detail = {
