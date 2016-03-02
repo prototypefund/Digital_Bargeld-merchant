@@ -18,7 +18,7 @@
     function cb() {
       document.body.style.display = "";
     }
-    document.addEvent("DOMContentLoaded", cb, false);
+    document.addEventListener("DOMContentLoaded", cb, false);
   }
   </script>
 </head>
