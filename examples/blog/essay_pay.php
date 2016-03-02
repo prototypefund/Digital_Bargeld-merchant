@@ -60,8 +60,7 @@
   // FIXME put some control below
 
   // with the article that's going to be payed
-  $resp = give_to_backend($_SERVER['HTTP_HOST'],
-                          "backend/pay",
+  $resp = give_to_backend("backend/pay",
                           $deposit_permission);
   $status_code = $resp->getResponseCode();
   http_response_code ($status_code);

@@ -75,8 +75,7 @@
   				      array(),
   				      $now,
   				      get_full_uri());*/
-    $resp = give_to_backend($_SERVER['HTTP_HOST'],
-                            "backend/contract",
+    $resp = give_to_backend("backend/contract",
                             $contract_rec);
     if ($resp->getResponseCode() != 200){
       echo json_encode(array(

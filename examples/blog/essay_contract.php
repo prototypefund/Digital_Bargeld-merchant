@@ -59,8 +59,7 @@
   				            "taxes" => $teatax,
   				            "now" => $now,
   				            "fulfillment_url" => $fulfillment_url));
-  $resp = give_to_backend($_SERVER['HTTP_HOST'],
-                          "backend/contract",
+  $resp = give_to_backend("backend/contract",
   	                  $contract_json);
   $status_code = $resp->getResponseCode();
   http_response_code ($status_code);

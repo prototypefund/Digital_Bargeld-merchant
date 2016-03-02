@@ -143,9 +143,8 @@ function generate_contract($amount_value,
  * Feed `$json` to the backend and return the "(pecl) http response object"
  * corresponding to the `$backend_relative_url` call
  */
-function give_to_backend($backend_host, $backend_relative_url, $json){
-  $url = (new http\URL("http://$backend_host"))
-    ->mod(array ("path" => $backend_relative_url), http\Url::JOIN_PATH);
+function give_to_backend($backend_relative_url, $json){
+  $url = url_join("http://".$_SERVER["HTTP_HOST"], $backend_relative_url);
   
   $req = new http\Client\Request("POST",
                                  $url,
