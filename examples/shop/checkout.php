@@ -130,8 +130,12 @@
 /* This function is called from "taler_pay" after
    we downloaded the JSON contract from the merchant.
    We now need to pass it to the extension. */
-function handle_contract(json_contract) {
-  var cEvent = new CustomEvent('taler-contract', { detail: json_contract });
+function handle_contract(contract_wrapper) {
+  var cEvent = new CustomEvent('taler-confirm-contract', {
+    detail: {
+      contract_wrapper: contract_wrapper
+    }
+  });
   document.dispatchEvent(cEvent);
 };
 

@@ -26,9 +26,13 @@
       </form>
     </section>
     <script type="application/javascript">
-    function handle_contract(json_contract) {
-      var cEvent = new CustomEvent('taler-contract',
-                                   {detail: json_contract});
+    function handle_contract(contract_wrapper) {
+      var cEvent = new CustomEvent("taler-confirm-contract", {
+        detail: {
+          contract_wrapper: contract_wrapper,
+          replace_navigation: true
+        }
+      });
       document.dispatchEvent(cEvent);
     };
 
