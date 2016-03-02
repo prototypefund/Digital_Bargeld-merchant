@@ -55,18 +55,20 @@ $fulfillment_url = url_rel("fulfillment.php")
   . '&tid=' . $transaction_id;
 
 
-  $contract = _generate_contract(array("amount_value" => $amount_value,
-                                       "amount_fraction" => $amount_fraction,
-                                       "currency" => $currency,
-				       "refund_delta" => 'P3M',
-  		 	               "transaction_id" => $transaction_id,
-  				       "description" => $desc,
-  				       "product_id" => $p_id,
-  				       "correlation_id" => "",
-				       "merchant_name" => "Kudos Inc.",
-  				       "taxes" => array(),
-  				       "now" => $now,
-  				       "fulfillment_url" => $fulfillment_url));
+$contract = generate_contract(array(
+  "amount_value" => $amount_value,
+  "amount_fraction" => $amount_fraction,
+  "currency" => $currency,
+  "refund_delta" => 'P3M',
+  "transaction_id" => $transaction_id,
+  "description" => $desc,
+  "product_id" => $p_id,
+  "correlation_id" => "",
+  "merchant_name" => "Kudos Inc.",
+  "taxes" => array(),
+  "now" => $now,
+  "fulfillment_url" => $fulfillment_url)
+);
 
 
 // pack the JSON for the contract 

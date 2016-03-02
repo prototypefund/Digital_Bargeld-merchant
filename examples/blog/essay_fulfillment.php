@@ -52,29 +52,20 @@
     $now = new DateTime();
     $now->setTimestamp(intval($timestamp));
 
-    $contract_rec = _generate_contract(array("amount_value" => 0,
-                                         "amount_fraction" => 50000,
-                                         "currency" => $MERCHANT_CURRENCY,
-					 "refund_delta" => $REFUND_DELTA,
-					 "merchant_name" => "Free Software Foundation (demo)",
-  		 	                 "transaction_id" => intval($tid),
-  				         "description" => trim(get_title($article)),
-  				         "product_id" => $article,
-  				         "correlation_id" => $article,
-  				         "taxes" => array(),
-  				         "now" => $now,
-  				         "fulfillment_url" => get_full_uri()));
-    /*
-    $contract_rec = generate_contract(0,
-                                      50000,
-  		                      $MERCHANT_CURRENCY,
-  				      intval($tid),
-  				      trim(get_title($article)),
-  				      $article,
-  				      $article,
-  				      array(),
-  				      $now,
-  				      get_full_uri());*/
+    $contract_rec = generate_contract(array(
+      "amount_value" => 0,
+      "amount_fraction" => 50000,
+      "currency" => $MERCHANT_CURRENCY,
+      "refund_delta" => $REFUND_DELTA,
+      "merchant_name" => "Free Software Foundation (demo)",
+      "transaction_id" => intval($tid),
+      "description" => trim(get_title($article)),
+      "product_id" => $article,
+      "correlation_id" => $article,
+      "taxes" => array(),
+      "now" => $now,
+      "fulfillment_url" => get_full_uri())
+    );
     $resp = give_to_backend("backend/contract",
                             $contract_rec);
     if ($resp->getResponseCode() != 200){

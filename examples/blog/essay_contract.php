@@ -36,29 +36,20 @@
     . '&timestamp=' . $now->getTimestamp()
     . '&tid=' . $transaction_id;
 
-/*  $contract_json = generate_contract($amount_value,
-                                     $amount_fraction,
-                                     $MERCHANT_CURRENCY,
-  				     $transaction_id,
-  				     trim($teaser),
-  				     $article,
-  				     $article,
-  				     $teatax,
-  				     $now,
-  				     $fulfillment_url);*/
-
-  $contract_json = _generate_contract(array("amount_value" => $amount_value,
-                                            "amount_fraction" => $amount_fraction,
-                                            "currency" => $MERCHANT_CURRENCY,
-					    "refund_delta" => $REFUND_DELTA,
-  		 	                    "transaction_id" => $transaction_id,
-  				            "description" => trim($teaser),
-					    "merchant_name" => "Free Software Foundation (demo)",
-  				            "product_id" => $article,
-  				            "correlation_id" => $article,
-  				            "taxes" => $teatax,
-  				            "now" => $now,
-  				            "fulfillment_url" => $fulfillment_url));
+  $contract_json = generate_contract(array(
+    "amount_value" => $amount_value,
+    "amount_fraction" => $amount_fraction,
+    "currency" => $MERCHANT_CURRENCY,
+    "refund_delta" => $REFUND_DELTA,
+    "transaction_id" => $transaction_id,
+    "description" => trim($teaser),
+    "merchant_name" => "Free Software Foundation (demo)",
+    "product_id" => $article,
+    "correlation_id" => $article,
+    "taxes" => $teatax,
+    "now" => $now,
+    "fulfillment_url" => $fulfillment_url)
+  );
   $resp = give_to_backend("backend/contract",
   	                  $contract_json);
   $status_code = $resp->getResponseCode();
