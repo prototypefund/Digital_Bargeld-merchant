@@ -46,7 +46,12 @@
           if (contract_request.status == 200) {
             console.log("response text:",
 	                contract_request.responseText);
-            handle_contract(contract_request.responseText);
+            var contract_wrapper = JSON.parse(contract_request.responseText);
+            if (!contract_wrapper) {
+              console.error("response text was invalid json");
+              return;
+            }
+            handle_contract(contract_wrapper);
           } else {
           alert("Failure to download contract from merchant " +
                 "(" + contract_request.status + "):\n" +

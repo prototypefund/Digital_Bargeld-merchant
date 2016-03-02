@@ -157,7 +157,12 @@ function taler_pay(form) {
         /* display contract_requestificate (i.e. it sends the JSON string
           to the extension) alert (contract_request.responseText); */
         console.log("response text:", contract_request.responseText);
-        handle_contract(contract_request.responseText);
+        var contract_wrapper = JSON.parse(contract_request.responseText);
+        if (!contract_wrapper) {
+          console.error("response text is invalid JSON");
+          return;
+        }
+        handle_contract(contract_wrapper);
       } else {
         /* There was an error obtaining the contract from the merchant,
            obviously this should not happen. To keep it simple, we just
