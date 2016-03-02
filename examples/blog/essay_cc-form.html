@@ -2,7 +2,7 @@
   <head>
     <link rel="stylesheet" type="text/css" href="../style.css">
   </head>
-  <body lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
+  <body style="display:none;" lang="en" bgcolor="#FFFFFF" text="#000000" link="#0000FF" vlink="#800080" alink="#FF0000">
     <header>
       <div id="logo"><a href="/"><img src="../gnu.svg" height="100" width="100"/></a></div>
       <h1>Credit card payment</h1>
@@ -66,13 +66,27 @@
       contract_request.send();
     }
 
+    var walletNotPresent = false;
+
     function has_taler_wallet_cb(aEvent){
+      if (walletNotPresent) {
+        return;
+      }
+      // FIXME: this is a template, but very ugly ...
       {jscode}
     };
+
+    
+    function handleTimeout() {
+      walletNotPresent = true;
+      document.body.style.display = "";
+    }
   
     document.addEventListener("taler-wallet-present",
                               has_taler_wallet_cb,
                               false);
+
+    window.setTimeout(handleTimeout, 200);
   
     // Register event to be triggered by the wallet when it gets enabled while
     // the user is on the payment page
