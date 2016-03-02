@@ -14,9 +14,15 @@
     var eve = new CustomEvent('taler-execute-payment', {detail: detail});
     document.dispatchEvent(eve);
   }
+  function makeVisible() {
+    function cb() {
+      document.body.style.display = "";
+    }
+    document.addEvent("DOMContentLoaded", cb, false);
+  }
   </script>
 </head>
-<body>
+<body style="display:none;">
 
   <header>
     <div id="logo">
@@ -55,8 +61,7 @@ include '../../copylib/util.php';
 
 $hc = get($_GET["uuid"]);
 
-if (empty($hc))
-{
+if (empty($hc)) {
   http_response_code(400);
   echo "<p>Bad request (UUID missing)</p>";
   return;
@@ -72,16 +77,16 @@ $pay_url = url_rel("pay.php");
 
 $offering_url = url_rel("checkout.php", true);
 
-if (null === $my_payment)
-{
+if (null === $my_payment) {
+  // TODO: show spinner after timeout
   echo "<p>you do not have the session state for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";
   echo "<script>executePayment('$hc', '$pay_url', '$offering_url');</script>";
   return;
 }
 
-if (true !== get($my_payment["is_payed"], false))
-{
+if (true !== get($my_payment["is_payed"], false)) {
+  // TODO: show spinner after timeout
   echo "<p>you have not payed for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";
   echo "<script>executePayment('$hc', '$pay_url');</script>";
@@ -91,8 +96,7 @@ if (true !== get($my_payment["is_payed"], false))
 $receiver = $my_payment["receiver"];
 
 $news = false;
-switch ($receiver)
-{
+switch ($receiver) {
   case "Taler":
     $news = "https://taler.net/news";
     break;
@@ -105,12 +109,13 @@ switch ($receiver)
 }
 
 $msg = "<p>Thanks for donating to " . $receiver . ".</p>";
-if ($news)
-{
+if ($news) {
   $msg .= "<p>Check our latest <a href=\"" . $news . "\">news!</a></p>";
 }
 
 echo $msg;
+
+echo "<script>makeVisible();</script>";
 
 ?>
     </article>
