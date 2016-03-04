@@ -326,6 +326,34 @@ TMH_trigger_daemon ()
   run_daemon (NULL, NULL);
 }
 
+/**
+ * Parse the TEST wireformat information from the configuration.
+ * If any of the required fields is missing return an error.
+ *
+ * @param cfg the configuration
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR on error
+ */
+static int
+parse_wireformat_test (const struct GNUNET_CONFIGURATION_Handle *cfg)
+{
+  char *account_number;
+  
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string(cfg,
+                                            "wire-test",
+					    "ACCOUNT_NUMBER",
+					    &account_number))
+    return GNUNET_SYSERR;
+  j_wire = json_pack("{s:s, s:s}",
+                     "type", "TEST",
+		     "account_number", account_number);
+  GNUNET_free (account_number);
+  if (NULL == j_wire)
+    return GNUNET_SYSERR;
+  return GNUNET_OK;
+
+}
+
 
 /**
  * Parse the SEPA information from the configuration.  If any of the
@@ -516,6 +544,8 @@ run (void *cls,
      const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
+  char *wireformat;
+
   result = GNUNET_SYSERR;
   shutdown_task =
     GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
@@ -527,9 +557,27 @@ run (void *cls,
           TMH_AUDITORS_init (config));
   /* FIXME: for now, we just support SEPA here: */
   EXITIF (GNUNET_OK !=
-	  parse_wireformat_sepa (config));
-  EXITIF (GNUNET_OK !=
-          validate_and_hash_wireformat ("SEPA"));
+          GNUNET_CONFIGURATION_get_value_string (config,
+                                                 "merchant",
+                                                 "WIREFORMAT",
+                                                 &wireformat));
+
+  if (0 == strcmp("SEPA", wireformat))
+  {
+    EXITIF (GNUNET_OK !=
+            parse_wireformat_sepa (config));
+    EXITIF (GNUNET_OK !=
+            validate_and_hash_wireformat ("SEPA"));
+  }
+  else if (0 == strcmp("TEST", wireformat))
+  {
+    EXITIF (GNUNET_OK !=
+            parse_wireformat_test (config));
+    EXITIF (GNUNET_OK !=
+            validate_and_hash_wireformat ("TEST"));
+  }
+  GNUNET_free (wireformat);
+
   EXITIF (GNUNET_OK !=
           GNUNET_CONFIGURATION_get_value_filename (config,
                                                    "merchant",
