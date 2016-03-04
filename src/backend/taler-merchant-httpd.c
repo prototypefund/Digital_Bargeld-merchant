@@ -336,18 +336,17 @@ TMH_trigger_daemon ()
 static int
 parse_wireformat_test (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
-  char *account_number;
+  unsigned long long account_number;
   
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_string(cfg,
+      GNUNET_CONFIGURATION_get_value_number(cfg,
                                             "wire-test",
 					    "ACCOUNT_NUMBER",
 					    &account_number))
     return GNUNET_SYSERR;
-  j_wire = json_pack("{s:s, s:s}",
+  j_wire = json_pack("{s:s, s:I}",
                      "type", "TEST",
-		     "account_number", account_number);
-  GNUNET_free (account_number);
+		     "account_number", (json_int_t) account_number);
   if (NULL == j_wire)
     return GNUNET_SYSERR;
   return GNUNET_OK;
