@@ -725,9 +725,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     {
       char *s = json_dumps (coins, JSON_INDENT(2));
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Coins json is: %s\n",
-                  s);
       free (s);
     }
 
@@ -786,10 +783,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     MHD_destroy_response (resp);
     return ret;
   }
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Looking up chosen exchange '%s'\n",
-              pc->chosen_exchange);
 
   /* Find the responsible exchange, this may take a while... */
   pc->pending = pc->coins_cnt;
