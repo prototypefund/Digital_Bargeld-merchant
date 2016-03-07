@@ -28,6 +28,8 @@
 #include "taler-merchant-httpd_responses.h"
 
 
+extern char *TMH_merchant_currency_string;
+
 /**
  * Manage a contract request. In practical terms, it adds the fields
  * 'exchanges', 'merchant_pub', and 'H_wire' to the contract 'proposition'
@@ -51,6 +53,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                      const char *upload_data,
                      size_t *upload_data_size)
 {
+
   json_t *root;
   json_t *jcontract;
   int res;
