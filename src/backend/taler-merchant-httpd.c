@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015 GNUnet e.V.
+  (C) 2014, 2015 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -350,7 +350,6 @@ parse_wireformat_test (const struct GNUNET_CONFIGURATION_Handle *cfg)
   if (NULL == j_wire)
     return GNUNET_SYSERR;
   return GNUNET_OK;
-
 }
 
 
@@ -545,6 +544,7 @@ run (void *cls,
 {
   char *wireformat;
 
+  wireformat = NULL;
   result = GNUNET_SYSERR;
   shutdown_task =
     GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
@@ -627,6 +627,7 @@ run (void *cls,
  EXITIF_exit:
   if (GNUNET_OK != result)
     GNUNET_SCHEDULER_shutdown ();
+  GNUNET_free_non_null (wireformat);
   GNUNET_free_non_null (keyfile);
   if (GNUNET_OK != result)
     GNUNET_SCHEDULER_shutdown ();

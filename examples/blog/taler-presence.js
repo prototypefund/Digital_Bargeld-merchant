@@ -1,7 +1,7 @@
 /* @licstart  The following is the entire license notice for the
   JavaScript code in this page.
 
-  Copyright (C) 2016 GNUnet e.V.
+  Copyright (C) 2016 INRIA
 
   The JavaScript code in this page is free software: you can
   redistribute it and/or modify it under the terms of the GNU

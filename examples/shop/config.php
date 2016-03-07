@@ -1,4 +1,5 @@
 <?php
+/* This file is in the public domain */
 
 $host = $_SERVER["HTTP_HOST"];
 
