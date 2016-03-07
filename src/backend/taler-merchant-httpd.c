@@ -561,12 +561,6 @@ run (void *cls,
                                                  "WIREFORMAT",
                                                  &wireformat));
 
-    EXITIF (GNUNET_OK !=
-            parse_wireformat_sepa (config));
-    EXITIF (GNUNET_OK !=
-            validate_and_hash_wireformat ("SEPA"));
-
-#if 0
   if (0 == strcmp("SEPA", wireformat))
   {
     EXITIF (GNUNET_OK !=
@@ -581,7 +575,6 @@ run (void *cls,
     EXITIF (GNUNET_OK !=
             validate_and_hash_wireformat ("TEST"));
   }
-#endif
 
   GNUNET_free (wireformat);
 
