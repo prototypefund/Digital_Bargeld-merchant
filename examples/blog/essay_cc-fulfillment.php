@@ -1,7 +1,7 @@
 <?php
 /*
   This file is part of GNU TALER.
-  Copyright (C) 2014, 2015 INRIA
+  Copyright (C) 2014, 2015, 2016 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -13,6 +13,8 @@
 
   You should have received a copy of the GNU Lesser General Public License along with
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
+
+  @author Marcello Stanisci
 */
 
   include '../../copylib/util.php';
