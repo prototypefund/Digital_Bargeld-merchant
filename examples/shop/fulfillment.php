@@ -46,8 +46,8 @@
         <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
       </svg>
     </div>
-
-    <h1>Toy Store - Product Page</h1>
+    <!--#include virtual="web-common/dropdown-navbar.html"-->
+    <h1 class="nav">Toy Store - Product Page</h1>
   </header>
 
   <aside class="sidebar" id="left">

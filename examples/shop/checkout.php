@@ -60,8 +60,8 @@
 
   <section id="main">
     <article>
-
-      <h1>Select your payment method</h1>
+      <!--#include virtual="web-common/dropdown-navbar.html" -->
+      <h1 class="nav">Select your payment method</h1>
 
       <p>
         This is an example for a "checkout" page of a Web shop.
