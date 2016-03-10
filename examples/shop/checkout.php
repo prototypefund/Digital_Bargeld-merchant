@@ -22,7 +22,7 @@
 <html>
 <head>
   <title>Toy Store - Payment method - Taler Demo</title>
-  <link rel="stylesheet" type="text/css" href="style.css">
+  <link rel="stylesheet" type="text/css" href="web-common/style.css">
   <script type="application/javascript" src="web-common/taler-presence.js"></script>
 </head>
 <body>
@@ -51,8 +51,8 @@
         <text x="19" y="82" font-family="Verdana" font-size="90" fill="darkcyan">S</text>
       </svg>
     </div>
-
-    <h1>Toy Store - Select payment method</h1>
+    <!--#include virtual="web-common/dropdown-navbar.html" -->
+    <h1 class="nav">Toy Store - Select payment method</h1>
   </header>
 
   <aside class="sidebar" id="left">
@@ -60,8 +60,7 @@
 
   <section id="main">
     <article>
-      <!--#include virtual="web-common/dropdown-navbar.html" -->
-      <h1 class="nav">Select your payment method</h1>
+      <h1>Select your payment method</h1>
 
       <p>
         This is an example for a "checkout" page of a Web shop.
