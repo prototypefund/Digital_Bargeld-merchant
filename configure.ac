@@ -214,6 +214,13 @@ AC_TYPE_UINTMAX_T
 AC_CHECK_FUNCS([strdup])
 
 AC_CONFIG_FILES([Makefile
+examples/Makefile
+examples/blog/Makefile
+examples/blog/articles/Makefile
+examples/blog/web-common/Makefile
+examples/shop/Makefile
+examples/shop/web-common/Makefile
+copylib/Makefile
 src/Makefile
 src/include/Makefile
 src/backenddb/Makefile
