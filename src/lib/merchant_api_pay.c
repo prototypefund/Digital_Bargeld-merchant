@@ -3,15 +3,15 @@
   Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU General Public License as published by the Free Software
-  Foundation; either version 3, or (at your option) any later version.
+  terms of the GNU Lesser General Public License as published by the Free Software
+  Foundation; either version 2.1, or (at your option) any later version.
 
   TALER is distributed in the hope that it will be useful, but WITHOUT ANY
   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+  A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
 
-  You should have received a copy of the GNU General Public License along with
-  TALER; see the file COPYING.  If not, If not, see
+  You should have received a copy of the GNU Lesser General Public License along with
+  TALER; see the file COPYING.LGPL.  If not, If not, see
   <http://www.gnu.org/licenses/>
 */
 /**
@@ -177,7 +177,7 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
   unsigned int i;
   struct TALER_DepositRequestPS dr;
   struct TALER_MERCHANT_PaidCoin pc[num_coins];
-  
+
   dr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_COIN_DEPOSIT);
   dr.purpose.size = htonl (sizeof (struct TALER_DepositRequestPS));
   dr.h_contract = *h_contract;
@@ -210,7 +210,7 @@ TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
     TALER_amount_hton (&dr.deposit_fee,
 		       &fee);
     GNUNET_CRYPTO_eddsa_sign (&coin->coin_priv.eddsa_priv,
-			      &dr.purpose,			      
+			      &dr.purpose,
 			      &p->coin_sig.eddsa_signature);
     p->denom_pub = coin->denom_pub;
     p->denom_sig = coin->denom_sig;
@@ -286,7 +286,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
   struct TALER_Amount total_fee;
   struct TALER_Amount total_amount;
   unsigned int i;
-  
+
   if (0 == num_coins)
   {
     GNUNET_break (0);
@@ -317,7 +317,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
     }
     else
     {
-      if ( (GNUNET_OK != 
+      if ( (GNUNET_OK !=
 	    TALER_amount_add (&total_fee,
 			      &total_fee,
 			      &fee)) ||
@@ -361,7 +361,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
       /* Wallet must cover part of the fee! */
       struct TALER_Amount new_amount;
 
-      if (GNUNET_OK != 
+      if (GNUNET_OK !=
 	  TALER_amount_add (&new_amount,
 			    &fee_left,
 			    amount))

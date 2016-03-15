@@ -1,5 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
+#
+# This configure file is in the public domain
 
 AC_PREREQ([2.69])
 AC_INIT([taler-merchant], [0.0.0], [taler-bug@gnunet.org])
@@ -212,6 +214,13 @@ AC_TYPE_UINTMAX_T
 AC_CHECK_FUNCS([strdup])
 
 AC_CONFIG_FILES([Makefile
+examples/Makefile
+examples/blog/Makefile
+examples/blog/articles/Makefile
+examples/blog/web-common/Makefile
+examples/shop/Makefile
+examples/shop/web-common/Makefile
+copylib/Makefile
 src/Makefile
 src/include/Makefile
 src/backenddb/Makefile
