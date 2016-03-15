@@ -11,11 +11,11 @@
   A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License along with
-  TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
+  TALER; see the file COPYING.GPL.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 
 /**
-* @file merchant/tests/merchant-non-http-test.c
+* @file src/tests/test_contract.c
 * @brief test for various merchant's capabilities
 * @author Marcello Stanisci
 */
@@ -129,9 +129,9 @@ run (void *cls, char *const *args, const char *cfgfile,
   {
     printf ("no keyfile entry in cfg file\n");
     result = GNUNET_SYSERR;
-  }  
+  }
 
-  privkey = GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile); 
+  privkey = GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile);
   wire = TALER_MERCHANT_parse_wireformat_sepa (config);
   shutdown_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
                                                 &do_shutdown, NULL);
@@ -158,23 +158,23 @@ run (void *cls, char *const *args, const char *cfgfile,
   /**
   * Holes:
   *
-  * - 'h_wire' 
+  * - 'h_wire'
   * - 'timestamp'
   *
   */
-  
+
   /**
   *
   * Preparing the 'details' sub-object: an array of 'item' objects
   * plus some juridical and delivery-aware informations
   *
   */
-  
+
   /**
   *
   * Preparing a 'item' sub-object
   */
-  
+
   /* Description */
   desc = "Fake purchase";
 
@@ -184,7 +184,7 @@ run (void *cls, char *const *args, const char *cfgfile,
 
   /* item price: OPTIONAL FIELD*/
   j_item_price = TALER_json_from_amount (&amount);
-  
+
   /* Product ID */
   p_id = (int32_t) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX);
 
@@ -207,9 +207,9 @@ run (void *cls, char *const *args, const char *cfgfile,
     printf ("error in packing [j_item: %p]\n", j_item);
     return;
   }
-  
+
   /* End of 'item' object definition */
-  
+
   /* Delivery date: OPTIONAL FIELD */
   now = GNUNET_TIME_absolute_get ();
   TALER_round_abs_time (&now);
@@ -218,7 +218,7 @@ run (void *cls, char *const *args, const char *cfgfile,
 
   /* Delivery location: OPTIONAL FIELD */
   j_delloc = json_string ("MALTK"); /* just a 'tag' which points to some well defined location */
-			
+
 
   /* Merchant jurisdiction: OPTIONAL FIELD (with its fields from 3rd to the last being optional)
   * for another optional field */
@@ -281,14 +281,14 @@ run (void *cls, char *const *args, const char *cfgfile,
 			          now,
 			          &aa,
 			          nounce);
-  if (ret == GNUNET_NO)	 
+  if (ret == GNUNET_NO)
   {
     printf ("Failed, contract already in DB\n");
     return;
   }
   else
     printf ("handling contract fine\n");
-  
+
 
   printf ("contract string : %s\n", aa);
 
@@ -317,14 +317,14 @@ run (void *cls, char *const *args, const char *cfgfile,
 int
 main (int argc, char *const *argv)
 {
-  
+
   static const struct GNUNET_GETOPT_CommandLineOption options[] = {
     {'t', "temp", NULL,
      gettext_noop ("Use temporary database tables"), GNUNET_NO,
      &GNUNET_GETOPT_set_one, &dry},
      GNUNET_GETOPT_OPTION_END
     };
-  
+
 
   if (GNUNET_OK !=
       GNUNET_PROGRAM_run (argc, argv,
@@ -335,5 +335,5 @@ main (int argc, char *const *argv)
   return (GNUNET_OK == result) ? 0 : 1;
 
 
- 
+
 }

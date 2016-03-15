@@ -1,5 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
+#
+# This configure file is in the public domain
 
 AC_PREREQ([2.69])
 AC_INIT([taler-merchant], [0.0.0], [taler-bug@gnunet.org])

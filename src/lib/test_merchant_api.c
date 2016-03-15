@@ -3,15 +3,15 @@
   Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU General Public License as published by the Free Software
-  Foundation; either version 3, or (at your option) any later version.
+  terms of the GNU Lesser General Public License as published by the Free Software
+  Foundation; either version 2.1, or (at your option) any later version.
 
   TALER is distributed in the hope that it will be useful, but WITHOUT ANY
   WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+  A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
 
-  You should have received a copy of the GNU General Public License along with
-  TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
+  You should have received a copy of the GNU Lesser General Public License along with
+  TALER; see the file COPYING.LGPL.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 /**
  * @file merchant/test_merchant_api.c
@@ -1045,7 +1045,7 @@ interpreter_run (void *cls,
 	fail (is);
 	return;
       }
-      
+
       /* parse wire details */
       wire = json_loads (cmd->details.pay.wire_details,
                          JSON_REJECT_DUPLICATES,
@@ -1121,9 +1121,9 @@ interpreter_run (void *cls,
 		      is->ip);
 	  fail (is);
 	  return;
-	}	
+	}
       }
-      
+
       if (0 == cmd->details.pay.refund_deadline.rel_value_us)
 	refund_deadline = GNUNET_TIME_UNIT_ZERO_ABS; /* no refunds */
       else
@@ -1131,7 +1131,7 @@ interpreter_run (void *cls,
       TALER_round_abs_time (&refund_deadline);
       timestamp = GNUNET_TIME_absolute_get ();
       TALER_round_abs_time (&timestamp);
-      cmd->details.pay.ph 
+      cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (merchant,
 				     MERCHANT_URI "pay",
 				     EXCHANGE_URI,
@@ -1184,7 +1184,7 @@ do_shutdown (void *cls,
   struct InterpreterState *is = cls;
   struct Command *cmd;
   unsigned int i;
-  
+
   shutdown_task = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Shutdown executing\n");
@@ -1511,12 +1511,12 @@ main (int argc,
       char * const *argv)
 {
   /* Value from "gnunet-ecc -p test_merchant.priv" */
-  const char *merchant_pub_str 
+  const char *merchant_pub_str
     = "5TRNSWAWHKBJ7G4T3PKRCQA6MCB3MX82F4M2XXS1653KE1V8RFPG";
   struct GNUNET_OS_Process *proc;
   struct GNUNET_OS_Process *exchanged;
   struct GNUNET_OS_Process *merchantd;
-  
+
   GNUNET_log_setup ("test-merchant-api",
                     "WARNING",
                     NULL);
