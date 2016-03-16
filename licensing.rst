@@ -34,8 +34,8 @@ We list as 'runtime dependencies'
 The following list encompasses all the runtime dependencies for this project,
 and gives the copyright holder for each of them
 
-* libjansson : MIT License, LGPL-Compatible, owned by Petri Lehtinen and other individuals
+* libjansson : MIT License, AGPL- and LGPL-Compatible, owned by Petri Lehtinen and other individuals
 * libgcrypt : LGPL, owned by Free Software Foundation
-* postgresql : PostgreSQL License, LGPL-Compatible, owned by The PostgreSQL Global Development Group
+* postgresql : PostgreSQL License, AGPL- and LGPL-Compatible, owned by The PostgreSQL Global Development Group
 * libgnunet (in all of its variants) : LGPL/GPL, owned by GNUnet e.V.
-* PHP :  PHP License, LGPL-Compatible, owned by The PHP Group
+* PHP :  PHP License, AGPL- and LGPL-Compatible, owned by The PHP Group
