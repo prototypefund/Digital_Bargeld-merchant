@@ -64,11 +64,11 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   struct TALER_Amount total;
   struct TALER_Amount max_fee;
   uint64_t transaction_id;
-  struct TMH_PARSE_FieldSpecification spec[] = {
-    TMH_PARSE_member_amount ("amount", &total),
-    TMH_PARSE_member_amount ("max_fee", &max_fee),
-    TMH_PARSE_member_uint64 ("transaction_id", &transaction_id),
-    TMH_PARSE_MEMBER_END
+  struct GNUNET_JSON_Specification spec[] = {
+    TALER_JSON_spec_amount ("amount", &total),
+    TALER_JSON_spec_amount ("max_fee", &max_fee),
+    GNUNET_JSON_spec_uint64 ("transaction_id", &transaction_id),
+    GNUNET_JSON_spec_end()
   };
 
   if (NULL == *connection_cls)
