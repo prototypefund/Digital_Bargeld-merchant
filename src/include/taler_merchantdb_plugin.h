@@ -23,6 +23,7 @@
 #define TALER_MERCHANTDB_PLUGIN_H
 
 #include <gnunet/gnunet_util_lib.h>
+#include <jansson.h>
 
 /**
  * Handle to interact with the database.

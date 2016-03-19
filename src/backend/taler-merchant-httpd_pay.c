@@ -426,7 +426,7 @@ process_pay_with_exchange (void *cls,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                              "hint", "unknown denom to exchange",
-                                                             "denom_pub", TALER_json_from_rsa_public_key (dc->denom.rsa_public_key)));
+                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
       return;
     }
     if (GNUNET_OK !=
@@ -439,7 +439,7 @@ process_pay_with_exchange (void *cls,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                              "hint", "no acceptable auditor for denomination",
-                                                             "denom_pub", TALER_json_from_rsa_public_key (dc->denom.rsa_public_key)));
+                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
       return;
     }
     if (0 == i)
@@ -477,8 +477,8 @@ process_pay_with_exchange (void *cls,
 				MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o, s:o}",
                                                              "hint", "fee higher than coin value",
-                                                             "f", TALER_json_from_amount (&dc->percoin_amount),
-                                                             "fee_deposit", TALER_json_from_amount (&denom_details->fee_deposit)));
+                                                             "f", TALER_JSON_from_amount (&dc->percoin_amount),
+                                                             "fee_deposit", TALER_JSON_from_amount (&denom_details->fee_deposit)));
       return;
     }
   }

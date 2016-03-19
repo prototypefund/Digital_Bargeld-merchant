@@ -22,14 +22,15 @@
  */
 #include "platform.h"
 #include <microhttpd.h>
-#include <jansson.h>
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_util.h>
+#include <taler/taler_json_lib.h>
 #include <taler/taler_exchange_service.h>
-#include "taler-merchant-httpd_parsing.h"
+#include <taler/taler_wire_plugin.h>
 #include "taler-merchant-httpd_responses.h"
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
+#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
@@ -337,7 +338,7 @@ static int
 parse_wireformat_test (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
   unsigned long long account_number;
-  
+
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_number(cfg,
                                             "wire-test",
@@ -445,19 +446,36 @@ parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg)
 static int
 validate_and_hash_wireformat (const char *allowed)
 {
-  const char *allowed_arr[] = {
-    allowed,
-    NULL
-  };
+  struct TALER_WIRE_Plugin *plugin;
+  char *lib_name;
+  int ret;
 
-  if (GNUNET_YES !=
-      TALER_json_validate_wireformat (allowed_arr,
-                                      j_wire))
+  (void) GNUNET_asprintf (&lib_name,
+                          "libtaler_plugin_wire_%s",
+                          allowed);
+  plugin = GNUNET_PLUGIN_load (lib_name,
+                               NULL);
+  if (NULL == plugin)
+  {
+    GNUNET_free (lib_name);
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Wire transfer method `%s' not supported\n",
+                allowed);
+    return GNUNET_NO;
+  }
+  plugin->library_name = lib_name;
+  ret = plugin->wire_validate (plugin->cls,
+                               j_wire,
+                               NULL);
+  GNUNET_PLUGIN_unload (lib_name,
+                        plugin);
+  GNUNET_free (lib_name);
+  if (GNUNET_YES != ret)
     return GNUNET_SYSERR;
   if (GNUNET_SYSERR ==
-      TALER_hash_json (j_wire,
+      TALER_JSON_hash (j_wire,
                        &h_wire))
-    return MHD_NO;
+    return GNUNET_SYSERR;
   return GNUNET_OK;
 }
 

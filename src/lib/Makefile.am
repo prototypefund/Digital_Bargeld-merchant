@@ -15,10 +15,12 @@ libtalermerchant_la_LDFLAGS = \
 
 libtalermerchant_la_SOURCES = \
   merchant_api_context.c merchant_api_context.h \
-  merchant_api_json.c merchant_api_json.h \
   merchant_api_pay.c
 
 libtalermerchant_la_LIBADD = \
+  -ltalerjson \
+  -ltalerutil \
+  -lgnunetjson \
   -lgnunetutil \
   -ljansson \
   $(XLIB)

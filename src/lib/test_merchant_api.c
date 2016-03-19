@@ -1059,7 +1059,7 @@ interpreter_run (void *cls,
         fail (is);
         return;
       }
-      TALER_hash_json (wire,
+      TALER_JSON_hash (wire,
 		       &h_wire);
       json_decref (wire);
 
@@ -1076,7 +1076,7 @@ interpreter_run (void *cls,
         fail (is);
         return;
       }
-      TALER_hash_json (contract,
+      TALER_JSON_hash (contract,
 		       &h_contract);
       json_decref (contract);
 

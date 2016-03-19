@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA 
+  (C) 2014, 2015, 2016 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -20,6 +20,7 @@
  * @author Christian Grothoff
  */
 #include "platform.h"
+#include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd_exchanges.h"
 
 
@@ -502,7 +503,7 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
       continue;
     j_exchange = json_pack ("{s:s, s:o}",
                         "url", exchange->uri,
-                        "master_pub", TALER_json_from_data (&exchange->master_pub,
+                        "master_pub", GNUNET_JSON_from_data (&exchange->master_pub,
                                                             sizeof (struct TALER_MasterPublicKeyP)));
     json_array_append_new (trusted_exchanges,
                            j_exchange);

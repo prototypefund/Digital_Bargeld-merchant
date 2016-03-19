@@ -21,6 +21,7 @@
 #include "platform.h"
 #include <jansson.h>
 #include <taler/taler_signatures.h>
+#include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_auditors.h"
@@ -118,16 +119,16 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                    j_auditors);
   json_object_set_new (jcontract,
                        "H_wire",
-		       TALER_json_from_data (&h_wire,
+		       GNUNET_JSON_from_data (&h_wire,
                                              sizeof (h_wire)));
   json_object_set_new (jcontract,
                        "merchant_pub",
-		       TALER_json_from_data (&pubkey,
+		       GNUNET_JSON_from_data (&pubkey,
                                              sizeof (pubkey)));
 
   /* create contract signature */
   GNUNET_assert (GNUNET_OK ==
-                 TALER_hash_json (jcontract,
+                 TALER_JSON_hash (jcontract,
                                   &contract.h_contract));
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract.purpose.size = htonl (sizeof (contract));
@@ -145,9 +146,9 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                                       MHD_HTTP_OK,
                                       "{s:O, s:O, s:O}",
                                       "contract", jcontract,
-                                      "merchant_sig", TALER_json_from_data (&contract_sig,
+                                      "merchant_sig", GNUNET_JSON_from_data (&contract_sig,
                                                                    sizeof (contract_sig)),
-                                      "H_contract", TALER_json_from_data (&contract.h_contract,
+                                      "H_contract", GNUNET_JSON_from_data (&contract.h_contract,
                                                                           sizeof (contract.h_contract)));
   json_decref (root);
   return res;
