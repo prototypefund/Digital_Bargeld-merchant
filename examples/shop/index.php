@@ -95,10 +95,7 @@ echo "\tvar shop_currency = '$MERCHANT_CURRENCY';\n";
         <li>from the app store for <a href="https://chrome.google.com/webstore/detail/gnu-taler-wallet/millncjiddlpgdmkklmhfadpacifaonc">Google
             Chrome and Chromium</a>
         </li>
-        <li>via inline install:
-          <button onclick="installWallet()" id="install-button">
-            Add to Chrome
-          </button>
+        <li>By visiting our <a href="/landing">landing page</a>.
         </li>
       </ul>
       Wallets for other browsers will be provided in the near future.
