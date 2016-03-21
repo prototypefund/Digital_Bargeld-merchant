@@ -426,7 +426,7 @@ process_pay_with_exchange (void *cls,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                              "hint", "unknown denom to exchange",
-                                                             "denom_pub", TALER_json_from_rsa_public_key (dc->denom.rsa_public_key)));
+                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
       return;
     }
     if (GNUNET_OK !=
@@ -439,7 +439,7 @@ process_pay_with_exchange (void *cls,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                              "hint", "no acceptable auditor for denomination",
-                                                             "denom_pub", TALER_json_from_rsa_public_key (dc->denom.rsa_public_key)));
+                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
       return;
     }
     if (0 == i)
@@ -477,8 +477,8 @@ process_pay_with_exchange (void *cls,
 				MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o, s:o}",
                                                              "hint", "fee higher than coin value",
-                                                             "f", TALER_json_from_amount (&dc->percoin_amount),
-                                                             "fee_deposit", TALER_json_from_amount (&denom_details->fee_deposit)));
+                                                             "f", TALER_JSON_from_amount (&dc->percoin_amount),
+                                                             "fee_deposit", TALER_JSON_from_amount (&denom_details->fee_deposit)));
       return;
     }
   }
@@ -641,29 +641,29 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     unsigned int coins_index;
     struct TALER_MerchantSignatureP merchant_sig;
     struct TALER_ContractPS cp;
-    struct TMH_PARSE_FieldSpecification spec[] = {
-      TMH_PARSE_member_amount ("amount", &pc->amount),
-      TMH_PARSE_member_array ("coins", &coins),
-      TMH_PARSE_member_fixed ("H_contract", &pc->h_contract),
-      TMH_PARSE_member_amount ("max_fee", &pc->max_fee),
-      TMH_PARSE_member_fixed ("merchant_sig", &merchant_sig),
-      TMH_PARSE_member_string ("exchange", &pc->chosen_exchange),
-      TMH_PARSE_member_time_abs ("refund_deadline", &pc->refund_deadline),
-      TMH_PARSE_member_time_abs ("timestamp", &pc->timestamp),
-      TMH_PARSE_member_uint64 ("transaction_id", &pc->transaction_id),
-      TMH_PARSE_MEMBER_END
+    const char *chosen_exchange;
+    struct GNUNET_JSON_Specification spec[] = {
+      TALER_JSON_spec_amount ("amount", &pc->amount),
+      GNUNET_JSON_spec_json ("coins", &coins),
+      GNUNET_JSON_spec_fixed_auto ("H_contract", &pc->h_contract),
+      TALER_JSON_spec_amount ("max_fee", &pc->max_fee),
+      GNUNET_JSON_spec_fixed_auto ("merchant_sig", &merchant_sig),
+      GNUNET_JSON_spec_string ("exchange", &chosen_exchange),
+      GNUNET_JSON_spec_absolute_time ("refund_deadline", &pc->refund_deadline),
+      GNUNET_JSON_spec_absolute_time ("timestamp", &pc->timestamp),
+      GNUNET_JSON_spec_uint64 ("transaction_id", &pc->transaction_id),
+      GNUNET_JSON_spec_end()
     };
 
     res = TMH_PARSE_json_data (connection,
                                root,
                                spec);
-
     if (GNUNET_YES != res)
     {
       json_decref (root);
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
-
+    pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Parsed JSON for /pay.\n");
     cp.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
@@ -696,9 +696,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     }
     else
     {
-      struct TMH_PARSE_FieldSpecification espec[] = {
-        TMH_PARSE_member_time_abs ("edate", &pc->edate),
-        TMH_PARSE_MEMBER_END
+      struct GNUNET_JSON_Specification espec[] = {
+        GNUNET_JSON_spec_absolute_time ("edate", &pc->edate),
+        GNUNET_JSON_spec_end()
       };
 
       res = TMH_PARSE_json_data (connection,
@@ -731,13 +731,13 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     json_array_foreach (coins, coins_index, coin)
     {
       struct MERCHANT_DepositConfirmation *dc = &pc->dc[coins_index];
-      struct TMH_PARSE_FieldSpecification spec[] = {
-        TMH_PARSE_member_denomination_public_key ("denom_pub", &dc->denom),
-        TMH_PARSE_member_amount ("f", &dc->percoin_amount),
-        TMH_PARSE_member_fixed ("coin_pub", &dc->coin_pub),
-        TMH_PARSE_member_denomination_signature ("ub_sig", &dc->ub_sig),
-        TMH_PARSE_member_fixed ("coin_sig", &dc->coin_sig),
-        TMH_PARSE_MEMBER_END
+      struct GNUNET_JSON_Specification spec[] = {
+        TALER_JSON_spec_denomination_public_key ("denom_pub", &dc->denom),
+        TALER_JSON_spec_amount ("f", &dc->percoin_amount),
+        GNUNET_JSON_spec_fixed_auto ("coin_pub", &dc->coin_pub),
+        TALER_JSON_spec_denomination_signature ("ub_sig", &dc->ub_sig),
+        GNUNET_JSON_spec_fixed_auto ("coin_sig", &dc->coin_sig),
+        GNUNET_JSON_spec_end()
       };
 
       res = TMH_PARSE_json_data (connection,

@@ -21,6 +21,7 @@
 #include "platform.h"
 #include <jansson.h>
 #include <taler/taler_signatures.h>
+#include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_auditors.h"
@@ -85,7 +86,7 @@ MH_handler_hash_contract (struct TMH_RequestHandler *rh,
                                               "missing 'contract' field");
   }
 
-  if (GNUNET_OK != TALER_hash_json (jcontract,
+  if (GNUNET_OK != TALER_JSON_hash (jcontract,
                                     &hc))
   {
     return TMH_RESPONSE_reply_external_error (connection,
@@ -93,14 +94,14 @@ MH_handler_hash_contract (struct TMH_RequestHandler *rh,
   }
 
   GNUNET_assert (GNUNET_OK ==
-                 TALER_hash_json (jcontract,
+                 TALER_JSON_hash (jcontract,
                                   &hc));
 
   /* return final response */
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
                                       "{s:O}",
-                                      "hash", TALER_json_from_data (&hc,
+                                      "hash", GNUNET_JSON_from_data (&hc,
                                                                     sizeof (hc)));
   json_decref (root);
   return res;

@@ -20,6 +20,7 @@
  * @author Christian Grothoff
  */
 #include "platform.h"
+#include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd_auditors.h"
 
 /**
@@ -209,7 +210,7 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     json_array_append_new (j_auditors,
                            json_pack ("{s:s, s:o, s:s}",
                                       "name", auditors[cnt].name,
-                                      "auditor_pub", TALER_json_from_data (&auditors[cnt].public_key,
+                                      "auditor_pub", GNUNET_JSON_from_data (&auditors[cnt].public_key,
                                                                            sizeof (struct TALER_AuditorPublicKeyP)),
                                       "uri", auditors[cnt].uri));
   return nauditors;

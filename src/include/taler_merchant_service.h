@@ -22,6 +22,7 @@
 #define _TALER_MERCHANT_SERVICE_H
 
 #include <taler/taler_util.h>
+#include <jansson.h>
 
 /* ********************* event loop *********************** */
 
@@ -281,7 +282,7 @@ TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
 			     const struct TALER_Amount *max_fee,
                              uint64_t transaction_id,
                              const struct TALER_MerchantPublicKeyP *merchant_pub,
-                             const struct TALER_MerchantPublicKeyP *merchant_sig,
+                             const struct TALER_MerchantSignatureP *merchant_sig,
                              struct GNUNET_TIME_Absolute refund_deadline,
                              struct GNUNET_TIME_Absolute timestamp,
                              struct GNUNET_TIME_Absolute execution_deadline,
