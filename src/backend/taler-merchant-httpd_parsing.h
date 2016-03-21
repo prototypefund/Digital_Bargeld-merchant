@@ -24,8 +24,8 @@
 #define TALER_EXCHANGE_HTTPD_PARSING_H
 
 #include <microhttpd.h>
-#include <jansson.h>
 #include <taler/taler_util.h>
+#include <taler/taler_json_lib.h>
 
 /**
  * Process a POST request containing a JSON object.  This
