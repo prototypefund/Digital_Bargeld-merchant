@@ -31,7 +31,6 @@
     return;
   }
   $deposit_permission = file_get_contents('php://input');
-  // FIXME check here if the deposit permission is associated
   session_start();
   if (!isset($_SESSION["payments"])) {
     $json = json_encode(
