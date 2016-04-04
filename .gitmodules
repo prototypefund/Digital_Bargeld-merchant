@@ -1,8 +1,8 @@
 [submodule "examples/blog/web-common"]
 	path = examples/blog/web-common
-	url = git://taler.net/web-common.git
+	url = ../web-common.git
 	branch = master
 [submodule "examples/shop/web-common"]
 	path = examples/shop/web-common
-	url = git://taler.net/web-common.git
+	url = ../web-common.git
 	branch = master
