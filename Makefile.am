@@ -5,7 +5,11 @@ ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = AUTHORS COPYING.GPL COPING.AGPL COPYING.LGPL
 
 app:
-	mkdir -p $(PACKAGE)-$(VERSION)-app
-	tar cf - configure.ac AUTHORS README copylib/Makefile.am copylib/*.php examples/blog/*.php examples/blog/*.html examples/blog/Makefile.am examples/blog/web-common/taler-presence.* Makefile.am `find src/ -name "*.c" -o -name "*.h" -o -name Makefile.am` | (cd $(PACKAGE)-$(VERSION)-app ; tar xf -)
-	tar cf $(PACKAGE)-$(VERSION)-app.tgz $(PACKAGE)-$(VERSION)-app
-	rm -rf $(PACKAGE)-$(VERSION)-app
+	mkdir -p $(PACKAGE)-frontend-$(VERSION)-app
+	tar cf - AUTHORS README copylib/Makefile.am copylib/*.php examples/blog/*.php examples/blog/*.html examples/blog/Makefile.am examples/blog/web-common/taler-presence.* | (cd $(PACKAGE)-$(VERSION)-app ; tar xf -)
+	tar cf $(PACKAGE)-frontend-$(VERSION)-app.tgz $(PACKAGE)-frontend-$(VERSION)-app
+	rm -rf $(PACKAGE)-frontend-$(VERSION)-app
+	mkdir -p $(PACKAGE)-backend-$(VERSION)-app
+	tar cf - configure.ac AUTHORS README Makefile.am `find src/ -name "*.c" -o -name "*.h" -o -name Makefile.am` | (cd $(PACKAGE)-backend-$(VERSION)-app ; tar xf -)
+	tar cf $(PACKAGE)-backend-$(VERSION)-app.tgz $(PACKAGE)-backend-$(VERSION)-app
+	rm -rf $(PACKAGE)-backend-$(VERSION)-app
