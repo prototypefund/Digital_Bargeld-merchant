@@ -112,7 +112,7 @@ plugin_init ()
   opath = lt_dlgetsearchpath ();
   if (NULL != opath)
     old_dlsearchpath = GNUNET_strdup (opath);
-  path = TALER_OS_installation_get_path (GNUNET_OS_IPK_LIBDIR);
+  path = GNUNET_OS_installation_get_path (GNUNET_OS_IPK_LIBDIR);
   if (NULL != path)
   {
     if (NULL != opath)
