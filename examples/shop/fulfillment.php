@@ -18,17 +18,8 @@
 <head>
   <title>Taler's "Demo" Shop</title>
   <link rel="stylesheet" type="text/css" href="web-common/style.css">
-  <script type="application/javascript" src="web-common/taler-presence.js"></script>
+  <script type="application/javascript" src="web-common/taler-wallet-lib.js"></script>
   <script type="application/javascript">
-  function executePayment(H_contract, pay_url, offering_url) {
-    var detail = {
-      H_contract: H_contract,
-      pay_url: pay_url,
-      offering_url: offering_url
-    };
-    var eve = new CustomEvent('taler-execute-payment', {detail: detail});
-    document.dispatchEvent(eve);
-  }
   function makeVisible() {
     function cb() {
       document.body.style.display = "";
@@ -81,7 +72,7 @@ if (null === $my_payment) {
   // TODO: show spinner after timeout
   echo "<p>you do not have the session state for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";
-  echo "<script>executePayment('$hc', '$pay_url', '$offering_url');</script>";
+  echo "<script>taler.executePayment('$hc', '$pay_url', '$offering_url');</script>";
   return;
 }
 
@@ -89,7 +80,7 @@ if (true !== get($my_payment["is_payed"], false)) {
   // TODO: show spinner after timeout
   echo "<p>you have not payed for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";
-  echo "<script>executePayment('$hc', '$pay_url');</script>";
+  echo "<script>taler.executePayment('$hc', '$pay_url');</script>";
   return;
 }
 

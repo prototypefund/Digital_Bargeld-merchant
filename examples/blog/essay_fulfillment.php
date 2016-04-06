@@ -79,7 +79,7 @@
     $hc = json_decode($resp->body->toString(), true)['H_contract'];
     $my_payment['hc'] = $hc;
     log_string("sending payment event");
-    $js_code = "executePayment(\"$hc\", \"$pay_url\", \"$offering_url\");";
+    $js_code = "taler.executePayment(\"$hc\", \"$pay_url\", \"$offering_url\");";
     $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => $js_code));
     echo $cc_page;
     return;
