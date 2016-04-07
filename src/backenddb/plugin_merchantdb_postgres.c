@@ -42,7 +42,7 @@ struct PostgresClosure
 
 
 #define PQSQL_strerror(kind, cmd, res)                \
-  GNUNET_log_from (kind, "merchant-db",                     \
+  GNUNET_log_from (kind, "merchantdb-postgres",       \
                    "SQL %s failed at %s:%u with error: %s", \
                    cmd, __FILE__, __LINE__, PQresultErrorMessage (res));
 
@@ -231,7 +231,7 @@ postgres_check_payment(void *cls,
   res = GNUNET_PQ_exec_prepared (pg->conn,
                                  "check_payment",
                                  params);
-  
+
   status = PQresultStatus (res);
   if (PGRES_TUPLES_OK != status)
   {
