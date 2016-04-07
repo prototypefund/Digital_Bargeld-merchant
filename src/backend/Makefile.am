@@ -1,6 +1,11 @@
 # This Makefile.am is in the public domain
 AM_CPPFLAGS = -I$(top_srcdir)/src/include -I$(top_srcdir)/src/backend-lib/
 
+pkgcfgdir = $(prefix)/share/taler/config.d/
+
+pkgcfg_DATA = \
+  merchant.conf
+
 bin_PROGRAMS = \
   taler-merchant-httpd
 
