@@ -638,6 +638,8 @@ run (void *cls,
                           &url_handler, NULL,
 			  MHD_OPTION_NOTIFY_COMPLETED,
 			  &handle_mhd_completion_callback, NULL,
+                          MHD_OPTION_CONNECTION_TIMEOUT,
+                          (unsigned int) 10 /* 10s */,
                           MHD_OPTION_END);
   EXITIF (NULL == mhd);
   result = GNUNET_OK;
