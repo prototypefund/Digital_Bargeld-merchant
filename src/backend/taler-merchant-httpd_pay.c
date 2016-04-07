@@ -538,6 +538,8 @@ process_pay_with_exchange (void *cls,
   {
     struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
 
+    GNUNET_assert (NULL != j_wire);
+
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                  &dc->percoin_amount,
                                  pc->edate,
