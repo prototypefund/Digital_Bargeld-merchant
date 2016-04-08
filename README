@@ -1,14 +1,40 @@
-Files are organized in two main chunks: (1) the ones which implement
-Taler "core" protocol and that must be used 'as is' by the merchants
-willing to use Taler, and (2) examples of mrchants using files of (1).
+TALER MERCHANT
 
-In particular, the structure is such that:
+1. DESCRIPTION
 
-- 'src/' contains the merchant "backend", a C piece of software which
-  implements cryto routines and communication with the 'exchange'
-- 'examples/' contains examples of merchants using Taler, as may be a
-  simple donation shop or a blog
-- 'copylib/' contains commons routines that any merchant using Taler
-  needs; for example, some JavaScript which detects if the user has a
-  Taler wallet installed
+Under the name 'Taler merchant' there are two main objectives: one is to
+implement a common helper (called 'backend') for all the existing merchants
+willing to integrate Taler in their existing online shops, whereas the other
+objective is implementing some demonstrator shops which use that backend.
+
+2. INNOVATIVE ASPECTS
+
+This component allows merchants to receive payments without invading the
+customers' privacy. Of course, this applies mostly for digital goods, as the
+merchant does not need to know the customer's physical address.
+
+3. PLANNING/PERSPECTIVES
+
+Since the main component's part is the backend, and it is supposed to work with
+preexisting shops, a massive backend's testing with existing shop portals should
+be accomplished.
+
+
+4. DEPENDENCIES
+
+libjansson: MIT License, AGPL- and LGPL-Compatible, owned by Petri Lehtinen and other individuals
+libgcrypt: LGPL, owned by Free Software Foundation
+postgresql: PostgreSQL License, AGPL- and LGPL-Compatible, owned by The PostgreSQL
+Global Development Group
+libgnunetutil (in all of its variants): GPLv3+, owned by GNUnet e.V.
+PHP:  PHP License, AGPL- and LGPL-Compatible, owned by The PHP Group
+
+5. DIRECTORY STRUCTURE
+
+- 'src/' contains the "backend", a C piece of software which implements cryto routines
+  and communication with the 'exchange'
+- 'examples/' contains examples of merchants using Taler, as may be a simple donation
+  shop or a blog
+- 'copylib/' contains commons routines that any merchant using Taler needs; for example,
+  some JavaScript which detects if the user has a Taler wallet installed
 - 'doc/' contains documentation files, like TeXinfo
