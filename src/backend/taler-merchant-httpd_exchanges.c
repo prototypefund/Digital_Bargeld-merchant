@@ -216,11 +216,9 @@ keys_mgmt_cb (void *cls,
  * Task that runs the exchange's event loop using the GNUnet scheduler.
  *
  * @param cls a `struct Exchange *`
- * @param tc scheduler context (unused)
  */
 static void
-context_task (void *cls,
-              const struct GNUNET_SCHEDULER_TaskContext *tc)
+context_task (void *cls)
 {
   long timeout;
   int max_fd;
@@ -279,11 +277,9 @@ context_task (void *cls,
  * Task to return find operation result asynchronously to caller.
  *
  * @param cls a `struct TMH_EXCHANGES_FindOperation`
- * @param tc unused
  */
 static void
-return_result (void *cls,
-               const struct GNUNET_SCHEDULER_TaskContext *tc)
+return_result (void *cls)
 {
   struct TMH_EXCHANGES_FindOperation *fo = cls;
   struct Exchange *exchange = fo->my_exchange;

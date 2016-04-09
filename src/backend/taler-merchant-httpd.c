@@ -227,11 +227,9 @@ url_handler (void *cls,
  * quit)
  *
  * @param cls NULL
- * @param tc scheduler task context
  */
 static void
-do_shutdown (void *cls,
-             const struct GNUNET_SCHEDULER_TaskContext *tc)
+do_shutdown (void *cls)
 {
   if (NULL != mhd_task)
   {
@@ -302,11 +300,9 @@ prepare_daemon (void);
  * and schedule the next run.
  *
  * @param cls the `struct MHD_Daemon` of the HTTP server to run
- * @param tc scheduler context
  */
 static void
-run_daemon (void *cls,
-            const struct GNUNET_SCHEDULER_TaskContext *tc)
+run_daemon (void *cls)
 {
   mhd_task = NULL;
   GNUNET_assert (MHD_YES == MHD_run (mhd));
@@ -324,7 +320,7 @@ void
 TMH_trigger_daemon ()
 {
   GNUNET_SCHEDULER_cancel (mhd_task);
-  run_daemon (NULL, NULL);
+  run_daemon (NULL);
 }
 
 
@@ -433,7 +429,8 @@ prepare_daemon ()
     tv = GNUNET_TIME_UNIT_FOREVER_REL;
   GNUNET_NETWORK_fdset_copy_native (wrs, &rs, max + 1);
   GNUNET_NETWORK_fdset_copy_native (wws, &ws, max + 1);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Adding run_daemon select task\n");
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Adding run_daemon select task\n");
   ret =
       GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_HIGH,
 				   tv, wrs, wws,
