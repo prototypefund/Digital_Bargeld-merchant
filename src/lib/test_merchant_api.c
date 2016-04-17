@@ -22,8 +22,10 @@
 #include <taler/taler_util.h>
 #include <taler/taler_signatures.h>
 #include <taler/taler_exchange_service.h>
+#include <taler/taler_json_lib.h>
 #include "taler_merchant_service.h"
 #include <gnunet/gnunet_util_lib.h>
+#include <gnunet/gnunet_curl_lib.h>
 #include <microhttpd.h>
 
 /**
@@ -37,11 +39,6 @@
 #define EXCHANGE_URI "http://localhost:8081/"
 
 /**
- * Main execution context for the main loop of the exchange.
- */
-static struct TALER_EXCHANGE_Context *ctx;
-
-/**
  * Handle to access the exchange.
  */
 static struct TALER_EXCHANGE_Handle *exchange;
@@ -49,7 +46,7 @@ static struct TALER_EXCHANGE_Handle *exchange;
 /**
  * Main execution context for the main loop of the exchange.
  */
-static struct TALER_MERCHANT_Context *merchant;
+static struct GNUNET_CURL_Context *ctx;
 
 /**
  * Public key of the merchant, matches the private
@@ -398,11 +395,9 @@ struct InterpreterState
  * Task that runs the context's event loop with the GNUnet scheduler.
  *
  * @param cls unused
- * @param tc scheduler context (unused)
  */
 static void
-context_task (void *cls,
-              const struct GNUNET_SCHEDULER_TaskContext *tc);
+context_task (void *cls);
 
 
 /**
@@ -466,11 +461,9 @@ find_command (const struct InterpreterState *is,
  * Run the main interpreter loop that performs exchange operations.
  *
  * @param cls contains the `struct InterpreterState`
- * @param tc scheduler context
  */
 static void
-interpreter_run (void *cls,
-                 const struct GNUNET_SCHEDULER_TaskContext *tc);
+interpreter_run (void *cls);
 
 
 /**
@@ -484,7 +477,7 @@ interpreter_run (void *cls,
 static void
 add_incoming_cb (void *cls,
                  unsigned int http_status,
-                 json_t *full_response)
+                 const json_t *full_response)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -585,7 +578,7 @@ compare_reserve_withdraw_history (const struct TALER_EXCHANGE_ReserveHistory *h,
 static void
 reserve_status_cb (void *cls,
                    unsigned int http_status,
-                   json_t *json,
+                   const json_t *json,
                    const struct TALER_Amount *balance,
                    unsigned int history_length,
                    const struct TALER_EXCHANGE_ReserveHistory *history)
@@ -700,7 +693,7 @@ static void
 reserve_withdraw_cb (void *cls,
                      unsigned int http_status,
                      const struct TALER_DenominationSignature *sig,
-                     json_t *full_response)
+                     const json_t *full_response)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -756,7 +749,7 @@ static void
 pay_cb (void *cls,
         unsigned int http_status,
         const char *redirect_uri,
-        json_t *obj)
+        const json_t *obj)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -836,12 +829,11 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
  * Run the main interpreter loop that performs exchange operations.
  *
  * @param cls contains the `struct InterpreterState`
- * @param tc scheduler context
  */
 static void
-interpreter_run (void *cls,
-                 const struct GNUNET_SCHEDULER_TaskContext *tc)
+interpreter_run (void *cls)
 {
+  const struct GNUNET_SCHEDULER_TaskContext *tc;
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
   const struct Command *ref;
@@ -852,6 +844,7 @@ interpreter_run (void *cls,
   json_t *wire;
 
   is->task = NULL;
+  tc = GNUNET_SCHEDULER_get_task_context ();
   if (0 != (tc->reason & GNUNET_SCHEDULER_REASON_SHUTDOWN))
   {
     fprintf (stderr,
@@ -915,7 +908,7 @@ interpreter_run (void *cls,
       return;
     }
     execution_date = GNUNET_TIME_absolute_get ();
-    TALER_round_abs_time (&execution_date);
+    GNUNET_TIME_round_abs (&execution_date);
     cmd->details.admin_add_incoming.aih
       = TALER_EXCHANGE_admin_add_incoming (exchange,
                                        &reserve_pub,
@@ -1019,6 +1012,7 @@ interpreter_run (void *cls,
       struct GNUNET_HashCode h_contract;
       struct GNUNET_TIME_Absolute refund_deadline;
       struct GNUNET_TIME_Absolute timestamp;
+      struct TALER_MerchantSignatureP merchant_sig;
 
       /* get amount */
       if (GNUNET_OK !=
@@ -1128,23 +1122,26 @@ interpreter_run (void *cls,
 	refund_deadline = GNUNET_TIME_UNIT_ZERO_ABS; /* no refunds */
       else
 	refund_deadline = GNUNET_TIME_relative_to_absolute (cmd->details.pay.refund_deadline);
-      TALER_round_abs_time (&refund_deadline);
+      GNUNET_TIME_round_abs (&refund_deadline);
       timestamp = GNUNET_TIME_absolute_get ();
-      TALER_round_abs_time (&timestamp);
+      GNUNET_TIME_round_abs (&timestamp);
+      memset (&merchant_sig, 0, sizeof (merchant_sig)); // FIXME: init properly!
+
       cmd->details.pay.ph
-	= TALER_MERCHANT_pay_wallet (merchant,
+	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI "pay",
-				     EXCHANGE_URI,
-				     &h_wire,
 				     &h_contract,
-				     timestamp,
 				     cmd->details.pay.transaction_id,
+				     &amount,
+				     &max_fee,
 				     &merchant_pub,
+                                     &merchant_sig,
+				     timestamp,
 				     refund_deadline,
+				     &h_wire,
+				     EXCHANGE_URI,
 				     1 /* num_coins */,
 				     &pc /* coins */,
-				     &max_fee,
-				     &amount,
 				     &pay_cb,
 				     is);
     }
@@ -1175,11 +1172,9 @@ interpreter_run (void *cls,
  * Cleans up our state.
  *
  * @param cls the interpreter state.
- * @param tc unused
  */
 static void
-do_shutdown (void *cls,
-             const struct GNUNET_SCHEDULER_TaskContext *tc)
+do_shutdown (void *cls)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd;
@@ -1274,14 +1269,9 @@ do_shutdown (void *cls,
     TALER_EXCHANGE_disconnect (exchange);
     exchange = NULL;
   }
-  if (NULL != merchant)
-  {
-    TALER_MERCHANT_fini (merchant);
-    merchant = NULL;
-  }
   if (NULL != ctx)
   {
-    TALER_EXCHANGE_fini (ctx);
+    GNUNET_CURL_fini (ctx);
     ctx = NULL;
   }
 }
@@ -1327,11 +1317,9 @@ cert_cb (void *cls,
  * Task that runs the context's event loop with the GNUnet scheduler.
  *
  * @param cls unused
- * @param tc scheduler context (unused)
  */
 static void
-context_task (void *cls,
-              const struct GNUNET_SCHEDULER_TaskContext *tc)
+context_task (void *cls)
 {
   long timeout;
   int max_fd;
@@ -1345,25 +1333,18 @@ context_task (void *cls,
   ctx_task = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Event loop running\n");
-  TALER_EXCHANGE_perform (ctx);
-  TALER_MERCHANT_perform (merchant);
+  GNUNET_CURL_perform (ctx);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
   FD_ZERO (&write_fd_set);
   FD_ZERO (&except_fd_set);
-  TALER_EXCHANGE_get_select_info (ctx,
-                              &read_fd_set,
-                              &write_fd_set,
-                              &except_fd_set,
-                              &max_fd,
-                              &timeout);
-  TALER_MERCHANT_get_select_info (merchant,
-				  &read_fd_set,
-				  &write_fd_set,
-				  &except_fd_set,
-				  &max_fd,
-				  &timeout);
+  GNUNET_CURL_get_select_info (ctx,
+                               &read_fd_set,
+                               &write_fd_set,
+                               &except_fd_set,
+                               &max_fd,
+                               &timeout);
   if (timeout >= 0)
     delay = GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS,
                                            timeout);
@@ -1392,13 +1373,9 @@ context_task (void *cls,
  * Main function that will be run by the scheduler.
  *
  * @param cls closure
- * @param args remaining command-line arguments
- * @param cfgfile name of the configuration file used (for saving, can be NULL!)
- * @param config configuration
  */
 static void
-run (void *cls,
-     const struct GNUNET_SCHEDULER_TaskContext *tc)
+run (void *cls)
 {
   struct InterpreterState *is;
   static struct Command commands[] =
@@ -1482,16 +1459,14 @@ run (void *cls,
   is = GNUNET_new (struct InterpreterState);
   is->commands = commands;
 
-  ctx = TALER_EXCHANGE_init ();
+  ctx = GNUNET_CURL_init ();
   GNUNET_assert (NULL != ctx);
-  merchant = TALER_MERCHANT_init ();
-  GNUNET_assert (NULL != merchant);
   ctx_task = GNUNET_SCHEDULER_add_now (&context_task,
                                        ctx);
   exchange = TALER_EXCHANGE_connect (ctx,
-                             EXCHANGE_URI,
-                             &cert_cb, is,
-                             TALER_EXCHANGE_OPTION_END);
+                                     EXCHANGE_URI,
+                                     &cert_cb, is,
+                                     TALER_EXCHANGE_OPTION_END);
   GNUNET_assert (NULL != exchange);
   shutdown_task
     = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply

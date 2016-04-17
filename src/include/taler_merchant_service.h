@@ -22,83 +22,8 @@
 #define _TALER_MERCHANT_SERVICE_H
 
 #include <taler/taler_util.h>
+#include <gnunet/gnunet_curl_lib.h>
 #include <jansson.h>
-
-/* ********************* event loop *********************** */
-
-/**
- * @brief Handle to this library context.  This is where the
- * main event loop logic lives.
- */
-struct TALER_MERCHANT_Context;
-
-
-/**
- * Initialise a context.  A context should be used for each thread and should
- * not be shared among multiple threads.
- *
- * @return the context, NULL on error (failure to initialize)
- */
-struct TALER_MERCHANT_Context *
-TALER_MERCHANT_init (void);
-
-
-/**
- * Obtain the information for a select() call to wait until
- * #TALER_MERCHANT_perform() is ready again.  Note that calling
- * any other TALER_MERCHANT-API may also imply that the library
- * is again ready for #TALER_MERCHANT_perform().
- *
- * Basically, a client should use this API to prepare for select(),
- * then block on select(), then call #TALER_MERCHANT_perform() and then
- * start again until the work with the context is done.
- *
- * This function will NOT zero out the sets and assumes that @a max_fd
- * and @a timeout are already set to minimal applicable values.  It is
- * safe to give this API FD-sets and @a max_fd and @a timeout that are
- * already initialized to some other descriptors that need to go into
- * the select() call.
- *
- * @param ctx context to get the event loop information for
- * @param read_fd_set will be set for any pending read operations
- * @param write_fd_set will be set for any pending write operations
- * @param except_fd_set is here because curl_multi_fdset() has this argument
- * @param max_fd set to the highest FD included in any set;
- *        if the existing sets have no FDs in it, the initial
- *        value should be "-1". (Note that `max_fd + 1` will need
- *        to be passed to select().)
- * @param timeout set to the timeout in milliseconds (!); -1 means
- *        no timeout (NULL, blocking forever is OK), 0 means to
- *        proceed immediately with #TALER_MERCHANT_perform().
- */
-void
-TALER_MERCHANT_get_select_info (struct TALER_MERCHANT_Context *ctx,
-                                fd_set *read_fd_set,
-                                fd_set *write_fd_set,
-                                fd_set *except_fd_set,
-                                int *max_fd,
-                                long *timeout);
-
-
-/**
- * Run the main event loop for the Taler interaction.
- *
- * @param ctx the library context
- */
-void
-TALER_MERCHANT_perform (struct TALER_MERCHANT_Context *ctx);
-
-
-/**
- * Cleanup library initialisation resources.  This function should be called
- * after using this library to cleanup the resources occupied during library's
- * initialisation.
- *
- * @param ctx the library context
- */
-void
-TALER_MERCHANT_fini (struct TALER_MERCHANT_Context *ctx);
-
 
 /* *********************  /pay *********************** */
 
@@ -132,7 +57,7 @@ typedef void
 (*TALER_MERCHANT_PayCallback) (void *cls,
                                unsigned int http_status,
                                const char *redirect_uri,
-                               json_t *obj);
+                               const json_t *obj);
 
 
 /**
@@ -171,7 +96,7 @@ struct TALER_MERCHANT_PayCoin
 /**
  * Pay a merchant.  API for wallets that have the coin's private keys.
  *
- * @param merchant the merchant context
+ * @param ctx execution context
  * @param merchant_uri URI of the merchant
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
@@ -191,7 +116,7 @@ struct TALER_MERCHANT_PayCoin
  * @return a handle for this request
  */
 struct TALER_MERCHANT_Pay *
-TALER_MERCHANT_pay_wallet (struct TALER_MERCHANT_Context *merchant,
+TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 			   const char *merchant_uri,
                            const struct GNUNET_HashCode *h_contract,
                            uint64_t transaction_id,
@@ -254,7 +179,7 @@ struct TALER_MERCHANT_PaidCoin
  * the public keys and signatures.  Note the sublte difference
  * in the type of @a coins compared to #TALER_MERCHANT_pay().
  *
- * @param merchant the merchant context
+ * @param ctx execution context
  * @param merchant_uri URI of the merchant
  * @param h_contract hash of the contact of the merchant with the customer
  * @param amount total value of the contract to be paid to the merchant
@@ -275,7 +200,7 @@ struct TALER_MERCHANT_PaidCoin
  * @return a handle for this request
  */
 struct TALER_MERCHANT_Pay *
-TALER_MERCHANT_pay_frontend (struct TALER_MERCHANT_Context *merchant,
+TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const char *merchant_uri,
                              const struct GNUNET_HashCode *h_contract,
 			     const struct TALER_Amount *amount,

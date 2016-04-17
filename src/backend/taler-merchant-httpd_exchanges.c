@@ -141,7 +141,7 @@ struct Exchange
 /**
  * Context for all exchange operations (useful to the event loop)
  */
-static struct TALER_EXCHANGE_Context *ctx;
+static struct GNUNET_CURL_Context *ctx;
 
 /**
  * Task we use to drive the interaction with this exchange.
@@ -232,18 +232,18 @@ context_task (void *cls)
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "In exchange context polling task\n");
 
   poller_task = NULL;
-  TALER_EXCHANGE_perform (ctx);
+  GNUNET_CURL_perform (ctx);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
   FD_ZERO (&write_fd_set);
   FD_ZERO (&except_fd_set);
-  TALER_EXCHANGE_get_select_info (ctx,
-                              &read_fd_set,
-                              &write_fd_set,
-                              &except_fd_set,
-                              &max_fd,
-                              &timeout);
+  GNUNET_CURL_get_select_info (ctx,
+                               &read_fd_set,
+                               &write_fd_set,
+                               &except_fd_set,
+                               &max_fd,
+                               &timeout);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "In exchange context polling task, max_fd=%d, timeout=%ld\n",
               max_fd, timeout);
@@ -372,10 +372,10 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
        (GNUNET_YES == exchange->pending) )
   {
     exchange->conn = TALER_EXCHANGE_connect (ctx,
-                                     exchange->uri,
-                                     &keys_mgmt_cb,
-                                     exchange,
-                                     TALER_EXCHANGE_OPTION_END);
+                                             exchange->uri,
+                                             &keys_mgmt_cb,
+                                             exchange,
+                                             TALER_EXCHANGE_OPTION_END);
     GNUNET_break (NULL != exchange->conn);
   }
   return fo;
@@ -464,10 +464,10 @@ parse_exchanges (void *cls,
                                exchange);
   exchange->pending = GNUNET_YES;
   exchange->conn = TALER_EXCHANGE_connect (ctx,
-                                   exchange->uri,
-                                   &keys_mgmt_cb,
-                                   exchange,
-                                   TALER_EXCHANGE_OPTION_END);
+                                           exchange->uri,
+                                           &keys_mgmt_cb,
+                                           exchange,
+                                           TALER_EXCHANGE_OPTION_END);
   GNUNET_break (NULL != exchange->conn);
 }
 
@@ -485,7 +485,7 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
   struct Exchange *exchange;
   json_t *j_exchange;
 
-  ctx = TALER_EXCHANGE_init ();
+  ctx = GNUNET_CURL_init ();
   if (NULL == ctx)
   {
     GNUNET_break (0);
@@ -536,5 +536,6 @@ TMH_EXCHANGES_done ()
     GNUNET_SCHEDULER_cancel (poller_task);
     poller_task = NULL;
   }
-  TALER_EXCHANGE_fini (ctx);
+  GNUNET_CURL_fini (ctx);
+  ctx = NULL;
 }

@@ -14,12 +14,12 @@ libtalermerchant_la_LDFLAGS = \
   -no-undefined
 
 libtalermerchant_la_SOURCES = \
-  merchant_api_context.c merchant_api_context.h \
   merchant_api_pay.c
 
 libtalermerchant_la_LIBADD = \
   -ltalerjson \
   -ltalerutil \
+  -lgnunetcurl \
   -lgnunetjson \
   -lgnunetutil \
   -ljansson \
@@ -45,7 +45,9 @@ test_merchant_api_LDADD = \
   libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
   -ltalerexchange \
+  -ltalerjson \
   -ltalerutil \
+  -lgnunetcurl \
   -lgnunetutil \
   -ljansson
 

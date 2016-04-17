@@ -28,5 +28,6 @@ taler_merchant_httpd_LDADD = \
   -ltalerpq \
   -lmicrohttpd \
   -ljansson \
+  -lgnunetcurl \
   -lgnunetjson \
   -lgnunetutil
