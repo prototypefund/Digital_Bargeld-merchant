@@ -123,6 +123,11 @@ struct TM_HandlerContext
    */
   TM_ContextCleanup cc;
 
+  /**
+   * Which request handler is handling this request?
+   */
+  const struct TMH_RequestHandler *rh;
+
 };
 
 
@@ -163,12 +168,12 @@ extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 
 /**
  * Our public key, corresponds to #privkey.
- */ 
+ */
 extern struct TALER_MerchantPublicKeyP pubkey;
 
 /**
  * Handle to the database backend.
- */ 
+ */
 extern struct TALER_MERCHANTDB_Plugin *db;
 
 /**

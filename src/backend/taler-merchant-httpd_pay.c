@@ -226,6 +226,9 @@ resume_pay_with_response (struct PayContext *pc,
 {
   pc->response_code = response_code;
   pc->response = response;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Resuming /pay handling as exchange interaction is done (%u)\n",
+              response_code);
   MHD_resume_connection (pc->connection);
   TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
@@ -241,6 +244,8 @@ abort_deposit (struct PayContext *pc)
 {
   unsigned int i;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Aborting pending /deposit operations\n");
   for (i=0;i<pc->coins_cnt;i++)
   {
     struct MERCHANT_DepositConfirmation *dci = &pc->dc[i];
@@ -379,8 +384,8 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
  */
 static void
 process_pay_with_exchange (void *cls,
-                       struct TALER_EXCHANGE_Handle *mh,
-                       int exchange_trusted)
+                           struct TALER_EXCHANGE_Handle *mh,
+                           int exchange_trusted)
 {
   struct PayContext *pc = cls;
   struct TALER_Amount acc_fee;
@@ -533,6 +538,8 @@ process_pay_with_exchange (void *cls,
     }
   }
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Exchange and fee structure OK. Initiating deposit operation for coins\n");
   /* Initiate /deposit operation for all coins */
   for (i=0;i<pc->coins_cnt;i++)
   {
@@ -541,20 +548,20 @@ process_pay_with_exchange (void *cls,
     GNUNET_assert (NULL != j_wire);
 
     dc->dh = TALER_EXCHANGE_deposit (mh,
-                                 &dc->percoin_amount,
-                                 pc->edate,
-                                 j_wire,
-                                 &pc->h_contract,
-                                 &dc->coin_pub,
-                                 &dc->ub_sig,
-                                 &dc->denom,
-                                 pc->timestamp,
-                                 pc->transaction_id,
-                                 &pubkey,
-                                 pc->refund_deadline,
-                                 &dc->coin_sig,
-                                 &deposit_cb,
-                                 dc);
+                                     &dc->percoin_amount,
+                                     pc->edate,
+                                     j_wire,
+                                     &pc->h_contract,
+                                     &dc->coin_pub,
+                                     &dc->ub_sig,
+                                     &dc->denom,
+                                     pc->timestamp,
+                                     pc->transaction_id,
+                                     &pubkey,
+                                     pc->refund_deadline,
+                                     &dc->coin_sig,
+                                     &deposit_cb,
+                                     dc);
     if (NULL == dc->dh)
     {
       /* Signature was invalid.  If the exchange was unavailable,
@@ -612,7 +619,10 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   {
     /* We are *done* processing the request, just queue the response (!) */
     if (UINT_MAX == pc->response_code)
+    {
+      GNUNET_break (0);
       return MHD_NO; /* hard error */
+    }
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Queueing response for /pay.\n");
     res = MHD_queue_response (connection,
@@ -632,7 +642,10 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                              upload_data_size,
                              &root);
   if (GNUNET_SYSERR == res)
+  {
+    GNUNET_break (0);
     return MHD_NO;  /* error parsing JSON */
+  }
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES; /* the POST's body has to be further fetched */
 
@@ -663,6 +676,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     if (GNUNET_YES != res)
     {
       json_decref (root);
+      GNUNET_break (0);
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
     pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
@@ -709,6 +723,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       if (GNUNET_YES != res)
       {
         json_decref (root);
+        GNUNET_break (0);
         return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
       }
     }
@@ -724,11 +739,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     /* note: 1 coin = 1 deposit confirmation expected */
     pc->dc = GNUNET_new_array (pc->coins_cnt,
                                struct MERCHANT_DepositConfirmation);
-
-    {
-      char *s = json_dumps (coins, JSON_INDENT(2));
-      free (s);
-    }
 
     json_array_foreach (coins, coins_index, coin)
     {
@@ -748,6 +758,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       if (GNUNET_YES != res)
       {
         json_decref (root);
+        GNUNET_break (0);
         return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
       }
 
@@ -789,14 +800,18 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   /* Find the responsible exchange, this may take a while... */
   pc->pending = pc->coins_cnt;
   pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,
-                                &process_pay_with_exchange,
-                                pc);
+                                        &process_pay_with_exchange,
+                                        pc);
 
   /* ... so we suspend connection until the last coin has been ack'd
      or until we have encountered a hard error.  Eventually, we will
      resume the connection and send back a response using
      #resume_pay_with_response(). */
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Suspending /pay handling while working with the exchange\n");
   MHD_suspend_connection (connection);
   json_decref (root);
   return MHD_YES;
 }
+
+/* end of taler-merchant-httpd_pay.c */

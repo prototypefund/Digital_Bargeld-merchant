@@ -194,8 +194,10 @@ url_handler (void *cls,
       "<html><title>404: not found</title></html>", 0,
       &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
     };
+  struct TM_HandlerContext *hc;
   struct TMH_RequestHandler *rh;
   unsigned int i;
+  int ret;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Handling request for URL `%s'\n",
@@ -208,11 +210,17 @@ url_handler (void *cls,
          ( (NULL == rh->method) ||
            (0 == strcasecmp (method,
                              rh->method)) ) )
-      return rh->handler (rh,
-                          connection,
-                          con_cls,
-                          upload_data,
-                          upload_data_size);
+    {
+      ret = rh->handler (rh,
+                         connection,
+                         con_cls,
+                         upload_data,
+                         upload_data_size);
+      hc = *con_cls;
+      if (NULL != hc)
+        hc->rh = rh;
+      return ret;
+    }
   }
   return TMH_MHD_handler_static_response (&h404,
                                           connection,
@@ -278,10 +286,14 @@ handle_mhd_completion_callback (void *cls,
                                 void **con_cls,
                                 enum MHD_RequestTerminationCode toe)
 {
-  struct TM_HandlerContext *hc = *con_cls; /* 'hc' is also a 'struct PayContext' */
+  struct TM_HandlerContext *hc = *con_cls;
 
   if (NULL == hc)
     return;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Finished handling request for `%s' with status %d\n",
+              hc->rh->url,
+              (int) toe);
   hc->cc (hc);
   *con_cls = NULL;
 }
