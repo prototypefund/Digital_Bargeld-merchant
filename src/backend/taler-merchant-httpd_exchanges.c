@@ -310,8 +310,8 @@ return_result (void *cls)
  */
 struct TMH_EXCHANGES_FindOperation *
 TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
-                     TMH_EXCHANGES_FindContinuation fc,
-                     void *fc_cls)
+			     TMH_EXCHANGES_FindContinuation fc,
+			     void *fc_cls)
 {
   struct Exchange *exchange;
   struct TMH_EXCHANGES_FindOperation *fo;

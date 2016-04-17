@@ -34,6 +34,7 @@ libtaler_plugin_merchantdb_postgres_la_LIBADD = \
 libtaler_plugin_merchantdb_postgres_la_LDFLAGS = \
   $(TALER_PLUGIN_LDFLAGS) \
   -lgnunetpq \
+  -ltalerpq \
   -ltalerutil \
   -lpq \
   -lgnunetpostgres \
