@@ -232,7 +232,7 @@ TMH_AUDITORS_done ()
     GNUNET_free (auditors[i].name);
     GNUNET_free (auditors[i].uri);
   }
-  GNUNET_free (auditors);
+  GNUNET_free_non_null (auditors);
   auditors = NULL;
   nauditors = 0;
 }
