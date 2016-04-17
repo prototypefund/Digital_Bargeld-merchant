@@ -465,50 +465,111 @@ run (void *cls,
     GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
                                   &do_shutdown,
                                   NULL);
-  EXITIF (GNUNET_SYSERR ==
-          TMH_EXCHANGES_init (config));
-  EXITIF (GNUNET_SYSERR ==
-          TMH_AUDITORS_init (config));
-  EXITIF (GNUNET_OK !=
-          GNUNET_CONFIGURATION_get_value_string (config,
-                                                 "merchant",
-                                                 "WIREFORMAT",
-                                                 &wireformat));
-  EXITIF (GNUNET_OK !=
-          validate_and_hash_wireformat (config,
-                                        wireformat));
+  if (GNUNET_SYSERR ==
+      TMH_EXCHANGES_init (config))
+  {
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  if (GNUNET_SYSERR ==
+      TMH_AUDITORS_init (config))
+  {
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_number (config,
+                                             "merchant",
+                                             "PORT",
+                                             &port))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "PORT");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_string (config,
+                                             "merchant",
+                                             "CURRENCY",
+                                             &TMH_merchant_currency_string))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "CURRENCY");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_time (config,
+                                           "merchant",
+                                           "EDATE",
+                                           &edate_delay))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "EDATE");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (config,
+                                             "merchant",
+                                             "WIREFORMAT",
+                                             &wireformat))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "WIREFORMAT");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  if (GNUNET_OK !=
+      validate_and_hash_wireformat (config,
+                                    wireformat))
+  {
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
   GNUNET_free (wireformat);
 
-  EXITIF (GNUNET_OK !=
-          GNUNET_CONFIGURATION_get_value_filename (config,
-                                                   "merchant",
-                                                   "KEYFILE",
-                                                   &keyfile));
-  EXITIF (NULL ==
-          (privkey =
-          GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)));
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_filename (config,
+                                               "merchant",
+                                               "KEYFILE",
+                                               &keyfile))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "KEYFILE");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  if (NULL ==
+      (privkey =
+       GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)))
+  {
+    GNUNET_break (0);
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
   GNUNET_CRYPTO_eddsa_key_get_public (privkey,
                                       &pubkey.eddsa_pub);
-  EXITIF (NULL ==
-          (db = TALER_MERCHANTDB_plugin_load (config)));
-  EXITIF (GNUNET_OK !=
-          db->initialize (db->cls, dry));
-  EXITIF (GNUNET_SYSERR ==
-          GNUNET_CONFIGURATION_get_value_number (config,
-                                                 "merchant",
-                                                 "PORT",
-                                                 &port));
-  EXITIF (GNUNET_SYSERR ==
-          GNUNET_CONFIGURATION_get_value_string (config,
-                                                 "merchant",
-                                                 "CURRENCY",
-                                                 &TMH_merchant_currency_string));
-
-  EXITIF (GNUNET_SYSERR ==
-          GNUNET_CONFIGURATION_get_value_time (config,
-                                               "merchant",
-                                               "EDATE",
-                                               &edate_delay));
+  if (NULL ==
+      (db = TALER_MERCHANTDB_plugin_load (config)))
+  {
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  if (GNUNET_OK !=
+      db->initialize (db->cls, dry))
+  {
+    GNUNET_break (0);
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
 
   mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
                           port,
@@ -519,13 +580,14 @@ run (void *cls,
                           MHD_OPTION_CONNECTION_TIMEOUT,
                           (unsigned int) 10 /* 10s */,
                           MHD_OPTION_END);
-  EXITIF (NULL == mhd);
+  if (NULL == mhd)
+  {
+    GNUNET_break (0);
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
   result = GNUNET_OK;
   mhd_task = prepare_daemon ();
-
- EXITIF_exit:
-  if (GNUNET_OK != result)
-    GNUNET_SCHEDULER_shutdown ();
 }
 
 

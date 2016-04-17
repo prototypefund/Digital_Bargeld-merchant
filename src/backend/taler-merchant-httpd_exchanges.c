@@ -487,7 +487,10 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 
   ctx = TALER_EXCHANGE_init ();
   if (NULL == ctx)
+  {
+    GNUNET_break (0);
     return GNUNET_SYSERR;
+  }
   GNUNET_CONFIGURATION_iterate_sections (cfg,
                                          &parse_exchanges,
                                          (void *) cfg);
