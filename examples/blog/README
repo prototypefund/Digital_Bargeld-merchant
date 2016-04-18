@@ -1,6 +1,6 @@
 
-This guide is for running the 'blog' and 'shop' examples,
-which require PHP and are served via nginx.
+This guide is for running the 'blog' example, which require PHP and is
+served via nginx.
 
 Assuming that your system has a working PHP, the following
 pecl packages are needed (the preferred way to install them
@@ -17,4 +17,5 @@ pecl_http 2.4.3 stable
 propro 1.0.0 stable
 raphf 1.1.0 stable
 
-You can now refer to the nginx configuration examples in this directory
+You can now refer to the nginx configuration examples (nginx_example.conf)
+in this directory
