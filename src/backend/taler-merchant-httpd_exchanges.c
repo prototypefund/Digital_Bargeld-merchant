@@ -330,9 +330,16 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   for (exchange = exchange_head; NULL != exchange; exchange = exchange->next)
     /* test it by checking public key --- FIXME: hostname or public key!?
        Should probably be URI, not hostname anyway! */
+  {
     if (0 == strcmp (exchange->uri,
                      chosen_exchange))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "The exchange `%s' is already known\n",
+                  chosen_exchange);
       break;
+    }
+  }
   if (NULL == exchange)
   {
     /* This is a new exchange */
@@ -342,12 +349,32 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
     GNUNET_CONTAINER_DLL_insert (exchange_head,
                                  exchange_tail,
                                  exchange);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "The exchange `%s' is new\n",
+                chosen_exchange);
   }
 
-  /* check if we should resume this exchange */
-  if ( (GNUNET_SYSERR == exchange->pending) &&
-       (0 == GNUNET_TIME_absolute_get_remaining (exchange->retry_time).rel_value_us) )
-    exchange->pending = GNUNET_YES;
+  if (GNUNET_SYSERR == exchange->pending)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Maybe retrying previously contacted exchange `%s'\n",
+                chosen_exchange);
+    /* check if we should resume this exchange */
+    if (0 == GNUNET_TIME_absolute_get_remaining (exchange->retry_time).rel_value_us)
+    {
+
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Retrying exchange `%s'\n",
+                  chosen_exchange);
+      exchange->pending = GNUNET_YES;
+    }
+    else
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Not retrying exchange `%s', too early\n",
+                  chosen_exchange);
+    }
+  }
 
 
   fo = GNUNET_new (struct TMH_EXCHANGES_FindOperation);
@@ -362,6 +389,9 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   {
     /* We are not currently waiting for a reply, immediately
        return result */
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Exchange `%s' already contacted\n",
+                chosen_exchange);
     fo->at = GNUNET_SCHEDULER_add_now (&return_result,
                                        fo);
     return fo;
