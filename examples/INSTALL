@@ -1,0 +1,20 @@
+
+This guide is for running the 'blog' and 'shop' examples,
+which require PHP and are served via nginx.
+
+Assuming that your system has a working PHP, the following
+pecl packages are needed (the preferred way to install them
+is with the pecl package manager, and not via your distribution's):
+
+pecl_http
+propro
+raphf
+
+As for the versioning, our working setup is using:
+
+PHP 5.6
+pecl_http 2.4.3 stable
+propro 1.0.0 stable
+raphf 1.1.0 stable
+
+You can now refer to the nginx configuration examples in this directory
