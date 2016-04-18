@@ -27,7 +27,7 @@
 /**
  * How often do we retry fetching /keys?
  */
-#define KEYS_RETRY_FREQ GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MINUTES, 60)
+#define KEYS_RETRY_FREQ GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10)
 
 
 /**
@@ -385,13 +385,10 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                                exchange->fo_tail,
                                fo);
 
-  if (GNUNET_NO == exchange->pending)
+  if (GNUNET_OK != exchange->pending)
   {
     /* We are not currently waiting for a reply, immediately
        return result */
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Exchange `%s' already contacted\n",
-                chosen_exchange);
     fo->at = GNUNET_SCHEDULER_add_now (&return_result,
                                        fo);
     return fo;
