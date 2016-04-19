@@ -141,12 +141,13 @@ struct Exchange
 /**
  * Context for all exchange operations (useful to the event loop)
  */
-static struct GNUNET_CURL_Context *ctx;
+static struct GNUNET_CURL_Context *merchant_curl_ctx;
 
 /**
- * Task we use to drive the interaction with this exchange.
+ * Task that pumps events into curl as soon as any
+ * curl-related events are available.
  */
-static struct GNUNET_SCHEDULER_Task *poller_task;
+static struct GNUNET_SCHEDULER_Task *merchant_curl_task;
 
 /**
  * Head of exchanges we know about.
@@ -162,6 +163,10 @@ static struct Exchange *exchange_tail;
  * List of our trusted exchanges for inclusion in contracts.
  */
 json_t *trusted_exchanges;
+
+/* forward declaration */
+static void
+merchant_curl_cb (void *cls);
 
 
 /**
@@ -213,12 +218,30 @@ keys_mgmt_cb (void *cls,
 
 
 /**
+ * Restart the task that pumps events into curl
+ * with updated file descriptors.
+ */
+static void
+merchant_curl_refresh ()
+{
+  if (NULL != merchant_curl_task)
+  {
+    GNUNET_SCHEDULER_cancel (merchant_curl_task);
+    merchant_curl_task = NULL;
+  }
+
+  merchant_curl_task = GNUNET_SCHEDULER_add_now (&merchant_curl_cb,
+                                                 NULL);
+}
+
+
+/**
  * Task that runs the exchange's event loop using the GNUnet scheduler.
  *
  * @param cls a `struct Exchange *`
  */
 static void
-context_task (void *cls)
+merchant_curl_cb (void *cls)
 {
   long timeout;
   int max_fd;
@@ -231,14 +254,14 @@ context_task (void *cls)
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "In exchange context polling task\n");
 
-  poller_task = NULL;
-  GNUNET_CURL_perform (ctx);
+  merchant_curl_task = NULL;
+  GNUNET_CURL_perform (merchant_curl_ctx);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
   FD_ZERO (&write_fd_set);
   FD_ZERO (&except_fd_set);
-  GNUNET_CURL_get_select_info (ctx,
+  GNUNET_CURL_get_select_info (merchant_curl_ctx,
                                &read_fd_set,
                                &write_fd_set,
                                &except_fd_set,
@@ -249,8 +272,8 @@ context_task (void *cls)
               max_fd, timeout);
   if (timeout >= 0)
     delay =
-    GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS,
-                                   timeout);
+      GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS,
+                                     timeout);
   else
     delay = GNUNET_TIME_UNIT_FOREVER_REL;
   rs = GNUNET_NETWORK_fdset_create ();
@@ -261,12 +284,12 @@ context_task (void *cls)
   GNUNET_NETWORK_fdset_copy_native (ws,
                                     &write_fd_set,
                                     max_fd + 1);
-  poller_task =
+  merchant_curl_task =
     GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_DEFAULT,
                                  delay,
                                  rs,
                                  ws,
-                                 &context_task,
+                                 &merchant_curl_cb,
                                  NULL);
   GNUNET_NETWORK_fdset_destroy (rs);
   GNUNET_NETWORK_fdset_destroy (ws);
@@ -292,9 +315,8 @@ return_result (void *cls)
           (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
           exchange->trusted);
   GNUNET_free (fo);
-  GNUNET_SCHEDULER_cancel (poller_task);
-  GNUNET_SCHEDULER_add_now (&context_task,
-                            NULL);
+  GNUNET_SCHEDULER_cancel (merchant_curl_task);
+  merchant_curl_refresh ();
 }
 
 
@@ -316,7 +338,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   struct Exchange *exchange;
   struct TMH_EXCHANGES_FindOperation *fo;
 
-  if (NULL == ctx)
+  if (NULL == merchant_curl_ctx)
   {
     GNUNET_break (0);
     return NULL;
@@ -398,12 +420,13 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   if ( (NULL == exchange->conn) &&
        (GNUNET_YES == exchange->pending) )
   {
-    exchange->conn = TALER_EXCHANGE_connect (ctx,
+    exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
                                              exchange->uri,
                                              &keys_mgmt_cb,
                                              exchange,
                                              TALER_EXCHANGE_OPTION_END);
     GNUNET_break (NULL != exchange->conn);
+    merchant_curl_refresh ();
   }
   return fo;
 }
@@ -440,7 +463,7 @@ TMH_EXCHANGES_find_exchange_cancel (struct TMH_EXCHANGES_FindOperation *fo)
  */
 static void
 parse_exchanges (void *cls,
-             const char *section)
+                 const char *section)
 {
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   char *uri;
@@ -490,7 +513,7 @@ parse_exchanges (void *cls,
                                exchange_tail,
                                exchange);
   exchange->pending = GNUNET_YES;
-  exchange->conn = TALER_EXCHANGE_connect (ctx,
+  exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
                                            exchange->uri,
                                            &keys_mgmt_cb,
                                            exchange,
@@ -512,8 +535,8 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
   struct Exchange *exchange;
   json_t *j_exchange;
 
-  ctx = GNUNET_CURL_init ();
-  if (NULL == ctx)
+  merchant_curl_ctx = GNUNET_CURL_init ();
+  if (NULL == merchant_curl_ctx)
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -534,8 +557,7 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     json_array_append_new (trusted_exchanges,
                            j_exchange);
   }
-  poller_task = GNUNET_SCHEDULER_add_now (&context_task,
-                                          NULL);
+  merchant_curl_refresh ();
   return GNUNET_OK;
 }
 
@@ -558,11 +580,11 @@ TMH_EXCHANGES_done ()
     GNUNET_free (exchange->uri);
     GNUNET_free (exchange);
   }
-  if (NULL != poller_task)
+  if (NULL != merchant_curl_task)
   {
-    GNUNET_SCHEDULER_cancel (poller_task);
-    poller_task = NULL;
+    GNUNET_SCHEDULER_cancel (merchant_curl_task);
+    merchant_curl_task = NULL;
   }
-  GNUNET_CURL_fini (ctx);
-  ctx = NULL;
+  GNUNET_CURL_fini (merchant_curl_ctx);
+  merchant_curl_ctx = NULL;
 }
