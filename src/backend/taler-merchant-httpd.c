@@ -503,13 +503,13 @@ run (void *cls,
   }
   if (GNUNET_SYSERR ==
       GNUNET_CONFIGURATION_get_value_string (config,
-                                             "merchant",
-                                             "CURRENCY",
+                                             "taler",
+                                             "currency",
                                              &TMH_merchant_currency_string))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "merchant",
-                               "CURRENCY");
+                               "taler",
+                               "currency");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
