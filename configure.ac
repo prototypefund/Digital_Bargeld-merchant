@@ -162,6 +162,16 @@ else
 	AC_DEFINE([HAVE_LIBCURL],[1],[Have CURL])
 fi
 
+
+# Check for curl/curl.h and gnurl/curl.h so we can use #ifdef
+# HAVE_CURL_CURL_H later (the above LIBCURL_CHECK_CONFIG accepted
+# *either* header set).
+AC_CHECK_HEADERS([curl/curl.h],,
+  curl=false
+  AC_CHECK_HEADERS([gnurl/curl.h],,
+  gnurl=false))
+
+
 # libgnurl
 if test "x$gnurl" = "x0"
 then
