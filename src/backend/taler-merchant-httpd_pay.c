@@ -291,10 +291,21 @@ deposit_cb (void *cls,
 		http_status);
     /* Transaction failed; stop all other ongoing deposits */
     abort_deposit (pc);
-    /* Forward error including 'proof' for the body */
-    resume_pay_with_response (pc,
-                              http_status,
-                              TMH_RESPONSE_make_json (proof));
+
+    if (NULL == proof)
+    {
+      /* FIXME: is this the right code for when the exchange fails? */
+      resume_pay_with_response (pc,
+                                MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                TMH_RESPONSE_make_internal_error ("Exchange failed, no proof available"));
+    }
+    else
+    {
+      /* Forward error including 'proof' for the body */
+      resume_pay_with_response (pc,
+                                http_status,
+                                TMH_RESPONSE_make_json (proof));
+    }
     return;
   }
   /* store result to DB */
