@@ -164,9 +164,14 @@ static struct Exchange *exchange_tail;
  */
 json_t *trusted_exchanges;
 
-/* forward declaration */
+
+/* forward declarations */
+
 static void
 merchant_curl_cb (void *cls);
+
+static void
+retry_exchange (void *cls);
 
 
 /**
@@ -201,8 +206,17 @@ keys_mgmt_cb (void *cls,
                 exchange->uri);
     TALER_EXCHANGE_disconnect (exchange->conn);
     exchange->conn = NULL;
-    exchange->pending = GNUNET_SYSERR; /* failed hard */
     exchange->retry_time = GNUNET_TIME_relative_to_absolute (KEYS_RETRY_FREQ);
+    /* Always retry trusted exchanges in the background, so that we don't have
+     * to wait for a customer to trigger it and thus delay his response */
+    if (GNUNET_YES == exchange->trusted)
+    {
+      GNUNET_SCHEDULER_add_delayed (KEYS_RETRY_FREQ, retry_exchange, exchange);
+    }
+    else
+    {
+      exchange->pending = GNUNET_SYSERR; /* failed hard */
+    }
   }
   while (NULL != (fo = exchange->fo_head))
   {
@@ -321,6 +335,29 @@ return_result (void *cls)
 
 
 /**
+ * Retry getting information from the given exchange in
+ * the closure.
+ *
+ * @param cls the exchange
+ * 
+ */
+static void
+retry_exchange (void *cls)
+{
+  struct Exchange *exchange = (struct Exchange *) cls;
+
+  exchange->pending = GNUNET_SYSERR; /* failed hard */
+  exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
+                                           exchange->uri,
+                                           &keys_mgmt_cb,
+                                           exchange,
+                                           TALER_EXCHANGE_OPTION_END);
+  GNUNET_break (NULL != exchange->conn);
+  merchant_curl_refresh ();
+}
+
+
+/**
  * Find a exchange that matches @a chosen_exchange. If we cannot connect
  * to the exchange, or if it is not acceptable, @a fc is called with
  * NULL for the exchange.
@@ -407,7 +444,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                                exchange->fo_tail,
                                fo);
 
-  if (GNUNET_OK != exchange->pending)
+  if (GNUNET_YES != exchange->pending)
   {
     /* We are not currently waiting for a reply, immediately
        return result */
@@ -420,13 +457,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   if ( (NULL == exchange->conn) &&
        (GNUNET_YES == exchange->pending) )
   {
-    exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
-                                             exchange->uri,
-                                             &keys_mgmt_cb,
-                                             exchange,
-                                             TALER_EXCHANGE_OPTION_END);
-    GNUNET_break (NULL != exchange->conn);
-    merchant_curl_refresh ();
+    retry_exchange (exchange);
   }
   return fo;
 }
@@ -513,12 +544,7 @@ parse_exchanges (void *cls,
                                exchange_tail,
                                exchange);
   exchange->pending = GNUNET_YES;
-  exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
-                                           exchange->uri,
-                                           &keys_mgmt_cb,
-                                           exchange,
-                                           TALER_EXCHANGE_OPTION_END);
-  GNUNET_break (NULL != exchange->conn);
+  retry_exchange (exchange);
 }
 
 
