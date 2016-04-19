@@ -329,7 +329,6 @@ return_result (void *cls)
           (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
           exchange->trusted);
   GNUNET_free (fo);
-  GNUNET_SCHEDULER_cancel (merchant_curl_task);
   merchant_curl_refresh ();
 }
 
