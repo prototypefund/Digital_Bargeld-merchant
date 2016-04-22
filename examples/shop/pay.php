@@ -30,10 +30,10 @@ if (empty($receiver))
   return;
 }
 
+session_start();
 $payments = &pull($_SESSION, "payments", array());
-$my_payment = get($payments[$receiver]);
 
-if (null === $my_payment)
+if (!isset($payments[$receiver]))
 {
   http_response_code(400);
   echo json_encode(array(
@@ -42,12 +42,15 @@ if (null === $my_payment)
   return;
 }
 
+echo 'recognized session';
+echo 'with hash ' . $payments[$receiver]['hc'];
+die();
 
 $post_body = file_get_contents('php://input');
 $deposit_permission = json_decode ($post_body, true);
 
 // Check if the receiver is actually *mentioned* in the contract
-if ($my_payment['hc'] != $deposit_permission['H_contract']) {
+if ($payments[$receiver]['hc'] != $deposit_permission['H_contract']) {
 
   $json = json_encode(
     array(
@@ -96,12 +99,7 @@ if ($status_code != 200)
   die();
 }
 
-session_start();
-
 $payments = &pull($_SESSION, "payments", array());
-$payments[$hc] = array(
-  'receiver' => $receiver,
-  'is_payed' => true
-);
+$payments[$receiver]['is_payed'] = true;
 
 ?>

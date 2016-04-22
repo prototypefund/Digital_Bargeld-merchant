@@ -98,7 +98,7 @@ if (array() === $my_payment || true !== get($my_payment["is_payed"], false)) {
   }
 
   $hc = json_decode($resp->body->toString(), true)['H_contract'];
-  $my_payment['ispayed'] = false;
+  $my_payment['is_payed'] = false;
   $my_payment['hc'] = $hc;
   echo "<p>you have not payed for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";

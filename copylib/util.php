@@ -42,7 +42,7 @@ function article_state_to_str($article_state){
 }
 
 function log_string($str){
-  file_put_contents("/tmp/blog.dbg", $str . "\n", FILE_APPEND);
+  file_put_contents("/tmp/frontend.dbg", $str . "\n", FILE_APPEND);
 }
 
 function get_full_uri(){

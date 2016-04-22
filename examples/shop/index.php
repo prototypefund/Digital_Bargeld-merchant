@@ -16,6 +16,7 @@
 -->
 <?php
 require_once "../../copylib/config.php";
+session_destroy();
 ?>
 <html lang="en">
 <head>
