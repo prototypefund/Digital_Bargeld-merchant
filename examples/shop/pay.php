@@ -18,18 +18,6 @@
 
 include '../../copylib/util.php';
 
-$hc = get($_GET["uuid"]);
-if (empty($hc))
-{
-  http_response_code(400);
-  echo json_encode(array(
-    "error" => "missing parameter",
-    "parameter" => "uuid"
-  ));
-  return;
-}
-
-// TODO: check if contract body matches URL parameters,
 // so we won't generate a response for the wrong receiver.
 $receiver = get($_GET["receiver"]);
 if (empty($receiver))
@@ -42,8 +30,25 @@ if (empty($receiver))
   return;
 }
 
+$payments = &pull($_SESSION, "payments", array());
+$my_payment = get($payments[$receiver]);
+
+if (null === $my_payment)
+{
+  http_response_code(400);
+  echo json_encode(array(
+    "error" => "no payment session active"
+  ));
+  return;
+}
+
+
 $post_body = file_get_contents('php://input');
 $deposit_permission = json_decode ($post_body, true);
+
+// Check if the receiver is actually *mentioned* in the
+// contract
+
 
 /* Craft the HTTP request, note that the backend
   could be on an entirely different machine if
@@ -57,7 +62,7 @@ $req = new http\Client\Request("POST",
                                array("Content-Type" => "application/json"));
 $req->getBody()->append (json_encode ($deposit_permission));
 
-// Execute the HTTP request
+// Execute the HTTP request to the backend
 $client = new http\Client;
 $client->enqueue($req)->send();
 

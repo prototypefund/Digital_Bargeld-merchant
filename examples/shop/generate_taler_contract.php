@@ -47,7 +47,7 @@ $now = new DateTime('now');
 // Include all information so we can
 // restore the contract without storing it
 $fulfillment_url = url_rel("fulfillment.php")
-  . '?uuid=${H_contract}'
+  . '?timestamp=' . $now->getTimestamp()
   . '&receiver=' . urlencode($receiver)
   . '&aval=' . urlencode($amount_value)
   . '&afrac=' . urlencode($amount_fraction)
@@ -70,69 +70,15 @@ $contract = generate_contract(array(
   "fulfillment_url" => $fulfillment_url)
 );
 
+file_put_contents("/tmp/shit.json", $contract);
 
-// pack the JSON for the contract 
-
-/*
-$contract = array(
-  'fulfillment_url' => $fulfillment_url,
-  'amount' => array(
-    'value' => $amount_value,
-    'fraction' => $amount_fraction,
-    'currency' => $currency
-  ),
-  'max_fee' => array(
-    'value' => 3,
-    'fraction' => 01010,
-    'currency' => $currency
-  ),
-  'transaction_id' => $transaction_id,
-  'products' => array(
-    array(
-      'description' => $desc,
-      'quantity' => 1,
-      'price' => array (
-        'value' => $amount_value,
-        'fraction' => $amount_fraction,
-        'currency' => $currency
-      ),
-      'product_id' => $p_id,
-    )
-  ),
-  'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
-  'expiry' => "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
-  'refund_deadline' => "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
-  'merchant' => array(
-    'name' => 'Kudos Inc.'
-  )
-);
-*/
-
-$json = json_encode(array(
-  'contract' => $contract
-), JSON_PRETTY_PRINT);
-
-$url = url_join("http://".$_SERVER["HTTP_HOST"], "backend/contract");
-
-$req = new http\Client\Request("POST",
-                               $url,
-                               array ("Content-Type" => "application/json"));
-
-$req->getBody()->append($contract);
-
-// Execute the HTTP request
-$client = new http\Client;
-$client->enqueue($req)->send();
-
-// Fetch the response
-$resp = $client->getResponse();
-$status_code = $resp->getResponseCode();
+$resp = give_to_backend("backend/contract", $contract);
 
 // Our response code is the same we got from the backend:
-http_response_code($status_code);
+http_response_code($resp->getResponseCode());
 
 // Now generate our body  
-if ($status_code != 200)
+if ($resp->getResponseCode() != 200)
 {
   echo json_encode(array(
     'error' => "internal error",
@@ -142,14 +88,8 @@ if ($status_code != 200)
 }
 else
 {
+  # no state here
   $got_json = json_decode($resp->body->toString(), true);
-  $hc = $got_json["H_contract"];
-
-  $payments = &pull($_SESSION, "payments", array());
-  $payments[$hc] = array(
-    'receiver' => $receiver,
-  );
-
   echo json_encode ($got_json, JSON_PRETTY_PRINT);
 }
 ?>

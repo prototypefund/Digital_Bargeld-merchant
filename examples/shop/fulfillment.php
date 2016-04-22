@@ -28,8 +28,7 @@
   }
   </script>
 </head>
-<body style="display:none;">
-
+<body style="display:none;"> 
   <header>
     <div id="logo">
       <svg height="100" width="100">
@@ -50,9 +49,9 @@
 
 include '../../copylib/util.php';
 
-$hc = get($_GET["uuid"]);
+$receiver = get($_GET["receiver"]);
 
-if (empty($hc)) {
+if (empty($receiver)) {
   http_response_code(400);
   echo "<p>Bad request (UUID missing)</p>";
   return;
@@ -60,31 +59,52 @@ if (empty($hc)) {
 
 session_start();
 
-$payments = get($_SESSION['payments'], array());
-$my_payment = get($payments[$hc]);
+$payments = &pull($_SESSION, 'payments', array());
+$my_payment = &pull($payments, $receiver, array());
 
 // This will keep the query parameters.
 $pay_url = url_rel("pay.php");
+$offering_url = url_rel("index.php", true);
 
-$offering_url = url_rel("checkout.php", true);
+if (array() === $my_payment || true !== get($my_payment["is_payed"], false)) {
+  // restore contract
+  
+  $contract = generate_contract(array(
+    "amount_value" => $_GET['aval'],
+    "amount_fraction" => $_GET['afrac'],
+    "currency" => $_GET['acurr'],
+    "refund_delta" => 'P3M',
+    "transaction_id" => $_GET['tid'],
+    "description" => "Donation to " . $receiver,
+    "product_id" => $p_id,
+    "correlation_id" => "",
+    "merchant_name" => "Kudos Inc.",
+    "taxes" => array(),
+    "now" => $_GET['timestamp'],
+    "fulfillment_url" => get_full_uri())
+  );
+  
+  $json = json_encode(array(
+    'contract' => $contract
+  ), JSON_PRETTY_PRINT);
 
-if (null === $my_payment) {
-  // TODO: show spinner after timeout
-  echo "<p>you do not have the session state for this contract: " . $hc . "</p>";
-  echo "<p>Asking the wallet to re-execute it ... </p>";
-  echo "<script>taler.executePayment('$hc', '$pay_url', '$offering_url');</script>";
-  return;
-}
+  $resp = give_to_backend("backend/contract", $json);
+  if ($resp->getResponseCode() != 200){
+    echo json_encode(array(
+    'error' => "internal error",
+    'hint' => "failed to regenerate contract",
+    'detail' => $resp->body->toString()
+    ), JSON_PRETTY_PRINT);
+    return;
+  }
 
-if (true !== get($my_payment["is_payed"], false)) {
-  // TODO: show spinner after timeout
+  $hc = json_decode($resp->body->toString(), true)['H_contract'];
+  $my_payment['ispayed'] = false;
+  $my_payment['hc'] = $hc;
   echo "<p>you have not payed for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";
-  echo "<script>taler.executePayment('$hc', '$pay_url');</script>";
-  return;
+  echo "<script>taler.executePayment('$hc', '$pay_url', '$offering_url');</script>";
 }
-
-$receiver = $my_payment["receiver"];
 
 $news = false;
 switch ($receiver) {
