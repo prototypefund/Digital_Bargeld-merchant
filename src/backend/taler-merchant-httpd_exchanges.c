@@ -545,6 +545,13 @@ parse_exchanges (void *cls,
     }
     GNUNET_free (mks);
   }
+  else
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "MASTER_KEY not given in section '%s', not trusting exchange\n",
+                section);
+
+  }
   GNUNET_CONTAINER_DLL_insert (exchange_head,
                                exchange_tail,
                                exchange);
