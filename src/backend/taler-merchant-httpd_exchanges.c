@@ -501,8 +501,8 @@ parse_exchanges (void *cls,
   struct Exchange *exchange;
 
   if (0 != strncasecmp (section,
-                        "exchange-",
-                        strlen ("exchange-")))
+                        "merchant-exchange-",
+                        strlen ("merchant-exchange-")))
     return;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
