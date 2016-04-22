@@ -347,6 +347,9 @@ static void
 retry_exchange (void *cls)
 {
   struct Exchange *exchange = (struct Exchange *) cls;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Connecting to exchange exchange %s in retry_exchange\n",
+              exchange->uri);
 
   exchange->pending = GNUNET_SYSERR; /* failed hard */
   exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
