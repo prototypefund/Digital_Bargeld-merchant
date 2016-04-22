@@ -325,6 +325,9 @@ return_result (void *cls)
   GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
                                exchange->fo_tail,
                                fo);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Returning result for exchange %s, trusted=%d\n",
+              exchange->uri, exchange->trusted);
   fo->fc (fo->fc_cls,
           (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
           exchange->trusted);
