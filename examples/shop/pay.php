@@ -46,8 +46,19 @@ if (null === $my_payment)
 $post_body = file_get_contents('php://input');
 $deposit_permission = json_decode ($post_body, true);
 
-// Check if the receiver is actually *mentioned* in the
-// contract
+// Check if the receiver is actually *mentioned* in the contract
+if ($my_payment['hc'] != $deposit_permission['H_contract']) {
+
+  $json = json_encode(
+    array(
+      "error" => "ill behaved wallet",
+      "status" => 400,
+      "detail" => "deposit permission mismatches with reconstructed contract"
+    )
+  );
+  echo $json;
+  die();
+}
 
 
 /* Craft the HTTP request, note that the backend

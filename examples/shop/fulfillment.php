@@ -48,8 +48,11 @@
 <?php
 
 include '../../copylib/util.php';
+include "../../copylib/merchants.php";
 
 $receiver = get($_GET["receiver"]);
+$now = new DateTime();
+$now->setTimestamp(intval(get($_GET["timestamp"])));
 
 if (empty($receiver)) {
   http_response_code(400);
@@ -70,25 +73,21 @@ if (array() === $my_payment || true !== get($my_payment["is_payed"], false)) {
   // restore contract
   
   $contract = generate_contract(array(
-    "amount_value" => $_GET['aval'],
-    "amount_fraction" => $_GET['afrac'],
+    "amount_value" => intval($_GET['aval']),
+    "amount_fraction" => intval($_GET['afrac']),
     "currency" => $_GET['acurr'],
     "refund_delta" => 'P3M',
-    "transaction_id" => $_GET['tid'],
+    "transaction_id" => intval($_GET['tid']),
     "description" => "Donation to " . $receiver,
-    "product_id" => $p_id,
+    "product_id" => "unused",
     "correlation_id" => "",
     "merchant_name" => "Kudos Inc.",
     "taxes" => array(),
-    "now" => $_GET['timestamp'],
+    "now" => $now,
     "fulfillment_url" => get_full_uri())
   );
   
-  $json = json_encode(array(
-    'contract' => $contract
-  ), JSON_PRETTY_PRINT);
-
-  $resp = give_to_backend("backend/contract", $json);
+  $resp = give_to_backend("backend/contract", $contract);
   if ($resp->getResponseCode() != 200){
     echo json_encode(array(
     'error' => "internal error",
@@ -104,6 +103,7 @@ if (array() === $my_payment || true !== get($my_payment["is_payed"], false)) {
   echo "<p>you have not payed for this contract: " . $hc . "</p>";
   echo "<p>Asking the wallet to re-execute it ... </p>";
   echo "<script>taler.executePayment('$hc', '$pay_url', '$offering_url');</script>";
+  return;
 }
 
 $news = false;

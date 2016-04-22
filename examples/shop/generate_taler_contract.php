@@ -54,7 +54,6 @@ $fulfillment_url = url_rel("fulfillment.php")
   . '&acurr=' . urlencode($currency)
   . '&tid=' . $transaction_id;
 
-
 $contract = generate_contract(array(
   "amount_value" => $amount_value,
   "amount_fraction" => $amount_fraction,
@@ -62,15 +61,13 @@ $contract = generate_contract(array(
   "refund_delta" => 'P3M',
   "transaction_id" => $transaction_id,
   "description" => $desc,
-  "product_id" => $p_id,
+  "product_id" => "unused",
   "correlation_id" => "",
   "merchant_name" => "Kudos Inc.",
   "taxes" => array(),
   "now" => $now,
   "fulfillment_url" => $fulfillment_url)
 );
-
-file_put_contents("/tmp/shit.json", $contract);
 
 $resp = give_to_backend("backend/contract", $contract);
 
