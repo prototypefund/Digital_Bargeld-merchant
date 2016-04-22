@@ -325,6 +325,9 @@ return_result (void *cls)
   GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
                                exchange->fo_tail,
                                fo);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Returning result for exchange %s, trusted=%d\n",
+              exchange->uri, exchange->trusted);
   fo->fc (fo->fc_cls,
           (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
           exchange->trusted);
@@ -344,6 +347,9 @@ static void
 retry_exchange (void *cls)
 {
   struct Exchange *exchange = (struct Exchange *) cls;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Connecting to exchange exchange %s in retry_exchange\n",
+              exchange->uri);
 
   exchange->pending = GNUNET_SYSERR; /* failed hard */
   exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
@@ -501,8 +507,8 @@ parse_exchanges (void *cls,
   struct Exchange *exchange;
 
   if (0 != strncasecmp (section,
-                        "exchange-",
-                        strlen ("exchange-")))
+                        "merchant-exchange-",
+                        strlen ("merchant-exchange-")))
     return;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
@@ -538,6 +544,13 @@ parse_exchanges (void *cls,
                                  _("ill-formed key"));
     }
     GNUNET_free (mks);
+  }
+  else
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "MASTER_KEY not given in section '%s', not trusting exchange\n",
+                section);
+
   }
   GNUNET_CONTAINER_DLL_insert (exchange_head,
                                exchange_tail,
