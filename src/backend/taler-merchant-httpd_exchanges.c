@@ -404,7 +404,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
       break;
     }
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Comparing chosen exchange url '%s' with known url '%s'.",
+                "Comparing chosen exchange url '%s' with known url '%s'.\n",
                 chosen_exchange, exchange->uri);
   }
   if (NULL == exchange)
