@@ -152,7 +152,7 @@ postgres_store_payment (void *cls,
                         struct GNUNET_TIME_Absolute refund,
                         const struct TALER_Amount *amount_without_fee,
                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                        json_t *exchange_proof)
+                        const json_t *exchange_proof)
 {
   struct PostgresClosure *pg = cls;
   PGresult *res;

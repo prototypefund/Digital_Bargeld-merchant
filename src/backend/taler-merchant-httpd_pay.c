@@ -277,7 +277,7 @@ abort_deposit (struct PayContext *pc)
 static void
 deposit_cb (void *cls,
             unsigned int http_status,
-            json_t *proof)
+            const json_t *proof)
 {
   struct MERCHANT_DepositConfirmation *dc = cls;
   struct PayContext *pc = dc->pc;
@@ -423,7 +423,7 @@ process_pay_with_exchange (void *cls,
     const struct TALER_EXCHANGE_DenomPublicKey *denom_details;
 
     denom_details = TALER_EXCHANGE_get_denomination_key (keys,
-                                                     &dc->denom);
+							 &dc->denom);
     if (NULL == denom_details)
     {
       GNUNET_break_op (0);
