@@ -19,7 +19,7 @@
   include("../../copylib/util.php");
   include("./blog_lib.php");
   
-  log_string("paying");
+  syslog($LOG_INFO, "paying");
 
   $article = get($_GET["article"]);
   if (empty($article)){
@@ -56,7 +56,6 @@
     echo $json;
     die();
   }
-  // FIXME put some control below
 
   // with the article that's going to be payed
   $resp = give_to_backend("backend/pay",

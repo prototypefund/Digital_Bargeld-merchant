@@ -286,15 +286,26 @@ deposit_cb (void *cls,
   pc->pending--;
   if (MHD_HTTP_OK != http_status)
   {
-    /* Transaction failed; stop all other ongoing deposits */
-    abort_deposit (pc);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
 		"Deposit operation failed with HTTP code %u\n",
 		http_status);
-    /* Forward error including 'proof' for the body */
-    resume_pay_with_response (pc,
-                              http_status,
-                              TMH_RESPONSE_make_json (proof));
+    /* Transaction failed; stop all other ongoing deposits */
+    abort_deposit (pc);
+
+    if (NULL == proof)
+    {
+      /* FIXME: is this the right code for when the exchange fails? */
+      resume_pay_with_response (pc,
+                                MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                TMH_RESPONSE_make_internal_error ("Exchange failed, no proof available"));
+    }
+    else
+    {
+      /* Forward error including 'proof' for the body */
+      resume_pay_with_response (pc,
+                                http_status,
+                                TMH_RESPONSE_make_json (proof));
+    }
     return;
   }
   /* store result to DB */
