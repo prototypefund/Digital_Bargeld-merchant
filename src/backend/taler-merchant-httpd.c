@@ -641,7 +641,7 @@ run (void *cls,
     else if (0 == strcmp (serve_type, "unix"))
     {
       struct sockaddr_un *un;
-      unsigned long long mode;
+      char *mode;
       struct GNUNET_NETWORK_Handle *nh;
       int fh;
 
@@ -668,7 +668,7 @@ run (void *cls,
       }
 
       if (GNUNET_OK !=
-          GNUNET_CONFIGURATION_get_value_number (config,
+          GNUNET_CONFIGURATION_get_value_string (config,
                                                  "merchant",
                                                  "unixpath_mode",
                                                  &mode))
@@ -680,7 +680,19 @@ run (void *cls,
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      unixpath_mode = (mode_t) mode;
+      errno = 0;
+      unixpath_mode = (mode_t) strtoul (mode, NULL, 8);
+      if (0 != errno)
+      {
+        GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                   "merchant",
+                                   "unixpath_mode",
+                                   "unixpath_mode must be octal number");
+        GNUNET_free (mode);
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+      GNUNET_free (mode);
 
       un = GNUNET_new (struct sockaddr_un);
       un->sun_family = AF_UNIX;
@@ -715,6 +727,10 @@ run (void *cls,
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
+
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "opened listen socket '%s' with mode %o\n",
+                  unixpath, unixpath_mode);
 
       mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
                               0,
