@@ -730,7 +730,7 @@ run (void *cls,
 
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                   "opened listen socket '%s' with mode %o\n",
-                  unixpath, unixpath_mode);
+                  serve_unixpath, unixpath_mode);
 
       mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
                               0,
