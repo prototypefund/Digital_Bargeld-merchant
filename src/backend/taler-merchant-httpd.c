@@ -19,6 +19,7 @@
  * communication with the exchange
  * @author Marcello Stanisci
  * @author Christian Grothoff
+ * @author Florian Dold
  */
 #include "platform.h"
 #include <microhttpd.h>
@@ -37,6 +38,12 @@
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
 #include "taler-merchant-httpd_util.h"
+
+
+/**
+ * Backlog for listen operation on unix-domain sockets.
+ */
+#define UNIX_BACKLOG 500
 
 
 /**
@@ -109,6 +116,17 @@ struct TALER_MERCHANTDB_Plugin *db;
  * The MHD Daemon
  */
 static struct MHD_Daemon *mhd;
+
+/**
+ * Path for the unix domain-socket
+ * to run the daemon on.
+ */
+static char *serve_unixpath;
+
+/**
+ * File mode for unix-domain socket.
+ */
+static mode_t unixpath_mode;
 
 
 /**
@@ -490,18 +508,6 @@ run (void *cls,
     return;
   }
   if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_number (config,
-                                             "merchant",
-                                             "PORT",
-                                             &port))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "merchant",
-                               "PORT");
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-  if (GNUNET_SYSERR ==
       GNUNET_CONFIGURATION_get_value_string (config,
                                              "taler",
                                              "currency",
@@ -583,15 +589,152 @@ run (void *cls,
     return;
   }
 
-  mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
-                          port,
-                          NULL, NULL,
-                          &url_handler, NULL,
-			  MHD_OPTION_NOTIFY_COMPLETED,
-			  &handle_mhd_completion_callback, NULL,
-                          MHD_OPTION_CONNECTION_TIMEOUT,
-                          (unsigned int) 10 /* 10s */,
-                          MHD_OPTION_END);
+
+  {
+    const char *choices[] = {"tcp", "unix"};
+    const char *serve_type;
+
+    if (GNUNET_OK !=
+        GNUNET_CONFIGURATION_get_value_choice (config,
+                                               "merchant",
+                                               "serve",
+                                               choices,
+                                               &serve_type))
+    {
+      GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                 "merchant",
+                                 "serve",
+                                 "serve type required");
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+
+    // FIXME: refactor two calls to MHD_start_daemon
+    // into one, using an options array instead of varags
+
+    if (0 == strcmp (serve_type, "tcp"))
+    {
+
+      if (GNUNET_SYSERR ==
+          GNUNET_CONFIGURATION_get_value_number (config,
+                                                 "merchant",
+                                                 "PORT",
+                                                 &port))
+      {
+        GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                                   "merchant",
+                                   "PORT");
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+
+      mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
+                              port,
+                              NULL, NULL,
+                              &url_handler, NULL,
+                              MHD_OPTION_NOTIFY_COMPLETED,
+                              &handle_mhd_completion_callback, NULL,
+                              MHD_OPTION_CONNECTION_TIMEOUT,
+                              (unsigned int) 10 /* 10s */,
+                              MHD_OPTION_END);
+    }
+    else if (0 == strcmp (serve_type, "unix"))
+    {
+      struct sockaddr_un *un;
+      unsigned long long mode;
+      struct GNUNET_NETWORK_Handle *nh;
+      int fh;
+
+      if (GNUNET_OK !=
+          GNUNET_CONFIGURATION_get_value_filename (config,
+                                                   "merchant",
+                                                   "unixpath",
+                                                   &serve_unixpath))
+      {
+        GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                   "merchant",
+                                   "unixpath",
+                                   "unixpath required");
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+
+      if (strlen (serve_unixpath) >= sizeof (un->sun_path))
+      {
+        fprintf (stderr,
+                 "Invalid configuration: unix path too long\n");
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+
+      if (GNUNET_OK !=
+          GNUNET_CONFIGURATION_get_value_number (config,
+                                                 "merchant",
+                                                 "unixpath_mode",
+                                                 &mode))
+      {
+        GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                   "merchant",
+                                   "unixpath_mode",
+                                   "unixpath_mode required");
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+      unixpath_mode = (mode_t) mode;
+
+      un = GNUNET_new (struct sockaddr_un);
+      un->sun_family = AF_UNIX;
+      strncpy (un->sun_path, serve_unixpath, sizeof (un->sun_path) - 1);
+
+      GNUNET_NETWORK_unix_precheck (un);
+
+      if (NULL == (nh = GNUNET_NETWORK_socket_create (AF_UNIX, SOCK_STREAM, 0)))
+      {
+        fprintf (stderr, "create failed for AF_UNIX\n");
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+      if (GNUNET_OK != GNUNET_NETWORK_socket_bind (nh, (void *) un, sizeof (struct sockaddr_un)))
+      {
+        fprintf (stderr, "bind failed for AF_UNIX\n");
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+      if (GNUNET_OK != GNUNET_NETWORK_socket_listen (nh, UNIX_BACKLOG))
+      {
+        fprintf (stderr, "listen failed for AF_UNIX\n");
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+
+      fh = GNUNET_NETWORK_get_fd (nh);
+
+      if (0 != fchmod (fh, unixpath_mode))
+      {
+        fprintf (stderr, "chmod failed: %s\n", strerror (errno));
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+
+      mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
+                              0,
+                              NULL, NULL,
+                              &url_handler, NULL,
+                              MHD_OPTION_LISTEN_SOCKET, fh,
+                              MHD_OPTION_NOTIFY_COMPLETED,
+                              &handle_mhd_completion_callback, NULL,
+                              MHD_OPTION_CONNECTION_TIMEOUT,
+                              (unsigned int) 10 /* 10s */,
+                              MHD_OPTION_END);
+      GNUNET_NETWORK_socket_free_memory_only_ (nh);
+    }
+    else
+    {
+      // not reached
+      GNUNET_assert (0);
+    }
+  }
+
   if (NULL == mhd)
   {
     GNUNET_break (0);
