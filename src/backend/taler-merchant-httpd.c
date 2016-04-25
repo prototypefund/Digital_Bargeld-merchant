@@ -721,7 +721,7 @@ run (void *cls,
 
       fh = GNUNET_NETWORK_get_fd (nh);
 
-      if (0 != fchmod (fh, unixpath_mode))
+      if (0 != chmod (serve_unixpath, unixpath_mode))
       {
         fprintf (stderr, "chmod failed: %s\n", strerror (errno));
         GNUNET_SCHEDULER_shutdown ();
