@@ -702,19 +702,19 @@ run (void *cls,
 
       if (NULL == (nh = GNUNET_NETWORK_socket_create (AF_UNIX, SOCK_STREAM, 0)))
       {
-        fprintf (stderr, "create failed for AF_UNIX\n");
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR, "create(for AF_UNIX)");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
       if (GNUNET_OK != GNUNET_NETWORK_socket_bind (nh, (void *) un, sizeof (struct sockaddr_un)))
       {
-        fprintf (stderr, "bind failed for AF_UNIX\n");
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR, "bind(for AF_UNIX)");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
       if (GNUNET_OK != GNUNET_NETWORK_socket_listen (nh, UNIX_BACKLOG))
       {
-        fprintf (stderr, "listen failed for AF_UNIX\n");
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR, "listen(for AF_UNIX)");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
