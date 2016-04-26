@@ -694,6 +694,10 @@ run (void *cls,
       }
       GNUNET_free (mode);
 
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "Creating listen socket '%s' with mode %o\n",
+                  serve_unixpath, unixpath_mode);
+
       un = GNUNET_new (struct sockaddr_un);
       un->sun_family = AF_UNIX;
       strncpy (un->sun_path, serve_unixpath, sizeof (un->sun_path) - 1);
@@ -727,10 +731,6 @@ run (void *cls,
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-
-      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "opened listen socket '%s' with mode %o\n",
-                  serve_unixpath, unixpath_mode);
 
       mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
                               0,
