@@ -39,3 +39,15 @@ libtaler_plugin_merchantdb_postgres_la_LDFLAGS = \
   -lpq \
   -lgnunetpostgres \
   -lgnunetutil $(XLIB)
+
+#check_PROGRAMS = \
+#  test-merchantdb-postgres
+#
+#test_merchantdb_postgres_SOURCES = \
+#  test_merchantdb.c
+#
+#test_merchantdb_postgres_LDADD = \
+#  # TODO
+#
+#TESTS = \
+#  test-merchantdb-postgres
