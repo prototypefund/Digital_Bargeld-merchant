@@ -49,6 +49,21 @@ run (void *cls)
     result = 1;
     return;
   }
+  if (GNUNET_OK !=
+      plugin->initialize (plugin->cls,
+                          GNUNET_YES))
+  {
+    result = 2;
+    goto drop;
+  }
+
+  /* Prepare data for 'store_payment()' */
+
+  /* Prepare data for 'check_payment()' */
+
+ drop:
+  TALER_MERCHANTDB_plugin_unload (plugin);
+  plugin = NULL;
 }
 
 int
