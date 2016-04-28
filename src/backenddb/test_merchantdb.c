@@ -18,3 +18,69 @@
  * @brief testcase for merchant's postgres db plugin
  * @author Marcello Stanisci
  */
+
+#include "platform.h"
+#include <taler/taler_util.h>
+#include "taler_merchantdb_lib.h"
+
+static int result;
+static struct TALER_EXCHANGEDB_Plugin *plugin;
+
+/**
+ * Main function that will be run by the scheduler.
+ *
+ * @param cls closure with config
+ */
+static void
+run (void *cls)
+{
+  struct GNUNET_CONFIGURATION_Handle *cfg = cls;
+
+  if (NULL ==
+      (plugin = TALER_MERCHANTDB_plugin_load (cfg)))
+  {
+    result = 1;
+    return;
+  }
+}
+
+int
+main (int argc,
+      char *const argv[])
+{
+
+  const char *plugin_name;
+  char *config_filename;
+  char *testname;
+  struct GNUNET_CONFIGURATION_Handle *cfg;
+
+  result = -1;
+  if (NULL == (plugin_name = strrchr (argv[0], (int) '-')))
+  {
+    GNUNET_break (0);
+    return -1;
+  }
+  GNUNET_log_setup (argv[0],
+                    "WARNING",
+                    NULL);
+  plugin_name++;
+  (void) GNUNET_asprintf (&testname,
+                          "test-merchantdb-%s", plugin_name);
+  (void) GNUNET_asprintf (&config_filename,
+                          "%s.conf", testname);
+  cfg = GNUNET_CONFIGURATION_create ();
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_parse (cfg,
+                                  config_filename))
+  {
+    GNUNET_break (0);
+    GNUNET_free (config_filename);
+    GNUNET_free (testname);
+    return 2;
+  }
+  GNUNET_SCHEDULER_run (&run, cfg);
+  GNUNET_CONFIGURATION_destroy (cfg);
+  GNUNET_free (config_filename);
+  GNUNET_free (testname);
+  return result;
+}

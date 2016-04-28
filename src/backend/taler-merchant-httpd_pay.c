@@ -30,7 +30,6 @@
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler_merchantdb_lib.h"
 
 
 /**
