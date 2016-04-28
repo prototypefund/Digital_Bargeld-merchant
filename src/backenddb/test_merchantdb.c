@@ -22,6 +22,7 @@
 #include "platform.h"
 #include <taler/taler_util.h>
 #include "taler_merchantdb_lib.h"
+#include <jansson.h>
 
 #define FAILIF(cond)                            \
   do {                                          \
@@ -29,6 +30,11 @@
     GNUNET_break (0);                           \
     goto drop;                                  \
   } while (0)
+
+#define RND_BLK(ptr)                                                    \
+  GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK, ptr, sizeof (*ptr))
+
+#define CURRENCY "EUR"
 
 static int result;
 static struct TALER_MERCHANTDB_Plugin *plugin;
@@ -42,28 +48,48 @@ static void
 run (void *cls)
 {
   struct GNUNET_CONFIGURATION_Handle *cfg = cls;
+  /* Data for 'store_payment()' */
+  struct  GNUNET_HashCode h_contract;
+  struct  GNUNET_HashCode h_wire;
+  uint64_t transaction_id;
+  struct GNUNET_TIME_Absolute timestamp;
+  struct GNUNET_TIME_Absolute refund;
+  struct TALER_Amount amount_without_fee;
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+  json_t *exchange_proof = NULL;
 
-  if (NULL ==
-      (plugin = TALER_MERCHANTDB_plugin_load (cfg)))
-  {
-    result = 1;
-    return;
-  }
-  if (GNUNET_OK !=
-      plugin->initialize (plugin->cls,
-                          GNUNET_YES))
-  {
-    result = 2;
-    goto drop;
-  }
+  FAILIF (NULL == (plugin = TALER_MERCHANTDB_plugin_load (cfg)));
+  FAILIF (GNUNET_OK != plugin->initialize (plugin->cls, GNUNET_YES));
 
   /* Prepare data for 'store_payment()' */
-
-  /* Prepare data for 'check_payment()' */
+  RND_BLK (&h_contract);
+  RND_BLK (&h_wire);
+  RND_BLK (&transaction_id);
+  timestamp = GNUNET_TIME_absolute_get();
+  refund = GNUNET_TIME_absolute_get();
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":1.000010",
+                                         &amount_without_fee));
+  RND_BLK (&coin_pub);
+  exchange_proof = json_object ();
+  GNUNET_assert (0 == json_object_set (exchange_proof, "test", json_string ("backenddb test")));
+  FAILIF (GNUNET_OK != plugin->store_payment (plugin->cls,
+                                              &h_contract,
+                                              &h_wire,
+                                              transaction_id,
+                                              timestamp,
+                                              refund,
+                                              &amount_without_fee,
+                                              &coin_pub,
+                                              exchange_proof));
+   FAILIF (GNUNET_OK != plugin->check_payment (plugin->cls, transaction_id));
+   result = 0;
 
  drop:
   TALER_MERCHANTDB_plugin_unload (plugin);
   plugin = NULL;
+  if (NULL != exchange_proof)
+    json_decref(exchange_proof);
 }
 
 int
@@ -82,9 +108,7 @@ main (int argc,
     GNUNET_break (0);
     return -1;
   }
-  GNUNET_log_setup (argv[0],
-                    "WARNING",
-                    NULL);
+  GNUNET_log_setup (argv[0], "WARNING", NULL);
   plugin_name++;
   (void) GNUNET_asprintf (&testname,
                           "test-merchantdb-%s", plugin_name);

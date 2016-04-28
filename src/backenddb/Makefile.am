@@ -51,7 +51,9 @@ test_merchantdb_postgres_SOURCES = \
   test_merchantdb.c
 
 test_merchantdb_postgres_LDFLAGS = \
-  -lgnunetutil
+  -lgnunetutil \
+  -ltalerutil \
+  -ljansson
 
 test_merchantdb_postgres_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la
