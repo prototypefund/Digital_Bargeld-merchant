@@ -23,8 +23,15 @@
 #include <taler/taler_util.h>
 #include "taler_merchantdb_lib.h"
 
+#define FAILIF(cond)                            \
+  do {                                          \
+    if (!(cond)){ break;}                       \
+    GNUNET_break (0);                           \
+    goto drop;                                  \
+  } while (0)
+
 static int result;
-static struct TALER_EXCHANGEDB_Plugin *plugin;
+static struct TALER_MERCHANTDB_Plugin *plugin;
 
 /**
  * Main function that will be run by the scheduler.
