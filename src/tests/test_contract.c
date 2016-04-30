@@ -35,11 +35,11 @@ struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
 char *keyfile;
 static int result;
 static struct MERCHANT_WIREFORMAT_Sepa *wire;
-static struct GNUNET_SCHEDULER_Task *shutdown_task;
 
 extern
 struct MERCHANT_WIREFORMAT_Sepa *
 TALER_MERCHANT_parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *cfg);
+
 
 /**
  * Shutdown task (magically invoked when the application is being
@@ -49,7 +49,8 @@ TALER_MERCHANT_parse_wireformat_sepa (const struct GNUNET_CONFIGURATION_Handle *
  * @param tc scheduler task context
  */
 static void
-do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
+do_shutdown (void *cls,
+             const struct GNUNET_SCHEDULER_TaskContext *tc)
 {
 
   if (NULL != db_conn)
@@ -59,11 +60,12 @@ do_shutdown (void *cls, const struct GNUNET_SCHEDULER_TaskContext *tc)
     }
 }
 
+
 extern uint32_t
 TALER_MERCHANTDB_contract_get_values (PGconn *conn,
-                                 const struct GNUNET_HashCode *h_contract,
-                                 uint64_t *nounce,
-				 struct GNUNET_TIME_Absolute *edate);
+                                      const struct GNUNET_HashCode *h_contract,
+                                      uint64_t *nounce,
+                                      struct GNUNET_TIME_Absolute *edate);
 
 
 /**
@@ -133,8 +135,7 @@ run (void *cls, char *const *args, const char *cfgfile,
 
   privkey = GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile);
   wire = TALER_MERCHANT_parse_wireformat_sepa (config);
-  shutdown_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
-                                                &do_shutdown, NULL);
+  GNUNET_SCHEDULER_add_shutdown (&do_shutdown, NULL);
 
   /**
   * 'Root' object of the contract, leaving some holes to bi filled
@@ -333,7 +334,4 @@ main (int argc, char *const *argv)
                           options, &run, NULL))
     return 3;
   return (GNUNET_OK == result) ? 0 : 1;
-
-
-
 }

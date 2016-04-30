@@ -81,11 +81,6 @@ struct GNUNET_TIME_Relative edate_delay;
 char *TMH_merchant_currency_string;
 
 /**
- * Shutdown task identifier
- */
-static struct GNUNET_SCHEDULER_Task *shutdown_task;
-
-/**
  * Task running the HTTP server.
  */
 static struct GNUNET_SCHEDULER_Task *mhd_task;
@@ -473,10 +468,8 @@ run (void *cls,
 
   wireformat = NULL;
   result = GNUNET_SYSERR;
-  shutdown_task =
-    GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_FOREVER_REL,
-                                  &do_shutdown,
-                                  NULL);
+  GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
+                                 NULL);
   if (GNUNET_SYSERR ==
       TMH_EXCHANGES_init (config))
   {
