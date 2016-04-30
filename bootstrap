@@ -1,2 +1,12 @@
 #!/bin/sh
+
+if ! git --version >/dev/null; then
+  echo "git not installed"
+  exit 1
+fi
+
+echo "$0: Updating submodules"
+echo | git submodule update --init
+
+echo "$0: Running autoreconf"
 autoreconf -if

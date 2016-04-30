@@ -18,18 +18,6 @@
 
 include '../../copylib/util.php';
 
-$hc = get($_GET["uuid"]);
-if (empty($hc))
-{
-  http_response_code(400);
-  echo json_encode(array(
-    "error" => "missing parameter",
-    "parameter" => "uuid"
-  ));
-  return;
-}
-
-// TODO: check if contract body matches URL parameters,
 // so we won't generate a response for the wrong receiver.
 $receiver = get($_GET["receiver"]);
 if (empty($receiver))
@@ -42,8 +30,39 @@ if (empty($receiver))
   return;
 }
 
+session_start();
+$payments = &pull($_SESSION, "payments", array());
+
+if (!isset($payments[$receiver]))
+{
+  http_response_code(400);
+  echo json_encode(array(
+    "error" => "no payment session active"
+  ));
+  return;
+}
+
+echo 'recognized session';
+echo 'with hash ' . $payments[$receiver]['hc'];
+die();
+
 $post_body = file_get_contents('php://input');
 $deposit_permission = json_decode ($post_body, true);
+
+// Check if the receiver is actually *mentioned* in the contract
+if ($payments[$receiver]['hc'] != $deposit_permission['H_contract']) {
+
+  $json = json_encode(
+    array(
+      "error" => "ill behaved wallet",
+      "status" => 400,
+      "detail" => "deposit permission mismatches with reconstructed contract"
+    )
+  );
+  echo $json;
+  die();
+}
+
 
 /* Craft the HTTP request, note that the backend
   could be on an entirely different machine if
@@ -57,7 +76,7 @@ $req = new http\Client\Request("POST",
                                array("Content-Type" => "application/json"));
 $req->getBody()->append (json_encode ($deposit_permission));
 
-// Execute the HTTP request
+// Execute the HTTP request to the backend
 $client = new http\Client;
 $client->enqueue($req)->send();
 
@@ -80,12 +99,7 @@ if ($status_code != 200)
   die();
 }
 
-session_start();
-
 $payments = &pull($_SESSION, "payments", array());
-$payments[$hc] = array(
-  'receiver' => $receiver,
-  'is_payed' => true
-);
+$payments[$receiver]['is_payed'] = true;
 
 ?>

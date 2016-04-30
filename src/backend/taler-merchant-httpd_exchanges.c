@@ -27,7 +27,7 @@
 /**
  * How often do we retry fetching /keys?
  */
-#define KEYS_RETRY_FREQ GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MINUTES, 60)
+#define KEYS_RETRY_FREQ GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10)
 
 
 /**
@@ -141,12 +141,13 @@ struct Exchange
 /**
  * Context for all exchange operations (useful to the event loop)
  */
-static struct GNUNET_CURL_Context *ctx;
+static struct GNUNET_CURL_Context *merchant_curl_ctx;
 
 /**
- * Task we use to drive the interaction with this exchange.
+ * Task that pumps events into curl as soon as any
+ * curl-related events are available.
  */
-static struct GNUNET_SCHEDULER_Task *poller_task;
+static struct GNUNET_SCHEDULER_Task *merchant_curl_task;
 
 /**
  * Head of exchanges we know about.
@@ -162,6 +163,15 @@ static struct Exchange *exchange_tail;
  * List of our trusted exchanges for inclusion in contracts.
  */
 json_t *trusted_exchanges;
+
+
+/* forward declarations */
+
+static void
+merchant_curl_cb (void *cls);
+
+static void
+retry_exchange (void *cls);
 
 
 /**
@@ -196,8 +206,17 @@ keys_mgmt_cb (void *cls,
                 exchange->uri);
     TALER_EXCHANGE_disconnect (exchange->conn);
     exchange->conn = NULL;
-    exchange->pending = GNUNET_SYSERR; /* failed hard */
     exchange->retry_time = GNUNET_TIME_relative_to_absolute (KEYS_RETRY_FREQ);
+    /* Always retry trusted exchanges in the background, so that we don't have
+     * to wait for a customer to trigger it and thus delay his response */
+    if (GNUNET_YES == exchange->trusted)
+    {
+      GNUNET_SCHEDULER_add_delayed (KEYS_RETRY_FREQ, retry_exchange, exchange);
+    }
+    else
+    {
+      exchange->pending = GNUNET_SYSERR; /* failed hard */
+    }
   }
   while (NULL != (fo = exchange->fo_head))
   {
@@ -213,12 +232,30 @@ keys_mgmt_cb (void *cls,
 
 
 /**
+ * Restart the task that pumps events into curl
+ * with updated file descriptors.
+ */
+static void
+merchant_curl_refresh ()
+{
+  if (NULL != merchant_curl_task)
+  {
+    GNUNET_SCHEDULER_cancel (merchant_curl_task);
+    merchant_curl_task = NULL;
+  }
+
+  merchant_curl_task = GNUNET_SCHEDULER_add_now (&merchant_curl_cb,
+                                                 NULL);
+}
+
+
+/**
  * Task that runs the exchange's event loop using the GNUnet scheduler.
  *
  * @param cls a `struct Exchange *`
  */
 static void
-context_task (void *cls)
+merchant_curl_cb (void *cls)
 {
   long timeout;
   int max_fd;
@@ -231,14 +268,14 @@ context_task (void *cls)
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "In exchange context polling task\n");
 
-  poller_task = NULL;
-  GNUNET_CURL_perform (ctx);
+  merchant_curl_task = NULL;
+  GNUNET_CURL_perform (merchant_curl_ctx);
   max_fd = -1;
   timeout = -1;
   FD_ZERO (&read_fd_set);
   FD_ZERO (&write_fd_set);
   FD_ZERO (&except_fd_set);
-  GNUNET_CURL_get_select_info (ctx,
+  GNUNET_CURL_get_select_info (merchant_curl_ctx,
                                &read_fd_set,
                                &write_fd_set,
                                &except_fd_set,
@@ -249,8 +286,8 @@ context_task (void *cls)
               max_fd, timeout);
   if (timeout >= 0)
     delay =
-    GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS,
-                                   timeout);
+      GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS,
+                                     timeout);
   else
     delay = GNUNET_TIME_UNIT_FOREVER_REL;
   rs = GNUNET_NETWORK_fdset_create ();
@@ -261,12 +298,12 @@ context_task (void *cls)
   GNUNET_NETWORK_fdset_copy_native (ws,
                                     &write_fd_set,
                                     max_fd + 1);
-  poller_task =
+  merchant_curl_task =
     GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_DEFAULT,
                                  delay,
                                  rs,
                                  ws,
-                                 &context_task,
+                                 &merchant_curl_cb,
                                  NULL);
   GNUNET_NETWORK_fdset_destroy (rs);
   GNUNET_NETWORK_fdset_destroy (ws);
@@ -288,13 +325,40 @@ return_result (void *cls)
   GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
                                exchange->fo_tail,
                                fo);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Returning result for exchange %s, trusted=%d\n",
+              exchange->uri, exchange->trusted);
   fo->fc (fo->fc_cls,
           (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
           exchange->trusted);
   GNUNET_free (fo);
-  GNUNET_SCHEDULER_cancel (poller_task);
-  GNUNET_SCHEDULER_add_now (&context_task,
-                            NULL);
+  merchant_curl_refresh ();
+}
+
+
+/**
+ * Retry getting information from the given exchange in
+ * the closure.
+ *
+ * @param cls the exchange
+ * 
+ */
+static void
+retry_exchange (void *cls)
+{
+  struct Exchange *exchange = (struct Exchange *) cls;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Connecting to exchange exchange %s in retry_exchange\n",
+              exchange->uri);
+
+  exchange->pending = GNUNET_SYSERR; /* failed hard */
+  exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
+                                           exchange->uri,
+                                           &keys_mgmt_cb,
+                                           exchange,
+                                           TALER_EXCHANGE_OPTION_END);
+  GNUNET_break (NULL != exchange->conn);
+  merchant_curl_refresh ();
 }
 
 
@@ -316,7 +380,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   struct Exchange *exchange;
   struct TMH_EXCHANGES_FindOperation *fo;
 
-  if (NULL == ctx)
+  if (NULL == merchant_curl_ctx)
   {
     GNUNET_break (0);
     return NULL;
@@ -330,9 +394,19 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   for (exchange = exchange_head; NULL != exchange; exchange = exchange->next)
     /* test it by checking public key --- FIXME: hostname or public key!?
        Should probably be URI, not hostname anyway! */
+  {
     if (0 == strcmp (exchange->uri,
                      chosen_exchange))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "The exchange `%s' is already known\n",
+                  chosen_exchange);
       break;
+    }
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Comparing chosen exchange url '%s' with known url '%s'.\n",
+                chosen_exchange, exchange->uri);
+  }
   if (NULL == exchange)
   {
     /* This is a new exchange */
@@ -342,12 +416,32 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
     GNUNET_CONTAINER_DLL_insert (exchange_head,
                                  exchange_tail,
                                  exchange);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "The exchange `%s' is new\n",
+                chosen_exchange);
   }
 
-  /* check if we should resume this exchange */
-  if ( (GNUNET_SYSERR == exchange->pending) &&
-       (0 == GNUNET_TIME_absolute_get_remaining (exchange->retry_time).rel_value_us) )
-    exchange->pending = GNUNET_YES;
+  if (GNUNET_SYSERR == exchange->pending)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Maybe retrying previously contacted exchange `%s'\n",
+                chosen_exchange);
+    /* check if we should resume this exchange */
+    if (0 == GNUNET_TIME_absolute_get_remaining (exchange->retry_time).rel_value_us)
+    {
+
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Retrying exchange `%s'\n",
+                  chosen_exchange);
+      exchange->pending = GNUNET_YES;
+    }
+    else
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Not retrying exchange `%s', too early\n",
+                  chosen_exchange);
+    }
+  }
 
 
   fo = GNUNET_new (struct TMH_EXCHANGES_FindOperation);
@@ -358,7 +452,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                                exchange->fo_tail,
                                fo);
 
-  if (GNUNET_NO == exchange->pending)
+  if (GNUNET_YES != exchange->pending)
   {
     /* We are not currently waiting for a reply, immediately
        return result */
@@ -371,12 +465,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   if ( (NULL == exchange->conn) &&
        (GNUNET_YES == exchange->pending) )
   {
-    exchange->conn = TALER_EXCHANGE_connect (ctx,
-                                             exchange->uri,
-                                             &keys_mgmt_cb,
-                                             exchange,
-                                             TALER_EXCHANGE_OPTION_END);
-    GNUNET_break (NULL != exchange->conn);
+    retry_exchange (exchange);
   }
   return fo;
 }
@@ -413,7 +502,7 @@ TMH_EXCHANGES_find_exchange_cancel (struct TMH_EXCHANGES_FindOperation *fo)
  */
 static void
 parse_exchanges (void *cls,
-             const char *section)
+                 const char *section)
 {
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   char *uri;
@@ -421,8 +510,8 @@ parse_exchanges (void *cls,
   struct Exchange *exchange;
 
   if (0 != strncasecmp (section,
-                        "exchange-",
-                        strlen ("exchange-")))
+                        "merchant-exchange-",
+                        strlen ("merchant-exchange-")))
     return;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
@@ -459,16 +548,18 @@ parse_exchanges (void *cls,
     }
     GNUNET_free (mks);
   }
+  else
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "MASTER_KEY not given in section '%s', not trusting exchange\n",
+                section);
+
+  }
   GNUNET_CONTAINER_DLL_insert (exchange_head,
                                exchange_tail,
                                exchange);
   exchange->pending = GNUNET_YES;
-  exchange->conn = TALER_EXCHANGE_connect (ctx,
-                                           exchange->uri,
-                                           &keys_mgmt_cb,
-                                           exchange,
-                                           TALER_EXCHANGE_OPTION_END);
-  GNUNET_break (NULL != exchange->conn);
+  retry_exchange (exchange);
 }
 
 
@@ -485,8 +576,8 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
   struct Exchange *exchange;
   json_t *j_exchange;
 
-  ctx = GNUNET_CURL_init ();
-  if (NULL == ctx)
+  merchant_curl_ctx = GNUNET_CURL_init ();
+  if (NULL == merchant_curl_ctx)
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -507,8 +598,7 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     json_array_append_new (trusted_exchanges,
                            j_exchange);
   }
-  poller_task = GNUNET_SCHEDULER_add_now (&context_task,
-                                          NULL);
+  merchant_curl_refresh ();
   return GNUNET_OK;
 }
 
@@ -531,11 +621,11 @@ TMH_EXCHANGES_done ()
     GNUNET_free (exchange->uri);
     GNUNET_free (exchange);
   }
-  if (NULL != poller_task)
+  if (NULL != merchant_curl_task)
   {
-    GNUNET_SCHEDULER_cancel (poller_task);
-    poller_task = NULL;
+    GNUNET_SCHEDULER_cancel (merchant_curl_task);
+    merchant_curl_task = NULL;
   }
-  GNUNET_CURL_fini (ctx);
-  ctx = NULL;
+  GNUNET_CURL_fini (merchant_curl_ctx);
+  merchant_curl_ctx = NULL;
 }

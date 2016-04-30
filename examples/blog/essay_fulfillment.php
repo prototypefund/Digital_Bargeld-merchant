@@ -26,7 +26,7 @@
     return;
   }
   session_start();
-
+  //syslog($LOG_ERR, "merchant: official log system");
   $payments = &pull($_SESSION, 'payments', array());
   $my_payment = &pull($payments, $article, false);
 
@@ -43,11 +43,9 @@
       $js_code = "get_contract(\"$article\");";
       $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => $js_code));
       echo $cc_page;
-      log_string("cnt blog");
       return;
     }
-    log_string("restoring blog");
-    //log_string("state: " . print_r($_SESSION, true));
+    // using deeplink (whether 1st time or not)
     // restore contract
     $now = new DateTime();
     $now->setTimestamp(intval($timestamp));
@@ -78,14 +76,14 @@
     }
     $hc = json_decode($resp->body->toString(), true)['H_contract'];
     $my_payment['hc'] = $hc;
-    log_string("sending payment event");
+    syslog($LOG_INFO, "sending payment event");
     $js_code = "taler.executePayment(\"$hc\", \"$pay_url\", \"$offering_url\");";
     $cc_page = template("./essay_cc-form.html", array('article' => $article, 'jscode' => $js_code));
     echo $cc_page;
     return;
     }
   // control here == article payed
-  log_string("arti blog");
+  syslog($LOG_INFO, "showing article");
   $article = get_article($article);
   echo $article;
 ?>

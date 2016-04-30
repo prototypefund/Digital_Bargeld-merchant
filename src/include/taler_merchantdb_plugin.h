@@ -82,7 +82,7 @@ struct TALER_MERCHANTDB_Plugin
                     struct GNUNET_TIME_Absolute refund,
                     const struct TALER_Amount *amount_without_fee,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
-		    json_t *exchange_proof);
+		    const json_t *exchange_proof);
 
   /**
    * Check whether a payment has already been stored

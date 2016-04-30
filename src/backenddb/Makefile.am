@@ -39,3 +39,24 @@ libtaler_plugin_merchantdb_postgres_la_LDFLAGS = \
   -lpq \
   -lgnunetpostgres \
   -lgnunetutil $(XLIB)
+
+if HAVE_POSTGRESQL
+if HAVE_GNUNETPQ
+check_PROGRAMS = \
+  test-merchantdb-postgres
+endif
+endif
+
+test_merchantdb_postgres_SOURCES = \
+  test_merchantdb.c
+
+test_merchantdb_postgres_LDFLAGS = \
+  -lgnunetutil \
+  -ltalerutil \
+  -ljansson
+
+test_merchantdb_postgres_LDADD = \
+  $(top_srcdir)/src/backenddb/libtalermerchantdb.la
+
+TESTS = \
+  test-merchantdb-postgres
