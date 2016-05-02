@@ -234,16 +234,17 @@ keys_mgmt_cb (void *cls,
 /**
  * Restart the task that pumps events into curl
  * with updated file descriptors.
+ *
+ * @param cls NULL
  */
 static void
-merchant_curl_refresh ()
+merchant_curl_refresh (void *cls)
 {
   if (NULL != merchant_curl_task)
   {
     GNUNET_SCHEDULER_cancel (merchant_curl_task);
     merchant_curl_task = NULL;
   }
-
   merchant_curl_task = GNUNET_SCHEDULER_add_now (&merchant_curl_cb,
                                                  NULL);
 }
@@ -332,7 +333,6 @@ return_result (void *cls)
           (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
           exchange->trusted);
   GNUNET_free (fo);
-  merchant_curl_refresh ();
 }
 
 
@@ -341,7 +341,7 @@ return_result (void *cls)
  * the closure.
  *
  * @param cls the exchange
- * 
+ *
  */
 static void
 retry_exchange (void *cls)
@@ -358,7 +358,6 @@ retry_exchange (void *cls)
                                            exchange,
                                            TALER_EXCHANGE_OPTION_END);
   GNUNET_break (NULL != exchange->conn);
-  merchant_curl_refresh ();
 }
 
 
@@ -576,7 +575,8 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
   struct Exchange *exchange;
   json_t *j_exchange;
 
-  merchant_curl_ctx = GNUNET_CURL_init ();
+  merchant_curl_ctx = GNUNET_CURL_init (&merchant_curl_refresh,
+                                        NULL);
   if (NULL == merchant_curl_ctx)
   {
     GNUNET_break (0);
@@ -598,7 +598,6 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     json_array_append_new (trusted_exchanges,
                            j_exchange);
   }
-  merchant_curl_refresh ();
   return GNUNET_OK;
 }
 

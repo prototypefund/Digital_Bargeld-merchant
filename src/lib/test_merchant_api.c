@@ -392,27 +392,6 @@ struct InterpreterState
 
 
 /**
- * Task that runs the context's event loop with the GNUnet scheduler.
- *
- * @param cls unused
- */
-static void
-context_task (void *cls);
-
-
-/**
- * Run the context task, the working set has changed.
- */
-static void
-trigger_context_task ()
-{
-  GNUNET_SCHEDULER_cancel (ctx_task);
-  ctx_task = GNUNET_SCHEDULER_add_now (&context_task,
-                                       NULL);
-}
-
-
-/**
  * The testcase failed, return with an error code.
  *
  * @param is interpreter state to clean up
@@ -1370,6 +1349,21 @@ context_task (void *cls)
 
 
 /**
+ * Run the context task, the working set has changed.
+ *
+ * @param cls NULL
+ */
+static void
+trigger_context_task (void *cls)
+{
+  if (NULL != ctx_task)
+    GNUNET_SCHEDULER_cancel (ctx_task);
+  ctx_task = GNUNET_SCHEDULER_add_now (&context_task,
+                                       NULL);
+}
+
+
+/**
  * Main function that will be run by the scheduler.
  *
  * @param cls closure
@@ -1459,7 +1453,8 @@ run (void *cls)
   is = GNUNET_new (struct InterpreterState);
   is->commands = commands;
 
-  ctx = GNUNET_CURL_init ();
+  ctx = GNUNET_CURL_init (&trigger_context_task,
+                          NULL);
   GNUNET_assert (NULL != ctx);
   ctx_task = GNUNET_SCHEDULER_add_now (&context_task,
                                        ctx);
