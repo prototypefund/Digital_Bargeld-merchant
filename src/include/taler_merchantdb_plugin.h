@@ -51,13 +51,10 @@ struct TALER_MERCHANTDB_Plugin
    * Initialize merchant tables
    *
    * @param cls closure
-   * @param tmp #GNUNET_YES if the tables are to be made temporary i.e. their
-   *          contents are dropped when the @a conn is closed
    * @return #GNUNET_OK upon success; #GNUNET_SYSERR upon failure
    */
   int
-  (*initialize) (void *cls,
-                 int tmp);
+  (*initialize) (void *cls);
 
   /**
    * Insert payment confirmation from the exchange into the database.

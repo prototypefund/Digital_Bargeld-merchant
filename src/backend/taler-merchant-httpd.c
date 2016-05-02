@@ -93,11 +93,6 @@ char *TMH_merchant_currency_string;
 static struct GNUNET_SCHEDULER_Task *mhd_task;
 
 /**
- * Should we do a dry run where temporary tables are used for storing the data.
- */
-static int dry;
-
-/**
  * Global return code
  */
 static int result;
@@ -575,7 +570,7 @@ run (void *cls,
     return;
   }
   if (GNUNET_OK !=
-      db->initialize (db->cls, dry))
+      db->initialize (db->cls))
   {
     GNUNET_break (0);
     GNUNET_SCHEDULER_shutdown ();
@@ -773,9 +768,6 @@ int
 main (int argc, char *const *argv)
 {
   static const struct GNUNET_GETOPT_CommandLineOption options[] = {
-    {'t', "temp", NULL,
-     gettext_noop ("Use temporary database tables"), GNUNET_NO,
-     &GNUNET_GETOPT_set_one, &dry},
     GNUNET_GETOPT_OPTION_END
   };
 

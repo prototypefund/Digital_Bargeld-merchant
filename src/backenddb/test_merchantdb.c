@@ -59,7 +59,7 @@ run (void *cls)
   json_t *exchange_proof = NULL;
 
   FAILIF (NULL == (plugin = TALER_MERCHANTDB_plugin_load (cfg)));
-  FAILIF (GNUNET_OK != plugin->initialize (plugin->cls, GNUNET_YES));
+  FAILIF (GNUNET_OK != plugin->initialize (plugin->cls));
 
   /* Prepare data for 'store_payment()' */
   RND_BLK (&h_contract);

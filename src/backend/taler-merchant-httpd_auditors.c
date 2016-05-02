@@ -82,7 +82,7 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
   unsigned int i;
   unsigned int j;
 
-  if (0 == GNUNET_TIME_absolute_get_remaining (dk->deposit_valid_until).rel_value_us)
+  if (0 == GNUNET_TIME_absolute_get_remaining (dk->expire_deposit).rel_value_us)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Denomination key offered by client has expired for deposits\n");

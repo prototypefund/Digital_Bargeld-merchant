@@ -51,37 +51,28 @@ struct PostgresClosure
  * Initialize merchant tables
  *
  * @param cls closure our `struct Plugin`
- * @param tmp #GNUNET_YES if the tables are to be made temporary i.e. their
- *          contents are dropped when the database connection is closed
  * @return #GNUNET_OK upon success; #GNUNET_SYSERR upon failure
  */
 static int
-postgres_initialize (void *cls,
-                     int tmp)
+postgres_initialize (void *cls)
 {
   struct PostgresClosure *pg = cls;
-  const char *tmp_str = (1 == tmp) ? "TEMPORARY" : "";
-  char *sql;
   PGresult *res;
   ExecStatusType status;
   int ret;
 
-  GNUNET_asprintf (&sql,
-                   "CREATE %1$s TABLE IF NOT EXISTS payments ("
-                   "h_contract BYTEA NOT NULL,"
-                   "h_wire BYTEA NOT NULL,"
-                   "transaction_id INT8," /*WARNING: this column used to be primary key, but that wrong since multiple coins belong to the same id*/
-                   "timestamp INT8 NOT NULL,"
-                   "refund_deadline INT8 NOT NULL,"
-                   "amount_without_fee_val INT8 NOT NULL,"
-                   "amount_without_fee_frac INT4 NOT NULL,"
-                   "amount_without_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL,"
-                   "coin_pub BYTEA NOT NULL,"
-                   "exchange_proof BYTEA NOT NULL);",
-                   tmp_str);
   ret = GNUNET_POSTGRES_exec (pg->conn,
-                              sql);
-  GNUNET_free (sql);
+                              "CREATE TABLE IF NOT EXISTS payments ("
+                              "h_contract BYTEA NOT NULL,"
+                              "h_wire BYTEA NOT NULL,"
+                              "transaction_id INT8," /*WARNING: this column used to be primary key, but that wrong since multiple coins belong to the same id*/
+                              "timestamp INT8 NOT NULL,"
+                              "refund_deadline INT8 NOT NULL,"
+                              "amount_without_fee_val INT8 NOT NULL,"
+                              "amount_without_fee_frac INT4 NOT NULL,"
+                              "amount_without_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL,"
+                              "coin_pub BYTEA NOT NULL,"
+                              "exchange_proof BYTEA NOT NULL);");
   if (GNUNET_OK != ret)
     return ret;
   if ( (NULL == (res = PQprepare (pg->conn,
@@ -211,9 +202,8 @@ postgres_store_payment (void *cls,
  *
  * @param cls our plugin handle
  * @param transaction_id the transaction id to search into
- * the db
- *
- * @return GNUNET_OK if found, GNUNET_NO if not, GNUNET_SYSERR
+ *        the db
+ * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
  * upon error
  */
 static int
