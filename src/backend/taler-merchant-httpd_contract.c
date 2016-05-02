@@ -104,14 +104,11 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   res = TMH_PARSE_json_data (connection,
                              jcontract,
                              spec);
-  printf ("parsed\n");
   if (GNUNET_NO == res)
     return MHD_YES;
   if (GNUNET_SYSERR == res)
     return TMH_RESPONSE_reply_external_error (connection,
                                               "contract request malformed");
-
-  printf ("beyond\n");
   /* add fields to the contract that the backend should provide */
   json_object_set (jcontract,
                    "exchanges",
