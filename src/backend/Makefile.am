@@ -6,6 +6,9 @@ pkgcfgdir = $(prefix)/share/taler/config.d/
 pkgcfg_DATA = \
   merchant.conf
 
+EXTRA_DIST = \
+  $(pkgcfg_DATA)
+
 bin_PROGRAMS = \
   taler-merchant-httpd
 

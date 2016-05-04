@@ -60,3 +60,6 @@ test_merchantdb_postgres_LDADD = \
 
 TESTS = \
   test-merchantdb-postgres
+
+EXTRA_DIST = \
+  test-merchantdb-postgres.conf

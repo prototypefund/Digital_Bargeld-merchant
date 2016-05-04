@@ -238,7 +238,7 @@ postgres_check_payment(void *cls,
 
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not check if contract %llu is in DB: %s\n",
-                transaction_id,
+                (unsigned long long) transaction_id,
 		sqlstate);
     PQclear (res);
     return GNUNET_SYSERR;
