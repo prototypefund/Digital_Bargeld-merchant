@@ -1102,7 +1102,7 @@ interpreter_run (void *cls)
       timestamp = GNUNET_TIME_absolute_get ();
       GNUNET_TIME_round_abs (&timestamp);
       memset (&merchant_sig, 0, sizeof (merchant_sig)); // FIXME: init properly!
-
+      GNUNET_break (0);
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI "pay",
@@ -1320,7 +1320,7 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
+      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
       .details.admin_add_incoming.amount = "EUR:5.01" },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,

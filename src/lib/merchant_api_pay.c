@@ -393,13 +393,12 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
       }
     }
   } /* end of sanity check */
-  pay_obj = json_pack ("{s:o, s:o," /* H_wire/H_contract */
+
+  pay_obj = json_pack ("{s:o," /* H_contract */
                        " s:I, s:o," /* transaction id, timestamp */
                        " s:o, s:s," /* refund_deadline, exchange */
                        " s:o, s:o," /* coins, max_fee */
-                       " s:o}",     /* amount */
-                       "H_wire", GNUNET_JSON_from_data (&h_wire,
-                                                       sizeof (h_wire)),
+                       " s:o, s:o}",/* amount, signature */
                        "H_contract", GNUNET_JSON_from_data (h_contract,
                                                            sizeof (struct GNUNET_HashCode)),
                        "transaction_id", (json_int_t) transaction_id,
@@ -408,8 +407,9 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 		       "exchange", exchange_uri,
 		       "coins", j_coins,
                        "max_fee", TALER_JSON_from_amount (max_fee),
-                       "amount", TALER_JSON_from_amount (amount)
-                       );
+                       "amount", TALER_JSON_from_amount (amount),
+                       "merchant_sig", GNUNET_JSON_from_data (merchant_sig,
+                                                              sizeof (struct TALER_MerchantSignatureP)));
 
   if (0 != execution_deadline.abs_value_us)
   {
