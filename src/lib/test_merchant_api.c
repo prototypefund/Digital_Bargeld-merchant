@@ -789,9 +789,9 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Have denomination key for `%s', but with wrong expiration range %llu vs [%llu,%llu)\n",
                   str,
-                  now.abs_value_us,
-                  pk->valid_from.abs_value_us,
-                  pk->withdraw_valid_until.abs_value_us);
+                  (unsigned long long) now.abs_value_us,
+                  (unsigned long long) pk->valid_from.abs_value_us,
+                  (unsigned long long) pk->withdraw_valid_until.abs_value_us);
       GNUNET_free (str);
       return NULL;
     }
@@ -1442,8 +1442,7 @@ main (int argc,
                                   NULL, NULL, NULL,
                                   "taler-exchange-keyup",
                                   "taler-exchange-keyup",
-                                  "-d", "test-exchange-home",
-                                  "-m", "test-exchange-home/master.priv",
+                                  "-c", "test_merchant_api.conf",
                                   NULL);
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
@@ -1452,7 +1451,7 @@ main (int argc,
                                    NULL, NULL, NULL,
                                    "taler-exchange-httpd",
                                    "taler-exchange-httpd",
-                                   "-d", "test-exchange-home",
+                                    "-c", "test_merchant_api.conf",
                                    NULL);
   /* give child time to start and bind against the socket */
   fprintf (stderr, "Waiting for taler-exchange-httpd to be ready");
@@ -1468,7 +1467,7 @@ main (int argc,
                                        NULL, NULL, NULL,
                                        "taler-merchant-httpd",
                                        "taler-merchant-httpd",
-                                       "-c", "test_merchant.conf",
+                                       "-c", "test_merchant_api.conf",
                                        NULL);
   /* give child time to start and bind against the socket */
   fprintf (stderr, "Waiting for taler-merchant-httpd to be ready");
