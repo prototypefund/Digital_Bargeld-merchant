@@ -902,7 +902,6 @@ interpreter_run (void *cls)
       fail (is);
       return;
     }
-    trigger_context_task ();
     return;
   case OC_WITHDRAW_STATUS:
     GNUNET_assert (NULL !=
@@ -918,7 +917,6 @@ interpreter_run (void *cls)
                                    &reserve_pub,
                                    &reserve_status_cb,
                                    is);
-    trigger_context_task ();
     return;
   case OC_WITHDRAW_SIGN:
     GNUNET_assert (NULL !=
@@ -978,7 +976,6 @@ interpreter_run (void *cls)
       fail (is);
       return;
     }
-    trigger_context_task ();
     return;
   case OC_PAY:
     {
@@ -1130,7 +1127,6 @@ interpreter_run (void *cls)
       fail (is);
       return;
     }
-    trigger_context_task ();
     return;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
