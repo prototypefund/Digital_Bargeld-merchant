@@ -55,4 +55,5 @@ EXTRA_DIST = \
   test_merchant_api.conf \
   test_merchant_api_home/.local/share/taler/exchange/offline-keys/master.priv \
   test_merchant_api_home/.config/taler/merchant/wire/test.json \
+  test_merchant_api_home/.config/taler/test.json \
   test_merchant.priv

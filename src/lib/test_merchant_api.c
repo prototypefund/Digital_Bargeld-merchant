@@ -1320,7 +1320,7 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account\":62 }",
+      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
       .details.admin_add_incoming.amount = "EUR:5.01" },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
@@ -1344,7 +1344,7 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99",
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account\":62 }",
+      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
       .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":1} ] }",
       .details.pay.transaction_id = 1 },
 
@@ -1357,7 +1357,7 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99",
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account\":62 }",
+      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
       .details.pay.contract = "{ \"items\":[{ \"name\":\"ice cream\", \"value\":1} ] }",
       .details.pay.transaction_id = 1 },
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
@@ -1370,7 +1370,7 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99",
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account\":62 }",
+      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
       .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":1} ] }",
       .details.pay.transaction_id = 2 },
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
@@ -1383,7 +1383,7 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99",
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account\":62 }",
+      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
       .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":2} ] }",
       .details.pay.transaction_id = 1 },
 
