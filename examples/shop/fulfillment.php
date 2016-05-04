@@ -71,7 +71,6 @@ $offering_url = url_rel("index.php", true);
 
 if (array() === $my_payment || true !== get($my_payment["is_payed"], false)) {
   // restore contract
-  
   $contract = generate_contract(array(
     "amount_value" => intval($_GET['aval']),
     "amount_fraction" => intval($_GET['afrac']),

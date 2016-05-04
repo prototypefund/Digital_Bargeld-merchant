@@ -17,7 +17,7 @@
 */
 
 include '../../copylib/util.php';
-
+log_string("getting money");
 // so we won't generate a response for the wrong receiver.
 $receiver = get($_GET["receiver"]);
 if (empty($receiver))
@@ -41,10 +41,6 @@ if (!isset($payments[$receiver]))
   ));
   return;
 }
-
-echo 'recognized session';
-echo 'with hash ' . $payments[$receiver]['hc'];
-die();
 
 $post_body = file_get_contents('php://input');
 $deposit_permission = json_decode ($post_body, true);
