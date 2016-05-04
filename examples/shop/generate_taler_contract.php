@@ -69,8 +69,6 @@ $contract = generate_contract(array(
   "fulfillment_url" => $fulfillment_url)
 );
 
-file_put_contents("/tmp/ff.link", $fulfillment_url . "\r\n");
-
 $resp = give_to_backend("backend/contract", $contract);
 
 // Our response code is the same we got from the backend:
