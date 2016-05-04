@@ -123,6 +123,11 @@ struct Exchange
   struct GNUNET_TIME_Absolute retry_time;
 
   /**
+   * Task where we retry fetching /keys from the exchange.
+   */
+  struct GNUNET_SCHEDULER_Task *retry_task;
+
+  /**
    * Flag which indicates whether some HTTP transfer between
    * this merchant and the exchange is still ongoing
    */
@@ -165,10 +170,50 @@ static struct Exchange *exchange_tail;
 json_t *trusted_exchanges;
 
 
-/* forward declarations */
-
+/**
+ * Function called with information about who is auditing
+ * a particular exchange and what key the exchange is using.
+ *
+ * @param cls closure, will be `struct Exchange` so that
+ *   when this function gets called, it will change the flag 'pending'
+ *   to 'false'. Note: 'keys' is automatically saved inside the exchange's
+ *   handle, which is contained inside 'struct Exchange', when
+ *   this callback is called. Thus, once 'pending' turns 'false',
+ *   it is safe to call 'TALER_EXCHANGE_get_keys()' on the exchange's handle,
+ *   in order to get the "good" keys.
+ * @param keys information about the various keys used
+ *        by the exchange
+ */
 static void
-retry_exchange (void *cls);
+keys_mgmt_cb (void *cls,
+              const struct TALER_EXCHANGE_Keys *keys);
+
+
+/**
+ * Retry getting information from the given exchange in
+ * the closure.
+ *
+ * @param cls the exchange
+ *
+ */
+static void
+retry_exchange (void *cls)
+{
+  struct Exchange *exchange = cls;
+
+  exchange->retry_task = NULL;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Connecting to exchange exchange %s in retry_exchange\n",
+              exchange->uri);
+
+  exchange->pending = GNUNET_SYSERR; /* failed hard */
+  exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
+                                           exchange->uri,
+                                           &keys_mgmt_cb,
+                                           exchange,
+                                           TALER_EXCHANGE_OPTION_END);
+  GNUNET_break (NULL != exchange->conn);
+}
 
 
 /**
@@ -208,7 +253,9 @@ keys_mgmt_cb (void *cls,
      * to wait for a customer to trigger it and thus delay his response */
     if (GNUNET_YES == exchange->trusted)
     {
-      GNUNET_SCHEDULER_add_delayed (KEYS_RETRY_FREQ, retry_exchange, exchange);
+      exchange->retry_task = GNUNET_SCHEDULER_add_delayed (KEYS_RETRY_FREQ,
+                                                           &retry_exchange,
+                                                           exchange);
     }
     else
     {
@@ -250,31 +297,6 @@ return_result (void *cls)
           (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
           exchange->trusted);
   GNUNET_free (fo);
-}
-
-
-/**
- * Retry getting information from the given exchange in
- * the closure.
- *
- * @param cls the exchange
- *
- */
-static void
-retry_exchange (void *cls)
-{
-  struct Exchange *exchange = (struct Exchange *) cls;
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Connecting to exchange exchange %s in retry_exchange\n",
-              exchange->uri);
-
-  exchange->pending = GNUNET_SYSERR; /* failed hard */
-  exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
-                                           exchange->uri,
-                                           &keys_mgmt_cb,
-                                           exchange,
-                                           TALER_EXCHANGE_OPTION_END);
-  GNUNET_break (NULL != exchange->conn);
 }
 
 
@@ -381,7 +403,8 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   if ( (NULL == exchange->conn) &&
        (GNUNET_YES == exchange->pending) )
   {
-    retry_exchange (exchange);
+    exchange->retry_task = GNUNET_SCHEDULER_add_now (&retry_exchange,
+                                                     exchange);
   }
   return fo;
 }
@@ -475,7 +498,8 @@ parse_exchanges (void *cls,
                                exchange_tail,
                                exchange);
   exchange->pending = GNUNET_YES;
-  retry_exchange (exchange);
+  exchange->retry_task = GNUNET_SCHEDULER_add_now (&retry_exchange,
+                                                   exchange);
 }
 
 
@@ -535,6 +559,8 @@ TMH_EXCHANGES_done ()
                                  exchange);
     if (NULL != exchange->conn)
       TALER_EXCHANGE_disconnect (exchange->conn);
+    if (NULL != exchange->retry_task)
+      GNUNET_SCHEDULER_cancel (exchange->retry_task);
     GNUNET_free (exchange->uri);
     GNUNET_free (exchange);
   }
@@ -543,3 +569,5 @@ TMH_EXCHANGES_done ()
   GNUNET_CURL_gnunet_rc_destroy (merchant_curl_rc);
   merchant_curl_rc = NULL;
 }
+
+/* end of taler-merchant-httpd_exchanges.c */
