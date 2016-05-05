@@ -133,6 +133,11 @@ struct TALER_MERCHANT_PayCoin
   struct TALER_DenominationSignature denom_sig;
 
   /**
+   * Overall value that coins of this @e denom_pub have.
+   */
+  struct TALER_Amount denom_value;
+
+  /**
    * Coin's private key.
    */
   struct TALER_CoinSpendPrivateKeyP coin_priv;
@@ -205,6 +210,11 @@ struct TALER_MERCHANT_PaidCoin
    * Exchange’s unblinded signature of the coin
    */
   struct TALER_DenominationSignature denom_sig;
+
+  /**
+   * Overall value that coins of this @e denom_pub have.
+   */
+  struct TALER_Amount denom_value;
 
   /**
    * Coin's public key.

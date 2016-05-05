@@ -24,6 +24,7 @@
 #include <taler/taler_exchange_service.h>
 #include <taler/taler_json_lib.h>
 #include "taler_merchant_service.h"
+#include "taler_merchantdb_lib.h"
 #include <gnunet/gnunet_util_lib.h>
 #include <gnunet/gnunet_curl_lib.h>
 #include <microhttpd.h>
@@ -1137,6 +1138,7 @@ interpreter_run (void *cls)
 	  pc.coin_priv = ref->details.reserve_withdraw.coin_priv;
 	  pc.denom_pub = ref->details.reserve_withdraw.pk->key;
 	  pc.denom_sig = ref->details.reserve_withdraw.sig;
+          pc.denom_value = ref->details.reserve_withdraw.pk->value;
 	  break;
 	default:
 	  GNUNET_assert (0);
@@ -1484,12 +1486,35 @@ main (int argc,
   struct GNUNET_OS_Process *proc;
   struct GNUNET_OS_Process *exchanged;
   struct GNUNET_OS_Process *merchantd;
+  struct TALER_MERCHANTDB_Plugin *db;
+  struct GNUNET_CONFIGURATION_Handle *cfg;
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
   GNUNET_log_setup ("test-merchant-api",
                     "WARNING",
                     NULL);
+  cfg = GNUNET_CONFIGURATION_create ();
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_CONFIGURATION_load (cfg,
+                                            "test_merchant_api.conf"));
+  db = TALER_MERCHANTDB_plugin_load (cfg);
+  if (NULL == db)
+  {
+    GNUNET_CONFIGURATION_destroy (cfg);
+    return 77;
+  }
+  (void) db->drop_tables (db->cls);
+  if (GNUNET_OK != db->initialize (db->cls))
+  {
+    TALER_MERCHANTDB_plugin_unload (db);
+    GNUNET_CONFIGURATION_destroy (cfg);
+    return 77;
+  }
+  TALER_MERCHANTDB_plugin_unload (db);
+  GNUNET_CONFIGURATION_destroy (cfg);
+
+
   GNUNET_assert (GNUNET_OK ==
 		 GNUNET_STRINGS_string_to_data (merchant_pub_str,
 						strlen (merchant_pub_str),

@@ -18,6 +18,7 @@ libtalermerchant_la_SOURCES = \
   merchant_api_pay.c
 
 libtalermerchant_la_LIBADD = \
+  -ltalerexchange \
   -ltalerjson \
   -ltalerutil \
   -lgnunetcurl \
@@ -43,6 +44,7 @@ TESTS = \
 test_merchant_api_SOURCES = \
   test_merchant_api.c
 test_merchant_api_LDADD = \
+  $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
   -ltalerexchange \

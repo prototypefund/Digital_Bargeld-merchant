@@ -48,6 +48,15 @@ struct TALER_MERCHANTDB_Plugin
   char *library_name;
 
   /**
+   * Drop merchant tables. Used for testcases.
+   *
+   * @param cls closure
+   * @return #GNUNET_OK upon success; #GNUNET_SYSERR upon failure
+   */
+  int
+  (*drop_tables) (void *cls);
+
+  /**
    * Initialize merchant tables
    *
    * @param cls closure
