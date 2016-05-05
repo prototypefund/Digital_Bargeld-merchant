@@ -1416,7 +1416,7 @@ run (void *cls)
     { .oc = OC_CONTRACT,
       .label = "create-contract-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":1, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"items\":[ {\"name\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
+      .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":1, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"expiry\":\"\\/Date(999999999)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"products\":[ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
@@ -1428,7 +1428,7 @@ run (void *cls)
     { .oc = OC_CONTRACT,
       .label = "create-contract-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.contract.proposal = "{ \"max_fee\":\"{EUR:0.5}\", \"transaction_id\":2, \"timestamp\":\"\\/date(42)\\/\", \"total_amount\":\"{EUR:5}\",  \"items\":[ {\"name\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
+      .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":2, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"products\":[ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
 
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        transaction ID) */

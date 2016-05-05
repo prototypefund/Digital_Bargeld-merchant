@@ -31,6 +31,58 @@
 
 extern char *TMH_merchant_currency_string;
 
+
+/**
+ * Check that the given JSON array of products is well-formed.
+ *
+ * @param products JSON array to check
+ * @return #GNUNET_OK if all is fine
+ */
+static int
+check_products (json_t *products)
+{
+  size_t index;
+  json_t *value;
+  int res;
+
+  if (! json_is_array (products))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  json_array_foreach (products, index, value) {
+    const char *description;
+    const char *error_name;
+    unsigned int error_line;
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_string ("description", &description),
+      /* FIXME: there are other fields in the product specification
+         that rre currently not labeled as optional. Maybe check
+         those as well, or make them truly optional. */
+      GNUNET_JSON_spec_end()
+    };
+
+    /* extract fields we need to sign separately */
+    res = GNUNET_JSON_parse (value,
+                             spec,
+                             &error_name,
+                             &error_line);
+    if (GNUNET_OK != res)
+    {
+      GNUNET_break (0);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Product description parsing failed at #%u: %s:%u\n",
+                  (unsigned int) index,
+                  error_name,
+                  error_line);
+      return GNUNET_SYSERR;
+    }
+    GNUNET_JSON_parse_free (spec);
+  }
+  return GNUNET_OK;
+}
+
+
 /**
  * Manage a contract request. In practical terms, it adds the fields
  * 'exchanges', 'merchant_pub', and 'H_wire' to the contract 'proposition'
@@ -64,10 +116,20 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   struct TALER_Amount total;
   struct TALER_Amount max_fee;
   uint64_t transaction_id;
+  json_t *products;
+  struct GNUNET_TIME_Absolute timestamp;
+  struct GNUNET_TIME_Absolute refund_deadline;
+  struct GNUNET_TIME_Absolute expiry;
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
     TALER_JSON_spec_amount ("max_fee", &max_fee),
     GNUNET_JSON_spec_uint64 ("transaction_id", &transaction_id),
+    /* The following entries we don't actually need, except to check that
+       the contract is well-formed */
+    GNUNET_JSON_spec_json ("products", &products),
+    GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
+    GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
+    GNUNET_JSON_spec_absolute_time ("expiry", &expiry),
     GNUNET_JSON_spec_end()
   };
 
@@ -97,6 +159,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 
   if (NULL == jcontract)
   {
+    json_decref (root);
     return TMH_RESPONSE_reply_external_error (connection,
                                               "contract request malformed");
   }
@@ -105,10 +168,26 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                              jcontract,
                              spec);
   if (GNUNET_NO == res)
+  {
+    json_decref (root);
     return MHD_YES;
+  }
   if (GNUNET_SYSERR == res)
+  {
+    json_decref (root);
     return TMH_RESPONSE_reply_external_error (connection,
                                               "contract request malformed");
+  }
+  /* check contract is well-formed */
+  if (GNUNET_OK != check_products (products))
+  {
+    GNUNET_JSON_parse_free (spec);
+    json_decref (root);
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "products in contract request malformed");
+  }
+
+
   /* add fields to the contract that the backend should provide */
   json_object_set (jcontract,
                    "exchanges",
@@ -126,9 +205,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                                              sizeof (pubkey)));
 
   /* create contract signature */
-  GNUNET_assert (GNUNET_OK ==
-                 TALER_JSON_hash (jcontract,
-                                  &contract.h_contract));
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract.purpose.size = htonl (sizeof (contract));
   contract.transaction_id = GNUNET_htonll (transaction_id);
@@ -136,6 +212,9 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                      &total);
   TALER_amount_hton (&contract.max_fee,
                      &max_fee);
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_JSON_hash (jcontract,
+                                  &contract.h_contract));
   GNUNET_CRYPTO_eddsa_sign (privkey,
                             &contract.purpose,
                             &contract_sig);
@@ -146,9 +225,10 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                                       "{s:O, s:O, s:O}",
                                       "contract", jcontract,
                                       "merchant_sig", GNUNET_JSON_from_data (&contract_sig,
-                                                                   sizeof (contract_sig)),
+                                                                             sizeof (contract_sig)),
                                       "H_contract", GNUNET_JSON_from_data (&contract.h_contract,
-                                                                          sizeof (contract.h_contract)));
+                                                                           sizeof (contract.h_contract)));
+  GNUNET_JSON_parse_free (spec);
   json_decref (root);
   return res;
 }
