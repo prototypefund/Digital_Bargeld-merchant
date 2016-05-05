@@ -121,7 +121,6 @@ handle_pay_finished (void *cls,
   }
   ph->cb (ph->cb_cls,
           response_code,
-	  "FIXME-redirect-URI",
           json);
   TALER_MERCHANT_pay_cancel (ph);
 }
@@ -134,6 +133,11 @@ handle_pay_finished (void *cls,
  * @param exchange_uri URI of the exchange that the coins belong to
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
+ * @param transaction_id transaction id for the transaction between merchant and customer
+ * @param amount total value of the contract to be paid to the merchant
+ * @param max_fee maximum fee covered by the merchant (according to the contract)
+ * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
+ * @param merchant_sig signature from the merchant over the original contract
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param transaction_id transaction id for the transaction between merchant and customer
  * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
@@ -215,12 +219,10 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
                                       amount,
 				      max_fee,
 				      transaction_id,
-				      merchant_pub,
 				      merchant_sig,
 				      refund_deadline,
 				      timestamp,
 				      GNUNET_TIME_UNIT_ZERO_ABS,
-				      h_wire,
 				      exchange_uri,
 				      num_coins,
 				      pc,
@@ -237,13 +239,11 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  *
  * @param ctx the execution loop context
  * @param exchange_uri URI of the exchange that the coins belong to
- * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param transaction_id transaction id for the transaction between merchant and customer
- * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
- * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend)
+ * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -260,12 +260,10 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const struct TALER_Amount *amount,
 			     const struct TALER_Amount *max_fee,
                              uint64_t transaction_id,
-                             const struct TALER_MerchantPublicKeyP *merchant_pub,
                              const struct TALER_MerchantSignatureP *merchant_sig,
                              struct GNUNET_TIME_Absolute refund_deadline,
                              struct GNUNET_TIME_Absolute timestamp,
                              struct GNUNET_TIME_Absolute execution_deadline,
-                             const struct GNUNET_HashCode *h_wire,
 			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
@@ -280,6 +278,12 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   struct TALER_Amount total_amount;
   unsigned int i;
 
+  if ( (0 != execution_deadline.abs_value_us) &&
+       (execution_deadline.abs_value_us < refund_deadline.abs_value_us) )
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   if (0 == num_coins)
   {
     GNUNET_break (0);

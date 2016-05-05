@@ -108,14 +108,11 @@ struct TALER_MERCHANT_Pay;
  *                    can indicate success, depending on whether the interaction
  *                    was with a merchant frontend or backend;
  *                    0 if the merchant's reply is bogus (fails to follow the protocol)
- * @param redirect_uri URI for the redirect, if the request was successful and we were talking to a frontend;
- *                     NULL if the request failed or if were were talking to a backend
  * @param obj the received JSON reply, with error details if the request failed
  */
 typedef void
 (*TALER_MERCHANT_PayCallback) (void *cls,
                                unsigned int http_status,
-                               const char *redirect_uri,
                                const json_t *obj);
 
 
@@ -179,7 +176,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 			   const char *merchant_uri,
                            const struct GNUNET_HashCode *h_contract,
                            uint64_t transaction_id,
-			   const struct TALER_Amount *amount,
+                           const struct TALER_Amount *amount,
                            const struct TALER_Amount *max_fee,
                            const struct TALER_MerchantPublicKeyP *merchant_pub,
                            const struct TALER_MerchantSignatureP *merchant_sig,
@@ -244,12 +241,10 @@ struct TALER_MERCHANT_PaidCoin
  * @param amount total value of the contract to be paid to the merchant
  * @param max_fee maximum fee covered by the merchant (according to the contract)
  * @param transaction_id transaction id for the transaction between merchant and customer
- * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
  * @param merchant_sig the signature of the merchant over the original contract
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
- * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend)
- * @param h_wire hash of the merchant’s account details
+ * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
  * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
@@ -265,12 +260,10 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const struct TALER_Amount *amount,
 			     const struct TALER_Amount *max_fee,
                              uint64_t transaction_id,
-                             const struct TALER_MerchantPublicKeyP *merchant_pub,
                              const struct TALER_MerchantSignatureP *merchant_sig,
                              struct GNUNET_TIME_Absolute refund_deadline,
                              struct GNUNET_TIME_Absolute timestamp,
                              struct GNUNET_TIME_Absolute execution_deadline,
-                             const struct GNUNET_HashCode *h_wire,
 			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,

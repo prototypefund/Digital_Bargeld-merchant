@@ -112,12 +112,10 @@ handle_contract_finished (void *cls,
       {
         GNUNET_break_op (0);
         response_code = 0;
+        break;
       }
-      else
-      {
-        h_contractp = &h_contract;
-        sigp = &sig;
-      }
+      h_contractp = &h_contract;
+      sigp = &sig;
     }
     break;
   case MHD_HTTP_BAD_REQUEST:

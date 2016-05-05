@@ -96,6 +96,11 @@ enum OpCode
   OC_WITHDRAW_SIGN,
 
   /**
+   * Get backend to sign a contract.
+   */
+  OC_CONTRACT,
+
+  /**
    * Pay with coins.
    */
   OC_PAY
@@ -285,6 +290,39 @@ struct Command
       struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
 
     } reserve_withdraw;
+
+    /**
+     * Information for an #OC_CONTRACT command.
+     */
+    struct
+    {
+
+      /**
+       * Contract proposal (without merchant_pub, exchanges or H_wire).
+       */
+      const char *proposal;
+
+      /**
+       * Handle to the active /contract operation, or NULL.
+       */
+      struct TALER_MERCHANT_ContractOperation *co;
+
+      /**
+       * Full contract in JSON, set by the /contract operation.
+       */
+      json_t *contract;
+
+      /**
+       * Signature, set by the /contract operation.
+       */
+      struct TALER_MerchantSignatureP merchant_sig;
+
+      /**
+       * Hash of the full contract, set by the /contract operation.
+       */
+      struct GNUNET_HashCode h_contract;
+
+    } contract;
 
     /**
      * Information for a #OC_PAY command.
@@ -727,7 +765,6 @@ reserve_withdraw_cb (void *cls,
 static void
 pay_cb (void *cls,
         unsigned int http_status,
-        const char *redirect_uri,
         const json_t *obj)
 {
   struct InterpreterState *is = cls;
@@ -977,6 +1014,10 @@ interpreter_run (void *cls)
       return;
     }
     return;
+  case OC_CONTRACT:
+    {
+
+    }
   case OC_PAY:
     {
       struct TALER_MERCHANT_PayCoin pc;
