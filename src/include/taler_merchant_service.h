@@ -41,13 +41,19 @@ struct TALER_MERCHANT_ContractOperation;
  * @param cls closure
  * @param http_status HTTP response code, 200 indicates success;
  *                    0 if the backend's reply is bogus (fails to follow the protocol)
- * @param obj the received JSON reply, with the contract on success, or
+ * @param obj the full received JSON reply, or
  *            error details if the request failed
+ * @param contract completed contract, NULL on error
+ * @param sig merchant's signature over the contract, NULL on error
+ * @param h_contract hash of the contract, NULL on error
  */
 typedef void
 (*TALER_MERCHANT_ContractCallback) (void *cls,
                                     unsigned int http_status,
-                                    const json_t *obj);
+                                    const json_t *obj,
+                                    const json_t *contract,
+                                    const struct TALER_MerchantSignatureP *sig,
+                                    const struct GNUNET_HashCode *h_contract);
 
 
 /**

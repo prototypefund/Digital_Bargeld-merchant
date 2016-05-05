@@ -68,7 +68,6 @@ struct TALER_MERCHANT_ContractOperation
 };
 
 
-
 /**
  * Function called when we're done processing the
  * HTTP /contract request.
@@ -83,13 +82,43 @@ handle_contract_finished (void *cls,
                           const json_t *json)
 {
   struct TALER_MERCHANT_ContractOperation *co = cls;
+  json_t *contract;
+  const struct TALER_MerchantSignatureP *sigp;
+  const struct GNUNET_HashCode *h_contractp;
+  struct TALER_MerchantSignatureP sig;
+  struct GNUNET_HashCode h_contract;
 
   co->job = NULL;
+  contract = NULL;
+  sigp = NULL;
+  h_contractp = NULL;
   switch (response_code)
   {
   case 0:
     break;
   case MHD_HTTP_OK:
+    {
+      struct GNUNET_JSON_Specification spec[] = {
+        GNUNET_JSON_spec_json ("contract", &contract),
+        GNUNET_JSON_spec_fixed_auto ("merchant_sig", &sig),
+        GNUNET_JSON_spec_fixed_auto ("H_contract", &h_contract),
+        GNUNET_JSON_spec_end()
+      };
+
+      if (GNUNET_OK !=
+          GNUNET_JSON_parse (json,
+                             spec,
+                             NULL, NULL))
+      {
+        GNUNET_break_op (0);
+        response_code = 0;
+      }
+      else
+      {
+        h_contractp = &h_contract;
+        sigp = &sig;
+      }
+    }
     break;
   case MHD_HTTP_BAD_REQUEST:
     /* This should never happen, either us or the merchant is buggy
@@ -121,7 +150,12 @@ handle_contract_finished (void *cls,
   }
   co->cb (co->cb_cls,
           response_code,
-          json);
+          json,
+          contract,
+          sigp,
+          h_contractp);
+  if (NULL != contract)
+    json_decref (contract);
   TALER_MERCHANT_contract_sign_cancel (co);
 }
 
