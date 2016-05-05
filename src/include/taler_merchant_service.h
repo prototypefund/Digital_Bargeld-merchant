@@ -25,6 +25,59 @@
 #include <gnunet/gnunet_curl_lib.h>
 #include <jansson.h>
 
+/* *********************  /contract *********************** */
+
+
+/**
+ * @brief Handle to a /contract operation at a merchant's backend.
+ */
+struct TALER_MERCHANT_ContractOperation;
+
+
+/**
+ * Callbacks of this type are used to serve the result of submitting a
+ * /contract request to a merchant.
+ *
+ * @param cls closure
+ * @param http_status HTTP response code, 200 indicates success;
+ *                    0 if the backend's reply is bogus (fails to follow the protocol)
+ * @param obj the received JSON reply, with the contract on success, or
+ *            error details if the request failed
+ */
+typedef void
+(*TALER_MERCHANT_ContractCallback) (void *cls,
+                                    unsigned int http_status,
+                                    const json_t *obj);
+
+
+/**
+ * Request backend to sign a contract (and add fields like wire transfer
+ * details).
+ *
+ * @param ctx execution context
+ * @param backend_uri URI of the backend
+ * @param contract prototype of the contract
+ * @param contract_cb the callback to call when a reply for this request is available
+ * @param contract_cb_cls closure for @a contract_cb
+ * @return a handle for this request
+ */
+struct TALER_MERCHANT_ContractOperation *
+TALER_MERCHANT_contract_sign (struct GNUNET_CURL_Context *ctx,
+                              const char *backend_uri,
+                              const json_t *contract,
+                              TALER_MERCHANT_ContractCallback contract_cb,
+                              void *contract_cb_cls);
+
+
+/**
+ * Cancel a /contract request.
+ *
+ * @param co the contract operation handle
+ */
+void
+TALER_MERCHANT_contract_sign_cancel (struct TALER_MERCHANT_ContractOperation *co);
+
+
 /* *********************  /pay *********************** */
 
 

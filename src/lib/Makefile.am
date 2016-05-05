@@ -14,6 +14,7 @@ libtalermerchant_la_LDFLAGS = \
   -no-undefined
 
 libtalermerchant_la_SOURCES = \
+  merchant_api_contract.c \
   merchant_api_pay.c
 
 libtalermerchant_la_LIBADD = \
