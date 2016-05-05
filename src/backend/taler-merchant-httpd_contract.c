@@ -187,6 +187,29 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                                               "products in contract request malformed");
   }
 
+  /* Check if this transaction ID erroneously corresponds to a
+     contract that already paid, in which case we should refuse
+     to sign it again (frontend buggy, it should use a fresh
+     transaction ID each time)! */
+  if (GNUNET_OK ==
+      db->check_payment (db->cls,
+                         transaction_id))
+  {
+    struct MHD_Response *resp;
+    int ret;
+
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Transaction %llu already paid in the past, refusing to sign!\n",
+                (unsigned long long) transaction_id);
+    resp = MHD_create_response_from_buffer (strlen ("Duplicate transaction ID!"),
+                                            "Duplicate transaction ID!",
+                                            MHD_RESPMEM_PERSISTENT);
+    ret = MHD_queue_response (connection,
+                              MHD_HTTP_FORBIDDEN,
+                              resp);
+    MHD_destroy_response (resp);
+    return ret;
+  }
 
   /* add fields to the contract that the backend should provide */
   json_object_set (jcontract,

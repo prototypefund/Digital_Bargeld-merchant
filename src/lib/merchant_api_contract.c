@@ -123,6 +123,7 @@ handle_contract_finished (void *cls,
        (or API version conflict); just pass JSON reply to the application */
     break;
   case MHD_HTTP_FORBIDDEN:
+    /* Duplicate transaction ID, frontend is buggy! */
     break;
   case MHD_HTTP_UNAUTHORIZED:
     /* Nothing really to verify, merchant says one of the signatures is

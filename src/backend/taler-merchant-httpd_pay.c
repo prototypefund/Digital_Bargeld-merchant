@@ -797,6 +797,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     /* Payment succeeded in the past; take short cut
        and accept immediately */
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Transaction %llu already paid in the past, taking short cut.\n",
+                (unsigned long long) pc->transaction_id);
     resp = MHD_create_response_from_buffer (0,
                                             NULL,
                                             MHD_RESPMEM_PERSISTENT);
