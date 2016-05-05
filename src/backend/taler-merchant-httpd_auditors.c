@@ -128,8 +128,8 @@ parse_auditors (void *cls,
   struct Auditor auditor;
 
   if (0 != strncasecmp (section,
-                        "auditor-",
-                        strlen ("auditor-")))
+                        "merchant-auditor-",
+                        strlen ("merchant-auditor-")))
     return;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,

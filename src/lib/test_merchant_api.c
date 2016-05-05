@@ -412,7 +412,8 @@ static void
 fail (struct InterpreterState *is)
 {
   GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-              "Interpreter failed at step %u\n",
+              "Interpreter failed at step %s (#%u)\n",
+              is->commands[is->ip].label,
               is->ip);
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_shutdown ();
@@ -1081,6 +1082,7 @@ interpreter_run (void *cls)
       struct GNUNET_TIME_Absolute timestamp;
       struct GNUNET_HashCode h_wire;
       struct TALER_MerchantPublicKeyP merchant_pub;
+      struct TALER_MerchantSignatureP merchant_sig;
       struct GNUNET_HashCode h_contract;
       struct TALER_Amount total_amount;
       struct TALER_Amount max_fee;
@@ -1090,6 +1092,7 @@ interpreter_run (void *cls)
       /* get amount */
       ref = find_command (is,
                           cmd->details.pay.contract_ref);
+      merchant_sig = ref->details.contract.merchant_sig;
       GNUNET_assert (NULL != ref->details.contract.contract);
       {
         struct GNUNET_JSON_Specification spec[] = {
@@ -1172,7 +1175,7 @@ interpreter_run (void *cls)
 				     &total_amount,
 				     &max_fee,
 				     &merchant_pub,
-                                     &cmd->details.contract.merchant_sig,
+                                     &merchant_sig,
 				     timestamp,
 				     refund_deadline,
 				     &h_wire,
@@ -1428,7 +1431,7 @@ run (void *cls)
     { .oc = OC_CONTRACT,
       .label = "create-contract-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":2, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"products\":[ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
+      .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":2, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"expiry\":\"\\/Date(999999999)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"products\":[ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
 
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        transaction ID) */
@@ -1436,6 +1439,7 @@ run (void *cls)
       .label = "deposit-double-2",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
       .details.pay.contract_ref = "create-contract-2",
+      .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
