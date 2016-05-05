@@ -48,6 +48,7 @@ test_merchant_api_LDADD = \
   -ltalerexchange \
   -ltalerjson \
   -ltalerutil \
+  -lgnunetjson \
   -lgnunetcurl \
   -lgnunetutil \
   -ljansson

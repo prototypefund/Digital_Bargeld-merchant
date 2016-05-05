@@ -27,5 +27,6 @@ GTAGS
 *.swp
 src/backend/taler-merchant-httpd
 src/lib/test_merchant_api
+src/lib/test_merchant_api_home/.local/share/taler/exchange/live-keys/
 taler_merchant_config.h
 taler_merchant_config.h.in

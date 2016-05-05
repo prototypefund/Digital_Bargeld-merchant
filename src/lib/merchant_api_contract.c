@@ -177,6 +177,7 @@ TALER_MERCHANT_contract_sign (struct GNUNET_CURL_Context *ctx,
                               void *contract_cb_cls)
 {
   struct TALER_MERCHANT_ContractOperation *co;
+  json_t *req;
   CURL *eh;
 
   co = GNUNET_new (struct TALER_MERCHANT_ContractOperation);
@@ -185,10 +186,13 @@ TALER_MERCHANT_contract_sign (struct GNUNET_CURL_Context *ctx,
   co->cb_cls = contract_cb_cls;
   co->url = GNUNET_strdup (backend_uri);
 
+  req = json_pack ("{s:O}",
+                   "contract", (json_t *) contract);
   eh = curl_easy_init ();
   GNUNET_assert (NULL != (co->json_enc =
-                          json_dumps (contract,
+                          json_dumps (req,
                                       JSON_COMPACT)));
+  json_decref (req);
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,

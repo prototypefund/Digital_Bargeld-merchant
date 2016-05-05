@@ -278,6 +278,13 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   struct TALER_Amount total_amount;
   unsigned int i;
 
+  if (GNUNET_YES !=
+      TALER_amount_cmp_currency (amount,
+                                 max_fee))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   if ( (0 != execution_deadline.abs_value_us) &&
        (execution_deadline.abs_value_us < refund_deadline.abs_value_us) )
   {
@@ -368,6 +375,14 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 	json_decref (j_coins);
 	return NULL;
       }
+      if (GNUNET_YES !=
+          TALER_amount_cmp_currency (&new_amount,
+                                     &total_amount))
+      {
+        GNUNET_break (0);
+	json_decref (j_coins);
+        return NULL;
+      }
       if (1 ==
 	  TALER_amount_cmp (&new_amount,
 			    &total_amount))
@@ -384,6 +399,14 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
     {
       /* Full fee covered by merchant, but our total
 	 must at least cover the total contract amount */
+      if (GNUNET_YES !=
+          TALER_amount_cmp_currency (amount,
+                                     &total_amount))
+      {
+        GNUNET_break (0);
+	json_decref (j_coins);
+        return NULL;
+      }
       if (1 ==
 	  TALER_amount_cmp (amount,
 			    &total_amount))
