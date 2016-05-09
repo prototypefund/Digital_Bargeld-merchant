@@ -24,15 +24,6 @@
 #include "taler-merchant-httpd.h"
 
 /**
- * Convert denomination key to its base32 representation
- * 
- * @param dk denomination key to convert
- * @return 0-terminated base32 encoding of @a dk, to be deallocated
- */
-char *
-denomination_to_string_alloc (struct TALER_DenominationPublicKey *dk);
-
-/**
  * Manage a payment
  *
  * @param rh context of the handler

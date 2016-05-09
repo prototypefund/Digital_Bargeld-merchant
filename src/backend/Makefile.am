@@ -15,11 +15,12 @@ bin_PROGRAMS = \
 check_PROGRAMS = \
   test-merchant
 
+# each test-merchant-{part} should test taler-merchant-httpd_{part}.c
 TESTS = \
-  test-merchant
+  test-merchant-pay
 
-test_merchant_SOURCES = \
-  test_merchant.c taler-merchant-httpd.h \
+test_merchant_pay_SOURCES = \
+  test_merchant_pay.c taler-merchant-httpd.h \
   taler-merchant-httpd_parsing.c taler-merchant-httpd_parsing.h \
   taler-merchant-httpd_responses.c taler-merchant-httpd_responses.h \
   taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
@@ -29,7 +30,7 @@ test_merchant_SOURCES = \
   taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h \
   taler-merchant-httpd_util.c taler-merchant-httpd_util.h
 
-test_merchant_LDFLAGS = \
+test_merchant_pay_LDFLAGS = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   -ltalerexchange \
   -ltalerjson \
@@ -63,4 +64,3 @@ taler_merchant_httpd_LDADD = \
   -lgnunetcurl \
   -lgnunetjson \
   -lgnunetutil
-
