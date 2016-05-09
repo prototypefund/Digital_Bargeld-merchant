@@ -463,13 +463,16 @@ process_pay_with_exchange (void *cls,
 							 &dc->denom);
     if (NULL == denom_details)
     {
-
+      char *denom_enc;
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                              "hint", "unknown denom to exchange",
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
+      denom_enc = denomination_to_string_alloc (&dc->denom);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "unknown denom to exchange: %s\n", denom_enc);
+      GNUNET_free (denom_enc);
       return;
     }
     if (GNUNET_OK !=
@@ -477,12 +480,16 @@ process_pay_with_exchange (void *cls,
                                denom_details,
                                exchange_trusted))
     {
+      char *denom_enc;
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                              "hint", "no acceptable auditor for denomination",
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
+      denom_enc = denomination_to_string_alloc (&dc->denom);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "no acceptable auditor for denomination: %s\n", denom_enc);
+      GNUNET_free (denom_enc);
       return;
     }
     if (0 == i)
