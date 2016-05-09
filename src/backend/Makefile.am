@@ -13,7 +13,7 @@ bin_PROGRAMS = \
   taler-merchant-httpd
 
 check_PROGRAMS = \
-  test-merchant
+  test-merchant-pay
 
 # each test-merchant-{part} should test taler-merchant-httpd_{part}.c
 TESTS = \
