@@ -232,6 +232,24 @@ resume_pay_with_response (struct PayContext *pc,
   TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
 
+/**
+ * Convert denomination key to its base32 representation
+ * 
+ * @param dk denomination key to convert
+ * @return 0-terminated base32 encoding of @a dk, to be deallocated
+ */
+char *
+denomination_to_string_alloc (struct TALER_DenominationPublicKey *dk)
+{
+  char *buf;
+  char *buf2;
+  size_t buf_size;
+  buf_size = GNUNET_CRYPTO_rsa_public_key_encode (dk->rsa_public_key, &buf);
+  buf2 = GNUNET_STRINGS_data_to_string_alloc (buf, buf_size);
+  GNUNET_free (buf);
+  return buf2;
+}
+
 
 /**
  * Abort all pending /deposit operations.
@@ -445,6 +463,7 @@ process_pay_with_exchange (void *cls,
 							 &dc->denom);
     if (NULL == denom_details)
     {
+
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
