@@ -238,7 +238,7 @@ resume_pay_with_response (struct PayContext *pc,
  * @param dk denomination key to convert
  * @return 0-terminated base32 encoding of @a dk, to be deallocated
  */
-char *
+static char *
 denomination_to_string_alloc (struct TALER_DenominationPublicKey *dk)
 {
   char *buf;
