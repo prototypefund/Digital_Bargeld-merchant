@@ -312,7 +312,7 @@ return_result (void *cls)
  */
 struct TMH_EXCHANGES_FindOperation *
 TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
-			     TMH_EXCHANGES_FindContinuation fc,
+			     TMH_EXCHANGES_FindContinuation fc, // process payment
 			     void *fc_cls)
 {
   struct Exchange *exchange;
@@ -390,7 +390,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                                exchange->fo_tail,
                                fo);
 
-  if (GNUNET_YES != exchange->pending)
+  if (GNUNET_YES != exchange->pending) // can post coins
   {
     /* We are not currently waiting for a reply, immediately
        return result */

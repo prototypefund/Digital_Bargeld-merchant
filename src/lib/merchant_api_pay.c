@@ -28,6 +28,7 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
+#include <taler/taler_exchange_service.h>
 
 
 /**
@@ -65,8 +66,112 @@ struct TALER_MERCHANT_Pay
    * Reference to the execution context.
    */
   struct GNUNET_CURL_Context *ctx;
+
+  /**
+   * Number of @e coins we are paying with.
+   */
+  unsigned int num_coins;
+
+  /**
+   * The coins we are paying with.
+   */
+  struct TALER_MERCHANT_PaidCoin *coins;
+
 };
 
+
+/**
+ * We got a 403 response back from the exchange (or the merchant).
+ * Now we need to check the provided cryptographic proof that the
+ * coin was actually already spent!
+ *
+ * @param pc handle of the original coin we paid with
+ * @param json cryptographic proof of coin's transaction history as
+ *        was returned by the exchange/merchant
+ * @return #GNUNET_OK if proof checks out
+ */
+static int
+check_coin_history (const struct TALER_MERCHANT_PaidCoin *pc,
+                    json_t *json)
+{
+  struct TALER_Amount spent;
+  struct TALER_Amount spent_plus_contrib;
+
+  if (GNUNET_OK !=
+      TALER_EXCHANGE_verify_coin_history (pc->amount_with_fee.currency,
+                                          &pc->coin_pub,
+                                          json,
+                                          &spent))
+  {
+    /* Exchange's history fails to verify */
+    GNUNET_break_op (0);
+    return GNUNET_SYSERR;
+  }
+  if (GNUNET_OK !=
+      TALER_amount_add (&spent_plus_contrib,
+                        &spent,
+                        &pc->amount_with_fee))
+  {
+    /* We got an integer overflow? Bad application! */
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if (-1 != TALER_amount_cmp (&pc->denom_value,
+                              &spent_plus_contrib))
+  {
+    /* according to our calculations, the transaction should
+       have still worked, exchange error! */
+    GNUNET_break_op (0);
+    return GNUNET_SYSERR;
+  }
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Accepting proof of double-spending\n");
+  return GNUNET_OK;
+}
+
+
+/**
+ * We got a 403 response back from the exchange (or the merchant).
+ * Now we need to check the provided cryptographic proof that the
+ * coin was actually already spent!
+ *
+ * @param ph handle of the original pay operation
+ * @param json cryptographic proof returned by the exchange/merchant
+ * @return #GNUNET_OK if proof checks out
+ */
+static int
+check_forbidden (struct TALER_MERCHANT_Pay *ph,
+                 const json_t *json)
+{
+  json_t *history;
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+  struct GNUNET_JSON_Specification spec[] = {
+    GNUNET_JSON_spec_json ("history", &history),
+    GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin_pub),
+    GNUNET_JSON_spec_end()
+  };
+  unsigned int i;
+
+  if (GNUNET_OK !=
+      GNUNET_JSON_parse (json,
+                         spec,
+                         NULL, NULL))
+  {
+    GNUNET_break_op (0);
+    return GNUNET_SYSERR;
+  }
+  for (i=0;i<ph->num_coins;i++)
+  {
+    if (0 == memcmp (&ph->coins[i].coin_pub,
+                     &coin_pub,
+                     sizeof (struct TALER_CoinSpendPublicKeyP)))
+      return check_coin_history (&ph->coins[i],
+                                 history);
+  }
+  GNUNET_break_op (0); /* complaint is not about any of the coins
+                          that we actually paid with... */
+  return GNUNET_SYSERR;
+}
 
 
 /**
@@ -96,6 +201,12 @@ handle_pay_finished (void *cls,
        (or API version conflict); just pass JSON reply to the application */
     break;
   case MHD_HTTP_FORBIDDEN:
+    if (GNUNET_OK != check_forbidden (ph,
+                                      json))
+    {
+      GNUNET_break_op (0);
+      response_code = 0;
+    }
     break;
   case MHD_HTTP_UNAUTHORIZED:
     /* Nothing really to verify, merchant says one of the signatures is
@@ -119,9 +230,11 @@ handle_pay_finished (void *cls,
     response_code = 0;
     break;
   }
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "/pay completed with response code %u\n",
+              (unsigned int) response_code);
   ph->cb (ph->cb_cls,
           response_code,
-	  "FIXME-redirect-URI",
           json);
   TALER_MERCHANT_pay_cancel (ph);
 }
@@ -134,6 +247,11 @@ handle_pay_finished (void *cls,
  * @param exchange_uri URI of the exchange that the coins belong to
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
+ * @param transaction_id transaction id for the transaction between merchant and customer
+ * @param amount total value of the contract to be paid to the merchant
+ * @param max_fee maximum fee covered by the merchant (according to the contract)
+ * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
+ * @param merchant_sig signature from the merchant over the original contract
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param transaction_id transaction id for the transaction between merchant and customer
  * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
@@ -205,6 +323,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 			      &p->coin_sig.eddsa_signature);
     p->denom_pub = coin->denom_pub;
     p->denom_sig = coin->denom_sig;
+    p->denom_value = coin->denom_value;
     p->coin_pub = dr.coin_pub;
     p->amount_with_fee = coin->amount_with_fee;
     p->amount_without_fee = coin->amount_without_fee;
@@ -215,12 +334,10 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
                                       amount,
 				      max_fee,
 				      transaction_id,
-				      merchant_pub,
 				      merchant_sig,
 				      refund_deadline,
 				      timestamp,
 				      GNUNET_TIME_UNIT_ZERO_ABS,
-				      h_wire,
 				      exchange_uri,
 				      num_coins,
 				      pc,
@@ -237,13 +354,11 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  *
  * @param ctx the execution loop context
  * @param exchange_uri URI of the exchange that the coins belong to
- * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param transaction_id transaction id for the transaction between merchant and customer
- * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
- * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend)
+ * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -260,12 +375,10 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const struct TALER_Amount *amount,
 			     const struct TALER_Amount *max_fee,
                              uint64_t transaction_id,
-                             const struct TALER_MerchantPublicKeyP *merchant_pub,
                              const struct TALER_MerchantSignatureP *merchant_sig,
                              struct GNUNET_TIME_Absolute refund_deadline,
                              struct GNUNET_TIME_Absolute timestamp,
                              struct GNUNET_TIME_Absolute execution_deadline,
-                             const struct GNUNET_HashCode *h_wire,
 			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
@@ -280,6 +393,19 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   struct TALER_Amount total_amount;
   unsigned int i;
 
+  if (GNUNET_YES !=
+      TALER_amount_cmp_currency (amount,
+                                 max_fee))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+  if ( (0 != execution_deadline.abs_value_us) &&
+       (execution_deadline.abs_value_us < refund_deadline.abs_value_us) )
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   if (0 == num_coins)
   {
     GNUNET_break (0);
@@ -364,6 +490,14 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 	json_decref (j_coins);
 	return NULL;
       }
+      if (GNUNET_YES !=
+          TALER_amount_cmp_currency (&new_amount,
+                                     &total_amount))
+      {
+        GNUNET_break (0);
+	json_decref (j_coins);
+        return NULL;
+      }
       if (1 ==
 	  TALER_amount_cmp (&new_amount,
 			    &total_amount))
@@ -380,6 +514,14 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
     {
       /* Full fee covered by merchant, but our total
 	 must at least cover the total contract amount */
+      if (GNUNET_YES !=
+          TALER_amount_cmp_currency (amount,
+                                     &total_amount))
+      {
+        GNUNET_break (0);
+	json_decref (j_coins);
+        return NULL;
+      }
       if (1 ==
 	  TALER_amount_cmp (amount,
 			    &total_amount))
@@ -424,6 +566,12 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   ph->cb = pay_cb;
   ph->cb_cls = pay_cb_cls;
   ph->url = GNUNET_strdup (merchant_uri);
+  ph->num_coins = num_coins;
+  ph->coins = GNUNET_new_array (num_coins,
+                                struct TALER_MERCHANT_PaidCoin);
+  memcpy (ph->coins,
+          coins,
+          num_coins * sizeof (struct TALER_MERCHANT_PaidCoin));
 
   eh = curl_easy_init ();
   GNUNET_assert (NULL != (ph->json_enc =

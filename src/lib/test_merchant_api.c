@@ -24,6 +24,7 @@
 #include <taler/taler_exchange_service.h>
 #include <taler/taler_json_lib.h>
 #include "taler_merchant_service.h"
+#include "taler_merchantdb_lib.h"
 #include <gnunet/gnunet_util_lib.h>
 #include <gnunet/gnunet_curl_lib.h>
 #include <microhttpd.h>
@@ -94,6 +95,11 @@ enum OpCode
    * Withdraw a coin from a reserve.
    */
   OC_WITHDRAW_SIGN,
+
+  /**
+   * Get backend to sign a contract.
+   */
+  OC_CONTRACT,
 
   /**
    * Pay with coins.
@@ -287,6 +293,39 @@ struct Command
     } reserve_withdraw;
 
     /**
+     * Information for an #OC_CONTRACT command.
+     */
+    struct
+    {
+
+      /**
+       * Contract proposal (without merchant_pub, exchanges or H_wire).
+       */
+      const char *proposal;
+
+      /**
+       * Handle to the active /contract operation, or NULL.
+       */
+      struct TALER_MERCHANT_ContractOperation *co;
+
+      /**
+       * Full contract in JSON, set by the /contract operation.
+       */
+      json_t *contract;
+
+      /**
+       * Signature, set by the /contract operation.
+       */
+      struct TALER_MerchantSignatureP merchant_sig;
+
+      /**
+       * Hash of the full contract, set by the /contract operation.
+       */
+      struct GNUNET_HashCode h_contract;
+
+    } contract;
+
+    /**
      * Information for a #OC_PAY command.
      * FIXME: support tests where we pay with multiple coins at once.
      */
@@ -294,14 +333,9 @@ struct Command
     {
 
       /**
-       * Amount to pay (total for the entire contract).
+       * Reference to the contract.
        */
-      const char *total_amount;
-
-      /**
-       * Maximum fee covered by merchant.
-       */
-      const char *max_fee;
+      const char *contract_ref;
 
       /**
        * Reference to a reserve_withdraw operation for a coin to
@@ -328,27 +362,6 @@ struct Command
        * total_amount.
        */
       const char *amount_without_fee;
-
-      /**
-       * JSON string describing the merchant's "wire details".
-       */
-      const char *wire_details;
-
-      /**
-       * JSON string describing the contract between the two parties.
-       */
-      const char *contract;
-
-      /**
-       * Transaction ID to use.
-       */
-      uint64_t transaction_id;
-
-      /**
-       * Relative time (to add to 'now') to compute the refund deadline.
-       * Zero for no refunds.
-       */
-      struct GNUNET_TIME_Relative refund_deadline;
 
       /**
        * Deposit handle while operation is running.
@@ -399,6 +412,10 @@ struct InterpreterState
 static void
 fail (struct InterpreterState *is)
 {
+  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+              "Interpreter failed at step %s (#%u)\n",
+              is->commands[is->ip].label,
+              is->ip);
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_shutdown ();
 }
@@ -716,6 +733,54 @@ reserve_withdraw_cb (void *cls,
 
 
 /**
+ * Callbacks of this type are used to serve the result of submitting a
+ * /contract request to a merchant.
+ *
+ * @param cls closure
+ * @param http_status HTTP response code, 200 indicates success;
+ *                    0 if the backend's reply is bogus (fails to follow the protocol)
+ * @param obj the full received JSON reply, or
+ *            error details if the request failed
+ * @param contract completed contract, NULL on error
+ * @param sig merchant's signature over the contract, NULL on error
+ * @param h_contract hash of the contract, NULL on error
+ */
+static void
+contract_cb (void *cls,
+             unsigned int http_status,
+             const json_t *obj,
+             const json_t *contract,
+             const struct TALER_MerchantSignatureP *sig,
+             const struct GNUNET_HashCode *h_contract)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  cmd->details.contract.co = NULL;
+  switch (http_status)
+  {
+  case MHD_HTTP_OK:
+    cmd->details.contract.contract = json_incref ((json_t *) contract);
+    cmd->details.contract.merchant_sig = *sig;
+    cmd->details.contract.h_contract = *h_contract;
+    break;
+  default:
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "/contract responded with unexpected status code %u in step %u\n",
+                http_status,
+                is->ip);
+    json_dumpf (obj, stderr, 0);
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
+  is->ip++;
+  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
+                                       is);
+}
+
+
+/**
  * Function called with the result of a /pay operation.
  *
  * @param cls closure with the interpreter state
@@ -727,7 +792,6 @@ reserve_withdraw_cb (void *cls,
 static void
 pay_cb (void *cls,
         unsigned int http_status,
-        const char *redirect_uri,
         const json_t *obj)
 {
   struct InterpreterState *is = cls;
@@ -977,83 +1041,93 @@ interpreter_run (void *cls)
       return;
     }
     return;
+  case OC_CONTRACT:
+    {
+      json_t *proposal;
+      json_error_t error;
+
+      /* parse wire details */
+      proposal = json_loads (cmd->details.contract.proposal,
+                             JSON_REJECT_DUPLICATES,
+                             &error);
+      if (NULL == proposal)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse proposal `%s' at command #%u: %s at %u\n",
+                    cmd->details.contract.proposal,
+                    is->ip,
+                    error.text,
+                    (unsigned int) error.column);
+        fail (is);
+        return;
+      }
+      cmd->details.contract.co
+        = TALER_MERCHANT_contract_sign (ctx,
+                                        MERCHANT_URI "contract",
+                                        proposal,
+                                        &contract_cb,
+                                        is);
+      if (NULL == cmd->details.contract.co)
+      {
+        GNUNET_break (0);
+        fail (is);
+        return;
+      }
+      return;
+    }
   case OC_PAY:
     {
       struct TALER_MERCHANT_PayCoin pc;
-      struct TALER_Amount amount;
-      struct TALER_Amount max_fee;
-      json_t *wire;
-      json_t *contract;
-      struct GNUNET_HashCode h_wire;
-      struct GNUNET_HashCode h_contract;
+      uint64_t transaction_id;
       struct GNUNET_TIME_Absolute refund_deadline;
       struct GNUNET_TIME_Absolute timestamp;
+      struct GNUNET_HashCode h_wire;
+      struct TALER_MerchantPublicKeyP merchant_pub;
       struct TALER_MerchantSignatureP merchant_sig;
+      struct GNUNET_HashCode h_contract;
+      struct TALER_Amount total_amount;
+      struct TALER_Amount max_fee;
+      const char *error_name;
+      unsigned int error_line;
 
       /* get amount */
-      if (GNUNET_OK !=
-	  TALER_string_to_amount (cmd->details.pay.total_amount,
-				  &amount))
+      ref = find_command (is,
+                          cmd->details.pay.contract_ref);
+      merchant_sig = ref->details.contract.merchant_sig;
+      GNUNET_assert (NULL != ref->details.contract.contract);
       {
-	GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		    "Failed to parse total amount `%s' at %u\n",
-		    cmd->details.pay.total_amount,
-		    is->ip);
-	fail (is);
-	return;
+        struct GNUNET_JSON_Specification spec[] = {
+          GNUNET_JSON_spec_uint64 ("transaction_id", &transaction_id),
+          GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
+          GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
+          GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
+          GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
+          TALER_JSON_spec_amount ("amount", &total_amount),
+          TALER_JSON_spec_amount ("max_fee", &max_fee),
+          GNUNET_JSON_spec_end()
+        };
+
+        if (GNUNET_OK !=
+            GNUNET_JSON_parse (ref->details.contract.contract,
+                               spec,
+                               &error_name,
+                               &error_line))
+        {
+          GNUNET_break_op (0);
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Parser failed on %s:%u\n",
+                      error_name,
+                      error_line);
+          fail (is);
+          return;
+        }
       }
 
-      /* get max_fee */
-      if (GNUNET_OK !=
-	  TALER_string_to_amount (cmd->details.pay.max_fee,
-				  &max_fee))
-      {
-	GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		    "Failed to parse max_fee `%s' at %u\n",
-		    cmd->details.pay.max_fee,
-		    is->ip);
-	fail (is);
-	return;
-      }
-
-      /* parse wire details */
-      wire = json_loads (cmd->details.pay.wire_details,
-                         JSON_REJECT_DUPLICATES,
-                         NULL);
-      if (NULL == wire)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse wire details `%s' at %u\n",
-                    cmd->details.pay.wire_details,
-                    is->ip);
-        fail (is);
-        return;
-      }
-      TALER_JSON_hash (wire,
-		       &h_wire);
-      json_decref (wire);
-
-      /* parse contract */
-      contract = json_loads (cmd->details.pay.contract,
-			     JSON_REJECT_DUPLICATES,
-			     NULL);
-      if (NULL == contract)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse contract details `%s' at instruction %u\n",
-                    cmd->details.pay.contract,
-                    is->ip);
-        fail (is);
-        return;
-      }
-      TALER_JSON_hash (contract,
+      TALER_JSON_hash (ref->details.contract.contract,
 		       &h_contract);
-      json_decref (contract);
 
       /* initialize 'pc' (FIXME: to do in a loop later...) */
       {
-	const struct Command *ref;
-
 	memset (&pc, 0, sizeof (pc));
 	ref = find_command (is,
 			    cmd->details.pay.coin_ref);
@@ -1064,6 +1138,7 @@ interpreter_run (void *cls)
 	  pc.coin_priv = ref->details.reserve_withdraw.coin_priv;
 	  pc.denom_pub = ref->details.reserve_withdraw.pk->key;
 	  pc.denom_sig = ref->details.reserve_withdraw.sig;
+          pc.denom_value = ref->details.reserve_withdraw.pk->value;
 	  break;
 	default:
 	  GNUNET_assert (0);
@@ -1094,21 +1169,12 @@ interpreter_run (void *cls)
 	}
       }
 
-      if (0 == cmd->details.pay.refund_deadline.rel_value_us)
-	refund_deadline = GNUNET_TIME_UNIT_ZERO_ABS; /* no refunds */
-      else
-	refund_deadline = GNUNET_TIME_relative_to_absolute (cmd->details.pay.refund_deadline);
-      GNUNET_TIME_round_abs (&refund_deadline);
-      timestamp = GNUNET_TIME_absolute_get ();
-      GNUNET_TIME_round_abs (&timestamp);
-      memset (&merchant_sig, 0, sizeof (merchant_sig)); // FIXME: init properly!
-      GNUNET_break (0);
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI "pay",
 				     &h_contract,
-				     cmd->details.pay.transaction_id,
-				     &amount,
+				     transaction_id,
+				     &total_amount,
 				     &max_fee,
 				     &merchant_pub,
                                      &merchant_sig,
@@ -1225,6 +1291,22 @@ do_shutdown (void *cls)
         cmd->details.reserve_withdraw.blinding_key.rsa_blinding_key = NULL;
       }
       break;
+    case OC_CONTRACT:
+      if (NULL != cmd->details.contract.co)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_contract_sign_cancel (cmd->details.contract.co);
+        cmd->details.contract.co = NULL;
+      }
+      if (NULL != cmd->details.contract.contract)
+      {
+        json_decref (cmd->details.contract.contract);
+        cmd->details.contract.contract = NULL;
+      }
+      break;
     case OC_PAY:
       if (NULL != cmd->details.pay.ph)
       {
@@ -1335,57 +1417,33 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_status.reserve_reference = "create-reserve-1",
       .details.reserve_status.expected_balance = "EUR:0" },
-    /* Try to pay with the 5 EUR coin (in full) */
+    /* Create contract */
+    { .oc = OC_CONTRACT,
+      .label = "create-contract-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":1, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"expiry\":\"\\/Date(999999999)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"products\":[ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
-      .details.pay.total_amount = "EUR:5",
-      .details.pay.max_fee = "EUR:0.5",
+      .details.pay.contract_ref = "create-contract-1",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
-      .details.pay.amount_without_fee = "EUR:4.99",
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
-      .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":1} ] }",
-      .details.pay.transaction_id = 1 },
+      .details.pay.amount_without_fee = "EUR:4.99" },
+    /* Create another contract */
+    { .oc = OC_CONTRACT,
+      .label = "create-contract-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":2, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"expiry\":\"\\/Date(999999999)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"products\":[ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
 
-    /* Try to double-spend the 5 EUR coin with different wire details */
-    { .oc = OC_PAY,
-      .label = "deposit-double-1",
-      .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.pay.total_amount = "EUR:5",
-      .details.pay.max_fee = "EUR:0.5",
-      .details.pay.coin_ref = "withdraw-coin-1",
-      .details.pay.amount_with_fee = "EUR:5",
-      .details.pay.amount_without_fee = "EUR:4.99",
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
-      .details.pay.contract = "{ \"items\":[{ \"name\":\"ice cream\", \"value\":1} ] }",
-      .details.pay.transaction_id = 1 },
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        transaction ID) */
     { .oc = OC_PAY,
       .label = "deposit-double-2",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.pay.total_amount = "EUR:5",
-      .details.pay.max_fee = "EUR:0.5",
+      .details.pay.contract_ref = "create-contract-2",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
-      .details.pay.amount_without_fee = "EUR:4.99",
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
-      .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":1} ] }",
-      .details.pay.transaction_id = 2 },
-    /* Try to double-spend the 5 EUR coin at the same merchant (but different
-       contract) */
-    { .oc = OC_PAY,
-      .label = "deposit-double-3",
-      .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.pay.total_amount = "EUR:5",
-      .details.pay.max_fee = "EUR:0.5",
-      .details.pay.coin_ref = "withdraw-coin-1",
-      .details.pay.amount_with_fee = "EUR:5",
-      .details.pay.amount_without_fee = "EUR:4.99",
-      .details.pay.wire_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
-      .details.pay.contract = "{ \"items\":[ {\"name\":\"ice cream\", \"value\":2} ] }",
-      .details.pay.transaction_id = 1 },
+      .details.pay.amount_without_fee = "EUR:4.99" },
 
     { .oc = OC_END }
   };
@@ -1428,12 +1486,35 @@ main (int argc,
   struct GNUNET_OS_Process *proc;
   struct GNUNET_OS_Process *exchanged;
   struct GNUNET_OS_Process *merchantd;
+  struct TALER_MERCHANTDB_Plugin *db;
+  struct GNUNET_CONFIGURATION_Handle *cfg;
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
   GNUNET_log_setup ("test-merchant-api",
                     "WARNING",
                     NULL);
+  cfg = GNUNET_CONFIGURATION_create ();
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_CONFIGURATION_load (cfg,
+                                            "test_merchant_api.conf"));
+  db = TALER_MERCHANTDB_plugin_load (cfg);
+  if (NULL == db)
+  {
+    GNUNET_CONFIGURATION_destroy (cfg);
+    return 77;
+  }
+  (void) db->drop_tables (db->cls);
+  if (GNUNET_OK != db->initialize (db->cls))
+  {
+    TALER_MERCHANTDB_plugin_unload (db);
+    GNUNET_CONFIGURATION_destroy (cfg);
+    return 77;
+  }
+  TALER_MERCHANTDB_plugin_unload (db);
+  GNUNET_CONFIGURATION_destroy (cfg);
+
+
   GNUNET_assert (GNUNET_OK ==
 		 GNUNET_STRINGS_string_to_data (merchant_pub_str,
 						strlen (merchant_pub_str),

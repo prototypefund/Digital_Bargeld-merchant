@@ -23,7 +23,6 @@
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 
-
 /**
  * Manage a payment
  *

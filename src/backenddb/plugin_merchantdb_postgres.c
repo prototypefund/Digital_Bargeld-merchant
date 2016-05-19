@@ -48,6 +48,26 @@ struct PostgresClosure
 
 
 /**
+ * Drop merchant tables
+ *
+ * @param cls closure our `struct Plugin`
+ * @return #GNUNET_OK upon success; #GNUNET_SYSERR upon failure
+ */
+static int
+postgres_drop_tables (void *cls)
+{
+  struct PostgresClosure *pg = cls;
+  int ret;
+
+  ret = GNUNET_POSTGRES_exec (pg->conn,
+                              "DROP TABLE payments;");
+  if (GNUNET_OK != ret)
+    return ret;
+  return GNUNET_OK;
+}
+
+
+/**
  * Initialize merchant tables
  *
  * @param cls closure our `struct Plugin`
@@ -290,6 +310,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   pg->conn = GNUNET_POSTGRES_connect (cfg, "merchantdb-postgres");
   plugin = GNUNET_new (struct TALER_MERCHANTDB_Plugin);
   plugin->cls = pg;
+  plugin->drop_tables = &postgres_drop_tables;
   plugin->initialize = &postgres_initialize;
   plugin->store_payment = &postgres_store_payment;
   plugin->check_payment = &postgres_check_payment;

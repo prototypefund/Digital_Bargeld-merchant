@@ -232,6 +232,24 @@ resume_pay_with_response (struct PayContext *pc,
   TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
 
+/**
+ * Convert denomination key to its base32 representation
+ * 
+ * @param dk denomination key to convert
+ * @return 0-terminated base32 encoding of @a dk, to be deallocated
+ */
+static char *
+denomination_to_string_alloc (struct TALER_DenominationPublicKey *dk)
+{
+  char *buf;
+  char *buf2;
+  size_t buf_size;
+  buf_size = GNUNET_CRYPTO_rsa_public_key_encode (dk->rsa_public_key, &buf);
+  buf2 = GNUNET_STRINGS_data_to_string_alloc (buf, buf_size);
+  GNUNET_free (buf);
+  return buf2;
+}
+
 
 /**
  * Abort all pending /deposit operations.
@@ -300,10 +318,19 @@ deposit_cb (void *cls,
     }
     else
     {
-      /* Forward error including 'proof' for the body */
+      /* Forward error, adding the "coin_pub" for which the
+         error was being generated */
+      json_t *eproof;
+
+      eproof = json_copy ((json_t *) proof);
+      json_object_set (eproof,
+                       "coin_pub",
+                       GNUNET_JSON_from_data (&dc->coin_pub,
+                                              sizeof (struct TALER_CoinSpendPublicKeyP)));
       resume_pay_with_response (pc,
                                 http_status,
-                                TMH_RESPONSE_make_json (proof));
+                                TMH_RESPONSE_make_json (eproof));
+      json_decref (eproof);
     }
     return;
   }
@@ -436,12 +463,16 @@ process_pay_with_exchange (void *cls,
 							 &dc->denom);
     if (NULL == denom_details)
     {
+      char *denom_enc;
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                              "hint", "unknown denom to exchange",
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
+      denom_enc = denomination_to_string_alloc (&dc->denom);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "unknown denom to exchange: %s\n", denom_enc);
+      GNUNET_free (denom_enc);
       return;
     }
     if (GNUNET_OK !=
@@ -449,12 +480,16 @@ process_pay_with_exchange (void *cls,
                                denom_details,
                                exchange_trusted))
     {
+      char *denom_enc;
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                              "hint", "no acceptable auditor for denomination",
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
+      denom_enc = denomination_to_string_alloc (&dc->denom);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "no acceptable auditor for denomination: %s\n", denom_enc);
+      GNUNET_free (denom_enc);
       return;
     }
     if (0 == i)
@@ -633,8 +668,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       GNUNET_break (0);
       return MHD_NO; /* hard error */
     }
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Queueing response for /pay.\n");
     res = MHD_queue_response (connection,
                               pc->response_code,
                               pc->response);
@@ -643,6 +676,10 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       MHD_destroy_response (pc->response);
       pc->response = NULL;
     }
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Queueing response (%u) for /pay (%s).\n",
+                (unsigned int) pc->response_code,
+                res ? "OK" : "FAILED");
     return res;
   }
 
@@ -797,6 +834,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     /* Payment succeeded in the past; take short cut
        and accept immediately */
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Transaction %llu already paid in the past, taking short cut.\n",
+                (unsigned long long) pc->transaction_id);
     resp = MHD_create_response_from_buffer (0,
                                             NULL,
                                             MHD_RESPMEM_PERSISTENT);

@@ -29,7 +29,6 @@
 #include "taler-merchant-httpd_responses.h"
 
 
-
 /**
  * Hashes a plain JSON contract sending the result to the other end of
  * HTTP communication
@@ -48,7 +47,6 @@ MH_handler_hash_contract (struct TMH_RequestHandler *rh,
                           const char *upload_data,
                           size_t *upload_data_size)
 {
-
   json_t *root;
   json_t *jcontract;
   int res;
@@ -102,8 +100,7 @@ MH_handler_hash_contract (struct TMH_RequestHandler *rh,
                                       MHD_HTTP_OK,
                                       "{s:O}",
                                       "hash", GNUNET_JSON_from_data (&hc,
-                                                                    sizeof (hc)));
+                                                                     sizeof (hc)));
   json_decref (root);
   return res;
-
 }

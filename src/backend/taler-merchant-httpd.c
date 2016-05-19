@@ -553,6 +553,10 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
+  if (GNUNET_YES != GNUNET_DISK_file_test (keyfile))
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Merchant private key `%s' does not exist yet, creating it!\n",
+                keyfile);
   if (NULL ==
       (privkey =
        GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)))
