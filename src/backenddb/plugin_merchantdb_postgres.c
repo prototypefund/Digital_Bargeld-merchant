@@ -263,17 +263,29 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   struct PostgresClosure *pg;
   struct TALER_MERCHANTDB_Plugin *plugin;
+  const char *ec;
 
   pg = GNUNET_new (struct PostgresClosure);
-  if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_have_value (cfg,
-                                       "merchantdb-postgres",
-                                       "CONFIG"))
+  ec = getenv ("TALER_MERCHANTDB_POSTGRES_CONFIG");
+  if (NULL != ec)
   {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "merchantdb-postgres",
-                               "CONFIG");
-    return NULL;
+    GNUNET_CONFIGURATION_set_value_string (cfg,
+                                           "merchantdb-postgres",
+                                           "CONFIG",
+                                           ec);
+  }
+  else
+  {
+    if (GNUNET_OK !=
+        GNUNET_CONFIGURATION_have_value (cfg,
+                                         "merchantdb-postgres",
+                                         "CONFIG"))
+    {
+      GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                                 "merchantdb-postgres",
+                                 "CONFIG");
+      return NULL;
+    }
   }
   pg->conn = GNUNET_POSTGRES_connect (cfg, "merchantdb-postgres");
   plugin = GNUNET_new (struct TALER_MERCHANTDB_Plugin);
