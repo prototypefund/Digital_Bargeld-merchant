@@ -1509,6 +1509,7 @@ main (int argc,
   struct GNUNET_OS_Process *merchantd;
   struct TALER_MERCHANTDB_Plugin *db;
   struct GNUNET_CONFIGURATION_Handle *cfg;
+  unsigned int cnt;
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
@@ -1560,18 +1561,31 @@ main (int argc,
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
   exchanged = GNUNET_OS_start_process (GNUNET_NO,
-                                   GNUNET_OS_INHERIT_STD_ALL,
-                                   NULL, NULL, NULL,
-                                   "taler-exchange-httpd",
-                                   "taler-exchange-httpd",
-                                    "-c", "test_merchant_api.conf",
-                                   NULL);
+                                       GNUNET_OS_INHERIT_STD_ALL,
+                                       NULL, NULL, NULL,
+                                       "taler-exchange-httpd",
+                                       "taler-exchange-httpd",
+                                       "-c", "test_merchant_api.conf",
+                                       NULL);
   /* give child time to start and bind against the socket */
-  fprintf (stderr, "Waiting for taler-exchange-httpd to be ready");
+  fprintf (stderr,
+           "Waiting for taler-exchange-httpd to be ready");
+  cnt = 0;
   do
     {
       fprintf (stderr, ".");
       sleep (1);
+      cnt++;
+      if (cnt > 60)
+      {
+        fprintf (stderr,
+                 "\nFailed to start taler-exchange-httpd\n");
+        GNUNET_OS_process_kill (exchanged,
+                                SIGKILL);
+        GNUNET_OS_process_wait (exchanged);
+        GNUNET_OS_process_destroy (exchanged);
+        return 77;
+      }
     }
   while (0 != system ("wget -q -t 1 -T 1 " EXCHANGE_URI "keys -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
@@ -1583,11 +1597,24 @@ main (int argc,
                                        "-c", "test_merchant_api.conf",
                                        NULL);
   /* give child time to start and bind against the socket */
-  fprintf (stderr, "Waiting for taler-merchant-httpd to be ready");
+  fprintf (stderr,
+           "Waiting for taler-merchant-httpd to be ready");
+  cnt = 0;
   do
     {
       fprintf (stderr, ".");
       sleep (1);
+      cnt++;
+      if (cnt > 60)
+      {
+        fprintf (stderr,
+                 "\nFailed to start taler-merchant-httpd\n");
+        GNUNET_OS_process_kill (merchantd,
+                                SIGKILL);
+        GNUNET_OS_process_wait (merchantd);
+        GNUNET_OS_process_destroy (merchantd);
+        return 77;
+      }
     }
   while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URI " -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");

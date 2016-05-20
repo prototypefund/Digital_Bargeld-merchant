@@ -8,7 +8,7 @@ AC_INIT([taler-merchant], [0.0.0], [taler-bug@gnunet.org])
 AC_CONFIG_SRCDIR([src/backend/taler-merchant-httpd.c])
 AC_CONFIG_HEADERS([taler_merchant_config.h])
 # support for non-recursive builds
-AM_INIT_AUTOMAKE([subdir-objects])
+AM_INIT_AUTOMAKE([subdir-objects 1.9 tar-pax])
 
 # pretty build rules
 AM_SILENT_RULES([yes])
