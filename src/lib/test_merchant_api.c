@@ -954,12 +954,12 @@ interpreter_run (void *cls)
     GNUNET_TIME_round_abs (&execution_date);
     cmd->details.admin_add_incoming.aih
       = TALER_EXCHANGE_admin_add_incoming (exchange,
-                                       &reserve_pub,
-                                       &amount,
-                                       execution_date,
-                                       wire,
-                                       &add_incoming_cb,
-                                       is);
+                                           &reserve_pub,
+                                           &amount,
+                                           execution_date,
+                                           wire,
+                                           &add_incoming_cb,
+                                           is);
     if (NULL == cmd->details.admin_add_incoming.aih)
     {
       GNUNET_break (0);
@@ -978,9 +978,9 @@ interpreter_run (void *cls)
                                         &reserve_pub.eddsa_pub);
     cmd->details.reserve_status.wsh
       = TALER_EXCHANGE_reserve_status (exchange,
-                                   &reserve_pub,
-                                   &reserve_status_cb,
-                                   is);
+                                       &reserve_pub,
+                                       &reserve_status_cb,
+                                       is);
     return;
   case OC_WITHDRAW_SIGN:
     GNUNET_assert (NULL !=
@@ -1402,7 +1402,7 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62 }",
+      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.amount = "EUR:5.01" },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
@@ -1449,14 +1449,14 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63 }",
+      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63, \"uuid\":2 }",
       .details.admin_add_incoming.amount = "EUR:1" },
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2b",
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.reserve_reference = "create-reserve-2",
-      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63 }",
+      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63, \"uuid\":3  }",
       .details.admin_add_incoming.amount = "EUR:4.01" },
 
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
