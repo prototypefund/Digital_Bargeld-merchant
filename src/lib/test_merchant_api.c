@@ -1028,12 +1028,12 @@ interpreter_run (void *cls)
       = GNUNET_CRYPTO_rsa_blinding_key_create (GNUNET_CRYPTO_rsa_public_key_len (cmd->details.reserve_withdraw.pk->key.rsa_public_key));
     cmd->details.reserve_withdraw.wsh
       = TALER_EXCHANGE_reserve_withdraw (exchange,
-                                     cmd->details.reserve_withdraw.pk,
-                                     &ref->details.admin_add_incoming.reserve_priv,
-                                     &cmd->details.reserve_withdraw.coin_priv,
-                                     &cmd->details.reserve_withdraw.blinding_key,
-                                     &reserve_withdraw_cb,
-                                     is);
+                                         cmd->details.reserve_withdraw.pk,
+                                         &ref->details.admin_add_incoming.reserve_priv,
+                                         &cmd->details.reserve_withdraw.coin_priv,
+                                         &cmd->details.reserve_withdraw.blinding_key,
+                                         &reserve_withdraw_cb,
+                                         is);
     if (NULL == cmd->details.reserve_withdraw.wsh)
     {
       GNUNET_break (0);
@@ -1444,6 +1444,27 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
+
+    /* Fill second reserve with EUR:1 */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63 }",
+      .details.admin_add_incoming.amount = "EUR:1" },
+    /* Add another 4.01 EUR to reserve #2 */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-2b",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.reserve_reference = "create-reserve-2",
+      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63 }",
+      .details.admin_add_incoming.amount = "EUR:4.01" },
+
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference = "create-reserve-2",
+      .details.reserve_withdraw.amount = "EUR:5" },
 
     { .oc = OC_END }
   };
