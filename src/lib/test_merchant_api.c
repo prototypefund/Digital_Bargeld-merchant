@@ -1550,6 +1550,15 @@ main (int argc,
                                   NULL);
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
+  proc = GNUNET_OS_start_process (GNUNET_NO,
+                                  GNUNET_OS_INHERIT_STD_ALL,
+                                  NULL, NULL, NULL,
+                                  "taler-exchange-dbinit",
+                                  "taler-exchange-dbinit",
+                                  "-c", "test_merchant_api.conf",
+                                  NULL);
+  GNUNET_OS_process_wait (proc);
+  GNUNET_OS_process_destroy (proc);
   exchanged = GNUNET_OS_start_process (GNUNET_NO,
                                    GNUNET_OS_INHERIT_STD_ALL,
                                    NULL, NULL, NULL,
