@@ -99,8 +99,7 @@ MH_handler_hash_contract (struct TMH_RequestHandler *rh,
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
                                       "{s:O}",
-                                      "hash", GNUNET_JSON_from_data (&hc,
-                                                                     sizeof (hc)));
+                                      "hash", GNUNET_JSON_from_data_auto (&hc));
   json_decref (root);
   return res;
 }

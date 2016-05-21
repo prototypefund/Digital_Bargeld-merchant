@@ -220,12 +220,10 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                    j_auditors);
   json_object_set_new (jcontract,
                        "H_wire",
-		       GNUNET_JSON_from_data (&h_wire,
-                                             sizeof (h_wire)));
+		       GNUNET_JSON_from_data_auto (&h_wire));
   json_object_set_new (jcontract,
                        "merchant_pub",
-		       GNUNET_JSON_from_data (&pubkey,
-                                             sizeof (pubkey)));
+		       GNUNET_JSON_from_data_auto (&pubkey));
 
   /* create contract signature */
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
@@ -247,10 +245,8 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                                       MHD_HTTP_OK,
                                       "{s:O, s:O, s:O}",
                                       "contract", jcontract,
-                                      "merchant_sig", GNUNET_JSON_from_data (&contract_sig,
-                                                                             sizeof (contract_sig)),
-                                      "H_contract", GNUNET_JSON_from_data (&contract.h_contract,
-                                                                           sizeof (contract.h_contract)));
+                                      "merchant_sig", GNUNET_JSON_from_data_auto (&contract_sig),
+                                      "H_contract", GNUNET_JSON_from_data_auto (&contract.h_contract));
   GNUNET_JSON_parse_free (spec);
   json_decref (root);
   return res;

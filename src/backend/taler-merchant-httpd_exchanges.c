@@ -534,9 +534,8 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     if (GNUNET_YES != exchange->trusted)
       continue;
     j_exchange = json_pack ("{s:s, s:o}",
-                        "url", exchange->uri,
-                        "master_pub", GNUNET_JSON_from_data (&exchange->master_pub,
-                                                            sizeof (struct TALER_MasterPublicKeyP)));
+                            "url", exchange->uri,
+                            "master_pub", GNUNET_JSON_from_data_auto (&exchange->master_pub));
     json_array_append_new (trusted_exchanges,
                            j_exchange);
   }

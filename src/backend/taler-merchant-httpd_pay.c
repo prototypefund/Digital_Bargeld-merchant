@@ -234,7 +234,7 @@ resume_pay_with_response (struct PayContext *pc,
 
 /**
  * Convert denomination key to its base32 representation
- * 
+ *
  * @param dk denomination key to convert
  * @return 0-terminated base32 encoding of @a dk, to be deallocated
  */
@@ -325,8 +325,7 @@ deposit_cb (void *cls,
       eproof = json_copy ((json_t *) proof);
       json_object_set (eproof,
                        "coin_pub",
-                       GNUNET_JSON_from_data (&dc->coin_pub,
-                                              sizeof (struct TALER_CoinSpendPublicKeyP)));
+                       GNUNET_JSON_from_data_auto (&dc->coin_pub));
       resume_pay_with_response (pc,
                                 http_status,
                                 TMH_RESPONSE_make_json (eproof));
