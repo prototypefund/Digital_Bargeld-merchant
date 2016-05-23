@@ -123,7 +123,7 @@ buffer_append (struct Buffer *buf,
   if (data_size + buf->fill > buf->alloc)
   {
     char *new_buf;
-    size_t new_size = buf->alloc;
+    size_t new_size = buf->alloc ? buf->alloc : 1;
     while (new_size < buf->fill + data_size)
       new_size *= 2;
     if (new_size > max_size)
