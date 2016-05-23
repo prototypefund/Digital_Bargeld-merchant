@@ -509,10 +509,10 @@ process_pay_with_exchange (void *cls,
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
-                                                             "hint", "no acceptable auditor for denomination",
+                                                             "error", "invalid denomination",
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "no acceptable auditor for denomination: %s\n", denom_enc);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "client offered invalid denomination: %s\n", denom_enc);
       GNUNET_free (denom_enc);
       return;
     }
