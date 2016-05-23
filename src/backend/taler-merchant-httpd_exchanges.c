@@ -435,13 +435,14 @@ TMH_EXCHANGES_find_exchange_cancel (struct TMH_EXCHANGES_FindOperation *fo)
 
 /**
  * Function called on each configuration section. Finds sections
- * about exchanges and parses the entries.
+ * about exchanges, parses the entries and tries to connect to
+ * it in order to fetch /keys.
  *
  * @param cls closure, with a `const struct GNUNET_CONFIGURATION_Handle *`
  * @param section name of the section
  */
 static void
-parse_exchanges (void *cls,
+accept_exchanges (void *cls,
                  const char *section)
 {
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
@@ -525,8 +526,9 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     return GNUNET_SYSERR;
   }
   merchant_curl_rc = GNUNET_CURL_gnunet_rc_create (merchant_curl_ctx);
+  /* get exchanges from the merchant configuration and try to connect to them */
   GNUNET_CONFIGURATION_iterate_sections (cfg,
-                                         &parse_exchanges,
+                                         &accept_exchanges,
                                          (void *) cfg);
   /* build JSON with list of trusted exchanges (will be included in contracts) */
   trusted_exchanges = json_array ();
