@@ -333,10 +333,13 @@ deposit_cb (void *cls,
 
     if (NULL == proof)
     {
-      /* FIXME: is this the right code for when the exchange fails? */
+      /* We can't do anything meaningful here, the exchange did something wrong */
+      /* FIXME: any useful information we can include? */
       resume_pay_with_response (pc,
-                                MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                TMH_RESPONSE_make_internal_error ("Exchange failed, no proof available"));
+                                MHD_HTTP_SERVICE_UNAVAILABLE,
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:s}",
+                                                             "error", "exchange failed",
+                                                             "hint", "The exchange provided an unexpected response"));
     }
     else
     {
