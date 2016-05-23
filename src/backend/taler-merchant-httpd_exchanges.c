@@ -528,7 +528,7 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
   GNUNET_CONFIGURATION_iterate_sections (cfg,
                                          &parse_exchanges,
                                          (void *) cfg);
-  /* build JSON with list of trusted exchanges */
+  /* build JSON with list of trusted exchanges (will be included in contracts) */
   trusted_exchanges = json_array ();
   for (exchange = exchange_head; NULL != exchange; exchange = exchange->next)
   {
