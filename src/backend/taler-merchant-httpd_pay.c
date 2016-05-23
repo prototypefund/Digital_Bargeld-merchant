@@ -33,6 +33,12 @@
 
 
 /**
+ * How long to wait before giving up processing with the exchange?
+ */
+#define PAY_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
+
+
+/**
  * Information we keep for an individual call to the /pay handler.
  */
 struct PayContext;
@@ -206,7 +212,17 @@ struct PayContext
    */
   unsigned int response_code;
 
+  /**
+   * Task called when the (suspended) processing for
+   * the /pay request times out.
+   * Happens when we don't get a response from the exchange.
+   */
+  struct GNUNET_SCHEDULER_Task *timeout_task;
+
 };
+
+
+
 
 
 /**
@@ -228,6 +244,11 @@ resume_pay_with_response (struct PayContext *pc,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming /pay handling as exchange interaction is done (%u)\n",
               response_code);
+  if (NULL != pc->timeout_task)
+  {
+    GNUNET_SCHEDULER_cancel (pc->timeout_task);
+    pc->timeout_task = NULL;
+  }
   MHD_resume_connection (pc->connection);
   TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
@@ -623,6 +644,30 @@ process_pay_with_exchange (void *cls,
 
 
 /**
+ * Handle a timeout for the processing of the pay request.
+ *
+ * @param cls closure
+ */
+static void
+handle_pay_timeout (void *cls)
+{
+  struct PayContext *pc = cls;
+
+  pc->timeout_task = NULL;
+
+  if (NULL != pc->fo)
+  {
+    TMH_EXCHANGES_find_exchange_cancel (pc->fo);
+    pc->fo = NULL;
+  }
+
+  resume_pay_with_response (pc,
+                            MHD_HTTP_SERVICE_UNAVAILABLE,
+                            TMH_RESPONSE_make_internal_error ("exchange not reachable"));
+}
+
+
+/**
  * Accomplish this payment.
  *
  * @param rh context of the handler
@@ -859,6 +904,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Suspending /pay handling while working with the exchange\n");
   MHD_suspend_connection (connection);
+  GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT, handle_pay_timeout, pc);
   json_decref (root);
   return MHD_YES;
 }
