@@ -68,7 +68,8 @@ struct TMH_EXCHANGES_FindOperation
   struct Exchange *my_exchange;
 
   /**
-   * Task scheduled to asynchronously return the result.
+   * Task scheduled to asynchronously return the result to
+   * the find continuation.
    */
   struct GNUNET_SCHEDULER_Task *at;
 
