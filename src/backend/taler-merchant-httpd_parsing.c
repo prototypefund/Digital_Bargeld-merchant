@@ -27,12 +27,6 @@
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 
-/* Although the following declaration isn't in any case useful
-to a merchant's activity, it's needed here to make the function
-'TMH_PARSE_nagivate_json ()' compile fine; so its value will be
-kept on some merchant's accepted currency. For multi currencies
-merchants, that of course would require a patch */
-extern char *TMH_merchant_currency_string;
 
 /**
  * Initial size for POST request buffer.
