@@ -18,6 +18,7 @@
  * @brief handling of /pay requests
  * @author Marcello Stanisci
  * @author Christian Grothoff
+ * @author Florian Dold
  */
 #include "platform.h"
 #include <jansson.h>
