@@ -125,7 +125,7 @@ buffer_append (struct Buffer *buf,
     char *new_buf;
     size_t new_size = buf->alloc;
     while (new_size < buf->fill + data_size)
-      new_size += 2;
+      new_size *= 2;
     if (new_size > max_size)
       return GNUNET_NO;
     new_buf = GNUNET_malloc (new_size);
