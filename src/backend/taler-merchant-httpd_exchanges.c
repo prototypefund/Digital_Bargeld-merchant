@@ -25,9 +25,19 @@
 
 
 /**
- * How often do we retry fetching /keys?
+ * Threshold after which exponential backoff should not increase.
  */
-#define KEYS_RETRY_FREQ GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 10)
+#define RETRY_BACKOFF_THRESHOLD GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 60)
+
+
+/**
+ * Perform our exponential back-off calculation, starting at 1 ms
+ * and then going by a factor of 2 up unto a maximum of RETRY_BACKOFF_THRESHOLD.
+ *
+ * @param r current backoff time, initially zero
+ */
+#define RETRY_BACKOFF(r) GNUNET_TIME_relative_min (RETRY_BACKOFF_THRESHOLD, \
+   GNUNET_TIME_relative_multiply (GNUNET_TIME_relative_max (GNUNET_TIME_UNIT_MILLISECONDS, (r)), 2));
 
 
 /**
@@ -119,9 +129,9 @@ struct Exchange
   struct TALER_MasterPublicKeyP master_pub;
 
   /**
-   * At what time should we try to fetch /keys again?
+   * How long should we wait between the next retry?
    */
-  struct GNUNET_TIME_Absolute retry_time;
+  struct GNUNET_TIME_Relative retry_delay;
 
   /**
    * Task where we retry fetching /keys from the exchange.
@@ -129,8 +139,9 @@ struct Exchange
   struct GNUNET_SCHEDULER_Task *retry_task;
 
   /**
-   * Flag which indicates whether some HTTP transfer between
-   * this merchant and the exchange is still ongoing
+   * GNUNET_YES to indicate that there is an ongoing
+   * transfer we're waiting for,
+   * GNUNET_NO to indicate that key data is up-to-date.
    */
   int pending;
 
@@ -207,7 +218,6 @@ retry_exchange (void *cls)
               "Connecting to exchange exchange %s in retry_exchange\n",
               exchange->uri);
 
-  exchange->pending = GNUNET_SYSERR; /* failed hard */
   exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
                                            exchange->uri,
                                            &keys_mgmt_cb,
@@ -238,38 +248,31 @@ keys_mgmt_cb (void *cls,
   struct Exchange *exchange = cls;
   struct TMH_EXCHANGES_FindOperation *fo;
 
-  if (NULL != keys)
+  GNUNET_assert (GNUNET_YES == exchange->pending);
+
+  if (NULL == keys)
   {
-    exchange->pending = GNUNET_NO;
-  }
-  else
-  {
+    exchange->retry_delay = RETRY_BACKOFF (exchange->retry_delay);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Failed to fetch /keys from `%s'\n",
-                exchange->uri);
+                "Failed to fetch /keys from `%s', retrying in %s\n",
+                exchange->uri,
+                GNUNET_STRINGS_relative_time_to_string (exchange->retry_delay, GNUNET_YES));
     TALER_EXCHANGE_disconnect (exchange->conn);
     exchange->conn = NULL;
-    exchange->retry_time = GNUNET_TIME_relative_to_absolute (KEYS_RETRY_FREQ);
-    /* Always retry trusted exchanges in the background, so that we don't have
-     * to wait for a customer to trigger it and thus delay his response */
-    if (GNUNET_YES == exchange->trusted)
-    {
-      exchange->retry_task = GNUNET_SCHEDULER_add_delayed (KEYS_RETRY_FREQ,
-                                                           &retry_exchange,
-                                                           exchange);
-    }
-    else
-    {
-      exchange->pending = GNUNET_SYSERR; /* failed hard */
-    }
+    exchange->retry_task = GNUNET_SCHEDULER_add_delayed (exchange->retry_delay,
+                                                         &retry_exchange,
+                                                         exchange);
+    return;
   }
+
+  exchange->pending = GNUNET_NO;
   while (NULL != (fo = exchange->fo_head))
   {
     GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
                                  exchange->fo_tail,
                                  fo);
     fo->fc (fo->fc_cls,
-            (NULL != keys) ? exchange->conn : NULL,
+            exchange->conn,
             exchange->trusted);
     GNUNET_free (fo);
   }
@@ -359,29 +362,6 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                 "The exchange `%s' is new\n",
                 chosen_exchange);
   }
-
-  if (GNUNET_SYSERR == exchange->pending)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Maybe retrying previously contacted exchange `%s'\n",
-                chosen_exchange);
-    /* check if we should resume this exchange */
-    if (0 == GNUNET_TIME_absolute_get_remaining (exchange->retry_time).rel_value_us)
-    {
-
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Retrying exchange `%s'\n",
-                  chosen_exchange);
-      exchange->pending = GNUNET_YES;
-    }
-    else
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Not retrying exchange `%s', too early\n",
-                  chosen_exchange);
-    }
-  }
-
 
   fo = GNUNET_new (struct TMH_EXCHANGES_FindOperation);
   fo->fc = fc;
