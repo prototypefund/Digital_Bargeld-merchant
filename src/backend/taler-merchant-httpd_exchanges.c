@@ -24,6 +24,12 @@
 #include "taler-merchant-httpd_exchanges.h"
 
 
+
+/**
+ * Delay after which we'll re-fetch key information from the exchange.
+ */
+#define RELOAD_DELAY GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS, 60)
+
 /**
  * Threshold after which exponential backoff should not increase.
  */
@@ -135,6 +141,10 @@ struct Exchange
 
   /**
    * Task where we retry fetching /keys from the exchange.
+   *
+   * Can also be active when pending=GNUNET_NO,
+   * since we periodically (every hour) reload the
+   * exchange keys.
    */
   struct GNUNET_SCHEDULER_Task *retry_task;
 
@@ -213,7 +223,10 @@ retry_exchange (void *cls)
 {
   struct Exchange *exchange = cls;
 
+  /* might be a scheduled reload and not our first attempt */
+  exchange->pending = GNUNET_YES;
   exchange->retry_task = NULL;
+
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Connecting to exchange exchange %s in retry_exchange\n",
               exchange->uri);
@@ -266,6 +279,11 @@ keys_mgmt_cb (void *cls,
   }
 
   exchange->pending = GNUNET_NO;
+  /* Schedule for our regular reload. */
+  /* FIXME: we might want to take HTTP cache control into account */
+  exchange->retry_task = GNUNET_SCHEDULER_add_delayed (RELOAD_DELAY,
+                                                       &retry_exchange,
+                                                       exchange);
   while (NULL != (fo = exchange->fo_head))
   {
     GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
