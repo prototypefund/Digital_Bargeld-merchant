@@ -104,7 +104,12 @@ enum OpCode
   /**
    * Pay with coins.
    */
-  OC_PAY
+  OC_PAY,
+
+  /**
+   * Retrieve deposit permissions for a given wire transfer
+   */
+   OC_TRACK_DEPOSIT
 
 };
 
@@ -369,6 +374,20 @@ struct Command
       struct TALER_MERCHANT_Pay *ph;
 
     } pay;
+
+    struct {
+
+      /**
+       * Wire transfer ID whose deposit permissions are to be retrieved
+       */
+      char *wtid;
+
+      /**
+       * Handle to a /track/deposit operation
+       */
+       struct TALER_MERCHANT_TrackDepositOperation *tdo;
+    
+    } track_deposit;
 
   } details;
 
@@ -813,6 +832,21 @@ pay_cb (void *cls,
                                        is);
 }
 
+/**
+ * Callback for a /track/deposit operation
+ *
+ * @param cls closure for this function
+ * @param http_status HTTP response code returned by the server
+ * @param obj server response's body
+ */
+static void
+track_deposit_cb (void *cls,
+                  unsigned int http_status,
+                  const json_t *obj)
+{
+  return;
+}
+
 
 /**
  * Find denomination key matching the given amount.
@@ -1194,6 +1228,14 @@ interpreter_run (void *cls)
       return;
     }
     return;
+  case OC_TRACK_DEPOSIT:
+    TALER_MERCHANT_track_deposit (ctx,
+                                  MERCHANT_URI "/track/deposit",
+                                  cmd->details.track_deposit.wtid,
+                                  EXCHANGE_URI,
+                                  track_deposit_cb,
+                                  is);
+    return;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
@@ -1318,9 +1360,17 @@ do_shutdown (void *cls)
         cmd->details.pay.ph = NULL;
       }
       break;
+    case OC_TRACK_DEPOSIT:
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "shutting down /track/deposit\n");
+      if (NULL != cmd->details.track_deposit.tdo)
+      {
+        TALER_MERCHANT_track_deposit_cancel (cmd->details.track_deposit.tdo);
+        cmd->details.track_deposit.tdo = NULL;
+      }
+      break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Unknown instruction %d at %u (%s)\n",
+                  "Shutdown: unknown instruction %d at %u (%s)\n",
                   cmd->oc,
                   i,
                   cmd->label);
@@ -1398,6 +1448,14 @@ run (void *cls)
   struct InterpreterState *is;
   static struct Command commands[] =
   {
+
+    { .oc = OC_TRACK_DEPOSIT,
+      .label = "track-deposit-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_deposit.wtid = "TESTWTID"},
+
+    { .oc = OC_END },
+
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",

@@ -37,6 +37,7 @@
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
+#include "taler-merchant-httpd_track.h"
 #include "taler-merchant-httpd_util.h"
 
 
@@ -193,6 +194,12 @@ url_handler (void *cls,
       { "/pay", NULL, "text/plain",
         "Only POST is allowed", 0,
         &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
+      { "/track/deposit", MHD_HTTP_METHOD_GET, "application/json",
+        NULL, 0,
+        &MH_handler_track_deposit, MHD_HTTP_OK},
+      { "/track/deposit", NULL, "text/plain",
+        "Only GET is allowed", 0,
+        &TMH_MHD_handler_static_response, MHD_HTTP_OK},
 
       {NULL, NULL, NULL, NULL, 0, 0 }
     };
@@ -483,6 +490,10 @@ run (void *cls,
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
                                  NULL);
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_log_setup ("taler-merchant-httpd",
+                                   "INFO",
+                                   NULL));
   if (GNUNET_SYSERR ==
       TMH_EXCHANGES_init (config))
   {

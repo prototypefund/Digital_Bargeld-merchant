@@ -21,6 +21,7 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_exchanges.c taler-merchant-httpd_exchanges.h \
   taler-merchant-httpd_contract.c taler-merchant-httpd_contract.h \
   taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h \
+  taler-merchant-httpd_track.c taler-merchant-httpd_track.h \
   taler-merchant-httpd_util.c taler-merchant-httpd_util.h
 
 taler_merchant_httpd_LDADD = \

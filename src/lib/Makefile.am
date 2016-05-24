@@ -15,7 +15,8 @@ libtalermerchant_la_LDFLAGS = \
 
 libtalermerchant_la_SOURCES = \
   merchant_api_contract.c \
-  merchant_api_pay.c
+  merchant_api_pay.c \
+  merchant_api_track.c
 
 libtalermerchant_la_LIBADD = \
   -ltalerexchange \

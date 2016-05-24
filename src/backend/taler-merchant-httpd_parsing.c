@@ -313,4 +313,49 @@ TMH_PARSE_json_data (struct MHD_Connection *connection,
 }
 
 
+
+/**
+ * Extract base32crockford encoded data from request.
+ *
+ * Queues an error response to the connection if the parameter is
+ * missing or invalid.
+ *
+ * @param connection the MHD connection
+ * @param param_name the name of the parameter with the key
+ * @param[out] out_data pointer to store the result
+ * @param out_size expected size of data
+ * @return
+ *   #GNUNET_YES if the the argument is present
+ *   #GNUNET_NO if the argument is absent or malformed
+ *   #GNUNET_SYSERR on internal error (error response could not be sent)
+ */
+int
+TMH_PARSE_mhd_request_arg_data (struct MHD_Connection *connection,
+                                const char *param_name,
+                                void *out_data,
+                                size_t out_size)
+{
+  const char *str;
+
+  str = MHD_lookup_connection_value (connection,
+                                     MHD_GET_ARGUMENT_KIND,
+                                     param_name);
+  if (NULL == str)
+  {
+    return (MHD_NO ==
+            TMH_RESPONSE_reply_arg_missing (connection, param_name))
+      ? GNUNET_SYSERR : GNUNET_NO;
+  }
+  if (GNUNET_OK !=
+      GNUNET_STRINGS_string_to_data (str,
+                                     strlen (str),
+                                     out_data,
+                                     out_size))
+    return (MHD_NO ==
+            TMH_RESPONSE_reply_arg_invalid (connection, param_name))
+      ? GNUNET_SYSERR : GNUNET_NO;
+  return GNUNET_OK;
+}
+
+
 /* end of taler-merchant-httpd_parsing.c */

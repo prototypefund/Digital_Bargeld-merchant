@@ -157,4 +157,25 @@ TMH_RESPONSE_reply_request_too_large (struct MHD_Connection *connection);
 void
 TMH_RESPONSE_add_global_headers (struct MHD_Response *response);
 
+/**
+ * Send a response indicating a missing argument.
+ *
+ * @param connection the MHD connection to use
+ * @param param_name the parameter that is missing
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
+                                const char *param_name);
+
+/**
+ * Send a response indicating an invalid argument.
+ *
+ * @param connection the MHD connection to use
+ * @param param_name the parameter that is invalid
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_arg_invalid (struct MHD_Connection *connection,
+                                const char *param_name);
 #endif
