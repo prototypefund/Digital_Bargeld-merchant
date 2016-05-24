@@ -398,6 +398,12 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
   struct PayContext *pc = (struct PayContext *) hc;
   unsigned int i;
 
+  if (NULL != pc->timeout_task)
+  {
+    GNUNET_SCHEDULER_cancel (pc->timeout_task);
+    pc->timeout_task = NULL;
+  }
+
   TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
   for (i=0;i<pc->coins_cnt;i++)
   {
