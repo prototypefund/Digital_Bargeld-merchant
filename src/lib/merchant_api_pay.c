@@ -457,12 +457,10 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			" s:o, s:o," /* denom_pub / ub_sig */
 			" s:o}",     /* coin_sig */
 			"f", TALER_JSON_from_amount (&pc->amount_with_fee),
-			"coin_pub", GNUNET_JSON_from_data (&pc->coin_pub,
-							  sizeof (struct TALER_CoinSpendPublicKeyP)),
+			"coin_pub", GNUNET_JSON_from_data_auto (&pc->coin_pub),
 			"denom_pub", GNUNET_JSON_from_rsa_public_key (pc->denom_pub.rsa_public_key),
 			"ub_sig", GNUNET_JSON_from_rsa_signature (pc->denom_sig.rsa_signature),
-			"coin_sig", GNUNET_JSON_from_data (&pc->coin_sig,
-							  sizeof (struct TALER_CoinSpendSignatureP))
+			"coin_sig", GNUNET_JSON_from_data_auto (&pc->coin_sig)
 			);
     json_array_append (j_coins,
 		       j_coin);
@@ -541,8 +539,7 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
                        " s:o, s:s," /* refund_deadline, exchange */
                        " s:o, s:o," /* coins, max_fee */
                        " s:o, s:o}",/* amount, signature */
-                       "H_contract", GNUNET_JSON_from_data (h_contract,
-                                                           sizeof (struct GNUNET_HashCode)),
+                       "H_contract", GNUNET_JSON_from_data_auto (h_contract),
                        "transaction_id", (json_int_t) transaction_id,
                        "timestamp", GNUNET_JSON_from_time_abs (timestamp),
                        "refund_deadline", GNUNET_JSON_from_time_abs (refund_deadline),
@@ -550,8 +547,7 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 		       "coins", j_coins,
                        "max_fee", TALER_JSON_from_amount (max_fee),
                        "amount", TALER_JSON_from_amount (amount),
-                       "merchant_sig", GNUNET_JSON_from_data (merchant_sig,
-                                                              sizeof (struct TALER_MerchantSignatureP)));
+                       "merchant_sig", GNUNET_JSON_from_data_auto (merchant_sig));
 
   if (0 != execution_deadline.abs_value_us)
   {

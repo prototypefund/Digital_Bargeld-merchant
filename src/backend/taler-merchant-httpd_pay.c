@@ -18,6 +18,7 @@
  * @brief handling of /pay requests
  * @author Marcello Stanisci
  * @author Christian Grothoff
+ * @author Florian Dold
  */
 #include "platform.h"
 #include <jansson.h>
@@ -30,6 +31,12 @@
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
+
+
+/**
+ * How long to wait before giving up processing with the exchange?
+ */
+#define PAY_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
 
 /**
@@ -206,6 +213,13 @@ struct PayContext
    */
   unsigned int response_code;
 
+  /**
+   * Task called when the (suspended) processing for
+   * the /pay request times out.
+   * Happens when we don't get a response from the exchange.
+   */
+  struct GNUNET_SCHEDULER_Task *timeout_task;
+
 };
 
 
@@ -228,13 +242,19 @@ resume_pay_with_response (struct PayContext *pc,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming /pay handling as exchange interaction is done (%u)\n",
               response_code);
+  if (NULL != pc->timeout_task)
+  {
+    GNUNET_SCHEDULER_cancel (pc->timeout_task);
+    pc->timeout_task = NULL;
+  }
   MHD_resume_connection (pc->connection);
   TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
 
+
 /**
  * Convert denomination key to its base32 representation
- * 
+ *
  * @param dk denomination key to convert
  * @return 0-terminated base32 encoding of @a dk, to be deallocated
  */
@@ -311,10 +331,13 @@ deposit_cb (void *cls,
 
     if (NULL == proof)
     {
-      /* FIXME: is this the right code for when the exchange fails? */
+      /* We can't do anything meaningful here, the exchange did something wrong */
+      /* FIXME: any useful information we can include? */
       resume_pay_with_response (pc,
-                                MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                TMH_RESPONSE_make_internal_error ("Exchange failed, no proof available"));
+                                MHD_HTTP_SERVICE_UNAVAILABLE,
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:s}",
+                                                             "error", "exchange failed",
+                                                             "hint", "The exchange provided an unexpected response"));
     }
     else
     {
@@ -325,8 +348,7 @@ deposit_cb (void *cls,
       eproof = json_copy ((json_t *) proof);
       json_object_set (eproof,
                        "coin_pub",
-                       GNUNET_JSON_from_data (&dc->coin_pub,
-                                              sizeof (struct TALER_CoinSpendPublicKeyP)));
+                       GNUNET_JSON_from_data_auto (&dc->coin_pub));
       resume_pay_with_response (pc,
                                 http_status,
                                 TMH_RESPONSE_make_json (eproof));
@@ -375,6 +397,12 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
 {
   struct PayContext *pc = (struct PayContext *) hc;
   unsigned int i;
+
+  if (NULL != pc->timeout_task)
+  {
+    GNUNET_SCHEDULER_cancel (pc->timeout_task);
+    pc->timeout_task = NULL;
+  }
 
   TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
   for (i=0;i<pc->coins_cnt;i++)
@@ -467,9 +495,10 @@ process_pay_with_exchange (void *cls,
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
-                                                             "hint", "unknown denom to exchange",
-                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:o, s:o}",
+                                                             "error", "denomination not found",
+                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key),
+                                                             "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "unknown denom to exchange: %s\n", denom_enc);
       GNUNET_free (denom_enc);
@@ -485,10 +514,10 @@ process_pay_with_exchange (void *cls,
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
-                                                             "hint", "no acceptable auditor for denomination",
+                                                             "error", "invalid denomination",
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "no acceptable auditor for denomination: %s\n", denom_enc);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "client offered invalid denomination: %s\n", denom_enc);
       GNUNET_free (denom_enc);
       return;
     }
@@ -620,6 +649,30 @@ process_pay_with_exchange (void *cls,
       return;
     }
   }
+}
+
+
+/**
+ * Handle a timeout for the processing of the pay request.
+ *
+ * @param cls closure
+ */
+static void
+handle_pay_timeout (void *cls)
+{
+  struct PayContext *pc = cls;
+
+  pc->timeout_task = NULL;
+
+  if (NULL != pc->fo)
+  {
+    TMH_EXCHANGES_find_exchange_cancel (pc->fo);
+    pc->fo = NULL;
+  }
+
+  resume_pay_with_response (pc,
+                            MHD_HTTP_SERVICE_UNAVAILABLE,
+                            TMH_RESPONSE_make_internal_error ("exchange not reachable"));
 }
 
 
@@ -834,9 +887,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     /* Payment succeeded in the past; take short cut
        and accept immediately */
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Transaction %llu already paid in the past, taking short cut.\n",
-                (unsigned long long) pc->transaction_id);
     resp = MHD_create_response_from_buffer (0,
                                             NULL,
                                             MHD_RESPMEM_PERSISTENT);
@@ -860,6 +910,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Suspending /pay handling while working with the exchange\n");
   MHD_suspend_connection (connection);
+  GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT, handle_pay_timeout, pc);
   json_decref (root);
   return MHD_YES;
 }
