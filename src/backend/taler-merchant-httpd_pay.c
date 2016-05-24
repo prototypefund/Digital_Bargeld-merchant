@@ -223,9 +223,6 @@ struct PayContext
 };
 
 
-
-
-
 /**
  * Resume the given pay context and send the given response.
  * Stores the response in the @a pc and signals MHD to resume
@@ -253,6 +250,7 @@ resume_pay_with_response (struct PayContext *pc,
   MHD_resume_connection (pc->connection);
   TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
+
 
 /**
  * Convert denomination key to its base32 representation
@@ -491,9 +489,10 @@ process_pay_with_exchange (void *cls,
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
-                                                             "hint", "unknown denom to exchange",
-                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:o, s:o}",
+                                                             "error", "denomination not found",
+                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key),
+                                                             "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "unknown denom to exchange: %s\n", denom_enc);
       GNUNET_free (denom_enc);
