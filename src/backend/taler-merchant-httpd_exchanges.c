@@ -28,7 +28,7 @@
 /**
  * Delay after which we'll re-fetch key information from the exchange.
  */
-#define RELOAD_DELAY GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MILLISECONDS, 60)
+#define RELOAD_DELAY GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MINUTES, 2)
 
 /**
  * Threshold after which exponential backoff should not increase.
