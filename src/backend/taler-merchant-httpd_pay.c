@@ -662,6 +662,9 @@ handle_pay_timeout (void *cls)
 {
   struct PayContext *pc = cls;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Resuming /pay with error after timeout\n");
+
   pc->timeout_task = NULL;
 
   if (NULL != pc->fo)
@@ -911,7 +914,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Suspending /pay handling while working with the exchange\n");
   MHD_suspend_connection (connection);
-  GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT, handle_pay_timeout, pc);
+  pc->timeout_task = GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT, handle_pay_timeout, pc);
   json_decref (root);
   return MHD_YES;
 }
