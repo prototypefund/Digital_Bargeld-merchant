@@ -65,7 +65,7 @@ extern uint32_t
 TALER_MERCHANTDB_contract_get_values (PGconn *conn,
                                       const struct GNUNET_HashCode *h_contract,
                                       uint64_t *nounce,
-                                      struct GNUNET_TIME_Absolute *edate);
+                                      struct GNUNET_TIME_Absolute *wire_transfer_deadline);
 
 
 /**
@@ -104,7 +104,7 @@ run (void *cls, char *const *args, const char *cfgfile,
   int64_t t_id;
   int64_t p_id;
   struct Contract contract;
-  struct GNUNET_TIME_Absolute edate;
+  struct GNUNET_TIME_Absolute wire_transfer_deadline;
   struct GNUNET_TIME_Absolute now;
   uint64_t nounce;
   struct GNUNET_HashCode h_contract_str;
@@ -294,17 +294,21 @@ run (void *cls, char *const *args, const char *cfgfile,
   printf ("contract string : %s\n", aa);
 
   GNUNET_CRYPTO_hash (aa, strlen (aa) + 1, &h_contract_str);
-  if (GNUNET_SYSERR == TALER_MERCHANTDB_contract_get_values (db_conn, &h_contract_str, &nounce, &edate))
+  if (GNUNET_SYSERR ==
+      TALER_MERCHANTDB_contract_get_values (db_conn,
+                                            &h_contract_str,
+                                            &nounce,
+                                            &wire_transfer_deadline))
+  {
     printf ("no hash found\n");
+  }
   else
   {
 
-    fancy_time = GNUNET_STRINGS_absolute_time_to_string (edate);
+    fancy_time = GNUNET_STRINGS_absolute_time_to_string (wire_transfer_deadline);
     printf ("hash found!, nounce is : %llu\n", nounce);
-    printf ("hash found!, time is : %s\n", fancy_time);
+    printf ("hash found!, wire transfer time is : %s\n", fancy_time);
   }
-
-  return;
 }
 
 

@@ -298,7 +298,7 @@ struct TALER_MERCHANT_PaidCoin
  * @param merchant_sig the signature of the merchant over the original contract
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
- * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
+ * @param wire_transfer_deadline date by which the merchant would like the exchange to execute the wire transfer (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
  * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
@@ -317,7 +317,7 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
                              const struct TALER_MerchantSignatureP *merchant_sig,
                              struct GNUNET_TIME_Absolute refund_deadline,
                              struct GNUNET_TIME_Absolute timestamp,
-                             struct GNUNET_TIME_Absolute execution_deadline,
+                             struct GNUNET_TIME_Absolute wire_transfer_deadline,
 			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,

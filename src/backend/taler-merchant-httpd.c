@@ -80,7 +80,7 @@ static char *keyfile;
  * This value tells the exchange by which date this merchant would like
  * to receive the funds for a deposited payment
  */
-struct GNUNET_TIME_Relative edate_delay;
+struct GNUNET_TIME_Relative wire_transfer_delay;
 
 /**
  * Which currency is supported by this merchant?
@@ -515,12 +515,12 @@ run (void *cls,
   if (GNUNET_SYSERR ==
       GNUNET_CONFIGURATION_get_value_time (config,
                                            "merchant",
-                                           "EDATE",
-                                           &edate_delay))
+                                           "WIRE_TRANSFER_DELAY",
+                                           &wire_transfer_delay))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "merchant",
-                               "EDATE");
+                               "WIRE_TRANSFER_DELAY");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }

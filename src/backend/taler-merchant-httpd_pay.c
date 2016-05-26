@@ -182,11 +182,11 @@ struct PayContext
   struct GNUNET_HashCode h_contract;
 
   /**
-   * Execution date. How soon would the merchant like the
-   * transaction to be executed? (Can be given by the frontend
-   * or be determined by our configuration via #edate_delay.)
+   * Wire transfer deadline. How soon would the merchant like the
+   * wire transfer to be executed? (Can be given by the frontend
+   * or be determined by our configuration via #wire_transfer_delay.)
    */
-  struct GNUNET_TIME_Absolute edate;
+  struct GNUNET_TIME_Absolute wire_transfer_deadline;
 
   /**
    * Response to return, NULL if we don't have one yet.
@@ -623,7 +623,7 @@ process_pay_with_exchange (void *cls,
 
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->percoin_amount,
-                                     pc->edate,
+                                     pc->wire_transfer_deadline,
                                      j_wire,
                                      &pc->h_contract,
                                      &dc->coin_pub,
@@ -802,18 +802,19 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                                 "invalid merchant signature supplied");
     }
 
-    /* 'edate' is optional, if it is not present, generate it here; it
-       will be timestamp plus the edate_delay supplied in config
-       file */
-    if (NULL == json_object_get (root, "edate"))
+    /* 'wire_transfer_deadline' is optional, if it is not present,
+       generate it here; it will be timestamp plus the
+       wire_transfer_delay supplied in config file */
+    if (NULL == json_object_get (root, "wire_transfer_deadline"))
     {
-      pc->edate = GNUNET_TIME_absolute_add (pc->timestamp,
-                                            edate_delay);
+      pc->wire_transfer_deadline = GNUNET_TIME_absolute_add (pc->timestamp,
+                                                             wire_transfer_delay);
     }
     else
     {
       struct GNUNET_JSON_Specification espec[] = {
-        GNUNET_JSON_spec_absolute_time ("edate", &pc->edate),
+        GNUNET_JSON_spec_absolute_time ("wire_transfer_deadline",
+                                        &pc->wire_transfer_deadline),
         GNUNET_JSON_spec_end()
       };
 
