@@ -57,7 +57,7 @@ check_products (json_t *products)
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_string ("description", &description),
       /* FIXME: there are other fields in the product specification
-         that rre currently not labeled as optional. Maybe check
+         that are currently not labeled as optional. Maybe check
          those as well, or make them truly optional. */
       GNUNET_JSON_spec_end()
     };

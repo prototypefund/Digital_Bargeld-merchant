@@ -38,7 +38,6 @@
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
 #include "taler-merchant-httpd_track.h"
-#include "taler-merchant-httpd_util.h"
 
 
 /**
@@ -175,12 +174,6 @@ url_handler (void *cls,
       { "/", MHD_HTTP_METHOD_GET, "text/plain",
         "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK },
-      { "/hash-contract", MHD_HTTP_METHOD_POST, "application/json",
-        NULL, 0,
-        &MH_handler_hash_contract, MHD_HTTP_OK },
-      { "/hash-contract", NULL, "text/plain",
-        "Only POST is allowed", 0,
-        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
       { "/contract", MHD_HTTP_METHOD_POST, "application/json",
         NULL, 0,
         &MH_handler_contract, MHD_HTTP_OK },
