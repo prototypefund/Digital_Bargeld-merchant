@@ -23,6 +23,7 @@
 #include <taler/taler_signatures.h>
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
+#include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
@@ -51,8 +52,19 @@ MH_handler_track_deposit (struct TMH_RequestHandler *rh,
                           const char *upload_data,
                           size_t *upload_data_size)
 {
+  static struct TMH_RequestHandler pong =
+    {
+      "", NULL, "text/html",
+      "/track/deposit served\n", 0,
+      &TMH_MHD_handler_static_response, MHD_HTTP_OK
+    };
+
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "serving /track/deposit\n");
-  return MHD_YES;
+  return TMH_MHD_handler_static_response (&pong,
+                                          connection,
+                                          connection_cls,
+                                          upload_data,
+                                          upload_data_size);
 }
 
 /* end of taler-merchant-httpd_contract.c */
