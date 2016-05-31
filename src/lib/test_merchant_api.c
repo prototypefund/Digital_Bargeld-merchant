@@ -1648,6 +1648,7 @@ main (int argc,
                                   "taler-exchange-dbinit",
                                   "taler-exchange-dbinit",
                                   "-c", "test_merchant_api.conf",
+                                  "-r",
                                   NULL);
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
