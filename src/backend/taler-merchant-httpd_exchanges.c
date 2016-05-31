@@ -141,17 +141,13 @@ struct Exchange
 
   /**
    * Task where we retry fetching /keys from the exchange.
-   *
-   * Can also be active when pending=GNUNET_NO,
-   * since we periodically (every hour) reload the
-   * exchange keys.
    */
   struct GNUNET_SCHEDULER_Task *retry_task;
 
   /**
-   * GNUNET_YES to indicate that there is an ongoing
-   * transfer we're waiting for,
-   * GNUNET_NO to indicate that key data is up-to-date.
+   * #GNUNET_YES to indicate that there is an ongoing
+   * transfer we are waiting for,
+   * #GNUNET_NO to indicate that key data is up-to-date.
    */
   int pending;
 
@@ -224,13 +220,15 @@ retry_exchange (void *cls)
   struct Exchange *exchange = cls;
 
   /* might be a scheduled reload and not our first attempt */
-  exchange->pending = GNUNET_YES;
   exchange->retry_task = NULL;
-
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Connecting to exchange exchange %s in retry_exchange\n",
               exchange->uri);
-
+  if (NULL != exchange->conn)
+  {
+    TALER_EXCHANGE_disconnect (exchange->conn);
+    exchange->conn = NULL;
+  }
   exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
                                            exchange->uri,
                                            &keys_mgmt_cb,
@@ -260,30 +258,34 @@ keys_mgmt_cb (void *cls,
 {
   struct Exchange *exchange = cls;
   struct TMH_EXCHANGES_FindOperation *fo;
-
-  GNUNET_assert (GNUNET_YES == exchange->pending);
+  struct GNUNET_TIME_Absolute expire;
+  struct GNUNET_TIME_Relative delay;
 
   if (NULL == keys)
   {
+    exchange->pending = GNUNET_YES;
     exchange->retry_delay = RETRY_BACKOFF (exchange->retry_delay);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Failed to fetch /keys from `%s', retrying in %s\n",
                 exchange->uri,
-                GNUNET_STRINGS_relative_time_to_string (exchange->retry_delay, GNUNET_YES));
-    TALER_EXCHANGE_disconnect (exchange->conn);
-    exchange->conn = NULL;
+                GNUNET_STRINGS_relative_time_to_string (exchange->retry_delay,
+                                                        GNUNET_YES));
     exchange->retry_task = GNUNET_SCHEDULER_add_delayed (exchange->retry_delay,
                                                          &retry_exchange,
                                                          exchange);
     return;
   }
-
+  expire = TALER_EXCHANGE_check_keys_current (exchange->conn);
+  if (0 == expire.abs_value_us)
+    delay = RELOAD_DELAY;
+  else
+    delay = GNUNET_TIME_absolute_get_remaining (expire);
+  exchange->retry_delay = GNUNET_TIME_UNIT_ZERO;
+  exchange->retry_task
+    = GNUNET_SCHEDULER_add_delayed (delay,
+                                    &retry_exchange,
+                                    exchange);
   exchange->pending = GNUNET_NO;
-  /* Schedule for our regular reload. */
-  /* FIXME: we might want to take HTTP cache control into account */
-  exchange->retry_task = GNUNET_SCHEDULER_add_delayed (RELOAD_DELAY,
-                                                       &retry_exchange,
-                                                       exchange);
   while (NULL != (fo = exchange->fo_head))
   {
     GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
@@ -389,7 +391,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                                exchange->fo_tail,
                                fo);
 
-  if (GNUNET_YES != exchange->pending) // can post coins
+  if (GNUNET_YES != exchange->pending)
   {
     /* We are not currently waiting for a reply, immediately
        return result */
