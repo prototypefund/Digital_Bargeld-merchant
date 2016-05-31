@@ -1679,7 +1679,7 @@ main (int argc,
   }
   /* give child time to start and bind against the socket */
   fprintf (stderr,
-           "Waiting for taler-exchange-httpd to be ready");
+           "Waiting for taler-exchange-httpd to be ready\n");
   cnt = 0;
   do
     {
@@ -1718,7 +1718,7 @@ main (int argc,
   }
   /* give child time to start and bind against the socket */
   fprintf (stderr,
-           "Waiting for taler-merchant-httpd to be ready");
+           "Waiting for taler-merchant-httpd to be ready\n");
   cnt = 0;
   do
     {
