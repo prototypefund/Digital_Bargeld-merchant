@@ -17,6 +17,7 @@
  * @file include/taler_merchant_service.h
  * @brief C interface of libtalermerchant, a C library to use merchant's HTTP API
  * @author Christian Grothoff
+ * @author Marcello Stanisci
  */
 #ifndef _TALER_MERCHANT_SERVICE_H
 #define _TALER_MERCHANT_SERVICE_H
@@ -24,6 +25,49 @@
 #include <taler/taler_util.h>
 #include <gnunet/gnunet_curl_lib.h>
 #include <jansson.h>
+
+/* ********************* /track/deposit *********************** */
+
+/**
+ * @brief Handle to a /contract operation at a merchant's backend.
+ */
+struct TALER_MERCHANT_TrackDepositOperation;
+
+/**
+ * Callbacks of this type are used to work the result of submitting a /track/deposit request to a merchant
+ */
+typedef void
+(*TALER_MERCHANT_TrackDepositCallback) (void *cls,
+                                        unsigned int http_status,
+                                        const json_t *obj);
+
+/**
+ * Request backend to return deposits associated with a given wtid.
+ *
+ * @param ctx execution context
+ * @param backend_uri URI of the backend (having /track/deposit appended)
+ * @param wtid base32 string indicating a wtid
+ * @param exchange base URL of the exchange in charge of returning the wanted information
+ * @param trackdeposit_cb the callback to call when a reply for this request is available
+ * @param trackdeposit_cb_cls closure for @a contract_cb
+ * @return a handle for this request
+ */
+struct TALER_MERCHANT_TrackDepositOperation *
+TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
+                              const char *backend_uri,
+                              const char *wtid,
+                              const char *exchange_uri,
+                              TALER_MERCHANT_TrackDepositCallback trackdeposit_cb,
+                              void *trackdeposit_cb_cls);
+
+/**
+ * Cancel a /track/deposit request.  This function cannot be used
+ * on a request handle if a response is already served for it.
+ *
+ * @param co the deposit's tracking operation
+ */
+void
+TALER_MERCHANT_track_deposit_cancel (struct TALER_MERCHANT_TrackDepositOperation *tdo);
 
 /* *********************  /contract *********************** */
 
@@ -196,8 +240,8 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 
 
 /**
- * Information we need from the frontend when forwarding
- * a payment to the backend.
+ * Information we need from the frontend (ok, the frontend sends just JSON)
+ * when forwarding a payment to the backend.
  */
 struct TALER_MERCHANT_PaidCoin
 {
@@ -254,7 +298,7 @@ struct TALER_MERCHANT_PaidCoin
  * @param merchant_sig the signature of the merchant over the original contract
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
- * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
+ * @param wire_transfer_deadline date by which the merchant would like the exchange to execute the wire transfer (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
  * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
@@ -273,7 +317,7 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
                              const struct TALER_MerchantSignatureP *merchant_sig,
                              struct GNUNET_TIME_Absolute refund_deadline,
                              struct GNUNET_TIME_Absolute timestamp,
-                             struct GNUNET_TIME_Absolute execution_deadline,
+                             struct GNUNET_TIME_Absolute wire_transfer_deadline,
 			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
@@ -294,5 +338,25 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 void
 TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *ph);
 
+
+
+/**
+ * Request backend to return deposits associated with a given wtid.
+ *
+ * @param ctx execution context
+ * @param backend_uri URI of the backend
+ * @param wtid base32 string indicating a wtid
+ * @param exchange_uri base URL of the exchange in charge of returning the wanted information
+ * @param trackdeposit_cb the callback to call when a reply for this request is available
+ * @param trackdeposit_cb_cls closure for @a contract_cb
+ * @return a handle for this request
+ */
+struct TALER_MERCHANT_TrackDepositOperation *
+TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
+                              const char *backend_uri,
+                              const char *wtid,
+                              const char *exchange_uri,
+                              TALER_MERCHANT_TrackDepositCallback trackdeposit_cb,
+                              void *trackdeposit_cb_cls);
 
 #endif  /* _TALER_MERCHANT_SERVICE_H */

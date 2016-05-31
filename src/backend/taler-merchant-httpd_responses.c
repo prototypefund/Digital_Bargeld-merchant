@@ -289,5 +289,41 @@ TMH_RESPONSE_make_external_error (const char *hint)
                                       "hint", hint);
 }
 
+/**
+ * Send a response indicating a missing argument.
+ *
+ * @param connection the MHD connection to use
+ * @param param_name the parameter that is missing
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
+                                const char *param_name)
+{
+  return TMH_RESPONSE_reply_json_pack (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       "{ s:s, s:s}",
+                                       "error", "missing parameter",
+                                       "parameter", param_name);
+}
+
+
+/**
+ * Send a response indicating an invalid argument.
+ *
+ * @param connection the MHD connection to use
+ * @param param_name the parameter that is invalid
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_arg_invalid (struct MHD_Connection *connection,
+                                const char *param_name)
+{
+  return TMH_RESPONSE_reply_json_pack (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       "{s:s, s:s}",
+                                       "error", "invalid parameter",
+                                       "parameter", param_name);
+}
 
 /* end of taler-exchange-httpd_responses.c */

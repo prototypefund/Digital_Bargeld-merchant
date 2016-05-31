@@ -37,7 +37,7 @@
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
-#include "taler-merchant-httpd_util.h"
+#include "taler-merchant-httpd_track.h"
 
 
 /**
@@ -80,7 +80,7 @@ static char *keyfile;
  * This value tells the exchange by which date this merchant would like
  * to receive the funds for a deposited payment
  */
-struct GNUNET_TIME_Relative edate_delay;
+struct GNUNET_TIME_Relative wire_transfer_delay;
 
 /**
  * Which currency is supported by this merchant?
@@ -174,12 +174,6 @@ url_handler (void *cls,
       { "/", MHD_HTTP_METHOD_GET, "text/plain",
         "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK },
-      { "/hash-contract", MHD_HTTP_METHOD_POST, "application/json",
-        NULL, 0,
-        &MH_handler_hash_contract, MHD_HTTP_OK },
-      { "/hash-contract", NULL, "text/plain",
-        "Only POST is allowed", 0,
-        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
       { "/contract", MHD_HTTP_METHOD_POST, "application/json",
         NULL, 0,
         &MH_handler_contract, MHD_HTTP_OK },
@@ -193,6 +187,12 @@ url_handler (void *cls,
       { "/pay", NULL, "text/plain",
         "Only POST is allowed", 0,
         &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
+      { "/track/deposit", MHD_HTTP_METHOD_GET, "application/json",
+        NULL, 0,
+        &MH_handler_track_deposit, MHD_HTTP_OK},
+      { "/track/deposit", NULL, "text/plain",
+        "Only GET is allowed", 0,
+        &TMH_MHD_handler_static_response, MHD_HTTP_OK},
 
       {NULL, NULL, NULL, NULL, 0, 0 }
     };
@@ -483,6 +483,10 @@ run (void *cls,
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
                                  NULL);
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_log_setup ("taler-merchant-httpd",
+                                   "INFO",
+                                   NULL));
   if (GNUNET_SYSERR ==
       TMH_EXCHANGES_init (config))
   {
@@ -511,12 +515,12 @@ run (void *cls,
   if (GNUNET_SYSERR ==
       GNUNET_CONFIGURATION_get_value_time (config,
                                            "merchant",
-                                           "EDATE",
-                                           &edate_delay))
+                                           "WIRE_TRANSFER_DELAY",
+                                           &wire_transfer_delay))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "merchant",
-                               "EDATE");
+                               "WIRE_TRANSFER_DELAY");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }

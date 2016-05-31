@@ -358,7 +358,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param transaction_id transaction id for the transaction between merchant and customer
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
- * @param execution_deadline date by which the merchant would like the exchange to execute the transaction (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
+ * @param wire_transfer_deadline date by which the merchant would like the exchange to execute the wire transfer (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -378,7 +378,7 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
                              const struct TALER_MerchantSignatureP *merchant_sig,
                              struct GNUNET_TIME_Absolute refund_deadline,
                              struct GNUNET_TIME_Absolute timestamp,
-                             struct GNUNET_TIME_Absolute execution_deadline,
+                             struct GNUNET_TIME_Absolute wire_transfer_deadline,
 			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
@@ -400,8 +400,8 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
     GNUNET_break (0);
     return NULL;
   }
-  if ( (0 != execution_deadline.abs_value_us) &&
-       (execution_deadline.abs_value_us < refund_deadline.abs_value_us) )
+  if ( (0 != wire_transfer_deadline.abs_value_us) &&
+       (wire_transfer_deadline.abs_value_us < wire_transfer_deadline.abs_value_us) )
   {
     GNUNET_break (0);
     return NULL;
@@ -549,12 +549,12 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
                        "amount", TALER_JSON_from_amount (amount),
                        "merchant_sig", GNUNET_JSON_from_data_auto (merchant_sig));
 
-  if (0 != execution_deadline.abs_value_us)
+  if (0 != wire_transfer_deadline.abs_value_us)
   {
     /* Frontend did have an execution date in mind, add it */
     json_object_set_new (pay_obj,
-			 "edate",
-			 GNUNET_JSON_from_time_abs (execution_deadline));
+			 "wire_transfer_deadline",
+			 GNUNET_JSON_from_time_abs (wire_transfer_deadline));
   }
 
   ph = GNUNET_new (struct TALER_MERCHANT_Pay);

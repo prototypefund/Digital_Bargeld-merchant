@@ -104,7 +104,12 @@ enum OpCode
   /**
    * Pay with coins.
    */
-  OC_PAY
+  OC_PAY,
+
+  /**
+   * Retrieve deposit permissions for a given wire transfer
+   */
+   OC_TRACK_DEPOSIT
 
 };
 
@@ -203,9 +208,14 @@ struct Command
       const char *amount;
 
       /**
-       * Wire details (JSON).
+       * Sender's bank account details (JSON).
        */
-      const char *wire;
+      const char *sender_details;
+
+      /**
+       * Transfer details (JSON)
+       */
+       const char *transfer_details;
 
       /**
        * Set (by the interpreter) to the reserve's private key
@@ -283,7 +293,7 @@ struct Command
       /**
        * Blinding key used for the operation.
        */
-      struct TALER_DenominationBlindingKey blinding_key;
+      struct TALER_DenominationBlindingKeyP blinding_key;
 
       /**
        * Withdraw handle (while operation is running).
@@ -369,6 +379,20 @@ struct Command
       struct TALER_MERCHANT_Pay *ph;
 
     } pay;
+
+    struct {
+
+      /**
+       * Wire transfer ID whose deposit permissions are to be retrieved
+       */
+      char *wtid;
+
+      /**
+       * Handle to a /track/deposit operation
+       */
+       struct TALER_MERCHANT_TrackDepositOperation *tdo;
+
+    } track_deposit;
 
   } details;
 
@@ -813,6 +837,30 @@ pay_cb (void *cls,
                                        is);
 }
 
+/**
+ * Callback for a /track/deposit operation
+ *
+ * @param cls closure for this function
+ * @param http_status HTTP response code returned by the server
+ * @param obj server response's body
+ */
+static void
+track_deposit_cb (void *cls,
+                  unsigned int http_status,
+                  const json_t *obj)
+{
+  if (MHD_HTTP_OK == http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Ok from /track/deposit handler\n");
+    result = GNUNET_OK;
+  }
+  else
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Not Ok from /track/deposit handler\n");
+    result = GNUNET_SYSERR;
+  }
+}
+
 
 /**
  * Find denomination key matching the given amount.
@@ -884,7 +932,8 @@ interpreter_run (void *cls)
   struct TALER_CoinSpendPublicKeyP coin_pub;
   struct TALER_Amount amount;
   struct GNUNET_TIME_Absolute execution_date;
-  json_t *wire;
+  json_t *sender_details;
+  json_t *transfer_details;
 
   is->task = NULL;
   tc = GNUNET_SCHEDULER_get_task_context ();
@@ -938,28 +987,46 @@ interpreter_run (void *cls)
       fail (is);
       return;
     }
-    wire = json_loads (cmd->details.admin_add_incoming.wire,
-                       JSON_REJECT_DUPLICATES,
-                       NULL);
-    if (NULL == wire)
+
+    execution_date = GNUNET_TIME_absolute_get ();
+    GNUNET_TIME_round_abs (&execution_date);
+    sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
+                                 JSON_REJECT_DUPLICATES,
+                                 NULL);
+    if (NULL == sender_details)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to parse wire details `%s' at %u\n",
-                  cmd->details.admin_add_incoming.wire,
+                  "Failed to parse sender details `%s' at %u\n",
+                  cmd->details.admin_add_incoming.sender_details,
                   is->ip);
       fail (is);
       return;
     }
-    execution_date = GNUNET_TIME_absolute_get ();
-    GNUNET_TIME_round_abs (&execution_date);
+    transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
+                                   JSON_REJECT_DUPLICATES,
+                                   NULL);
+
+    if (NULL == transfer_details)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed to parse transfer details `%s' at %u\n",
+                  cmd->details.admin_add_incoming.transfer_details,
+                  is->ip);
+      fail (is);
+      return;
+    }
+
     cmd->details.admin_add_incoming.aih
       = TALER_EXCHANGE_admin_add_incoming (exchange,
                                            &reserve_pub,
                                            &amount,
                                            execution_date,
-                                           wire,
+                                           sender_details,
+                                           transfer_details,
                                            &add_incoming_cb,
                                            is);
+    json_decref (sender_details);
+    json_decref (transfer_details);
     if (NULL == cmd->details.admin_add_incoming.aih)
     {
       GNUNET_break (0);
@@ -1024,8 +1091,10 @@ interpreter_run (void *cls)
     }
     GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.reserve_withdraw.coin_priv.eddsa_priv,
                                         &coin_pub.eddsa_pub);
-    cmd->details.reserve_withdraw.blinding_key.rsa_blinding_key
-      = GNUNET_CRYPTO_rsa_blinding_key_create (GNUNET_CRYPTO_rsa_public_key_len (cmd->details.reserve_withdraw.pk->key.rsa_public_key));
+    GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                                &cmd->details.reserve_withdraw.blinding_key,
+                                sizeof (cmd->details.reserve_withdraw.blinding_key));
+
     cmd->details.reserve_withdraw.wsh
       = TALER_EXCHANGE_reserve_withdraw (exchange,
                                          cmd->details.reserve_withdraw.pk,
@@ -1194,6 +1263,14 @@ interpreter_run (void *cls)
       return;
     }
     return;
+  case OC_TRACK_DEPOSIT:
+    TALER_MERCHANT_track_deposit (ctx,
+                                  MERCHANT_URI "/track/deposit",
+                                  cmd->details.track_deposit.wtid,
+                                  EXCHANGE_URI,
+                                  track_deposit_cb,
+                                  is);
+    return;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
@@ -1285,11 +1362,6 @@ do_shutdown (void *cls)
         GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
         cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
       }
-      if (NULL != cmd->details.reserve_withdraw.blinding_key.rsa_blinding_key)
-      {
-        GNUNET_CRYPTO_rsa_blinding_key_free (cmd->details.reserve_withdraw.blinding_key.rsa_blinding_key);
-        cmd->details.reserve_withdraw.blinding_key.rsa_blinding_key = NULL;
-      }
       break;
     case OC_CONTRACT:
       if (NULL != cmd->details.contract.co)
@@ -1318,9 +1390,17 @@ do_shutdown (void *cls)
         cmd->details.pay.ph = NULL;
       }
       break;
+    case OC_TRACK_DEPOSIT:
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "shutting down /track/deposit\n");
+      if (NULL != cmd->details.track_deposit.tdo)
+      {
+        TALER_MERCHANT_track_deposit_cancel (cmd->details.track_deposit.tdo);
+        cmd->details.track_deposit.tdo = NULL;
+      }
+      break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Unknown instruction %d at %u (%s)\n",
+                  "Shutdown: unknown instruction %d at %u (%s)\n",
                   cmd->oc,
                   i,
                   cmd->label);
@@ -1398,11 +1478,20 @@ run (void *cls)
   struct InterpreterState *is;
   static struct Command commands[] =
   {
+
+    { .oc = OC_TRACK_DEPOSIT,
+      .label = "track-deposit-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_deposit.wtid = "TESTWTID"},
+
+    { .oc = OC_END },
+
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = "EUR:5.01" },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
@@ -1449,14 +1538,16 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63, \"uuid\":2 }",
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63, \"uuid\":2 }",
+      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 2}",
       .details.admin_add_incoming.amount = "EUR:1" },
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2b",
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.reserve_reference = "create-reserve-2",
-      .details.admin_add_incoming.wire = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63, \"uuid\":3  }",
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63, \"uuid\":3  }",
+      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 3}",
       .details.admin_add_incoming.amount = "EUR:4.01" },
 
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
@@ -1549,6 +1640,12 @@ main (int argc,
                                   "taler-exchange-keyup",
                                   "-c", "test_merchant_api.conf",
                                   NULL);
+  if (NULL == proc)
+  {
+    fprintf (stderr,
+             "Failed to run taler-exchange-keyup. Check your PATH.\n");
+    return 77;
+  }
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
   proc = GNUNET_OS_start_process (GNUNET_NO,
@@ -1557,7 +1654,14 @@ main (int argc,
                                   "taler-exchange-dbinit",
                                   "taler-exchange-dbinit",
                                   "-c", "test_merchant_api.conf",
+                                  "-r",
                                   NULL);
+  if (NULL == proc)
+  {
+    fprintf (stderr,
+             "Failed to run taler-exchange-dbinit. Check your PATH.\n");
+    return 77;
+  }
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
   exchanged = GNUNET_OS_start_process (GNUNET_NO,
@@ -1567,9 +1671,15 @@ main (int argc,
                                        "taler-exchange-httpd",
                                        "-c", "test_merchant_api.conf",
                                        NULL);
+  if (NULL == exchanged)
+  {
+    fprintf (stderr,
+             "Failed to run taler-exchange-httpd. Check your PATH.\n");
+    return 77;
+  }
   /* give child time to start and bind against the socket */
   fprintf (stderr,
-           "Waiting for taler-exchange-httpd to be ready");
+           "Waiting for taler-exchange-httpd to be ready\n");
   cnt = 0;
   do
     {
@@ -1596,9 +1706,19 @@ main (int argc,
                                        "taler-merchant-httpd",
                                        "-c", "test_merchant_api.conf",
                                        NULL);
+  if (NULL == merchantd)
+  {
+    fprintf (stderr,
+             "Failed to run taler-merchant-httpd. Check your PATH.\n");
+    GNUNET_OS_process_kill (exchanged,
+                            SIGKILL);
+    GNUNET_OS_process_wait (exchanged);
+    GNUNET_OS_process_destroy (exchanged);
+    return 77;
+  }
   /* give child time to start and bind against the socket */
   fprintf (stderr,
-           "Waiting for taler-merchant-httpd to be ready");
+           "Waiting for taler-merchant-httpd to be ready\n");
   cnt = 0;
   do
     {
@@ -1613,6 +1733,10 @@ main (int argc,
                                 SIGKILL);
         GNUNET_OS_process_wait (merchantd);
         GNUNET_OS_process_destroy (merchantd);
+        GNUNET_OS_process_kill (exchanged,
+                                SIGKILL);
+        GNUNET_OS_process_wait (exchanged);
+        GNUNET_OS_process_destroy (exchanged);
         return 77;
       }
     }

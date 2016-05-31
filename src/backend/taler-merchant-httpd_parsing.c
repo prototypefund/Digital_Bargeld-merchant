@@ -27,12 +27,6 @@
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 
-/* Although the following declaration isn't in any case useful
-to a merchant's activity, it's needed here to make the function
-'TMH_PARSE_nagivate_json ()' compile fine; so its value will be
-kept on some merchant's accepted currency. For multi currencies
-merchants, that of course would require a patch */
-extern char *TMH_merchant_currency_string;
 
 /**
  * Initial size for POST request buffer.
@@ -129,9 +123,9 @@ buffer_append (struct Buffer *buf,
   if (data_size + buf->fill > buf->alloc)
   {
     char *new_buf;
-    size_t new_size = buf->alloc;
+    size_t new_size = buf->alloc ? buf->alloc : 1;
     while (new_size < buf->fill + data_size)
-      new_size += 2;
+      new_size *= 2;
     if (new_size > max_size)
       return GNUNET_NO;
     new_buf = GNUNET_malloc (new_size);
@@ -310,6 +304,51 @@ TMH_PARSE_json_data (struct MHD_Connection *connection,
     return ret;
   }
   return GNUNET_YES;
+}
+
+
+
+/**
+ * Extract base32crockford encoded data from request.
+ *
+ * Queues an error response to the connection if the parameter is
+ * missing or invalid.
+ *
+ * @param connection the MHD connection
+ * @param param_name the name of the parameter with the key
+ * @param[out] out_data pointer to store the result
+ * @param out_size expected size of data
+ * @return
+ *   #GNUNET_YES if the the argument is present
+ *   #GNUNET_NO if the argument is absent or malformed
+ *   #GNUNET_SYSERR on internal error (error response could not be sent)
+ */
+int
+TMH_PARSE_mhd_request_arg_data (struct MHD_Connection *connection,
+                                const char *param_name,
+                                void *out_data,
+                                size_t out_size)
+{
+  const char *str;
+
+  str = MHD_lookup_connection_value (connection,
+                                     MHD_GET_ARGUMENT_KIND,
+                                     param_name);
+  if (NULL == str)
+  {
+    return (MHD_NO ==
+            TMH_RESPONSE_reply_arg_missing (connection, param_name))
+      ? GNUNET_SYSERR : GNUNET_NO;
+  }
+  if (GNUNET_OK !=
+      GNUNET_STRINGS_string_to_data (str,
+                                     strlen (str),
+                                     out_data,
+                                     out_size))
+    return (MHD_NO ==
+            TMH_RESPONSE_reply_arg_invalid (connection, param_name))
+      ? GNUNET_SYSERR : GNUNET_NO;
+  return GNUNET_OK;
 }
 
 

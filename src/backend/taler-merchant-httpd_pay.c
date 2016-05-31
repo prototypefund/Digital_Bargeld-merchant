@@ -18,6 +18,7 @@
  * @brief handling of /pay requests
  * @author Marcello Stanisci
  * @author Christian Grothoff
+ * @author Florian Dold
  */
 #include "platform.h"
 #include <jansson.h>
@@ -30,6 +31,12 @@
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
+
+
+/**
+ * How long to wait before giving up processing with the exchange?
+ */
+#define PAY_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
 
 /**
@@ -175,11 +182,11 @@ struct PayContext
   struct GNUNET_HashCode h_contract;
 
   /**
-   * Execution date. How soon would the merchant like the
-   * transaction to be executed? (Can be given by the frontend
-   * or be determined by our configuration via #edate_delay.)
+   * Wire transfer deadline. How soon would the merchant like the
+   * wire transfer to be executed? (Can be given by the frontend
+   * or be determined by our configuration via #wire_transfer_delay.)
    */
-  struct GNUNET_TIME_Absolute edate;
+  struct GNUNET_TIME_Absolute wire_transfer_deadline;
 
   /**
    * Response to return, NULL if we don't have one yet.
@@ -206,6 +213,13 @@ struct PayContext
    */
   unsigned int response_code;
 
+  /**
+   * Task called when the (suspended) processing for
+   * the /pay request times out.
+   * Happens when we don't get a response from the exchange.
+   */
+  struct GNUNET_SCHEDULER_Task *timeout_task;
+
 };
 
 
@@ -228,9 +242,15 @@ resume_pay_with_response (struct PayContext *pc,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming /pay handling as exchange interaction is done (%u)\n",
               response_code);
+  if (NULL != pc->timeout_task)
+  {
+    GNUNET_SCHEDULER_cancel (pc->timeout_task);
+    pc->timeout_task = NULL;
+  }
   MHD_resume_connection (pc->connection);
   TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
+
 
 /**
  * Convert denomination key to its base32 representation
@@ -311,10 +331,13 @@ deposit_cb (void *cls,
 
     if (NULL == proof)
     {
-      /* FIXME: is this the right code for when the exchange fails? */
+      /* We can't do anything meaningful here, the exchange did something wrong */
+      /* FIXME: any useful information we can include? */
       resume_pay_with_response (pc,
-                                MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                TMH_RESPONSE_make_internal_error ("Exchange failed, no proof available"));
+                                MHD_HTTP_SERVICE_UNAVAILABLE,
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:s}",
+                                                             "error", "exchange failed",
+                                                             "hint", "The exchange provided an unexpected response"));
     }
     else
     {
@@ -374,6 +397,12 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
 {
   struct PayContext *pc = (struct PayContext *) hc;
   unsigned int i;
+
+  if (NULL != pc->timeout_task)
+  {
+    GNUNET_SCHEDULER_cancel (pc->timeout_task);
+    pc->timeout_task = NULL;
+  }
 
   TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
   for (i=0;i<pc->coins_cnt;i++)
@@ -466,9 +495,10 @@ process_pay_with_exchange (void *cls,
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
-                                                             "hint", "unknown denom to exchange",
-                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:o, s:o}",
+                                                             "error", "denomination not found",
+                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key),
+                                                             "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "unknown denom to exchange: %s\n", denom_enc);
       GNUNET_free (denom_enc);
@@ -484,10 +514,10 @@ process_pay_with_exchange (void *cls,
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
-                                                             "hint", "no acceptable auditor for denomination",
+                                                             "error", "invalid denomination",
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "no acceptable auditor for denomination: %s\n", denom_enc);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "client offered invalid denomination: %s\n", denom_enc);
       GNUNET_free (denom_enc);
       return;
     }
@@ -593,7 +623,7 @@ process_pay_with_exchange (void *cls,
 
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->percoin_amount,
-                                     pc->edate,
+                                     pc->wire_transfer_deadline,
                                      j_wire,
                                      &pc->h_contract,
                                      &dc->coin_pub,
@@ -619,6 +649,33 @@ process_pay_with_exchange (void *cls,
       return;
     }
   }
+}
+
+
+/**
+ * Handle a timeout for the processing of the pay request.
+ *
+ * @param cls closure
+ */
+static void
+handle_pay_timeout (void *cls)
+{
+  struct PayContext *pc = cls;
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Resuming /pay with error after timeout\n");
+
+  pc->timeout_task = NULL;
+
+  if (NULL != pc->fo)
+  {
+    TMH_EXCHANGES_find_exchange_cancel (pc->fo);
+    pc->fo = NULL;
+  }
+
+  resume_pay_with_response (pc,
+                            MHD_HTTP_SERVICE_UNAVAILABLE,
+                            TMH_RESPONSE_make_internal_error ("exchange not reachable"));
 }
 
 
@@ -748,18 +805,24 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                                 "invalid merchant signature supplied");
     }
 
-    /* 'edate' is optional, if it is not present, generate it here; it
-       will be timestamp plus the edate_delay supplied in config
-       file */
-    if (NULL == json_object_get (root, "edate"))
+    /* 'wire_transfer_deadline' is optional, if it is not present,
+       generate it here; it will be timestamp plus the
+       wire_transfer_delay supplied in config file */
+    if (NULL == json_object_get (root, "wire_transfer_deadline"))
     {
-      pc->edate = GNUNET_TIME_absolute_add (pc->timestamp,
-                                            edate_delay);
+      pc->wire_transfer_deadline = GNUNET_TIME_absolute_add (pc->timestamp,
+                                                             wire_transfer_delay);
+      if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
+      {
+        /* Refund value very large, delay wire transfer accordingly */
+        pc->wire_transfer_deadline = pc->refund_deadline;
+      }
     }
     else
     {
       struct GNUNET_JSON_Specification espec[] = {
-        GNUNET_JSON_spec_absolute_time ("edate", &pc->edate),
+        GNUNET_JSON_spec_absolute_time ("wire_transfer_deadline",
+                                        &pc->wire_transfer_deadline),
         GNUNET_JSON_spec_end()
       };
 
@@ -772,6 +835,14 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
         GNUNET_break (0);
         return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
       }
+      if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
+      {
+        GNUNET_break (0);
+        json_decref (root);
+        return TMH_RESPONSE_reply_external_error (connection,
+                                                  "refund deadline after wire transfer deadline");
+      }
+
     }
 
 
@@ -833,9 +904,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     /* Payment succeeded in the past; take short cut
        and accept immediately */
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Transaction %llu already paid in the past, taking short cut.\n",
-                (unsigned long long) pc->transaction_id);
     resp = MHD_create_response_from_buffer (0,
                                             NULL,
                                             MHD_RESPMEM_PERSISTENT);
@@ -859,6 +927,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Suspending /pay handling while working with the exchange\n");
   MHD_suspend_connection (connection);
+  pc->timeout_task = GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT, handle_pay_timeout, pc);
   json_decref (root);
   return MHD_YES;
 }

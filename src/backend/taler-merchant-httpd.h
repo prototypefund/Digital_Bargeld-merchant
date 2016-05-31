@@ -179,10 +179,10 @@ extern struct TALER_MERCHANTDB_Plugin *db;
 /**
  * If the frontend does NOT specify an execution date, how long should
  * we tell the exchange to wait to aggregate transactions before
- * executing?  This delay is added to the current time when we
- * generate the advisory execution time for the exchange.
+ * executing the wire transfer?  This delay is added to the current
+ * time when we generate the advisory execution time for the exchange.
  */
-extern struct GNUNET_TIME_Relative edate_delay;
+extern struct GNUNET_TIME_Relative wire_transfer_delay;
 
 /**
  * Kick MHD to run now, to be called after MHD_resume_connection().
