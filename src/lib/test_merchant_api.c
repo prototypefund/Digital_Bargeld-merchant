@@ -1640,6 +1640,12 @@ main (int argc,
                                   "taler-exchange-keyup",
                                   "-c", "test_merchant_api.conf",
                                   NULL);
+  if (NULL == proc)
+  {
+    fprintf (stderr,
+             "Failed to run taler-exchange-keyup. Check your PATH.\n");
+    return 77;
+  }
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
   proc = GNUNET_OS_start_process (GNUNET_NO,
@@ -1650,6 +1656,12 @@ main (int argc,
                                   "-c", "test_merchant_api.conf",
                                   "-r",
                                   NULL);
+  if (NULL == proc)
+  {
+    fprintf (stderr,
+             "Failed to run taler-exchange-dbinit. Check your PATH.\n");
+    return 77;
+  }
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
   exchanged = GNUNET_OS_start_process (GNUNET_NO,
@@ -1659,6 +1671,12 @@ main (int argc,
                                        "taler-exchange-httpd",
                                        "-c", "test_merchant_api.conf",
                                        NULL);
+  if (NULL == exchanged)
+  {
+    fprintf (stderr,
+             "Failed to run taler-exchange-httpd. Check your PATH.\n");
+    return 77;
+  }
   /* give child time to start and bind against the socket */
   fprintf (stderr,
            "Waiting for taler-exchange-httpd to be ready");
@@ -1688,6 +1706,16 @@ main (int argc,
                                        "taler-merchant-httpd",
                                        "-c", "test_merchant_api.conf",
                                        NULL);
+  if (NULL == merchantd)
+  {
+    fprintf (stderr,
+             "Failed to run taler-merchant-httpd. Check your PATH.\n");
+    GNUNET_OS_process_kill (exchanged,
+                            SIGKILL);
+    GNUNET_OS_process_wait (exchanged);
+    GNUNET_OS_process_destroy (exchanged);
+    return 77;
+  }
   /* give child time to start and bind against the socket */
   fprintf (stderr,
            "Waiting for taler-merchant-httpd to be ready");
@@ -1705,6 +1733,10 @@ main (int argc,
                                 SIGKILL);
         GNUNET_OS_process_wait (merchantd);
         GNUNET_OS_process_destroy (merchantd);
+        GNUNET_OS_process_kill (exchanged,
+                                SIGKILL);
+        GNUNET_OS_process_wait (exchanged);
+        GNUNET_OS_process_destroy (exchanged);
         return 77;
       }
     }
