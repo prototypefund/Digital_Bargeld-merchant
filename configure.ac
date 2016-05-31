@@ -223,6 +223,14 @@ AC_TYPE_UINTMAX_T
 # Checks for library functions.
 AC_CHECK_FUNCS([strdup])
 
+
+#
+# Check for tsc
+#
+AC_CHECK_PROG([tsc],[tsc],[yes],[no])
+AM_CONDITIONAL([HAVE_TSC], [test "x$tsc" = xyes])
+
+
 AC_CONFIG_FILES([Makefile
 examples/Makefile
 examples/blog/Makefile
