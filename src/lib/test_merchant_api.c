@@ -1265,7 +1265,7 @@ interpreter_run (void *cls)
     return;
   case OC_TRACK_DEPOSIT:
     TALER_MERCHANT_track_deposit (ctx,
-                                  MERCHANT_URI "/track/deposit",
+                                  MERCHANT_URI "track/deposit",
                                   cmd->details.track_deposit.wtid,
                                   EXCHANGE_URI,
                                   track_deposit_cb,
@@ -1478,14 +1478,14 @@ run (void *cls)
   struct InterpreterState *is;
   static struct Command commands[] =
   {
-
+#if NEW_MARCELLO_CODE
     { .oc = OC_TRACK_DEPOSIT,
       .label = "track-deposit-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.track_deposit.wtid = "TESTWTID"},
 
     { .oc = OC_END },
-
+#endif
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",

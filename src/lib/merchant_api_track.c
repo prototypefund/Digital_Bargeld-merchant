@@ -93,13 +93,15 @@ handle_trackdeposit_finished (void *cls,
   case MHD_HTTP_OK:
     {
     /* Work out argument for external callback from the body .. */
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "200 returned from /track/deposit");
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "200 returned from /track/deposit\n");
     }
     break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "track deposit URI not found");
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "track deposit URI not found\n");
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
@@ -165,6 +167,7 @@ TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
                                   tdo);
   return tdo;
 }
+
 
 /**
  * Cancel a /track/deposit request.  This function cannot be used
