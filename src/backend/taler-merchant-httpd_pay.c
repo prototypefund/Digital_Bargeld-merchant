@@ -812,6 +812,11 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     {
       pc->wire_transfer_deadline = GNUNET_TIME_absolute_add (pc->timestamp,
                                                              wire_transfer_delay);
+      if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
+      {
+        /* Refund value very large, delay wire transfer accordingly */
+        pc->wire_transfer_deadline = pc->refund_deadline;
+      }
     }
     else
     {
@@ -830,6 +835,14 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
         GNUNET_break (0);
         return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
       }
+      if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
+      {
+        GNUNET_break (0);
+        json_decref (root);
+        return TMH_RESPONSE_reply_external_error (connection,
+                                                  "refund deadline after wire transfer deadline");
+      }
+
     }
 
 
