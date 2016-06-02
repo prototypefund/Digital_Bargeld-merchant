@@ -1162,6 +1162,7 @@ interpreter_run (void *cls)
       /* get amount */
       ref = find_command (is,
                           cmd->details.pay.contract_ref);
+      GNUNET_assert (NULL != ref); 
       merchant_sig = ref->details.contract.merchant_sig;
       GNUNET_assert (NULL != ref->details.contract.contract);
       {
