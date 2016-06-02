@@ -401,7 +401,7 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
     return NULL;
   }
   if ( (0 != wire_transfer_deadline.abs_value_us) &&
-       (wire_transfer_deadline.abs_value_us < wire_transfer_deadline.abs_value_us) )
+       (wire_transfer_deadline.abs_value_us < refund_deadline.abs_value_us) )
   {
     GNUNET_break (0);
     return NULL;
