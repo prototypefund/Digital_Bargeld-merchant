@@ -23,6 +23,7 @@
  * @author Christian Grothoff
  */
 #include "platform.h"
+#include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_responses.h"
 #include <taler/taler_util.h>
 #include <gnunet/gnunet_util_lib.h>
@@ -244,12 +245,7 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection)
 void
 TMH_RESPONSE_add_global_headers (struct MHD_Response *response)
 {
-  int TMH_exchange_connection_close;
-  TMH_exchange_connection_close = 0;
-
-  /* this test is taken verbatim from the exchange's code,
-    so there is no particular need to do that for a merchant */
-  if (TMH_exchange_connection_close)
+  if (TMH_merchant_connection_close)
     (void) MHD_add_response_header (response,
                                     MHD_HTTP_HEADER_CONNECTION,
                                     "close");

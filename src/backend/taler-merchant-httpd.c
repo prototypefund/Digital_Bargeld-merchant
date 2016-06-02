@@ -88,6 +88,11 @@ struct GNUNET_TIME_Relative wire_transfer_delay;
 char *TMH_merchant_currency_string;
 
 /**
+ * Should a "Connection: close" header be added to each HTTP response?
+ */
+int TMH_merchant_connection_close;
+
+/**
  * Task running the HTTP server.
  */
 static struct GNUNET_SCHEDULER_Task *mhd_task;
@@ -776,6 +781,9 @@ int
 main (int argc, char *const *argv)
 {
   static const struct GNUNET_GETOPT_CommandLineOption options[] = {
+    { 'C', "connection-close", NULL,
+      "force HTTP connections to be closed after each request", 0,
+      &GNUNET_GETOPT_set_one, &TMH_merchant_connection_close},
     GNUNET_GETOPT_OPTION_END
   };
 
