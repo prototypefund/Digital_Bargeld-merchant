@@ -1281,8 +1281,6 @@ interpreter_run (void *cls)
     fail (is);
     return;
   }
-  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                       is);
 }
 
 
