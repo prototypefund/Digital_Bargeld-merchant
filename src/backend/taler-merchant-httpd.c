@@ -198,6 +198,12 @@ url_handler (void *cls,
       { "/track/deposit", NULL, "text/plain",
         "Only GET is allowed", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK},
+      { "/track/transaction", MHD_HTTP_METHOD_GET, "application/json",
+        NULL, 0,
+        &MH_handler_track_transaction, MHD_HTTP_OK},
+      { "/track/transaction", NULL, "text/plain",
+        "Only GET is allowed", 0,
+        &TMH_MHD_handler_static_response, MHD_HTTP_OK},
 
       {NULL, NULL, NULL, NULL, 0, 0 }
     };

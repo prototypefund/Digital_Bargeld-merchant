@@ -339,6 +339,9 @@ void
 TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *ph);
 
 
+typedef void
+(*TALER_MERCHANT_TrackDepositCallback)(void *cls,
+                                       ...);
 
 /**
  * Request backend to return deposits associated with a given wtid.

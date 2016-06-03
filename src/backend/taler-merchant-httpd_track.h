@@ -18,6 +18,8 @@
  * @brief headers for /track/{deposit,wtid} handler
  * @author Marcello Stanisci
  */
+#ifndef TALER_MERCHANT_HTTPD_TRACK_H
+#define TALER_MERCHANT_HTTPD_TRACK_H
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 
@@ -39,3 +41,23 @@ MH_handler_track_deposit (struct TMH_RequestHandler *rh,
                           void **connection_cls,
                           const char *upload_data,
                           size_t *upload_data_size);
+
+/**
+ * Handle a "/track/transaction" request.
+ *
+ * @param rh context of the handler
+ * @param connection the MHD connection to handle
+ * @param[in,out] connection_cls the connection's closure (can be updated)
+ * @param upload_data upload data
+ * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @return MHD result code
+ */
+int
+MH_handler_track_transaction (struct TMH_RequestHandler *rh,
+                              struct MHD_Connection *connection,
+                              void **connection_cls,
+                              const char *upload_data,
+                              size_t *upload_data_size);
+
+
+#endif

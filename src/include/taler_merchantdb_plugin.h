@@ -30,6 +30,12 @@
  */
 struct TALER_MERCHANTDB_Plugin;
 
+
+typedef void
+(*TALER_MERCHANTDB_PaymentCallback)(void *cls,
+                                    ...);
+
+
 /**
  * Handle to interact with the database.
  */
@@ -90,6 +96,7 @@ struct TALER_MERCHANTDB_Plugin
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
 		    const json_t *exchange_proof);
 
+
   /**
    * Check whether a payment has already been stored
    *
@@ -103,6 +110,23 @@ struct TALER_MERCHANTDB_Plugin
   int
   (*check_payment) (void *cls,
                     uint64_t transaction_id);
+
+
+  /**
+   * Lookup information about a payment by transaction ID.
+   *
+   * @param cls closure
+   * @param transaction_id key for the search
+   * @param cb function to call with payment data
+   * @param cb_cls closure for @a cb
+   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   *         #GNUNET_SYSERR on hard errors
+   */
+  int
+  (*find_payment) (void *cls,
+                   uint64_t transaction_id,
+                   TALER_MERCHANTDB_PaymentCallback cb,
+                   void *cb_cls);
 
 };
 #endif
