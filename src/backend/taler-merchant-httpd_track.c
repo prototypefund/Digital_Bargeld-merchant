@@ -29,6 +29,7 @@
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
+#include "taler-merchant-httpd_track.h"
 
 
 extern char *TMH_merchant_currency_string;
@@ -70,6 +71,14 @@ struct DepositTrackContext
    */
   unsigned int details_length;
 
+  struct MHD_Connection *connection;
+
+  unsigned int response_code;
+
+  json_t *json;
+
+  const char *error;
+
 };
 
 
@@ -104,14 +113,14 @@ wire_deposit_cb (void *cls,
   if (NULL == total_amount)
   {
     rctx->error = "failed to obtain /wire/deposit response from exchange";
-    rctx->json = json_incref (json);
+    rctx->json = json_incref ((json_t *) json);
     rctx->response_code = http_status;
-    MHD_connection_resume (rctx->connection);
+    MHD_resume_connection (rctx->connection);
     return;
   }
   rctx->details_length = details_length;
-  rctx->details = GNUNET_new_array (struct TALER_WireDepositDetails,
-                                    details_length);
+  rctx->details = GNUNET_new_array (details_length,
+                                    struct TALER_WireDepositDetails);
   memcpy (rctx->details,
           details,
           details_length * sizeof (struct TALER_WireDepositDetails));
@@ -141,7 +150,7 @@ cert_cb (void *cls,
   {
     rctx->error = "failed to obtain /keys from exchange";
     rctx->response_code = MHD_HTTP_SERVICE_UNAVAILABLE;
-    MHD_connection_resume (rctx->connection);
+    MHD_resume_connection (rctx->connection);
     return;
   }
   rctx->wdh = TALER_EXCHANGE_wire_deposits (rctx->eh,
@@ -177,7 +186,7 @@ MH_handler_track_deposit (struct TMH_RequestHandler *rh,
   rctx = *connection_cls;
   if (NULL != rctx)
   {
-    if (NULL == rctx->
+    // ...
   }
   uri = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
@@ -194,15 +203,15 @@ MH_handler_track_deposit (struct TMH_RequestHandler *rh,
   if (GNUNET_OK !=
       GNUNET_STRINGS_string_to_data (str,
                                      strlen (str),
-                                     &wtid,
-                                     sizeof (wtid)))
+                                     &rctx->wtid,
+                                     sizeof (rctx->wtid)))
     return TMH_RESPONSE_reply_external_error (connection,
                                               "wtid argument malformed");
-  eh = TALER_EXCHANGE_connect (ctx,
-                               url,
-                               &cert_cb,
-                               rctx,
-                               TALER_EXCHANGE_OPTION_END);
+  rctx->eh = TALER_EXCHANGE_connect (NULL /* FIXME */,
+                                     uri,
+                                     &cert_cb,
+                                     rctx,
+                                     TALER_EXCHANGE_OPTION_END);
 
   GNUNET_break (0);
   return MHD_NO;
@@ -238,7 +247,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   if (1 !=
       sscanf (str,
               "%llu",
-              str))
+              &transaction_id))
     return TMH_RESPONSE_reply_external_error (connection,
                                               "id argument must be a number");
   GNUNET_break (0);

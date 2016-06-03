@@ -60,6 +60,7 @@ TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
                               TALER_MERCHANT_TrackDepositCallback trackdeposit_cb,
                               void *trackdeposit_cb_cls);
 
+
 /**
  * Cancel a /track/deposit request.  This function cannot be used
  * on a request handle if a response is already served for it.
@@ -339,27 +340,5 @@ void
 TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *ph);
 
 
-typedef void
-(*TALER_MERCHANT_TrackDepositCallback)(void *cls,
-                                       ...);
-
-/**
- * Request backend to return deposits associated with a given wtid.
- *
- * @param ctx execution context
- * @param backend_uri URI of the backend
- * @param wtid base32 string indicating a wtid
- * @param exchange_uri base URL of the exchange in charge of returning the wanted information
- * @param trackdeposit_cb the callback to call when a reply for this request is available
- * @param trackdeposit_cb_cls closure for @a contract_cb
- * @return a handle for this request
- */
-struct TALER_MERCHANT_TrackDepositOperation *
-TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
-                              const char *backend_uri,
-                              const char *wtid,
-                              const char *exchange_uri,
-                              TALER_MERCHANT_TrackDepositCallback trackdeposit_cb,
-                              void *trackdeposit_cb_cls);
 
 #endif  /* _TALER_MERCHANT_SERVICE_H */
