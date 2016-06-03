@@ -483,6 +483,7 @@ run (void *cls,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
   char *wireformat;
+  int fh;
 
   wireformat = NULL;
   result = GNUNET_SYSERR;
@@ -615,7 +616,6 @@ run (void *cls,
       struct sockaddr_un *un;
       char *mode;
       struct GNUNET_NETWORK_Handle *nh;
-      int fh;
 
       if (GNUNET_OK !=
           GNUNET_CONFIGURATION_get_value_filename (config,
