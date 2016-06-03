@@ -610,36 +610,7 @@ run (void *cls,
       return;
     }
 
-    // FIXME: refactor two calls to MHD_start_daemon
-    // into one, using an options array instead of varags
-
-    if (0 == strcmp (serve_type, "tcp"))
-    {
-
-      if (GNUNET_SYSERR ==
-          GNUNET_CONFIGURATION_get_value_number (config,
-                                                 "merchant",
-                                                 "PORT",
-                                                 &port))
-      {
-        GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                                   "merchant",
-                                   "PORT");
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-
-      mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
-                              port,
-                              NULL, NULL,
-                              &url_handler, NULL,
-                              MHD_OPTION_NOTIFY_COMPLETED,
-                              &handle_mhd_completion_callback, NULL,
-                              MHD_OPTION_CONNECTION_TIMEOUT,
-                              (unsigned int) 10 /* 10s */,
-                              MHD_OPTION_END);
-    }
-    else if (0 == strcmp (serve_type, "unix"))
+    if (0 == strcmp (serve_type, "unix"))
     {
       struct sockaddr_un *un;
       char *mode;
@@ -732,25 +703,30 @@ run (void *cls,
       }
 
       fh = GNUNET_NETWORK_get_fd (nh);
-
       if (0 != chmod (serve_unixpath, unixpath_mode))
       {
         fprintf (stderr, "chmod failed: %s\n", strerror (errno));
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-
-      mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
-                              0,
-                              NULL, NULL,
-                              &url_handler, NULL,
-                              MHD_OPTION_LISTEN_SOCKET, fh,
-                              MHD_OPTION_NOTIFY_COMPLETED,
-                              &handle_mhd_completion_callback, NULL,
-                              MHD_OPTION_CONNECTION_TIMEOUT,
-                              (unsigned int) 10 /* 10s */,
-                              MHD_OPTION_END);
       GNUNET_NETWORK_socket_free_memory_only_ (nh);
+      port = 0;
+    }
+    else if (0 == strcmp (serve_type, "tcp"))
+    {
+      if (GNUNET_SYSERR ==
+          GNUNET_CONFIGURATION_get_value_number (config,
+                                                 "merchant",
+                                                 "PORT",
+                                                 &port))
+      {
+        GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                                   "merchant",
+                                   "PORT");
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+      fh = -1;
     }
     else
     {
@@ -758,7 +734,16 @@ run (void *cls,
       GNUNET_assert (0);
     }
   }
-
+  mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
+                          port,
+                          NULL, NULL,
+                          &url_handler, NULL,
+                          MHD_OPTION_LISTEN_SOCKET, fh,
+                          MHD_OPTION_NOTIFY_COMPLETED,
+                          &handle_mhd_completion_callback, NULL,
+                          MHD_OPTION_CONNECTION_TIMEOUT,
+                          (unsigned int) 10 /* 10s */,
+                          MHD_OPTION_END);
   if (NULL == mhd)
   {
     GNUNET_break (0);
