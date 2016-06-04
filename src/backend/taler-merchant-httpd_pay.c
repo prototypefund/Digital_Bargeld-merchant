@@ -48,7 +48,7 @@ struct PayContext;
 /**
  * Information kept during a /pay request for each coin.
  */
-struct MERCHANT_DepositConfirmation
+struct DepositConfirmation
 {
 
   /**
@@ -68,15 +68,15 @@ struct MERCHANT_DepositConfirmation
   struct TALER_DenominationPublicKey denom;
 
   /**
-   * Amount "f" that this coin contributes to the overall payment.
+   * Amount this coin contributes to the total purchase price.
    * This amount includes the deposit fee.
    */
-  struct TALER_Amount percoin_amount;
+  struct TALER_Amount amount_with_fee;
 
   /**
-   * Amount this coin contributes to the total purchase price.
+   * Fee charged by the exchange for the deposit operation of this coin.
    */
-  struct TALER_Amount amount_without_fee;
+  struct TALER_Amount deposit_fee;
 
   /**
    * Public key of the coin.
@@ -99,6 +99,11 @@ struct MERCHANT_DepositConfirmation
    */
   unsigned int index;
 
+  /**
+   * #GNUNET_YES if we found this coin in the database.
+   */
+  int found_in_db;
+
 };
 
 
@@ -117,7 +122,7 @@ struct PayContext
   /**
    * Array with @e coins_cnt coins we are despositing.
    */
-  struct MERCHANT_DepositConfirmation *dc;
+  struct DepositConfirmation *dc;
 
   /**
    * MHD connection to return to
@@ -220,6 +225,14 @@ struct PayContext
    */
   struct GNUNET_SCHEDULER_Task *timeout_task;
 
+  /**
+   * #GNUNET_NO if the transaction is not in our database,
+   * #GNUNET_YES if the transaction is known to our database,
+   * #GNUNET_SYSERR if the transaction ID is used for a different
+   * transaction in our database.
+   */
+  int transaction_exits;
+
 };
 
 
@@ -264,8 +277,11 @@ denomination_to_string_alloc (struct TALER_DenominationPublicKey *dk)
   char *buf;
   char *buf2;
   size_t buf_size;
-  buf_size = GNUNET_CRYPTO_rsa_public_key_encode (dk->rsa_public_key, &buf);
-  buf2 = GNUNET_STRINGS_data_to_string_alloc (buf, buf_size);
+
+  buf_size = GNUNET_CRYPTO_rsa_public_key_encode (dk->rsa_public_key,
+                                                  &buf);
+  buf2 = GNUNET_STRINGS_data_to_string_alloc (buf,
+                                              buf_size);
   GNUNET_free (buf);
   return buf2;
 }
@@ -285,7 +301,7 @@ abort_deposit (struct PayContext *pc)
               "Aborting pending /deposit operations\n");
   for (i=0;i<pc->coins_cnt;i++)
   {
-    struct MERCHANT_DepositConfirmation *dci = &pc->dc[i];
+    struct DepositConfirmation *dci = &pc->dc[i];
 
     if (NULL != dci->dh)
     {
@@ -299,7 +315,7 @@ abort_deposit (struct PayContext *pc)
 /**
  * Callback to handle a deposit permission's response.
  *
- * @param cls a `struct MERCHANT_DepositConfirmation` (i.e. a pointer
+ * @param cls a `struct DepositConfirmation` (i.e. a pointer
  *   into the global array of confirmations and an index for this call
  *   in that array). That way, the last executed callback can detect
  *   that no other confirmations are on the way, and can pack a response
@@ -316,7 +332,7 @@ deposit_cb (void *cls,
             unsigned int http_status,
             const json_t *proof)
 {
-  struct MERCHANT_DepositConfirmation *dc = cls;
+  struct DepositConfirmation *dc = cls;
   struct PayContext *pc = dc->pc;
 
   dc->dh = NULL;
@@ -358,14 +374,11 @@ deposit_cb (void *cls,
   }
   /* store result to DB */
   if (GNUNET_OK !=
-      db->store_payment (db->cls,
-			 &pc->h_contract,
-			 &h_wire,
+      db->store_deposit (db->cls,
 			 pc->transaction_id,
-			 pc->timestamp,
-			 pc->refund_deadline,
-			 &dc->amount_without_fee,
 			 &dc->coin_pub,
+			 &dc->amount_with_fee,
+			 &dc->deposit_fee,
 			 proof))
   {
     GNUNET_break (0);
@@ -377,6 +390,7 @@ deposit_cb (void *cls,
                               TMH_RESPONSE_make_internal_error ("Merchant database error"));
     return;
   }
+
   if (0 != pc->pending)
     return; /* still more to do */
   resume_pay_with_response (pc,
@@ -407,7 +421,7 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
   TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
   for (i=0;i<pc->coins_cnt;i++)
   {
-    struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
+    struct DepositConfirmation *dc = &pc->dc[i];
 
     if (NULL != dc->dh)
     {
@@ -484,7 +498,7 @@ process_pay_with_exchange (void *cls,
   /* Total up the fees and the value of the deposited coins! */
   for (i=0;i<pc->coins_cnt;i++)
   {
-    struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
+    struct DepositConfirmation *dc = &pc->dc[i];
     const struct TALER_EXCHANGE_DenomPublicKey *denom_details;
 
     denom_details = TALER_EXCHANGE_get_denomination_key (keys,
@@ -492,6 +506,7 @@ process_pay_with_exchange (void *cls,
     if (NULL == denom_details)
     {
       char *denom_enc;
+
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
@@ -500,7 +515,9 @@ process_pay_with_exchange (void *cls,
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key),
                                                              "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "unknown denom to exchange: %s\n", denom_enc);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "unknown denom to exchange: %s\n",
+                  denom_enc);
       GNUNET_free (denom_enc);
       return;
     }
@@ -510,6 +527,7 @@ process_pay_with_exchange (void *cls,
                                exchange_trusted))
     {
       char *denom_enc;
+
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
@@ -517,14 +535,17 @@ process_pay_with_exchange (void *cls,
                                                              "error", "invalid denomination",
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "client offered invalid denomination: %s\n", denom_enc);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Client offered invalid denomination: %s\n",
+                  denom_enc);
       GNUNET_free (denom_enc);
       return;
     }
+    dc->deposit_fee = denom_details->fee_deposit;
     if (0 == i)
     {
       acc_fee = denom_details->fee_deposit;
-      acc_amount = dc->percoin_amount;
+      acc_amount = dc->amount_with_fee;
     }
     else
     {
@@ -534,7 +555,7 @@ process_pay_with_exchange (void *cls,
 			      &acc_fee)) ||
 	   (GNUNET_OK !=
 	    TALER_amount_add (&acc_amount,
-			      &dc->percoin_amount,
+			      &dc->amount_with_fee,
 			      &acc_amount)) )
       {
 	GNUNET_break_op (0);
@@ -545,10 +566,9 @@ process_pay_with_exchange (void *cls,
 	return;
       }
     }
-    if (GNUNET_SYSERR ==
-	TALER_amount_subtract (&dc->amount_without_fee,
-			       &dc->percoin_amount,
-			       &denom_details->fee_deposit))
+    if (1 ==
+	TALER_amount_cmp (&dc->deposit_fee,
+                          &dc->amount_with_fee))
     {
       GNUNET_break_op (0);
       /* fee higher than residual coin value, makes no sense. */
@@ -556,7 +576,7 @@ process_pay_with_exchange (void *cls,
 				MHD_HTTP_BAD_REQUEST,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:o, s:o}",
                                                              "hint", "fee higher than coin value",
-                                                             "f", TALER_JSON_from_amount (&dc->percoin_amount),
+                                                             "f" /* FIXME */, TALER_JSON_from_amount (&dc->amount_with_fee),
                                                              "fee_deposit", TALER_JSON_from_amount (&denom_details->fee_deposit)));
       return;
     }
@@ -617,12 +637,13 @@ process_pay_with_exchange (void *cls,
   /* Initiate /deposit operation for all coins */
   for (i=0;i<pc->coins_cnt;i++)
   {
-    struct MERCHANT_DepositConfirmation *dc = &pc->dc[i];
+    struct DepositConfirmation *dc = &pc->dc[i];
 
+    if (GNUNET_YES == dc->found_in_db)
+      continue;
     GNUNET_assert (NULL != j_wire);
-
     dc->dh = TALER_EXCHANGE_deposit (mh,
-                                     &dc->percoin_amount,
+                                     &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
                                      j_wire,
                                      &pc->h_contract,
@@ -676,6 +697,92 @@ handle_pay_timeout (void *cls)
   resume_pay_with_response (pc,
                             MHD_HTTP_SERVICE_UNAVAILABLE,
                             TMH_RESPONSE_make_internal_error ("exchange not reachable"));
+}
+
+
+/**
+ * Function called with information about a coin that was deposited.
+ *
+ * @param cls closure
+ * @param transaction_id of the contract
+ * @param coin_pub public key of the coin
+ * @param amount_with_fee amount the exchange will deposit for this coin
+ * @param deposit_fee fee the exchange will charge for this coin
+ * @param exchange_proof proof from exchange that coin was accepted
+ */
+static void
+check_coin_paid (void *cls,
+                 uint64_t transaction_id,
+                 const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                 const struct TALER_Amount *amount_with_fee,
+                 const struct TALER_Amount *deposit_fee,
+                 const json_t *exchange_proof)
+{
+  struct PayContext *pc = cls;
+  unsigned int i;
+
+  if (pc->transaction_id != transaction_id)
+  {
+    GNUNET_break (0);
+    return;
+  }
+  for (i=0;i<pc->coins_cnt;i++)
+  {
+    struct DepositConfirmation *dc = &pc->dc[i];
+
+    if ( (0 != memcmp (coin_pub,
+                       &dc->coin_pub,
+                       sizeof (struct TALER_CoinSpendPublicKeyP))) ||
+         (0 != TALER_amount_cmp (amount_with_fee,
+                                 &dc->amount_with_fee)) )
+      continue;
+    dc->found_in_db = GNUNET_YES;
+    pc->pending--;
+  }
+}
+
+
+/**
+ * Check if the existing transaction matches our transaction.
+ * Update `transaction_exits` accordingly.
+ *
+ * @param cls closure with the `struct PayContext`
+ * @param transaction_id of the contract
+ * @param h_contract hash of the contract
+ * @param h_xwire hash of our wire details
+ * @param timestamp time of the confirmation
+ * @param refund refund deadline
+ * @param total_amount total amount we receive for the contract after fees
+ */
+static void
+check_transaction_exists (void *cls,
+                          uint64_t transaction_id,
+                          const struct GNUNET_HashCode *h_contract,
+                          const struct GNUNET_HashCode *h_xwire,
+                          struct GNUNET_TIME_Absolute timestamp,
+                          struct GNUNET_TIME_Absolute refund,
+                          const struct TALER_Amount *total_amount)
+{
+  struct PayContext *pc = cls;
+
+  if ( (0 == memcmp (h_contract,
+                     &pc->h_contract,
+                     sizeof (struct GNUNET_HashCode))) &&
+       (0 == memcmp (h_xwire,
+                     &h_wire,
+                     sizeof (struct GNUNET_HashCode))) &&
+       (timestamp.abs_value_us == pc->timestamp.abs_value_us) &&
+       (refund.abs_value_us == pc->refund_deadline.abs_value_us) &&
+       (0 == TALER_amount_cmp (total_amount,
+                               &pc->amount) ) )
+  {
+    pc->transaction_exits = GNUNET_YES;
+  }
+  else
+  {
+    GNUNET_break_op (0);
+    pc->transaction_exits = GNUNET_SYSERR;
+  }
 }
 
 
@@ -855,14 +962,14 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     }
     /* note: 1 coin = 1 deposit confirmation expected */
     pc->dc = GNUNET_new_array (pc->coins_cnt,
-                               struct MERCHANT_DepositConfirmation);
+                               struct DepositConfirmation);
 
     json_array_foreach (coins, coins_index, coin)
     {
-      struct MERCHANT_DepositConfirmation *dc = &pc->dc[coins_index];
+      struct DepositConfirmation *dc = &pc->dc[coins_index];
       struct GNUNET_JSON_Specification spec[] = {
         TALER_JSON_spec_denomination_public_key ("denom_pub", &dc->denom),
-        TALER_JSON_spec_amount ("f", &dc->percoin_amount),
+        TALER_JSON_spec_amount ("f" /* FIXME */, &dc->amount_with_fee),
         GNUNET_JSON_spec_fixed_auto ("coin_pub", &dc->coin_pub),
         TALER_JSON_spec_denomination_signature ("ub_sig", &dc->ub_sig),
         GNUNET_JSON_spec_fixed_auto ("coin_sig", &dc->coin_sig),
@@ -881,7 +988,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
       {
         char *s;
-        s = TALER_amount_to_string (&dc->percoin_amount);
+
+        s = TALER_amount_to_string (&dc->amount_with_fee);
         GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                     "Coin #%i has f %s\n",
                     coins_index,
@@ -893,11 +1001,20 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       dc->pc = pc;
     }
   }
+  pc->pending = pc->coins_cnt;
 
-  /* Check if this payment attempt has already taken place */
-  if (GNUNET_OK ==
-      db->check_payment (db->cls,
-                         pc->transaction_id))
+  /* Check if this payment attempt has already succeeded */
+  if (GNUNET_SYSERR ==
+      db->find_payments_by_id (db->cls,
+                               pc->transaction_id,
+                               &check_coin_paid,
+                               pc))
+  {
+    GNUNET_break (0);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              "Merchant database error");
+  }
+  if (0 == pc->pending)
   {
     struct MHD_Response *resp;
     int ret;
@@ -914,8 +1031,42 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     return ret;
   }
 
+  /* Check if transaction is already known, if not store it. */
+  if (GNUNET_SYSERR ==
+      db->find_transaction_by_id (db->cls,
+                                  pc->transaction_id,
+                                  &check_transaction_exists,
+                                  pc))
+  {
+    GNUNET_break (0);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              "Merchant database error");
+  }
+  if (GNUNET_SYSERR == pc->transaction_exits)
+  {
+    GNUNET_break (0);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              "Transaction ID reused with different transaction details");
+  }
+  if (GNUNET_NO == pc->transaction_exits)
+  {
+    if (GNUNET_OK !=
+        db->store_transaction (db->cls,
+                               pc->transaction_id,
+                               &pc->h_contract,
+                               &h_wire,
+                               pc->timestamp,
+                               pc->refund_deadline,
+                               &pc->amount))
+    {
+      GNUNET_break (0);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                "Merchant database error");
+    }
+  }
+
+  MHD_suspend_connection (connection);
   /* Find the responsible exchange, this may take a while... */
-  pc->pending = pc->coins_cnt;
   pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,
                                         &process_pay_with_exchange,
                                         pc);
@@ -926,8 +1077,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
      #resume_pay_with_response(). */
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Suspending /pay handling while working with the exchange\n");
-  MHD_suspend_connection (connection);
-  pc->timeout_task = GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT, handle_pay_timeout, pc);
+  pc->timeout_task = GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT,
+                                                   &handle_pay_timeout,
+                                                   pc);
   json_decref (root);
   return MHD_YES;
 }

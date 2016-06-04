@@ -55,7 +55,7 @@ typedef void
 struct TALER_MERCHANT_TrackDepositOperation *
 TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
                               const char *backend_uri,
-                              const char *wtid,
+                              const struct TALER_WireTransferIdentifierRawP *wtid,
                               const char *exchange_uri,
                               TALER_MERCHANT_TrackDepositCallback trackdeposit_cb,
                               void *trackdeposit_cb_cls);

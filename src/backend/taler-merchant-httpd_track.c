@@ -107,7 +107,7 @@ wire_deposit_cb (void *cls,
                  const struct TALER_WireDepositDetails *details)
 {
   struct DepositTrackContext *rctx = cls;
-  unsigned int i;
+  // unsigned int i;
 
   rctx->wdh = NULL;
   if (NULL == total_amount)

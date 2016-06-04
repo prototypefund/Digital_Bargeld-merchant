@@ -31,9 +31,68 @@
 struct TALER_MERCHANTDB_Plugin;
 
 
+/**
+ * Function called with information about a transaction.
+ *
+ * @param cls closure
+ * @param transaction_id of the contract
+ * @param h_contract hash of the contract
+ * @param h_wire hash of our wire details
+ * @param timestamp time of the confirmation
+ * @param refund refund deadline
+ * @param total_amount total amount we receive for the contract after fees
+ */
 typedef void
-(*TALER_MERCHANTDB_PaymentCallback)(void *cls,
-                                    ...);
+(*TALER_MERCHANTDB_TransactionCallback)(void *cls,
+                                        uint64_t transaction_id,
+                                        const struct GNUNET_HashCode *h_contract,
+                                        const struct GNUNET_HashCode *h_wire,
+                                        struct GNUNET_TIME_Absolute timestamp,
+                                        struct GNUNET_TIME_Absolute refund,
+                                        const struct TALER_Amount *total_amount);
+
+
+/**
+ * Function called with information about a coin that was deposited.
+ *
+ * @param cls closure
+ * @param transaction_id of the contract
+ * @param coin_pub public key of the coin
+ * @param amount_with_fee amount the exchange will deposit for this coin
+ * @param deposit_fee fee the exchange will charge for this coin
+ * @param exchange_proof proof from exchange that coin was accepted
+ */
+typedef void
+(*TALER_MERCHANTDB_CoinDepositCallback)(void *cls,
+                                        uint64_t transaction_id,
+                                        const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                        const struct TALER_Amount *amount_with_fee,
+                                        const struct TALER_Amount *deposit_fee,
+                                        const json_t *exchange_proof);
+
+
+/**
+ * Information about the wire transfer corresponding to
+ * a deposit operation.  Note that it is in theory possible
+ * that we have a @a transaction_id and @a coin_pub in the
+ * result that do not match a deposit that we know about,
+ * for example because someone else deposited funds into
+ * our account.
+ *
+ * @param cls closure
+ * @param transaction_id ID of the contract
+ * @param coin_pub public key of the coin
+ * @param wtid identifier of the wire transfer in which the exchange
+ *             send us the money for the coin deposit
+ * @param exchange_proof proof from exchange about what the deposit was for
+ *             NULL if we have not asked for this signature
+ */
+typedef void
+(*TALER_MERCHANTDB_TransferCallback)(void *cls,
+                                     uint64_t transaction_id,
+                                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                     const struct TALER_WireTransferIdentifierRawP *wtid,
+                                     const json_t *exchange_proof);
 
 
 /**
@@ -71,49 +130,100 @@ struct TALER_MERCHANTDB_Plugin
   int
   (*initialize) (void *cls);
 
+
+  /**
+   * Insert transaction data into the database.
+   *
+   * @param cls closure
+   * @param transaction_id of the contract
+   * @param h_contract hash of the contract
+   * @param h_wire hash of our wire details
+   * @param timestamp time of the confirmation
+   * @param refund refund deadline
+   * @param total_amount total amount we receive for the contract after fees
+   * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+   */
+  int
+  (*store_transaction) (void *cls,
+                        uint64_t transaction_id,
+                        const struct GNUNET_HashCode *h_contract,
+                        const struct GNUNET_HashCode *h_wire,
+                        struct GNUNET_TIME_Absolute timestamp,
+                        struct GNUNET_TIME_Absolute refund,
+                        const struct TALER_Amount *total_amount);
+
+
   /**
    * Insert payment confirmation from the exchange into the database.
    *
    * @param cls closure
-   * @param h_contract hash of the contract
-   * @param h_wire hash of our wire details
    * @param transaction_id of the contract
-   * @param timestamp time of the confirmation
-   * @param refund refund deadline
-   * @param amount_without_fee amount the exchange will deposit
    * @param coin_pub public key of the coin
+   * @param amount_with_fee amount the exchange will deposit for this coin
+   * @param deposit_fee fee the exchange will charge for this coin
    * @param exchange_proof proof from exchange that coin was accepted
    * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
    */
   int
-  (*store_payment) (void *cls,
-                    const struct GNUNET_HashCode *h_contract,
-                    const struct GNUNET_HashCode *h_wire,
+  (*store_deposit) (void *cls,
                     uint64_t transaction_id,
-                    struct GNUNET_TIME_Absolute timestamp,
-                    struct GNUNET_TIME_Absolute refund,
-                    const struct TALER_Amount *amount_without_fee,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
-		    const json_t *exchange_proof);
+                    const struct TALER_Amount *amount_with_fee,
+                    const struct TALER_Amount *deposit_fee,
+                    const json_t *exchange_proof);
 
 
   /**
-   * Check whether a payment has already been stored
+   * Insert mapping of @a coin_pub and @a transaction_id to
+   * corresponding @a wtid.
    *
-   * @param cls our plugin handle
-   * @param transaction_id the transaction id to search into
-   * the db
-   *
-   * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
-   * upon error
+   * @param cls closure
+   * @param transaction_id ID of the contract
+   * @param coin_pub public key of the coin
+   * @param wtid identifier of the wire transfer in which the exchange
+   *             send us the money for the coin deposit
+   * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
    */
   int
-  (*check_payment) (void *cls,
-                    uint64_t transaction_id);
+  (*store_coin_to_transfer) (void *cls,
+                             uint64_t transaction_id,
+                             const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                             const struct TALER_WireTransferIdentifierRawP *wtid);
 
 
   /**
-   * Lookup information about a payment by transaction ID.
+   * Insert wire transfer confirmation from the exchange into the database.
+   *
+   * @param cls closure
+   * @param wtid identifier of the wire transfer
+   * @param exchange_proof proof from exchange about what the deposit was for
+   * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+   */
+  int
+  (*store_transfer_to_proof) (void *cls,
+                              const struct TALER_WireTransferIdentifierRawP *wtid,
+                              const json_t *exchange_proof);
+
+
+  /**
+   * Find information about a transaction.
+   *
+   * @param cls our plugin handle
+   * @param transaction_id the transaction id to search
+   * @param cb function to call with transaction data
+   * @param cb_cls closure for @a cb
+   * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
+   *         upon error
+   */
+  int
+  (*find_transaction_by_id) (void *cls,
+                             uint64_t transaction_id,
+                             TALER_MERCHANTDB_TransactionCallback cb,
+                             void *cb_cls);
+
+
+  /**
+   * Lookup information about coin payments by transaction ID.
    *
    * @param cls closure
    * @param transaction_id key for the search
@@ -123,10 +233,50 @@ struct TALER_MERCHANTDB_Plugin
    *         #GNUNET_SYSERR on hard errors
    */
   int
-  (*find_payment) (void *cls,
-                   uint64_t transaction_id,
-                   TALER_MERCHANTDB_PaymentCallback cb,
-                   void *cb_cls);
+  (*find_payments_by_id) (void *cls,
+                          uint64_t transaction_id,
+                          TALER_MERCHANTDB_CoinDepositCallback cb,
+                          void *cb_cls);
+
+
+  /**
+   * Lookup information about a transfer by @a transaction_id.  Note
+   * that in theory there could be multiple wire transfers for a
+   * single @a transaction_id, as the transaction may have involved
+   * multiple coins and the coins may be spread over different wire
+   * transfers.
+   *
+   * @param cls closure
+   * @param transaction_id key for the search
+   * @param cb function to call with transfer data
+   * @param cb_cls closure for @a cb
+   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   *         #GNUNET_SYSERR on hard errors
+   */
+  int
+  (*find_transfers_by_id) (void *cls,
+                           uint64_t transaction_id,
+                           TALER_MERCHANTDB_TransferCallback cb,
+                           void *cb_cls);
+
+
+  /**
+   * Lookup information about a coin deposits by @a wtid.
+   *
+   * @param cls closure
+   * @param wtid wire transfer identifier to find matching transactions for
+   * @param cb function to call with payment data
+   * @param cb_cls closure for @a cb
+   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   *         #GNUNET_SYSERR on hard errors
+   */
+  int
+  (*find_deposits_by_wtid) (void *cls,
+                            const struct TALER_WireTransferIdentifierRawP *wtid,
+                            TALER_MERCHANTDB_CoinDepositCallback cb,
+                            void *cb_cls);
 
 };
+
+
 #endif

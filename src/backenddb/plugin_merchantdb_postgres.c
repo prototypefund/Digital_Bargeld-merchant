@@ -17,6 +17,7 @@
  * @file merchant/plugin_merchantdb_postgres.c
  * @brief database helper functions for postgres used by the merchant
  * @author Sree Harsha Totakura <sreeharsha@totakura.in>
+ * @author Christian Grothoff
  */
 #include "platform.h"
 #include <gnunet/gnunet_util_lib.h>
@@ -41,10 +42,84 @@ struct PostgresClosure
 };
 
 
-#define PQSQL_strerror(kind, cmd, res)                \
-  GNUNET_log_from (kind, "merchantdb-postgres",       \
-                   "SQL %s failed at %s:%u with error: %s", \
+/**
+ * Log error from PostGres.
+ *
+ * @param kind log level to use
+ * @param cmd command that failed
+ * @param res postgres result object with error details
+ */
+#define PQSQL_strerror(kind, cmd, res)                                \
+  GNUNET_log_from (kind, "merchantdb-postgres",                       \
+                   "SQL %s failed at %s:%u with error: %s",           \
                    cmd, __FILE__, __LINE__, PQresultErrorMessage (res));
+
+
+/**
+ * Macro to run @a s SQL statement using #GNUNET_POSTGRES_exec()
+ * and return with #GNUNET_SYSERR if the operation fails.
+ *
+ * @param pg context for running the statement
+ * @param s SQL statement to run
+ */
+#define PG_EXEC(pg,s) do {                                            \
+    if (GNUNET_OK != GNUNET_POSTGRES_exec (pg->conn, s))              \
+    {                                                                 \
+      GNUNET_break (0);                                               \
+      return GNUNET_SYSERR;                                           \
+    }                                                                 \
+  } while (0)
+
+
+/**
+ * Macro to run @a s SQL statement using #GNUNET_POSTGRES_exec().
+ * Ignore errors, they happen.
+ *
+ * @param pg context for running the statement
+ * @param s SQL statement to run
+ */
+#define PG_EXEC_INDEX(pg,s) do {                                        \
+    PGresult *result = PQexec (pg->conn, s);                            \
+    PQclear (result);                                                   \
+  } while (0)
+
+
+/**
+ * Prepare an SQL statement and log errors on failure.
+ *
+ * @param pg context for running the preparation
+ * @param n name of the prepared statement
+ * @param s SQL statement to run
+ * @param c number of arguments @a s expects
+ */
+#define PG_PREPARE(pg,n,s,c) do {                                       \
+    ExecStatusType status;                                              \
+    PGresult *res = PQprepare (pg->conn, n, s, c, NULL);                \
+    if ( (NULL == res) ||                                               \
+         (PGRES_COMMAND_OK != (status = PQresultStatus (res))) )        \
+    {                                                                   \
+      if (NULL != res)                                                  \
+      {                                                                 \
+        PQSQL_strerror (GNUNET_ERROR_TYPE_ERROR, "PQprepare", res);     \
+        PQclear (res);                                                  \
+      }                                                                 \
+      return GNUNET_SYSERR;                                             \
+    }                                                                   \
+    PQclear (res);                                                      \
+  } while (0)
+
+
+/**
+ * Log a really unexpected PQ error.
+ *
+ * @param result PQ result object of the PQ operation that failed
+ */
+#define BREAK_DB_ERR(result) do {               \
+    GNUNET_break (0);                           \
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,        \
+                "Database failure: %s\n",       \
+                PQresultErrorMessage (result)); \
+  } while (0)
 
 
 /**
@@ -57,12 +132,11 @@ static int
 postgres_drop_tables (void *cls)
 {
   struct PostgresClosure *pg = cls;
-  int ret;
 
-  ret = GNUNET_POSTGRES_exec (pg->conn,
-                              "DROP TABLE payments;");
-  if (GNUNET_OK != ret)
-    return ret;
+  PG_EXEC_INDEX (pg, "DROP TABLE merchant_transfers;");
+  PG_EXEC_INDEX (pg, "DROP TABLE merchant_deposits;");
+  PG_EXEC_INDEX (pg, "DROP TABLE merchant_transactions;");
+  PG_EXEC_INDEX (pg, "DROP TABLE merchant_proofs;");
   return GNUNET_OK;
 }
 
@@ -77,200 +151,677 @@ static int
 postgres_initialize (void *cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *res;
-  ExecStatusType status;
+
+  /* Setup tables */
+  PG_EXEC (pg,
+           "CREATE TABLE IF NOT EXISTS merchant_transactions ("
+           " transaction_id INT8 PRIMARY KEY"
+           ",h_contract BYTEA NOT NULL CHECK (LENGTH(h_contract)=64)"
+           ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
+           ",timestamp INT8 NOT NULL"
+           ",refund_deadline INT8 NOT NULL"
+           ",total_amount_val INT8 NOT NULL"
+           ",total_amount_frac INT4 NOT NULL"
+           ",total_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+           ");");
+  PG_EXEC (pg,
+           "CREATE TABLE IF NOT EXISTS merchant_deposits ("
+           " transaction_id INT8 REFERENCES merchant_transactions (transaction_id)"
+           ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+           ",amount_with_fee_val INT8 NOT NULL"
+           ",amount_with_fee_frac INT4 NOT NULL"
+           ",amount_with_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+           ",deposit_fee_val INT8 NOT NULL"
+           ",deposit_fee_frac INT4 NOT NULL"
+           ",deposit_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+           ",exchange_proof BYTEA NOT NULL"
+           ",PRIMARY KEY (transaction_id, coin_pub)"
+           ");");
+  PG_EXEC (pg,
+           "CREATE TABLE IF NOT EXISTS merchant_proofs ("
+           " wtid BYTEA PRIMARY KEY CHECK (LENGTH(wtid)=32)"
+           ",proof BYTEA NOT NULL);");
+  /* Note that transaction_id + coin_pub may actually be unknown to
+     us, e.g. someone else deposits something for us at the exchange.
+     Hence those cannot be foreign keys into deposits/transactions! */
+  PG_EXEC (pg,
+           "CREATE TABLE IF NOT EXISTS merchant_transfers ("
+           " transaction_id INT8"
+           ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+           ",wtid BYTEA REFERENCES merchant_proofs (wtid)"
+           ",PRIMARY KEY (transaction_id, coin_pub)"
+           ");");
+  PG_EXEC_INDEX (pg,
+                 "CREATE INDEX IF NOT EXISTS transfers_by_coin "
+                 " ON transfers (transaction_id, coin_pub)");
+  PG_EXEC_INDEX (pg,
+                 "CREATE INDEX IF NOT EXISTS transfers_by_wtid "
+                 " ON transfers (wtid)");
+
+  /* Setup prepared "INSERT" statements */
+  PG_PREPARE (pg,
+              "insert_transaction",
+              "INSERT INTO merchant_transactions"
+              "(transaction_id"
+              ",h_contract"
+              ",h_wire"
+              ",timestamp"
+              ",refund_deadline"
+              ",total_amount_val"
+              ",total_amount_frac"
+              ",total_amount_curr"
+              ") VALUES "
+              "($1, $2, $3, $4, $5, $6, $7, $8)",
+              8);
+  PG_PREPARE (pg,
+              "insert_deposit",
+              "INSERT INTO merchant_deposits"
+              "(transaction_id"
+              ",coin_pub"
+              ",amount_with_fee_val"
+              ",amount_with_fee_frac"
+              ",amount_with_fee_curr"
+              ",deposit_fee_val"
+              ",deposit_fee_frac"
+              ",deposit_fee_curr"
+              ",exchange_proof) VALUES "
+              "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+              9);
+  PG_PREPARE (pg,
+              "insert_transfer",
+              "INSERT INTO merchant_transfers"
+              "(transaction_id"
+              ",coin_pub"
+              ",wtid) VALUES "
+              "($1, $2, $3)",
+              3);
+  PG_PREPARE (pg,
+              "insert_proof",
+              "INSERT INTO merchant_proofs"
+              "(wtid"
+              ",proof) VALUES "
+              "($1, $2)",
+              2);
+
+  /* Setup prepared "SELECT" statements */
+  PG_PREPARE (pg,
+              "find_transaction",
+              "SELECT"
+              " h_contract"
+              ",h_wire"
+              ",timestamp"
+              ",refund_deadline"
+              ",total_amount_val"
+              ",total_amount_frac"
+              ",total_amount_curr"
+              " FROM merchant_transactions"
+              " WHERE transaction_id=$1",
+              1);
+  PG_PREPARE (pg,
+              "find_deposits",
+              "SELECT"
+              " coin_pub"
+              ",amount_with_fee_val"
+              ",amount_with_fee_frac"
+              ",amount_with_fee_curr"
+              ",deposit_fee_val"
+              ",deposit_fee_frac"
+              ",deposit_fee_curr"
+              ",exchange_proof"
+              " FROM merchant_deposits"
+              " WHERE transaction_id=$1",
+              1);
+  PG_PREPARE (pg,
+              "find_transfers_by_transaction_id",
+              "SELECT"
+              " coin_pub"
+              ",wtid"
+              ",merchant_proofs.proof"
+              " FROM merchant_transfers"
+              "   JOIN merchant_proofs USING (wtid)"
+              " WHERE transaction_id=$1",
+              1);
+  PG_PREPARE (pg,
+              "find_deposits_by_wtid",
+              "SELECT"
+              " merchant_transfers.transaction_id"
+              ",merchant_transfers.coin_pub"
+              ",merchant_deposits.amount_with_fee_val"
+              ",merchant_deposits.amount_with_fee_frac"
+              ",merchant_deposits.amount_with_fee_curr"
+              ",merchant_deposits.deposit_fee_val"
+              ",merchant_deposits.deposit_fee_frac"
+              ",merchant_deposits.deposit_fee_curr"
+              ",merchant_deposits.exchange_proof"
+              " FROM merchant_transfers"
+              "   JOIN merchant_deposits"
+              "     ON (merchant_deposits.transaction_id = merchant_transfers.transaction_id"
+              "       AND"
+              "         merchant_deposits.coin_pub = merchant_transfers.coin_pub)"
+              " WHERE wtid=$1",
+              1);
+  return GNUNET_OK;
+}
+
+
+/**
+ * Insert transaction data into the database.
+ *
+ * @param cls closure
+ * @param transaction_id of the contract
+ * @param h_contract hash of the contract
+ * @param h_wire hash of our wire details
+ * @param timestamp time of the confirmation
+ * @param refund refund deadline
+ * @param total_amount total amount we receive for the contract after fees
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ */
+static int
+postgres_store_transaction (void *cls,
+                            uint64_t transaction_id,
+                            const struct GNUNET_HashCode *h_contract,
+                            const struct GNUNET_HashCode *h_wire,
+                            struct GNUNET_TIME_Absolute timestamp,
+                            struct GNUNET_TIME_Absolute refund,
+                            const struct TALER_Amount *total_amount)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
   int ret;
 
-  ret = GNUNET_POSTGRES_exec (pg->conn,
-                              "CREATE TABLE IF NOT EXISTS payments ("
-                              "h_contract BYTEA NOT NULL,"
-                              "h_wire BYTEA NOT NULL,"
-                              "transaction_id INT8," /*WARNING: this column used to be primary key, but that wrong since multiple coins belong to the same id*/
-                              "timestamp INT8 NOT NULL,"
-                              "refund_deadline INT8 NOT NULL,"
-                              "amount_without_fee_val INT8 NOT NULL,"
-                              "amount_without_fee_frac INT4 NOT NULL,"
-                              "amount_without_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL,"
-                              "coin_pub BYTEA NOT NULL,"
-                              "exchange_proof BYTEA NOT NULL);");
-  if (GNUNET_OK != ret)
-    return ret;
-  if ( (NULL == (res = PQprepare (pg->conn,
-                                  "insert_payment",
-                                  "INSERT INTO payments"
-                                  "(h_contract"
-                                  ",h_wire"
-                                  ",transaction_id"
-                                  ",timestamp"
-                                  ",refund_deadline"
-                                  ",amount_without_fee_val"
-                                  ",amount_without_fee_frac"
-                                  ",amount_without_fee_curr"
-                                  ",coin_pub"
-                                  ",exchange_proof) VALUES "
-                                  "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-                                  10, NULL))) ||
-       (PGRES_COMMAND_OK != (status = PQresultStatus(res))) )
-  {
-    if (NULL != res)
-    {
-      PQSQL_strerror (GNUNET_ERROR_TYPE_ERROR, "PQprepare", res);
-      PQclear (res);
-    }
-    return GNUNET_SYSERR;
-  }
-  if ( (NULL == (res = PQprepare (pg->conn,
-                                  "check_payment",
-                                  "SELECT * "
-				  "FROM payments "
-				  "WHERE transaction_id=$1",
-                                  1, NULL))) ||
-       (PGRES_COMMAND_OK != (status = PQresultStatus(res))) )
-  {
-    if (NULL != res)
-    {
-      PQSQL_strerror (GNUNET_ERROR_TYPE_ERROR, "PQprepare", res);
-      PQclear (res);
-    }
-    return GNUNET_SYSERR;
-  }
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (h_contract),
+    GNUNET_PQ_query_param_auto_from_type (h_wire),
+    GNUNET_PQ_query_param_absolute_time (&timestamp),
+    GNUNET_PQ_query_param_absolute_time (&refund),
+    TALER_PQ_query_param_amount (total_amount),
+    GNUNET_PQ_query_param_end
+  };
 
-  PQclear (res);
-  return GNUNET_OK;
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "insert_transaction",
+                                    params);
+  if (PGRES_COMMAND_OK != PQresultStatus (result))
+  {
+    ret = GNUNET_SYSERR;
+    BREAK_DB_ERR (result);
+  }
+  else
+  {
+    ret = GNUNET_OK;
+  }
+  PQclear (result);
+  return ret;
 }
 
 
 /**
  * Insert payment confirmation from the exchange into the database.
  *
- * @param cls our plugin handle
- * @param h_contract hash of the contract
- * @param h_wire hash of our wire details
+ * @param cls closure
  * @param transaction_id of the contract
- * @param timestamp time of the confirmation
- * @param refund refund deadline
- * @param amount_without_fee amount the exchange will deposit
  * @param coin_pub public key of the coin
- * @param exchange_proof proof from the exchange that coin was accepted
+ * @param amount_with_fee amount the exchange will deposit for this coin
+ * @param deposit_fee fee the exchange will charge for this coin
+ * @param exchange_proof proof from exchange that coin was accepted
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
  */
 static int
-postgres_store_payment (void *cls,
-                        const struct GNUNET_HashCode *h_contract,
-                        const struct GNUNET_HashCode *h_wire,
+postgres_store_deposit (void *cls,
                         uint64_t transaction_id,
-                        struct GNUNET_TIME_Absolute timestamp,
-                        struct GNUNET_TIME_Absolute refund,
-                        const struct TALER_Amount *amount_without_fee,
                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                        const struct TALER_Amount *amount_with_fee,
+                        const struct TALER_Amount *deposit_fee,
                         const json_t *exchange_proof)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *res;
-  ExecStatusType status;
+  PGresult *result;
+  int ret;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_contract),
-    GNUNET_PQ_query_param_auto_from_type (h_wire),
     GNUNET_PQ_query_param_uint64 (&transaction_id),
-    GNUNET_PQ_query_param_absolute_time (&timestamp),
-    GNUNET_PQ_query_param_absolute_time (&refund),
-    TALER_PQ_query_param_amount (amount_without_fee),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
+    TALER_PQ_query_param_amount (amount_with_fee),
+    TALER_PQ_query_param_amount (deposit_fee),
     TALER_PQ_query_param_json (exchange_proof),
     GNUNET_PQ_query_param_end
   };
 
-  res = GNUNET_PQ_exec_prepared (pg->conn,
-                                 "insert_payment",
-                                 params);
-  status = PQresultStatus (res);
-
-  if (PGRES_COMMAND_OK != status)
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "insert_deposit",
+                                    params);
+  if (PGRES_COMMAND_OK != PQresultStatus (result))
   {
-    const char *sqlstate;
+    ret = GNUNET_SYSERR;
+    BREAK_DB_ERR (result);
+  }
+  else
+  {
+    ret = GNUNET_OK;
+  }
+  PQclear (result);
+  return ret;
+}
 
-    sqlstate = PQresultErrorField (res, PG_DIAG_SQLSTATE);
-    if (NULL == sqlstate)
-    {
-      /* very unexpected... */
-      GNUNET_break (0);
-      PQclear (res);
-      return GNUNET_SYSERR;
-    }
-    /* 40P01: deadlock, 40001: serialization failure */
-    if ( (0 == strcmp (sqlstate,
-                       "23505")))
-    {
-      /* Primary key violation */
-      PQclear (res);
-      return GNUNET_NO;
-    }
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Database commit failure: %s\n",
-                sqlstate);
-    PQclear (res);
+
+/**
+ * Insert mapping of @a coin_pub and @a transaction_id to
+ * corresponding @a wtid.
+ *
+ * @param cls closure
+ * @param transaction_id ID of the contract
+ * @param coin_pub public key of the coin
+ * @param wtid identifier of the wire transfer in which the exchange
+ *             send us the money for the coin deposit
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ */
+static int
+postgres_store_coin_to_transfer (void *cls,
+                                 uint64_t transaction_id,
+                                 const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                 const struct TALER_WireTransferIdentifierRawP *wtid)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  int ret;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (coin_pub),
+    GNUNET_PQ_query_param_auto_from_type (wtid),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "insert_transfer",
+                                    params);
+  if (PGRES_COMMAND_OK != PQresultStatus (result))
+  {
+    ret = GNUNET_SYSERR;
+    BREAK_DB_ERR (result);
+  }
+  else
+  {
+    ret = GNUNET_OK;
+  }
+  PQclear (result);
+  return ret;
+}
+
+
+/**
+ * Insert wire transfer confirmation from the exchange into the database.
+ *
+ * @param cls closure
+ * @param wtid identifier of the wire transfer
+ * @param exchange_proof proof from exchange about what the deposit was for
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ */
+static int
+postgres_store_transfer_to_proof (void *cls,
+                                  const struct TALER_WireTransferIdentifierRawP *wtid,
+                                  const json_t *exchange_proof)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  int ret;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (wtid),
+    TALER_PQ_query_param_json (exchange_proof),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "insert_proof",
+                                    params);
+  if (PGRES_COMMAND_OK != PQresultStatus (result))
+  {
+    ret = GNUNET_SYSERR;
+    BREAK_DB_ERR (result);
+  }
+  else
+  {
+    ret = GNUNET_OK;
+  }
+  PQclear (result);
+  return ret;
+}
+
+
+/**
+ * Find information about a transaction.
+ *
+ * @param cls our plugin handle
+ * @param transaction_id the transaction id to search
+ * @param cb function to call with transaction data
+ * @param cb_cls closure for @a cb
+ * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
+ *         upon error
+ */
+static int
+postgres_find_transaction_by_id (void *cls,
+                                 uint64_t transaction_id,
+                                 TALER_MERCHANTDB_TransactionCallback cb,
+                                 void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_transaction",
+                                    params);
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  if (0 == PQntuples (result))
+  {
+    PQclear (result);
+    return GNUNET_NO;
+  }
+  if (1 != PQntuples (result))
+  {
+    GNUNET_break (0);
+    PQclear (result);
     return GNUNET_SYSERR;
   }
 
-  PQclear (res);
+  {
+    struct GNUNET_HashCode h_contract;
+    struct GNUNET_HashCode h_wire;
+    struct GNUNET_TIME_Absolute timestamp;
+    struct GNUNET_TIME_Absolute refund_deadline;
+    struct TALER_Amount total_amount;
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_auto_from_type ("h_contract",
+                                            &h_contract),
+      GNUNET_PQ_result_spec_auto_from_type ("h_wire",
+                                            &h_wire),
+      GNUNET_PQ_result_spec_auto_from_type ("timestamp",
+                                            &timestamp),
+      GNUNET_PQ_result_spec_absolute_time ("refund_deadline",
+                                           &refund_deadline),
+      TALER_PQ_result_spec_amount ("total_amount",
+                                   &total_amount),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  0))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+    cb (cb_cls,
+        transaction_id,
+        &h_contract,
+        &h_wire,
+        timestamp,
+        refund_deadline,
+        &total_amount);
+  }
+  PQclear (result);
   return GNUNET_OK;
 }
 
+
 /**
- * Check whether a payment has already been stored
+ * Lookup information about coin payments by transaction ID.
  *
- * @param cls our plugin handle
- * @param transaction_id the transaction id to search into
- *        the db
- * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
- * upon error
+ * @param cls closure
+ * @param transaction_id key for the search
+ * @param cb function to call with payment data
+ * @param cb_cls closure for @a cb
+ * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+ *         #GNUNET_SYSERR on hard errors
  */
 static int
-postgres_check_payment(void *cls,
-                       uint64_t transaction_id)
+postgres_find_payments_by_id (void *cls,
+                              uint64_t transaction_id,
+                              TALER_MERCHANTDB_CoinDepositCallback cb,
+                              void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *res;
-  ExecStatusType status;
+  PGresult *result;
+  unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_uint64 (&transaction_id),
     GNUNET_PQ_query_param_end
   };
-  res = GNUNET_PQ_exec_prepared (pg->conn,
-                                 "check_payment",
-                                 params);
-
-  status = PQresultStatus (res);
-  if (PGRES_TUPLES_OK != status)
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_deposits",
+                                    params);
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
   {
-    const char *sqlstate;
-
-    sqlstate = PQresultErrorField (res, PG_DIAG_SQLSTATE);
-    if (NULL == sqlstate)
-    {
-      /* very unexpected... */
-      GNUNET_break (0);
-      PQclear (res);
-      return GNUNET_SYSERR;
-    }
-
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not check if contract %llu is in DB: %s\n",
-                (unsigned long long) transaction_id,
-		sqlstate);
-    PQclear (res);
+    BREAK_DB_ERR (result);
+    PQclear (result);
     return GNUNET_SYSERR;
   }
-  /* count rows */
-  if (PQntuples (res) > 0)
-    return GNUNET_OK;
-  return GNUNET_NO;
+  if (0 == PQntuples (result))
+  {
+    PQclear (result);
+    return GNUNET_NO;
+  }
 
+  for (i=0;i<PQntuples (result);i++)
+  {
+    struct TALER_CoinSpendPublicKeyP coin_pub;
+    struct TALER_Amount amount_with_fee;
+    struct TALER_Amount deposit_fee;
+    json_t *exchange_proof;
 
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
+                                            &coin_pub),
+      TALER_PQ_result_spec_amount ("amount_with_fee",
+                                   &amount_with_fee),
+      TALER_PQ_result_spec_amount ("deposit_fee",
+                                   &deposit_fee),
+      TALER_PQ_result_spec_json ("exchange_proof",
+                                 &exchange_proof),
+      GNUNET_PQ_result_spec_end
+    };
 
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+    cb (cb_cls,
+        transaction_id,
+        &coin_pub,
+        &amount_with_fee,
+        &deposit_fee,
+        exchange_proof);
+    GNUNET_PQ_cleanup_result (rs);
+  }
+  PQclear (result);
+  return GNUNET_OK;
+
+  GNUNET_break (0);
+  return GNUNET_SYSERR;
 }
+
+
+/**
+ * Lookup information about a transfer by @a transaction_id.  Note
+ * that in theory there could be multiple wire transfers for a
+ * single @a transaction_id, as the transaction may have involved
+ * multiple coins and the coins may be spread over different wire
+ * transfers.
+ *
+ * @param cls closure
+ * @param transaction_id key for the search
+ * @param cb function to call with transfer data
+ * @param cb_cls closure for @a cb
+ * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+ *         #GNUNET_SYSERR on hard errors
+ */
+static int
+postgres_find_transfers_by_id (void *cls,
+                               uint64_t transaction_id,
+                               TALER_MERCHANTDB_TransferCallback cb,
+                               void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int i;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_end
+  };
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_transfers_by_transaction_id",
+                                    params);
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  if (0 == PQntuples (result))
+  {
+    PQclear (result);
+    return GNUNET_NO;
+  }
+
+  for (i=0;i<PQntuples (result);i++)
+  {
+    struct TALER_CoinSpendPublicKeyP coin_pub;
+    struct TALER_WireTransferIdentifierRawP wtid;
+    json_t *proof;
+
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
+                                            &coin_pub),
+      GNUNET_PQ_result_spec_auto_from_type ("wtid",
+                                            &wtid),
+      TALER_PQ_result_spec_json ("proof",
+                                 &proof),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+    cb (cb_cls,
+        transaction_id,
+        &coin_pub,
+        &wtid,
+        proof);
+    GNUNET_PQ_cleanup_result (rs);
+  }
+  PQclear (result);
+  return GNUNET_OK;
+}
+
+
+/**
+ * Lookup information about a coin deposits by @a wtid.
+ *
+ * @param cls closure
+ * @param wtid wire transfer identifier to find matching transactions for
+ * @param cb function to call with payment data
+ * @param cb_cls closure for @a cb
+ * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+ *         #GNUNET_SYSERR on hard errors
+ */
+static int
+postgres_find_deposits_by_wtid (void *cls,
+                                const struct TALER_WireTransferIdentifierRawP *wtid,
+                                TALER_MERCHANTDB_CoinDepositCallback cb,
+                                void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int i;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (wtid),
+    GNUNET_PQ_query_param_end
+  };
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_deposits_by_wtid",
+                                    params);
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  if (0 == PQntuples (result))
+  {
+    PQclear (result);
+    return GNUNET_NO;
+  }
+
+  for (i=0;i<PQntuples (result);i++)
+  {
+    uint64_t transaction_id;
+    struct TALER_CoinSpendPublicKeyP coin_pub;
+    struct TALER_Amount amount_with_fee;
+    struct TALER_Amount deposit_fee;
+    json_t *exchange_proof;
+
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_uint64 ("transaction_id",
+                                    &transaction_id),
+      GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
+                                            &coin_pub),
+      TALER_PQ_result_spec_amount ("amount_with_fee",
+                                   &amount_with_fee),
+      TALER_PQ_result_spec_amount ("deposit_fee",
+                                   &deposit_fee),
+      TALER_PQ_result_spec_json ("exchange_proof",
+                                 &exchange_proof),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+    cb (cb_cls,
+        transaction_id,
+        &coin_pub,
+        &amount_with_fee,
+        &deposit_fee,
+        exchange_proof);
+    GNUNET_PQ_cleanup_result (rs);
+  }
+  PQclear (result);
+  return GNUNET_OK;
+}
+
+
 /**
  * Initialize Postgres database subsystem.
  *
@@ -312,8 +863,14 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->cls = pg;
   plugin->drop_tables = &postgres_drop_tables;
   plugin->initialize = &postgres_initialize;
-  plugin->store_payment = &postgres_store_payment;
-  plugin->check_payment = &postgres_check_payment;
+  plugin->store_transaction = &postgres_store_transaction;
+  plugin->store_deposit = &postgres_store_deposit;
+  plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
+  plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
+  plugin->find_transaction_by_id = &postgres_find_transaction_by_id;
+  plugin->find_payments_by_id = &postgres_find_payments_by_id;
+  plugin->find_transfers_by_id = &postgres_find_transfers_by_id;
+  plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
 
   return plugin;
 }
@@ -336,3 +893,5 @@ libtaler_plugin_merchantdb_postgres_done (void *cls)
   GNUNET_free (plugin);
   return NULL;
 }
+
+/* end of plugin_merchantdb_postgres.c */

@@ -137,14 +137,17 @@ handle_trackdeposit_finished (void *cls,
 struct TALER_MERCHANT_TrackDepositOperation *
 TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
                               const char *backend_uri,
-                              const char *wtid,
+                              const struct TALER_WireTransferIdentifierRawP *wtid,
                               const char *exchange_uri,
                               TALER_MERCHANT_TrackDepositCallback trackdeposit_cb,
                               void *trackdeposit_cb_cls)
 {
   struct TALER_MERCHANT_TrackDepositOperation *tdo;
   CURL *eh;
+  char *wtid_str;
 
+  wtid_str = GNUNET_STRINGS_data_to_string_alloc (wtid,
+                                                  sizeof (struct TALER_WireTransferIdentifierRawP));
   tdo = GNUNET_new (struct TALER_MERCHANT_TrackDepositOperation);
   tdo->ctx = ctx;
   tdo->cb = trackdeposit_cb;
@@ -153,8 +156,9 @@ TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
   GNUNET_asprintf (&tdo->url,
                    "%s?wtid=%s&exchange=%s",
                    backend_uri,
-                   wtid,
+                   wtid_str,
                    exchange_uri);
+  GNUNET_free (wtid_str);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
