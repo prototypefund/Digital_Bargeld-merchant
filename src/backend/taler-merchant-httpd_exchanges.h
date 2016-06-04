@@ -59,13 +59,13 @@ TMH_EXCHANGES_done (void);
  * operation.
  *
  * @param cls closure
- * @param mh handle to the exchange context
+ * @param eh handle to the exchange context
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
  */
 typedef void
 (*TMH_EXCHANGES_FindContinuation)(void *cls,
-                              struct TALER_EXCHANGE_Handle *mh,
-                              int exchange_trusted);
+                                  struct TALER_EXCHANGE_Handle *eh,
+                                  int exchange_trusted);
 
 
 /**
@@ -82,15 +82,11 @@ struct TMH_EXCHANGES_FindOperation;
  * @param chosen_exchange URI of the exchange we would like to talk to
  * @param fc function to call with the handles for the exchange
  * @param fc_cls closure for @a fc
- *
- * FIXME: should probably return a value to *cancel* the
- * operation in case MHD connection goes down and needs to
- * free fc_cls.
  */
 struct TMH_EXCHANGES_FindOperation *
 TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
-                     TMH_EXCHANGES_FindContinuation fc,
-                     void *fc_cls);
+                             TMH_EXCHANGES_FindContinuation fc,
+                             void *fc_cls);
 
 
 /**
