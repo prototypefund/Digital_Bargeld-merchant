@@ -29,9 +29,6 @@
 #include "taler-merchant-httpd_responses.h"
 
 
-extern char *TMH_merchant_currency_string;
-
-
 /**
  * Check that the given JSON array of products is well-formed.
  *

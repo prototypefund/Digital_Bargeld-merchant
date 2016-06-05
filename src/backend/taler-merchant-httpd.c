@@ -84,11 +84,6 @@ static char *keyfile;
 struct GNUNET_TIME_Relative wire_transfer_delay;
 
 /**
- * Which currency is supported by this merchant?
- */
-char *TMH_merchant_currency_string;
-
-/**
  * Should a "Connection: close" header be added to each HTTP response?
  */
 int TMH_merchant_connection_close;
@@ -508,18 +503,6 @@ run (void *cls,
   if (GNUNET_SYSERR ==
       TMH_AUDITORS_init (config))
   {
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-  if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_string (config,
-                                             "taler",
-                                             "currency",
-                                             &TMH_merchant_currency_string))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "taler",
-                               "currency");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }

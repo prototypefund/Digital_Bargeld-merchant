@@ -37,8 +37,6 @@
  */
 #define TRACK_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
-extern char *TMH_merchant_currency_string;
-
 
 /**
  * Context used for handing /track/deposit requests.
@@ -89,15 +87,10 @@ struct DepositTrackContext
   char *uri;
 
   /**
-   * FIXME: why do we need this?
+   * Pointer to the detail that we are currently
+   * checking in #check_deposit().
    */
-  struct TALER_WireDepositDetails *details;
-
-  /**
-   * Length of the @e details array.
-   * FIXME: probably not needed!
-   */
-  unsigned int details_length;
+  const struct TALER_WireDepositDetails *current_detail;
 
   /**
    * Argument for the /wire/deposits request.
@@ -108,6 +101,13 @@ struct DepositTrackContext
    * Response code to return.
    */
   unsigned int response_code;
+
+  /**
+   * #GNUNET_NO if we did not find a matching coin.
+   * #GNUNET_SYSERR if we found a matching coin, but the amounts do not match.
+   * #GNUNET_OK if we did find a matching coin.
+   */
+  int check_deposit_result;
 };
 
 
@@ -184,8 +184,9 @@ track_deposit_cleanup (struct TM_HandlerContext *hc)
 /**
  * Function called with information about a coin that was deposited.
  * Verify that it matches the information claimed by the exchange.
+ * Update the `check_deposit_result` field accordingly.
  *
- * @param cls closure FIXME!
+ * @param cls closure with our `struct DepositTrackContext *`
  * @param transaction_id of the contract
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
@@ -200,7 +201,25 @@ check_deposit (void *cls,
                const struct TALER_Amount *deposit_fee,
                const json_t *exchange_proof)
 {
-  GNUNET_break (0); // not implemented!
+  struct DepositTrackContext *rctx = cls;
+  const struct TALER_WireDepositDetails *wdd = rctx->current_detail;
+
+  if (0 != memcmp (&wdd->coin_pub,
+                   coin_pub,
+                   sizeof (struct TALER_CoinSpendPublicKeyP)))
+    return; /* not the coin we're looking for */
+  if ( (0 != TALER_amount_cmp (amount_with_fee,
+                               &wdd->coin_value)) ||
+       (0 != TALER_amount_cmp (deposit_fee,
+                               &wdd->coin_fee)) )
+  {
+    /* Disagreement between the exchange and us how much this
+       coin is worth! */
+    GNUNET_break_op (0);
+    rctx->check_deposit_result = GNUNET_SYSERR;
+    return;
+  }
+  rctx->check_deposit_result = GNUNET_OK;
 }
 
 
@@ -254,14 +273,10 @@ wire_deposit_cb (void *cls,
                 "Failed to persist wire transfer proof in DB\n");
   }
 
-  rctx->details_length = details_length;
-  rctx->details = GNUNET_new_array (details_length,
-                                    struct TALER_WireDepositDetails);
-  memcpy (rctx->details,
-          details,
-          details_length * sizeof (struct TALER_WireDepositDetails));
   for (i=0;i<details_length;i++)
   {
+    rctx->current_detail = &details[i];
+    rctx->check_deposit_result = GNUNET_NO;
     ret = db->find_payments_by_id (rctx,
                                    details[i].transaction_id,
                                    &check_deposit,
@@ -271,12 +286,25 @@ wire_deposit_cb (void *cls,
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Failed to verify existing payment data in DB\n");
     }
-    if (GNUNET_NO == ret)
+    if ( (GNUNET_NO == ret) ||
+         (GNUNET_NO == rctx->check_deposit_result) )
     {
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Failed to find payment data in DB\n");
     }
-    /* FIXME: check result of #check_deposit()! */
+    if (GNUNET_SYSERR == rctx->check_deposit_result)
+    {
+      /* #check_deposit() failed, do something! */
+      GNUNET_break (0);
+      /* FIXME: generate nicer custom response */
+      resume_track_deposit_with_response
+        (rctx,
+         MHD_HTTP_FAILED_DEPENDENCY,
+         TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
+                                      "index", (json_int_t) i,
+                                      "details", json));
+      return;
+    }
     ret = db->store_coin_to_transfer (db->cls,
                                       details[i].transaction_id,
                                       &details[i].coin_pub,

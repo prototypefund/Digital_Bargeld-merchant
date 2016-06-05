@@ -37,8 +37,6 @@
  */
 #define TRACK_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
-extern char *TMH_merchant_currency_string;
-
 
 /**
  * Context for a /track/transaction operation.
