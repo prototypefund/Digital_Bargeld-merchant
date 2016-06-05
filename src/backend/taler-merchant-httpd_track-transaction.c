@@ -253,11 +253,11 @@ track_transaction_cleanup (struct TM_HandlerContext *hc)
 
 
 /**
- * Resume the given pay context and send the given response.
- * Stores the response in the @a pc and signals MHD to resume
- * the connection.  Also ensures MHD runs immediately.
+ * Resume the given /track/transaction operation and send the given
+ * response.  Stores the response in the @a tctx and signals MHD to
+ * resume the connection.  Also ensures MHD runs immediately.
  *
- * @param pc payment context
+ * @param tctx transaction tracking context
  * @param response_code response code to use
  * @param response response data to send back
  */
@@ -329,13 +329,14 @@ wire_deposits_cb (void *cls,
     resume_track_transaction_with_response
       (tctx,
        MHD_HTTP_FAILED_DEPENDENCY,
-       TMH_RESPONSE_make_json_pack ("{s:I, s:o}",
+       TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
                                     "exchange_status", (json_int_t) http_status,
                                     "details", json));
     return;
   }
   if (GNUNET_OK !=
       db->store_transfer_to_proof (db->cls,
+                                   tctx->exchange_uri,
                                    &tctx->current_wtid,
                                    json))
   {
@@ -466,7 +467,7 @@ process_track_transaction_with_exchange (void *cls,
 
 
 /**
- * Handle a timeout for the processing of the pay request.
+ * Handle a timeout for the processing of the track transaction request.
  *
  * @param cls closure
  */
@@ -576,18 +577,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   const char *str;
   int ret;
 
-  str = MHD_lookup_connection_value (connection,
-                                     MHD_GET_ARGUMENT_KIND,
-                                     "id");
-  if (NULL == str)
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "id argument missing");
-  if (1 !=
-      sscanf (str,
-              "%llu",
-              &transaction_id))
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "id argument must be a number");
   if (NULL == *connection_cls)
   {
     tctx = GNUNET_new (struct TrackTransactionContext);
@@ -600,6 +589,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     /* not first call, recover state */
     tctx = *connection_cls;
   }
+
   if (0 != tctx->response_code)
   {
     /* We are *done* processing the request, just queue the response (!) */
@@ -623,6 +613,19 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return ret;
   }
 
+  str = MHD_lookup_connection_value (connection,
+                                     MHD_GET_ARGUMENT_KIND,
+                                     "id");
+  if (NULL == str)
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "id argument missing");
+  if (1 !=
+      sscanf (str,
+              "%llu",
+              &transaction_id))
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "id argument must be a number");
+
   ret = db->find_transaction_by_id (db->cls,
                                     transaction_id,
                                     &transaction_cb,
@@ -631,7 +634,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   {
     /* FIXME: generate proper 404 */
     GNUNET_break (0);
-    free_tctx (tctx);
     return TMH_RESPONSE_reply_external_error (connection,
                                               "Unknown transaction ID");
   }
@@ -640,7 +642,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
        (NULL == tctx->exchange_uri) )
   {
     GNUNET_break (0);
-    free_tctx (tctx);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               "Database error");
   }
@@ -658,7 +659,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   {
     /* FIXME: generate proper 404 */
     GNUNET_break (0);
-    free_tctx (tctx);
     return TMH_RESPONSE_reply_external_error (connection,
                                               "No deposits found for transaction ID");
   }

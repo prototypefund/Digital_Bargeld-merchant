@@ -98,6 +98,17 @@ typedef void
 
 
 /**
+ * Function called with information about a wire transfer identifier.
+ *
+ * @param cls closure
+ * @param proof proof from exchange about what the wire transfer was for
+ */
+typedef void
+(*TALER_MERCHANTDB_ProofCallback)(void *cls,
+                                  const json_t *proof);
+
+
+/**
  * Handle to interact with the database.
  */
 struct TALER_MERCHANTDB_Plugin
@@ -199,12 +210,14 @@ struct TALER_MERCHANTDB_Plugin
    * Insert wire transfer confirmation from the exchange into the database.
    *
    * @param cls closure
+   * @param exchange_uri from which exchange did we get the @a exchange_proof
    * @param wtid identifier of the wire transfer
    * @param exchange_proof proof from exchange about what the deposit was for
    * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
    */
   int
   (*store_transfer_to_proof) (void *cls,
+                              const char *exchange_uri,
                               const struct TALER_WireTransferIdentifierRawP *wtid,
                               const json_t *exchange_proof);
 
@@ -280,6 +293,24 @@ struct TALER_MERCHANTDB_Plugin
                             TALER_MERCHANTDB_CoinDepositCallback cb,
                             void *cb_cls);
 
+
+  /**
+   * Lookup proof information about a wire transfer.
+   *
+   * @param cls closure
+   * @param exchange_uri from which exchange are we looking for proof
+   * @param wtid wire transfer identifier for the search
+   * @param cb function to call with proof data
+   * @param cb_cls closure for @a cb
+   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   *         #GNUNET_SYSERR on hard errors
+   */
+  int
+  (*find_proof_by_wtid) (void *cls,
+                         const char *exchange_uri,
+                         const struct TALER_WireTransferIdentifierRawP *wtid,
+                         TALER_MERCHANTDB_ProofCallback cb,
+                         void *cb_cls);
 };
 
 

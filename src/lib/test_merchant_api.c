@@ -109,7 +109,7 @@ enum OpCode
   /**
    * Retrieve deposit permissions for a given wire transfer
    */
-   OC_TRACK_DEPOSIT
+  OC_TRACK_DEPOSIT
 
 };
 
@@ -1162,7 +1162,7 @@ interpreter_run (void *cls)
       /* get amount */
       ref = find_command (is,
                           cmd->details.pay.contract_ref);
-      GNUNET_assert (NULL != ref); 
+      GNUNET_assert (NULL != ref);
       merchant_sig = ref->details.contract.merchant_sig;
       GNUNET_assert (NULL != ref->details.contract.contract);
       {
@@ -1265,12 +1265,16 @@ interpreter_run (void *cls)
     }
     return;
   case OC_TRACK_DEPOSIT:
+    GNUNET_break (0);
+    fail (is);
+#if 0
     TALER_MERCHANT_track_deposit (ctx,
                                   MERCHANT_URI "track/deposit",
                                   cmd->details.track_deposit.wtid,
                                   EXCHANGE_URI,
-                                  track_deposit_cb,
+                                  &track_deposit_cb,
                                   is);
+#endif
     return;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,

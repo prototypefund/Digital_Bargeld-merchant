@@ -180,8 +180,11 @@ postgres_initialize (void *cls)
            ");");
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_proofs ("
-           " wtid BYTEA PRIMARY KEY CHECK (LENGTH(wtid)=32)"
-           ",proof BYTEA NOT NULL);");
+           " exchange_uri VARCHAR NOT NULL"
+           ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
+           ",proof BYTEA NOT NULL"
+           " PRIMARY KEY(wtid,exchange_uri)"
+           ");");
   /* Note that transaction_id + coin_pub may actually be unknown to
      us, e.g. someone else deposits something for us at the exchange.
      Hence those cannot be foreign keys into deposits/transactions! */
@@ -193,11 +196,11 @@ postgres_initialize (void *cls)
            ",PRIMARY KEY (transaction_id, coin_pub)"
            ");");
   PG_EXEC_INDEX (pg,
-                 "CREATE INDEX IF NOT EXISTS transfers_by_coin "
-                 " ON transfers (transaction_id, coin_pub)");
+                 "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin "
+                 " ON merchant_transfers (transaction_id, coin_pub)");
   PG_EXEC_INDEX (pg,
-                 "CREATE INDEX IF NOT EXISTS transfers_by_wtid "
-                 " ON transfers (wtid)");
+                 "CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid "
+                 " ON merchant_transfers (wtid)");
 
   /* Setup prepared "INSERT" statements */
   PG_PREPARE (pg,
@@ -240,10 +243,11 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "insert_proof",
               "INSERT INTO merchant_proofs"
-              "(wtid"
+              "(exchange_uri"
+              ",wtid"
               ",proof) VALUES "
-              "($1, $2)",
-              2);
+              "($1, $2, $3)",
+              3);
 
   /* Setup prepared "SELECT" statements */
   PG_PREPARE (pg,
@@ -460,12 +464,14 @@ postgres_store_coin_to_transfer (void *cls,
  * Insert wire transfer confirmation from the exchange into the database.
  *
  * @param cls closure
+ * @param exchange_uri URI of the exchange
  * @param wtid identifier of the wire transfer
  * @param exchange_proof proof from exchange about what the deposit was for
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
  */
 static int
 postgres_store_transfer_to_proof (void *cls,
+                                  const char *exchange_uri,
                                   const struct TALER_WireTransferIdentifierRawP *wtid,
                                   const json_t *exchange_proof)
 {
@@ -474,6 +480,7 @@ postgres_store_transfer_to_proof (void *cls,
   int ret;
 
   struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (exchange_uri),
     GNUNET_PQ_query_param_auto_from_type (wtid),
     TALER_PQ_query_param_json (exchange_proof),
     GNUNET_PQ_query_param_end
@@ -833,6 +840,29 @@ postgres_find_deposits_by_wtid (void *cls,
 
 
 /**
+ * Lookup proof information about a wire transfer.
+ *
+ * @param cls closure
+ * @param merchant_uri from which merchant are we looking for proof
+ * @param wtid wire transfer identifier for the search
+ * @param cb function to call with proof data
+ * @param cb_cls closure for @a cb
+ * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+ *         #GNUNET_SYSERR on hard errors
+ */
+static int
+postgres_find_proof_by_wtid (void *cls,
+                             const char *merchant_uri,
+                             const struct TALER_WireTransferIdentifierRawP *wtid,
+                             TALER_MERCHANTDB_ProofCallback cb,
+                             void *cb_cls)
+{
+  GNUNET_break (0);
+  return GNUNET_SYSERR;
+}
+
+
+/**
  * Initialize Postgres database subsystem.
  *
  * @param cls a configuration instance
@@ -881,6 +911,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_payments_by_id = &postgres_find_payments_by_id;
   plugin->find_transfers_by_id = &postgres_find_transfers_by_id;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
+  plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
 
   return plugin;
 }
