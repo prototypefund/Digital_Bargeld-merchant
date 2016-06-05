@@ -183,7 +183,7 @@ postgres_initialize (void *cls)
            " exchange_uri VARCHAR NOT NULL"
            ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
            ",proof BYTEA NOT NULL"
-           " PRIMARY KEY(wtid,exchange_uri)"
+           ",PRIMARY KEY (wtid, exchange_uri)"
            ");");
   /* Note that transaction_id + coin_pub may actually be unknown to
      us, e.g. someone else deposits something for us at the exchange.
@@ -192,7 +192,7 @@ postgres_initialize (void *cls)
            "CREATE TABLE IF NOT EXISTS merchant_transfers ("
            " transaction_id INT8"
            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-           ",wtid BYTEA REFERENCES merchant_proofs (wtid)"
+           ",wtid BYTEA NOT NULL CHECK (LENGTH(wtid)=32)"
            ",PRIMARY KEY (transaction_id, coin_pub)"
            ");");
   PG_EXEC_INDEX (pg,
@@ -307,6 +307,14 @@ postgres_initialize (void *cls)
               "         merchant_deposits.coin_pub = merchant_transfers.coin_pub)"
               " WHERE wtid=$1",
               1);
+  PG_PREPARE (pg,
+              "find_proof_by_wtid",
+              "SELECT"
+              " proof"
+              " FROM merchant_proofs"
+              " WHERE wtid=$1"
+              "  AND exchange_uri=$2",
+              2);
   return GNUNET_OK;
 }
 
@@ -843,7 +851,7 @@ postgres_find_deposits_by_wtid (void *cls,
  * Lookup proof information about a wire transfer.
  *
  * @param cls closure
- * @param merchant_uri from which merchant are we looking for proof
+ * @param exchange_uri from which exchange are we looking for proof
  * @param wtid wire transfer identifier for the search
  * @param cb function to call with proof data
  * @param cb_cls closure for @a cb
@@ -852,13 +860,65 @@ postgres_find_deposits_by_wtid (void *cls,
  */
 static int
 postgres_find_proof_by_wtid (void *cls,
-                             const char *merchant_uri,
+                             const char *exchange_uri,
                              const struct TALER_WireTransferIdentifierRawP *wtid,
                              TALER_MERCHANTDB_ProofCallback cb,
                              void *cb_cls)
 {
-  GNUNET_break (0);
-  return GNUNET_SYSERR;
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (wtid),
+    GNUNET_PQ_query_param_string (exchange_uri),
+    GNUNET_PQ_query_param_end
+  };
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_proof_by_wtid",
+                                    params);
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  if (0 == PQntuples (result))
+  {
+    PQclear (result);
+    return GNUNET_NO;
+  }
+  if (1 != PQntuples (result))
+  {
+    GNUNET_break (0);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+
+  {
+    json_t *proof;
+
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      TALER_PQ_result_spec_json ("proof",
+                                 &proof),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  0))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+    cb (cb_cls,
+        proof);
+    GNUNET_PQ_cleanup_result (rs);
+  }
+
+  PQclear (result);
+  return GNUNET_OK;
 }
 
 
