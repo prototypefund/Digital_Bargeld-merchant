@@ -62,34 +62,9 @@ struct DepositTrackContext
   struct TALER_EXCHANGE_WireDepositsHandle *wdh;
 
   /**
-   *
-   */
-  struct TALER_WireDepositDetails *details;
-
-  /**
-   * Argument for the /wire/deposits request.
-   */
-  struct TALER_WireTransferIdentifierRawP wtid;
-
-  /**
-   * Length of the @e details array.
-   */
-  unsigned int details_length;
-
-  /**
    * HTTP connection we are handling.
    */
   struct MHD_Connection *connection;
-
-  /**
-   * Response code to return.
-   */
-  unsigned int response_code;
-
-  /**
-   * Error message.
-   */
-  const char *error;
 
   /**
    * Response to return upon resume.
@@ -112,6 +87,27 @@ struct DepositTrackContext
    * URI of the exchange.
    */
   char *uri;
+
+  /**
+   * FIXME: why do we need this?
+   */
+  struct TALER_WireDepositDetails *details;
+
+  /**
+   * Length of the @e details array.
+   * FIXME: probably not needed!
+   */
+  unsigned int details_length;
+
+  /**
+   * Argument for the /wire/deposits request.
+   */
+  struct TALER_WireTransferIdentifierRawP wtid;
+
+  /**
+   * Response code to return.
+   */
+  unsigned int response_code;
 };
 
 
@@ -132,6 +128,11 @@ free_deposit_track_context (struct DepositTrackContext *rctx)
   {
     GNUNET_SCHEDULER_cancel (rctx->timeout_task);
     rctx->timeout_task = NULL;
+  }
+  if (NULL != rctx->uri)
+  {
+    GNUNET_free (rctx->uri);
+    rctx->uri = NULL;
   }
   GNUNET_free (rctx);
 }
@@ -275,7 +276,7 @@ wire_deposit_cb (void *cls,
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Failed to find payment data in DB\n");
     }
-    /* FIXME: check result of "check_deposit"! */
+    /* FIXME: check result of #check_deposit()! */
     ret = db->store_coin_to_transfer (db->cls,
                                       details[i].transaction_id,
                                       &details[i].coin_pub,
@@ -357,7 +358,11 @@ proof_cb (void *cls,
 {
   struct DepositTrackContext *rctx = cls;
 
-  GNUNET_break (0); // not implemented!
+  rctx->response_code = MHD_HTTP_OK;
+  /* FIXME: might want a more custom response here... */
+  rctx->response = TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
+                                                "exchange_status", (json_int_t) MHD_HTTP_OK,
+                                                "details", proof);
 }
 
 
@@ -445,7 +450,7 @@ MH_handler_track_deposit (struct TMH_RequestHandler *rh,
                                               "wtid argument malformed");
   }
 
-  /* FIXME: check if reply is already in database! */
+  /* Check if reply is already in database! */
   ret = db->find_proof_by_wtid (db->cls,
                                 rctx->uri,
                                 &rctx->wtid,
