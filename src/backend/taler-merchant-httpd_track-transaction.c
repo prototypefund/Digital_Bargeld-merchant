@@ -617,14 +617,14 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                      MHD_GET_ARGUMENT_KIND,
                                      "id");
   if (NULL == str)
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "id argument missing");
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           "id argument missing");
   if (1 !=
       sscanf (str,
               "%llu",
               &transaction_id))
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "id argument must be a number");
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           "id argument must be a number");
 
   ret = db->find_transaction_by_id (db->cls,
                                     transaction_id,
@@ -632,10 +632,8 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                     tctx);
   if (GNUNET_NO == ret)
   {
-    /* FIXME: generate proper 404 */
-    GNUNET_break (0);
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "Unknown transaction ID");
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         "id");
   }
   if ( (GNUNET_SYSERR == ret) ||
        (tctx->transaction_id != (uint64_t) transaction_id) ||
@@ -657,10 +655,8 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_NO == ret)
   {
-    /* FIXME: generate proper 404 */
-    GNUNET_break (0);
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "No deposits found for transaction ID");
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         "deposits");
   }
   *connection_cls = tctx;
 

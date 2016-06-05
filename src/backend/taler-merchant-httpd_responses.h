@@ -94,6 +94,31 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection);
 
 
 /**
+ * Send a response indicating that we did not find the @a object
+ * needed for the reply.
+ *
+ * @param connection the MHD connection to use
+ * @param object name of the object we did not find
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
+                              const char *object);
+
+
+/**
+ * Send a response indicating that the request was malformed.
+ *
+ * @param connection the MHD connection to use
+ * @param issue description of what was wrong with the request
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_bad_request (struct MHD_Connection *connection,
+                                const char *issue);
+
+
+/**
  * Send a response indicating an internal error.
  *
  * @param connection the MHD connection to use

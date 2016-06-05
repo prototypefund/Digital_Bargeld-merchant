@@ -29,7 +29,7 @@
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
-#include "taler-merchant-httpd_track_deposit.h"
+#include "taler-merchant-httpd_track-deposit.h"
 
 
 /**
@@ -367,7 +367,7 @@ proof_cb (void *cls,
 
 
 /**
- * Manages a /track/wtid call, thus it calls the /track/deposit
+ * Manages a /track/deposit call, thus it calls the /track/wtid
  * offered by the exchange in order to return the set of deposits
  * (of coins) associated with a given wire transfer.
  *
@@ -430,24 +430,24 @@ MH_handler_track_deposit (struct TMH_RequestHandler *rh,
                                      MHD_GET_ARGUMENT_KIND,
                                      "exchange");
   if (NULL == uri)
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "exchange argument missing");
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           "exchange argument missing");
   rctx->uri = GNUNET_strdup (uri);
 
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "wtid");
   if (NULL == str)
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "wtid argument missing");
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           "wtid argument missing");
   if (GNUNET_OK !=
       GNUNET_STRINGS_string_to_data (str,
                                      strlen (str),
                                      &rctx->wtid,
                                      sizeof (rctx->wtid)))
   {
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "wtid argument malformed");
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           "wtid argument malformed");
   }
 
   /* Check if reply is already in database! */
