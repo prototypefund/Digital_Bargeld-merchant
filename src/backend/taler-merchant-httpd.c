@@ -37,7 +37,8 @@
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
-#include "taler-merchant-httpd_track.h"
+#include "taler-merchant-httpd_track-deposit.h"
+#include "taler-merchant-httpd_track-transaction.h"
 
 
 /**
