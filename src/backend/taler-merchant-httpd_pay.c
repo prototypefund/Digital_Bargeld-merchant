@@ -748,6 +748,7 @@ check_coin_paid (void *cls,
  *
  * @param cls closure with the `struct PayContext`
  * @param transaction_id of the contract
+ * @param exchange_uri URI of the exchange
  * @param h_contract hash of the contract
  * @param h_xwire hash of our wire details
  * @param timestamp time of the confirmation
@@ -757,6 +758,7 @@ check_coin_paid (void *cls,
 static void
 check_transaction_exists (void *cls,
                           uint64_t transaction_id,
+                          const char *exchange_uri,
                           const struct GNUNET_HashCode *h_contract,
                           const struct GNUNET_HashCode *h_xwire,
                           struct GNUNET_TIME_Absolute timestamp,
@@ -1053,6 +1055,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     if (GNUNET_OK !=
         db->store_transaction (db->cls,
                                pc->transaction_id,
+                               pc->chosen_exchange,
                                &pc->h_contract,
                                &h_wire,
                                pc->timestamp,

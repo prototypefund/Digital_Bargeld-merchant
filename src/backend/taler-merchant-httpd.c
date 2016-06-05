@@ -60,7 +60,7 @@ struct GNUNET_HashCode h_wire;
 /**
  * Merchant's private key
  */
-struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
+struct TALER_MerchantPrivateKeyP privkey;
 
 /**
  * Merchant's public key
@@ -276,8 +276,6 @@ do_shutdown (void *cls)
   }
   TMH_EXCHANGES_done ();
   TMH_AUDITORS_done ();
-  if (NULL != keyfile)
-    GNUNET_free (privkey);
   if (NULL != j_wire)
   {
     json_decref (j_wire);
@@ -491,6 +489,7 @@ run (void *cls,
 {
   char *wireformat;
   int fh;
+  struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
 
   wireformat = NULL;
   result = GNUNET_SYSERR;
@@ -575,15 +574,17 @@ run (void *cls,
                 "Merchant private key `%s' does not exist yet, creating it!\n",
                 keyfile);
   if (NULL ==
-      (privkey =
+      (pk =
        GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)))
   {
     GNUNET_break (0);
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-  GNUNET_CRYPTO_eddsa_key_get_public (privkey,
+  privkey.eddsa_priv = *pk;
+  GNUNET_CRYPTO_eddsa_key_get_public (pk,
                                       &pubkey.eddsa_pub);
+  GNUNET_free (pk);
   if (NULL ==
       (db = TALER_MERCHANTDB_plugin_load (config)))
   {

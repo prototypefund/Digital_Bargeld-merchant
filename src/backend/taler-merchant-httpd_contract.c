@@ -213,7 +213,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   GNUNET_assert (GNUNET_OK ==
                  TALER_JSON_hash (jcontract,
                                   &contract.h_contract));
-  GNUNET_CRYPTO_eddsa_sign (privkey,
+  GNUNET_CRYPTO_eddsa_sign (&privkey.eddsa_priv,
                             &contract.purpose,
                             &contract_sig);
 

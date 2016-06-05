@@ -40,6 +40,11 @@
 extern char *TMH_merchant_currency_string;
 
 
+/**
+ * Context for a /track/transaction operation.
+ */
+struct TrackTransactionContext;
+
 
 /**
  * Information we keep for each coin in a /track/transaction operation.
@@ -57,6 +62,11 @@ struct TrackCoinContext
   struct TrackCoinContext *prev;
 
   /**
+   * Our Context for a /track/transaction operation.
+   */
+  struct TrackTransactionContext *tctx;
+
+  /**
    * Public key of the coin.
    */
   struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -65,6 +75,16 @@ struct TrackCoinContext
    * Handle for the request to resolve the WTID for this coin.
    */
   struct TALER_EXCHANGE_DepositWtidHandle *dwh;
+
+  /**
+   * Wire transfer identifier for this coin.
+   */
+  struct TALER_WireTransferIdentifierRawP wtid;
+
+  /**
+   * Have we obtained the WTID for this coin yet?
+   */
+  int have_wtid;
 
 };
 
@@ -95,6 +115,16 @@ struct TrackTransactionContext
    * Kept in a DLL.
    */
   struct TrackCoinContext *tcc_tail;
+
+  /**
+   * Exchange that was used for the transaction.
+   */
+  char *exchange_uri;
+
+  /**
+   * Wire transfer identifier we are currently looking up in @e wdh
+   */
+  struct TALER_WireTransferIdentifierRawP current_wtid;
 
   /**
    * Transaction this request is about.
@@ -184,6 +214,11 @@ free_tctx (struct TrackTransactionContext *tctx)
     }
     GNUNET_free (tcc);
   }
+  if (NULL != tctx->wdh)
+  {
+    TALER_EXCHANGE_wire_deposits_cancel (tctx->wdh);
+    tctx->wdh = NULL;
+  }
   if (NULL != tctx->fo)
   {
     TMH_EXCHANGES_find_exchange_cancel (tctx->fo);
@@ -193,6 +228,11 @@ free_tctx (struct TrackTransactionContext *tctx)
   {
     GNUNET_SCHEDULER_cancel (tctx->timeout_task);
     tctx->timeout_task = NULL;
+  }
+  if (NULL != tctx->exchange_uri)
+  {
+    GNUNET_free (tctx->exchange_uri);
+    tctx->exchange_uri = NULL;
   }
   GNUNET_free (tctx);
 }
@@ -222,21 +262,21 @@ track_transaction_cleanup (struct TM_HandlerContext *hc)
  * @param response response data to send back
  */
 static void
-resume_track_transaction_with_response (struct TrackTransactionContext *ttc,
+resume_track_transaction_with_response (struct TrackTransactionContext *tctx,
                                         unsigned int response_code,
                                         struct MHD_Response *response)
 {
-  ttc->response_code = response_code;
-  ttc->response = response;
+  tctx->response_code = response_code;
+  tctx->response = response;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming /track/transaction handling as exchange interaction is done (%u)\n",
               response_code);
-  if (NULL != ttc->timeout_task)
+  if (NULL != tctx->timeout_task)
   {
-    GNUNET_SCHEDULER_cancel (ttc->timeout_task);
-    ttc->timeout_task = NULL;
+    GNUNET_SCHEDULER_cancel (tctx->timeout_task);
+    tctx->timeout_task = NULL;
   }
-  MHD_resume_connection (ttc->connection);
+  MHD_resume_connection (tctx->connection);
   TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
 
@@ -280,13 +320,56 @@ wire_deposits_cb (void *cls,
                   const struct TALER_WireDepositDetails *details)
 {
   struct TrackTransactionContext *tctx = cls;
+  struct TrackCoinContext *tcc;
+  unsigned int i;
 
-  /* FIXME: store data in database */
-  /* FIXME: check which coins of 'tctx' are now covered */
-  GNUNET_break (0);
+  tctx->wdh = NULL;
+  if (MHD_HTTP_OK != http_status)
+  {
+    resume_track_transaction_with_response
+      (tctx,
+       MHD_HTTP_FAILED_DEPENDENCY,
+       TMH_RESPONSE_make_json_pack ("{s:I, s:o}",
+                                    "exchange_status", (json_int_t) http_status,
+                                    "details", json));
+    return;
+  }
+  if (GNUNET_OK !=
+      db->store_transfer_to_proof (db->cls,
+                                   &tctx->current_wtid,
+                                   json))
+  {
+    /* Not good, but not fatal either, log error and continue */
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to store transfer-to-proof mapping in DB\n");
+  }
+  for (tcc=tctx->tcc_head;NULL != tcc;tcc=tcc->next)
+  {
+    if (GNUNET_YES == tcc->have_wtid)
+      continue;
+    for (i=0;i<details_length;i++)
+    {
+      if (0 != memcmp (&details[i].coin_pub,
+                       &tcc->coin_pub,
+                       sizeof (struct TALER_CoinSpendPublicKeyP)))
+        continue;
+      tcc->wtid = tctx->current_wtid;
+      tcc->have_wtid = GNUNET_YES;
+      if (GNUNET_OK !=
+          db->store_coin_to_transfer (db->cls,
+                                      tctx->transaction_id,
+                                      &tcc->coin_pub,
+                                      &tctx->current_wtid))
+      {
+        /* Not good, but not fatal either, log error and continue */
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to store coin-to-transfer mapping in DB\n");
+      }
+    }
+  }
+  /* Continue traceing (will also handle case that we are done) */
   trace_coins (tctx);
 }
-
 
 
 /**
@@ -296,7 +379,7 @@ wire_deposits_cb (void *cls,
  * obtain the inverse: all other coins of that wire transfer,
  * which is what we prefer to store.
  *
- * @param cls closure
+ * @param cls closure with a `struct TrackCoinContext`
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
  * @param json original json reply (may include signatures, those have then been
  *        validated already)
@@ -313,8 +396,11 @@ wtid_cb (void *cls,
          struct GNUNET_TIME_Absolute execution_time,
          const struct TALER_Amount *coin_contribution)
 {
-  struct TrackTransactionContext *tctx = cls;
+  struct TrackCoinContext *tcc = cls;
+  struct TrackTransactionContext *tctx = tcc->tctx;
 
+  tcc->dwh = NULL;
+  tctx->current_wtid = *wtid;
   tctx->wdh = TALER_EXCHANGE_wire_deposits (tctx->eh,
                                             wtid,
                                             &wire_deposits_cb,
@@ -332,29 +418,30 @@ wtid_cb (void *cls,
 static void
 trace_coins (struct TrackTransactionContext *tctx)
 {
-  GNUNET_assert (NULL != tctx->eh);
+  struct TrackCoinContext *tcc;
 
-  GNUNET_break (0);
-#if ALL_COINS_DONE
-  if (0)
+  GNUNET_assert (NULL != tctx->eh);
+  for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
+    if (GNUNET_YES != tcc->have_wtid)
+      break;
+  if (NULL == tcc)
   {
+#if ALL_COINS_DONE_FIXME
     generate_response ();
     resume_track_transaction_with_response (tctx,
                                             MHD_HTTP_OK,
                                             response);
+#endif
     return;
   }
-#endif
-#if FOR_NEXT_COIN_IN_ORDER_ONE_AT_A_TIME_UNTIL_ALL_ARE_DONE
-  tctx->dwh = TALER_EXCHANGE_deposit_wtid (eh,
-                                           merchant_priv,
-                                           &tctx->h_wire,
-                                           &tctx->h_contract,
-                                           &coin_pub,
-                                           tctx->transaction_id,
-                                           &wtid_cb,
-                                           tctx);
-#endif
+  tcc->dwh = TALER_EXCHANGE_deposit_wtid (tctx->eh,
+                                          &privkey,
+                                          &tctx->h_wire,
+                                          &tctx->h_contract,
+                                          &tcc->coin_pub,
+                                          tctx->transaction_id,
+                                          &wtid_cb,
+                                          tcc);
 }
 
 
@@ -386,18 +473,18 @@ process_track_transaction_with_exchange (void *cls,
 static void
 handle_track_transaction_timeout (void *cls)
 {
-  struct TrackTransactionContext *ttc = cls;
+  struct TrackTransactionContext *tctx = cls;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming /track/transaction with error after timeout\n");
-  ttc->timeout_task = NULL;
+  tctx->timeout_task = NULL;
 
-  if (NULL != ttc->fo)
+  if (NULL != tctx->fo)
   {
-    TMH_EXCHANGES_find_exchange_cancel (ttc->fo);
-    ttc->fo = NULL;
+    TMH_EXCHANGES_find_exchange_cancel (tctx->fo);
+    tctx->fo = NULL;
   }
-  resume_track_transaction_with_response (ttc,
+  resume_track_transaction_with_response (tctx,
                                           MHD_HTTP_SERVICE_UNAVAILABLE,
                                           TMH_RESPONSE_make_internal_error ("exchange not reachable"));
 }
@@ -408,6 +495,7 @@ handle_track_transaction_timeout (void *cls)
  *
  * @param cls closure
  * @param transaction_id of the contract
+ * @param exchange_uri URI of the exchange
  * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
@@ -417,20 +505,22 @@ handle_track_transaction_timeout (void *cls)
 static void
 transaction_cb (void *cls,
                 uint64_t transaction_id,
+                const char *exchange_uri,
                 const struct GNUNET_HashCode *h_contract,
                 const struct GNUNET_HashCode *h_wire,
                 struct GNUNET_TIME_Absolute timestamp,
                 struct GNUNET_TIME_Absolute refund,
                 const struct TALER_Amount *total_amount)
 {
-  struct TrackTransactionContext *ttc = cls;
+  struct TrackTransactionContext *tctx = cls;
 
-  ttc->transaction_id = transaction_id;
-  ttc->h_contract = *h_contract;
-  ttc->h_wire = *h_wire;
-  ttc->timestamp = timestamp;
-  ttc->refund_deadline = refund;
-  ttc->total_amount = *total_amount;
+  tctx->transaction_id = transaction_id;
+  tctx->exchange_uri = GNUNET_strdup (exchange_uri);
+  tctx->h_contract = *h_contract;
+  tctx->h_wire = *h_wire;
+  tctx->timestamp = timestamp;
+  tctx->refund_deadline = refund;
+  tctx->total_amount = *total_amount;
 }
 
 
@@ -452,13 +542,14 @@ coin_cb (void *cls,
          const struct TALER_Amount *deposit_fee,
          const json_t *exchange_proof)
 {
-  struct TrackTransactionContext *ttc = cls;
+  struct TrackTransactionContext *tctx = cls;
   struct TrackCoinContext *tcc;
 
   tcc = GNUNET_new (struct TrackCoinContext);
+  tcc->tctx = tctx;
   tcc->coin_pub = *coin_pub;
-  GNUNET_CONTAINER_DLL_insert (ttc->tcc_head,
-                               ttc->tcc_tail,
+  GNUNET_CONTAINER_DLL_insert (tctx->tcc_head,
+                               tctx->tcc_tail,
                                tcc);
 }
 
@@ -545,7 +636,8 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                               "Unknown transaction ID");
   }
   if ( (GNUNET_SYSERR == ret) ||
-       (tctx->transaction_id != (uint64_t) transaction_id) )
+       (tctx->transaction_id != (uint64_t) transaction_id) ||
+       (NULL == tctx->exchange_uri) )
   {
     GNUNET_break (0);
     free_tctx (tctx);
@@ -575,7 +667,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Suspending /track/transaction handling while working with the exchange\n");
   MHD_suspend_connection (connection);
-  tctx->fo = TMH_EXCHANGES_find_exchange (NULL, /* FIXME: tctx->chosen_exchange */
+  tctx->fo = TMH_EXCHANGES_find_exchange (tctx->exchange_uri,
                                           &process_track_transaction_with_exchange,
                                           tctx);
 

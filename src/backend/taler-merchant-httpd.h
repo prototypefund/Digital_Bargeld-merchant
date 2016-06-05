@@ -162,9 +162,9 @@ extern json_t *j_wire;
 extern struct GNUNET_HashCode h_wire;
 
 /**
- * Our private key (for the merchant to sign contracts).
+ * Our private key, corresponds to #pubkey.
  */
-extern struct GNUNET_CRYPTO_EddsaPrivateKey *privkey;
+extern struct TALER_MerchantPrivateKeyP privkey;
 
 /**
  * Our public key, corresponds to #privkey.
