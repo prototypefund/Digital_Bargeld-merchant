@@ -234,6 +234,7 @@ check_deposit (void *cls,
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param exchange_pub public key of the exchange used to sign @a json
  * @param json original json reply (may include signatures, those have then been
  *        validated already)
  * @param wtid extracted wire transfer identifier, or NULL if the exchange could
@@ -246,6 +247,7 @@ check_deposit (void *cls,
 static void
 wire_deposit_cb (void *cls,
                  unsigned int http_status,
+                 const struct TALER_ExchangePublicKeyP *exchange_pub,
                  const json_t *json,
                  const struct GNUNET_HashCode *h_wire,
                  const struct TALER_Amount *total_amount,
@@ -272,6 +274,7 @@ wire_deposit_cb (void *cls,
       db->store_transfer_to_proof (db->cls,
                                    rctx->uri,
                                    &rctx->wtid,
+                                   exchange_pub,
                                    json))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,

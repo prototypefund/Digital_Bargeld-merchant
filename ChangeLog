@@ -1,2 +1,6 @@
+Tue Jun  7 15:17:45 CEST 2016
+	Store signing key used by exchange in DB.  Might be useful
+	in the future when we implement GC for the backenddb. -CG
+
 Wed Jun  1 17:27:36 CEST 2016
 	Releasing taler-merchant-0.0.0. -CG
