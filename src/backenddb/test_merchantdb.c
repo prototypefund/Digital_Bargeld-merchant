@@ -36,8 +36,121 @@
 
 #define CURRENCY "EUR"
 
+#define EXCHANGE_URI "http://localhost:8888/"
+
 static int result;
+
 static struct TALER_MERCHANTDB_Plugin *plugin;
+
+static struct GNUNET_HashCode h_contract;
+
+static struct GNUNET_HashCode h_wire;
+
+static uint64_t transaction_id;
+
+static struct GNUNET_TIME_Absolute timestamp;
+
+static struct GNUNET_TIME_Absolute refund;
+
+static struct TALER_Amount amount_with_fee;
+
+static struct TALER_Amount deposit_fee;
+
+static struct TALER_CoinSpendPublicKeyP coin_pub;
+
+static struct TALER_ExchangePublicKeyP signkey_pub;
+
+static struct TALER_WireTransferIdentifierRawP wtid;
+
+static json_t *deposit_proof = NULL;
+
+static json_t *transfer_proof = NULL;
+
+
+/**
+ * Function called with information about a transaction.
+ *
+ * @param cls closure
+ * @param transaction_id of the contract
+ * @param exchange_uri URI of the exchange
+ * @param h_contract hash of the contract
+ * @param h_wire hash of our wire details
+ * @param timestamp time of the confirmation
+ * @param refund refund deadline
+ * @param total_amount total amount we receive for the contract after fees
+ */
+static void
+transaction_cb (void *cls,
+                uint64_t transaction_id,
+                const char *exchange_uri,
+                const struct GNUNET_HashCode *h_contract,
+                const struct GNUNET_HashCode *h_wire,
+                struct GNUNET_TIME_Absolute timestamp,
+                struct GNUNET_TIME_Absolute refund,
+                const struct TALER_Amount *total_amount)
+{
+}
+
+
+/**
+ * Function called with information about a coin that was deposited.
+ *
+ * @param cls closure
+ * @param transaction_id of the contract
+ * @param coin_pub public key of the coin
+ * @param amount_with_fee amount the exchange will deposit for this coin
+ * @param deposit_fee fee the exchange will charge for this coin
+ * @param exchange_proof proof from exchange that coin was accepted
+ */
+static void
+deposit_cb (void *cls,
+            uint64_t transaction_id,
+            const struct TALER_CoinSpendPublicKeyP *coin_pub,
+            const struct TALER_Amount *amount_with_fee,
+            const struct TALER_Amount *deposit_fee,
+            const json_t *exchange_proof)
+{
+}
+
+
+/**
+ * Information about the wire transfer corresponding to
+ * a deposit operation.  Note that it is in theory possible
+ * that we have a @a transaction_id and @a coin_pub in the
+ * result that do not match a deposit that we know about,
+ * for example because someone else deposited funds into
+ * our account.
+ *
+ * @param cls closure
+ * @param transaction_id ID of the contract
+ * @param coin_pub public key of the coin
+ * @param wtid identifier of the wire transfer in which the exchange
+ *             send us the money for the coin deposit
+ * @param exchange_proof proof from exchange about what the deposit was for
+ *             NULL if we have not asked for this signature
+ */
+static void
+transfer_cb (void *cls,
+             uint64_t transaction_id,
+             const struct TALER_CoinSpendPublicKeyP *coin_pub,
+             const struct TALER_WireTransferIdentifierRawP *wtid,
+             const json_t *exchange_proof)
+{
+}
+
+
+/**
+ * Function called with information about a wire transfer identifier.
+ *
+ * @param cls closure
+ * @param proof proof from exchange about what the wire transfer was for
+ */
+static void
+proof_cb (void *cls,
+          const json_t *proof)
+{
+}
+
 
 /**
  * Main function that will be run by the scheduler.
@@ -49,18 +162,6 @@ run (void *cls)
 {
   struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   /* Data for 'store_payment()' */
-  struct  GNUNET_HashCode h_contract;
-  struct  GNUNET_HashCode h_wire;
-  uint64_t transaction_id;
-  struct GNUNET_TIME_Absolute timestamp;
-  struct GNUNET_TIME_Absolute refund;
-  struct TALER_Amount amount_with_fee;
-  struct TALER_Amount deposit_fee;
-  struct TALER_CoinSpendPublicKeyP coin_pub;
-  struct TALER_ExchangePublicKeyP signkey_pub;
-  struct TALER_WireTransferIdentifierRawP wtid;
-  json_t *deposit_proof = NULL;
-  json_t *transfer_proof = NULL;
 
   FAILIF (NULL == (plugin = TALER_MERCHANTDB_plugin_load (cfg)));
   (void)  plugin->drop_tables (plugin->cls);
@@ -94,7 +195,7 @@ run (void *cls)
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,
                                      transaction_id,
-                                     "http://localhost:8888/",
+                                     EXCHANGE_URI,
                                      &h_contract,
                                      &h_wire,
                                      timestamp,
@@ -115,15 +216,36 @@ run (void *cls)
                                           &wtid));
   FAILIF (GNUNET_OK !=
           plugin->store_transfer_to_proof (plugin->cls,
-                                           "http://localhost:8888/",
+                                           EXCHANGE_URI,
                                            &wtid,
                                            &signkey_pub,
                                            transfer_proof));
-#if 0
   FAILIF (GNUNET_OK !=
-          plugin->check_payment (plugin->cls,
-                                 transaction_id));
-#endif
+          plugin->find_transaction_by_id (plugin->cls,
+                                          transaction_id,
+                                          &transaction_cb,
+                                          NULL));
+  FAILIF (GNUNET_OK !=
+          plugin->find_payments_by_id (plugin->cls,
+                                       transaction_id,
+                                       &deposit_cb,
+                                       NULL));
+  FAILIF (GNUNET_OK !=
+          plugin->find_transfers_by_id (plugin->cls,
+                                        transaction_id,
+                                        &transfer_cb,
+                                        NULL));
+  FAILIF (GNUNET_OK !=
+          plugin->find_deposits_by_wtid (plugin->cls,
+                                         &wtid,
+                                         &deposit_cb,
+                                         NULL));
+  FAILIF (GNUNET_OK !=
+          plugin->find_proof_by_wtid (plugin->cls,
+                                      EXCHANGE_URI,
+                                      &wtid,
+                                      &proof_cb,
+                                      NULL));
   result = 0;
 
  drop:
