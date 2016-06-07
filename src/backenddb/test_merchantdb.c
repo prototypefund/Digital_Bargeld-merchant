@@ -24,6 +24,7 @@
 #include "taler_merchantdb_lib.h"
 #include <jansson.h>
 
+
 #define FAILIF(cond)                            \
   do {                                          \
     if (!(cond)){ break;}                       \
@@ -34,37 +35,89 @@
 #define RND_BLK(ptr)                                                    \
   GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK, ptr, sizeof (*ptr))
 
+
+/**
+ * Currency we use for the coins.
+ */
 #define CURRENCY "EUR"
 
+/**
+ * URI we use for the exchange in the database.
+ * Note that an exchange does not actually have
+ * to run at this address.
+ */
 #define EXCHANGE_URI "http://localhost:8888/"
 
+/**
+ * Global return value for the test.  Initially -1, set to 0 upon
+ * completion.  Other values indicate some kind of error.
+ */
 static int result;
 
+/**
+ * Handle to the plugin we are testing.
+ */
 static struct TALER_MERCHANTDB_Plugin *plugin;
 
+/**
+ * Hash of the contract.  Set to some random value.
+ */
 static struct GNUNET_HashCode h_contract;
 
+/**
+ * Hash of the wire transfer address.  Set to some random value.
+ */
 static struct GNUNET_HashCode h_wire;
 
+/**
+ * Transaction ID.
+ */
 static uint64_t transaction_id;
 
+/**
+ * Time of the transaction.
+ */
 static struct GNUNET_TIME_Absolute timestamp;
 
-static struct GNUNET_TIME_Absolute refund;
+/**
+ * Deadline until which refunds are allowed.
+ */
+static struct GNUNET_TIME_Absolute refund_deadline;
 
+/**
+ * Total amount, including deposit fee.
+ */
 static struct TALER_Amount amount_with_fee;
 
+/**
+ * Deposit fee for the coin.
+ */
 static struct TALER_Amount deposit_fee;
 
+/**
+ * Public key of the coin.  Set to some random value.
+ */
 static struct TALER_CoinSpendPublicKeyP coin_pub;
 
+/**
+ * Public key of the exchange.  Set to some random value.
+ */
 static struct TALER_ExchangePublicKeyP signkey_pub;
 
+/**
+ * Wire transfer identifier.  Set to some random value.
+ */
 static struct TALER_WireTransferIdentifierRawP wtid;
 
-static json_t *deposit_proof = NULL;
+/**
+ * "Proof" of deposit from the exchange. Set to some valid JSON.
+ */
+static json_t *deposit_proof;
 
-static json_t *transfer_proof = NULL;
+/**
+ * "Proof" of wire transfer from the exchange. Set to some valid JSON.
+ */
+static json_t *transfer_proof;
 
 
 /**
@@ -76,19 +129,33 @@ static json_t *transfer_proof = NULL;
  * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
- * @param refund refund deadline
+ * @param refund_deadline refund deadline
  * @param total_amount total amount we receive for the contract after fees
  */
 static void
 transaction_cb (void *cls,
-                uint64_t transaction_id,
-                const char *exchange_uri,
-                const struct GNUNET_HashCode *h_contract,
-                const struct GNUNET_HashCode *h_wire,
-                struct GNUNET_TIME_Absolute timestamp,
-                struct GNUNET_TIME_Absolute refund,
-                const struct TALER_Amount *total_amount)
+                uint64_t atransaction_id,
+                const char *aexchange_uri,
+                const struct GNUNET_HashCode *ah_contract,
+                const struct GNUNET_HashCode *ah_wire,
+                struct GNUNET_TIME_Absolute atimestamp,
+                struct GNUNET_TIME_Absolute arefund_deadline,
+                const struct TALER_Amount *atotal_amount)
 {
+#define CHECK(a) do { if (! (a)) { GNUNET_break (0); result = 3; } } while (0)
+  CHECK (atransaction_id == transaction_id);
+  CHECK (0 == strcmp (aexchange_uri,
+                      EXCHANGE_URI));
+  CHECK (0 == memcmp (ah_contract,
+                      &h_contract,
+                      sizeof (struct GNUNET_HashCode)));
+  CHECK (0 == memcmp (ah_wire,
+                      &h_wire,
+                      sizeof (struct GNUNET_HashCode)));
+  CHECK (atimestamp.abs_value_us == timestamp.abs_value_us);
+  CHECK (arefund_deadline.abs_value_us == refund_deadline.abs_value_us);
+  CHECK (0 == TALER_amount_cmp (atotal_amount,
+                                &amount_with_fee));
 }
 
 
@@ -104,12 +171,22 @@ transaction_cb (void *cls,
  */
 static void
 deposit_cb (void *cls,
-            uint64_t transaction_id,
-            const struct TALER_CoinSpendPublicKeyP *coin_pub,
-            const struct TALER_Amount *amount_with_fee,
-            const struct TALER_Amount *deposit_fee,
-            const json_t *exchange_proof)
+            uint64_t atransaction_id,
+            const struct TALER_CoinSpendPublicKeyP *acoin_pub,
+            const struct TALER_Amount *aamount_with_fee,
+            const struct TALER_Amount *adeposit_fee,
+            const json_t *aexchange_proof)
 {
+  CHECK (atransaction_id == transaction_id);
+  CHECK (0 == memcmp (acoin_pub,
+                      &coin_pub,
+                      sizeof (struct TALER_CoinSpendPublicKeyP)));
+  CHECK (0 == TALER_amount_cmp (aamount_with_fee,
+                                &amount_with_fee));
+  CHECK (0 == TALER_amount_cmp (adeposit_fee,
+                                &deposit_fee));
+  CHECK (1 == json_equal ((json_t *) aexchange_proof,
+                          deposit_proof));
 }
 
 
@@ -131,11 +208,20 @@ deposit_cb (void *cls,
  */
 static void
 transfer_cb (void *cls,
-             uint64_t transaction_id,
-             const struct TALER_CoinSpendPublicKeyP *coin_pub,
-             const struct TALER_WireTransferIdentifierRawP *wtid,
+             uint64_t atransaction_id,
+             const struct TALER_CoinSpendPublicKeyP *acoin_pub,
+             const struct TALER_WireTransferIdentifierRawP *awtid,
              const json_t *exchange_proof)
 {
+  CHECK (atransaction_id == transaction_id);
+  CHECK (0 == memcmp (acoin_pub,
+                      &coin_pub,
+                      sizeof (struct TALER_CoinSpendPublicKeyP)));
+  CHECK (0 == memcmp (awtid,
+                      &wtid,
+                      sizeof (struct TALER_WireTransferIdentifierRawP)));
+  CHECK (1 == json_equal ((json_t *) exchange_proof,
+                          transfer_proof));
 }
 
 
@@ -149,7 +235,10 @@ static void
 proof_cb (void *cls,
           const json_t *proof)
 {
+  CHECK (1 == json_equal ((json_t *) proof,
+                          transfer_proof));
 }
+#undef CHECK
 
 
 /**
@@ -174,7 +263,9 @@ run (void *cls)
   RND_BLK (&signkey_pub);
   RND_BLK (&wtid);
   timestamp = GNUNET_TIME_absolute_get();
-  refund = GNUNET_TIME_absolute_get();
+  GNUNET_TIME_round_abs (&timestamp);
+  refund_deadline = GNUNET_TIME_absolute_get();
+  GNUNET_TIME_round_abs (&refund_deadline);
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":1.000010",
                                          &amount_with_fee));
@@ -199,7 +290,7 @@ run (void *cls)
                                      &h_contract,
                                      &h_wire,
                                      timestamp,
-                                     refund,
+                                     refund_deadline,
                                      &amount_with_fee));
   FAILIF (GNUNET_OK !=
           plugin->store_deposit (plugin->cls,
@@ -246,7 +337,8 @@ run (void *cls)
                                       &wtid,
                                       &proof_cb,
                                       NULL));
-  result = 0;
+  if (-1 == result)
+    result = 0;
 
  drop:
   GNUNET_break (GNUNET_OK == plugin->drop_tables (plugin->cls));
@@ -298,3 +390,5 @@ main (int argc,
   GNUNET_free (testname);
   return result;
 }
+
+/* end of test_merchantdb.c */
