@@ -176,6 +176,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param coin_pub public key of the coin
    * @param amount_with_fee amount the exchange will deposit for this coin
    * @param deposit_fee fee the exchange will charge for this coin
+   * @param signkey_pub public key used by the exchange for @a exchange_proof
    * @param exchange_proof proof from exchange that coin was accepted
    * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
    */
@@ -185,6 +186,7 @@ struct TALER_MERCHANTDB_Plugin
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
                     const struct TALER_Amount *amount_with_fee,
                     const struct TALER_Amount *deposit_fee,
+                    const struct TALER_ExchangePublicKeyP *signkey_pub,
                     const json_t *exchange_proof);
 
 
@@ -212,6 +214,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param cls closure
    * @param exchange_uri from which exchange did we get the @a exchange_proof
    * @param wtid identifier of the wire transfer
+   * @param signkey_pub public key used by the exchange for @a exchange_proof
    * @param exchange_proof proof from exchange about what the deposit was for
    * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
    */
@@ -219,6 +222,7 @@ struct TALER_MERCHANTDB_Plugin
   (*store_transfer_to_proof) (void *cls,
                               const char *exchange_uri,
                               const struct TALER_WireTransferIdentifierRawP *wtid,
+                              const struct TALER_ExchangePublicKeyP *signkey_pub,
                               const json_t *exchange_proof);
 
 

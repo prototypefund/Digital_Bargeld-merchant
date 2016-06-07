@@ -323,6 +323,7 @@ abort_deposit (struct PayContext *pc)
  * @param http_status HTTP response code, #MHD_HTTP_OK
  *   (200) for successful deposit; 0 if the exchange's reply is bogus (fails
  *   to follow the protocol)
+ * @param sign_key which key did the exchange use to sign the @a proof
  * @param proof the received JSON reply,
  *   should be kept as proof (and, in case of errors, be forwarded to
  *   the customer)
@@ -330,6 +331,7 @@ abort_deposit (struct PayContext *pc)
 static void
 deposit_cb (void *cls,
             unsigned int http_status,
+            const struct TALER_ExchangePublicKeyP *sign_key,
             const json_t *proof)
 {
   struct DepositConfirmation *dc = cls;
@@ -379,6 +381,7 @@ deposit_cb (void *cls,
 			 &dc->coin_pub,
 			 &dc->amount_with_fee,
 			 &dc->deposit_fee,
+                         sign_key,
 			 proof))
   {
     GNUNET_break (0);

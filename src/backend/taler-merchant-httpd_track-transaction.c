@@ -299,6 +299,7 @@ trace_coins (struct TrackTransactionContext *tctx);
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param exchange_pub public key of the exchange used for signing
  * @param json original json reply (may include signatures, those have then been
  *        validated already)
  * @param wtid extracted wire transfer identifier, or NULL if the exchange could
@@ -311,6 +312,7 @@ trace_coins (struct TrackTransactionContext *tctx);
 static void
 wire_deposits_cb (void *cls,
                   unsigned int http_status,
+                  const struct TALER_ExchangePublicKeyP *exchange_pub,
                   const json_t *json,
                   const struct GNUNET_HashCode *h_wire,
                   const struct TALER_Amount *total_amount,
@@ -336,6 +338,7 @@ wire_deposits_cb (void *cls,
       db->store_transfer_to_proof (db->cls,
                                    tctx->exchange_uri,
                                    &tctx->current_wtid,
+                                   exchange_pub,
                                    json))
   {
     /* Not good, but not fatal either, log error and continue */
@@ -380,6 +383,7 @@ wire_deposits_cb (void *cls,
  *
  * @param cls closure with a `struct TrackCoinContext`
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param exchange_pub public key of the exchange used for signing @a json
  * @param json original json reply (may include signatures, those have then been
  *        validated already)
  * @param wtid wire transfer identifier used by the exchange, NULL if exchange did not
@@ -390,6 +394,7 @@ wire_deposits_cb (void *cls,
 static void
 wtid_cb (void *cls,
          unsigned int http_status,
+         const struct TALER_ExchangePublicKeyP *exchange_pub,
          const json_t *json,
          const struct TALER_WireTransferIdentifierRawP *wtid,
          struct GNUNET_TIME_Absolute execution_time,
