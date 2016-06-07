@@ -95,7 +95,6 @@ struct TrackTransactionContext
 
   /**
    * This field MUST be first.
-   * FIXME: Explain why!
    */
   struct TM_HandlerContext hc;
 
@@ -118,41 +117,6 @@ struct TrackTransactionContext
    * Exchange that was used for the transaction.
    */
   char *exchange_uri;
-
-  /**
-   * Wire transfer identifier we are currently looking up in @e wdh
-   */
-  struct TALER_WireTransferIdentifierRawP current_wtid;
-
-  /**
-   * Transaction this request is about.
-   */
-  uint64_t transaction_id;
-
-  /**
-   * Hash of wire details for the transaction.
-   */
-  struct GNUNET_HashCode h_wire;
-
-  /**
-   * Timestamp of the transaction.
-   */
-  struct GNUNET_TIME_Absolute timestamp;
-
-  /**
-   * Refund deadline for the transaction.
-   */
-  struct GNUNET_TIME_Absolute refund_deadline;
-
-  /**
-   * Total value of the transaction.
-   */
-  struct TALER_Amount total_amount;
-
-  /**
-   * Hash of the contract.
-   */
-  struct GNUNET_HashCode h_contract;
 
   /**
    * Task run on timeout.
@@ -182,10 +146,44 @@ struct TrackTransactionContext
   struct MHD_Response *response;
 
   /**
+   * Wire transfer identifier we are currently looking up in @e wdh.
+   */
+  struct TALER_WireTransferIdentifierRawP current_wtid;
+
+  /**
+   * Hash of wire details for the transaction.
+   */
+  struct GNUNET_HashCode h_wire;
+
+  /**
+   * Hash of the contract.
+   */
+  struct GNUNET_HashCode h_contract;
+
+  /**
+   * Timestamp of the transaction.
+   */
+  struct GNUNET_TIME_Absolute timestamp;
+
+  /**
+   * Refund deadline for the transaction.
+   */
+  struct GNUNET_TIME_Absolute refund_deadline;
+
+  /**
+   * Total value of the transaction.
+   */
+  struct TALER_Amount total_amount;
+
+  /**
+   * Transaction this request is about.
+   */
+  uint64_t transaction_id;
+
+  /**
    * Response code to return upon resume.
    */
   unsigned int response_code;
-
 
 };
 
@@ -672,4 +670,4 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 }
 
 
-/* end of taler-merchant-httpd_contract.c */
+/* end of taler-merchant-httpd_track-transaction.c */

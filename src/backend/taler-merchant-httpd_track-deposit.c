@@ -129,6 +129,11 @@ free_deposit_track_context (struct DepositTrackContext *rctx)
     GNUNET_SCHEDULER_cancel (rctx->timeout_task);
     rctx->timeout_task = NULL;
   }
+  if (NULL != rctx->wdh)
+  {
+    TALER_EXCHANGE_wire_deposits_cancel (rctx->wdh);
+    rctx->wdh = NULL;
+  }
   if (NULL != rctx->uri)
   {
     GNUNET_free (rctx->uri);
@@ -213,7 +218,7 @@ check_deposit (void *cls,
        (0 != TALER_amount_cmp (deposit_fee,
                                &wdd->coin_fee)) )
   {
-    /* Disagreement between the exchange and us how much this
+    /* Disagreement between the exchange and us about how much this
        coin is worth! */
     GNUNET_break_op (0);
     rctx->check_deposit_result = GNUNET_SYSERR;
