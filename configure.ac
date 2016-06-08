@@ -84,6 +84,33 @@ AC_CHECK_HEADERS([gnunet/gnunet_pq_lib.h],
 AM_CONDITIONAL(HAVE_GNUNETPQ, test x$libgnunetpq = x1)
 
 
+
+# Check for Taler's libtalerfakebank
+libtalerfakebank=0
+AC_MSG_CHECKING([for libtalerfakebank])
+AC_ARG_WITH(exchange,
+            [AS_HELP_STRING([--with-exchange=PFX], [base of Taler EXCHANGE installation])],
+            [AC_MSG_RESULT([given as $with_exchange])],
+            [AC_MSG_RESULT(not given)
+             with_exchange=yes])
+AS_CASE([$with_exchange],
+        [yes], [],
+        [no], [AC_MSG_ERROR([--with-exchange is required])],
+        [LDFLAGS="-L$with_exchange/lib $LDFLAGS"
+         CPPFLAGS="-I$with_exchange/include $CPPFLAGS $POSTGRESQL_CPPFLAGS"])
+
+CPPFLAGS="$CPPFLAGS $POSTGRESQL_CPPFLAGS"
+LDFLAGS="$LDFLAGS -L/usr/local/lib"
+
+AC_CHECK_HEADERS([taler/taler_fakebank_lib.h],
+ [AC_CHECK_LIB([talerfakebank], [TALER_FAKEBANK_start], libtalerfakebank=1)],
+   [], [#ifdef HAVE_GNUNET_PLATFORM_H
+        #include <gnunet/platform.h>
+       #endif])
+AM_CONDITIONAL(HAVE_TALERFAKEBANK, test x$libtalerfakebank = x1)
+
+
+
 # check for libmicrohttpd
 microhttpd=0
 AC_MSG_CHECKING([for microhttpd])

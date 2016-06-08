@@ -19,10 +19,11 @@
  * @author Christian Grothoff
  */
 #include "platform.h"
+#include <taler/taler_exchange_service.h>
+#include <taler/taler_fakebank_lib.h>
+#include <taler/taler_json_lib.h>
 #include <taler/taler_util.h>
 #include <taler/taler_signatures.h>
-#include <taler/taler_exchange_service.h>
-#include <taler/taler_json_lib.h>
 #include "taler_merchant_service.h"
 #include "taler_merchantdb_lib.h"
 #include <gnunet/gnunet_util_lib.h>
@@ -64,6 +65,12 @@ static struct GNUNET_SCHEDULER_Task *timeout_task;
  * Context for running the #ctx's event loop.
  */
 static struct GNUNET_CURL_RescheduleContext *rc;
+
+/**
+ * Handle to the fake bank service we run for the
+ * aggregator.
+ */
+static struct TALER_FAKEBANK_Handle *fakebank;
 
 /**
  * Result of the testcases, #GNUNET_OK on success
@@ -1431,6 +1438,8 @@ do_shutdown (void *cls)
     GNUNET_CURL_gnunet_rc_destroy (rc);
     rc = NULL;
   }
+  TALER_FAKEBANK_stop (fakebank);
+  fakebank = NULL;
 }
 
 
@@ -1565,6 +1574,15 @@ run (void *cls)
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Interpreter initializing\n");
+  fakebank = TALER_FAKEBANK_start (8888);
+  if (NULL == fakebank)
+  {
+    fprintf (stderr,
+             "\nFailed to start fake bank service\n");
+    result = 77;
+    return;
+  }
+
   is = GNUNET_new (struct InterpreterState);
   is->commands = commands;
 
@@ -1745,6 +1763,7 @@ main (int argc,
     }
   while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URI " -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
+
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_run (&run, NULL);
   GNUNET_OS_process_kill (merchantd,
@@ -1755,6 +1774,8 @@ main (int argc,
                           SIGTERM);
   GNUNET_OS_process_wait (exchanged);
   GNUNET_OS_process_destroy (exchanged);
+  if (77 == result)
+    return 77;
   return (GNUNET_OK == result) ? 0 : 1;
 }
 

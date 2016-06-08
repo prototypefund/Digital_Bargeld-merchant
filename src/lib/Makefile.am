@@ -36,8 +36,10 @@ libtalermerchant_la_LIBADD += -lgnurl
 endif
 endif
 
+if HAVE_TALERFAKEBANK
 check_PROGRAMS = \
   test_merchant_api
+endif
 
 TESTS = \
   $(check_PROGRAMS)
@@ -48,6 +50,7 @@ test_merchant_api_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
+  -ltalerfakebank \
   -ltalerexchange \
   -ltalerjson \
   -ltalerutil \
