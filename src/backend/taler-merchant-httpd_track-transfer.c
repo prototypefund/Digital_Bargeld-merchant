@@ -14,8 +14,8 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_track-deposit.c
- * @brief implement API for tracking deposits and wire transfers
+ * @file backend/taler-merchant-httpd_track-transfer.c
+ * @brief implement API for tracking transfers and wire transfers
  * @author Marcello Stanisci
  * @author Christian Grothoff
  */
@@ -29,7 +29,7 @@
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
-#include "taler-merchant-httpd_track-deposit.h"
+#include "taler-merchant-httpd_track-transfer.h"
 
 
 /**
@@ -39,9 +39,9 @@
 
 
 /**
- * Context used for handing /track/deposit requests.
+ * Context used for handing /track/transfer requests.
  */
-struct DepositTrackContext
+struct TransferTrackContext
 {
 
   /**
@@ -55,9 +55,9 @@ struct DepositTrackContext
   struct TALER_EXCHANGE_Handle *eh;
 
   /**
-   * Handle for the /wire/deposits request.
+   * Handle for the /wire/transfers request.
    */
-  struct TALER_EXCHANGE_WireDepositsHandle *wdh;
+  struct TALER_EXCHANGE_TrackTransferHandle *wdh;
 
   /**
    * HTTP connection we are handling.
@@ -88,12 +88,12 @@ struct DepositTrackContext
 
   /**
    * Pointer to the detail that we are currently
-   * checking in #check_deposit().
+   * checking in #check_transfer().
    */
-  const struct TALER_WireDepositDetails *current_detail;
+  const struct TALER_TrackTransferDetails *current_detail;
 
   /**
-   * Argument for the /wire/deposits request.
+   * Argument for the /wire/transfers request.
    */
   struct TALER_WireTransferIdentifierRawP wtid;
 
@@ -107,7 +107,7 @@ struct DepositTrackContext
    * #GNUNET_SYSERR if we found a matching coin, but the amounts do not match.
    * #GNUNET_OK if we did find a matching coin.
    */
-  int check_deposit_result;
+  int check_transfer_result;
 };
 
 
@@ -117,7 +117,7 @@ struct DepositTrackContext
  * @param rctx data to free
  */
 static void
-free_deposit_track_context (struct DepositTrackContext *rctx)
+free_transfer_track_context (struct TransferTrackContext *rctx)
 {
   if (NULL != rctx->fo)
   {
@@ -131,7 +131,7 @@ free_deposit_track_context (struct DepositTrackContext *rctx)
   }
   if (NULL != rctx->wdh)
   {
-    TALER_EXCHANGE_wire_deposits_cancel (rctx->wdh);
+    TALER_EXCHANGE_track_transfer_cancel (rctx->wdh);
     rctx->wdh = NULL;
   }
   if (NULL != rctx->uri)
@@ -144,18 +144,18 @@ free_deposit_track_context (struct DepositTrackContext *rctx)
 
 
 /**
- * Resume the given /track/deposit operation and send the given response.
+ * Resume the given /track/transfer operation and send the given response.
  * Stores the response in the @a rctx and signals MHD to resume
  * the connection.  Also ensures MHD runs immediately.
  *
- * @param rctx deposit tracking context
+ * @param rctx transfer tracking context
  * @param response_code response code to use
  * @param response response data to send back
  */
 static void
-resume_track_deposit_with_response (struct DepositTrackContext *rctx,
-                                    unsigned int response_code,
-                                    struct MHD_Response *response)
+resume_track_transfer_with_response (struct TransferTrackContext *rctx,
+                                     unsigned int response_code,
+                                     struct MHD_Response *response)
 {
   rctx->response_code = response_code;
   rctx->response = response;
@@ -173,41 +173,41 @@ resume_track_deposit_with_response (struct DepositTrackContext *rctx,
 
 
 /**
- * Custom cleanup routine for a `struct DepositTrackContext`.
+ * Custom cleanup routine for a `struct TransferTrackContext`.
  *
- * @param hc the `struct DepositTrackContext` to clean up.
+ * @param hc the `struct TransferTrackContext` to clean up.
  */
 static void
-track_deposit_cleanup (struct TM_HandlerContext *hc)
+track_transfer_cleanup (struct TM_HandlerContext *hc)
 {
-  struct DepositTrackContext *rctx = (struct DepositTrackContext *) hc;
+  struct TransferTrackContext *rctx = (struct TransferTrackContext *) hc;
 
-  free_deposit_track_context (rctx);
+  free_transfer_track_context (rctx);
 }
 
 
 /**
- * Function called with information about a coin that was deposited.
+ * Function called with information about a coin that was transfered.
  * Verify that it matches the information claimed by the exchange.
- * Update the `check_deposit_result` field accordingly.
+ * Update the `check_transfer_result` field accordingly.
  *
- * @param cls closure with our `struct DepositTrackContext *`
+ * @param cls closure with our `struct TransferTrackContext *`
  * @param transaction_id of the contract
  * @param coin_pub public key of the coin
- * @param amount_with_fee amount the exchange will deposit for this coin
- * @param deposit_fee fee the exchange will charge for this coin
+ * @param amount_with_fee amount the exchange will transfer for this coin
+ * @param transfer_fee fee the exchange will charge for this coin
  * @param exchange_proof proof from exchange that coin was accepted
  */
 static void
-check_deposit (void *cls,
-               uint64_t transaction_id,
-               const struct TALER_CoinSpendPublicKeyP *coin_pub,
-               const struct TALER_Amount *amount_with_fee,
-               const struct TALER_Amount *deposit_fee,
-               const json_t *exchange_proof)
+check_transfer (void *cls,
+                uint64_t transaction_id,
+                const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                const struct TALER_Amount *amount_with_fee,
+                const struct TALER_Amount *transfer_fee,
+                const json_t *exchange_proof)
 {
-  struct DepositTrackContext *rctx = cls;
-  const struct TALER_WireDepositDetails *wdd = rctx->current_detail;
+  struct TransferTrackContext *rctx = cls;
+  const struct TALER_TrackTransferDetails *wdd = rctx->current_detail;
 
   if (0 != memcmp (&wdd->coin_pub,
                    coin_pub,
@@ -215,16 +215,16 @@ check_deposit (void *cls,
     return; /* not the coin we're looking for */
   if ( (0 != TALER_amount_cmp (amount_with_fee,
                                &wdd->coin_value)) ||
-       (0 != TALER_amount_cmp (deposit_fee,
+       (0 != TALER_amount_cmp (transfer_fee,
                                &wdd->coin_fee)) )
   {
     /* Disagreement between the exchange and us about how much this
        coin is worth! */
     GNUNET_break_op (0);
-    rctx->check_deposit_result = GNUNET_SYSERR;
+    rctx->check_transfer_result = GNUNET_SYSERR;
     return;
   }
-  rctx->check_deposit_result = GNUNET_OK;
+  rctx->check_transfer_result = GNUNET_OK;
 }
 
 
@@ -245,23 +245,23 @@ check_deposit (void *cls,
  * @param details array with details about the combined transactions
  */
 static void
-wire_deposit_cb (void *cls,
-                 unsigned int http_status,
-                 const struct TALER_ExchangePublicKeyP *exchange_pub,
-                 const json_t *json,
-                 const struct GNUNET_HashCode *h_wire,
-                 const struct TALER_Amount *total_amount,
-                 unsigned int details_length,
-                 const struct TALER_WireDepositDetails *details)
+wire_transfer_cb (void *cls,
+                  unsigned int http_status,
+                  const struct TALER_ExchangePublicKeyP *exchange_pub,
+                  const json_t *json,
+                  const struct GNUNET_HashCode *h_wire,
+                  const struct TALER_Amount *total_amount,
+                  unsigned int details_length,
+                  const struct TALER_TrackTransferDetails *details)
 {
-  struct DepositTrackContext *rctx = cls;
+  struct TransferTrackContext *rctx = cls;
   unsigned int i;
   int ret;
 
   rctx->wdh = NULL;
   if (MHD_HTTP_OK != http_status)
   {
-    resume_track_deposit_with_response
+    resume_track_transfer_with_response
       (rctx,
        MHD_HTTP_FAILED_DEPENDENCY,
        TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
@@ -284,10 +284,10 @@ wire_deposit_cb (void *cls,
   for (i=0;i<details_length;i++)
   {
     rctx->current_detail = &details[i];
-    rctx->check_deposit_result = GNUNET_NO;
+    rctx->check_transfer_result = GNUNET_NO;
     ret = db->find_payments_by_id (rctx,
                                    details[i].transaction_id,
-                                   &check_deposit,
+                                   &check_transfer,
                                    rctx);
     if (GNUNET_SYSERR == ret)
     {
@@ -295,17 +295,17 @@ wire_deposit_cb (void *cls,
                   "Failed to verify existing payment data in DB\n");
     }
     if ( (GNUNET_NO == ret) ||
-         (GNUNET_NO == rctx->check_deposit_result) )
+         (GNUNET_NO == rctx->check_transfer_result) )
     {
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Failed to find payment data in DB\n");
     }
-    if (GNUNET_SYSERR == rctx->check_deposit_result)
+    if (GNUNET_SYSERR == rctx->check_transfer_result)
     {
-      /* #check_deposit() failed, do something! */
+      /* #check_transfer() failed, do something! */
       GNUNET_break (0);
       /* FIXME: generate nicer custom response */
-      resume_track_deposit_with_response
+      resume_track_transfer_with_response
         (rctx,
          MHD_HTTP_FAILED_DEPENDENCY,
          TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
@@ -324,7 +324,7 @@ wire_deposit_cb (void *cls,
     }
   }
   /* FIXME: might want a more custom response here... */
-  resume_track_deposit_with_response
+  resume_track_transfer_with_response
     (rctx,
      MHD_HTTP_OK,
      TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
@@ -336,38 +336,38 @@ wire_deposit_cb (void *cls,
 /**
  * Function called with the result of our exchange lookup.
  *
- * @param cls the `struct DepositTrackContext`
+ * @param cls the `struct TransferTrackContext`
  * @param eh NULL if exchange was not found to be acceptable
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
  */
 static void
-process_track_deposit_with_exchange (void *cls,
-                                     struct TALER_EXCHANGE_Handle *eh,
-                                     int exchange_trusted)
+process_track_transfer_with_exchange (void *cls,
+                                      struct TALER_EXCHANGE_Handle *eh,
+                                      int exchange_trusted)
 {
-  struct DepositTrackContext *rctx = cls;
+  struct TransferTrackContext *rctx = cls;
 
   rctx->fo = NULL;
   rctx->eh = eh;
-  rctx->wdh = TALER_EXCHANGE_wire_deposits (eh,
+  rctx->wdh = TALER_EXCHANGE_track_transfer (eh,
                                             &rctx->wtid,
-                                            &wire_deposit_cb,
+                                            &wire_transfer_cb,
                                             rctx);
 }
 
 
 /**
- * Handle a timeout for the processing of the track deposit request.
+ * Handle a timeout for the processing of the track transfer request.
  *
  * @param cls closure
  */
 static void
-handle_track_deposit_timeout (void *cls)
+handle_track_transfer_timeout (void *cls)
 {
-  struct DepositTrackContext *rctx = cls;
+  struct TransferTrackContext *rctx = cls;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Resuming /track/deposit with error after timeout\n");
+              "Resuming /track/transfer with error after timeout\n");
   rctx->timeout_task = NULL;
 
   if (NULL != rctx->fo)
@@ -375,9 +375,9 @@ handle_track_deposit_timeout (void *cls)
     TMH_EXCHANGES_find_exchange_cancel (rctx->fo);
     rctx->fo = NULL;
   }
-  resume_track_deposit_with_response (rctx,
-                                      MHD_HTTP_SERVICE_UNAVAILABLE,
-                                      TMH_RESPONSE_make_internal_error ("exchange not reachable"));
+  resume_track_transfer_with_response (rctx,
+                                       MHD_HTTP_SERVICE_UNAVAILABLE,
+                                       TMH_RESPONSE_make_internal_error ("exchange not reachable"));
 }
 
 
@@ -392,7 +392,7 @@ static void
 proof_cb (void *cls,
           const json_t *proof)
 {
-  struct DepositTrackContext *rctx = cls;
+  struct TransferTrackContext *rctx = cls;
 
   rctx->response_code = MHD_HTTP_OK;
   /* FIXME: might want a more custom response here... */
@@ -403,8 +403,8 @@ proof_cb (void *cls,
 
 
 /**
- * Manages a /track/deposit call, thus it calls the /track/wtid
- * offered by the exchange in order to return the set of deposits
+ * Manages a /track/transfer call, thus it calls the /track/wtid
+ * offered by the exchange in order to return the set of transfers
  * (of coins) associated with a given wire transfer.
  *
  * @param rh context of the handler
@@ -415,21 +415,21 @@ proof_cb (void *cls,
  * @return MHD result code
  */
 int
-MH_handler_track_deposit (struct TMH_RequestHandler *rh,
-                          struct MHD_Connection *connection,
-                          void **connection_cls,
-                          const char *upload_data,
-                          size_t *upload_data_size)
+MH_handler_track_transfer (struct TMH_RequestHandler *rh,
+                           struct MHD_Connection *connection,
+                           void **connection_cls,
+                           const char *upload_data,
+                           size_t *upload_data_size)
 {
-  struct DepositTrackContext *rctx;
+  struct TransferTrackContext *rctx;
   const char *str;
   const char *uri;
   int ret;
 
   if (NULL == *connection_cls)
   {
-    rctx = GNUNET_new (struct DepositTrackContext);
-    rctx->hc.cc = &track_deposit_cleanup;
+    rctx = GNUNET_new (struct TransferTrackContext);
+    rctx->hc.cc = &track_transfer_cleanup;
     rctx->connection = connection;
     *connection_cls = rctx;
   }
@@ -456,7 +456,7 @@ MH_handler_track_deposit (struct TMH_RequestHandler *rh,
       rctx->response = NULL;
     }
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Queueing response (%u) for /track/deposit (%s).\n",
+                "Queueing response (%u) for /track/transfer (%s).\n",
                 (unsigned int) rctx->response_code,
                 ret ? "OK" : "FAILED");
     return ret;
@@ -506,15 +506,16 @@ MH_handler_track_deposit (struct TMH_RequestHandler *rh,
   }
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Suspending /track/deposit handling while working with the exchange\n");
+              "Suspending /track/transfer handling while working with the exchange\n");
   MHD_suspend_connection (connection);
   rctx->fo = TMH_EXCHANGES_find_exchange (uri,
-                                          &process_track_deposit_with_exchange,
+                                          &process_track_transfer_with_exchange,
                                           rctx);
-  rctx->timeout_task = GNUNET_SCHEDULER_add_delayed (TRACK_TIMEOUT,
-                                                     &handle_track_deposit_timeout,
-                                                     rctx);
+  rctx->timeout_task
+    = GNUNET_SCHEDULER_add_delayed (TRACK_TIMEOUT,
+                                    &handle_track_transfer_timeout,
+                                    rctx);
   return MHD_NO;
 }
 
-/* end of taler-merchant-httpd_track-deposit.c */
+/* end of taler-merchant-httpd_track-transfer.c */

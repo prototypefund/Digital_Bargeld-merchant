@@ -459,9 +459,9 @@ struct Command
       char *check_bank_ref;
 
       /**
-       * Handle to a /track/deposit operation
+       * Handle to a /track/transfer operation
        */
-       struct TALER_MERCHANT_TrackDepositOperation *tdo;
+       struct TALER_MERCHANT_TrackTransferHandle *tdo;
 
     } track_deposit;
 
@@ -944,7 +944,7 @@ maint_child_death (void *cls)
 
 
 /**
- * Callback for a /track/deposit operation
+ * Callback for a /track/transfer operation
  *
  * @param cls closure for this function
  * @param http_status HTTP response code returned by the server
@@ -963,13 +963,13 @@ track_deposit_cb (void *cls,
   if (MHD_HTTP_OK == http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Ok from /track/deposit handler\n");
+                "Ok from /track/transfer handler\n");
     result = GNUNET_OK;
   }
   else
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Not Ok from /track/deposit handler\n");
+                "Not Ok from /track/transfer handler\n");
     result = GNUNET_SYSERR;
   }
   next_command (is);
@@ -1448,7 +1448,7 @@ interpreter_run (void *cls)
                         cmd->details.track_deposit.check_bank_ref);
     GNUNET_assert (NULL != ref);
     cmd->details.track_deposit.tdo =
-      TALER_MERCHANT_track_deposit (ctx,
+      TALER_MERCHANT_track_transfer (ctx,
                                     MERCHANT_URI "track/deposit",
                                     &ref->details.check_bank_transfer.wtid,
                                     EXCHANGE_URI,
@@ -1594,10 +1594,10 @@ do_shutdown (void *cls)
       break;
     case OC_TRACK_DEPOSIT:
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "shutting down /track/deposit\n");
+                  "shutting down /track/transfer\n");
       if (NULL != cmd->details.track_deposit.tdo)
       {
-        TALER_MERCHANT_track_deposit_cancel (cmd->details.track_deposit.tdo);
+        TALER_MERCHANT_track_transfer_cancel (cmd->details.track_deposit.tdo);
         cmd->details.track_deposit.tdo = NULL;
       }
       break;

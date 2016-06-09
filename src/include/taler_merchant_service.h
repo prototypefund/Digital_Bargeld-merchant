@@ -26,49 +26,6 @@
 #include <gnunet/gnunet_curl_lib.h>
 #include <jansson.h>
 
-/* ********************* /track/deposit *********************** */
-
-/**
- * @brief Handle to a /contract operation at a merchant's backend.
- */
-struct TALER_MERCHANT_TrackDepositOperation;
-
-/**
- * Callbacks of this type are used to work the result of submitting a /track/deposit request to a merchant
- */
-typedef void
-(*TALER_MERCHANT_TrackDepositCallback) (void *cls,
-                                        unsigned int http_status,
-                                        const json_t *obj);
-
-/**
- * Request backend to return deposits associated with a given wtid.
- *
- * @param ctx execution context
- * @param backend_uri URI of the backend (having /track/deposit appended)
- * @param wtid base32 string indicating a wtid
- * @param exchange base URL of the exchange in charge of returning the wanted information
- * @param trackdeposit_cb the callback to call when a reply for this request is available
- * @param trackdeposit_cb_cls closure for @a contract_cb
- * @return a handle for this request
- */
-struct TALER_MERCHANT_TrackDepositOperation *
-TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
-                              const char *backend_uri,
-                              const struct TALER_WireTransferIdentifierRawP *wtid,
-                              const char *exchange_uri,
-                              TALER_MERCHANT_TrackDepositCallback trackdeposit_cb,
-                              void *trackdeposit_cb_cls);
-
-
-/**
- * Cancel a /track/deposit request.  This function cannot be used
- * on a request handle if a response is already served for it.
- *
- * @param co the deposit's tracking operation
- */
-void
-TALER_MERCHANT_track_deposit_cancel (struct TALER_MERCHANT_TrackDepositOperation *tdo);
 
 /* *********************  /contract *********************** */
 
@@ -339,6 +296,95 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 void
 TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *ph);
 
+
+/* ********************* /track/transfer *********************** */
+
+/**
+ * @brief Handle to a /contract operation at a merchant's backend.
+ */
+struct TALER_MERCHANT_TrackTransferHandle;
+
+/**
+ * Callbacks of this type are used to work the result of submitting a /track/transfer request to a merchant
+ */
+typedef void
+(*TALER_MERCHANT_TrackTransferCallback) (void *cls,
+                                        unsigned int http_status,
+                                        const json_t *obj);
+
+/**
+ * Request backend to return deposits associated with a given wtid.
+ *
+ * @param ctx execution context
+ * @param backend_uri URI of the backend (having /track/transfer appended)
+ * @param wtid base32 string indicating a wtid
+ * @param exchange base URL of the exchange in charge of returning the wanted information
+ * @param track_transfer_cb the callback to call when a reply for this request is available
+ * @param track_transfer_cb_cls closure for @a track_transfer_cb
+ * @return a handle for this request
+ */
+struct TALER_MERCHANT_TrackTransferHandle *
+TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
+                               const char *backend_uri,
+                               const struct TALER_WireTransferIdentifierRawP *wtid,
+                               const char *exchange_uri,
+                               TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
+                               void *track_transfer_cb_cls);
+
+
+/**
+ * Cancel a /track/transfer request.  This function cannot be used
+ * on a request handle if a response is already served for it.
+ *
+ * @param co the deposit's tracking operation
+ */
+void
+TALER_MERCHANT_track_transfer_cancel (struct TALER_MERCHANT_TrackTransferHandle *tdo);
+
+
+/* ********************* /track/transaction *********************** */
+
+/**
+ * @brief Handle to a /contract operation at a merchant's backend.
+ */
+struct TALER_MERCHANT_TrackTransactionHandle;
+
+/**
+ * Callbacks of this type are used to work the result of submitting a /track/transaction request to a merchant
+ */
+typedef void
+(*TALER_MERCHANT_TrackTransactionCallback) (void *cls,
+                                            unsigned int http_status,
+                                            const json_t *obj);
+
+/**
+ * Request backend to return deposits associated with a given wtid.
+ *
+ * @param ctx execution context
+ * @param backend_uri URI of the backend (having /track/transaction appended)
+ * @param wtid base32 string indicating a wtid
+ * @param exchange base URL of the exchange in charge of returning the wanted information
+ * @param track_transaction_cb the callback to call when a reply for this request is available
+ * @param track_transaction_cb_cls closure for @a track_transaction_cb
+ * @return a handle for this request
+ */
+struct TALER_MERCHANT_TrackTransactionHandle *
+TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
+                                  const char *backend_uri,
+                                  uint64_t transaction_id,
+                                  const char *exchange_uri,
+                                  TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
+                                  void *track_transaction_cb_cls);
+
+
+/**
+ * Cancel a /track/transaction request.  This function cannot be used
+ * on a request handle if a response is already served for it.
+ *
+ * @param co the deposit's tracking operation
+ */
+void
+TALER_MERCHANT_track_transaction_cancel (struct TALER_MERCHANT_TrackTransactionHandle *tdo);
 
 
 #endif  /* _TALER_MERCHANT_SERVICE_H */

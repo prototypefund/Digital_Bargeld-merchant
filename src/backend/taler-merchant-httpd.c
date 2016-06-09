@@ -37,8 +37,8 @@
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_contract.h"
 #include "taler-merchant-httpd_pay.h"
-#include "taler-merchant-httpd_track-deposit.h"
 #include "taler-merchant-httpd_track-transaction.h"
+#include "taler-merchant-httpd_track-transfer.h"
 
 
 /**
@@ -188,10 +188,10 @@ url_handler (void *cls,
       { "/pay", NULL, "text/plain",
         "Only POST is allowed", 0,
         &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
-      { "/track/deposit", MHD_HTTP_METHOD_GET, "application/json",
+      { "/track/transfer", MHD_HTTP_METHOD_GET, "application/json",
         NULL, 0,
-        &MH_handler_track_deposit, MHD_HTTP_OK},
-      { "/track/deposit", NULL, "text/plain",
+        &MH_handler_track_transfer, MHD_HTTP_OK},
+      { "/track/transfer", NULL, "text/plain",
         "Only GET is allowed", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK},
       { "/track/transaction", MHD_HTTP_METHOD_GET, "application/json",

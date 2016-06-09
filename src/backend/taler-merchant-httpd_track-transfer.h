@@ -14,19 +14,19 @@
   TALER; see the file COPYING.  If not, If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_track-deposit.h
- * @brief headers for /track/deposit handler
+ * @file backend/taler-merchant-httpd_track-transfer.h
+ * @brief headers for /track/transfer handler
  * @author Christian Grothoff
  * @author Marcello Stanisci
  */
-#ifndef TALER_MERCHANT_HTTPD_TRACK_DEPOSIT_H
-#define TALER_MERCHANT_HTTPD_TRACK_DEPOSIT_H
+#ifndef TALER_MERCHANT_HTTPD_TRACK_TRANSFER_H
+#define TALER_MERCHANT_HTTPD_TRACK_TRANSFER_H
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 
 /**
- * Manages a /track/deposit call, thus it calls the /wire/deposit
- * offered by the exchange in order to return the set of deposits
+ * Manages a /track/transfer call, thus it calls the /wire/transfer
+ * offered by the exchange in order to return the set of transfers
  * (of coins) associated with a given wire transfer
  *
  * @param rh context of the handler
@@ -37,11 +37,11 @@
  * @return MHD result code
  */
 int
-MH_handler_track_deposit (struct TMH_RequestHandler *rh,
-                          struct MHD_Connection *connection,
-                          void **connection_cls,
-                          const char *upload_data,
-                          size_t *upload_data_size);
+MH_handler_track_transfer (struct TMH_RequestHandler *rh,
+                           struct MHD_Connection *connection,
+                           void **connection_cls,
+                           const char *upload_data,
+                           size_t *upload_data_size);
 
 
 #endif

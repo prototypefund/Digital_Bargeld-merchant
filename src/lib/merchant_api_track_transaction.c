@@ -15,10 +15,11 @@
   <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_contract.c
- * @brief Implementation of the /track/deposit and /track/wtid request of the
+ * @file lib/merchant_api_track_transaction.c
+ * @brief Implementation of the /track/transaction request of the
  * merchant's HTTP API
  * @author Marcello Stanisci
+ * @author Christian Grothoff
  */
 #include "platform.h"
 #include <curl/curl.h>
@@ -32,9 +33,9 @@
 
 
 /**
- * @brief A Contract Operation Handle
+ * @brief A handle for tracking transactions.
  */
-struct TALER_MERCHANT_TrackDepositOperation
+struct TALER_MERCHANT_TrackTransactionHandle
 {
 
   /**
@@ -56,7 +57,7 @@ struct TALER_MERCHANT_TrackDepositOperation
   /**
    * Function to call with the result.
    */
-  TALER_MERCHANT_TrackDepositCallback cb;
+  TALER_MERCHANT_TrackTransactionCallback cb;
 
   /**
    * Closure for @a cb.
@@ -72,18 +73,18 @@ struct TALER_MERCHANT_TrackDepositOperation
 
 /**
  * Function called when we're done processing the
- * HTTP /track/deposit request.
+ * HTTP /track/transaction request.
  *
- * @param cls the `struct TALER_MERCHANT_TrackDepositOperation`
+ * @param cls the `struct TALER_MERCHANT_TrackTransactionHandle`
  * @param response_code HTTP response code, 0 on error
  * @param json response body, NULL if not in JSON
  */
 static void
-handle_trackdeposit_finished (void *cls,
+handle_tracktransaction_finished (void *cls,
                               long response_code,
                               const json_t *json)
 {
-  struct TALER_MERCHANT_TrackDepositOperation *tdo = cls;
+  struct TALER_MERCHANT_TrackTransactionHandle *tdo = cls;
 
   tdo->job = NULL;
   switch (response_code)
@@ -94,7 +95,7 @@ handle_trackdeposit_finished (void *cls,
     {
     /* Work out argument for external callback from the body .. */
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "200 returned from /track/deposit\n");
+                "200 returned from /track/transaction\n");
     /* FIXME: actually verify signature */
     }
     break;
@@ -102,7 +103,7 @@ handle_trackdeposit_finished (void *cls,
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "track deposit URI not found\n");
+                "track transaction URI not found\n");
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
@@ -125,41 +126,37 @@ handle_trackdeposit_finished (void *cls,
 
 
 /**
- * Request backend to return deposits associated with a given wtid.
+ * Request backend to return transactions associated with a given wtid.
  *
  * @param ctx execution context
- * @param backend_uri URI of the backend (having "/track/deposit" appended)
+ * @param backend_uri URI of the backend (having "/track/transaction" appended)
  * @param wtid base32 string indicating a wtid
  * @param exchange base URL of the exchange in charge of returning the wanted information
- * @param trackdeposit_cb the callback to call when a reply for this request is available
- * @param trackdeposit_cb_cls closure for @a contract_cb
+ * @param track_transaction_cb the callback to call when a reply for this request is available
+ * @param track_transaction_cb_cls closure for @a contract_cb
  * @return a handle for this request
  */
-struct TALER_MERCHANT_TrackDepositOperation *
-TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
-                              const char *backend_uri,
-                              const struct TALER_WireTransferIdentifierRawP *wtid,
-                              const char *exchange_uri,
-                              TALER_MERCHANT_TrackDepositCallback trackdeposit_cb,
-                              void *trackdeposit_cb_cls)
+struct TALER_MERCHANT_TrackTransactionHandle *
+TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
+                                  const char *backend_uri,
+                                  uint64_t transaction_id,
+                                  const char *exchange_uri,
+                                  TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
+                                  void *track_transaction_cb_cls)
 {
-  struct TALER_MERCHANT_TrackDepositOperation *tdo;
+  struct TALER_MERCHANT_TrackTransactionHandle *tdo;
   CURL *eh;
-  char *wtid_str;
 
-  wtid_str = GNUNET_STRINGS_data_to_string_alloc (wtid,
-                                                  sizeof (struct TALER_WireTransferIdentifierRawP));
-  tdo = GNUNET_new (struct TALER_MERCHANT_TrackDepositOperation);
+  tdo = GNUNET_new (struct TALER_MERCHANT_TrackTransactionHandle);
   tdo->ctx = ctx;
-  tdo->cb = trackdeposit_cb;
-  tdo->cb_cls = trackdeposit_cb_cls;
-  /* URI gotten with /track/deposit already appended... */
+  tdo->cb = track_transaction_cb;
+  tdo->cb_cls = track_transaction_cb_cls;
+  /* URI gotten with /track/transaction already appended... */
   GNUNET_asprintf (&tdo->url,
-                   "%s?wtid=%s&exchange=%s",
+                   "%s?transaction=%llu&exchange=%s",
                    backend_uri,
-                   wtid_str,
+                   (unsigned long long) transaction_id,
                    exchange_uri);
-  GNUNET_free (wtid_str);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
@@ -168,20 +165,20 @@ TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
   tdo->job = GNUNET_CURL_job_add (ctx,
                                   eh,
                                   GNUNET_YES,
-                                  &handle_trackdeposit_finished,
+                                  &handle_tracktransaction_finished,
                                   tdo);
   return tdo;
 }
 
 
 /**
- * Cancel a /track/deposit request.  This function cannot be used
+ * Cancel a /track/transaction request.  This function cannot be used
  * on a request handle if a response is already served for it.
  *
- * @param co the deposit's tracking operation
+ * @param co the transaction's tracking handle
  */
 void
-TALER_MERCHANT_track_deposit_cancel (struct TALER_MERCHANT_TrackDepositOperation *tdo)
+TALER_MERCHANT_track_transaction_cancel (struct TALER_MERCHANT_TrackTransactionHandle *tdo)
 {
   if (NULL != tdo->job)
   {
@@ -193,4 +190,4 @@ TALER_MERCHANT_track_deposit_cancel (struct TALER_MERCHANT_TrackDepositOperation
   GNUNET_free (tdo);
 }
 
-/* end of merchant_api_track.c */
+/* end of merchant_api_track_transaction.c */
