@@ -81,7 +81,7 @@ struct TALER_MERCHANT_TrackDepositOperation
 static void
 handle_trackdeposit_finished (void *cls,
                               long response_code,
-                              const json_t *json) // body
+                              const json_t *json)
 {
   struct TALER_MERCHANT_TrackDepositOperation *tdo = cls;
 
@@ -95,6 +95,7 @@ handle_trackdeposit_finished (void *cls,
     /* Work out argument for external callback from the body .. */
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "200 returned from /track/deposit\n");
+    /* FIXME: actually verify signature */
     }
     break;
   case MHD_HTTP_NOT_FOUND:
@@ -116,7 +117,7 @@ handle_trackdeposit_finished (void *cls,
     response_code = 0;
     break;
   }
-  /* FIXME figure out wich parameters ought to be passed back */
+  /* FIXME: figure out which parameters ought to be passed back */
   tdo->cb (tdo->cb_cls,
            response_code,
            json);
@@ -127,7 +128,7 @@ handle_trackdeposit_finished (void *cls,
  * Request backend to return deposits associated with a given wtid.
  *
  * @param ctx execution context
- * @param backend_uri URI of the backend (having /track/deposit appended)
+ * @param backend_uri URI of the backend (having "/track/deposit" appended)
  * @param wtid base32 string indicating a wtid
  * @param exchange base URL of the exchange in charge of returning the wanted information
  * @param trackdeposit_cb the callback to call when a reply for this request is available
@@ -152,7 +153,7 @@ TALER_MERCHANT_track_deposit (struct GNUNET_CURL_Context *ctx,
   tdo->ctx = ctx;
   tdo->cb = trackdeposit_cb;
   tdo->cb_cls = trackdeposit_cb_cls;
-  /* TO BE FREED SOMEWHERE. GOTTEN WITH /track/deposit ALREADY APPENDED */
+  /* URI gotten with /track/deposit already appended... */
   GNUNET_asprintf (&tdo->url,
                    "%s?wtid=%s&exchange=%s",
                    backend_uri,
