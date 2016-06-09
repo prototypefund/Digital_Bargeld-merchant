@@ -41,6 +41,16 @@
 #define EXCHANGE_URI "http://localhost:8081/"
 
 /**
+ * URI of the bank.
+ */
+#define BANK_URI "http://localhost:8083/"
+
+/**
+ * On which port do we run the (fake) bank?
+ */
+#define BANK_PORT 8083
+
+/**
  * Handle to access the exchange.
  */
 static struct TALER_EXCHANGE_Handle *exchange;
@@ -1604,19 +1614,11 @@ run (void *cls)
   struct InterpreterState *is;
   static struct Command commands[] =
   {
-#if NEW_MARCELLO_CODE
-    { .oc = OC_TRACK_DEPOSIT,
-      .label = "track-deposit-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.track_deposit.wtid = "TESTWTID"},
-
-    { .oc = OC_END },
-#endif
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = "EUR:5.01" },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
@@ -1664,7 +1666,7 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63, \"uuid\":2 }",
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":63, \"uuid\":2 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 2}",
       .details.admin_add_incoming.amount = "EUR:1" },
     /* Add another 4.01 EUR to reserve #2 */
@@ -1672,7 +1674,7 @@ run (void *cls)
       .label = "create-reserve-2b",
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.reserve_reference = "create-reserve-2",
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"http://localhost/\", \"account_number\":63, \"uuid\":3  }",
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":63, \"uuid\":3  }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 3}",
       .details.admin_add_incoming.amount = "EUR:4.01" },
 
@@ -1683,17 +1685,24 @@ run (void *cls)
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
 
-    /* Run transfers. */
 #if 0
+    /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator" },
+#endif
+#if NEW_MARCELLO_CODE
+    { .oc = OC_TRACK_DEPOSIT,
+      .label = "track-deposit-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_deposit.wtid = "TESTWTID"},
+
 #endif
     { .oc = OC_END }
   };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Interpreter initializing\n");
-  fakebank = TALER_FAKEBANK_start (8888);
+  fakebank = TALER_FAKEBANK_start (BANK_PORT);
   if (NULL == fakebank)
   {
     fprintf (stderr,
