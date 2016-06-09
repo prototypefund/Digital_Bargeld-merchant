@@ -118,10 +118,14 @@ handle_tracktransaction_finished (void *cls,
     response_code = 0;
     break;
   }
-  /* FIXME: figure out which parameters ought to be passed back */
+  /* FIXME: pass proper results back! */
   tdo->cb (tdo->cb_cls,
            response_code,
-           json);
+           NULL,
+           json,
+           NULL,
+           GNUNET_TIME_UNIT_ZERO_ABS,
+           NULL);
 }
 
 

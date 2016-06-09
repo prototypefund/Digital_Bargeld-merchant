@@ -139,9 +139,14 @@ enum OpCode
   OC_CHECK_BANK_TRANSFERS_EMPTY,
 
   /**
-   * Retrieve deposit permissions for a given wire transfer
+   * Retrieve deposit details for a given wire transfer
    */
-  OC_TRACK_DEPOSIT
+  OC_TRACK_TRANSFER,
+
+  /**
+   * Retrieve wire transfer details for a given transaction
+   */
+  OC_TRACK_TRANSACTION
 
 };
 
@@ -410,6 +415,11 @@ struct Command
        */
       struct TALER_MERCHANT_Pay *ph;
 
+      /**
+       * Set to the transaction ID of the respective contract.
+       */
+      uint64_t transaction_id;
+
     } pay;
 
     struct {
@@ -461,9 +471,24 @@ struct Command
       /**
        * Handle to a /track/transfer operation
        */
-       struct TALER_MERCHANT_TrackTransferHandle *tdo;
+      struct TALER_MERCHANT_TrackTransferHandle *tdo;
 
-    } track_deposit;
+    } track_transfer;
+
+    struct {
+
+      /**
+       * #OC_PAY command from which we should grab
+       * the WTID.
+       */
+      char *pay_ref;
+
+      /**
+       * Handle to a /track/transaction operation
+       */
+      struct TALER_MERCHANT_TrackTransactionHandle *tth;
+
+    } track_transaction;
 
   } details;
 
@@ -948,17 +973,29 @@ maint_child_death (void *cls)
  *
  * @param cls closure for this function
  * @param http_status HTTP response code returned by the server
- * @param obj server response's body
+ * @param sign_key exchange key used to sign @a json, or NULL
+ * @param json original json reply (may include signatures, those have then been
+ *        validated already)
+ * @param h_wire hash of the wire transfer address the transfer went to, or NULL on error
+ * @param total_amount total amount of the wire transfer, or NULL if the exchange could
+ *             not provide any @a wtid (set only if @a http_status is #MHD_HTTP_OK)
+ * @param details_length length of the @a details array
+ * @param details array with details about the combined transactions
  */
 static void
-track_deposit_cb (void *cls,
-                  unsigned int http_status,
-                  const json_t *obj)
+track_transfer_cb (void *cls,
+                   unsigned int http_status,
+                   const struct TALER_ExchangePublicKeyP *sign_key,
+                   const json_t *json,
+                   const struct GNUNET_HashCode *h_wire,
+                   const struct TALER_Amount *total_amount,
+                   unsigned int details_length,
+                   const struct TALER_TrackTransferDetails *details)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
 
-  cmd->details.track_deposit.tdo = NULL;
+  cmd->details.track_transfer.tdo = NULL;
   /* FIXME: properly test result vs. expecations... */
   if (MHD_HTTP_OK == http_status)
   {
@@ -970,6 +1007,49 @@ track_deposit_cb (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Not Ok from /track/transfer handler\n");
+    result = GNUNET_SYSERR;
+  }
+  next_command (is);
+}
+
+
+/**
+ * Function called with detailed wire transfer data.
+ *
+ * @param cls closure
+ * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param sign_key exchange key used to sign @a json, or NULL
+ * @param json original json reply (may include signatures, those have then been
+ *        validated already)
+ * @param wtid wire transfer identifier used by the exchange, NULL if exchange did not
+ *                  yet execute the transaction
+ * @param execution_time actual or planned execution time for the wire transfer
+ * @param coin_contribution contribution to the @a total_amount of the deposited coin (may be NULL)
+ */
+static void
+track_transaction_cb (void *cls,
+                      unsigned int http_status,
+                      const struct TALER_ExchangePublicKeyP *sign_key,
+                      const json_t *json,
+                      const struct TALER_WireTransferIdentifierRawP *wtid,
+                      struct GNUNET_TIME_Absolute execution_time,
+                      const struct TALER_Amount *coin_contribution)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  cmd->details.track_transaction.tth = NULL;
+  /* FIXME: properly test result vs. expecations... */
+  if (MHD_HTTP_OK == http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Ok from /track/transaction handler\n");
+    result = GNUNET_OK;
+  }
+  else
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Not Ok from /track/transaction handler\n");
     result = GNUNET_SYSERR;
   }
   next_command (is);
@@ -1305,7 +1385,8 @@ interpreter_run (void *cls)
           fail (is);
           return;
         }
-      }
+        cmd->details.pay.transaction_id = transaction_id;
+    }
 
       TALER_JSON_hash (ref->details.contract.contract,
 		       &h_contract);
@@ -1443,17 +1524,29 @@ interpreter_run (void *cls)
       next_command (is);
       return;
     }
-  case OC_TRACK_DEPOSIT:
+  case OC_TRACK_TRANSFER:
     ref = find_command (is,
-                        cmd->details.track_deposit.check_bank_ref);
+                        cmd->details.track_transfer.check_bank_ref);
     GNUNET_assert (NULL != ref);
-    cmd->details.track_deposit.tdo =
+    cmd->details.track_transfer.tdo =
       TALER_MERCHANT_track_transfer (ctx,
                                     MERCHANT_URI,
                                     &ref->details.check_bank_transfer.wtid,
                                     EXCHANGE_URI,
-                                    &track_deposit_cb,
+                                    &track_transfer_cb,
                                     is);
+    return;
+  case OC_TRACK_TRANSACTION:
+    ref = find_command (is,
+                        cmd->details.track_transaction.pay_ref);
+    GNUNET_assert (NULL != ref);
+    cmd->details.track_transaction.tth =
+      TALER_MERCHANT_track_transaction (ctx,
+                                        MERCHANT_URI,
+                                        ref->details.pay.transaction_id,
+                                        EXCHANGE_URI,
+                                        &track_transaction_cb,
+                                        is);
     return;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1592,13 +1685,18 @@ do_shutdown (void *cls)
       break;
     case OC_CHECK_BANK_TRANSFERS_EMPTY:
       break;
-    case OC_TRACK_DEPOSIT:
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "shutting down /track/transfer\n");
-      if (NULL != cmd->details.track_deposit.tdo)
+    case OC_TRACK_TRANSFER:
+      if (NULL != cmd->details.track_transfer.tdo)
       {
-        TALER_MERCHANT_track_transfer_cancel (cmd->details.track_deposit.tdo);
-        cmd->details.track_deposit.tdo = NULL;
+        TALER_MERCHANT_track_transfer_cancel (cmd->details.track_transfer.tdo);
+        cmd->details.track_transfer.tdo = NULL;
+      }
+      break;
+    case OC_TRACK_TRANSACTION:
+      if (NULL != cmd->details.track_transaction.tth)
+      {
+        TALER_MERCHANT_track_transaction_cancel (cmd->details.track_transaction.tth);
+        cmd->details.track_transaction.tth = NULL;
       }
       break;
     default:
@@ -1792,10 +1890,10 @@ run (void *cls)
       .label = "check_bank_empty" },
 
     /* Trace the WTID back to the original transaction */
-    { .oc = OC_TRACK_DEPOSIT,
+    { .oc = OC_TRACK_TRANSFER,
       .label = "track-deposit-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_deposit.check_bank_ref = "check_bank_transfer-499c"
+      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c"
       /* FIXME: more needed here for actual checking... */
     },
 

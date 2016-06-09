@@ -300,17 +300,33 @@ TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *ph);
 /* ********************* /track/transfer *********************** */
 
 /**
- * @brief Handle to a /contract operation at a merchant's backend.
+ * @brief Handle to a /track/transfer operation at a merchant's backend.
  */
 struct TALER_MERCHANT_TrackTransferHandle;
 
 /**
  * Callbacks of this type are used to work the result of submitting a /track/transfer request to a merchant
+ *
+ * @param cls closure
+ * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param sign_key exchange key used to sign @a json, or NULL
+ * @param json original json reply (may include signatures, those have then been
+ *        validated already)
+ * @param h_wire hash of the wire transfer address the transfer went to, or NULL on error
+ * @param total_amount total amount of the wire transfer, or NULL if the exchange could
+ *             not provide any @a wtid (set only if @a http_status is #MHD_HTTP_OK)
+ * @param details_length length of the @a details array
+ * @param details array with details about the combined transactions
  */
 typedef void
 (*TALER_MERCHANT_TrackTransferCallback) (void *cls,
-                                        unsigned int http_status,
-                                        const json_t *obj);
+                                         unsigned int http_status,
+                                         const struct TALER_ExchangePublicKeyP *sign_key,
+                                         const json_t *json,
+                                         const struct GNUNET_HashCode *h_wire,
+                                         const struct TALER_Amount *total_amount,
+                                         unsigned int details_length,
+                                         const struct TALER_TrackTransferDetails *details);
 
 /**
  * Request backend to return deposits associated with a given wtid.
@@ -345,17 +361,32 @@ TALER_MERCHANT_track_transfer_cancel (struct TALER_MERCHANT_TrackTransferHandle 
 /* ********************* /track/transaction *********************** */
 
 /**
- * @brief Handle to a /contract operation at a merchant's backend.
+ * @brief Handle to a /track/transaction operation at a merchant's backend.
  */
 struct TALER_MERCHANT_TrackTransactionHandle;
 
 /**
  * Callbacks of this type are used to work the result of submitting a /track/transaction request to a merchant
- */
+ *
+ * @param cls closure
+ * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param sign_key exchange key used to sign @a json, or NULL
+ * @param json original json reply (may include signatures, those have then been
+ *        validated already)
+ * @param wtid wire transfer identifier used by the exchange, NULL if exchange did not
+ *                  yet execute the transaction
+ * @param execution_time actual or planned execution time for the wire transfer
+ * @param coin_contribution contribution to the @a total_amount of the deposited coin (may be NULL)
+*/
 typedef void
 (*TALER_MERCHANT_TrackTransactionCallback) (void *cls,
                                             unsigned int http_status,
-                                            const json_t *obj);
+                                            const struct TALER_ExchangePublicKeyP *sign_key,
+                                            const json_t *json,
+                                            const struct TALER_WireTransferIdentifierRawP *wtid,
+                                            struct GNUNET_TIME_Absolute execution_time,
+                                            const struct TALER_Amount *coin_contribution);
+
 
 /**
  * Request backend to return deposits associated with a given wtid.
