@@ -99,6 +99,11 @@ handle_tracktransaction_finished (void *cls,
     /* FIXME: actually verify signature */
     }
     break;
+  case MHD_HTTP_ACCEPTED:
+    {
+      /* Expect time stamp of when the transfer is supposed to happen */
+    }
+    break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */
@@ -134,17 +139,15 @@ handle_tracktransaction_finished (void *cls,
  *
  * @param ctx execution context
  * @param backend_uri base URI of the backend
- * @param wtid base32 string indicating a wtid
- * @param exchange base URL of the exchange in charge of returning the wanted information
+ * @param transaction_id which transaction should we trace
  * @param track_transaction_cb the callback to call when a reply for this request is available
- * @param track_transaction_cb_cls closure for @a contract_cb
+ * @param track_transaction_cb_cls closure for @a track_transaction_cb
  * @return a handle for this request
  */
 struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                                   const char *backend_uri,
                                   uint64_t transaction_id,
-                                  const char *exchange_uri,
                                   TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
                                   void *track_transaction_cb_cls)
 {
@@ -156,10 +159,9 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
   tdo->cb = track_transaction_cb;
   tdo->cb_cls = track_transaction_cb_cls;
   GNUNET_asprintf (&tdo->url,
-                   "%s/track/transaction?transaction=%llu&exchange=%s",
+                   "%s/track/transaction?transaction=%llu",
                    backend_uri,
-                   (unsigned long long) transaction_id,
-                   exchange_uri);
+                   (unsigned long long) transaction_id);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,

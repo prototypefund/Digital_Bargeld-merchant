@@ -393,8 +393,7 @@ typedef void
  *
  * @param ctx execution context
  * @param backend_uri base URI of the backend
- * @param wtid base32 string indicating a wtid
- * @param exchange base URL of the exchange in charge of returning the wanted information
+ * @param transaction_id which transaction should we trace
  * @param track_transaction_cb the callback to call when a reply for this request is available
  * @param track_transaction_cb_cls closure for @a track_transaction_cb
  * @return a handle for this request
@@ -403,7 +402,6 @@ struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                                   const char *backend_uri,
                                   uint64_t transaction_id,
-                                  const char *exchange_uri,
                                   TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
                                   void *track_transaction_cb_cls);
 

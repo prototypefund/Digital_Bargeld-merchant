@@ -1544,7 +1544,6 @@ interpreter_run (void *cls)
       TALER_MERCHANT_track_transaction (ctx,
                                         MERCHANT_URI,
                                         ref->details.pay.transaction_id,
-                                        EXCHANGE_URI,
                                         &track_transaction_cb,
                                         is);
     return;
