@@ -129,6 +129,16 @@ enum OpCode
   OC_RUN_AGGREGATOR,
 
   /**
+   * Check that the fakebank has received a certain transaction.
+   */
+  OC_CHECK_BANK_TRANSFER,
+
+  /**
+   * Check that the fakebank has not received any other transactions.
+   */
+  OC_CHECK_BANK_TRANSFERS_EMPTY,
+
+  /**
    * Retrieve deposit permissions for a given wire transfer
    */
   OC_TRACK_DEPOSIT
@@ -416,6 +426,29 @@ struct Command
 
     } run_aggregator;
 
+    struct {
+
+      /**
+       * Which amount do we expect to see transferred?
+       */
+      const char *amount;
+
+      /**
+       * Which account do we expect to be debited?
+       */
+      uint64_t account_debit;
+
+      /**
+       * Which account do we expect to be credited?
+       */
+      uint64_t account_credit;
+
+      /**
+       * Set (!) to the wire transfer identifier observed.
+       */
+      struct TALER_WireTransferIdentifierRawP wtid;
+
+    } check_bank_transfer;
 
     struct {
 
@@ -1216,32 +1249,6 @@ interpreter_run (void *cls)
       }
       return;
     }
-  case OC_RUN_AGGREGATOR:
-    {
-      const struct GNUNET_DISK_FileHandle *pr;
-
-      cmd->details.run_aggregator.aggregator_proc
-        = GNUNET_OS_start_process (GNUNET_NO,
-                                   GNUNET_OS_INHERIT_STD_ALL,
-                                   NULL, NULL, NULL,
-                                   "taler-exchange-aggregator",
-                                   "taler-exchange-aggregator",
-                                   "-c", "test_merchant_api.conf",
-                                   "-t", /* exit when done */
-                                   NULL);
-      if (NULL == cmd->details.run_aggregator.aggregator_proc)
-      {
-        GNUNET_break (0);
-        fail (is);
-        return;
-      }
-      pr = GNUNET_DISK_pipe_handle (sigpipe, GNUNET_DISK_PIPE_END_READ);
-      cmd->details.run_aggregator.child_death_task
-        = GNUNET_SCHEDULER_add_read_file (GNUNET_TIME_UNIT_FOREVER_REL,
-                                          pr,
-                                          &maint_child_death, is);
-      return;
-    }
   case OC_PAY:
     {
       struct TALER_MERCHANT_PayCoin pc;
@@ -1362,6 +1369,71 @@ interpreter_run (void *cls)
       return;
     }
     return;
+  case OC_RUN_AGGREGATOR:
+    {
+      const struct GNUNET_DISK_FileHandle *pr;
+
+      cmd->details.run_aggregator.aggregator_proc
+        = GNUNET_OS_start_process (GNUNET_NO,
+                                   GNUNET_OS_INHERIT_STD_ALL,
+                                   NULL, NULL, NULL,
+                                   "taler-exchange-aggregator",
+                                   "taler-exchange-aggregator",
+                                   "-c", "test_merchant_api.conf",
+                                   "-t", /* exit when done */
+                                   NULL);
+      if (NULL == cmd->details.run_aggregator.aggregator_proc)
+      {
+        GNUNET_break (0);
+        fail (is);
+        return;
+      }
+      pr = GNUNET_DISK_pipe_handle (sigpipe, GNUNET_DISK_PIPE_END_READ);
+      cmd->details.run_aggregator.child_death_task
+        = GNUNET_SCHEDULER_add_read_file (GNUNET_TIME_UNIT_FOREVER_REL,
+                                          pr,
+                                          &maint_child_death, is);
+      return;
+    }
+  case OC_CHECK_BANK_TRANSFER:
+    {
+      if (GNUNET_OK !=
+          TALER_string_to_amount (cmd->details.check_bank_transfer.amount,
+                                  &amount))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse amount `%s' at %u\n",
+                    cmd->details.reserve_withdraw.amount,
+                    is->ip);
+        fail (is);
+        return;
+      }
+      if (GNUNET_OK !=
+          TALER_FAKEBANK_check (fakebank,
+                          &amount,
+                          cmd->details.check_bank_transfer.account_debit,
+                          cmd->details.check_bank_transfer.account_credit,
+                          &cmd->details.check_bank_transfer.wtid))
+      {
+        GNUNET_break (0);
+        fail (is);
+        return;
+      }
+      next_command (is);
+      return;
+    }
+  case OC_CHECK_BANK_TRANSFERS_EMPTY:
+    {
+      if (GNUNET_OK !=
+          TALER_FAKEBANK_check_empty (fakebank))
+      {
+        GNUNET_break (0);
+        fail (is);
+        return;
+      }
+      next_command (is);
+      return;
+    }
   case OC_TRACK_DEPOSIT:
     GNUNET_break (0);
     fail (is);
@@ -1506,6 +1578,10 @@ do_shutdown (void *cls)
         GNUNET_SCHEDULER_cancel (cmd->details.run_aggregator.child_death_task);
         cmd->details.run_aggregator.child_death_task = NULL;
       }
+      break;
+    case OC_CHECK_BANK_TRANSFER:
+      break;
+    case OC_CHECK_BANK_TRANSFERS_EMPTY:
       break;
     case OC_TRACK_DEPOSIT:
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "shutting down /track/deposit\n");
@@ -1685,9 +1761,24 @@ run (void *cls)
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
 
+    /* Check nothing happened on the bank side so far */
+    { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
+      .label = "check_bank_empty" },
+
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator" },
+
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-499c",
+      .details.check_bank_transfer.amount = "EUR:4.99",
+      .details.check_bank_transfer.account_debit = 2, /* exchange-outgoing */
+      .details.check_bank_transfer.account_credit = 62 /* merchant */
+    },
+    { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
+      .label = "check_bank_empty" },
+
+
 #if NEW_MARCELLO_CODE
     { .oc = OC_TRACK_DEPOSIT,
       .label = "track-deposit-1",
