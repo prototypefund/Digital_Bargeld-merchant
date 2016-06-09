@@ -453,9 +453,10 @@ struct Command
     struct {
 
       /**
-       * Wire transfer ID whose deposit permissions are to be retrieved
+       * #OC_CHECK_BANK_TRANSFER command from which we should grab
+       * the WTID.
        */
-      char *wtid;
+      char *check_bank_ref;
 
       /**
        * Handle to a /track/deposit operation
@@ -954,16 +955,24 @@ track_deposit_cb (void *cls,
                   unsigned int http_status,
                   const json_t *obj)
 {
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  cmd->details.track_deposit.tdo = NULL;
+  /* FIXME: properly test result vs. expecations... */
   if (MHD_HTTP_OK == http_status)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Ok from /track/deposit handler\n");
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Ok from /track/deposit handler\n");
     result = GNUNET_OK;
   }
   else
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Not Ok from /track/deposit handler\n");
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Not Ok from /track/deposit handler\n");
     result = GNUNET_SYSERR;
   }
+  next_command (is);
 }
 
 
@@ -1435,16 +1444,16 @@ interpreter_run (void *cls)
       return;
     }
   case OC_TRACK_DEPOSIT:
-    GNUNET_break (0);
-    fail (is);
-#if 0
-    TALER_MERCHANT_track_deposit (ctx,
-                                  MERCHANT_URI "track/deposit",
-                                  cmd->details.track_deposit.wtid,
-                                  EXCHANGE_URI,
-                                  &track_deposit_cb,
-                                  is);
-#endif
+    ref = find_command (is,
+                        cmd->details.track_deposit.check_bank_ref);
+    GNUNET_assert (NULL != ref);
+    cmd->details.track_deposit.tdo =
+      TALER_MERCHANT_track_deposit (ctx,
+                                    MERCHANT_URI "track/deposit",
+                                    &ref->details.check_bank_transfer.wtid,
+                                    EXCHANGE_URI,
+                                    &track_deposit_cb,
+                                    is);
     return;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1584,7 +1593,8 @@ do_shutdown (void *cls)
     case OC_CHECK_BANK_TRANSFERS_EMPTY:
       break;
     case OC_TRACK_DEPOSIT:
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "shutting down /track/deposit\n");
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "shutting down /track/deposit\n");
       if (NULL != cmd->details.track_deposit.tdo)
       {
         TALER_MERCHANT_track_deposit_cancel (cmd->details.track_deposit.tdo);
@@ -1769,23 +1779,28 @@ run (void *cls)
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator" },
 
+    /* Obtain WTID of the transfer */
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-499c",
       .details.check_bank_transfer.amount = "EUR:4.99",
       .details.check_bank_transfer.account_debit = 2, /* exchange-outgoing */
       .details.check_bank_transfer.account_credit = 62 /* merchant */
     },
+
+    /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
 
-
-#if NEW_MARCELLO_CODE
+    /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_DEPOSIT,
       .label = "track-deposit-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_deposit.wtid = "TESTWTID"},
+      .details.track_deposit.check_bank_ref = "check_bank_transfer-499c"
+      /* FIXME: more needed here for actual checking... */
+    },
 
-#endif
+    /* FIXME: also do reverse test: lookup WTID by transaction ID */
+
     { .oc = OC_END }
   };
 
