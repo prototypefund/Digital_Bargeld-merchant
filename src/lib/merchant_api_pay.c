@@ -244,7 +244,7 @@ handle_pay_finished (void *cls,
  * Pay a merchant.  API for wallets that have the coin's private keys.
  *
  * @param ctx the execution loop context
- * @param exchange_uri URI of the exchange that the coins belong to
+ * @param merchant_uri base URI of the merchant's backend
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param transaction_id transaction id for the transaction between merchant and customer
@@ -256,6 +256,7 @@ handle_pay_finished (void *cls,
  * @param transaction_id transaction id for the transaction between merchant and customer
  * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
+ * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -353,12 +354,13 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  * in the type of @a coins compared to #TALER_MERCHANT_pay().
  *
  * @param ctx the execution loop context
- * @param exchange_uri URI of the exchange that the coins belong to
+ * @param merchant_uri base URI of the merchant's backend
  * @param h_contract hash of the contact of the merchant with the customer
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param transaction_id transaction id for the transaction between merchant and customer
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
  * @param wire_transfer_deadline date by which the merchant would like the exchange to execute the wire transfer (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
+ * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -561,7 +563,10 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   ph->ctx = ctx;
   ph->cb = pay_cb;
   ph->cb_cls = pay_cb_cls;
-  ph->url = GNUNET_strdup (merchant_uri);
+  GNUNET_asprintf (&ph->url,
+                   "%s%s",
+                   merchant_uri,
+                   "/pay");
   ph->num_coins = num_coins;
   ph->coins = GNUNET_new_array (num_coins,
                                 struct TALER_MERCHANT_PaidCoin);

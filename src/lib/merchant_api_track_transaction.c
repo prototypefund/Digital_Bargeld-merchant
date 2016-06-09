@@ -129,7 +129,7 @@ handle_tracktransaction_finished (void *cls,
  * Request backend to return transactions associated with a given wtid.
  *
  * @param ctx execution context
- * @param backend_uri URI of the backend (having "/track/transaction" appended)
+ * @param backend_uri base URI of the backend
  * @param wtid base32 string indicating a wtid
  * @param exchange base URL of the exchange in charge of returning the wanted information
  * @param track_transaction_cb the callback to call when a reply for this request is available
@@ -151,9 +151,8 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
   tdo->ctx = ctx;
   tdo->cb = track_transaction_cb;
   tdo->cb_cls = track_transaction_cb_cls;
-  /* URI gotten with /track/transaction already appended... */
   GNUNET_asprintf (&tdo->url,
-                   "%s?transaction=%llu&exchange=%s",
+                   "%s/track/transaction?transaction=%llu&exchange=%s",
                    backend_uri,
                    (unsigned long long) transaction_id,
                    exchange_uri);

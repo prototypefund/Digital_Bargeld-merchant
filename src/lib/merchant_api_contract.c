@@ -184,7 +184,10 @@ TALER_MERCHANT_contract_sign (struct GNUNET_CURL_Context *ctx,
   co->ctx = ctx;
   co->cb = contract_cb;
   co->cb_cls = contract_cb_cls;
-  co->url = GNUNET_strdup (backend_uri);
+  GNUNET_asprintf (&co->url,
+                   "%s%s",
+                   backend_uri,
+                   "/contract");
 
   req = json_pack ("{s:O}",
                    "contract", (json_t *) contract);

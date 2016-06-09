@@ -33,7 +33,7 @@
 /**
  * URI under which the merchant is reachable during the testcase.
  */
-#define MERCHANT_URI "http://localhost:8082/"
+#define MERCHANT_URI "http://localhost:8082"
 
 /**
  * URI under which the exchange is reachable during the testcase.
@@ -1246,7 +1246,7 @@ interpreter_run (void *cls)
       }
       cmd->details.contract.co
         = TALER_MERCHANT_contract_sign (ctx,
-                                        MERCHANT_URI "contract",
+                                        MERCHANT_URI,
                                         proposal,
                                         &contract_cb,
                                         is);
@@ -1355,7 +1355,7 @@ interpreter_run (void *cls)
 
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
-				     MERCHANT_URI "pay",
+				     MERCHANT_URI,
 				     &h_contract,
 				     transaction_id,
 				     &total_amount,
@@ -1449,7 +1449,7 @@ interpreter_run (void *cls)
     GNUNET_assert (NULL != ref);
     cmd->details.track_deposit.tdo =
       TALER_MERCHANT_track_transfer (ctx,
-                                    MERCHANT_URI "track/deposit",
+                                    MERCHANT_URI,
                                     &ref->details.check_bank_transfer.wtid,
                                     EXCHANGE_URI,
                                     &track_deposit_cb,

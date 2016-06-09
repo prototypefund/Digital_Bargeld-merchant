@@ -63,7 +63,7 @@ typedef void
  * details).
  *
  * @param ctx execution context
- * @param backend_uri URI of the backend
+ * @param backend_uri base URI of the backend
  * @param contract prototype of the contract
  * @param contract_cb the callback to call when a reply for this request is available
  * @param contract_cb_cls closure for @a contract_cb
@@ -160,7 +160,7 @@ struct TALER_MERCHANT_PayCoin
  * Pay a merchant.  API for wallets that have the coin's private keys.
  *
  * @param ctx execution context
- * @param merchant_uri URI of the merchant
+ * @param merchant_uri base URI of the merchant
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param transaction_id transaction id for the transaction between merchant and customer
@@ -248,7 +248,7 @@ struct TALER_MERCHANT_PaidCoin
  * in the type of @a coins compared to #TALER_MERCHANT_pay().
  *
  * @param ctx execution context
- * @param merchant_uri URI of the merchant
+ * @param merchant_uri base URI of the merchant
  * @param h_contract hash of the contact of the merchant with the customer
  * @param amount total value of the contract to be paid to the merchant
  * @param max_fee maximum fee covered by the merchant (according to the contract)
@@ -316,7 +316,7 @@ typedef void
  * Request backend to return deposits associated with a given wtid.
  *
  * @param ctx execution context
- * @param backend_uri URI of the backend (having /track/transfer appended)
+ * @param backend_uri base URI of the backend
  * @param wtid base32 string indicating a wtid
  * @param exchange base URL of the exchange in charge of returning the wanted information
  * @param track_transfer_cb the callback to call when a reply for this request is available
@@ -361,7 +361,7 @@ typedef void
  * Request backend to return deposits associated with a given wtid.
  *
  * @param ctx execution context
- * @param backend_uri URI of the backend (having /track/transaction appended)
+ * @param backend_uri base URI of the backend
  * @param wtid base32 string indicating a wtid
  * @param exchange base URL of the exchange in charge of returning the wanted information
  * @param track_transaction_cb the callback to call when a reply for this request is available
