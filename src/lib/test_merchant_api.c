@@ -1226,7 +1226,7 @@ interpreter_run (void *cls)
                                    NULL, NULL, NULL,
                                    "taler-exchange-aggregator",
                                    "taler-exchange-aggregator",
-                                   "-c", "test_exchange_api.conf",
+                                   "-c", "test_merchant_api.conf",
                                    "-t", /* exit when done */
                                    NULL);
       if (NULL == cmd->details.run_aggregator.aggregator_proc)
@@ -1685,11 +1685,9 @@ run (void *cls)
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
 
-#if 0
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator" },
-#endif
 #if NEW_MARCELLO_CODE
     { .oc = OC_TRACK_DEPOSIT,
       .label = "track-deposit-1",
