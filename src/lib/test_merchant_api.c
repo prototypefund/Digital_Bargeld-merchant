@@ -114,6 +114,11 @@ enum OpCode
   OC_PAY,
 
   /**
+   * Run the aggregator to execute deposits.
+   */
+  OC_RUN_AGGREGATOR,
+
+  /**
    * Retrieve deposit permissions for a given wire transfer
    */
   OC_TRACK_DEPOSIT
@@ -390,6 +395,21 @@ struct Command
     struct {
 
       /**
+       * Process for the aggregator.
+       */
+      struct GNUNET_OS_Process *aggregator_proc;
+
+      /**
+       * ID of task called whenever we get a SIGCHILD.
+       */
+      struct GNUNET_SCHEDULER_Task *child_death_task;
+
+    } run_aggregator;
+
+
+    struct {
+
+      /**
        * Wire transfer ID whose deposit permissions are to be retrieved
        */
       char *wtid;
@@ -433,6 +453,12 @@ struct InterpreterState
   unsigned int ip;
 
 };
+
+
+/**
+ * Pipe used to communicate child death via signal.
+ */
+static struct GNUNET_DISK_PipeHandle *sigpipe;
 
 
 /**
@@ -494,6 +520,20 @@ interpreter_run (void *cls);
 
 
 /**
+ * Run the next command with the interpreter.
+ *
+ * @param is current interpeter state.
+ */
+static void
+next_command (struct InterpreterState *is)
+{
+  is->ip++;
+  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
+                                       is);
+}
+
+
+/**
  * Function called upon completion of our /admin/add/incoming request.
  *
  * @param cls closure with the interpreter state
@@ -516,9 +556,7 @@ add_incoming_cb (void *cls,
     fail (is);
     return;
   }
-  is->ip++;
-  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                       is);
+  next_command (is);
 }
 
 
@@ -701,9 +739,7 @@ reserve_status_cb (void *cls,
     GNUNET_break (0);
     break;
   }
-  is->ip++;
-  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                       is);
+  next_command (is);
 }
 
 
@@ -757,9 +793,7 @@ reserve_withdraw_cb (void *cls,
     GNUNET_break (0);
     break;
   }
-  is->ip++;
-  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                       is);
+  next_command (is);
 }
 
 
@@ -805,9 +839,7 @@ contract_cb (void *cls,
     fail (is);
     return;
   }
-  is->ip++;
-  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                       is);
+  next_command (is);
 }
 
 
@@ -839,10 +871,33 @@ pay_cb (void *cls,
     fail (is);
     return;
   }
-  is->ip++;
-  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                       is);
+  next_command (is);
 }
+
+
+/**
+ * Task triggered whenever we receive a SIGCHLD (child
+ * process died).
+ *
+ * @param cls closure, NULL if we need to self-restart
+ */
+static void
+maint_child_death (void *cls)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  const struct GNUNET_DISK_FileHandle *pr;
+  char c[16];
+
+  cmd->details.run_aggregator.child_death_task = NULL;
+  pr = GNUNET_DISK_pipe_handle (sigpipe, GNUNET_DISK_PIPE_END_READ);
+  GNUNET_break (0 < GNUNET_DISK_file_read (pr, &c, sizeof (c)));
+  GNUNET_OS_process_wait (cmd->details.run_aggregator.aggregator_proc);
+  GNUNET_OS_process_destroy (cmd->details.run_aggregator.aggregator_proc);
+  cmd->details.run_aggregator.aggregator_proc = NULL;
+  next_command (is);
+}
+
 
 /**
  * Callback for a /track/deposit operation
@@ -1151,6 +1206,32 @@ interpreter_run (void *cls)
       }
       return;
     }
+  case OC_RUN_AGGREGATOR:
+    {
+      const struct GNUNET_DISK_FileHandle *pr;
+
+      cmd->details.run_aggregator.aggregator_proc
+        = GNUNET_OS_start_process (GNUNET_NO,
+                                   GNUNET_OS_INHERIT_STD_ALL,
+                                   NULL, NULL, NULL,
+                                   "taler-exchange-aggregator",
+                                   "taler-exchange-aggregator",
+                                   "-c", "test_exchange_api.conf",
+                                   "-t", /* exit when done */
+                                   NULL);
+      if (NULL == cmd->details.run_aggregator.aggregator_proc)
+      {
+        GNUNET_break (0);
+        fail (is);
+        return;
+      }
+      pr = GNUNET_DISK_pipe_handle (sigpipe, GNUNET_DISK_PIPE_END_READ);
+      cmd->details.run_aggregator.child_death_task
+        = GNUNET_SCHEDULER_add_read_file (GNUNET_TIME_UNIT_FOREVER_REL,
+                                          pr,
+                                          &maint_child_death, is);
+      return;
+    }
   case OC_PAY:
     {
       struct TALER_MERCHANT_PayCoin pc;
@@ -1400,6 +1481,22 @@ do_shutdown (void *cls)
         cmd->details.pay.ph = NULL;
       }
       break;
+    case OC_RUN_AGGREGATOR:
+      if (NULL != cmd->details.run_aggregator.aggregator_proc)
+      {
+        GNUNET_break (0 ==
+                      GNUNET_OS_process_kill (cmd->details.run_aggregator.aggregator_proc,
+                                              SIGKILL));
+        GNUNET_OS_process_wait (cmd->details.run_aggregator.aggregator_proc);
+        GNUNET_OS_process_destroy (cmd->details.run_aggregator.aggregator_proc);
+        cmd->details.run_aggregator.aggregator_proc = NULL;
+      }
+      if (NULL != cmd->details.run_aggregator.child_death_task)
+      {
+        GNUNET_SCHEDULER_cancel (cmd->details.run_aggregator.child_death_task);
+        cmd->details.run_aggregator.child_death_task = NULL;
+      }
+      break;
     case OC_TRACK_DEPOSIT:
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "shutting down /track/deposit\n");
       if (NULL != cmd->details.track_deposit.tdo)
@@ -1478,6 +1575,23 @@ cert_cb (void *cls,
                                        is);
 }
 
+
+/**
+ * Signal handler called for SIGCHLD.  Triggers the
+ * respective handler by writing to the trigger pipe.
+ */
+static void
+sighandler_child_death ()
+{
+  static char c;
+  int old_errno = errno;	/* back-up errno */
+
+  GNUNET_break (1 ==
+		GNUNET_DISK_file_write (GNUNET_DISK_pipe_handle
+					(sigpipe, GNUNET_DISK_PIPE_END_WRITE),
+					&c, sizeof (c)));
+  errno = old_errno;		/* restore errno */
+}
 
 /**
  * Main function that will be run by the scheduler.
@@ -1569,6 +1683,11 @@ run (void *cls)
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
 
+    /* Run transfers. */
+#if 0
+    { .oc = OC_RUN_AGGREGATOR,
+      .label = "run-aggregator" },
+#endif
     { .oc = OC_END }
   };
 
@@ -1622,6 +1741,7 @@ main (int argc,
   struct TALER_MERCHANTDB_Plugin *db;
   struct GNUNET_CONFIGURATION_Handle *cfg;
   unsigned int cnt;
+  struct GNUNET_SIGNAL_Context *shc_chld;
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
@@ -1765,7 +1885,14 @@ main (int argc,
   fprintf (stderr, "\n");
 
   result = GNUNET_SYSERR;
+  sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO, GNUNET_NO, GNUNET_NO);
+  GNUNET_assert (NULL != sigpipe);
+  shc_chld = GNUNET_SIGNAL_handler_install (GNUNET_SIGCHLD,
+                                            &sighandler_child_death);
   GNUNET_SCHEDULER_run (&run, NULL);
+  GNUNET_SIGNAL_handler_uninstall (shc_chld);
+  shc_chld = NULL;
+  GNUNET_DISK_pipe_close (sigpipe);
   GNUNET_OS_process_kill (merchantd,
                           SIGTERM);
   GNUNET_OS_process_wait (merchantd);
