@@ -44,12 +44,6 @@ struct TALER_MERCHANT_TrackTransferHandle
   char *url;
 
   /**
-   * base32 identifier being the 'witd' parameter required by the
-   * exchange
-   */
-  char *wtid;
-
-  /**
    * Handle for the request.
    */
   struct GNUNET_CURL_Job *job;
@@ -69,6 +63,90 @@ struct TALER_MERCHANT_TrackTransferHandle
    */
   struct GNUNET_CURL_Context *ctx;
 };
+
+
+/**
+ * We got a #MHD_HTTP_OK response for the /track/transfer request.
+ * Check that the response is well-formed and if it is, call the
+ * callback.  If not, return an error code.
+ *
+ * This code is very similar to
+ * exchange_api_track_transfer.c::check_track_transfer_response_ok.
+ * (Except we do not check the signature, as that was done by the
+ * backend which we trust already.)
+ * Any changes should likely be reflected there as well.
+ *
+ * @param wdh handle to the operation
+ * @param json response we got
+ * @return #GNUNET_OK if we are done and all is well,
+ *         #GNUNET_SYSERR if the response was bogus
+ */
+static int
+check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh,
+                                  const json_t *json)
+{
+  json_t *details_j;
+  struct GNUNET_HashCode h_wire;
+  struct TALER_Amount total_amount;
+  struct TALER_MerchantPublicKeyP merchant_pub;
+  unsigned int num_details;
+  struct TALER_ExchangePublicKeyP exchange_pub;
+  struct GNUNET_JSON_Specification spec[] = {
+    TALER_JSON_spec_amount ("total", &total_amount),
+    GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
+    GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
+    GNUNET_JSON_spec_json ("deposits", &details_j),
+    GNUNET_JSON_spec_fixed_auto ("exchange_pub", &exchange_pub),
+    GNUNET_JSON_spec_end()
+  };
+
+  if (GNUNET_OK !=
+      GNUNET_JSON_parse (json,
+                         spec,
+                         NULL, NULL))
+  {
+    GNUNET_break_op (0);
+    return GNUNET_SYSERR;
+  }
+  num_details = json_array_size (details_j);
+  {
+    struct TALER_TrackTransferDetails details[num_details];
+    unsigned int i;
+
+    for (i=0;i<num_details;i++)
+    {
+      struct TALER_TrackTransferDetails *detail = &details[i];
+      struct json_t *detail_j = json_array_get (details_j, i);
+      struct GNUNET_JSON_Specification spec_detail[] = {
+        GNUNET_JSON_spec_fixed_auto ("H_contract", &detail->h_contract),
+        GNUNET_JSON_spec_uint64 ("transaction_id", &detail->transaction_id),
+        GNUNET_JSON_spec_fixed_auto ("coin_pub", &detail->coin_pub),
+        TALER_JSON_spec_amount ("deposit_value", &detail->coin_value),
+        TALER_JSON_spec_amount ("deposit_fee", &detail->coin_fee),
+        GNUNET_JSON_spec_end()
+      };
+
+      if (GNUNET_OK !=
+          GNUNET_JSON_parse (detail_j,
+                             spec_detail,
+                             NULL, NULL))
+      {
+        GNUNET_break_op (0);
+        return GNUNET_SYSERR;
+      }
+    }
+    wdh->cb (wdh->cb_cls,
+             MHD_HTTP_OK,
+             &exchange_pub,
+             json,
+             &h_wire,
+             &total_amount,
+             num_details,
+             details);
+  }
+  TALER_MERCHANT_track_transfer_cancel (wdh);
+  return GNUNET_OK;
+}
 
 
 /**
@@ -92,18 +170,16 @@ handle_track_transfer_finished (void *cls,
   case 0:
     break;
   case MHD_HTTP_OK:
-    {
-    /* Work out argument for external callback from the body .. */
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "200 returned from /track/transfer\n");
-    /* FIXME: actually verify signature */
-    }
+    if (GNUNET_OK ==
+        check_track_transfer_response_ok (tdo,
+                                          json))
+      return;
+    GNUNET_break_op (0);
+    response_code = 0;
     break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "track transfer URI not found\n");
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
@@ -118,7 +194,6 @@ handle_track_transfer_finished (void *cls,
     response_code = 0;
     break;
   }
-  /* FIXME: pass proper results back! */
   tdo->cb (tdo->cb_cls,
            response_code,
            NULL,
@@ -127,6 +202,7 @@ handle_track_transfer_finished (void *cls,
            NULL,
            0,
            NULL);
+  TALER_MERCHANT_track_transfer_cancel (tdo);
 }
 
 
@@ -194,7 +270,6 @@ TALER_MERCHANT_track_transfer_cancel (struct TALER_MERCHANT_TrackTransferHandle 
     tdo->job = NULL;
   }
   GNUNET_free (tdo->url);
-  GNUNET_free (tdo->wtid);
   GNUNET_free (tdo);
 }
 

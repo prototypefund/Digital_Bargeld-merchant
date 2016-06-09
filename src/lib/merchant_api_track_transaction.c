@@ -44,12 +44,6 @@ struct TALER_MERCHANT_TrackTransactionHandle
   char *url;
 
   /**
-   * base32 identifier being the 'witd' parameter required by the
-   * exchange
-   */
-  char *wtid;
-
-  /**
    * Handle for the request.
    */
   struct GNUNET_CURL_Job *job;
@@ -80,9 +74,9 @@ struct TALER_MERCHANT_TrackTransactionHandle
  * @param json response body, NULL if not in JSON
  */
 static void
-handle_tracktransaction_finished (void *cls,
-                              long response_code,
-                              const json_t *json)
+handle_track_transaction_finished (void *cls,
+                                   long response_code,
+                                   const json_t *json)
 {
   struct TALER_MERCHANT_TrackTransactionHandle *tdo = cls;
 
@@ -131,6 +125,7 @@ handle_tracktransaction_finished (void *cls,
            NULL,
            GNUNET_TIME_UNIT_ZERO_ABS,
            NULL);
+  TALER_MERCHANT_track_transaction_cancel (tdo);
 }
 
 
@@ -170,7 +165,7 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
   tdo->job = GNUNET_CURL_job_add (ctx,
                                   eh,
                                   GNUNET_YES,
-                                  &handle_tracktransaction_finished,
+                                  &handle_track_transaction_finished,
                                   tdo);
   return tdo;
 }
@@ -191,7 +186,6 @@ TALER_MERCHANT_track_transaction_cancel (struct TALER_MERCHANT_TrackTransactionH
     tdo->job = NULL;
   }
   GNUNET_free (tdo->url);
-  GNUNET_free (tdo->wtid);
   GNUNET_free (tdo);
 }
 
