@@ -373,7 +373,7 @@ TMH_RESPONSE_reply_arg_invalid (struct MHD_Connection *connection,
  */
 struct MHD_Response *
 TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
-                                        const struct TMH_TransactionWireTransfer *transfers)
+                                        const struct TALER_MERCHANT_TransactionWireTransfer *transfers)
 {
   struct MHD_Response *ret;
   unsigned int i;
@@ -382,14 +382,14 @@ TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
   j_transfers = json_array ();
   for (i=0;i<num_transfers;i++)
   {
-    const struct TMH_TransactionWireTransfer *transfer = &transfers[i];
+    const struct TALER_MERCHANT_TransactionWireTransfer *transfer = &transfers[i];
     json_t *j_coins;
     unsigned int j;
 
     j_coins = json_array ();
     for (j=0;j<transfer->num_coins;j++)
     {
-      const struct TMH_CoinWireTransfer *coin = &transfer->coins[j];
+      const struct TALER_MERCHANT_CoinWireTransfer *coin = &transfer->coins[j];
 
       json_array_append_new (j_coins,
                              json_pack ("{s:o, s:o, s:o}",

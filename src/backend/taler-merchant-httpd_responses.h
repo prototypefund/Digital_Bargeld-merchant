@@ -29,6 +29,8 @@
 #include <jansson.h>
 #include <microhttpd.h>
 #include <pthread.h>
+/* just need some structs, not the actual API */
+#include "taler_merchant_service.h"
 
 /**
  * Make JSON response object.
@@ -65,55 +67,6 @@ struct MHD_Response *
 TMH_RESPONSE_make_json_pack (const char *fmt,
                              ...);
 
-/**
- * Information about a coin aggregated in a wire transfer for a
- * /track/transaction response.
- */
-struct TMH_CoinWireTransfer
-{
-
-  /**
-   * Public key of the coin.
-   */
-  struct TALER_CoinSpendPublicKeyP coin_pub;
-
-  /**
-   * Value of the coin including deposit fee.
-   */
-  struct TALER_Amount amount_with_fee;
-
-  /**
-   * Deposit fee for the coin.
-   */
-  struct TALER_Amount deposit_fee;
-
-};
-
-/**
- * Information about a wire transfer for a /track/transaction response.
- */
-struct TMH_TransactionWireTransfer
-{
-
-  /**
-   * Wire transfer identifier this struct is about.
-   */
-  struct TALER_WireTransferIdentifierRawP wtid;
-
-  /**
-   * Number of coins of the selected transaction that
-   * is covered by this wire transfer.
-   */
-  unsigned int num_coins;
-
-  /**
-   * Information about the coins of the selected transaction
-   * that are part of the wire transfer.
-   */
-  struct TMH_CoinWireTransfer *coins;
-
-};
-
 
 /**
  * Generate /track/transaction response.
@@ -124,7 +77,7 @@ struct TMH_TransactionWireTransfer
  */
 struct MHD_Response *
 TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
-                                        const struct TMH_TransactionWireTransfer *transfers);
+                                        const struct TALER_MERCHANT_TransactionWireTransfer *transfers);
 
 
 /**

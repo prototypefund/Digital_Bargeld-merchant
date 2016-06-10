@@ -493,7 +493,7 @@ trace_coins (struct TrackTransactionContext *tctx)
       /* on-stack allocation is fine, as the number of coins and the
          number of wire-transfers per-transaction is expected to be tiny. */
       struct MHD_Response *resp;
-      struct TMH_TransactionWireTransfer wts[num_wtid];
+      struct TALER_MERCHANT_TransactionWireTransfer wts[num_wtid];
       unsigned int wtid_off;
 
       wtid_off = 0;
@@ -515,7 +515,7 @@ trace_coins (struct TrackTransactionContext *tctx)
         if (GNUNET_NO == found)
         {
           unsigned int num_coins;
-          struct TMH_TransactionWireTransfer *wt;
+          struct TALER_MERCHANT_TransactionWireTransfer *wt;
 
           wt = &wts[wtid_off++];
           wt->wtid = tcc->wtid;
@@ -531,7 +531,7 @@ trace_coins (struct TrackTransactionContext *tctx)
           /* initialize coins array */
           wt->num_coins = num_coins;
           wt->coins = GNUNET_new_array (num_coins,
-                                        struct TMH_CoinWireTransfer);
+                                        struct TALER_MERCHANT_CoinWireTransfer);
           num_coins = 0;
           for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
           {
@@ -539,7 +539,7 @@ trace_coins (struct TrackTransactionContext *tctx)
                              &tcc2->wtid,
                              sizeof (struct TALER_WireTransferIdentifierRawP)))
             {
-              struct TMH_CoinWireTransfer *coin = &wt->coins[num_coins++];
+              struct TALER_MERCHANT_CoinWireTransfer *coin = &wt->coins[num_coins++];
 
               coin->coin_pub = tcc2->coin_pub;
               coin->amount_with_fee = tcc2->amount_with_fee;

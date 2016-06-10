@@ -1089,22 +1089,16 @@ track_transfer_cb (void *cls,
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
- * @param sign_key exchange key used to sign @a json, or NULL
- * @param json original json reply (may include signatures, those have then been
- *        validated already)
- * @param wtid wire transfer identifier used by the exchange, NULL if exchange did not
- *                  yet execute the transaction
- * @param execution_time actual or planned execution time for the wire transfer
- * @param coin_contribution contribution to the @a total_amount of the deposited coin (may be NULL)
+ * @param json original json reply
+ * @param num_transfers number of wire transfers involved in setting the transaction
+ * @param transfers detailed list of transfers involved and their coins
  */
 static void
 track_transaction_cb (void *cls,
                       unsigned int http_status,
-                      const struct TALER_ExchangePublicKeyP *sign_key,
                       const json_t *json,
-                      const struct TALER_WireTransferIdentifierRawP *wtid,
-                      struct GNUNET_TIME_Absolute execution_time,
-                      const struct TALER_Amount *coin_contribution)
+                      unsigned int num_transfers,
+                      const struct TALER_MERCHANT_TransactionWireTransfer *transfers)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -1127,12 +1121,20 @@ track_transaction_cb (void *cls,
     {
       const struct Command *ref;
       struct TALER_Amount ea;
+      struct TALER_Amount coin_contribution;
 
+      if (1 != num_transfers)
+      {
+        GNUNET_break (0);
+        json_dumpf (json, stderr, 0);
+        fail (is);
+        return;
+      }
       ref = find_command (is,
                           cmd->details.track_transaction.expected_transfer_ref);
       GNUNET_assert (NULL != ref);
       if (0 != memcmp (&ref->details.check_bank_transfer.wtid,
-                       wtid,
+                       &transfers[0].wtid,
                        sizeof (struct TALER_WireTransferIdentifierRawP)))
       {
         GNUNET_break (0);
@@ -1144,12 +1146,23 @@ track_transaction_cb (void *cls,
          single coin involved in a pay/deposit.  Thus, this invariant
          may not always hold in the future depending no how the
          testcases evolve. */
+      if (1 != transfers[0].num_coins)
+      {
+        GNUNET_break (0);
+        json_dumpf (json, stderr, 0);
+        fail (is);
+        return;
+      }
       GNUNET_assert (GNUNET_OK ==
                      TALER_string_to_amount (ref->details.check_bank_transfer.amount,
                                              &ea));
+      GNUNET_assert (GNUNET_OK ==
+                     TALER_amount_subtract (&coin_contribution,
+                                            &transfers[0].coins[0].amount_with_fee,
+                                            &transfers[0].coins[0].deposit_fee));
       if (0 !=
           TALER_amount_cmp (&ea,
-                            coin_contribution))
+                            &coin_contribution))
       {
         GNUNET_break (0);
         json_dumpf (json, stderr, 0);

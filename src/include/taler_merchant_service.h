@@ -366,26 +366,70 @@ TALER_MERCHANT_track_transfer_cancel (struct TALER_MERCHANT_TrackTransferHandle 
 struct TALER_MERCHANT_TrackTransactionHandle;
 
 /**
+ * Information about a coin aggregated in a wire transfer for a
+ * /track/transaction response.
+ */
+struct TALER_MERCHANT_CoinWireTransfer
+{
+
+  /**
+   * Public key of the coin.
+   */
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+
+  /**
+   * Value of the coin including deposit fee.
+   */
+  struct TALER_Amount amount_with_fee;
+
+  /**
+   * Deposit fee for the coin.
+   */
+  struct TALER_Amount deposit_fee;
+
+};
+
+/**
+ * Information about a wire transfer for a /track/transaction response.
+ */
+struct TALER_MERCHANT_TransactionWireTransfer
+{
+
+  /**
+   * Wire transfer identifier this struct is about.
+   */
+  struct TALER_WireTransferIdentifierRawP wtid;
+
+  /**
+   * Number of coins of the selected transaction that
+   * is covered by this wire transfer.
+   */
+  unsigned int num_coins;
+
+  /**
+   * Information about the coins of the selected transaction
+   * that are part of the wire transfer.
+   */
+  struct TALER_MERCHANT_CoinWireTransfer *coins;
+
+};
+
+
+/**
  * Callbacks of this type are used to work the result of submitting a /track/transaction request to a merchant
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
- * @param sign_key exchange key used to sign @a json, or NULL
- * @param json original json reply (may include signatures, those have then been
- *        validated already)
- * @param wtid wire transfer identifier used by the exchange, NULL if exchange did not
- *                  yet execute the transaction
- * @param execution_time actual or planned execution time for the wire transfer
- * @param coin_contribution contribution to the @a total_amount of the deposited coin (may be NULL)
+ * @param json original json reply from the backend
+ * @param num_transfers number of wire transfers the exchange used for the transaction
+ * @param transfers details about each transfer and which coins are aggregated in it
 */
 typedef void
 (*TALER_MERCHANT_TrackTransactionCallback) (void *cls,
                                             unsigned int http_status,
-                                            const struct TALER_ExchangePublicKeyP *sign_key,
                                             const json_t *json,
-                                            const struct TALER_WireTransferIdentifierRawP *wtid,
-                                            struct GNUNET_TIME_Absolute execution_time,
-                                            const struct TALER_Amount *coin_contribution);
+                                            unsigned int num_transfers,
+                                            const struct TALER_MERCHANT_TransactionWireTransfer *transfers);
 
 
 /**

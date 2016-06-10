@@ -66,6 +66,102 @@ struct TALER_MERCHANT_TrackTransactionHandle
 
 
 /**
+ * Free data in @a transfers.
+ *
+ * @param num_transfers length of the @a transfers array
+ * @param transfers information about wire transfers to free
+ */
+static void
+free_transfers (unsigned int num_transfers,
+                struct TALER_MERCHANT_TransactionWireTransfer *transfers)
+{
+  unsigned int i;
+
+  for (i=0;i<num_transfers;i++)
+    GNUNET_free (transfers[i].coins);
+}
+
+
+/**
+ * Handle #MHD_HTTP_OK response to /track/transaction.
+ * Parse @a json and if successful call the callback in @a tdo.
+ *
+ * @param tdo handle of the operation
+ * @param json json to parse
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR on error
+ */
+static int
+parse_track_transaction_ok (struct TALER_MERCHANT_TrackTransactionHandle *tdo,
+                            const json_t *json)
+{
+  unsigned int num_transfers = json_array_size (json);
+  struct TALER_MERCHANT_TransactionWireTransfer transfers[num_transfers];
+  unsigned int i;
+
+  if (0 == num_transfers)
+  {
+    /* zero transfers is not a valid reply */
+    GNUNET_break_op (0);
+    return GNUNET_SYSERR;
+  }
+  for (i=0;i<num_transfers;i++)
+  {
+    struct TALER_MERCHANT_TransactionWireTransfer *transfer = &transfers[i];
+    json_t *coins;
+    unsigned int j;
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_fixed_auto ("wtid", &transfer->wtid),
+      GNUNET_JSON_spec_json ("coins", &coins),
+      GNUNET_JSON_spec_end()
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_JSON_parse (json_array_get (json, i),
+                           spec,
+                           NULL, NULL))
+    {
+      GNUNET_break_op (0);
+      return GNUNET_SYSERR;
+    }
+    transfer->num_coins = json_array_size (coins);
+    transfer->coins = GNUNET_new_array (transfer->num_coins,
+                                        struct TALER_MERCHANT_CoinWireTransfer);
+    for (j=0;j<transfer->num_coins;j++)
+    {
+      struct TALER_MERCHANT_CoinWireTransfer *coin = &transfer->coins[j];
+      struct GNUNET_JSON_Specification coin_spec[] = {
+        GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin->coin_pub),
+        TALER_JSON_spec_amount ("amount_with_fee", &coin->amount_with_fee),
+        TALER_JSON_spec_amount ("deposit_fee", &coin->deposit_fee),
+        GNUNET_JSON_spec_end()
+      };
+      if (GNUNET_OK !=
+          GNUNET_JSON_parse (json_array_get (coins, j),
+                             coin_spec,
+                             NULL, NULL))
+      {
+        GNUNET_break_op (0);
+        GNUNET_JSON_parse_free (spec);
+        free_transfers (i,
+                        transfers);
+        return GNUNET_SYSERR;
+      }
+    }
+    GNUNET_JSON_parse_free (spec);
+  }
+  tdo->cb (tdo->cb_cls,
+           MHD_HTTP_OK,
+           json,
+           num_transfers,
+           transfers);
+  free_transfers (num_transfers,
+                  transfers);
+  TALER_MERCHANT_track_transaction_cancel (tdo);
+  return GNUNET_OK;
+}
+
+
+/**
  * Function called when we're done processing the
  * HTTP /track/transaction request.
  *
@@ -86,12 +182,11 @@ handle_track_transaction_finished (void *cls,
   case 0:
     break;
   case MHD_HTTP_OK:
-    {
-    /* Work out argument for external callback from the body .. */
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "200 returned from /track/transaction\n");
-    /* FIXME: actually verify signature */
-    }
+    if (GNUNET_OK ==
+        parse_track_transaction_ok (tdo,
+                                    json))
+      return;
+    response_code = 0;
     break;
   case MHD_HTTP_ACCEPTED:
     {
@@ -117,13 +212,10 @@ handle_track_transaction_finished (void *cls,
     response_code = 0;
     break;
   }
-  /* FIXME: pass proper results back! */
   tdo->cb (tdo->cb_cls,
            response_code,
-           NULL,
            json,
-           NULL,
-           GNUNET_TIME_UNIT_ZERO_ABS,
+           0,
            NULL);
   TALER_MERCHANT_track_transaction_cancel (tdo);
 }
