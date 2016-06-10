@@ -77,13 +77,13 @@ struct TALER_MERCHANT_TrackTransferHandle
  * Any changes should likely be reflected there as well.
  *
  * @param wdh handle to the operation
- * @param json response we got
+ * @param json response we got as the 'details' from the exchange
  * @return #GNUNET_OK if we are done and all is well,
  *         #GNUNET_SYSERR if the response was bogus
  */
 static int
-check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh,
-                                  const json_t *json)
+parse_exchange_details_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh,
+                           const json_t *json)
 {
   json_t *details_j;
   struct GNUNET_HashCode h_wire;
@@ -91,7 +91,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
   struct TALER_MerchantPublicKeyP merchant_pub;
   unsigned int num_details;
   struct TALER_ExchangePublicKeyP exchange_pub;
-  struct GNUNET_JSON_Specification spec[] = {
+  struct GNUNET_JSON_Specification inner_spec[] = {
     TALER_JSON_spec_amount ("total", &total_amount),
     GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
     GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
@@ -102,7 +102,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
 
   if (GNUNET_OK !=
       GNUNET_JSON_parse (json,
-                         spec,
+                         inner_spec,
                          NULL, NULL))
   {
     GNUNET_break_op (0);
@@ -144,8 +144,66 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
              num_details,
              details);
   }
-  TALER_MERCHANT_track_transfer_cancel (wdh);
   return GNUNET_OK;
+}
+
+
+/**
+ * We got a #MHD_HTTP_OK response for the /track/transfer request.
+ * Check that the response is well-formed and if it is, call the
+ * callback.  If not, return an error code.
+ *
+ * This code is very similar to
+ * exchange_api_track_transfer.c::check_track_transfer_response_ok.
+ * (Except we do not check the signature, as that was done by the
+ * backend which we trust already.)
+ * Any changes should likely be reflected there as well.
+ *
+ * @param wdh handle to the operation
+ * @param json response we got
+ * @return #GNUNET_OK if we are done and all is well,
+ *         #GNUNET_SYSERR if the response was bogus
+ */
+static int
+check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh,
+                                  const json_t *json)
+{
+  int ret;
+  json_t *inner_j;
+  uint32_t exchange_status;
+  struct GNUNET_JSON_Specification outer_spec[] = {
+    GNUNET_JSON_spec_json ("details", &inner_j),
+    GNUNET_JSON_spec_uint32 ("exchange_status", &exchange_status),
+    GNUNET_JSON_spec_end()
+  };
+
+  if (GNUNET_OK !=
+      GNUNET_JSON_parse (json,
+                         outer_spec,
+                         NULL, NULL))
+  {
+    GNUNET_break_op (0);
+    return GNUNET_SYSERR;
+  }
+  switch (exchange_status)
+  {
+  case MHD_HTTP_OK:
+    ret = parse_exchange_details_ok (wdh,
+                                     inner_j);
+    break;
+    /* FIXME: other acceptable exchange status codes to handle here?
+       FIXME: implement proper way to pass exchange status vs. backend
+              status code to application! */
+  default:
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected exchange status code %u\n",
+                (unsigned int) exchange_status);
+    ret = GNUNET_SYSERR;
+    break;
+  }
+  if (GNUNET_OK == ret)
+    TALER_MERCHANT_track_transfer_cancel (wdh);
+  return ret;
 }
 
 
@@ -213,8 +271,8 @@ handle_track_transfer_finished (void *cls,
  * @param backend_uri base URI of the backend
  * @param wtid base32 string indicating a wtid
  * @param exchange base URL of the exchange in charge of returning the wanted information
- * @param tracktransfer_cb the callback to call when a reply for this request is available
- * @param tracktransfer_cb_cls closure for @a contract_cb
+ * @param track_transfer_cb the callback to call when a reply for this request is available
+ * @param track_transfer_cb_cls closure for @a contract_cb
  * @return a handle for this request
  */
 struct TALER_MERCHANT_TrackTransferHandle *
@@ -222,8 +280,8 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                const char *backend_uri,
                                const struct TALER_WireTransferIdentifierRawP *wtid,
                                const char *exchange_uri,
-                               TALER_MERCHANT_TrackTransferCallback tracktransfer_cb,
-                               void *tracktransfer_cb_cls)
+                               TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
+                               void *track_transfer_cb_cls)
 {
   struct TALER_MERCHANT_TrackTransferHandle *tdo;
   CURL *eh;
@@ -233,8 +291,9 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                                   sizeof (struct TALER_WireTransferIdentifierRawP));
   tdo = GNUNET_new (struct TALER_MERCHANT_TrackTransferHandle);
   tdo->ctx = ctx;
-  tdo->cb = tracktransfer_cb;
-  tdo->cb_cls = tracktransfer_cb_cls;
+  tdo->cb = track_transfer_cb;
+  tdo->cb_cls = track_transfer_cb_cls;
+  /* TODO: do we need to escape 'exchange_uri' here? */
   GNUNET_asprintf (&tdo->url,
                    "%s/track/transfer?wtid=%s&exchange=%s",
                    backend_uri,

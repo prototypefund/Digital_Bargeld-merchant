@@ -469,6 +469,11 @@ struct Command
       char *check_bank_ref;
 
       /**
+       * #OC_PAY command which we expect in the result.
+       */
+      char *expected_pay_ref;
+
+      /**
        * Handle to a /track/transfer operation
        */
       struct TALER_MERCHANT_TrackTransferHandle *tdo;
@@ -996,18 +1001,79 @@ track_transfer_cb (void *cls,
   struct Command *cmd = &is->commands[is->ip];
 
   cmd->details.track_transfer.tdo = NULL;
-  /* FIXME: properly test result vs. expecations... */
-  if (MHD_HTTP_OK == http_status)
+  if (cmd->expected_response_code != http_status)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Ok from /track/transfer handler\n");
-    result = GNUNET_OK;
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u to command %s\n",
+                http_status,
+                cmd->label);
+    json_dumpf (json, stderr, 0);
+    fail (is);
+    return;
   }
-  else
+  switch (http_status)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Not Ok from /track/transfer handler\n");
-    result = GNUNET_SYSERR;
+  case MHD_HTTP_OK:
+    {
+      const struct Command *ref;
+      unsigned int i;
+      int found;
+
+      ref = find_command (is,
+                          cmd->details.track_transfer.expected_pay_ref);
+      found = GNUNET_NO;
+      for (i=0;i<details_length;i++)
+      {
+        struct TALER_Amount amount_with_fee;
+        struct TALER_Amount amount_without_fee;
+        struct TALER_Amount deposit_fee;
+        const struct Command *cref;
+        struct TALER_CoinSpendPublicKeyP coin_pub;
+
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_string_to_amount (ref->details.pay.amount_without_fee,
+                                               &amount_without_fee));
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_string_to_amount (ref->details.pay.amount_with_fee,
+                                               &amount_with_fee));
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_amount_subtract (&deposit_fee,
+                                              &amount_with_fee,
+                                              &amount_without_fee));
+
+	cref = find_command (is,
+                             ref->details.pay.coin_ref);
+	switch (cref->oc)
+	{
+	case OC_WITHDRAW_SIGN:
+          GNUNET_CRYPTO_eddsa_key_get_public (&cref->details.reserve_withdraw.coin_priv.eddsa_priv,
+                                              &coin_pub.eddsa_pub);
+	  break;
+	default:
+	  GNUNET_assert (0);
+	}
+
+        if ( (details[i].transaction_id == ref->details.pay.transaction_id) &&
+             (0 == TALER_amount_cmp (&details[i].coin_value,
+                                     &amount_with_fee)) &&
+             (0 == TALER_amount_cmp (&details[i].coin_fee,
+                                     &deposit_fee)) &&
+             (0 == memcmp (&details[i].coin_pub,
+                           &coin_pub,
+                           sizeof (struct TALER_CoinSpendPublicKeyP))) )
+          found = GNUNET_YES;
+      }
+      if (GNUNET_NO == found)
+      {
+        GNUNET_break (0);
+        json_dumpf (json, stderr, 0);
+        fail (is);
+        return;
+      }
+      break;
+    }
+  default:
+    break;
   }
   next_command (is);
 }
@@ -1039,18 +1105,25 @@ track_transaction_cb (void *cls,
   struct Command *cmd = &is->commands[is->ip];
 
   cmd->details.track_transaction.tth = NULL;
-  /* FIXME: properly test result vs. expecations... */
-  if (MHD_HTTP_OK == http_status)
+  if (cmd->expected_response_code != http_status)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Ok from /track/transaction handler\n");
-    result = GNUNET_OK;
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u to command %s\n",
+                http_status,
+                cmd->label);
+    json_dumpf (json, stderr, 0);
+    fail (is);
+    return;
   }
-  else
+  /* FIXME: properly test result vs. expecations... */
+  switch (http_status)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Not Ok from /track/transaction handler\n");
-    result = GNUNET_SYSERR;
+  case MHD_HTTP_OK:
+    {
+      break;
+    }
+  default:
+    break;
   }
   next_command (is);
 }
@@ -1386,7 +1459,7 @@ interpreter_run (void *cls)
           return;
         }
         cmd->details.pay.transaction_id = transaction_id;
-    }
+      }
 
       TALER_JSON_hash (ref->details.contract.contract,
 		       &h_contract);
@@ -1890,10 +1963,10 @@ run (void *cls)
 
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
-      .label = "track-deposit-1",
+      .label = "track-transfer-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c"
-      /* FIXME: more needed here for actual checking... */
+      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c",
+      .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
 
     /* FIXME: also do reverse test: lookup WTID by transaction ID */

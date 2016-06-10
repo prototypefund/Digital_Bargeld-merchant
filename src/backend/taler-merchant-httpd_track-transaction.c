@@ -613,7 +613,14 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                 ret ? "OK" : "FAILED");
     return ret;
   }
-
+  if ( (NULL != tctx->fo) ||
+       (NULL != tctx->eh) )
+  {
+    /* likely old MHD version */
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Not sure why we are here, should be suspended\n");
+    return MHD_YES; /* still work in progress */
+  }
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "id");
@@ -671,7 +678,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   tctx->timeout_task = GNUNET_SCHEDULER_add_delayed (TRACK_TIMEOUT,
                                                      &handle_track_transaction_timeout,
                                                      tctx);
-  return MHD_NO;
+  return MHD_YES;
 }
 
 

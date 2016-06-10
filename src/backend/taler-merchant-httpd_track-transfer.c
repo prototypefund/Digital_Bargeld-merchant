@@ -259,6 +259,9 @@ wire_transfer_cb (void *cls,
   int ret;
 
   rctx->wdh = NULL;
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Got response code %u from exchange for /track/transfer\n",
+              http_status);
   if (MHD_HTTP_OK != http_status)
   {
     resume_track_transfer_with_response
@@ -285,7 +288,7 @@ wire_transfer_cb (void *cls,
   {
     rctx->current_detail = &details[i];
     rctx->check_transfer_result = GNUNET_NO;
-    ret = db->find_payments_by_id (rctx,
+    ret = db->find_payments_by_id (db->cls,
                                    details[i].transaction_id,
                                    &check_transfer,
                                    rctx);
@@ -353,6 +356,15 @@ process_track_transfer_with_exchange (void *cls,
                                             &rctx->wtid,
                                             &wire_transfer_cb,
                                             rctx);
+  if (NULL == rctx->wdh)
+  {
+    GNUNET_break (0);
+    resume_track_transfer_with_response
+      (rctx,
+       MHD_HTTP_INTERNAL_SERVER_ERROR,
+       TMH_RESPONSE_make_json_pack ("{s:s}",
+                                    "error", "failed to run /track/transfer on exchange"));
+  }
 }
 
 
@@ -461,6 +473,14 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                 ret ? "OK" : "FAILED");
     return ret;
   }
+  if ( (NULL != rctx->fo) ||
+       (NULL != rctx->eh) )
+  {
+    /* likely old MHD version */
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Not sure why we are here, should be suspended\n");
+    return MHD_YES; /* still work in progress */
+  }
 
   uri = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
@@ -502,6 +522,10 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
       MHD_destroy_response (rctx->response);
       rctx->response = NULL;
     }
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Queueing response (%u) for /track/transfer (%s).\n",
+                (unsigned int) rctx->response_code,
+                ret ? "OK" : "FAILED");
     return ret;
   }
 
@@ -515,7 +539,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
     = GNUNET_SCHEDULER_add_delayed (TRACK_TIMEOUT,
                                     &handle_track_transfer_timeout,
                                     rctx);
-  return MHD_NO;
+  return MHD_YES;
 }
 
 /* end of taler-merchant-httpd_track-transfer.c */
