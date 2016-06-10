@@ -80,6 +80,16 @@ struct TrackCoinContext
   struct TALER_WireTransferIdentifierRawP wtid;
 
   /**
+   * Value of the coin including deposit fee.
+   */
+  struct TALER_Amount amount_with_fee;
+
+  /**
+   * Deposit fee for the coin.
+   */
+  struct TALER_Amount deposit_fee;
+
+  /**
    * Have we obtained the WTID for this coin yet?
    */
   int have_wtid;
@@ -373,6 +383,21 @@ wire_deposits_cb (void *cls,
 
 
 /**
+ * Function called with information about a wire transfer identifier.
+ * We actually never expect this to be called.
+ *
+ * @param cls closure
+ * @param proof proof from exchange about what the wire transfer was for
+ */
+static void
+proof_cb (void *cls,
+          const json_t *proof)
+{
+  GNUNET_break_op (0);
+}
+
+
+/**
  * Function called with detailed wire transfer data.
  * We were trying to find out in which wire transfer one of the
  * coins was involved in. Now we know. What we do now is first
@@ -403,6 +428,19 @@ wtid_cb (void *cls,
 
   tcc->dwh = NULL;
   tctx->current_wtid = *wtid;
+
+  if (GNUNET_YES ==
+      db->find_proof_by_wtid (db->cls,
+                              tctx->exchange_uri,
+                              wtid,
+                              &proof_cb,
+                              NULL))
+  {
+    GNUNET_break_op (0);
+    /* FIXME: report error: we got this WTID before, and the
+       transaction was NOT in the list. So exchange is lying to us!
+       (or our DB is internally inconsistent.) */
+  }
   tctx->wdh = TALER_EXCHANGE_track_transfer (tctx->eh,
                                             wtid,
                                             &wire_deposits_cb,
@@ -428,12 +466,98 @@ trace_coins (struct TrackTransactionContext *tctx)
       break;
   if (NULL == tcc)
   {
-#if ALL_COINS_DONE_FIXME
-    generate_response ();
-    resume_track_transaction_with_response (tctx,
-                                            MHD_HTTP_OK,
-                                            response);
-#endif
+    unsigned int num_wtid = 0;
+
+    /* count how many disjoint wire transfer identifiers there are;
+       note that there should only usually be one, so while this
+       is worst-case O(n^2), in pracitce this is O(n) */
+    for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
+    {
+      struct TrackCoinContext *tcc2;
+      int found = GNUNET_NO;
+
+      for (tcc2 = tctx->tcc_head; tcc2 != tcc; tcc2 = tcc2->next)
+      {
+        if (0 == memcmp (&tcc->wtid,
+                         &tcc2->wtid,
+                         sizeof (struct TALER_WireTransferIdentifierRawP)))
+        {
+          found = GNUNET_YES;
+          break;
+        }
+      }
+      if (GNUNET_NO == found)
+        num_wtid++;
+    }
+    {
+      /* on-stack allocation is fine, as the number of coins and the
+         number of wire-transfers per-transaction is expected to be tiny. */
+      struct MHD_Response *resp;
+      struct TMH_TransactionWireTransfer wts[num_wtid];
+      unsigned int wtid_off;
+
+      wtid_off = 0;
+      for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
+      {
+        struct TrackCoinContext *tcc2;
+        int found = GNUNET_NO;
+
+        for (tcc2 = tctx->tcc_head; tcc2 != tcc; tcc2 = tcc2->next)
+        {
+          if (0 == memcmp (&tcc->wtid,
+                           &tcc2->wtid,
+                           sizeof (struct TALER_WireTransferIdentifierRawP)))
+          {
+            found = GNUNET_YES;
+            break;
+          }
+        }
+        if (GNUNET_NO == found)
+        {
+          unsigned int num_coins;
+          struct TMH_TransactionWireTransfer *wt;
+
+          wt = &wts[wtid_off++];
+          wt->wtid = tcc->wtid;
+          /* count number of coins with this wtid */
+          num_coins = 0;
+          for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
+          {
+            if (0 == memcmp (&wt->wtid,
+                             &tcc2->wtid,
+                             sizeof (struct TALER_WireTransferIdentifierRawP)))
+              num_coins++;
+          }
+          /* initialize coins array */
+          wt->num_coins = num_coins;
+          wt->coins = GNUNET_new_array (num_coins,
+                                        struct TMH_CoinWireTransfer);
+          num_coins = 0;
+          for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
+          {
+            if (0 == memcmp (&wt->wtid,
+                             &tcc2->wtid,
+                             sizeof (struct TALER_WireTransferIdentifierRawP)))
+            {
+              struct TMH_CoinWireTransfer *coin = &wt->coins[num_coins++];
+
+              coin->coin_pub = tcc2->coin_pub;
+              coin->amount_with_fee = tcc2->amount_with_fee;
+              coin->deposit_fee = tcc2->deposit_fee;
+            }
+          }
+        } /* GNUNET_NO == found */
+      } /* for all tcc */
+      GNUNET_assert (wtid_off == num_wtid);
+
+      resp = TMH_RESPONSE_make_track_transaction_ok (num_wtid,
+                                                     wts);
+      for (wtid_off=0;wtid_off < num_wtid; wtid_off++)
+        GNUNET_free (wts[wtid_off].coins);
+      resume_track_transaction_with_response (tctx,
+                                              MHD_HTTP_OK,
+                                              resp);
+    } /* end of scope for 'wts' and 'resp' */
     return;
   }
   tcc->dwh = TALER_EXCHANGE_track_transaction (tctx->eh,
@@ -527,6 +651,39 @@ transaction_cb (void *cls,
 
 
 /**
+ * Information about the wire transfer corresponding to
+ * a deposit operation.  Note that it is in theory possible
+ * that we have a @a transaction_id and @a coin_pub in the
+ * result that do not match a deposit that we know about,
+ * for example because someone else deposited funds into
+ * our account.
+ *
+ * @param cls closure
+ * @param transaction_id ID of the contract
+ * @param coin_pub public key of the coin
+ * @param wtid identifier of the wire transfer in which the exchange
+ *             send us the money for the coin deposit
+ * @param exchange_proof proof from exchange about what the deposit was for
+ *             NULL if we have not asked for this signature
+ */
+static void
+transfer_cb (void *cls,
+             uint64_t transaction_id,
+             const struct TALER_CoinSpendPublicKeyP *coin_pub,
+             const struct TALER_WireTransferIdentifierRawP *wtid,
+             const json_t *exchange_proof)
+{
+  struct TrackCoinContext *tcc = cls;
+
+  GNUNET_break (0 == memcmp (coin_pub,
+                             &tcc->coin_pub,
+                             sizeof (struct TALER_CoinSpendPublicKeyP)));
+  tcc->wtid = *wtid;
+  tcc->have_wtid = GNUNET_YES;
+}
+
+
+/**
  * Function called with information about a coin that was deposited.
  *
  * @param cls closure
@@ -550,9 +707,16 @@ coin_cb (void *cls,
   tcc = GNUNET_new (struct TrackCoinContext);
   tcc->tctx = tctx;
   tcc->coin_pub = *coin_pub;
+  tcc->amount_with_fee = *amount_with_fee;
+  tcc->deposit_fee = *deposit_fee;
   GNUNET_CONTAINER_DLL_insert (tctx->tcc_head,
                                tctx->tcc_tail,
                                tcc);
+  GNUNET_break (GNUNET_SYSERR !=
+                db->find_transfers_by_id (db->cls,
+                                          transaction_id,
+                                          &transfer_cb,
+                                          tcc));
 }
 
 

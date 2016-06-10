@@ -26,6 +26,7 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_responses.h"
 #include <taler/taler_util.h>
+#include <taler/taler_json_lib.h>
 #include <gnunet/gnunet_util_lib.h>
 
 
@@ -361,5 +362,50 @@ TMH_RESPONSE_reply_arg_invalid (struct MHD_Connection *connection,
                                        "error", "invalid parameter",
                                        "parameter", param_name);
 }
+
+
+/**
+ * Generate /track/transaction response.
+ *
+ * @param num_transfers how many wire transfers make up the transaction
+ * @param transfers data on each wire transfer
+ * @return MHD response object
+ */
+struct MHD_Response *
+TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
+                                        const struct TMH_TransactionWireTransfer *transfers)
+{
+  struct MHD_Response *ret;
+  unsigned int i;
+  json_t *j_transfers;
+
+  j_transfers = json_array ();
+  for (i=0;i<num_transfers;i++)
+  {
+    const struct TMH_TransactionWireTransfer *transfer = &transfers[i];
+    json_t *j_coins;
+    unsigned int j;
+
+    j_coins = json_array ();
+    for (j=0;j<transfer->num_coins;j++)
+    {
+      const struct TMH_CoinWireTransfer *coin = &transfer->coins[j];
+
+      json_array_append_new (j_coins,
+                             json_pack ("{s:o, s:o, s:o}",
+                                        "coin_pub", GNUNET_JSON_from_data_auto (&coin->coin_pub),
+                                        "amount_with_fee", TALER_JSON_from_amount (&coin->amount_with_fee),
+                                        "deposit_fee", TALER_JSON_from_amount (&coin->deposit_fee)));
+    }
+    json_array_append_new (j_transfers,
+                           json_pack ("{s:o, s:o}",
+                                      "wtid", GNUNET_JSON_from_data_auto (&transfer->wtid),
+                                      "coins", j_coins));
+  }
+  ret = TMH_RESPONSE_make_json (j_transfers);
+  json_decref (j_transfers);
+  return ret;
+}
+
 
 /* end of taler-exchange-httpd_responses.c */

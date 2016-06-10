@@ -1997,6 +1997,7 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
 
+#if 0
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-1",
@@ -2004,8 +2005,9 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-499c",
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
+#endif
 
-#if 0
+#if 1
     /* Trace transaction to WTID */
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-1",
