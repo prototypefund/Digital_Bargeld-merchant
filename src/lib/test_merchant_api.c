@@ -489,6 +489,11 @@ struct Command
       char *pay_ref;
 
       /**
+       * #OC_CHECK_BANK_TRANSFER command which we expect in the result.
+       */
+      char *expected_transfer_ref;
+
+      /**
        * Handle to a /track/transaction operation
        */
       struct TALER_MERCHANT_TrackTransactionHandle *tth;
@@ -1115,11 +1120,42 @@ track_transaction_cb (void *cls,
     fail (is);
     return;
   }
-  /* FIXME: properly test result vs. expecations... */
+  /* Test result vs. expecations... */
   switch (http_status)
   {
   case MHD_HTTP_OK:
     {
+      const struct Command *ref;
+      struct TALER_Amount ea;
+
+      ref = find_command (is,
+                          cmd->details.track_transaction.expected_transfer_ref);
+      GNUNET_assert (NULL != ref);
+      if (0 != memcmp (&ref->details.check_bank_transfer.wtid,
+                       wtid,
+                       sizeof (struct TALER_WireTransferIdentifierRawP)))
+      {
+        GNUNET_break (0);
+        json_dumpf (json, stderr, 0);
+        fail (is);
+        return;
+      }
+      /* NOTE: this assumes that the wire transfer corresponds to a
+         single coin involved in a pay/deposit.  Thus, this invariant
+         may not always hold in the future depending no how the
+         testcases evolve. */
+      GNUNET_assert (GNUNET_OK ==
+                     TALER_string_to_amount (ref->details.check_bank_transfer.amount,
+                                             &ea));
+      if (0 !=
+          TALER_amount_cmp (&ea,
+                            coin_contribution))
+      {
+        GNUNET_break (0);
+        json_dumpf (json, stderr, 0);
+        fail (is);
+        return;
+      }
       break;
     }
   default:
@@ -1969,8 +2005,16 @@ run (void *cls)
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
 
-    /* FIXME: also do reverse test: lookup WTID by transaction ID */
-
+#if 0
+    /* Trace transaction to WTID */
+    { .oc = OC_TRACK_TRANSACTION,
+      .label = "track-transaction-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transaction.pay_ref = "deposit-simple",
+      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c"
+    },
+#endif
+    /* end of testcase */
     { .oc = OC_END }
   };
 
