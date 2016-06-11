@@ -356,6 +356,7 @@ wire_deposits_cb (void *cls,
       db->store_transfer_to_proof (db->cls,
                                    tctx->exchange_uri,
                                    &tctx->current_wtid,
+                                   tctx->current_execution_time,
                                    exchange_pub,
                                    json))
   {
@@ -692,6 +693,7 @@ transaction_cb (void *cls,
  * @param coin_pub public key of the coin
  * @param wtid identifier of the wire transfer in which the exchange
  *             send us the money for the coin deposit
+ * @param execution_time when was the wire transfer executed?
  * @param exchange_proof proof from exchange about what the deposit was for
  *             NULL if we have not asked for this signature
  */
@@ -700,6 +702,7 @@ transfer_cb (void *cls,
              uint64_t transaction_id,
              const struct TALER_CoinSpendPublicKeyP *coin_pub,
              const struct TALER_WireTransferIdentifierRawP *wtid,
+             struct GNUNET_TIME_Absolute execution_time,
              const json_t *exchange_proof)
 {
   struct TrackCoinContext *tcc = cls;
@@ -708,6 +711,7 @@ transfer_cb (void *cls,
                              &tcc->coin_pub,
                              sizeof (struct TALER_CoinSpendPublicKeyP)));
   tcc->wtid = *wtid;
+  tcc->execution_time = execution_time;
   tcc->have_wtid = GNUNET_YES;
 }
 

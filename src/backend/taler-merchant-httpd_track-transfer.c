@@ -277,6 +277,8 @@ wire_transfer_cb (void *cls,
       db->store_transfer_to_proof (db->cls,
                                    rctx->uri,
                                    &rctx->wtid,
+                                   GNUNET_TIME_UNIT_ZERO_ABS
+                                   /* FIXME: unknowable with current APIs */,
                                    exchange_pub,
                                    json))
   {

@@ -203,6 +203,7 @@ deposit_cb (void *cls,
  * @param coin_pub public key of the coin
  * @param wtid identifier of the wire transfer in which the exchange
  *             send us the money for the coin deposit
+ * @param execution_time when was the @a wtid transfer executed
  * @param exchange_proof proof from exchange about what the deposit was for
  *             NULL if we have not asked for this signature
  */
@@ -211,6 +212,7 @@ transfer_cb (void *cls,
              uint64_t atransaction_id,
              const struct TALER_CoinSpendPublicKeyP *acoin_pub,
              const struct TALER_WireTransferIdentifierRawP *awtid,
+             struct GNUNET_TIME_Absolute execution_time,
              const json_t *exchange_proof)
 {
   CHECK (atransaction_id == transaction_id);
@@ -309,6 +311,7 @@ run (void *cls)
           plugin->store_transfer_to_proof (plugin->cls,
                                            EXCHANGE_URI,
                                            &wtid,
+                                           GNUNET_TIME_UNIT_ZERO_ABS,
                                            &signkey_pub,
                                            transfer_proof));
   FAILIF (GNUNET_OK !=

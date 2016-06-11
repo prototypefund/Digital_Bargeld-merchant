@@ -400,7 +400,7 @@ TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
     }
     GNUNET_assert (0 ==
                    json_array_append_new (j_transfers,
-                                          json_pack ("{s:o, s:o}",
+                                          json_pack ("{s:o, s:o, s:o}",
                                                      "wtid", GNUNET_JSON_from_data_auto (&transfer->wtid),
                                                      "execution_time", GNUNET_JSON_from_time_abs (transfer->execution_time),
                                                      "coins", j_coins)));

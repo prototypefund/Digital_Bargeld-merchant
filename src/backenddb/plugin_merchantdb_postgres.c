@@ -183,6 +183,7 @@ postgres_initialize (void *cls)
            "CREATE TABLE IF NOT EXISTS merchant_proofs ("
            " exchange_uri VARCHAR NOT NULL"
            ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
+           ",execution_time INT8 NOT NULL"
            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
            ",proof BYTEA NOT NULL"
            ",PRIMARY KEY (wtid, exchange_uri)"
@@ -248,10 +249,11 @@ postgres_initialize (void *cls)
               "INSERT INTO merchant_proofs"
               "(exchange_uri"
               ",wtid"
+              ",execution_time"
               ",signkey_pub"
               ",proof) VALUES "
-              "($1, $2, $3, $4)",
-              4);
+              "($1, $2, $3, $4, $5)",
+              5);
 
   /* Setup prepared "SELECT" statements */
   PG_PREPARE (pg,
@@ -287,6 +289,7 @@ postgres_initialize (void *cls)
               "SELECT"
               " coin_pub"
               ",wtid"
+              ",merchant_proofs.execution_time"
               ",merchant_proofs.proof"
               " FROM merchant_transfers"
               "   JOIN merchant_proofs USING (wtid)"
@@ -481,6 +484,7 @@ postgres_store_coin_to_transfer (void *cls,
  * @param cls closure
  * @param exchange_uri URI of the exchange
  * @param wtid identifier of the wire transfer
+ * @param execution_time when was @a wtid executed
  * @param signkey_pub public key used by the exchange for @a exchange_proof
  * @param exchange_proof proof from exchange about what the deposit was for
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
@@ -489,6 +493,7 @@ static int
 postgres_store_transfer_to_proof (void *cls,
                                   const char *exchange_uri,
                                   const struct TALER_WireTransferIdentifierRawP *wtid,
+                                  struct GNUNET_TIME_Absolute execution_time,
                                   const struct TALER_ExchangePublicKeyP *signkey_pub,
                                   const json_t *exchange_proof)
 {
@@ -499,6 +504,7 @@ postgres_store_transfer_to_proof (void *cls,
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (exchange_uri),
     GNUNET_PQ_query_param_auto_from_type (wtid),
+    GNUNET_PQ_query_param_absolute_time (&execution_time),
     GNUNET_PQ_query_param_auto_from_type (signkey_pub),
     TALER_PQ_query_param_json (exchange_proof),
     GNUNET_PQ_query_param_end
@@ -742,6 +748,7 @@ postgres_find_transfers_by_id (void *cls,
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_WireTransferIdentifierRawP wtid;
+    struct GNUNET_TIME_Absolute execution_time;
     json_t *proof;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
@@ -749,6 +756,8 @@ postgres_find_transfers_by_id (void *cls,
                                             &coin_pub),
       GNUNET_PQ_result_spec_auto_from_type ("wtid",
                                             &wtid),
+      GNUNET_PQ_result_spec_absolute_time ("execution_time",
+                                           &execution_time),
       TALER_PQ_result_spec_json ("proof",
                                  &proof),
       GNUNET_PQ_result_spec_end
@@ -767,6 +776,7 @@ postgres_find_transfers_by_id (void *cls,
         transaction_id,
         &coin_pub,
         &wtid,
+        execution_time,
         proof);
     GNUNET_PQ_cleanup_result (rs);
   }
