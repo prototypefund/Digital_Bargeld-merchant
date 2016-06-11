@@ -132,6 +132,7 @@ parse_exchange_details_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh,
                              NULL, NULL))
       {
         GNUNET_break_op (0);
+        GNUNET_JSON_parse_free (inner_spec);
         return GNUNET_SYSERR;
       }
     }
@@ -144,6 +145,7 @@ parse_exchange_details_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh,
              num_details,
              details);
   }
+  GNUNET_JSON_parse_free (inner_spec);
   return GNUNET_OK;
 }
 
@@ -203,6 +205,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
   }
   if (GNUNET_OK == ret)
     TALER_MERCHANT_track_transfer_cancel (wdh);
+  GNUNET_JSON_parse_free (outer_spec);
   return ret;
 }
 

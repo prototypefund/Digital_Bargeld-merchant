@@ -1928,6 +1928,7 @@ run (void *cls)
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = "EUR:5.01" },
+
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-1",
@@ -1946,6 +1947,8 @@ run (void *cls)
       .label = "create-contract-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":1, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"expiry\":\"\\/Date(999999999)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"products\":[ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
+
+
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
@@ -1954,6 +1957,7 @@ run (void *cls)
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
     /* Create another contract */
+
     { .oc = OC_CONTRACT,
       .label = "create-contract-2",
       .expected_response_code = MHD_HTTP_OK,
@@ -1996,6 +2000,7 @@ run (void *cls)
     /* Check nothing happened on the bank side so far */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
+
 
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
@@ -2070,7 +2075,6 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
     },
-
 
     /* end of testcase */
     { .oc = OC_END }

@@ -151,6 +151,7 @@ check_forbidden (struct TALER_MERCHANT_Pay *ph,
     GNUNET_JSON_spec_end()
   };
   unsigned int i;
+  int ret;
 
   if (GNUNET_OK !=
       GNUNET_JSON_parse (json,
@@ -165,11 +166,16 @@ check_forbidden (struct TALER_MERCHANT_Pay *ph,
     if (0 == memcmp (&ph->coins[i].coin_pub,
                      &coin_pub,
                      sizeof (struct TALER_CoinSpendPublicKeyP)))
-      return check_coin_history (&ph->coins[i],
-                                 history);
+    {
+      ret = check_coin_history (&ph->coins[i],
+                                history);
+      GNUNET_JSON_parse_free (spec);
+      return ret;
+    }
   }
   GNUNET_break_op (0); /* complaint is not about any of the coins
                           that we actually paid with... */
+  GNUNET_JSON_parse_free (spec);
   return GNUNET_SYSERR;
 }
 
@@ -615,6 +621,7 @@ TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *pay)
     GNUNET_CURL_job_cancel (pay->job);
     pay->job = NULL;
   }
+  GNUNET_free (pay->coins);
   GNUNET_free (pay->url);
   GNUNET_free (pay->json_enc);
   GNUNET_free (pay);
