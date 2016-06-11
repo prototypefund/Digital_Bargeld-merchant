@@ -464,8 +464,9 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			"ub_sig", GNUNET_JSON_from_rsa_signature (pc->denom_sig.rsa_signature),
 			"coin_sig", GNUNET_JSON_from_data_auto (&pc->coin_sig)
 			);
-    json_array_append (j_coins,
-		       j_coin);
+    GNUNET_assert (0 ==
+                   json_array_append (j_coins,
+                                      j_coin));
   }
 
   { /* Sanity check that total_amount and total_fee

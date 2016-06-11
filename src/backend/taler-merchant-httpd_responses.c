@@ -391,16 +391,18 @@ TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
     {
       const struct TALER_MERCHANT_CoinWireTransfer *coin = &transfer->coins[j];
 
-      json_array_append_new (j_coins,
-                             json_pack ("{s:o, s:o, s:o}",
-                                        "coin_pub", GNUNET_JSON_from_data_auto (&coin->coin_pub),
-                                        "amount_with_fee", TALER_JSON_from_amount (&coin->amount_with_fee),
-                                        "deposit_fee", TALER_JSON_from_amount (&coin->deposit_fee)));
+      GNUNET_assert (0 ==
+                     json_array_append_new (j_coins,
+                                            json_pack ("{s:o, s:o, s:o}",
+                                                       "coin_pub", GNUNET_JSON_from_data_auto (&coin->coin_pub),
+                                                       "amount_with_fee", TALER_JSON_from_amount (&coin->amount_with_fee),
+                                                       "deposit_fee", TALER_JSON_from_amount (&coin->deposit_fee))));
     }
-    json_array_append_new (j_transfers,
-                           json_pack ("{s:o, s:o}",
-                                      "wtid", GNUNET_JSON_from_data_auto (&transfer->wtid),
-                                      "coins", j_coins));
+    GNUNET_assert (0 ==
+                   json_array_append_new (j_transfers,
+                                          json_pack ("{s:o, s:o}",
+                                                     "wtid", GNUNET_JSON_from_data_auto (&transfer->wtid),
+                                                     "coins", j_coins)));
   }
   ret = TMH_RESPONSE_make_json (j_transfers);
   json_decref (j_transfers);

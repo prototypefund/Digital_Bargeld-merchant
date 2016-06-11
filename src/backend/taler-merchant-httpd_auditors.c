@@ -207,11 +207,12 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
   /* Generate preferred exchange(s) array. */
   j_auditors = json_array ();
   for (cnt = 0; cnt < nauditors; cnt++)
-    json_array_append_new (j_auditors,
-                           json_pack ("{s:s, s:o, s:s}",
-                                      "name", auditors[cnt].name,
-                                      "auditor_pub", GNUNET_JSON_from_data_auto (&auditors[cnt].public_key),
-                                      "uri", auditors[cnt].uri));
+    GNUNET_assert (0 ==
+                   json_array_append_new (j_auditors,
+                                          json_pack ("{s:s, s:o, s:s}",
+                                                     "name", auditors[cnt].name,
+                                                     "auditor_pub", GNUNET_JSON_from_data_auto (&auditors[cnt].public_key),
+                                                     "uri", auditors[cnt].uri)));
   return nauditors;
 }
 

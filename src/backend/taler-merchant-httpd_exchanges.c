@@ -539,8 +539,9 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     j_exchange = json_pack ("{s:s, s:o}",
                             "url", exchange->uri,
                             "master_pub", GNUNET_JSON_from_data_auto (&exchange->master_pub));
-    json_array_append_new (trusted_exchanges,
-                           j_exchange);
+    GNUNET_assert (0 ==
+                   json_array_append_new (trusted_exchanges,
+                                          j_exchange));
   }
   return GNUNET_OK;
 }
