@@ -1455,9 +1455,11 @@ interpreter_run (void *cls)
       if (NULL == cmd->details.contract.co)
       {
         GNUNET_break (0);
+        json_decref (proposal);
         fail (is);
         return;
       }
+      json_decref (proposal);
       return;
     }
   case OC_PAY:

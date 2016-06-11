@@ -465,8 +465,8 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			"coin_sig", GNUNET_JSON_from_data_auto (&pc->coin_sig)
 			);
     GNUNET_assert (0 ==
-                   json_array_append (j_coins,
-                                      j_coin));
+                   json_array_append_new (j_coins,
+                                          j_coin));
   }
 
   { /* Sanity check that total_amount and total_fee
