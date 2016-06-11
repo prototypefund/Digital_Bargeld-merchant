@@ -111,6 +111,7 @@ parse_track_transaction_ok (struct TALER_MERCHANT_TrackTransactionHandle *tdo,
     unsigned int j;
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_fixed_auto ("wtid", &transfer->wtid),
+      GNUNET_JSON_spec_absolute_time ("execution_time", &transfer->execution_time),
       GNUNET_JSON_spec_json ("coins", &coins),
       GNUNET_JSON_spec_end()
     };

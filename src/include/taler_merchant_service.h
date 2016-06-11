@@ -401,6 +401,11 @@ struct TALER_MERCHANT_TransactionWireTransfer
   struct TALER_WireTransferIdentifierRawP wtid;
 
   /**
+   * When was this wire transfer executed?
+   */
+  struct GNUNET_TIME_Absolute execution_time;
+
+  /**
    * Number of coins of the selected transaction that
    * is covered by this wire transfer.
    */

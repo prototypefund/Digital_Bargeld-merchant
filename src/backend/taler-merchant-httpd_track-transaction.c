@@ -80,6 +80,11 @@ struct TrackCoinContext
   struct TALER_WireTransferIdentifierRawP wtid;
 
   /**
+   * Execution time of the wire transfer @e wtid.
+   */
+  struct GNUNET_TIME_Absolute execution_time;
+
+  /**
    * Value of the coin including deposit fee.
    */
   struct TALER_Amount amount_with_fee;
@@ -159,6 +164,11 @@ struct TrackTransactionContext
    * Wire transfer identifier we are currently looking up in @e wdh.
    */
   struct TALER_WireTransferIdentifierRawP current_wtid;
+
+  /**
+   * Execution time of the wire transfer we are currently looking up in @e wdh.
+   */
+  struct GNUNET_TIME_Absolute current_execution_time;
 
   /**
    * Hash of wire details for the transaction.
@@ -364,6 +374,7 @@ wire_deposits_cb (void *cls,
                        sizeof (struct TALER_CoinSpendPublicKeyP)))
         continue;
       tcc->wtid = tctx->current_wtid;
+      tcc->execution_time = tctx->current_execution_time;
       tcc->have_wtid = GNUNET_YES;
       if (GNUNET_OK !=
           db->store_coin_to_transfer (db->cls,
@@ -377,7 +388,7 @@ wire_deposits_cb (void *cls,
       }
     }
   }
-  /* Continue traceing (will also handle case that we are done) */
+  /* Continue tracing (will also handle case that we are done) */
   trace_coins (tctx);
 }
 
@@ -393,6 +404,7 @@ static void
 proof_cb (void *cls,
           const json_t *proof)
 {
+  /* FIXME #4577: store @a proof in @a cls to return with error message */
   GNUNET_break_op (0);
 }
 
@@ -443,6 +455,7 @@ wtid_cb (void *cls,
     return;
   }
   tctx->current_wtid = *wtid;
+  tctx->current_execution_time = execution_time;
 
   if (GNUNET_YES ==
       db->find_proof_by_wtid (db->cls,
@@ -452,7 +465,7 @@ wtid_cb (void *cls,
                               NULL))
   {
     GNUNET_break_op (0);
-    /* FIXME: report error: we got this WTID before, and the
+    /* FIXME #4577: report error: we got this WTID before, and the
        transaction was NOT in the list. So exchange is lying to us!
        (or our DB is internally inconsistent.) */
   }
@@ -534,6 +547,7 @@ trace_coins (struct TrackTransactionContext *tctx)
 
           wt = &wts[wtid_off++];
           wt->wtid = tcc->wtid;
+          wt->execution_time = tcc->execution_time;
           /* count number of coins with this wtid */
           num_coins = 0;
           for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
