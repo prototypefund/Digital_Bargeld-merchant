@@ -427,6 +427,21 @@ wtid_cb (void *cls,
   struct TrackTransactionContext *tctx = tcc->tctx;
 
   tcc->dwh = NULL;
+  if (MHD_HTTP_OK != http_status)
+  {
+    /* Transaction not resolved for one of the coins, report error!
+       We keep the status code for #MHD_HTTP_ACCEPTED, but box all the
+       others (as #MHD_HTTP_ACCEPTED is not an error). */
+    resume_track_transaction_with_response
+      (tcc->tctx,
+       (MHD_HTTP_ACCEPTED == http_status)
+       ? MHD_HTTP_ACCEPTED
+       : MHD_HTTP_FAILED_DEPENDENCY,
+       TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
+                                    "exchange_status", (json_int_t) http_status,
+                                    "details", json));
+    return;
+  }
   tctx->current_wtid = *wtid;
 
   if (GNUNET_YES ==
@@ -442,9 +457,9 @@ wtid_cb (void *cls,
        (or our DB is internally inconsistent.) */
   }
   tctx->wdh = TALER_EXCHANGE_track_transfer (tctx->eh,
-                                            wtid,
-                                            &wire_deposits_cb,
-                                            tctx);
+                                             wtid,
+                                             &wire_deposits_cb,
+                                             tctx);
 }
 
 

@@ -2043,6 +2043,13 @@ run (void *cls)
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
+    /* Check "failure" to trace transaction to WTID before aggregator */
+    { .oc = OC_TRACK_TRANSACTION,
+      .label = "track-transaction-2-found",
+      .expected_response_code = MHD_HTTP_ACCEPTED,
+      .details.track_transaction.pay_ref = "deposit-simple-2"
+    },
+
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator-2" },
@@ -2075,6 +2082,7 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
     },
+
 
     /* end of testcase */
     { .oc = OC_END }
