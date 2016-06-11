@@ -1974,6 +1974,7 @@ run (void *cls)
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":63, \"uuid\":2 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 2}",
       .details.admin_add_incoming.amount = "EUR:1" },
+
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2b",
@@ -2010,7 +2011,6 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
 
-#if 0
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-1",
@@ -2018,9 +2018,7 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-499c",
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
-#endif
 
-#if 1
     /* Trace transaction to WTID */
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-1",
@@ -2028,7 +2026,50 @@ run (void *cls)
       .details.track_transaction.pay_ref = "deposit-simple",
       .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c"
     },
-#endif
+
+    /* Pay again successfully on 2nd contract */
+    { .oc = OC_PAY,
+      .label = "deposit-simple-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay.contract_ref = "create-contract-2",
+      .details.pay.coin_ref = "withdraw-coin-2",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99" },
+
+    /* Run transfers. */
+    { .oc = OC_RUN_AGGREGATOR,
+      .label = "run-aggregator-2" },
+
+    /* Obtain WTID of the transfer */
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-499c-2",
+      .details.check_bank_transfer.amount = "EUR:4.99",
+      .details.check_bank_transfer.account_debit = 2, /* exchange-outgoing */
+      .details.check_bank_transfer.account_credit = 62 /* merchant */
+    },
+
+    /* Check that there are no other unusual transfers */
+    { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
+      .label = "check_bank_empty" },
+
+    /* This time, invert the order in which we do the tracing */
+    /* Trace transaction to WTID */
+    { .oc = OC_TRACK_TRANSACTION,
+      .label = "track-transaction-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transaction.pay_ref = "deposit-simple-2",
+      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2"
+    },
+
+    /* Trace the WTID back to the original transaction */
+    { .oc = OC_TRACK_TRANSFER,
+      .label = "track-transfer-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
+      .details.track_transfer.expected_pay_ref = "deposit-simple-2"
+    },
+
+
     /* end of testcase */
     { .oc = OC_END }
   };
