@@ -518,8 +518,9 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
   struct Exchange *exchange;
   json_t *j_exchange;
 
-  merchant_curl_ctx = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
-                                        &merchant_curl_rc);
+  merchant_curl_ctx
+    = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
+                        &merchant_curl_rc);
   if (NULL == merchant_curl_ctx)
   {
     GNUNET_break (0);
@@ -571,6 +572,8 @@ TMH_EXCHANGES_done ()
   merchant_curl_ctx = NULL;
   GNUNET_CURL_gnunet_rc_destroy (merchant_curl_rc);
   merchant_curl_rc = NULL;
+  json_decref (trusted_exchanges);
+  trusted_exchanges = NULL;
 }
 
 /* end of taler-merchant-httpd_exchanges.c */

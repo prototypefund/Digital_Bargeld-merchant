@@ -364,9 +364,9 @@ deposit_cb (void *cls,
       json_t *eproof;
 
       eproof = json_copy ((json_t *) proof);
-      json_object_set (eproof,
-                       "coin_pub",
-                       GNUNET_JSON_from_data_auto (&dc->coin_pub));
+      json_object_set_new (eproof,
+                           "coin_pub",
+                           GNUNET_JSON_from_data_auto (&dc->coin_pub));
       resume_pay_with_response (pc,
                                 http_status,
                                 TMH_RESPONSE_make_json (eproof));
@@ -452,6 +452,11 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
   {
     MHD_destroy_response (pc->response);
     pc->response = NULL;
+  }
+  if (NULL != pc->chosen_exchange)
+  {
+    GNUNET_free (pc->chosen_exchange);
+    pc->chosen_exchange = NULL;
   }
   GNUNET_free (pc);
 }
@@ -850,7 +855,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                 res ? "OK" : "FAILED");
     return res;
   }
-
+  if (NULL != pc->chosen_exchange)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Shouldn't be here. Old MHD version?\n");
+    return MHD_YES;
+  }
   res = TMH_PARSE_post_json (connection,
                              &pc->json_parse_context,
                              upload_data,
@@ -859,7 +869,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if (GNUNET_SYSERR == res)
   {
     GNUNET_break (0);
-    return MHD_NO;  /* error parsing JSON */
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "failed to parse JSON body");
   }
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES; /* the POST's body has to be further fetched */
@@ -912,6 +923,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                     &pubkey.eddsa_pub))
     {
       GNUNET_break (0);
+      GNUNET_JSON_parse_free (spec);
       json_decref (root);
       return TMH_RESPONSE_reply_external_error (connection,
                                                 "invalid merchant signature supplied");
@@ -920,7 +932,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     /* 'wire_transfer_deadline' is optional, if it is not present,
        generate it here; it will be timestamp plus the
        wire_transfer_delay supplied in config file */
-    if (NULL == json_object_get (root, "wire_transfer_deadline"))
+    if (NULL == json_object_get (root,
+                                 "wire_transfer_deadline"))
     {
       pc->wire_transfer_deadline = GNUNET_TIME_absolute_add (pc->timestamp,
                                                              wire_transfer_delay);
@@ -943,6 +956,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                  espec);
       if (GNUNET_YES != res)
       {
+        GNUNET_JSON_parse_free (spec);
         json_decref (root);
         GNUNET_break (0);
         return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
@@ -950,17 +964,18 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
       {
         GNUNET_break (0);
+        GNUNET_JSON_parse_free (spec);
         json_decref (root);
         return TMH_RESPONSE_reply_external_error (connection,
                                                   "refund deadline after wire transfer deadline");
       }
-
     }
 
 
     pc->coins_cnt = json_array_size (coins);
     if (0 == pc->coins_cnt)
     {
+      GNUNET_JSON_parse_free (spec);
       json_decref (root);
       return TMH_RESPONSE_reply_external_error (connection,
                                                 "no coins given");
@@ -986,6 +1001,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                  spec);
       if (GNUNET_YES != res)
       {
+        GNUNET_JSON_parse_free (spec);
         json_decref (root);
         GNUNET_break (0);
         return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
@@ -1005,7 +1021,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       dc->index = coins_index;
       dc->pc = pc;
     }
-  }
+    GNUNET_JSON_parse_free (spec);
+  } /* end of parsing of JSON upload */
   pc->pending = pc->coins_cnt;
 
   /* Check if this payment attempt has already succeeded */
@@ -1016,6 +1033,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                pc))
   {
     GNUNET_break (0);
+    json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               "Merchant database error");
   }
@@ -1033,6 +1051,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                               MHD_HTTP_OK,
                               resp);
     MHD_destroy_response (resp);
+    json_decref (root);
     return ret;
   }
 
@@ -1044,12 +1063,14 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                   pc))
   {
     GNUNET_break (0);
+    json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               "Merchant database error");
   }
   if (GNUNET_SYSERR == pc->transaction_exits)
   {
     GNUNET_break (0);
+    json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               "Transaction ID reused with different transaction details");
   }
@@ -1066,6 +1087,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                &pc->amount))
     {
       GNUNET_break (0);
+      json_decref (root);
       return TMH_RESPONSE_reply_internal_error (connection,
                                                 "Merchant database error");
     }

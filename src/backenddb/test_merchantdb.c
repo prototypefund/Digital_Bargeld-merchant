@@ -275,14 +275,14 @@ run (void *cls)
   RND_BLK (&coin_pub);
   deposit_proof = json_object ();
   GNUNET_assert (0 ==
-                 json_object_set (deposit_proof,
-                                  "test",
-                                  json_string ("backenddb test A")));
+                 json_object_set_new (deposit_proof,
+                                      "test",
+                                      json_string ("backenddb test A")));
   transfer_proof = json_object ();
   GNUNET_assert (0 ==
-                 json_object_set (transfer_proof,
-                                  "test",
-                                  json_string ("backenddb test B")));
+                 json_object_set_new (transfer_proof,
+                                      "test",
+                                      json_string ("backenddb test B")));
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,
                                      transaction_id,

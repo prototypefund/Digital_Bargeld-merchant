@@ -81,6 +81,41 @@ check_products (json_t *products)
 
 
 /**
+ * Information we keep for an individual calls
+ * to requests that parse JSON, but keep no other state.
+ */
+struct TMH_JsonParseContext
+{
+
+  /**
+   * This field MUST be first.
+   * FIXME: Explain why!
+   */
+  struct TM_HandlerContext hc;
+
+  /**
+   * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
+   */
+  void *json_parse_context;
+};
+
+
+/**
+ * Custom cleanup routine for a `struct TMH_JsonParseContext`.
+ *
+ * @param hc the `struct TMH_JsonParseContext` to clean up.
+ */
+static void
+json_parse_cleanup (struct TM_HandlerContext *hc)
+{
+  struct TMH_JsonParseContext *jpc = (struct TMH_JsonParseContext *) hc;
+
+  TMH_PARSE_post_cleanup_callback (jpc->json_parse_context);
+  GNUNET_free (jpc);
+}
+
+
+/**
  * Manage a contract request. In practical terms, it adds the fields
  * 'exchanges', 'merchant_pub', and 'H_wire' to the contract 'proposition'
  * gotten from the frontend. Finally, it adds (outside of the
@@ -133,7 +168,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   if (NULL == *connection_cls)
   {
     ctx = GNUNET_new (struct TMH_JsonParseContext);
-    ctx->hc.cc = &TMH_json_parse_cleanup;
+    ctx->hc.cc = &json_parse_cleanup;
     *connection_cls = ctx;
   }
   else
@@ -217,7 +252,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   /* return final response */
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:O, s:O, s:O}",
+                                      "{s:O, s:o s:o}",
                                       "contract", jcontract,
                                       "merchant_sig", GNUNET_JSON_from_data_auto (&contract_sig),
                                       "H_contract", GNUNET_JSON_from_data_auto (&contract.h_contract));

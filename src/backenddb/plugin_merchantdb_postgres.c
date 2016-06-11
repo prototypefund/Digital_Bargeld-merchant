@@ -605,6 +605,7 @@ postgres_find_transaction_by_id (void *cls,
         timestamp,
         refund_deadline,
         &total_amount);
+    GNUNET_PQ_cleanup_result (rs);
   }
   PQclear (result);
   return GNUNET_OK;
