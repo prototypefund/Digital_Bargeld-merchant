@@ -278,7 +278,7 @@ wire_transfer_cb (void *cls,
                                    rctx->uri,
                                    &rctx->wtid,
                                    GNUNET_TIME_UNIT_ZERO_ABS
-                                   /* FIXME: unknowable with current APIs */,
+                                   /* FIXME #4578: unknowable with current APIs */,
                                    exchange_pub,
                                    json))
   {
