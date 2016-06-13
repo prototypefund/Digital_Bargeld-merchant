@@ -1334,6 +1334,7 @@ interpreter_run (void *cls)
 
     cmd->details.admin_add_incoming.aih
       = TALER_EXCHANGE_admin_add_incoming (exchange,
+                                           "http://localhost:18080/",
                                            &reserve_pub,
                                            &amount,
                                            execution_date,
