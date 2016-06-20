@@ -19,6 +19,7 @@ LT_INIT
 
 # Checks for programs.
 AC_PROG_CC
+AC_PROG_CC_C99
 
 CFLAGS="-Wall $CFLAGS"
 
