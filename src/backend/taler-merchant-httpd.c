@@ -470,6 +470,7 @@ instances_iterator_cb (void *cls,
 {
   char *substr;
   char *token;
+  char *instance_wiresection;
   struct MerchantInstance *mi;
   struct IterateInstancesCls *iic;
   struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
@@ -508,7 +509,7 @@ instances_iterator_cb (void *cls,
     return;
   }
 
-  if (GNUNET_YES != GNUNET_DISK_file_test (keyfile))
+  if (GNUNET_YES != GNUNET_DISK_file_test (mi->keyfile))
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Merchant private key `%s' does not exist yet, creating it!\n",
                 keyfile);
@@ -528,13 +529,21 @@ instances_iterator_cb (void *cls,
   mi->id = token + 1;
   if (0 == strcmp ("default", mi->id))
     iic->default_instance = GNUNET_YES;
-    
+
+  GNUNET_asprintf (&instance_wiresection,
+                   "%s-wireformat",
+                   mi->id);
+
+  mi->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
+                                             iic->config,
+                                             instance_wiresection); 
+  GNUNET_free (instance_wiresection);                                             
 
   /**
    * TODO
    *
-   * Fill wirething
-   * Check if 'default' given
+   * place data in global place
+   *
    */
 
 }
@@ -580,6 +589,8 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "No default merchant instance found\n");
+    GNUNET_PLUGIN_unload (lib_name,
+                          iic->plugin);
     GNUNET_SCHEDULER_shutdown ();
     return GNUNET_SYSERR;
   }
@@ -587,6 +598,8 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Congratulations, you have a default instance\n");
 
+  GNUNET_PLUGIN_unload (lib_name,
+                        iic->plugin);
   GNUNET_free (lib_name);
   GNUNET_free (iic);
   return GNUNET_OK;
