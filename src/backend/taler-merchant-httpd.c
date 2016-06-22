@@ -46,6 +46,10 @@
  */
 #define UNIX_BACKLOG 500
 
+/**
+ * Array of all merchants instances known by this backend
+ */
+struct MerchantInstance *instances;
 
 /**
  * Our wire format details in JSON format (with salt).
@@ -454,6 +458,98 @@ prepare_daemon ()
 
 
 /**
+ * Callback that looks for 'merchant-instance-*' sections,
+ * and populates accordingly each instance's data
+ *
+ * @param cls closure
+ * @section section name this callback gets
+ */
+static void
+instances_iterator_cb (void *cls,
+                       const char *section)
+{
+  char *substr;
+  char *token;
+  struct MerchantInstance *mi;
+  struct GNUNET_CONFIGURATION_Handle *config;
+  struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
+
+  config = cls;
+  substr = strstr (section, "merchant-instance-");
+
+  if (NULL == substr)
+    return;
+
+  if (substr != section)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to specify a merchant instance\n");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }                
+
+  /** Get id **/
+  token = strrchr (section, '-'); 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Extracted token: %s\n",
+              token + 1);
+  mi = GNUNET_new (struct MerchantInstance);
+
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_filename (config,
+                                               section,
+                                               "KEYFILE",
+                                               &mi->keyfile))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               section,
+                               "KEYFILE");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (GNUNET_YES != GNUNET_DISK_file_test (keyfile))
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Merchant private key `%s' does not exist yet, creating it!\n",
+                keyfile);
+  if (NULL ==
+       (pk = GNUNET_CRYPTO_eddsa_key_create_from_file (mi->keyfile)))
+  {
+    GNUNET_break (0);
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  mi->privkey.eddsa_priv = *pk;
+  GNUNET_CRYPTO_eddsa_key_get_public (pk,
+                                      &mi->pubkey.eddsa_pub);
+  GNUNET_free (pk);
+
+  /**
+   * Fill 'id'
+   * Fill wirething
+   */
+
+}
+
+/**
+ * Iterate over each merchant instance, in order to populate
+ * each instance's own data
+ *
+ * @param config configuration handle
+ * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ * (for example, if no "defaul" instance is defined)
+ */
+static void
+iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config)
+{
+  GNUNET_CONFIGURATION_iterate_sections (config,
+                                         &instances_iterator_cb,
+                                         (void *) config);
+
+}
+
+
+/**
  * Main function that will be run by the scheduler.
  *
  * @param cls closure
@@ -517,6 +613,8 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
+
+  /** per instance **/
   if (GNUNET_OK !=
       validate_and_hash_wireformat (config,
                                     wireformat))
@@ -554,6 +652,14 @@ run (void *cls,
   GNUNET_CRYPTO_eddsa_key_get_public (pk,
                                       &pubkey.eddsa_pub);
   GNUNET_free (pk);
+  /** per instance end **/
+
+  /** debug per instance iterator start **/
+  iterate_instances (config);
+  GNUNET_SCHEDULER_shutdown ();
+  return;
+  /** debug per instance iterator end **/
+  
   if (NULL ==
       (db = TALER_MERCHANTDB_plugin_load (config)))
   {

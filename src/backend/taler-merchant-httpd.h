@@ -33,6 +33,40 @@
     if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
   } while (0)
 
+/**
+ * Information that defines a merchant "instance". That way, a single
+ * backend can account for several merchants, as used to do in donation
+ * shops
+ */
+struct MerchantInstance {
+
+  /**
+   * File holding the merchant's private key
+   */
+  char *keyfile;
+
+  /**
+   * Wire details for this instance
+   */
+  struct json_t *j_wire;
+  
+  /**
+   * Hash of our wire format details as given in #j_wire.
+   */
+  struct GNUNET_HashCode h_wire;
+
+  /**
+   * Merchant's private key
+   */
+  struct TALER_MerchantPrivateKeyP privkey;
+  
+  /**
+   * Merchant's public key
+   */
+  struct TALER_MerchantPublicKeyP pubkey;
+
+};
+
 
 /**
  * @brief Struct describing an URL and the handler for it.
