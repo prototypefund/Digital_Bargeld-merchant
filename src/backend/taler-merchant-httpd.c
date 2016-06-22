@@ -281,6 +281,15 @@ do_shutdown (void *cls)
     json_decref (j_wire);
     j_wire = NULL;
   }
+  if (NULL != instances)
+  {
+    unsigned int i;
+
+    for (i=0; NULL != instances[i]; i++)
+    {
+      GNUNET_free (instances[i]); 
+    }
+  }
 }
 
 
