@@ -364,58 +364,6 @@ TMH_trigger_daemon ()
 
 
 /**
- * Verify that #j_wire contains a well-formed wire format, and
- * update #h_wire to match it (if successful).
- *
- * @param cfg configuration to use
- * @param allowed which wire format is allowed/expected?
- * @return #GNUNET_OK on success, #GNUNET_SYSERR on error
- */
-static int
-validate_and_hash_wireformat (const struct GNUNET_CONFIGURATION_Handle *cfg,
-                              const char *allowed)
-{
-  struct TALER_WIRE_Plugin *plugin;
-  char *lib_name;
-  int ret;
-
-  (void) GNUNET_asprintf (&lib_name,
-                          "libtaler_plugin_wire_%s",
-                          allowed);
-  plugin = GNUNET_PLUGIN_load (lib_name,
-                               NULL);
-  if (NULL == plugin)
-  {
-    GNUNET_free (lib_name);
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Wire transfer method `%s' not supported\n",
-                allowed);
-    return GNUNET_NO;
-  }
-  plugin->library_name = lib_name;
-  j_wire = plugin->get_wire_details (plugin->cls,
-                                     cfg,
-                                     "merchant-wireformat");
-  if (NULL == j_wire)
-    ret = GNUNET_SYSERR;
-  else
-    ret = plugin->wire_validate (plugin->cls,
-                                 j_wire,
-                                 NULL);
-  GNUNET_PLUGIN_unload (lib_name,
-                        plugin);
-  GNUNET_free (lib_name);
-  if (GNUNET_YES != ret)
-    return GNUNET_SYSERR;
-  if (GNUNET_SYSERR ==
-      TALER_JSON_hash (j_wire,
-                       &h_wire))
-    return GNUNET_SYSERR;
-  return GNUNET_OK;
-}
-
-
-/**
  * Function that queries MHD's select sets and
  * starts the task waiting for them.
  *
@@ -549,11 +497,26 @@ instances_iterator_cb (void *cls,
                                              instance_wiresection); 
   GNUNET_free (instance_wiresection);                                             
 
+  /** template for validating wiredetails **
+  ret = plugin->wire_validate (plugin->cls,
+                               j_wire,
+                               NULL);
+  GNUNET_PLUGIN_unload (lib_name,
+                        plugin);
+  GNUNET_free (lib_name);
+  if (GNUNET_YES != ret)
+    return GNUNET_SYSERR;
+  if (GNUNET_SYSERR ==
+      TALER_JSON_hash (j_wire,
+                       &h_wire))
+    return GNUNET_SYSERR;
+
+  ** end of template for validating wiredetails **/
+
   GNUNET_array_append (instances, iic->current_index, mi);
   /**
    * TODO
-   *
-   * place data in global place
+   * Validate fetched wiredetails
    */
 
 }
@@ -635,7 +598,6 @@ run (void *cls,
 {
   char *wireformat;
   int fh;
-  struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
 
   wireformat = NULL;
   result = GNUNET_SYSERR;
@@ -682,45 +644,6 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-
-  /** per instance **/
-  if (GNUNET_OK !=
-      validate_and_hash_wireformat (config,
-                                    wireformat))
-  {
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-
-  if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_filename (config,
-                                               "merchant",
-                                               "KEYFILE",
-                                               &keyfile))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "merchant",
-                               "KEYFILE");
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-  if (GNUNET_YES != GNUNET_DISK_file_test (keyfile))
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Merchant private key `%s' does not exist yet, creating it!\n",
-                keyfile);
-  if (NULL ==
-      (pk =
-       GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile)))
-  {
-    GNUNET_break (0);
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-  privkey.eddsa_priv = *pk;
-  GNUNET_CRYPTO_eddsa_key_get_public (pk,
-                                      &pubkey.eddsa_pub);
-  GNUNET_free (pk);
-  /** per instance end **/
 
   /** debug per instance iterator start **/
   iterate_instances (config, wireformat);
