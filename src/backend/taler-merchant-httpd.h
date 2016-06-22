@@ -45,6 +45,13 @@ struct IterateInstancesCls {
   const struct GNUNET_CONFIGURATION_Handle *config; 
 
   /**
+   * Current index in the global array of #MerchantInstance
+   * types. Used by the callback in order to properly place
+   * the instance it is parsing
+   */
+  unsigned int current_index;
+
+  /**
    * Flag indicating whether config contains a default instance
    */
   unsigned int default_instance; 

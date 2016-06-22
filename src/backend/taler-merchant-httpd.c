@@ -47,9 +47,10 @@
 #define UNIX_BACKLOG 500
 
 /**
- * Array of all merchants instances known by this backend
+ * NULL-terminated array of all merchants instances known
+ * by this backend
  */
-struct MerchantInstance *instances;
+struct MerchantInstance **instances;
 
 /**
  * Our wire format details in JSON format (with salt).
@@ -539,11 +540,11 @@ instances_iterator_cb (void *cls,
                                              instance_wiresection); 
   GNUNET_free (instance_wiresection);                                             
 
+  GNUNET_array_append (instances, iic->current_index, mi);
   /**
    * TODO
    *
    * place data in global place
-   *
    */
 
 }
@@ -568,6 +569,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
                           "libtaler_plugin_wire_%s",
                           allowed);
   iic = GNUNET_new (struct IterateInstancesCls);
+  iic->current_index = 0;
   iic->config = config;
   iic->default_instance = GNUNET_NO;
   iic->plugin = GNUNET_PLUGIN_load (lib_name,
@@ -601,6 +603,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   GNUNET_PLUGIN_unload (lib_name,
                         iic->plugin);
   GNUNET_free (lib_name);
+  GNUNET_array_append (instances, iic->current_index, NULL);
   GNUNET_free (iic);
   return GNUNET_OK;
 }
