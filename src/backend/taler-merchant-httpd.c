@@ -471,10 +471,10 @@ instances_iterator_cb (void *cls,
   char *substr;
   char *token;
   struct MerchantInstance *mi;
-  struct GNUNET_CONFIGURATION_Handle *config;
+  struct IterateInstancesCls *iic;
   struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
 
-  config = cls;
+  iic = cls;
   substr = strstr (section, "merchant-instance-");
 
   if (NULL == substr)
@@ -496,7 +496,7 @@ instances_iterator_cb (void *cls,
   mi = GNUNET_new (struct MerchantInstance);
 
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_filename (config,
+      GNUNET_CONFIGURATION_get_value_filename (iic->config,
                                                section,
                                                "KEYFILE",
                                                &mi->keyfile))
@@ -526,9 +526,13 @@ instances_iterator_cb (void *cls,
 
   /** To free or not to free **/
   mi->id = token + 1;
+  if (0 == strcmp ("default", mi->id))
+    iic->default_instance = GNUNET_YES;
+    
 
   /**
-   * Fill 'id'
+   * TODO
+   *
    * Fill wirething
    * Check if 'default' given
    */
@@ -571,6 +575,17 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   GNUNET_CONFIGURATION_iterate_sections (config,
                                          &instances_iterator_cb,
                                          (void *) iic);
+
+  if (GNUNET_NO == iic->default_instance)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "No default merchant instance found\n");
+    GNUNET_SCHEDULER_shutdown ();
+    return GNUNET_SYSERR;
+  }
+  else
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Congratulations, you have a default instance\n");
 
   GNUNET_free (lib_name);
   GNUNET_free (iic);

@@ -64,9 +64,11 @@ struct IterateInstancesCls {
 struct MerchantInstance {
 
   /**
-   * Instance's mnemonic identifier
+   * Instance's mnemonic identifier. This value lives as long as
+   * the configuration is kept in memory, as it's as substring of
+   * a section name
    */
-  char *id;
+  const char *id;
 
   /**
    * File holding the merchant's private key
