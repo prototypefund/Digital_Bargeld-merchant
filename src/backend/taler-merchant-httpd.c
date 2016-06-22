@@ -524,9 +524,13 @@ instances_iterator_cb (void *cls,
                                       &mi->pubkey.eddsa_pub);
   GNUNET_free (pk);
 
+  /** To free or not to free **/
+  mi->id = token + 1;
+
   /**
    * Fill 'id'
    * Fill wirething
+   * Check if 'default' given
    */
 
 }
@@ -536,16 +540,41 @@ instances_iterator_cb (void *cls,
  * each instance's own data
  *
  * @param config configuration handle
+ * @param allowed which wire format is allowed/expected?
  * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
  * (for example, if no "defaul" instance is defined)
  */
-static void
-iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config)
+static unsigned int
+iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
+                   const char *allowed)
 {
+  struct IterateInstancesCls *iic;
+  char *lib_name;
+
+  (void) GNUNET_asprintf (&lib_name,
+                          "libtaler_plugin_wire_%s",
+                          allowed);
+  iic = GNUNET_new (struct IterateInstancesCls);
+  iic->config = config;
+  iic->default_instance = GNUNET_NO;
+  iic->plugin = GNUNET_PLUGIN_load (lib_name,
+                                    NULL);
+  iic->plugin->library_name = lib_name;
+  if (NULL == iic->plugin)
+  {
+    GNUNET_free (lib_name);
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Wire transfer method `%s' not supported\n",
+                allowed);
+    return GNUNET_SYSERR;
+  }
   GNUNET_CONFIGURATION_iterate_sections (config,
                                          &instances_iterator_cb,
-                                         (void *) config);
+                                         (void *) iic);
 
+  GNUNET_free (lib_name);
+  GNUNET_free (iic);
+  return GNUNET_OK;
 }
 
 
@@ -622,7 +651,6 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-  GNUNET_free (wireformat);
 
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_filename (config,
@@ -655,11 +683,11 @@ run (void *cls,
   /** per instance end **/
 
   /** debug per instance iterator start **/
-  iterate_instances (config);
+  iterate_instances (config, wireformat);
   GNUNET_SCHEDULER_shutdown ();
   return;
   /** debug per instance iterator end **/
-  
+  GNUNET_free (wireformat);
   if (NULL ==
       (db = TALER_MERCHANTDB_plugin_load (config)))
   {

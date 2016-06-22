@@ -34,11 +34,39 @@
   } while (0)
 
 /**
+ * Used by the iterator of the various merchant's instances given
+ * in configuration
+ */
+struct IterateInstancesCls {
+
+  /**
+   * Handle for the configuration beig parsed
+   */
+  const struct GNUNET_CONFIGURATION_Handle *config; 
+
+  /**
+   * Flag indicating whether config contains a default instance
+   */
+  unsigned int default_instance; 
+
+  /**
+   * Wire plugin
+   */
+  struct TALER_WIRE_Plugin *plugin;
+};
+
+
+/**
  * Information that defines a merchant "instance". That way, a single
  * backend can account for several merchants, as used to do in donation
  * shops
  */
 struct MerchantInstance {
+
+  /**
+   * Instance's mnemonic identifier
+   */
+  char *id;
 
   /**
    * File holding the merchant's private key
