@@ -693,11 +693,8 @@ run (void *cls,
     return;
   }
 
-  /** debug per instance iterator start **/
   iterate_instances (config, wireformat);
-  GNUNET_SCHEDULER_shutdown ();
-  return;
-  /** debug per instance iterator end **/
+
   GNUNET_free (wireformat);
   if (NULL ==
       (db = TALER_MERCHANTDB_plugin_load (config)))
