@@ -38,6 +38,8 @@
  */
 #define PAY_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
+extern struct MerchantInstance **instances;
+
 
 /**
  * Information we keep for an individual call to the /pay handler.
@@ -232,6 +234,11 @@ struct PayContext
    * transaction in our database.
    */
   int transaction_exits;
+  
+  /**
+   * Bank details of the payment's receiver (in JSON format)
+   */
+  struct json_t *receiver_j_wire;
 
 };
 
@@ -642,6 +649,9 @@ process_pay_with_exchange (void *cls,
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Exchange and fee structure OK. Initiating deposit operation for coins\n");
+
+  
+
   /* Initiate /deposit operation for all coins */
   for (i=0;i<pc->coins_cnt;i++)
   {
@@ -649,11 +659,11 @@ process_pay_with_exchange (void *cls,
 
     if (GNUNET_YES == dc->found_in_db)
       continue;
-    GNUNET_assert (NULL != j_wire);
+    GNUNET_assert (NULL != pc->receiver_j_wire);
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
-                                     j_wire,
+                                     pc->receiver_j_wire,
                                      &pc->h_contract,
                                      &dc->coin_pub,
                                      &dc->ub_sig,
@@ -818,6 +828,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct PayContext *pc;
   int res;
   json_t *root;
+  struct json_t *receiver;
+  unsigned int i;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "In handler for /pay.\n");
@@ -1094,6 +1106,17 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
 
   MHD_suspend_connection (connection);
+
+
+  if (NULL == (receiver = json_object_get (root, "receiver")))
+    receiver = json_string ("default");
+
+  for (i=0; NULL != instances[i]; i++)
+  {
+    if (0 == strcmp (json_string_value (receiver), instances[i]->id))
+      pc->receiver_j_wire = instances[i]->j_wire;
+  }
+
   /* Find the responsible exchange, this may take a while... */
   pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,
                                         &process_pay_with_exchange,

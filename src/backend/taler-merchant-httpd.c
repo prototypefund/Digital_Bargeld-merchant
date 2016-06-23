@@ -287,6 +287,7 @@ do_shutdown (void *cls)
 
     for (i=0; NULL != instances[i]; i++)
     {
+      json_decref (instances[i]->j_wire);
       GNUNET_free (instances[i]); 
     }
   }
