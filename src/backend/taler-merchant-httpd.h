@@ -60,6 +60,12 @@ struct IterateInstancesCls {
    * Wire plugin
    */
   struct TALER_WIRE_Plugin *plugin;
+
+  /**
+   * Tells if the parsing encountered any error. We need this
+   * field since the iterator must return void
+   */
+   unsigned int ret;
 };
 
 

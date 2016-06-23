@@ -497,28 +497,31 @@ instances_iterator_cb (void *cls,
                                              instance_wiresection); 
   GNUNET_free (instance_wiresection);                                             
 
-  /** template for validating wiredetails **
-  ret = plugin->wire_validate (plugin->cls,
-                               j_wire,
-                               NULL);
-  GNUNET_PLUGIN_unload (lib_name,
-                        plugin);
-  GNUNET_free (lib_name);
-  if (GNUNET_YES != ret)
-    return GNUNET_SYSERR;
-  if (GNUNET_SYSERR ==
-      TALER_JSON_hash (j_wire,
-                       &h_wire))
-    return GNUNET_SYSERR;
+  if (GNUNET_YES != iic->plugin->wire_validate (iic->plugin->cls,
+                                                mi->j_wire,
+                                                NULL))
+  {
 
-  ** end of template for validating wiredetails **/
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Malformed wireformat\n");
+    iic->ret |= GNUNET_SYSERR;
+  }
+
+  if (GNUNET_YES != TALER_JSON_hash (mi->j_wire,
+                                     &mi->h_wire))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to hash wireformat\n");
+    iic->ret |= GNUNET_SYSERR;
+  }
+  #if EXTRADEBUG
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Found wireformat instance:\n");
+              json_dumpf (mi->j_wire, stdout, 0);
+              printf ("\n");
+  #endif
 
   GNUNET_array_append (instances, iic->current_index, mi);
-  /**
-   * TODO
-   * Validate fetched wiredetails
-   */
-
 }
 
 /**
@@ -563,21 +566,65 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "No default merchant instance found\n");
-    GNUNET_PLUGIN_unload (lib_name,
-                          iic->plugin);
-    GNUNET_SCHEDULER_shutdown ();
-    return GNUNET_SYSERR;
+    goto fail;
   }
   else
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Congratulations, you have a default instance\n");
 
+  if (0 != (GNUNET_SYSERR & iic->ret))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+               "No default merchant instance found\n");
+    goto fail;
+  }
+
   GNUNET_PLUGIN_unload (lib_name,
                         iic->plugin);
   GNUNET_free (lib_name);
   GNUNET_array_append (instances, iic->current_index, NULL);
+  #if EXTRADEBUG
+  unsigned int i;
+  for (i=0; NULL != instances[i]; i++)
+  {
+    char *hash;
+    char *priv;
+    char *pub;
+
+    hash =
+      GNUNET_STRINGS_data_to_string_alloc (&instances[i]->h_wire,
+                                           sizeof (struct GNUNET_HashCode));
+    priv =
+      GNUNET_STRINGS_data_to_string_alloc (&instances[i]->privkey.eddsa_priv,
+                                           sizeof (struct GNUNET_CRYPTO_EddsaPrivateKey));
+    pub =
+      GNUNET_STRINGS_data_to_string_alloc (&instances[i]->pubkey.eddsa_pub,
+                                           sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "instances[%d]: id=%s,\nj_wire=%s,\nj_hash=%s,\npriv=%s,\npub=%s\n",
+                i,
+                instances[i]->id,
+                json_dumps (instances[i]->j_wire, JSON_INDENT (2)),
+                hash,
+                priv,
+                pub);   
+
+    GNUNET_free (hash);
+    GNUNET_free (priv);
+    GNUNET_free (pub);
+  }
+  #endif
   GNUNET_free (iic);
   return GNUNET_OK;
+
+  fail: do {
+    GNUNET_PLUGIN_unload (lib_name,
+                          iic->plugin);
+    GNUNET_free (lib_name);
+    GNUNET_free (iic);
+    GNUNET_SCHEDULER_shutdown ();
+    return GNUNET_SYSERR;  
+  } while (0);
 }
 
 
