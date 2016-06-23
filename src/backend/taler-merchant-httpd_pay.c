@@ -236,9 +236,9 @@ struct PayContext
   int transaction_exits;
   
   /**
-   * Bank details of the payment's receiver (in JSON format)
+   * Instance of the payment's receiver (in JSON format)
    */
-  struct json_t *receiver_j_wire;
+  struct MerchantInstance *mi;
 
 };
 
@@ -659,18 +659,18 @@ process_pay_with_exchange (void *cls,
 
     if (GNUNET_YES == dc->found_in_db)
       continue;
-    GNUNET_assert (NULL != pc->receiver_j_wire);
+    GNUNET_assert (NULL != pc->mi->j_wire);
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
-                                     pc->receiver_j_wire,
+                                     pc->mi->j_wire,
                                      &pc->h_contract,
                                      &dc->coin_pub,
                                      &dc->ub_sig,
                                      &dc->denom,
                                      pc->timestamp,
                                      pc->transaction_id,
-                                     &pubkey,
+                                     &pc->mi->pubkey,
                                      pc->refund_deadline,
                                      &dc->coin_sig,
                                      &deposit_cb,
@@ -789,7 +789,7 @@ check_transaction_exists (void *cls,
                      &pc->h_contract,
                      sizeof (struct GNUNET_HashCode))) &&
        (0 == memcmp (h_xwire,
-                     &h_wire,
+                     &pc->mi->h_wire,
                      sizeof (struct GNUNET_HashCode))) &&
        (timestamp.abs_value_us == pc->timestamp.abs_value_us) &&
        (refund.abs_value_us == pc->refund_deadline.abs_value_us) &&
@@ -805,6 +805,8 @@ check_transaction_exists (void *cls,
   }
 }
 
+extern struct MerchantInstance *
+get_instance (struct json_t *json);
 
 /**
  * Accomplish this payment.
@@ -828,8 +830,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct PayContext *pc;
   int res;
   json_t *root;
-  struct json_t *receiver;
-  unsigned int i;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "In handler for /pay.\n");
@@ -917,6 +917,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       GNUNET_break (0);
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
+    pc->mi = get_instance (root);
     pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Parsed JSON for /pay.\n");
@@ -932,7 +933,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_CONTRACT,
                                     &cp.purpose,
                                     &merchant_sig.eddsa_sig,
-                                    &pubkey.eddsa_pub))
+                                    &pc->mi->pubkey.eddsa_pub))
     {
       GNUNET_break (0);
       GNUNET_JSON_parse_free (spec);
@@ -1066,7 +1067,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     json_decref (root);
     return ret;
   }
-
   /* Check if transaction is already known, if not store it. */
   if (GNUNET_SYSERR ==
       db->find_transaction_by_id (db->cls,
@@ -1093,7 +1093,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                pc->transaction_id,
                                pc->chosen_exchange,
                                &pc->h_contract,
-                               &h_wire,
+                               &pc->mi->h_wire,
                                pc->timestamp,
                                pc->refund_deadline,
                                &pc->amount))
@@ -1106,16 +1106,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
 
   MHD_suspend_connection (connection);
-
-
-  if (NULL == (receiver = json_object_get (root, "receiver")))
-    receiver = json_string ("default");
-
-  for (i=0; NULL != instances[i]; i++)
-  {
-    if (0 == strcmp (json_string_value (receiver), instances[i]->id))
-      pc->receiver_j_wire = instances[i]->j_wire;
-  }
 
   /* Find the responsible exchange, this may take a while... */
   pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,

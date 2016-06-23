@@ -114,6 +114,8 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
   GNUNET_free (jpc);
 }
 
+extern struct MerchantInstance *
+get_instance (struct json_t *json);
 
 /**
  * Manage a contract request. In practical terms, it adds the fields
@@ -142,6 +144,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   json_t *root;
   json_t *jcontract;
   int res;
+  struct MerchantInstance *mi;
   struct TMH_JsonParseContext *ctx;
   struct TALER_ContractPS contract;
   struct GNUNET_CRYPTO_EddsaSignature contract_sig;
@@ -219,7 +222,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                                               "products in contract request malformed");
   }
 
-
+  mi = get_instance (root);
   /* add fields to the contract that the backend should provide */
   json_object_set (jcontract,
                    "exchanges",
@@ -229,10 +232,10 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                    j_auditors);
   json_object_set_new (jcontract,
                        "H_wire",
-		       GNUNET_JSON_from_data_auto (&h_wire));
+		       GNUNET_JSON_from_data_auto (&mi->h_wire));
   json_object_set_new (jcontract,
                        "merchant_pub",
-		       GNUNET_JSON_from_data_auto (&pubkey));
+		       GNUNET_JSON_from_data_auto (&mi->pubkey));
 
   /* create contract signature */
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
@@ -245,7 +248,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   GNUNET_assert (GNUNET_OK ==
                  TALER_JSON_hash (jcontract,
                                   &contract.h_contract));
-  GNUNET_CRYPTO_eddsa_sign (&privkey.eddsa_priv,
+  GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                             &contract.purpose,
                             &contract_sig);
 

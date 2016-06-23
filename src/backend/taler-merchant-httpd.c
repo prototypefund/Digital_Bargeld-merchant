@@ -53,34 +53,9 @@
 struct MerchantInstance **instances;
 
 /**
- * Our wire format details in JSON format (with salt).
- */
-struct json_t *j_wire;
-
-/**
- * Hash of our wire format details as given in #j_wire.
- */
-struct GNUNET_HashCode h_wire;
-
-/**
- * Merchant's private key
- */
-struct TALER_MerchantPrivateKeyP privkey;
-
-/**
- * Merchant's public key
- */
-struct TALER_MerchantPublicKeyP pubkey;
-
-/**
  * The port we are running on
  */
 static long long unsigned port;
-
-/**
- * File holding the merchant's private key
- */
-static char *keyfile;
 
 /**
  * This value tells the exchange by which date this merchant would like
@@ -276,11 +251,6 @@ do_shutdown (void *cls)
   }
   TMH_EXCHANGES_done ();
   TMH_AUDITORS_done ();
-  if (NULL != j_wire)
-  {
-    json_decref (j_wire);
-    j_wire = NULL;
-  }
   if (NULL != instances)
   {
     unsigned int i;
@@ -471,7 +441,7 @@ instances_iterator_cb (void *cls,
   if (GNUNET_YES != GNUNET_DISK_file_test (mi->keyfile))
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Merchant private key `%s' does not exist yet, creating it!\n",
-                keyfile);
+                mi->keyfile);
   if (NULL ==
        (pk = GNUNET_CRYPTO_eddsa_key_create_from_file (mi->keyfile)))
   {
@@ -523,6 +493,34 @@ instances_iterator_cb (void *cls,
   #endif
 
   GNUNET_array_append (instances, iic->current_index, mi);
+}
+
+/**
+ * Extract merchant instance from the given JSON
+ *
+ * @param json the JSON to inspect; it is not required to
+ * comply with any particular format. It will only be checked
+ * if the field "receiver" is there.
+ * @return a pointer to a #struct MerchantInstance. This will be
+ * the 'default' merchant if the frontend did not specif any
+ * "receiver" field. The user should not care to free the returned
+ * value, as it is taken from a global array that will be freed
+ * by the general shutdown routine. NULL if the frontend specified
+ * a wrong instance
+ */
+struct MerchantInstance *
+get_instance (struct json_t *json)
+{
+  unsigned int i;
+  struct json_t *receiver;
+  /*FIXME who decrefs receiver?*/
+  if (NULL == (receiver = json_object_get (json, "receiver")))
+    receiver = json_string ("default");
+
+  for (i=0; NULL != instances[i]; i++)
+    if (0 == strcmp (json_string_value (receiver), instances[i]->id))
+      return instances[i];
+  return NULL;
 }
 
 /**
