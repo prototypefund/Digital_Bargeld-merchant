@@ -840,12 +840,13 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                           MHD_GET_ARGUMENT_KIND,
                                           "receiver");
   if (NULL == receiver)
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           "receiver argument missing");
+    receiver = "default";
+
   tctx->mi = NULL;
   for (i=0; NULL != instances[i]; i++)
     if (0 == strcmp (receiver, instances[i]->id))
       tctx->mi = instances[i];
+
   if (NULL == tctx->mi)
     return TMH_RESPONSE_reply_bad_request (connection,
                                            "unknown receiver");
