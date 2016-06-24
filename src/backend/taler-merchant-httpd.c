@@ -258,6 +258,7 @@ do_shutdown (void *cls)
     for (i=0; NULL != instances[i]; i++)
     {
       json_decref (instances[i]->j_wire);
+      GNUNET_free (instances[i]->id);
       GNUNET_free (instances[i]); 
     }
   }
@@ -455,7 +456,7 @@ instances_iterator_cb (void *cls,
   GNUNET_free (pk);
 
   /** To free or not to free **/
-  mi->id = token + 1;
+  mi->id = GNUNET_strdup (token + 1);
   if (0 == strcmp ("default", mi->id))
     iic->default_instance = GNUNET_YES;
 

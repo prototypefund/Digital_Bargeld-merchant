@@ -773,6 +773,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   struct TrackTransactionContext *tctx;
   unsigned long long transaction_id;
   const char *str;
+  const char *receiver;
   int ret;
 
   if (NULL == *connection_cls)
@@ -824,6 +825,12 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   if (NULL == str)
     return TMH_RESPONSE_reply_bad_request (connection,
                                            "id argument missing");
+  receiver = MHD_lookup_connection_value (connection,
+                                          MHD_GET_ARGUMENT_KIND,
+                                          "receiver");
+  if (NULL == receiver)
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           "receiver argument missing");
   if (1 !=
       sscanf (str,
               "%llu",
