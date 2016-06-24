@@ -251,6 +251,7 @@ handle_pay_finished (void *cls,
  *
  * @param ctx the execution loop context
  * @param merchant_uri base URI of the merchant's backend
+ * @param receiver which merchant instance will receive this payment
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param transaction_id transaction id for the transaction between merchant and customer
@@ -275,6 +276,7 @@ handle_pay_finished (void *cls,
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 			   const char *merchant_uri,
+			   const char *receiver,
                            const struct GNUNET_HashCode *h_contract,
                            uint64_t transaction_id,
 			   const struct TALER_Amount *amount,
@@ -337,6 +339,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
   }
   return TALER_MERCHANT_pay_frontend (ctx,
 				      merchant_uri,
+                                      receiver,
 				      h_contract,
                                       amount,
 				      max_fee,
@@ -361,6 +364,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  *
  * @param ctx the execution loop context
  * @param merchant_uri base URI of the merchant's backend
+ * @param receiver which merchant instance will receive this payment
  * @param h_contract hash of the contact of the merchant with the customer
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param transaction_id transaction id for the transaction between merchant and customer
@@ -379,6 +383,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const char *merchant_uri,
+			     const char *receiver,
                              const struct GNUNET_HashCode *h_contract,
 			     const struct TALER_Amount *amount,
 			     const struct TALER_Amount *max_fee,
@@ -557,6 +562,10 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
                        "max_fee", TALER_JSON_from_amount (max_fee),
                        "amount", TALER_JSON_from_amount (amount),
                        "merchant_sig", GNUNET_JSON_from_data_auto (merchant_sig));
+  if (NULL != receiver)
+    json_object_set_new (pay_obj,
+                         "receiver",
+                         json_string (receiver));
 
   if (0 != wire_transfer_deadline.abs_value_us)
   {

@@ -61,6 +61,12 @@ static struct TALER_EXCHANGE_Handle *exchange;
 static struct GNUNET_CURL_Context *ctx;
 
 /**
+ * Which merchant instance we will run the testcase for
+ */
+static char *instance;
+
+
+/**
  * Public key of the merchant, matches the private
  * key from "test_merchant.priv".
  */
@@ -1562,6 +1568,7 @@ interpreter_run (void *cls)
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI,
+                                     NULL,
 				     &h_contract,
 				     transaction_id,
 				     &total_amount,
@@ -1838,6 +1845,7 @@ do_shutdown (void *cls)
     is->task = NULL;
   }
   GNUNET_free (is);
+  GNUNET_free_non_null (instance);
   if (NULL != exchange)
   {
     TALER_EXCHANGE_disconnect (exchange);
@@ -2150,6 +2158,14 @@ main (int argc,
   GNUNET_assert (GNUNET_OK ==
                  GNUNET_CONFIGURATION_load (cfg,
                                             "test_merchant_api.conf"));
+  if (GNUNET_OK == GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                          "merchant",
+                                                          "INSTANCE",
+                                                          &instance)) 
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Using non default instance '%s'\n",
+                instance);                                                          
+
   db = TALER_MERCHANTDB_plugin_load (cfg);
   if (NULL == db)
   {

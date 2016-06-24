@@ -161,6 +161,7 @@ struct TALER_MERCHANT_PayCoin
  *
  * @param ctx execution context
  * @param merchant_uri base URI of the merchant
+ * @param receiver which merchant instance will receive this payment
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param transaction_id transaction id for the transaction between merchant and customer
@@ -181,6 +182,7 @@ struct TALER_MERCHANT_PayCoin
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 			   const char *merchant_uri,
+			   const char *receiver,
                            const struct GNUNET_HashCode *h_contract,
                            uint64_t transaction_id,
                            const struct TALER_Amount *amount,
@@ -249,6 +251,7 @@ struct TALER_MERCHANT_PaidCoin
  *
  * @param ctx execution context
  * @param merchant_uri base URI of the merchant
+ * @param receiver which merchant instance will receive this payment
  * @param h_contract hash of the contact of the merchant with the customer
  * @param amount total value of the contract to be paid to the merchant
  * @param max_fee maximum fee covered by the merchant (according to the contract)
@@ -268,6 +271,7 @@ struct TALER_MERCHANT_PaidCoin
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const char *merchant_uri,
+			     const char *receiver,
                              const struct GNUNET_HashCode *h_contract,
 			     const struct TALER_Amount *amount,
 			     const struct TALER_Amount *max_fee,
