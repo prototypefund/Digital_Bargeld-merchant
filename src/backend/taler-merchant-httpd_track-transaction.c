@@ -43,6 +43,10 @@
  */
 struct TrackTransactionContext;
 
+/**
+ * Merchant instance being tracked
+ */
+struct MerchantInstance;
 
 /**
  * Information we keep for each coin in a /track/transaction operation.
@@ -204,6 +208,11 @@ struct TrackTransactionContext
    * Response code to return upon resume.
    */
   unsigned int response_code;
+
+  /**
+   * Which merchant instance is being tracked
+   */
+  struct MerchantInstance *mi;
 
 };
 
@@ -591,7 +600,7 @@ trace_coins (struct TrackTransactionContext *tctx)
     return;
   }
   tcc->dwh = TALER_EXCHANGE_track_transaction (tctx->eh,
-                                               &privkey,
+                                               &tctx->mi->privkey,
                                                &tctx->h_wire,
                                                &tctx->h_contract,
                                                &tcc->coin_pub,
@@ -752,6 +761,7 @@ coin_cb (void *cls,
                                           tcc));
 }
 
+extern struct MerchantInstance **instances;
 
 /**
  * Handle a "/track/transaction" request.
@@ -774,6 +784,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   unsigned long long transaction_id;
   const char *str;
   const char *receiver;
+  unsigned int i;
   int ret;
 
   if (NULL == *connection_cls)
@@ -831,6 +842,13 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   if (NULL == receiver)
     return TMH_RESPONSE_reply_bad_request (connection,
                                            "receiver argument missing");
+  tctx->mi = NULL;
+  for (i=0; NULL != instances[i]; i++)
+    if (0 == strcmp (receiver, instances[i]->id))
+      tctx->mi = instances[i];
+  if (NULL == tctx->mi)
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           "unknown receiver");
   if (1 !=
       sscanf (str,
               "%llu",
