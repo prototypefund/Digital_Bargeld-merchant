@@ -61,6 +61,12 @@ static struct TALER_EXCHANGE_Handle *exchange;
 static struct GNUNET_CURL_Context *ctx;
 
 /**
+ * Which merchant instance we will run the testcase for
+ */
+static char *receiver = NULL;
+
+
+/**
  * Public key of the merchant, matches the private
  * key from "test_merchant.priv".
  */
@@ -1436,6 +1442,10 @@ interpreter_run (void *cls)
       proposal = json_loads (cmd->details.contract.proposal,
                              JSON_REJECT_DUPLICATES,
                              &error);
+      if (NULL != receiver)
+        json_object_set_new (proposal,
+                             "receiver",
+                             json_string (receiver));
       if (NULL == proposal)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1558,10 +1568,13 @@ interpreter_run (void *cls)
 	  return;
 	}
       }
-
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Using receiver '%s'\n",
+                  receiver);
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI,
+                                     receiver,
 				     &h_contract,
 				     transaction_id,
 				     &total_amount,
@@ -1656,6 +1669,7 @@ interpreter_run (void *cls)
     cmd->details.track_transfer.tdo =
       TALER_MERCHANT_track_transfer (ctx,
                                     MERCHANT_URI,
+                                    receiver,
                                     &ref->details.check_bank_transfer.wtid,
                                     EXCHANGE_URI,
                                     &track_transfer_cb,
@@ -1668,6 +1682,7 @@ interpreter_run (void *cls)
     cmd->details.track_transaction.tth =
       TALER_MERCHANT_track_transaction (ctx,
                                         MERCHANT_URI,
+                                        receiver,
                                         ref->details.pay.transaction_id,
                                         &track_transaction_cb,
                                         is);
@@ -1838,6 +1853,7 @@ do_shutdown (void *cls)
     is->task = NULL;
   }
   GNUNET_free (is);
+  GNUNET_free_non_null (receiver);
   if (NULL != exchange)
   {
     TALER_EXCHANGE_disconnect (exchange);
@@ -2150,6 +2166,14 @@ main (int argc,
   GNUNET_assert (GNUNET_OK ==
                  GNUNET_CONFIGURATION_load (cfg,
                                             "test_merchant_api.conf"));
+  if (GNUNET_OK == GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                          "merchant",
+                                                          "INSTANCE",
+                                                          &receiver)) 
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Using non default receiver '%s'\n",
+                receiver);                                                          
+
   db = TALER_MERCHANTDB_plugin_load (cfg);
   if (NULL == db)
   {

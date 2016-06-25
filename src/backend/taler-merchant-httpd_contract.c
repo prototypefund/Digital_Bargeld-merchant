@@ -223,6 +223,15 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   }
 
   mi = get_instance (root);
+  if (NULL == mi)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Not able to find the specified receiver\n"); 
+    json_decref (root);
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              "Unknown receiver given");
+  }
+
   /* add fields to the contract that the backend should provide */
   json_object_set (jcontract,
                    "exchanges",

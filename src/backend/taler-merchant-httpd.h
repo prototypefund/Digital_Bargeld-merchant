@@ -81,7 +81,7 @@ struct MerchantInstance {
    * the configuration is kept in memory, as it's as substring of
    * a section name
    */
-  const char *id;
+  char *id;
 
   /**
    * File holding the merchant's private key
