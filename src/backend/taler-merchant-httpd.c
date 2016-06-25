@@ -574,7 +574,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   if (0 != (GNUNET_SYSERR & iic->ret))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-               "No default merchant instance found\n");
+               "At least one instance has not been successfully parsed\n");
     goto fail;
   }
 

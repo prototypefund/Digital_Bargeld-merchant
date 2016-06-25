@@ -918,6 +918,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
     pc->mi = get_instance (root);
+    GNUNET_assert (NULL !=
+                    (pc->mi = get_instance (root)));
     pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Parsed JSON for /pay.\n");
