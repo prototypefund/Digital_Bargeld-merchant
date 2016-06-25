@@ -231,7 +231,9 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_external_error (connection,
                                               "Unknown receiver given");
   }
-
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Signing contract on behalf of receiver '%s'\n",
+              mi->id);
   /* add fields to the contract that the backend should provide */
   json_object_set (jcontract,
                    "exchanges",
