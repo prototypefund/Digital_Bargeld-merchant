@@ -928,8 +928,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                               "Unknown receiver given");
     }
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "The receiver for this deposit is '%s'\n",
-                pc->mi->id);
+                "The receiver for this deposit is '%s', whose bank details are '%s'\n",
+                pc->mi->id,
+                json_dumps (pc->mi->j_wire, JSON_COMPACT));
     pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Parsed JSON for /pay.\n");
