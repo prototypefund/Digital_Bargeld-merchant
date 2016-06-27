@@ -223,7 +223,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   }
 
   json_dumps (root, stdout, 0);
-  mi = get_instance (root);
+  mi = get_instance (jcontract);
   if (NULL == mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
