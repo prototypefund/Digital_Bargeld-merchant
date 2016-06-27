@@ -222,7 +222,6 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
                                               "products in contract request malformed");
   }
 
-  json_dumps (root, stdout, 0);
   mi = get_instance (jcontract);
   if (NULL == mi)
   {
