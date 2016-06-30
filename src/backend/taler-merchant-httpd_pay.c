@@ -660,6 +660,10 @@ process_pay_with_exchange (void *cls,
     if (GNUNET_YES == dc->found_in_db)
       continue;
     GNUNET_assert (NULL != pc->mi->j_wire);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Timing for this payment, wire_deadline: %llu, refund_deadline: %llu",
+                pc->wire_transfer_deadline,
+                pc->refund_deadline);
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
