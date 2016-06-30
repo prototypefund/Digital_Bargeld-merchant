@@ -661,7 +661,7 @@ process_pay_with_exchange (void *cls,
       continue;
     GNUNET_assert (NULL != pc->mi->j_wire);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Timing for this payment, wire_deadline: %llu, refund_deadline: %llu",
+                "Timing for this payment, wire_deadline: %lu, refund_deadline: %lu",
                 pc->wire_transfer_deadline.abs_value_us,
                 pc->refund_deadline.abs_value_us);
     dc->dh = TALER_EXCHANGE_deposit (mh,
