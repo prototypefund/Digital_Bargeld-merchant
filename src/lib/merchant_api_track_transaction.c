@@ -11,7 +11,7 @@
   A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
 
   You should have received a copy of the GNU Lesser General Public License along with
-  TALER; see the file COPYING.LGPL.  If not, If not, see
+  TALER; see the file COPYING.LGPL.  If not, see
   <http://www.gnu.org/licenses/>
 */
 /**
