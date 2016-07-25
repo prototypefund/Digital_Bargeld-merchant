@@ -3,8 +3,9 @@
    * Parse $html_filename and add an entry of the type
    * "$html_filename" => ("img1.png", "img2.png") for each
    * encountered 'img' tag having the 'src' attribute formatted
-   * as "/essay/<article_slug>/data/img1.png", to the JSON which
-   * associates any article with its images
+   * as "/essay/<article_filename>/data/img1.png", to the JSON which
+   * associates any article with its images.
+   * Note that <article_filename> has the final '.html' removed
    */
   function add_article($html_filename){
     $doc = new DOMDocument(); 
@@ -12,7 +13,7 @@
     $xpath = new DOMXPath($doc);
     $xpath->registerNamespace('php', 'http://php.net/xpath');
     $xpath->registerPhpFunctions('preg_match');
-    $elements = $xpath->query('//img[php:functionString("preg_match", "@^/essay/[^/]+/data/[^/]+@", @src) > 0]');
+    $elements = $xpath->query('//img[php:functionString("preg_match", "@^/data/[^/]+/[^/]+@", @src) > 0]');
     $db_filename = "articles_images.json";
     $json_str;
     if (file_exists($db_filename))

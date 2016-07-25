@@ -19,7 +19,8 @@
   include("../../copylib/util.php");
   include("./blog_lib.php");
   
-  syslog($LOG_INFO, "paying");
+  /*FIXME: the following log gets annoyingly sent to _any_ open terminal */
+  /*syslog($LOG_INFO, "paying");*/
 
   $article = get($_GET["article"]);
   if (empty($article)){
