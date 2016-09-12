@@ -359,7 +359,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 /**
  * Pay a merchant.  API for frontends talking to backends. Here,
  * the frontend does not have the coin's private keys, but just
- * the public keys and signatures.  Note the sublte difference
+ * the public keys and signatures.  Note the subtle difference
  * in the type of @a coins compared to #TALER_MERCHANT_pay().
  *
  * @param ctx the execution loop context
