@@ -719,19 +719,9 @@ transfer_cb (void *cls,
 {
   struct TrackCoinContext *tcc = cls;
 
-  /* FIXME 2: the GNUNET_break statement below should (?) abort/return.
-     (According to gnunet_common.h, it just prints an ERROR-level message.)
-     Otherwise, consider the following scenario: let
-     tcc=coin1,
-     transaction_id=x,
-     transaction x be such that it is paid by coin1 and coin2 but
-     coin1 has been paid back by wtid=1 and coin2 by wtid=2.
-     Since transfer_cb gets called *for each* coin involved in transaction x
-     and tcc remains the same, tcc will get wtid=2, if coin2 is the last in
-     the iteration. */
-  GNUNET_break (0 == memcmp (coin_pub,
-                             &tcc->coin_pub,
-                             sizeof (struct TALER_CoinSpendPublicKeyP)));
+  GNUNET_assert (0 == memcmp (coin_pub,
+                              &tcc->coin_pub,
+                              sizeof (struct TALER_CoinSpendPublicKeyP)));
   tcc->wtid = *wtid;
   tcc->execution_time = execution_time;
   tcc->have_wtid = GNUNET_YES;
