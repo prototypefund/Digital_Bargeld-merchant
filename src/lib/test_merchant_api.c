@@ -2042,10 +2042,22 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-499c",
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
+    { .oc = OC_TRACK_TRANSFER,
+      .label = "track-transfer-1-again",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c",
+      .details.track_transfer.expected_pay_ref = "deposit-simple"
+    },
 
     /* Trace transaction to WTID */
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transaction.pay_ref = "deposit-simple",
+      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c"
+    },
+    { .oc = OC_TRACK_TRANSACTION,
+      .label = "track-transaction-1-again",
       .expected_response_code = MHD_HTTP_OK,
       .details.track_transaction.pay_ref = "deposit-simple",
       .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c"
@@ -2063,6 +2075,11 @@ run (void *cls)
     /* Check "failure" to trace transaction to WTID before aggregator */
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-2-found",
+      .expected_response_code = MHD_HTTP_ACCEPTED,
+      .details.track_transaction.pay_ref = "deposit-simple-2"
+    },
+    { .oc = OC_TRACK_TRANSACTION,
+      .label = "track-transaction-2-found-again",
       .expected_response_code = MHD_HTTP_ACCEPTED,
       .details.track_transaction.pay_ref = "deposit-simple-2"
     },
@@ -2091,10 +2108,22 @@ run (void *cls)
       .details.track_transaction.pay_ref = "deposit-simple-2",
       .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2"
     },
+    { .oc = OC_TRACK_TRANSACTION,
+      .label = "track-transaction-2-again",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transaction.pay_ref = "deposit-simple-2",
+      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2"
+    },
 
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
+      .details.track_transfer.expected_pay_ref = "deposit-simple-2"
+    },
+    { .oc = OC_TRACK_TRANSFER,
+      .label = "track-transfer-2-again",
       .expected_response_code = MHD_HTTP_OK,
       .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
@@ -2169,10 +2198,10 @@ main (int argc,
   if (GNUNET_OK == GNUNET_CONFIGURATION_get_value_string (cfg,
                                                           "merchant",
                                                           "INSTANCE",
-                                                          &receiver)) 
+                                                          &receiver))
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Using non default receiver '%s'\n",
-                receiver);                                                          
+                receiver);
 
   db = TALER_MERCHANTDB_plugin_load (cfg);
   if (NULL == db)
