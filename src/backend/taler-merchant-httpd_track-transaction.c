@@ -719,9 +719,10 @@ transfer_cb (void *cls,
 {
   struct TrackCoinContext *tcc = cls;
 
-  GNUNET_assert (0 == memcmp (coin_pub,
-                              &tcc->coin_pub,
-                              sizeof (struct TALER_CoinSpendPublicKeyP)));
+  if (0 != memcmp (coin_pub,
+                   &tcc->coin_pub,
+                   sizeof (struct TALER_CoinSpendPublicKeyP)))
+    return;
   tcc->wtid = *wtid;
   tcc->execution_time = execution_time;
   tcc->have_wtid = GNUNET_YES;
