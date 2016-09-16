@@ -497,26 +497,62 @@ static void
 trace_coins (struct TrackTransactionContext *tctx)
 {
   struct TrackCoinContext *tcc;
+  unsigned int num_wtid;
 
   GNUNET_assert (NULL != tctx->eh);
   for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
     if (GNUNET_YES != tcc->have_wtid)
       break;
-  if (NULL == tcc)
+  if (NULL != tcc)
   {
-    unsigned int num_wtid = 0;
+    /* we are not done requesting WTIDs, do the next one */
+    tcc->dwh = TALER_EXCHANGE_track_transaction (tctx->eh,
+                                                 &tctx->mi->privkey,
+                                                 &tctx->h_wire,
+                                                 &tctx->h_contract,
+                                                 &tcc->coin_pub,
+                                                 tctx->transaction_id,
+                                                 &wtid_cb,
+                                                 tcc);
+    return;
+  }
+  /* We have obtained all WTIDs, now prepare the response */
+  num_wtid = 0;
+  /* count how many disjoint wire transfer identifiers there are;
+     note that there should only usually be one, so while this
+     is worst-case O(n^2), in pracitce this is O(n) */
+  for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
+  {
+    struct TrackCoinContext *tcc2;
+    int found = GNUNET_NO;
 
-    /* count how many disjoint wire transfer identifiers there are;
-       note that there should only usually be one, so while this
-       is worst-case O(n^2), in pracitce this is O(n) */
+    for (tcc2 = tctx->tcc_head; tcc2 != tcc; tcc2 = tcc2->next)
+    {
+      if (0 == memcmp (&tcc->wtid,
+                       &tcc2->wtid,
+                       sizeof (struct TALER_WireTransferIdentifierRawP)))
+      {
+        found = GNUNET_YES;
+        break;
+      }
+    }
+    if (GNUNET_NO == found)
+      num_wtid++;
+  }
+
+  {
+    /* on-stack allocation is fine, as the number of coins and the
+       number of wire-transfers per-transaction is expected to be tiny. */
+    struct MHD_Response *resp;
+    struct TALER_MERCHANT_TransactionWireTransfer wts[num_wtid];
+    unsigned int wtid_off;
+
+    wtid_off = 0;
     for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
     {
       struct TrackCoinContext *tcc2;
       int found = GNUNET_NO;
 
-      /* FIXME 1: How can a tcc without wtid (the 'for' loop above
-         looks exactly for wtid-less entries) have the same wtid of
-         another tcc2 ?*/
       for (tcc2 = tctx->tcc_head; tcc2 != tcc; tcc2 = tcc2->next)
       {
         if (0 == memcmp (&tcc->wtid,
@@ -528,88 +564,52 @@ trace_coins (struct TrackTransactionContext *tctx)
         }
       }
       if (GNUNET_NO == found)
-        num_wtid++;
-    }
-    {
-      /* on-stack allocation is fine, as the number of coins and the
-         number of wire-transfers per-transaction is expected to be tiny. */
-      struct MHD_Response *resp;
-      struct TALER_MERCHANT_TransactionWireTransfer wts[num_wtid];
-      unsigned int wtid_off;
-
-      wtid_off = 0;
-      for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
       {
-        struct TrackCoinContext *tcc2;
-        int found = GNUNET_NO;
+        unsigned int num_coins;
+        struct TALER_MERCHANT_TransactionWireTransfer *wt;
 
-        for (tcc2 = tctx->tcc_head; tcc2 != tcc; tcc2 = tcc2->next)
+        wt = &wts[wtid_off++];
+        wt->wtid = tcc->wtid;
+        wt->execution_time = tcc->execution_time;
+        /* count number of coins with this wtid */
+        num_coins = 0;
+        for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
         {
-          if (0 == memcmp (&tcc->wtid,
+          if (0 == memcmp (&wt->wtid,
+                           &tcc2->wtid,
+                           sizeof (struct TALER_WireTransferIdentifierRawP)))
+            num_coins++;
+        }
+        /* initialize coins array */
+        wt->num_coins = num_coins;
+        wt->coins = GNUNET_new_array (num_coins,
+                                      struct TALER_MERCHANT_CoinWireTransfer);
+        num_coins = 0;
+        for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
+        {
+          if (0 == memcmp (&wt->wtid,
                            &tcc2->wtid,
                            sizeof (struct TALER_WireTransferIdentifierRawP)))
           {
-            found = GNUNET_YES;
-            break;
+            struct TALER_MERCHANT_CoinWireTransfer *coin = &wt->coins[num_coins++];
+
+            coin->coin_pub = tcc2->coin_pub;
+            coin->amount_with_fee = tcc2->amount_with_fee;
+            coin->deposit_fee = tcc2->deposit_fee;
           }
         }
-        if (GNUNET_NO == found)
-        {
-          unsigned int num_coins;
-          struct TALER_MERCHANT_TransactionWireTransfer *wt;
+      } /* GNUNET_NO == found */
+    } /* for all tcc */
+    GNUNET_assert (wtid_off == num_wtid);
 
-          wt = &wts[wtid_off++];
-          wt->wtid = tcc->wtid;
-          wt->execution_time = tcc->execution_time;
-          /* count number of coins with this wtid */
-          num_coins = 0;
-          for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
-          {
-            if (0 == memcmp (&wt->wtid,
-                             &tcc2->wtid,
-                             sizeof (struct TALER_WireTransferIdentifierRawP)))
-              num_coins++;
-          }
-          /* initialize coins array */
-          wt->num_coins = num_coins;
-          wt->coins = GNUNET_new_array (num_coins,
-                                        struct TALER_MERCHANT_CoinWireTransfer);
-          num_coins = 0;
-          for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
-          {
-            if (0 == memcmp (&wt->wtid,
-                             &tcc2->wtid,
-                             sizeof (struct TALER_WireTransferIdentifierRawP)))
-            {
-              struct TALER_MERCHANT_CoinWireTransfer *coin = &wt->coins[num_coins++];
-
-              coin->coin_pub = tcc2->coin_pub;
-              coin->amount_with_fee = tcc2->amount_with_fee;
-              coin->deposit_fee = tcc2->deposit_fee;
-            }
-          }
-        } /* GNUNET_NO == found */
-      } /* for all tcc */
-      GNUNET_assert (wtid_off == num_wtid);
-
-      resp = TMH_RESPONSE_make_track_transaction_ok (num_wtid,
-                                                     wts);
-      for (wtid_off=0;wtid_off < num_wtid; wtid_off++)
-        GNUNET_free (wts[wtid_off].coins);
-      resume_track_transaction_with_response (tctx,
-                                              MHD_HTTP_OK,
-                                              resp);
-    } /* end of scope for 'wts' and 'resp' */
-    return;
-  }
-  tcc->dwh = TALER_EXCHANGE_track_transaction (tctx->eh,
-                                               &tctx->mi->privkey,
-                                               &tctx->h_wire,
-                                               &tctx->h_contract,
-                                               &tcc->coin_pub,
-                                               tctx->transaction_id,
-                                               &wtid_cb,
-                                               tcc);
+    resp = TMH_RESPONSE_make_track_transaction_ok (num_wtid,
+                                                   wts);
+    for (wtid_off=0;wtid_off < num_wtid; wtid_off++)
+      GNUNET_free (wts[wtid_off].coins);
+    resume_track_transaction_with_response (tctx,
+                                            MHD_HTTP_OK,
+                                            resp);
+  } /* end of scope for 'wts' and 'resp' */
 }
 
 
