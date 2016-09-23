@@ -512,7 +512,8 @@ instances_iterator_cb (void *cls,
                 "Failed to hash wireformat\n");
     iic->ret |= GNUNET_SYSERR;
   }
-  #if EXTRADEBUG
+  #define EXTRADEBUGG
+  #ifdef EXTRADEBUG
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Found wireformat instance:\n");
               json_dumpf (mi->j_wire, stdout, 0);
@@ -534,7 +535,7 @@ instances_iterator_cb (void *cls,
                                          GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to put an entry into the 'by_id' hashmap");
+                "Failed to put an entry into the 'by_id' hashmap\n");
     iic->ret |= GNUNET_SYSERR;
   }
 
@@ -545,7 +546,7 @@ instances_iterator_cb (void *cls,
                                          GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to put an entry into the 'by_kpub_map' hashmap");
+                "Failed to put an entry into the 'by_kpub_map' hashmap\n");
     iic->ret |= GNUNET_SYSERR;
   }
 }
@@ -645,7 +646,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   GNUNET_free (lib_name);
 
   GNUNET_array_append (instances, iic->current_index, NULL);
-  #if EXTRADEBUG
+  #ifdef EXTRADEBUG
   unsigned int i;
   for (i=0; NULL != instances[i]; i++)
   {
@@ -662,7 +663,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
     pub =
       GNUNET_STRINGS_data_to_string_alloc (&instances[i]->pubkey.eddsa_pub,
                                            sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "instances[%d]: id=%s,\nj_wire=%s,\nj_hash=%s,\npriv=%s,\npub=%s\n",
                 i,
                 instances[i]->id,

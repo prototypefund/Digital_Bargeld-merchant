@@ -922,6 +922,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
     pc->mi = get_instance (root);
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "/pay: picked instance %s\n",
+                pc->mi->id);
 
     if (NULL == pc->mi)
     {
