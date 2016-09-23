@@ -264,6 +264,12 @@ do_shutdown (void *cls)
   }
   TMH_EXCHANGES_done ();
   TMH_AUDITORS_done ();
+
+  if (NULL != by_id_map)
+    GNUNET_CONTAINER_multihashmap_destroy (by_id_map);
+  if (NULL != by_kpub_map)
+    GNUNET_CONTAINER_multihashmap_destroy (by_kpub_map);
+
   if (NULL != instances)
   {
     unsigned int i;
@@ -560,16 +566,23 @@ instances_iterator_cb (void *cls,
 struct MerchantInstance *
 get_instance (struct json_t *json)
 {
-  unsigned int i;
   struct json_t *receiver;
+  struct GNUNET_HashCode h_receiver;
+
+
   /*FIXME who decrefs receiver?*/
   if (NULL == (receiver = json_object_get (json, "receiver")))
     receiver = json_string ("default");
 
-  for (i=0; NULL != instances[i]; i++)
-    if (0 == strcmp (json_string_value (receiver), instances[i]->id))
-      return instances[i];
-  return NULL;
+  // hash it
+  GNUNET_CRYPTO_hash (json_string_value (receiver),
+                      strlen (json_string_value (receiver)),
+                      &h_receiver);
+
+  /* We're fine if that returns NULL, the calling routine knows how
+     to handle that */
+  return GNUNET_CONTAINER_multihashmap_get (by_id_map,
+                                            &h_receiver);
 }
 
 /**
@@ -717,14 +730,14 @@ run (void *cls,
   }
 
   if (NULL ==
-     (by_id_map = GNUNET_CONTAINER_multihashmap_create(0, GNUNET_NO)))
+     (by_id_map = GNUNET_CONTAINER_multihashmap_create(1, GNUNET_NO)))
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
 
   if (NULL ==
-     (by_kpub_map = GNUNET_CONTAINER_multihashmap_create(0, GNUNET_NO)))
+     (by_kpub_map = GNUNET_CONTAINER_multihashmap_create(1, GNUNET_NO)))
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
