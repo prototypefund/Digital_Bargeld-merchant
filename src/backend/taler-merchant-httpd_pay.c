@@ -234,7 +234,7 @@ struct PayContext
    * transaction in our database.
    */
   int transaction_exits;
-  
+
   /**
    * Instance of the payment's receiver (in JSON format)
    */
@@ -650,7 +650,7 @@ process_pay_with_exchange (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Exchange and fee structure OK. Initiating deposit operation for coins\n");
 
-  
+
 
   /* Initiate /deposit operation for all coins */
   for (i=0;i<pc->coins_cnt;i++)
@@ -662,8 +662,8 @@ process_pay_with_exchange (void *cls,
     GNUNET_assert (NULL != pc->mi->j_wire);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Timing for this payment, wire_deadline: %llu, refund_deadline: %llu\n",
-                pc->wire_transfer_deadline.abs_value_us,
-                pc->refund_deadline.abs_value_us);
+                (unsigned long long) pc->wire_transfer_deadline.abs_value_us,
+                (unsigned long long) pc->refund_deadline.abs_value_us);
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
@@ -926,7 +926,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     if (NULL == pc->mi)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Not able to find the specified receiver\n"); 
+                  "Not able to find the specified receiver\n");
       json_decref (root);
       return TMH_RESPONSE_reply_external_error (connection,
                                               "Unknown receiver given");

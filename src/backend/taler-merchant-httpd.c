@@ -258,7 +258,7 @@ do_shutdown (void *cls)
     {
       json_decref (instances[i]->j_wire);
       GNUNET_free (instances[i]->id);
-      GNUNET_free (instances[i]); 
+      GNUNET_free (instances[i]);
     }
   }
 }
@@ -416,10 +416,10 @@ instances_iterator_cb (void *cls,
                 "Failed to specify a merchant instance\n");
     GNUNET_SCHEDULER_shutdown ();
     return;
-  }                
+  }
 
   /** Get id **/
-  token = strrchr (section, '-'); 
+  token = strrchr (section, '-');
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Extracted token: %s\n",
               token + 1);
@@ -465,8 +465,8 @@ instances_iterator_cb (void *cls,
 
   mi->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
                                              iic->config,
-                                             instance_wiresection); 
-  GNUNET_free (instance_wiresection);                                             
+                                             instance_wiresection);
+  GNUNET_free (instance_wiresection);
 
   if (GNUNET_YES != iic->plugin->wire_validate (iic->plugin->cls,
                                                 mi->j_wire,
@@ -548,7 +548,6 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   iic->default_instance = GNUNET_NO;
   iic->plugin = GNUNET_PLUGIN_load (lib_name,
                                     NULL);
-  iic->plugin->library_name = lib_name;
   if (NULL == iic->plugin)
   {
     GNUNET_free (lib_name);
@@ -557,6 +556,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
                 allowed);
     return GNUNET_SYSERR;
   }
+  iic->plugin->library_name = lib_name;
   GNUNET_CONFIGURATION_iterate_sections (config,
                                          &instances_iterator_cb,
                                          (void *) iic);
@@ -606,7 +606,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
                 json_dumps (instances[i]->j_wire, JSON_INDENT (2)),
                 hash,
                 priv,
-                pub);   
+                pub);
 
     GNUNET_free (hash);
     GNUNET_free (priv);
@@ -622,7 +622,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
     GNUNET_free (lib_name);
     GNUNET_free (iic);
     GNUNET_SCHEDULER_shutdown ();
-    return GNUNET_SYSERR;  
+    return GNUNET_SYSERR;
   } while (0);
 }
 

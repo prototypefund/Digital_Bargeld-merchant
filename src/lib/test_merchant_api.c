@@ -1032,6 +1032,7 @@ track_transfer_cb (void *cls,
 
       ref = find_command (is,
                           cmd->details.track_transfer.expected_pay_ref);
+      GNUNET_assert (NULL != ref);
       found = GNUNET_NO;
       for (i=0;i<details_length;i++)
       {
@@ -1054,6 +1055,7 @@ track_transfer_cb (void *cls,
 
 	cref = find_command (is,
                              ref->details.pay.coin_ref);
+        GNUNET_assert (NULL != cref);
 	switch (cref->oc)
 	{
 	case OC_WITHDRAW_SIGN:
