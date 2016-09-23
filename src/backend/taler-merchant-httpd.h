@@ -46,8 +46,8 @@ struct IterateInstancesCls {
 
   /**
    * Current index in the global array of #MerchantInstance
-   * types. Used by the callback in order to properly place
-   * the instance it is parsing
+   * types. Used by the callback in order to know which index
+   * is associated to the element being processed.
    */
   unsigned int current_index;
 

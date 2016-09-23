@@ -52,6 +52,20 @@
 struct MerchantInstance **instances;
 
 /**
+ * Hashmap pointing at merchant instances by 'id'. An 'id' is
+ * just a string that identifies a merchant instance. When a frontend
+ * needs to specify an instance to the backend, it does so by 'id'
+ */
+struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
+
+/**
+ * Hashmap pointing at merchant instances by public key. This map
+ * is mainly used to check whether there is more than one instance
+ * using the same key
+ */
+struct GNUNET_CONTAINER_MultiHashMap *by_kpub_map;
+
+/**
  * The port we are running on
  */
 static long long unsigned port;
@@ -403,6 +417,9 @@ instances_iterator_cb (void *cls,
   struct MerchantInstance *mi;
   struct IterateInstancesCls *iic;
   struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
+  /* used as hashmap keys */
+  struct GNUNET_HashCode h_pk;
+  struct GNUNET_HashCode h_id;
 
   iic = cls;
   substr = strstr (section, "merchant-instance-");
@@ -454,7 +471,11 @@ instances_iterator_cb (void *cls,
                                       &mi->pubkey.eddsa_pub);
   GNUNET_free (pk);
 
-  /** To free or not to free **/
+  /**
+   * FIXME: token must NOT be freed, as it is handled by the
+   * gnunet_configuration facility. OTOH mi->id does need to be freed,
+   * because it is a duplicate.
+   */
   mi->id = GNUNET_strdup (token + 1);
   if (0 == strcmp ("default", mi->id))
     iic->default_instance = GNUNET_YES;
@@ -493,6 +514,34 @@ instances_iterator_cb (void *cls,
   #endif
 
   GNUNET_array_append (instances, iic->current_index, mi);
+
+  GNUNET_CRYPTO_hash (mi->id,
+                      strlen(mi->id),
+                      &h_id);
+  GNUNET_CRYPTO_hash (&mi->pubkey.eddsa_pub,
+                      sizeof (struct GNUNET_CRYPTO_EddsaPublicKey),
+                      &h_pk);
+  if (GNUNET_OK !=
+      GNUNET_CONTAINER_multihashmap_put (by_id_map,
+                                         &h_id,
+                                         instances[iic->current_index],
+                                         GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to put an entry into the 'by_id' hashmap");
+    iic->ret |= GNUNET_SYSERR;
+  }
+
+  if (GNUNET_OK !=
+      GNUNET_CONTAINER_multihashmap_put (by_kpub_map,
+                                         &h_pk,
+                                         instances[iic->current_index],
+                                         GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to put an entry into the 'by_kpub_map' hashmap");
+    iic->ret |= GNUNET_SYSERR;
+  }
 }
 
 /**
@@ -581,6 +630,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   GNUNET_PLUGIN_unload (lib_name,
                         iic->plugin);
   GNUNET_free (lib_name);
+
   GNUNET_array_append (instances, iic->current_index, NULL);
   #if EXTRADEBUG
   unsigned int i;
@@ -661,6 +711,20 @@ run (void *cls,
   }
   if (GNUNET_SYSERR ==
       TMH_AUDITORS_init (config))
+  {
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (NULL ==
+     (by_id_map = GNUNET_CONTAINER_multihashmap_create(0, GNUNET_NO)))
+  {
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (NULL ==
+     (by_kpub_map = GNUNET_CONTAINER_multihashmap_create(0, GNUNET_NO)))
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
