@@ -41,7 +41,7 @@
 /**
  * Context used for handing /track/transfer requests.
  */
-struct TransferTrackContext
+struct TrackTransferContext
 {
 
   /**
@@ -117,7 +117,7 @@ struct TransferTrackContext
  * @param rctx data to free
  */
 static void
-free_transfer_track_context (struct TransferTrackContext *rctx)
+free_transfer_track_context (struct TrackTransferContext *rctx)
 {
   if (NULL != rctx->fo)
   {
@@ -153,7 +153,7 @@ free_transfer_track_context (struct TransferTrackContext *rctx)
  * @param response response data to send back
  */
 static void
-resume_track_transfer_with_response (struct TransferTrackContext *rctx,
+resume_track_transfer_with_response (struct TrackTransferContext *rctx,
                                      unsigned int response_code,
                                      struct MHD_Response *response)
 {
@@ -173,14 +173,14 @@ resume_track_transfer_with_response (struct TransferTrackContext *rctx,
 
 
 /**
- * Custom cleanup routine for a `struct TransferTrackContext`.
+ * Custom cleanup routine for a `struct TrackTransferContext`.
  *
- * @param hc the `struct TransferTrackContext` to clean up.
+ * @param hc the `struct TrackTransferContext` to clean up.
  */
 static void
 track_transfer_cleanup (struct TM_HandlerContext *hc)
 {
-  struct TransferTrackContext *rctx = (struct TransferTrackContext *) hc;
+  struct TrackTransferContext *rctx = (struct TrackTransferContext *) hc;
 
   free_transfer_track_context (rctx);
 }
@@ -191,7 +191,7 @@ track_transfer_cleanup (struct TM_HandlerContext *hc)
  * Verify that it matches the information claimed by the exchange.
  * Update the `check_transfer_result` field accordingly.
  *
- * @param cls closure with our `struct TransferTrackContext *`
+ * @param cls closure with our `struct TrackTransferContext *`
  * @param transaction_id of the contract
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will transfer for this coin
@@ -206,7 +206,7 @@ check_transfer (void *cls,
                 const struct TALER_Amount *transfer_fee,
                 const json_t *exchange_proof)
 {
-  struct TransferTrackContext *rctx = cls;
+  struct TrackTransferContext *rctx = cls;
   const struct TALER_TrackTransferDetails *wdd = rctx->current_detail;
 
   if (0 != memcmp (&wdd->coin_pub,
@@ -254,7 +254,7 @@ wire_transfer_cb (void *cls,
                   unsigned int details_length,
                   const struct TALER_TrackTransferDetails *details)
 {
-  struct TransferTrackContext *rctx = cls;
+  struct TrackTransferContext *rctx = cls;
   unsigned int i;
   int ret;
 
@@ -341,7 +341,7 @@ wire_transfer_cb (void *cls,
 /**
  * Function called with the result of our exchange lookup.
  *
- * @param cls the `struct TransferTrackContext`
+ * @param cls the `struct TrackTransferContext`
  * @param eh NULL if exchange was not found to be acceptable
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
  */
@@ -350,7 +350,7 @@ process_track_transfer_with_exchange (void *cls,
                                       struct TALER_EXCHANGE_Handle *eh,
                                       int exchange_trusted)
 {
-  struct TransferTrackContext *rctx = cls;
+  struct TrackTransferContext *rctx = cls;
 
   rctx->fo = NULL;
   rctx->eh = eh;
@@ -378,7 +378,7 @@ process_track_transfer_with_exchange (void *cls,
 static void
 handle_track_transfer_timeout (void *cls)
 {
-  struct TransferTrackContext *rctx = cls;
+  struct TrackTransferContext *rctx = cls;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming /track/transfer with error after timeout\n");
@@ -406,7 +406,7 @@ static void
 proof_cb (void *cls,
           const json_t *proof)
 {
-  struct TransferTrackContext *rctx = cls;
+  struct TrackTransferContext *rctx = cls;
 
   rctx->response_code = MHD_HTTP_OK;
   /* FIXME: might want a more custom response here... */
@@ -435,14 +435,14 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                            const char *upload_data,
                            size_t *upload_data_size)
 {
-  struct TransferTrackContext *rctx;
+  struct TrackTransferContext *rctx;
   const char *str;
   const char *uri;
   int ret;
 
   if (NULL == *connection_cls)
   {
-    rctx = GNUNET_new (struct TransferTrackContext);
+    rctx = GNUNET_new (struct TrackTransferContext);
     rctx->hc.cc = &track_transfer_cleanup;
     rctx->connection = connection;
     *connection_cls = rctx;
