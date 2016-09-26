@@ -252,9 +252,10 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
   tdo->cb = track_transaction_cb;
   tdo->cb_cls = track_transaction_cb_cls;
   GNUNET_asprintf (&tdo->url,
-                   "%s/track/transaction?id=%llu",
+                   "%s/track/transaction?id=%llu&receiver=%s",
                    backend_uri,
-                   (unsigned long long) transaction_id);
+                   (unsigned long long) transaction_id,
+                   receiver);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,

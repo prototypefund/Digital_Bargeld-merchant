@@ -259,6 +259,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   GNUNET_assert (GNUNET_OK ==
                  TALER_JSON_hash (jcontract,
                                   &contract.h_contract));
+  contract.merchant_pub = mi->pubkey;
   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                             &contract.purpose,
                             &contract_sig);

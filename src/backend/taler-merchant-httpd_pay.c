@@ -922,6 +922,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
     pc->mi = get_instance (root);
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "/pay: picked instance %s\n",
+                pc->mi->id);
 
     if (NULL == pc->mi)
     {
@@ -946,6 +949,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     TALER_amount_hton (&cp.max_fee,
                        &pc->max_fee);
     cp.h_contract = pc->h_contract;
+    cp.merchant_pub = pc->mi->pubkey;
     if (GNUNET_OK !=
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_CONTRACT,
                                     &cp.purpose,
