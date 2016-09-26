@@ -33,6 +33,11 @@
 
 
 /**
+ * Map containing all the known merchant instances
+ */
+extern struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
+
+/**
  * How long to wait before giving up processing with the exchange?
  */
 #define TRACK_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
@@ -765,8 +770,6 @@ coin_cb (void *cls,
                                           tcc));
 }
 
-extern struct MerchantInstance **instances;
-
 /**
  * Handle a "/track/transaction" request.
  *
@@ -788,8 +791,8 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   unsigned long long transaction_id;
   const char *str;
   const char *receiver;
-  unsigned int i;
   int ret;
+  struct GNUNET_HashCode h_receiver;
 
   if (NULL == *connection_cls)
   {
@@ -845,12 +848,12 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                           "receiver");
   if (NULL == receiver)
     receiver = "default";
-
+  GNUNET_CRYPTO_hash (receiver,
+                      strlen (receiver),
+                      &h_receiver);
   tctx->mi = NULL;
-  for (i=0; NULL != instances[i]; i++)
-    if (0 == strcmp (receiver, instances[i]->id))
-      tctx->mi = instances[i];
-
+  GNUNET_assert (NULL != (tctx->mi = GNUNET_CONTAINER_multihashmap_get (by_id_map,
+                                                                        &h_receiver)));
   if (NULL == tctx->mi)
     return TMH_RESPONSE_reply_bad_request (connection,
                                            "unknown receiver");

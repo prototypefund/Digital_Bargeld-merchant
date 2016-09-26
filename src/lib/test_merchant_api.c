@@ -1668,12 +1668,12 @@ interpreter_run (void *cls)
     GNUNET_assert (NULL != ref);
     cmd->details.track_transfer.tdo =
       TALER_MERCHANT_track_transfer (ctx,
-                                    MERCHANT_URI,
-                                    receiver,
-                                    &ref->details.check_bank_transfer.wtid,
-                                    EXCHANGE_URI,
-                                    &track_transfer_cb,
-                                    is);
+                                     MERCHANT_URI,
+                                     receiver,
+                                     &ref->details.check_bank_transfer.wtid,
+                                     EXCHANGE_URI,
+                                     &track_transfer_cb,
+                                     is);
     return;
   case OC_TRACK_TRANSACTION:
     ref = find_command (is,
@@ -2175,9 +2175,6 @@ int
 main (int argc,
       char * const *argv)
 {
-  /* Value from "gnunet-ecc -p test_merchant.priv" */
-  const char *merchant_pub_str
-    = "5TRNSWAWHKBJ7G4T3PKRCQA6MCB3MX82F4M2XXS1653KE1V8RFPG";
   struct GNUNET_OS_Process *proc;
   struct GNUNET_OS_Process *exchanged;
   struct GNUNET_OS_Process *merchantd;
@@ -2185,6 +2182,9 @@ main (int argc,
   struct GNUNET_CONFIGURATION_Handle *cfg;
   unsigned int cnt;
   struct GNUNET_SIGNAL_Context *shc_chld;
+  char *instance_section;
+  char *keyfile;
+  struct GNUNET_CRYPTO_EddsaPrivateKey *kpriv;
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
@@ -2202,7 +2202,20 @@ main (int argc,
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Using non default receiver '%s'\n",
                 receiver);
+  GNUNET_asprintf (&instance_section,
+                   "merchant-instance-%s",
+                   receiver);
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_CONFIGURATION_get_value_filename (cfg,
+                                                          instance_section,
+                                                          "KEYFILE",
+                                                          &keyfile));
 
+  kpriv = GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile);
+  GNUNET_CRYPTO_eddsa_key_get_public (kpriv, &merchant_pub.eddsa_pub);
+
+  GNUNET_free (keyfile);
+  GNUNET_free (instance_section);
   db = TALER_MERCHANTDB_plugin_load (cfg);
   if (NULL == db)
   {
@@ -2219,12 +2232,6 @@ main (int argc,
   TALER_MERCHANTDB_plugin_unload (db);
   GNUNET_CONFIGURATION_destroy (cfg);
 
-
-  GNUNET_assert (GNUNET_OK ==
-		 GNUNET_STRINGS_string_to_data (merchant_pub_str,
-						strlen (merchant_pub_str),
-						&merchant_pub,
-						sizeof (merchant_pub)));
   proc = GNUNET_OS_start_process (GNUNET_NO,
                                   GNUNET_OS_INHERIT_STD_ALL,
                                   NULL, NULL, NULL,

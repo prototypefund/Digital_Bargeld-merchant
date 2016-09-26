@@ -46,12 +46,6 @@
 #define UNIX_BACKLOG 500
 
 /**
- * NULL-terminated array of all merchants instances known
- * by this backend
- */
-struct MerchantInstance **instances;
-
-/**
  * Hashmap pointing at merchant instances by 'id'. An 'id' is
  * just a string that identifies a merchant instance. When a frontend
  * needs to specify an instance to the backend, it does so by 'id'
@@ -239,6 +233,22 @@ url_handler (void *cls,
 
 
 /**
+ * Callback that frees all the elements in the hashmap
+ * 
+ * @param cls closure
+ * @param key current key
+ * @param value current value
+ */
+int
+hashmap_free (void *cls,
+              const struct GNUNET_HashCode *key,
+              void *value)
+{
+  GNUNET_free (value);
+  return GNUNET_YES;
+}
+
+/**
  * Shutdown task (magically invoked when the application is being
  * quit)
  *
@@ -265,22 +275,13 @@ do_shutdown (void *cls)
   TMH_EXCHANGES_done ();
   TMH_AUDITORS_done ();
 
+  GNUNET_CONTAINER_multihashmap_iterate (by_id_map,
+                                         &hashmap_free,
+                                         NULL);
   if (NULL != by_id_map)
     GNUNET_CONTAINER_multihashmap_destroy (by_id_map);
   if (NULL != by_kpub_map)
     GNUNET_CONTAINER_multihashmap_destroy (by_kpub_map);
-
-  if (NULL != instances)
-  {
-    unsigned int i;
-
-    for (i=0; NULL != instances[i]; i++)
-    {
-      json_decref (instances[i]->j_wire);
-      GNUNET_free (instances[i]->id);
-      GNUNET_free (instances[i]); 
-    }
-  }
 }
 
 
@@ -478,7 +479,7 @@ instances_iterator_cb (void *cls,
   GNUNET_free (pk);
 
   /**
-   * FIXME: token must NOT be freed, as it is handled by the
+   * FIXME: 'token' must NOT be freed, as it is handled by the
    * gnunet_configuration facility. OTOH mi->id does need to be freed,
    * because it is a duplicate.
    */
@@ -512,15 +513,13 @@ instances_iterator_cb (void *cls,
                 "Failed to hash wireformat\n");
     iic->ret |= GNUNET_SYSERR;
   }
-  #define EXTRADEBUGG
-  #ifdef EXTRADEBUG
+  #define EXTRADEBUG
+  #ifdef EXTRADEBUGG
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Found wireformat instance:\n");
               json_dumpf (mi->j_wire, stdout, 0);
               printf ("\n");
   #endif
-
-  GNUNET_array_append (instances, iic->current_index, mi);
 
   GNUNET_CRYPTO_hash (mi->id,
                       strlen(mi->id),
@@ -531,18 +530,29 @@ instances_iterator_cb (void *cls,
   if (GNUNET_OK !=
       GNUNET_CONTAINER_multihashmap_put (by_id_map,
                                          &h_id,
-                                         instances[iic->current_index],
+                                         mi,
                                          GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to put an entry into the 'by_id' hashmap\n");
     iic->ret |= GNUNET_SYSERR;
   }
+  #ifdef EXTRADEBUG
+  else {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Added element at %p, by by-id key %s of '%s' in hashmap\n",
+                mi,
+                GNUNET_h2s (&h_id),
+                mi->id);
+    GNUNET_assert (NULL != GNUNET_CONTAINER_multihashmap_get (by_id_map,
+                                                              &h_id));
+  }
+  #endif
 
   if (GNUNET_OK !=
       GNUNET_CONTAINER_multihashmap_put (by_kpub_map,
                                          &h_pk,
-                                         instances[iic->current_index],
+                                         mi,
                                          GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -568,22 +578,28 @@ struct MerchantInstance *
 get_instance (struct json_t *json)
 {
   struct json_t *receiver;
+  const char *receiver_str;
   struct GNUNET_HashCode h_receiver;
-
+  struct MerchantInstance *ret;
 
   /*FIXME who decrefs receiver?*/
   if (NULL == (receiver = json_object_get (json, "receiver")))
     receiver = json_string ("default");
 
-  // hash it
-  GNUNET_CRYPTO_hash (json_string_value (receiver),
-                      strlen (json_string_value (receiver)),
+  receiver_str = json_string_value (receiver);
+  GNUNET_CRYPTO_hash (receiver_str,
+                      strlen (receiver_str),
                       &h_receiver);
-
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Looking for by-id key %s of '%s' in hashmap\n",
+              GNUNET_h2s (&h_receiver),
+              receiver_str);
   /* We're fine if that returns NULL, the calling routine knows how
      to handle that */
-  return GNUNET_CONTAINER_multihashmap_get (by_id_map,
-                                            &h_receiver);
+  ret = GNUNET_CONTAINER_multihashmap_get (by_id_map,
+                                           &h_receiver);
+  GNUNET_break (NULL != ret);                                          
+  return ret;                                                                       
 }
 
 /**
@@ -645,38 +661,6 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
                         iic->plugin);
   GNUNET_free (lib_name);
 
-  GNUNET_array_append (instances, iic->current_index, NULL);
-  #ifdef EXTRADEBUG
-  unsigned int i;
-  for (i=0; NULL != instances[i]; i++)
-  {
-    char *hash;
-    char *priv;
-    char *pub;
-
-    hash =
-      GNUNET_STRINGS_data_to_string_alloc (&instances[i]->h_wire,
-                                           sizeof (struct GNUNET_HashCode));
-    priv =
-      GNUNET_STRINGS_data_to_string_alloc (&instances[i]->privkey.eddsa_priv,
-                                           sizeof (struct GNUNET_CRYPTO_EddsaPrivateKey));
-    pub =
-      GNUNET_STRINGS_data_to_string_alloc (&instances[i]->pubkey.eddsa_pub,
-                                           sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "instances[%d]: id=%s,\nj_wire=%s,\nj_hash=%s,\npriv=%s,\npub=%s\n",
-                i,
-                instances[i]->id,
-                json_dumps (instances[i]->j_wire, JSON_INDENT (2)),
-                hash,
-                priv,
-                pub);   
-
-    GNUNET_free (hash);
-    GNUNET_free (priv);
-    GNUNET_free (pub);
-  }
-  #endif
   GNUNET_free (iic);
   return GNUNET_OK;
 
