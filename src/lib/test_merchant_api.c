@@ -51,6 +51,11 @@
 #define BANK_PORT 8083
 
 /**
+ * Max size allowed for a contract
+ */
+#define CONTRACT_MAX_SIZE 500
+
+/**
  * Handle to access the exchange.
  */
 static struct TALER_EXCHANGE_Handle *exchange;
@@ -61,16 +66,24 @@ static struct TALER_EXCHANGE_Handle *exchange;
 static struct GNUNET_CURL_Context *ctx;
 
 /**
- * Which merchant instance we will run the testcase for
+ * Array of receivers to test against
  */
-static char *receiver = NULL;
-
+static char **instances;
 
 /**
- * Public key of the merchant, matches the private
- * key from "test_merchant.priv".
+ * How many merchant instances this test runs
  */
-static struct TALER_MerchantPublicKeyP merchant_pub;
+unsigned int nreceiver = 0;
+
+/**
+ * Current receiver
+ */
+static char *receiver;
+
+/**
+ * Current receiver being tested
+ */
+unsigned int receiver_idx = 0;
 
 /**
  * Task run on timeout.
@@ -353,8 +366,10 @@ struct Command
 
       /**
        * Contract proposal (without merchant_pub, exchanges or H_wire).
+       * It's dynamically generated because we need different transaction_id
+       * for different merchant instances.
        */
-      const char *proposal;
+      char proposal[CONTRACT_MAX_SIZE];
 
       /**
        * Handle to the active /contract operation, or NULL.
@@ -560,6 +575,47 @@ fail (struct InterpreterState *is)
               is->ip);
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_shutdown ();
+}
+
+/**
+ * Get a new contract proposal for each OC_CONTRACT
+ * in the list of command. It's used when we run multiple
+ * instances beacuse we can't have the same transaction_id
+ * for two instances.
+ *
+ * @param cmds the list of commands
+ */
+void
+get_new_contracts (struct Command *cmds)
+{
+  unsigned int i;
+  unsigned int d = 0;
+  struct Command *cmd;
+  #define DELTA 1000
+  
+  for (i=0;OC_END != (cmd = &cmds[i])->oc;i++)
+    if ( (NULL != cmd->label) &&
+         (OC_CONTRACT == cmd->oc) )
+    {
+
+      if (0 == strcmp (cmd->label, "create-contract-2"))
+        d = DELTA;
+
+      snprintf (cmd->details.contract.proposal,
+                CONTRACT_MAX_SIZE,
+                "{\
+                  \"max_fee\":\
+                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":500000},\
+                  \"transaction_id\":%d,\
+                  \"timestamp\":\"\\/Date(42)\\/\",\
+                  \"refund_deadline\":\"\\/Date(0)\\/\",\
+                  \"expiry\":\"\\/Date(999999999)\\/\",\
+                  \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
+                  \"products\":\
+                     [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ]\
+                }",
+                receiver_idx + d);
+    }
 }
 
 
@@ -1277,7 +1333,20 @@ interpreter_run (void *cls)
   {
   case OC_END:
     result = GNUNET_OK;
-    GNUNET_SCHEDULER_shutdown ();
+    if (receiver_idx + 1 == nreceiver)
+    {
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+    is->ip = 0;
+    receiver_idx++;
+    receiver = instances[receiver_idx];
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Switching instance: '%s'",
+                receiver);
+    get_new_contracts(is->commands);
+    is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
+                                         is);
     return;
   case OC_ADMIN_ADD_INCOMING:
     if (NULL !=
@@ -1440,7 +1509,6 @@ interpreter_run (void *cls)
       json_t *proposal;
       json_error_t error;
 
-      /* parse wire details */
       proposal = json_loads (cmd->details.contract.proposal,
                              JSON_REJECT_DUPLICATES,
                              &error);
@@ -1497,6 +1565,7 @@ interpreter_run (void *cls)
       merchant_sig = ref->details.contract.merchant_sig;
       GNUNET_assert (NULL != ref->details.contract.contract);
       {
+        /* Get information that need to be replied in the deposit permission */
         struct GNUNET_JSON_Specification spec[] = {
           GNUNET_JSON_spec_uint64 ("transaction_id", &transaction_id),
           GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
@@ -1570,9 +1639,6 @@ interpreter_run (void *cls)
 	  return;
 	}
       }
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Using receiver '%s'\n",
-                  receiver);
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI,
@@ -1684,7 +1750,7 @@ interpreter_run (void *cls)
     cmd->details.track_transaction.tth =
       TALER_MERCHANT_track_transaction (ctx,
                                         MERCHANT_URI,
-                                        receiver,
+                                        receiver, /* got it NULL, right now */
                                         ref->details.pay.transaction_id,
                                         &track_transaction_cb,
                                         is);
@@ -1855,7 +1921,7 @@ do_shutdown (void *cls)
     is->task = NULL;
   }
   GNUNET_free (is);
-  GNUNET_free_non_null (receiver);
+  GNUNET_free_non_null (instances);
   if (NULL != exchange)
   {
     TALER_EXCHANGE_disconnect (exchange);
@@ -1964,10 +2030,7 @@ run (void *cls)
     /* Create contract */
     { .oc = OC_CONTRACT,
       .label = "create-contract-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":1, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"expiry\":\"\\/Date(999999999)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"products\":[ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
-
-
+      .expected_response_code = MHD_HTTP_OK },
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
@@ -1979,9 +2042,7 @@ run (void *cls)
 
     { .oc = OC_CONTRACT,
       .label = "create-contract-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.contract.proposal = "{ \"max_fee\":{\"currency\":\"EUR\", \"value\":0, \"fraction\":500000}, \"transaction_id\":2, \"timestamp\":\"\\/Date(42)\\/\", \"refund_deadline\":\"\\/Date(0)\\/\", \"expiry\":\"\\/Date(999999999)\\/\", \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},  \"products\":[ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
-
+      .expected_response_code = MHD_HTTP_OK },
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        transaction ID) */
     { .oc = OC_PAY,
@@ -2131,10 +2192,10 @@ run (void *cls)
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
     },
 
-
     /* end of testcase */
     { .oc = OC_END }
   };
+  get_new_contracts (commands);
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Interpreter initializing\n");
@@ -2177,6 +2238,8 @@ int
 main (int argc,
       char * const *argv)
 {
+  char *_instances;
+  char *token;
   struct GNUNET_OS_Process *proc;
   struct GNUNET_OS_Process *exchanged;
   struct GNUNET_OS_Process *merchantd;
@@ -2184,9 +2247,6 @@ main (int argc,
   struct GNUNET_CONFIGURATION_Handle *cfg;
   unsigned int cnt;
   struct GNUNET_SIGNAL_Context *shc_chld;
-  char *instance_section;
-  char *keyfile;
-  struct GNUNET_CRYPTO_EddsaPrivateKey *kpriv;
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
@@ -2197,27 +2257,17 @@ main (int argc,
   GNUNET_assert (GNUNET_OK ==
                  GNUNET_CONFIGURATION_load (cfg,
                                             "test_merchant_api.conf"));
-  if (GNUNET_OK == GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                          "merchant",
-                                                          "INSTANCE",
-                                                          &receiver))
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Using non default receiver '%s'\n",
-                receiver);
-  GNUNET_asprintf (&instance_section,
-                   "merchant-instance-%s",
-                   receiver);
-  GNUNET_assert (GNUNET_OK ==
-                 GNUNET_CONFIGURATION_get_value_filename (cfg,
-                                                          instance_section,
-                                                          "KEYFILE",
-                                                          &keyfile));
+  GNUNET_break (GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                       "merchant",
+                                                       "INSTANCES",
+                                                       &_instances));
+  GNUNET_break (NULL != (token = strtok (_instances, " ")));
+  GNUNET_array_append (instances, nreceiver, token);
 
-  kpriv = GNUNET_CRYPTO_eddsa_key_create_from_file (keyfile);
-  GNUNET_CRYPTO_eddsa_key_get_public (kpriv, &merchant_pub.eddsa_pub);
+  while (NULL != (token = strtok (NULL, " ")))
+    GNUNET_array_append(instances, nreceiver, token); 
 
-  GNUNET_free (keyfile);
-  GNUNET_free (instance_section);
+  receiver = instances[receiver_idx];
   db = TALER_MERCHANTDB_plugin_load (cfg);
   if (NULL == db)
   {
