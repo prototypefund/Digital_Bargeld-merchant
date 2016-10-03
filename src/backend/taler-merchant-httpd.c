@@ -39,6 +39,7 @@
 #include "taler-merchant-httpd_pay.h"
 #include "taler-merchant-httpd_track-transaction.h"
 #include "taler-merchant-httpd_track-transfer.h"
+#include "taler-merchant-httpd_history.h"
 
 /**
  * Backlog for listen operation on unix-domain sockets.
