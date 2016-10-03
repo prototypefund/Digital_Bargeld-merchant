@@ -548,8 +548,7 @@ postgres_store_transfer_to_proof (void *cls,
  * @param date limit to transactions' age
  * @param cb function to call with transaction data
  * @param cb_cls closure for @a cb
- * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
- *         upon error
+ * @return numer of found tuples, #GNUNET_SYSERR upon error
  */
 static int
 postgres_find_transactions_by_date (void *cls,
@@ -576,8 +575,9 @@ postgres_find_transactions_by_date (void *cls,
   if (0 == PQntuples (result))
   {
     PQclear (result);
-    return GNUNET_NO;
+    return 0;
   }
+  /*FIXME iterate over result(s)*/
   {
     char *exchange_uri;
     struct GNUNET_HashCode h_contract;
