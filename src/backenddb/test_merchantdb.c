@@ -80,6 +80,11 @@ static uint64_t transaction_id;
 static struct GNUNET_TIME_Absolute timestamp;
 
 /**
+ * Delta aimed to test the "by_date" query on transactions.
+ */
+static struct GNUNET_TIME_Relative delta;
+
+/**
  * Deadline until which refunds are allowed.
  */
 static struct GNUNET_TIME_Absolute refund_deadline;
@@ -158,6 +163,34 @@ transaction_cb (void *cls,
                                 &amount_with_fee));
 }
 
+
+/**
+ * Function called with information about a transaction. Checks whether the
+ * returned tuple
+ *
+ * @param cls closure
+ * @param transaction_id of the contract
+ * @param exchange_uri URI of the exchange
+ * @param h_contract hash of the contract
+ * @param h_wire hash of our wire details
+ * @param timestamp time of the confirmation
+ * @param refund refund deadline
+ * @param total_amount total amount we receive for the contract after fees
+ */
+
+static void
+history_cb (void *cls,
+            uint64_t transaction_id,
+            const char *exchange_uri,
+            const struct GNUNET_HashCode *h_contract,
+            const struct GNUNET_HashCode *h_wire,
+            struct GNUNET_TIME_Absolute timestamp,
+            struct GNUNET_TIME_Absolute refund,
+            const struct TALER_Amount *total_amount)
+{
+  /*Just a stub*/
+  return;
+}
 
 /**
  * Function called with information about a coin that was deposited.
@@ -252,6 +285,7 @@ static void
 run (void *cls)
 {
   struct GNUNET_CONFIGURATION_Handle *cfg = cls;
+  struct GNUNET_TIME_Absolute fake_now;
   /* Data for 'store_payment()' */
 
   FAILIF (NULL == (plugin = TALER_MERCHANTDB_plugin_load (cfg)));
@@ -266,6 +300,8 @@ run (void *cls)
   RND_BLK (&wtid);
   timestamp = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&timestamp);
+  delta = GNUNET_TIME_UNIT_MINUTES;
+  fake_now = GNUNET_TIME_absolute_add (timestamp, delta);
   refund_deadline = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&refund_deadline);
   GNUNET_assert (GNUNET_OK ==
@@ -319,6 +355,14 @@ run (void *cls)
                                           transaction_id,
                                           &transaction_cb,
                                           NULL));
+
+  /* FIXME: put here find_transactions_by_date () */
+  FAILIF (1 !=
+          plugin->find_transactions_by_date (plugin->cls,
+                                             fake_now,
+                                             history_cb,
+                                             NULL));
+
   FAILIF (GNUNET_OK !=
           plugin->find_payments_by_id (plugin->cls,
                                        transaction_id,
@@ -369,7 +413,7 @@ main (int argc,
     GNUNET_break (0);
     return -1;
   }
-  GNUNET_log_setup (argv[0], "WARNING", NULL);
+  GNUNET_log_setup (argv[0], "INFO", NULL);
   plugin_name++;
   (void) GNUNET_asprintf (&testname,
                           "test-merchantdb-%s",

@@ -427,7 +427,8 @@ struct TALER_MERCHANT_TransactionWireTransfer
 
 
 /**
- * Callbacks of this type are used to work the result of submitting a /track/transaction request to a merchant
+ * Callbacks of this type are used to work the result of submitting a
+ * /track/transaction request to a merchant
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation

@@ -199,10 +199,10 @@ postgres_initialize (void *cls)
            ",PRIMARY KEY (transaction_id, coin_pub)"
            ");");
   PG_EXEC_INDEX (pg,
-                 "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin "
+                 "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin"
                  " ON merchant_transfers (transaction_id, coin_pub)");
   PG_EXEC_INDEX (pg,
-                 "CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid "
+                 "CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid"
                  " ON merchant_transfers (wtid)");
 
   /* Setup prepared "INSERT" statements */
@@ -258,7 +258,8 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "find_transactions_by_date",
               "SELECT"
-              " exchange_uri"
+              " transaction_id"
+              ",exchange_uri"
               ",h_contract"
               ",h_wire"
               ",timestamp"
@@ -552,13 +553,16 @@ postgres_store_transfer_to_proof (void *cls,
  */
 static int
 postgres_find_transactions_by_date (void *cls,
-                                   struct GNUNET_TIME_Absolute date,
-                                   TALER_MERCHANTDB_TransactionCallback cb,
-                                   void *cb_cls)
+                                    struct GNUNET_TIME_Absolute date,
+                                    TALER_MERCHANTDB_TransactionCallback cb,
+                                    void *cb_cls)
 {
 
   struct PostgresClosure *pg = cls;
   PGresult *result;
+  unsigned int n;
+  unsigned int i;
+
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_end
@@ -572,12 +576,12 @@ postgres_find_transactions_by_date (void *cls,
     PQclear (result);
     return GNUNET_SYSERR;
   }
-  if (0 == PQntuples (result))
+  if (0 == (n = PQntuples (result)))
   {
     PQclear (result);
     return 0;
   }
-  /*FIXME iterate over result(s)*/
+  for (i = 0; i < n; i++)
   {
     char *exchange_uri;
     struct GNUNET_HashCode h_contract;
@@ -607,7 +611,7 @@ postgres_find_transactions_by_date (void *cls,
     if (GNUNET_OK !=
         GNUNET_PQ_extract_result (result,
                                   rs,
-                                  0))
+                                  i))
     {
       GNUNET_break (0);
       PQclear (result);
