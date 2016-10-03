@@ -255,6 +255,21 @@ postgres_initialize (void *cls)
               "($1, $2, $3, $4, $5)",
               5);
 
+  PG_PREPARE (pg,
+              "find_transaction_by_date",
+              "SELECT"
+              " exchange_uri"
+              ",h_contract"
+              ",h_wire"
+              ",timestamp"
+              ",refund_deadline"
+              ",total_amount_val"
+              ",total_amount_frac"
+              ",total_amount_curr"
+              " FROM merchant_transactions"
+              " WHERE timestamp<=$1",
+              1);
+
   /* Setup prepared "SELECT" statements */
   PG_PREPARE (pg,
               "find_transaction",
@@ -526,6 +541,91 @@ postgres_store_transfer_to_proof (void *cls,
   return ret;
 }
 
+/**
+ * Return transactions older than the given date
+ *
+ * @param cls our plugin handle
+ * @param date limit to transactions' age
+ * @param cb function to call with transaction data
+ * @param cb_cls closure for @a cb
+ * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
+ *         upon error
+ */
+static int
+postgres_find_transaction_by_date (void *cls,
+                                   struct GNUNET_TIME_Absolute date,
+                                   TALER_MERCHANTDB_TransactionCallback cb,
+                                   void *cb_cls)
+{
+
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_absolute_time (&date),
+    GNUNET_PQ_query_param_end
+  };
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_transaction_by_date",
+                                    params);
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  if (0 == PQntuples (result))
+  {
+    PQclear (result);
+    return GNUNET_NO;
+  }
+  {
+    char *exchange_uri;
+    struct GNUNET_HashCode h_contract;
+    struct GNUNET_HashCode h_wire;
+    struct GNUNET_TIME_Absolute timestamp;
+    struct GNUNET_TIME_Absolute refund_deadline;
+    struct TALER_Amount total_amount;
+    uint64_t transaction_id;
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_string ("exchange_uri",
+                                    &exchange_uri),
+      GNUNET_PQ_result_spec_uint64 ("transaction_id",
+                                    &transaction_id),
+      GNUNET_PQ_result_spec_auto_from_type ("h_contract",
+                                            &h_contract),
+      GNUNET_PQ_result_spec_auto_from_type ("h_wire",
+                                            &h_wire),
+      GNUNET_PQ_result_spec_absolute_time ("timestamp",
+                                           &timestamp),
+      GNUNET_PQ_result_spec_absolute_time ("refund_deadline",
+                                           &refund_deadline),
+      TALER_PQ_result_spec_amount ("total_amount",
+                                   &total_amount),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  0))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+    cb (cb_cls,
+        transaction_id,
+        exchange_uri,
+        &h_contract,
+        &h_wire,
+        timestamp,
+        refund_deadline,
+        &total_amount);
+    GNUNET_PQ_cleanup_result (rs);
+  }
+  PQclear (result);
+  return GNUNET_OK;
+}				 
 
 /**
  * Find information about a transaction.
