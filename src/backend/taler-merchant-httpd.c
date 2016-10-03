@@ -188,7 +188,9 @@ url_handler (void *cls,
       { "/track/transaction", NULL, "text/plain",
         "Only GET is allowed", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK},
-
+      { "/history", MHD_HTTP_METHOD_GET, "text/plain",
+        "Only GET is allowed", 0,
+        &MH_handler_history, MHD_HTTP_OK},
       {NULL, NULL, NULL, NULL, 0, 0 }
     };
   static struct TMH_RequestHandler h404 =
