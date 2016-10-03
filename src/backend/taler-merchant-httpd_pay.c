@@ -50,16 +50,6 @@ struct MerchantInstance *mi;
 struct PayContext;
 
 /**
- * Information to return to the wallet whenever the merchant does
- * not echo back something returned by the exchange. Currently used
- * to return signed 200 OK responses
- */
-struct MerchantResponse
-{
-  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
-};
-
-/**
  * Information kept during a /pay request for each coin.
  */
 struct DepositConfirmation
@@ -356,7 +346,7 @@ deposit_cb (void *cls,
   struct DepositConfirmation *dc = cls;
   struct PayContext *pc = dc->pc;
   struct GNUNET_CRYPTO_EddsaSignature sig;
-  struct MerchantResponse mr;
+  struct PaymentResponsePS mr;
 
   dc->dh = NULL;
   pc->pending--;
@@ -428,7 +418,11 @@ deposit_cb (void *cls,
   resume_pay_with_response (pc,
                             MHD_HTTP_OK,
                             TMH_RESPONSE_make_json_pack ("{s:s}",
-                                                         "merchant_sig", GNUNET_JSON_from_data_auto (&sig)));
+                                                         "merchant_sig",
+							 json_string_value (GNUNET_JSON_from_data_auto (&sig))));
+  GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+              "responding with: %s\n",
+	      json_string_value (GNUNET_JSON_from_data_auto (&sig)));
 }
 
 
