@@ -234,6 +234,22 @@ struct TALER_MERCHANTDB_Plugin
    * Find information about a transaction.
    *
    * @param cls our plugin handle
+   * @param date limit to transactions' age
+   * @param cb function to call with transaction data
+   * @param cb_cls closure for @a cb
+   * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
+   *         upon error
+   */
+  int
+  (*find_transactions_by_date) (void *cls,
+                                struct GNUNET_TIME_Absolute date,
+                                TALER_MERCHANTDB_TransactionCallback cb,
+                                void *cb_cls);
+
+  /**
+   * Find information about a transaction.
+   *
+   * @param cls our plugin handle
    * @param transaction_id the transaction id to search
    * @param cb function to call with transaction data
    * @param cb_cls closure for @a cb

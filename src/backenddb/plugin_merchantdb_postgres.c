@@ -256,7 +256,7 @@ postgres_initialize (void *cls)
               5);
 
   PG_PREPARE (pg,
-              "find_transaction_by_date",
+              "find_transactions_by_date",
               "SELECT"
               " exchange_uri"
               ",h_contract"
@@ -552,7 +552,7 @@ postgres_store_transfer_to_proof (void *cls,
  *         upon error
  */
 static int
-postgres_find_transaction_by_date (void *cls,
+postgres_find_transactions_by_date (void *cls,
                                    struct GNUNET_TIME_Absolute date,
                                    TALER_MERCHANTDB_TransactionCallback cb,
                                    void *cb_cls)
@@ -565,7 +565,7 @@ postgres_find_transaction_by_date (void *cls,
     GNUNET_PQ_query_param_end
   };
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_transaction_by_date",
+                                    "find_transactions_by_date",
                                     params);
   if (PGRES_TUPLES_OK != PQresultStatus (result))
   {
@@ -1089,6 +1089,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
   plugin->find_transaction_by_id = &postgres_find_transaction_by_id;
+  plugin->find_transactions_by_date = &postgres_find_transactions_by_date;
   plugin->find_payments_by_id = &postgres_find_payments_by_id;
   plugin->find_transfers_by_id = &postgres_find_transfers_by_id;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
