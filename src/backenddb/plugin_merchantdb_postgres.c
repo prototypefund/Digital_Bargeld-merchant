@@ -268,7 +268,7 @@ postgres_initialize (void *cls)
               ",total_amount_frac"
               ",total_amount_curr"
               " FROM merchant_transactions"
-              " WHERE timestamp<=$1",
+              " WHERE timestamp>=$1",
               1);
 
   /* Setup prepared "SELECT" statements */
@@ -543,7 +543,7 @@ postgres_store_transfer_to_proof (void *cls,
 }
 
 /**
- * Return transactions older than the given date
+ * Return transactions younger than the given date
  *
  * @param cls our plugin handle
  * @param date limit to transactions' age

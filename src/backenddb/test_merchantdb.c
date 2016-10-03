@@ -301,7 +301,7 @@ run (void *cls)
   timestamp = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&timestamp);
   delta = GNUNET_TIME_UNIT_MINUTES;
-  fake_now = GNUNET_TIME_absolute_add (timestamp, delta);
+  fake_now = GNUNET_TIME_absolute_subtract (timestamp, delta);
   refund_deadline = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&refund_deadline);
   GNUNET_assert (GNUNET_OK ==
