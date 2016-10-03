@@ -38,7 +38,10 @@
  */
 #define PAY_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
-extern struct MerchantInstance **instances;
+/**
+ * The instance which is working this request
+ */
+struct MerchantInstance *mi;
 
 
 /**
@@ -46,6 +49,15 @@ extern struct MerchantInstance **instances;
  */
 struct PayContext;
 
+/**
+ * Information to return to the wallet whenever the merchant does
+ * not echo back something returned by the exchange. Currently used
+ * to return signed 200 OK responses
+ */
+struct MerchantResponse
+{
+  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
+};
 
 /**
  * Information kept during a /pay request for each coin.
@@ -343,6 +355,8 @@ deposit_cb (void *cls,
 {
   struct DepositConfirmation *dc = cls;
   struct PayContext *pc = dc->pc;
+  struct GNUNET_CRYPTO_EddsaSignature sig;
+  struct MerchantResponse mr;
 
   dc->dh = NULL;
   pc->pending--;
@@ -403,11 +417,18 @@ deposit_cb (void *cls,
 
   if (0 != pc->pending)
     return; /* still more to do */
+
+  
+  mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
+  mr.purpose.size = htonl (sizeof (mr));
+
+  GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
+                            &mr.purpose,
+			    &sig);
   resume_pay_with_response (pc,
                             MHD_HTTP_OK,
-                            MHD_create_response_from_buffer (0,
-                                                             NULL,
-                                                             MHD_RESPMEM_PERSISTENT));
+                            TMH_RESPONSE_make_json_pack ("{s:s}",
+                                                         "merchant_sig", GNUNET_JSON_from_data_auto (&sig)));
 }
 
 
@@ -891,6 +912,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES; /* the POST's body has to be further fetched */
 
+  mi = get_instance (root);
+
   /* Got the JSON upload, parse it */
   {
     json_t *coins;
@@ -1018,6 +1041,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     pc->dc = GNUNET_new_array (pc->coins_cnt,
                                struct DepositConfirmation);
 
+    /* This loop populates the array 'dc' in 'pc' */
     json_array_foreach (coins, coins_index, coin)
     {
       struct DepositConfirmation *dc = &pc->dc[coins_index];
