@@ -165,7 +165,12 @@ enum OpCode
   /**
    * Retrieve wire transfer details for a given transaction
    */
-  OC_TRACK_TRANSACTION
+  OC_TRACK_TRANSACTION,
+
+  /**
+   * Test getting transactions based on timestamp
+   */
+  OC_HISTORY
 
 };
 
@@ -525,6 +530,27 @@ struct Command
       struct TALER_MERCHANT_TrackTransactionHandle *tth;
 
     } track_transaction;
+
+    struct {
+      /**
+       * Date we want retrieved transactions younger than
+       */
+      struct GNUNET_TIME_Absolute date;
+
+      /**
+       * How many "rows" we expect in the result
+       */
+      unsigned int nresult;
+      
+      /**
+       * Handle to the merchant
+       */
+      
+      /*TBD*/
+      
+    } history;
+
+
 
   } details;
 

@@ -547,7 +547,7 @@ postgres_store_transfer_to_proof (void *cls,
  *
  * @param cls our plugin handle
  * @param date limit to transactions' age
- * @param cb function to call with transaction data
+ * @param cb function to call with transaction data, can be NULL
  * @param cb_cls closure for @a cb
  * @return numer of found tuples, #GNUNET_SYSERR upon error
  */
@@ -576,10 +576,10 @@ postgres_find_transactions_by_date (void *cls,
     PQclear (result);
     return GNUNET_SYSERR;
   }
-  if (0 == (n = PQntuples (result)))
+  if (0 == (n = PQntuples (result)) || NULL == cb)
   {
     PQclear (result);
-    return 0;
+    return n;
   }
   for (i = 0; i < n; i++)
   {
