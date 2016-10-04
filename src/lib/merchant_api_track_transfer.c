@@ -296,7 +296,7 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                                   sizeof (struct TALER_WireTransferIdentifierRawP));
   tdo = GNUNET_new (struct TALER_MERCHANT_TrackTransferHandle);
   tdo->ctx = ctx;
-  tdo->cb = track_transfer_cb;
+  tdo->cb = track_transfer_cb; // very last to be called
   tdo->cb_cls = track_transfer_cb_cls;
   /* TODO: do we need to escape 'exchange_uri' here? */
   GNUNET_asprintf (&tdo->url,

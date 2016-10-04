@@ -473,5 +473,30 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
 void
 TALER_MERCHANT_track_transaction_cancel (struct TALER_MERCHANT_TrackTransactionHandle *tdo);
 
+/* ********************* /history *********************** */
+
+struct TALER_MERCHANT_HistoryOperation;
+
+/**
+ * Callback for a /history request. It's up to this function how
+ * to render the array containing transactions details (FIXME link to
+ * documentation)
+ *
+ * @param cls closure
+ * @param http_status HTTP status returned by the merchant backend
+ * @param json actual body containing history
+ */
+
+typedef void
+(*TALER_MERCHANT_HistoryOperationCallback) (void *cls,
+                                            unsigned int http_status,
+                                            const json_t *json);
+
+
+struct TALER_MERCHANT_HistoryOperation *
+TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
+                        const char *backend_uri,
+                        TALER_MERCHANT_HistoryOperationCallback history_cb,
+                        void *history_cb_cls);
 
 #endif  /* _TALER_MERCHANT_SERVICE_H */
