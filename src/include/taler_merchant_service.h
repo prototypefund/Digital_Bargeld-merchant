@@ -486,16 +486,25 @@ struct TALER_MERCHANT_HistoryOperation;
  * @param http_status HTTP status returned by the merchant backend
  * @param json actual body containing history
  */
-
 typedef void
 (*TALER_MERCHANT_HistoryOperationCallback) (void *cls,
                                             unsigned int http_status,
                                             const json_t *json);
 
-
+/**
+ * Issue a /history request to the backend.
+ *
+ * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
+ * @param date only transactions younger than/equals to date will be returned
+ * @param history_cb callback which will work the response gotten from the backend
+ * @param history_cb_cls closure to pass to history_cb
+ * @return handle for this operation, NULL upon errors
+ */
 struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                         const char *backend_uri,
+                        struct GNUNET_TIME_Absolute date,
                         TALER_MERCHANT_HistoryOperationCallback history_cb,
                         void *history_cb_cls);
 
