@@ -204,7 +204,7 @@ url_handler (void *cls,
   unsigned int i;
   int ret;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Handling request for URL `%s'\n",
               url);
   for (i=0;NULL != handlers[i].url;i++)

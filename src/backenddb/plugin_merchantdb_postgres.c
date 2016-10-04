@@ -628,7 +628,7 @@ postgres_find_transactions_by_date (void *cls,
     GNUNET_PQ_cleanup_result (rs);
   }
   PQclear (result);
-  return GNUNET_OK;
+  return n;
 }				 
 
 /**

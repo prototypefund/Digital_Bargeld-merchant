@@ -253,8 +253,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param transaction_id the transaction id to search
    * @param cb function to call with transaction data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
-   *         upon error
+   * @return number of found tuples, #GNUNET_SYSERR upon error
    */
   int
   (*find_transaction_by_id) (void *cls,
