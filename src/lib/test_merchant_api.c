@@ -31,6 +31,11 @@
 #include <microhttpd.h>
 
 /**
+ * Shortcut
+ */
+#define LOG_INFO(...) GNUNET_log(GNUNET_ERROR_TYPE_INFO, __VA_ARGS__)
+
+/**
  * URI under which the merchant is reachable during the testcase.
  */
 #define MERCHANT_URI "http://localhost:8082"
@@ -546,7 +551,10 @@ struct Command
        * Handle to the merchant
        */
       
-      /*TBD*/
+      /**
+       * Handle to /history request
+       */
+      struct TALER_MERCHANT_HistoryOperation *ho;
       
     } history;
 
@@ -731,6 +739,31 @@ add_incoming_cb (void *cls,
   next_command (is);
 }
 
+
+/**
+ * Callback for a /history request. It's up to this function how
+ * to render the array containing transactions details (FIXME link to
+ * documentation)
+ *
+ * @param cls closure
+ * @param http_status HTTP status returned by the merchant backend
+ * @param json actual body containing history
+ */
+void
+history_cb (void *cls,
+            unsigned int http_status,
+            const json_t *json)
+{
+  struct InterpreterState *is = cls;
+
+  if (MHD_HTTP_OK != http_status)
+  {
+    fail (is);
+    return;
+  }
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "Got 200 OK from /history!\n");
+
+}	    
 
 /**
  * Check if the given historic event @a h corresponds to the given
@@ -1812,6 +1845,7 @@ interpreter_run (void *cls)
     ref = find_command (is,
                         cmd->details.track_transaction.pay_ref);
     GNUNET_assert (NULL != ref);
+    /*FIXME check/assert return code */
     cmd->details.track_transaction.tth =
       TALER_MERCHANT_track_transaction (ctx,
                                         MERCHANT_URI,
@@ -1820,6 +1854,23 @@ interpreter_run (void *cls)
                                         &track_transaction_cb,
                                         is);
     return;
+  case OC_HISTORY:
+
+    LOG_INFO("Processing history\n");
+    return;
+
+    if (NULL ==
+       (cmd->details.history.ho = TALER_MERCHANT_history (ctx,
+	                                                  MERCHANT_URI,
+	                                                  cmd->details.history.date,
+							  history_cb,
+							  is)))
+    {
+      fail (is); 
+      return;
+    }							  
+  break; 
+    
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
@@ -1971,6 +2022,15 @@ do_shutdown (void *cls)
         cmd->details.track_transaction.tth = NULL;
       }
       break;
+    case OC_HISTORY:
+      
+      if (NULL != cmd->details.history.ho)
+      {
+        TALER_MERCHANT_history_cancel (cmd->details.history.ho);
+        cmd->details.history.ho = NULL;
+      }
+      break;
+
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -2237,8 +2297,7 @@ run (void *cls)
       .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2"
     },
     { .oc = OC_TRACK_TRANSACTION,
-      .label = "track-transaction-2-again",
-      .expected_response_code = MHD_HTTP_OK,
+      .label = "track-transaction-2-again", .expected_response_code = MHD_HTTP_OK,
       .details.track_transaction.pay_ref = "deposit-simple-2",
       .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2"
     },
@@ -2256,7 +2315,23 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
     },
-
+    /**
+     * NOTE: could NOT initialize timestamps by calling GNUNET_TIME_xy ()
+     * because that used to give a 'Initializer element is not constant'
+     * error at compile time.
+     */
+    { .oc = OC_HISTORY,
+      .label = "history-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.history.date.abs_value_us = 0,
+      .details.history.nresult = 2
+    },
+    { .oc = OC_HISTORY,
+      .label = "history-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.history.date.abs_value_us = 2000000000 * 1000LL *1000LL,
+      .details.history.nresult = 0
+    },
     /* end of testcase */
     { .oc = OC_END }
   };

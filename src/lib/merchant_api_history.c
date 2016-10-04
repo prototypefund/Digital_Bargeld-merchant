@@ -16,8 +16,8 @@
 */
 /**
  * @file lib/merchant_api_contract.c
- * @brief Implementation of the /contract request of the merchant's HTTP API
- * @author Christian Grothoff
+ * @brief Implementation of the /history request of the merchant's HTTP API
+ * @author Marcello Stanisci
  */
 #include "platform.h"
 #include <curl/curl.h>
@@ -67,9 +67,15 @@ struct TALER_MERCHANT_HistoryOperation
  * @param handle from the operation to cancel
  */
 void
-TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *handle)
+TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *ho)
 {
-  /*TBD*/
+  if (NULL != ho->job)
+  {
+    GNUNET_CURL_job_cancel (ho->job);
+    ho->job = NULL;
+  }
+  GNUNET_free (ho->url);
+  GNUNET_free (ho);
 }
 
 
@@ -153,17 +159,25 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                    backend_uri,
                    seconds);
   eh = curl_easy_init ();
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_URL,
-                                   ho->url));
+  if (CURLE_OK != curl_easy_setopt (eh,
+                                    CURLOPT_URL,
+                                    ho->url))
+  {
+    GNUNET_break (0);  
+    return NULL;
+  }    
 
 
-  ho->job = GNUNET_CURL_job_add (ctx,
-                                 eh,
-                                 GNUNET_YES,
-                                 &history_raw_cb,
-                                 ho);
+
+  if (NULL == (ho->job = GNUNET_CURL_job_add (ctx,
+                                              eh,
+                                              GNUNET_YES,
+                                              &history_raw_cb,
+                                              ho)))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   return ho;
 }                        
 

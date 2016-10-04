@@ -516,6 +516,6 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
  * @param handle from the operation to cancel
  */
 void
-TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *handle);
+TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *ho);
 
 #endif  /* _TALER_MERCHANT_SERVICE_H */
