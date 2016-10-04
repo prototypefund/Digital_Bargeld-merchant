@@ -62,6 +62,18 @@ struct TALER_MERCHANT_HistoryOperation
 };
 
 /**
+ * Cancel a pending /history request
+ *
+ * @param handle from the operation to cancel
+ */
+void
+TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *handle)
+{
+  /*TBD*/
+}
+
+
+/**
  * Function called when we're done processing the
  * HTTP /track/transaction request.
  *
@@ -74,8 +86,39 @@ history_raw_cb (void *cls,
                 long response_code,
                 const json_t *json)
 {
+  struct TALER_MERCHANT_HistoryOperation *ho = cls;
 
+  ho->job = NULL;
 
+  switch (response_code)
+  {
+  case 0:
+    break;
+  case MHD_HTTP_OK:
+    ho->cb (ho->cb_cls,
+            response_code,
+            json);
+    break;
+  case MHD_HTTP_INTERNAL_SERVER_ERROR:
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "history URI not found\n");
+    break;
+  
+  case MHD_HTTP_BAD_REQUEST:
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "Wrong parameter passed in URL\n");
+    break;
+  default:
+    /* unexpected response code */
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u\n",
+                (unsigned int) response_code);
+    GNUNET_break (0);
+    response_code = 0;
+    break;
+  }
+  ho->cb (ho->cb_cls,
+          response_code,
+          json);
+  TALER_MERCHANT_history_cancel (ho);
 
 }
 

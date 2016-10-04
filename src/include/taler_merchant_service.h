@@ -508,4 +508,14 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                         TALER_MERCHANT_HistoryOperationCallback history_cb,
                         void *history_cb_cls);
 
+
+
+/**
+ * Cancel a pending /history request
+ *
+ * @param handle from the operation to cancel
+ */
+void
+TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *handle);
+
 #endif  /* _TALER_MERCHANT_SERVICE_H */
