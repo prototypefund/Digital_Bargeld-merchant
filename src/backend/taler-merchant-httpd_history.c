@@ -86,6 +86,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute date;
   json_t *response;
   unsigned int ret;
+  uint64_t seconds;
   
   response = json_array (); /*FIXME who decrefs this?*/
   str = MHD_lookup_connection_value (connection,
@@ -96,9 +97,13 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_bad_request (connection,
                                            "date argument missing");
 
-  if (1 != sscanf (str, "%llu", &date.abs_value_us))
+  if (1 != sscanf (str, "%llu", &seconds))
     return TMH_RESPONSE_reply_bad_request (connection,
                                            "date argument must be a timestamp");
+  date.abs_value_us = seconds * 1000LL * 1000LL;
+  if (date.abs_value_us / 1000LL / 1000LL != seconds)
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           "Timestamp overflowed");
   ret = db->find_transactions_by_date (db->cls,
                                        date,
                                        history_cb,
