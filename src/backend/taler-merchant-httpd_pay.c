@@ -420,9 +420,6 @@ deposit_cb (void *cls,
                             TMH_RESPONSE_make_json_pack ("{s:s}",
                                                          "merchant_sig",
 							 json_string_value (GNUNET_JSON_from_data_auto (&sig))));
-  GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-              "responding with: %s\n",
-	      json_string_value (GNUNET_JSON_from_data_auto (&sig)));
 }
 
 

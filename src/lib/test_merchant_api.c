@@ -31,11 +31,6 @@
 #include <microhttpd.h>
 
 /**
- * Shortcut
- */
-#define LOG_INFO(...) GNUNET_log(GNUNET_ERROR_TYPE_INFO, __VA_ARGS__)
-
-/**
  * URI under which the merchant is reachable during the testcase.
  */
 #define MERCHANT_URI "http://localhost:8082"
@@ -755,14 +750,24 @@ history_cb (void *cls,
             const json_t *json)
 {
   struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  unsigned int nelements;
 
   if (MHD_HTTP_OK != http_status)
   {
     fail (is);
     return;
   }
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "Got 200 OK from /history!\n");
+  nelements = json_array_size (json);
+  if (nelements != (cmd->details.history.nresult * (receiver_idx + 1)))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Did not get as many history entries as expected\n"); 
+    fail (is);
+    return;
+  }
 
+  next_command (is);
 }	    
 
 /**
@@ -1086,10 +1091,6 @@ pay_cb (void *cls,
                  (jsig = json_object_get (obj, "merchant_sig")));
     mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Got DP: %s\n",
-  	      json_dumps (obj,
-  	                  JSON_INDENT (2)));
     GNUNET_assert (GNUNET_OK ==
                    GNUNET_STRINGS_string_to_data (json_string_value (jsig),
                                                   strlen (json_string_value (jsig)),
@@ -1438,8 +1439,8 @@ interpreter_run (void *cls)
     is->ip = 0;
     receiver_idx++;
     receiver = instances[receiver_idx];
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Switching instance: '%s'",
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Switching instance: '%s'\n",
                 receiver);
     get_new_contracts(is->commands);
     is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
@@ -1773,6 +1774,7 @@ interpreter_run (void *cls)
                                    NULL, NULL, NULL,
                                    "taler-exchange-aggregator",
                                    "taler-exchange-aggregator",
+				   "-l", "/tmp/a/log",
                                    "-c", "test_merchant_api.conf",
                                    "-t", /* exit when done */
                                    NULL);
@@ -1855,9 +1857,6 @@ interpreter_run (void *cls)
                                         is);
     return;
   case OC_HISTORY:
-
-    LOG_INFO("Processing history\n");
-    return;
 
     if (NULL ==
        (cmd->details.history.ho = TALER_MERCHANT_history (ctx,
@@ -2317,8 +2316,7 @@ run (void *cls)
     },
     /**
      * NOTE: could NOT initialize timestamps by calling GNUNET_TIME_xy ()
-     * because that used to give a 'Initializer element is not constant'
-     * error at compile time.
+     * because that raised a 'Initializer element is not constant' when compiling.
      */
     { .oc = OC_HISTORY,
       .label = "history-1",
@@ -2329,7 +2327,7 @@ run (void *cls)
     { .oc = OC_HISTORY,
       .label = "history-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.history.date.abs_value_us = 2000000000 * 1000LL *1000LL,
+      .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
       .details.history.nresult = 0
     },
     /* end of testcase */
@@ -2555,5 +2553,3 @@ main (int argc,
     return 77;
   return (GNUNET_OK == result) ? 0 : 1;
 }
-
-/* end of test_merchant_api.c */

@@ -104,6 +104,7 @@ history_raw_cb (void *cls,
     ho->cb (ho->cb_cls,
             response_code,
             json);
+    return;
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     GNUNET_log (GNUNET_ERROR_TYPE_INFO, "history URI not found\n");
@@ -125,7 +126,6 @@ history_raw_cb (void *cls,
           response_code,
           json);
   TALER_MERCHANT_history_cancel (ho);
-
 }
 
 /**
@@ -155,7 +155,7 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
   ho->cb_cls = history_cb_cls;
   seconds = date.abs_value_us / 1000LL / 1000LL;
   GNUNET_asprintf (&ho->url,
-                   "%s?date=%llu",
+                   "%s/history?date=%llu",
                    backend_uri,
                    seconds);
   eh = curl_easy_init ();
