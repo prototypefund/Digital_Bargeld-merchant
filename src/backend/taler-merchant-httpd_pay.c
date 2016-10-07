@@ -411,15 +411,19 @@ deposit_cb (void *cls,
   
   mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
   mr.purpose.size = htonl (sizeof (mr));
+  mr.h_contract = pc->h_contract;
 
   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                             &mr.purpose,
 			    &sig);
   resume_pay_with_response (pc,
                             MHD_HTTP_OK,
-                            TMH_RESPONSE_make_json_pack ("{s:s}",
+                            TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                          "merchant_sig",
-							 json_string_value (GNUNET_JSON_from_data_auto (&sig))));
+							 json_string_value (GNUNET_JSON_from_data_auto (&sig)),
+                                                         "h_contract",
+                                                         GNUNET_JSON_from_data (&pc->h_contract,
+                                                                                sizeof (struct GNUNET_HashCode))));
 }
 
 

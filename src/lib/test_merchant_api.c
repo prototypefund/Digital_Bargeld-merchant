@@ -1071,7 +1071,9 @@ pay_cb (void *cls,
   struct Command *cmd = &is->commands[is->ip];
   struct PaymentResponsePS mr;
   struct GNUNET_CRYPTO_EddsaSignature sig;
-  json_t *jsig;
+  struct GNUNET_HashCode h_contract;
+  const char *error_name;
+  unsigned int error_line;
 
   cmd->details.pay.ph = NULL;
   if (cmd->expected_response_code != http_status)
@@ -1087,20 +1089,33 @@ pay_cb (void *cls,
   if (MHD_HTTP_OK == http_status)
   {
     /* Check signature */ 
-    GNUNET_break (NULL !=
-                 (jsig = json_object_get (obj, "merchant_sig")));
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_fixed_auto ("merchant_sig", &sig),
+      GNUNET_JSON_spec_fixed_auto ("h_contract", &h_contract),
+      GNUNET_JSON_spec_end ()    
+    };
+    if (GNUNET_OK !=
+        GNUNET_JSON_parse (obj,
+                           spec,
+                           &error_name,
+                           &error_line))
+    {
+      GNUNET_break_op (0);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Parser failed on %s:%u\n",
+                  error_name,
+                  error_line);
+      fail (is);
+      return;
+    }
     mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
-    GNUNET_assert (GNUNET_OK ==
-                   GNUNET_STRINGS_string_to_data (json_string_value (jsig),
-                                                  strlen (json_string_value (jsig)),
-  			                        &sig,
-                                                  sizeof (sig)));
+    mr.h_contract = h_contract;
     if (GNUNET_OK !=
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
                                     &mr.purpose,
-  				  &sig,
-  				  &cmd->details.pay.merchant_pub.eddsa_pub))
+  		                    &sig,
+  				    &cmd->details.pay.merchant_pub.eddsa_pub))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Merchant signature given in response to /pay invalid\n");
