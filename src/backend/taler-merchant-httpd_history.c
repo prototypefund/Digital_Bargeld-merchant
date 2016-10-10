@@ -86,7 +86,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute date;
   json_t *response;
   unsigned int ret;
-  uint64_t seconds;
+  unsigned long long seconds;
   
   response = json_array (); /*FIXME who decrefs this?*/
   str = MHD_lookup_connection_value (connection,
