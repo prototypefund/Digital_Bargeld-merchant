@@ -1,3 +1,12 @@
+Mon Oct 10 16:27:57 CEST 2016
+        Implementing:
+        - /track API, to map transactions to wire transfers and
+        viceversa.
+        - /history API, to get the list of transactions in DB.
+        - merchant "instances", to run make multiple shops on the
+        same backend.
+        -MS
+
 Tue Jun  7 15:17:45 CEST 2016
 	Store signing key used by exchange in DB.  Might be useful
 	in the future when we implement GC for the backenddb. -CG
