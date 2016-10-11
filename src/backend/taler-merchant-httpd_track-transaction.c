@@ -853,9 +853,8 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   GNUNET_CRYPTO_hash (receiver,
                       strlen (receiver),
                       &h_receiver);
-  tctx->mi = NULL;
-  GNUNET_assert (NULL != (tctx->mi = GNUNET_CONTAINER_multihashmap_get (by_id_map,
-                                                                        &h_receiver)));
+  tctx->mi = GNUNET_CONTAINER_multihashmap_get (by_id_map,
+                                                &h_receiver);
   if (NULL == tctx->mi)
     return TMH_RESPONSE_reply_bad_request (connection,
                                            "unknown receiver");
