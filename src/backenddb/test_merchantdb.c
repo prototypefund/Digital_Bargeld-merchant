@@ -136,6 +136,7 @@ static json_t *transfer_proof;
  *
  * @param cls closure
  * @param transaction_id of the contract
+ * @param merchant_pub public key of the merchant
  * @param exchange_uri URI of the exchange
  * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
@@ -146,6 +147,7 @@ static json_t *transfer_proof;
 static void
 transaction_cb (void *cls,
                 uint64_t atransaction_id,
+		const struct TALER_MerchantPublicKeyP *amerchant_pub,
                 const char *aexchange_uri,
                 const struct GNUNET_HashCode *ah_contract,
                 const struct GNUNET_HashCode *ah_wire,
@@ -155,6 +157,9 @@ transaction_cb (void *cls,
 {
 #define CHECK(a) do { if (! (a)) { GNUNET_break (0); result = 3; } } while (0)
   CHECK (atransaction_id == transaction_id);
+  CHECK (0 == memcmp (amerchant_pub,
+                      &merchant_pub,
+		      sizeof (struct TALER_MerchantPublicKeyP)));
   CHECK (0 == strcmp (aexchange_uri,
                       EXCHANGE_URI));
   CHECK (0 == memcmp (ah_contract,
@@ -176,6 +181,7 @@ transaction_cb (void *cls,
  *
  * @param cls closure
  * @param transaction_id of the contract
+ * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
  * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
@@ -187,6 +193,7 @@ transaction_cb (void *cls,
 static void
 history_cb (void *cls,
             uint64_t transaction_id,
+	    const struct TALER_MerchantPublicKeyP *merchant_pub,
             const char *exchange_uri,
             const struct GNUNET_HashCode *h_contract,
             const struct GNUNET_HashCode *h_wire,
@@ -359,10 +366,11 @@ run (void *cls)
                                            &signkey_pub,
                                            transfer_proof));
   FAILIF (GNUNET_OK !=
-          plugin->find_transaction_by_id (plugin->cls,
-                                          transaction_id,
-                                          &transaction_cb,
-                                          NULL));
+          plugin->find_transaction (plugin->cls,
+                                    transaction_id,
+				    &merchant_pub,
+                                    &transaction_cb,
+                                    NULL));
 
   /* FIXME: put here find_transactions_by_date () */
   FAILIF (1 !=

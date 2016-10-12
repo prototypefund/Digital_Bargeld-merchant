@@ -36,6 +36,7 @@ struct TALER_MERCHANTDB_Plugin;
  *
  * @param cls closure
  * @param transaction_id of the contract
+ * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
  * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
@@ -46,6 +47,7 @@ struct TALER_MERCHANTDB_Plugin;
 typedef void
 (*TALER_MERCHANTDB_TransactionCallback)(void *cls,
                                         uint64_t transaction_id,
+					const struct TALER_MerchantPublicKeyP *merchant_pub,
                                         const char *exchange_uri,
                                         const struct GNUNET_HashCode *h_contract,
                                         const struct GNUNET_HashCode *h_wire,
@@ -253,15 +255,18 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls our plugin handle
    * @param transaction_id the transaction id to search
+   * @param merchant_pub merchant's public key. It's AND'd with transaction_id
+   * in order to find the result.
    * @param cb function to call with transaction data
    * @param cb_cls closure for @a cb
    * @return number of found tuples, #GNUNET_SYSERR upon error
    */
   int
-  (*find_transaction_by_id) (void *cls,
-                             uint64_t transaction_id,
-                             TALER_MERCHANTDB_TransactionCallback cb,
-                             void *cb_cls);
+  (*find_transaction) (void *cls,
+                       uint64_t transaction_id,
+		       const struct TALER_MerchantPublicKeyP *merchant_pub,
+                       TALER_MERCHANTDB_TransactionCallback cb,
+                       void *cb_cls);
 
 
   /**

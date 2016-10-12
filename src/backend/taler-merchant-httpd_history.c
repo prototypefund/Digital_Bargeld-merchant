@@ -31,6 +31,7 @@
  *
  * @param cls closure
  * @param transaction_id of the contract
+ * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
  * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
@@ -42,6 +43,7 @@
 static void
 history_cb (void *cls,
             uint64_t transaction_id,
+	    const struct TALER_MerchantPublicKeyP *merchant_pub,
             const char *exchange_uri,
             const struct GNUNET_HashCode *h_contract,
             const struct GNUNET_HashCode *h_wire,

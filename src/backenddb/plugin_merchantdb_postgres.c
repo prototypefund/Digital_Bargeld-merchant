@@ -262,6 +262,7 @@ postgres_initialize (void *cls)
               "find_transactions_by_date",
               "SELECT"
               " transaction_id"
+	      ",merchant_pub"
               ",exchange_uri"
               ",h_contract"
               ",h_wire"
@@ -287,8 +288,9 @@ postgres_initialize (void *cls)
               ",total_amount_frac"
               ",total_amount_curr"
               " FROM merchant_transactions"
-              " WHERE transaction_id=$1",
-              1);
+              " WHERE transaction_id=$1"
+	      " AND merchant_pub=$2",
+              2);
   PG_PREPARE (pg,
               "find_deposits",
               "SELECT"
@@ -589,6 +591,7 @@ postgres_find_transactions_by_date (void *cls,
   }
   for (i = 0; i < n; i++)
   {
+    struct TALER_MerchantPublicKeyP merchant_pub;
     char *exchange_uri;
     struct GNUNET_HashCode h_contract;
     struct GNUNET_HashCode h_wire;
@@ -601,6 +604,8 @@ postgres_find_transactions_by_date (void *cls,
                                     &exchange_uri),
       GNUNET_PQ_result_spec_uint64 ("transaction_id",
                                     &transaction_id),
+      GNUNET_PQ_result_spec_auto_from_type ("merchant_pub",
+                                            &merchant_pub),				    
       GNUNET_PQ_result_spec_auto_from_type ("h_contract",
                                             &h_contract),
       GNUNET_PQ_result_spec_auto_from_type ("h_wire",
@@ -625,6 +630,7 @@ postgres_find_transactions_by_date (void *cls,
     }
     cb (cb_cls,
         transaction_id,
+	&merchant_pub,
         exchange_uri,
         &h_contract,
         &h_wire,
@@ -642,21 +648,25 @@ postgres_find_transactions_by_date (void *cls,
  *
  * @param cls our plugin handle
  * @param transaction_id the transaction id to search
+ * @param merchant_pub merchant's public key. It's AND'd with transaction_id
+ * in order to find the result.
  * @param cb function to call with transaction data
  * @param cb_cls closure for @a cb
  * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
  *         upon error
  */
 static int
-postgres_find_transaction_by_id (void *cls,
-                                 uint64_t transaction_id,
-                                 TALER_MERCHANTDB_TransactionCallback cb,
-                                 void *cb_cls)
+postgres_find_transaction (void *cls,
+                           uint64_t transaction_id,
+			   const struct TALER_MerchantPublicKeyP *merchant_pub,
+                           TALER_MERCHANTDB_TransactionCallback cb,
+                           void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
 
@@ -715,6 +725,7 @@ postgres_find_transaction_by_id (void *cls,
     }
     cb (cb_cls,
         transaction_id,
+	merchant_pub,
         exchange_uri,
         &h_contract,
         &h_wire,
@@ -1098,7 +1109,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->store_deposit = &postgres_store_deposit;
   plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
-  plugin->find_transaction_by_id = &postgres_find_transaction_by_id;
+  plugin->find_transaction = &postgres_find_transaction;
   plugin->find_transactions_by_date = &postgres_find_transactions_by_date;
   plugin->find_payments_by_id = &postgres_find_payments_by_id;
   plugin->find_transfers_by_id = &postgres_find_transfers_by_id;

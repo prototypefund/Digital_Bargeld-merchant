@@ -670,6 +670,7 @@ handle_track_transaction_timeout (void *cls)
  *
  * @param cls closure
  * @param transaction_id of the contract
+ * @param merchant's public key
  * @param exchange_uri URI of the exchange
  * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
@@ -680,6 +681,7 @@ handle_track_transaction_timeout (void *cls)
 static void
 transaction_cb (void *cls,
                 uint64_t transaction_id,
+		const struct TALER_MerchantPublicKeyP *merchant_pub,
                 const char *exchange_uri,
                 const struct GNUNET_HashCode *h_contract,
                 const struct GNUNET_HashCode *h_wire,
@@ -865,10 +867,11 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_bad_request (connection,
                                            "id argument must be a number");
 
-  ret = db->find_transaction_by_id (db->cls,
-                                    transaction_id,
-                                    &transaction_cb,
-                                    tctx);
+  ret = db->find_transaction (db->cls,
+                              transaction_id,
+			      &tctx->mi->pubkey,
+                              &transaction_cb,
+                              tctx);
   if (GNUNET_NO == ret)
   {
     return TMH_RESPONSE_reply_not_found (connection,
