@@ -348,6 +348,7 @@ run (void *cls)
   FAILIF (GNUNET_OK !=
           plugin->store_deposit (plugin->cls,
                                  transaction_id,
+				 &merchant_pub,
                                  &coin_pub,
                                  &amount_with_fee,
                                  &deposit_fee,

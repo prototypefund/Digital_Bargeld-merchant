@@ -1457,7 +1457,7 @@ interpreter_run (void *cls)
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Switching instance: '%s'\n",
                 receiver);
-    get_new_contracts(is->commands);
+    /*get_new_contracts(is->commands);*/
     is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
                                          is);
     return;
@@ -2169,7 +2169,17 @@ run (void *cls)
     /* Create contract */
     { .oc = OC_CONTRACT,
       .label = "create-contract-1",
-      .expected_response_code = MHD_HTTP_OK },
+      .expected_response_code = MHD_HTTP_OK,
+      .details.contract.proposal = "{\
+                  \"max_fee\":\
+                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":500000},\
+                  \"transaction_id\":1,\
+                  \"timestamp\":\"\\/Date(42)\\/\",\
+                  \"refund_deadline\":\"\\/Date(0)\\/\",\
+                  \"expiry\":\"\\/Date(999999999)\\/\",\
+                  \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
+                  \"products\":\
+                     [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }"},
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
@@ -2181,7 +2191,17 @@ run (void *cls)
 
     { .oc = OC_CONTRACT,
       .label = "create-contract-2",
-      .expected_response_code = MHD_HTTP_OK },
+      .expected_response_code = MHD_HTTP_OK,
+      .details.contract.proposal = "{\
+                  \"max_fee\":\
+                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":500000},\
+                  \"transaction_id\":2,\
+                  \"timestamp\":\"\\/Date(42)\\/\",\
+                  \"refund_deadline\":\"\\/Date(0)\\/\",\
+                  \"expiry\":\"\\/Date(999999999)\\/\",\
+                  \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
+                  \"products\":\
+                     [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        transaction ID) */
     { .oc = OC_PAY,
@@ -2348,7 +2368,7 @@ run (void *cls)
     /* end of testcase */
     { .oc = OC_END }
   };
-  get_new_contracts (commands);
+  /*get_new_contracts (commands);*/
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Interpreter initializing\n");

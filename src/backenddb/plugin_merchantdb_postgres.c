@@ -155,7 +155,7 @@ postgres_initialize (void *cls)
   /* Setup tables */
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_transactions ("
-           " transaction_id INT8 UNIQUE"
+           " transaction_id INT8"
            ",exchange_uri VARCHAR NOT NULL"
 	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
            ",h_contract BYTEA NOT NULL CHECK (LENGTH(h_contract)=64)"
@@ -169,7 +169,9 @@ postgres_initialize (void *cls)
            ");");
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_deposits ("
-           " transaction_id INT8 REFERENCES merchant_transactions (transaction_id)"
+	   " transaction_id INT8"
+	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+	   ",FOREIGN KEY (transaction_id, merchant_pub) REFERENCES merchant_transactions (transaction_id, merchant_pub)"
            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
            ",amount_with_fee_val INT8 NOT NULL"
            ",amount_with_fee_frac INT4 NOT NULL"
@@ -228,6 +230,7 @@ postgres_initialize (void *cls)
               "insert_deposit",
               "INSERT INTO merchant_deposits"
               "(transaction_id"
+	      ",merchant_pub"
               ",coin_pub"
               ",amount_with_fee_val"
               ",amount_with_fee_frac"
@@ -237,8 +240,8 @@ postgres_initialize (void *cls)
               ",deposit_fee_curr"
               ",signkey_pub"
               ",exchange_proof) VALUES "
-              "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-              10);
+              "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+              11);
   PG_PREPARE (pg,
               "insert_transfer",
               "INSERT INTO merchant_transfers"
@@ -410,6 +413,7 @@ postgres_store_transaction (void *cls,
  *
  * @param cls closure
  * @param transaction_id of the contract
+ * @param merchant_pub merchant's public key
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
@@ -420,6 +424,7 @@ postgres_store_transaction (void *cls,
 static int
 postgres_store_deposit (void *cls,
                         uint64_t transaction_id,
+                        const struct TALER_MerchantPublicKeyP *merchant_pub,
                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
                         const struct TALER_Amount *amount_with_fee,
                         const struct TALER_Amount *deposit_fee,
@@ -432,6 +437,7 @@ postgres_store_deposit (void *cls,
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     TALER_PQ_query_param_amount (amount_with_fee),
     TALER_PQ_query_param_amount (deposit_fee),

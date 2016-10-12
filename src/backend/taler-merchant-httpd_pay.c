@@ -389,6 +389,7 @@ deposit_cb (void *cls,
   if (GNUNET_OK !=
       db->store_deposit (db->cls,
 			 pc->transaction_id,
+			 &pc->mi->pubkey,
 			 &dc->coin_pub,
 			 &dc->amount_with_fee,
 			 &dc->deposit_fee,

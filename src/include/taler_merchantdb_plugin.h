@@ -179,6 +179,7 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls closure
    * @param transaction_id of the contract
+   * @param merchant_pub merchant's public key
    * @param coin_pub public key of the coin
    * @param amount_with_fee amount the exchange will deposit for this coin
    * @param deposit_fee fee the exchange will charge for this coin
@@ -189,6 +190,7 @@ struct TALER_MERCHANTDB_Plugin
   int
   (*store_deposit) (void *cls,
                     uint64_t transaction_id,
+                    const struct TALER_MerchantPublicKeyP *merchant_pub,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
                     const struct TALER_Amount *amount_with_fee,
                     const struct TALER_Amount *deposit_fee,
