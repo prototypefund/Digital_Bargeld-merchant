@@ -155,8 +155,9 @@ postgres_initialize (void *cls)
   /* Setup tables */
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_transactions ("
-           " transaction_id INT8 PRIMARY KEY"
+           " transaction_id INT8 UNIQUE"
            ",exchange_uri VARCHAR NOT NULL"
+	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
            ",h_contract BYTEA NOT NULL CHECK (LENGTH(h_contract)=64)"
            ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
            ",timestamp INT8 NOT NULL"
@@ -164,6 +165,7 @@ postgres_initialize (void *cls)
            ",total_amount_val INT8 NOT NULL"
            ",total_amount_frac INT4 NOT NULL"
            ",total_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+	   ",PRIMARY KEY (transaction_id, merchant_pub)"
            ");");
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_deposits ("
@@ -211,6 +213,7 @@ postgres_initialize (void *cls)
               "INSERT INTO merchant_transactions"
               "(transaction_id"
               ",exchange_uri"
+	      ",merchant_pub"
               ",h_contract"
               ",h_wire"
               ",timestamp"
@@ -219,8 +222,8 @@ postgres_initialize (void *cls)
               ",total_amount_frac"
               ",total_amount_curr"
               ") VALUES "
-              "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-              9);
+              "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+              10);
   PG_PREPARE (pg,
               "insert_deposit",
               "INSERT INTO merchant_deposits"
@@ -347,6 +350,7 @@ postgres_initialize (void *cls)
  *
  * @param cls closure
  * @param transaction_id of the contract
+ * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
  * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
@@ -358,6 +362,7 @@ postgres_initialize (void *cls)
 static int
 postgres_store_transaction (void *cls,
                             uint64_t transaction_id,
+			    const struct TALER_MerchantPublicKeyP *merchant_pub,
                             const char *exchange_uri,
                             const struct GNUNET_HashCode *h_contract,
                             const struct GNUNET_HashCode *h_wire,
@@ -372,6 +377,7 @@ postgres_store_transaction (void *cls,
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_uint64 (&transaction_id),
     GNUNET_PQ_query_param_string (exchange_uri),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (h_contract),
     GNUNET_PQ_query_param_auto_from_type (h_wire),
     GNUNET_PQ_query_param_absolute_time (&timestamp),

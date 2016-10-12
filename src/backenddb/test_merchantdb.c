@@ -110,6 +110,12 @@ static struct TALER_CoinSpendPublicKeyP coin_pub;
 static struct TALER_ExchangePublicKeyP signkey_pub;
 
 /**
+ * Public Key of the merchant. Set to some random value.
+ * Used as merchant instances now do store their keys.
+ */
+static struct TALER_MerchantPublicKeyP merchant_pub;
+
+/**
  * Wire transfer identifier.  Set to some random value.
  */
 static struct TALER_WireTransferIdentifierRawP wtid;
@@ -297,6 +303,7 @@ run (void *cls)
   RND_BLK (&h_wire);
   RND_BLK (&transaction_id);
   RND_BLK (&signkey_pub);
+  RND_BLK (&merchant_pub);
   RND_BLK (&wtid);
   timestamp = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&timestamp);
@@ -324,6 +331,7 @@ run (void *cls)
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,
                                      transaction_id,
+				     &merchant_pub,
                                      EXCHANGE_URI,
                                      &h_contract,
                                      &h_wire,

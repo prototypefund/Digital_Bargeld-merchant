@@ -1131,6 +1131,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     if (GNUNET_OK !=
         db->store_transaction (db->cls,
                                pc->transaction_id,
+			       &pc->mi->pubkey,
                                pc->chosen_exchange,
                                &pc->h_contract,
                                &pc->mi->h_wire,
