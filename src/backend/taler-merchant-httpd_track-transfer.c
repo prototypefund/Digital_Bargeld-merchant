@@ -258,6 +258,7 @@ wire_transfer_cb (void *cls,
   struct TrackTransferContext *rctx = cls;
   unsigned int i;
   int ret;
+  struct TALER_MerchantPublicKeyP merchant_pub;
 
   rctx->wdh = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
@@ -274,6 +275,32 @@ wire_transfer_cb (void *cls,
     return;
   }
 
+  struct GNUNET_JSON_Specification spec[] = {
+    GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub.eddsa_pub),
+    GNUNET_JSON_spec_end ()
+  };
+  const char *error_name;
+  unsigned int error_line;
+
+  if (GNUNET_SYSERR == GNUNET_JSON_parse (json,
+                                          spec,
+                                          &error_name,
+                                          &error_line))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Exchange did not give any merchant key in response\n");
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Gotten json: %s\n",
+                json_dumps (json, JSON_INDENT (2)));
+    resume_track_transfer_with_response
+      (rctx,
+       MHD_HTTP_INTERNAL_SERVER_ERROR,
+       TMH_RESPONSE_make_internal_error ("The exchange did not include merchant key in response\n"));
+    return;
+  
+  }       
+
+  /*TODO Extract merchant_pub from json */
   if (GNUNET_OK !=
       db->store_transfer_to_proof (db->cls,
                                    rctx->uri,
@@ -290,10 +317,11 @@ wire_transfer_cb (void *cls,
   {
     rctx->current_detail = &details[i];
     rctx->check_transfer_result = GNUNET_NO;
-    ret = db->find_payments_by_id (db->cls,
-                                   details[i].transaction_id,
-                                   &check_transfer,
-                                   rctx);
+    ret = db->find_payments (db->cls,
+                             details[i].transaction_id,
+                             &merchant_pub,
+                             &check_transfer,
+                             rctx);
     if (GNUNET_SYSERR == ret)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,

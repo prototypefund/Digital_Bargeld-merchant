@@ -306,8 +306,9 @@ postgres_initialize (void *cls)
               ",deposit_fee_curr"
               ",exchange_proof"
               " FROM merchant_deposits"
-              " WHERE transaction_id=$1",
-              1);
+              " WHERE transaction_id=$1"
+              " AND merchant_pub=$2",
+              2);
   PG_PREPARE (pg,
               "find_transfers_by_transaction_id",
               "SELECT"
@@ -750,16 +751,18 @@ postgres_find_transaction (void *cls,
  *
  * @param cls closure
  * @param transaction_id key for the search
+ * @param merchant_pub merchant's public key
  * @param cb function to call with payment data
  * @param cb_cls closure for @a cb
  * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
  *         #GNUNET_SYSERR on hard errors
  */
 static int
-postgres_find_payments_by_id (void *cls,
-                              uint64_t transaction_id,
-                              TALER_MERCHANTDB_CoinDepositCallback cb,
-                              void *cb_cls)
+postgres_find_payments (void *cls,
+                        uint64_t transaction_id,
+		        const struct TALER_MerchantPublicKeyP *merchant_pub,
+                        TALER_MERCHANTDB_CoinDepositCallback cb,
+                        void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
@@ -767,6 +770,7 @@ postgres_find_payments_by_id (void *cls,
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
   result = GNUNET_PQ_exec_prepared (pg->conn,
@@ -1117,7 +1121,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
   plugin->find_transaction = &postgres_find_transaction;
   plugin->find_transactions_by_date = &postgres_find_transactions_by_date;
-  plugin->find_payments_by_id = &postgres_find_payments_by_id;
+  plugin->find_payments = &postgres_find_payments;
   plugin->find_transfers_by_id = &postgres_find_transfers_by_id;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;

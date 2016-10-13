@@ -885,10 +885,11 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_internal_error (connection,
                                               "Database error");
   }
-  ret = db->find_payments_by_id (db->cls,
-                                 transaction_id,
-                                 &coin_cb,
-                                 tctx);
+  ret = db->find_payments (db->cls,
+                           transaction_id,
+                           &tctx->mi->pubkey,
+                           &coin_cb,
+                           tctx);
   if (GNUNET_SYSERR == ret)
   {
     GNUNET_break (0);

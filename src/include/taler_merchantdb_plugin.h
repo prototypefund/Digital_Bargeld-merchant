@@ -276,16 +276,18 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls closure
    * @param transaction_id key for the search
+   * @param merchant_pub merchant's public key
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
    * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
-  (*find_payments_by_id) (void *cls,
-                          uint64_t transaction_id,
-                          TALER_MERCHANTDB_CoinDepositCallback cb,
-                          void *cb_cls);
+  (*find_payments) (void *cls,
+                    uint64_t transaction_id,
+                    const struct TALER_MerchantPublicKeyP *merchant_pub,
+                    TALER_MERCHANTDB_CoinDepositCallback cb,
+                    void *cb_cls);
 
 
   /**

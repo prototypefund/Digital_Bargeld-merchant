@@ -1083,10 +1083,11 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
   /* Check if this payment attempt has already succeeded */
   if (GNUNET_SYSERR ==
-      db->find_payments_by_id (db->cls,
-			       pc->transaction_id,
-			       &check_coin_paid,
-			       pc))
+      db->find_payments (db->cls,
+		         pc->transaction_id,
+                         &pc->mi->pubkey,
+		         &check_coin_paid,
+		         pc))
   {
     GNUNET_break (0);
     json_decref (root);
@@ -1116,12 +1117,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 			    pc->transaction_id,
 			    &pc->mi->pubkey,
 			    &check_transaction_exists,
-                           pc))
-  
-   GNUNET_break (0);
-   json_decref (root);
-   return TMH_RESPONSE_reply_internal_error (connection,
-                                             "Merchant database error");
+                            pc))
+  {
+    GNUNET_break (0);
+    json_decref (root);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                               "Merchant database error");
   }
   if (GNUNET_SYSERR == pc->transaction_exits)
   {
