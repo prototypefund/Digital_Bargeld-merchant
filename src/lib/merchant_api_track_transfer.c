@@ -241,10 +241,11 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   tdo->cb_cls = track_transfer_cb_cls;
   /* TODO: do we need to escape 'exchange_uri' here? */
   GNUNET_asprintf (&tdo->url,
-                   "%s/track/transfer?wtid=%s&exchange=%s",
+                   "%s/track/transfer?wtid=%s&exchange=%s&receiver=%s",
                    backend_uri,
                    wtid_str,
-                   exchange_uri);
+                   exchange_uri,
+		   receiver);
   GNUNET_free (wtid_str);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==

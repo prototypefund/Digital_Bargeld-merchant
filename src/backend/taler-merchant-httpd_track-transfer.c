@@ -555,7 +555,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
 
   receiver_str = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,
-                                              "instance");
+                                              "receiver");
   if (NULL == receiver_str)
     receiver_str = "default";
   rctx->mi = TMH_lookup_instance (receiver_str);
