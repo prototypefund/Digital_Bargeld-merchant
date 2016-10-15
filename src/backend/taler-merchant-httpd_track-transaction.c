@@ -411,18 +411,37 @@ wire_deposits_cb (void *cls,
 
 
 /**
+ * Closure for #proof_cb().
+ */
+struct ProofCheckContext
+{
+  /**
+   * Proof returned from #proof_cb.  The reference counter was
+   * increased for this reference and it must thus be freed.
+   * NULL if we did not find any proof.  The JSON should
+   * match the `TrackTransferResponse` of the exchange API
+   * (https://api.taler.net/api-exchange.html#tracktransferresponse)
+   */
+  json_t *p_ret;
+
+};
+
+
+/**
  * Function called with information about a wire transfer identifier.
  * We actually never expect this to be called.
  *
- * @param cls closure
+ * @param cls closure with a `struct ProofCheckContext`
  * @param proof proof from exchange about what the wire transfer was for
  */
 static void
 proof_cb (void *cls,
           const json_t *proof)
 {
-  /* FIXME #4577: store @a proof in @a cls to return with error message */
-  GNUNET_break_op (0);
+  struct ProofCheckContext *pcc = cls;
+
+  GNUNET_break (NULL == pcc->p_ret);
+  pcc->p_ret = json_incref ((json_t *) proof);
 }
 
 
@@ -437,7 +456,8 @@ proof_cb (void *cls,
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
  * @param exchange_pub public key of the exchange used for signing @a json
  * @param json original json reply (may include signatures, those have then been
- *        validated already)
+ *        validated already), should be a `TrackTransactionResponse`
+ *        from the exchange API
  * @param wtid wire transfer identifier used by the exchange, NULL if exchange did not
  *                  yet execute the transaction
  * @param execution_time actual or planned execution time for the wire transfer
@@ -454,6 +474,7 @@ wtid_cb (void *cls,
 {
   struct TrackCoinContext *tcc = cls;
   struct TrackTransactionContext *tctx = tcc->tctx;
+  struct ProofCheckContext pcc;
 
   tcc->dwh = NULL;
   if (MHD_HTTP_OK != http_status)
@@ -473,7 +494,7 @@ wtid_cb (void *cls,
   }
   tctx->current_wtid = *wtid;
   tctx->current_execution_time = execution_time;
-
+  pcc.p_ret = NULL;
   if (GNUNET_YES ==
       db->find_proof_by_wtid (db->cls,
                               tctx->exchange_uri,
@@ -482,9 +503,15 @@ wtid_cb (void *cls,
                               NULL))
   {
     GNUNET_break_op (0);
-    /* FIXME #4577: report error: we got this WTID before, and the
-       transaction was NOT in the list. So exchange is lying to us!
-       (or our DB is internally inconsistent.) */
+    resume_track_transaction_with_response
+      (tcc->tctx,
+       MHD_HTTP_CONFLICT,
+       TMH_RESPONSE_make_json_pack ("{s:s, s:O, s:o, s:o}",
+                                    "error", "conflicting transfer data from exchange",
+                                    "transaction_tracking_claim", json,
+                                    "wtid_tracking_claim", pcc.p_ret,
+                                    "coin_pub", GNUNET_JSON_from_data_auto (&tcc->coin_pub)));
+    return;
   }
   tctx->wdh = TALER_EXCHANGE_track_transfer (tctx->eh,
                                              wtid,
@@ -887,6 +914,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   }
   ret = db->find_payments_by_id (db->cls,
                                  transaction_id,
+                                 &tctx->mi->pubkey,
                                  &coin_cb,
                                  tctx);
   if (GNUNET_SYSERR == ret)

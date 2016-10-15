@@ -33,6 +33,7 @@
     if (cond) { GNUNET_break (0); goto EXITIF_exit; }             \
   } while (0)
 
+
 /**
  * Used by the iterator of the various merchant's instances given
  * in configuration
@@ -42,7 +43,7 @@ struct IterateInstancesCls {
   /**
    * Handle for the configuration beig parsed
    */
-  const struct GNUNET_CONFIGURATION_Handle *config; 
+  const struct GNUNET_CONFIGURATION_Handle *config;
 
   /**
    * Current index in the global array of #MerchantInstance
@@ -54,7 +55,7 @@ struct IterateInstancesCls {
   /**
    * Flag indicating whether config contains a default instance
    */
-  unsigned int default_instance; 
+  unsigned int default_instance;
 
   /**
    * Wire plugin
@@ -92,7 +93,7 @@ struct MerchantInstance {
    * Wire details for this instance
    */
   struct json_t *j_wire;
-  
+
   /**
    * Hash of our wire format details as given in #j_wire.
    */
@@ -102,7 +103,7 @@ struct MerchantInstance {
    * Merchant's private key
    */
   struct TALER_MerchantPrivateKeyP privkey;
-  
+
   /**
    * Merchant's public key
    */
@@ -254,5 +255,15 @@ extern struct GNUNET_TIME_Relative wire_transfer_delay;
  */
 void
 TMH_trigger_daemon (void);
+
+/**
+ * Lookup a merchant instance by its name.
+ *
+ * @param name name of the instance to resolve
+ * @return NULL if that instance is unknown to us
+ */
+struct MerchantInstance *
+TMH_lookup_instance (const char *name);
+
 
 #endif

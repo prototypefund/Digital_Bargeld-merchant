@@ -306,8 +306,24 @@ postgres_initialize (void *cls)
               ",deposit_fee_curr"
               ",exchange_proof"
               " FROM merchant_deposits"
-              " WHERE transaction_id=$1",
-              1);
+              " WHERE transaction_id=$1"
+              " AND merchant_pub=$2",
+              2);
+  PG_PREPARE (pg,
+              "find_deposits_by_tid_and_coin",
+              "SELECT"
+              " amount_with_fee_val"
+              ",amount_with_fee_frac"
+              ",amount_with_fee_curr"
+              ",deposit_fee_val"
+              ",deposit_fee_frac"
+              ",deposit_fee_curr"
+              ",exchange_proof"
+              " FROM merchant_deposits"
+              " WHERE transaction_id=$1"
+              " AND merchant_pub=$2"
+              " AND coin_pub=$3",
+              3);
   PG_PREPARE (pg,
               "find_transfers_by_transaction_id",
               "SELECT"
@@ -611,7 +627,7 @@ postgres_find_transactions_by_date (void *cls,
       GNUNET_PQ_result_spec_uint64 ("transaction_id",
                                     &transaction_id),
       GNUNET_PQ_result_spec_auto_from_type ("merchant_pub",
-                                            &merchant_pub),				    
+                                            &merchant_pub),
       GNUNET_PQ_result_spec_auto_from_type ("h_contract",
                                             &h_contract),
       GNUNET_PQ_result_spec_auto_from_type ("h_wire",
@@ -647,7 +663,7 @@ postgres_find_transactions_by_date (void *cls,
   }
   PQclear (result);
   return n;
-}				 
+}
 
 /**
  * Find information about a transaction.
@@ -746,10 +762,11 @@ postgres_find_transaction (void *cls,
 
 
 /**
- * Lookup information about coin payments by transaction ID.
+ * Lookup information about coin payments by transaction ID (and @a merchant_pub)
  *
  * @param cls closure
  * @param transaction_id key for the search
+ * @param merchant_pub public key of the merchant
  * @param cb function to call with payment data
  * @param cb_cls closure for @a cb
  * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
@@ -758,6 +775,7 @@ postgres_find_transaction (void *cls,
 static int
 postgres_find_payments_by_id (void *cls,
                               uint64_t transaction_id,
+                              const struct TALER_MerchantPublicKeyP *merchant_pub,
                               TALER_MERCHANTDB_CoinDepositCallback cb,
                               void *cb_cls)
 {
@@ -767,6 +785,7 @@ postgres_find_payments_by_id (void *cls,
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
   result = GNUNET_PQ_exec_prepared (pg->conn,
@@ -815,6 +834,93 @@ postgres_find_payments_by_id (void *cls,
     cb (cb_cls,
         transaction_id,
         &coin_pub,
+        &amount_with_fee,
+        &deposit_fee,
+        exchange_proof);
+    GNUNET_PQ_cleanup_result (rs);
+  }
+  PQclear (result);
+  return GNUNET_OK;
+
+  GNUNET_break (0);
+  return GNUNET_SYSERR;
+}
+
+
+/**
+ * Lookup information about coin payments by transaction ID.
+ *
+ * @param cls closure
+ * @param transaction_id key for the search
+ * @param merchant_pub merchant's public key. It's AND'd with @a transaction_id
+ *        in order to find the result.
+ * @param coin_pub public key to use for the search
+ * @param cb function to call with payment data
+ * @param cb_cls closure for @a cb
+ * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+ *         #GNUNET_SYSERR on hard errors
+ */
+static int
+postgres_find_payments_by_id_and_coin (void *cls,
+                                       uint64_t transaction_id,
+                                       const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                       const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                       TALER_MERCHANTDB_CoinDepositCallback cb,
+                                       void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int i;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_uint64 (&transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_auto_from_type (coin_pub),
+    GNUNET_PQ_query_param_end
+  };
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_deposits_by_tid_and_coin",
+                                    params);
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  if (0 == PQntuples (result))
+  {
+    PQclear (result);
+    return GNUNET_NO;
+  }
+
+  for (i=0;i<PQntuples (result);i++)
+  {
+    struct TALER_Amount amount_with_fee;
+    struct TALER_Amount deposit_fee;
+    json_t *exchange_proof;
+
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      TALER_PQ_result_spec_amount ("amount_with_fee",
+                                   &amount_with_fee),
+      TALER_PQ_result_spec_amount ("deposit_fee",
+                                   &deposit_fee),
+      TALER_PQ_result_spec_json ("exchange_proof",
+                                 &exchange_proof),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+    cb (cb_cls,
+        transaction_id,
+        coin_pub,
         &amount_with_fee,
         &deposit_fee,
         exchange_proof);
@@ -1118,6 +1224,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_transaction = &postgres_find_transaction;
   plugin->find_transactions_by_date = &postgres_find_transactions_by_date;
   plugin->find_payments_by_id = &postgres_find_payments_by_id;
+  plugin->find_payments_by_id_and_coin = &postgres_find_payments_by_id_and_coin;
   plugin->find_transfers_by_id = &postgres_find_transfers_by_id;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;

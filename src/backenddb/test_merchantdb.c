@@ -383,6 +383,7 @@ run (void *cls)
   FAILIF (GNUNET_OK !=
           plugin->find_payments_by_id (plugin->cls,
                                        transaction_id,
+                                       &merchant_pub,
                                        &deposit_cb,
                                        NULL));
   FAILIF (GNUNET_OK !=

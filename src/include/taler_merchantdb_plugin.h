@@ -64,7 +64,8 @@ typedef void
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
- * @param exchange_proof proof from exchange that coin was accepted
+ * @param exchange_proof proof from exchange that coin was accepted,
+ *        matches the `interface DepositSuccess` of the documentation.
  */
 typedef void
 (*TALER_MERCHANTDB_CoinDepositCallback)(void *cls,
@@ -257,7 +258,7 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls our plugin handle
    * @param transaction_id the transaction id to search
-   * @param merchant_pub merchant's public key. It's AND'd with transaction_id
+   * @param merchant_pub merchant's public key. It's AND'd with @a transaction_id
    * in order to find the result.
    * @param cb function to call with transaction data
    * @param cb_cls closure for @a cb
@@ -276,6 +277,8 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls closure
    * @param transaction_id key for the search
+   * @param merchant_pub merchant's public key. It's AND'd with @a transaction_id
+   *        in order to find the result.
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
    * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
@@ -284,8 +287,31 @@ struct TALER_MERCHANTDB_Plugin
   int
   (*find_payments_by_id) (void *cls,
                           uint64_t transaction_id,
+                          const struct TALER_MerchantPublicKeyP *merchant_pub,
                           TALER_MERCHANTDB_CoinDepositCallback cb,
                           void *cb_cls);
+
+
+  /**
+   * Lookup information about coin payments by transaction ID and coin.
+   *
+   * @param cls closure
+   * @param transaction_id key for the search
+   * @param merchant_pub merchant's public key. It's AND'd with @a transaction_id
+   *        in order to find the result.
+   * @param coin_pub public key to use for the search
+   * @param cb function to call with payment data
+   * @param cb_cls closure for @a cb
+   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   *         #GNUNET_SYSERR on hard errors
+   */
+  int
+  (*find_payments_by_id_and_coin) (void *cls,
+                                   uint64_t transaction_id,
+                                   const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                   const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                   TALER_MERCHANTDB_CoinDepositCallback cb,
+                                   void *cb_cls);
 
 
   /**

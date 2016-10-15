@@ -237,7 +237,7 @@ url_handler (void *cls,
 
 /**
  * Callback that frees all the elements in the hashmap
- * 
+ *
  * @param cls closure
  * @param key current key
  * @param value current value
@@ -564,6 +564,32 @@ instances_iterator_cb (void *cls,
   }
 }
 
+
+/**
+ * Lookup a merchant instance by its name.
+ *
+ * @param name name of the instance to resolve
+ * @return NULL if that instance is unknown to us
+ */
+struct MerchantInstance *
+TMH_lookup_instance (const char *name)
+{
+  struct GNUNET_HashCode h_receiver;
+
+  GNUNET_CRYPTO_hash (name,
+                      strlen (name),
+                      &h_receiver);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Looking for by-id key %s of '%s' in hashmap\n",
+              GNUNET_h2s (&h_receiver),
+              name);
+  /* We're fine if that returns NULL, the calling routine knows how
+     to handle that */
+  return GNUNET_CONTAINER_multihashmap_get (by_id_map,
+                                            &h_receiver);
+}
+
+
 /**
  * Extract merchant instance from the given JSON
  *
@@ -582,28 +608,14 @@ get_instance (struct json_t *json)
 {
   struct json_t *receiver;
   const char *receiver_str;
-  struct GNUNET_HashCode h_receiver;
-  struct MerchantInstance *ret;
 
-  /*FIXME who decrefs receiver?*/
   if (NULL == (receiver = json_object_get (json, "receiver")))
-    receiver = json_string ("default");
-
-  receiver_str = json_string_value (receiver);
-  GNUNET_CRYPTO_hash (receiver_str,
-                      strlen (receiver_str),
-                      &h_receiver);
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Looking for by-id key %s of '%s' in hashmap\n",
-              GNUNET_h2s (&h_receiver),
-              receiver_str);
-  /* We're fine if that returns NULL, the calling routine knows how
-     to handle that */
-  ret = GNUNET_CONTAINER_multihashmap_get (by_id_map,
-                                           &h_receiver);
-  GNUNET_break (NULL != ret);                                          
-  return ret;                                                                       
+    receiver_str = "default";
+  else
+    receiver_str = json_string_value (receiver);
+  return TMH_lookup_instance (receiver_str);
 }
+
 
 /**
  * Iterate over each merchant instance, in order to populate

@@ -60,6 +60,11 @@ struct TrackTransferContext
   struct TALER_EXCHANGE_TrackTransferHandle *wdh;
 
   /**
+   * For which merchant instance is this tracking request?
+   */
+  struct MerchantInstance *mi;
+
+  /**
    * HTTP connection we are handling.
    */
   struct MHD_Connection *connection;
@@ -96,6 +101,16 @@ struct TrackTransferContext
    * Argument for the /wire/transfers request.
    */
   struct TALER_WireTransferIdentifierRawP wtid;
+
+  /**
+   * Full original response we are currently processing.
+   */
+  const json_t *original_response;
+
+  /**
+   * Which transaction detail are we currently looking at?
+   */
+  unsigned int current_offset;
 
   /**
    * Response code to return.
@@ -195,7 +210,7 @@ track_transfer_cleanup (struct TM_HandlerContext *hc)
  * @param transaction_id of the contract
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will transfer for this coin
- * @param transfer_fee fee the exchange will charge for this coin
+ * @param deposit_fee fee the exchange will charge for this coin
  * @param exchange_proof proof from exchange that coin was accepted
  */
 static void
@@ -203,25 +218,34 @@ check_transfer (void *cls,
                 uint64_t transaction_id,
                 const struct TALER_CoinSpendPublicKeyP *coin_pub,
                 const struct TALER_Amount *amount_with_fee,
-                const struct TALER_Amount *transfer_fee,
+                const struct TALER_Amount *deposit_fee,
                 const json_t *exchange_proof)
 {
   struct TrackTransferContext *rctx = cls;
-  const struct TALER_TrackTransferDetails *wdd = rctx->current_detail;
+  const struct TALER_TrackTransferDetails *ttd = rctx->current_detail;
 
-  if (0 != memcmp (&wdd->coin_pub,
-                   coin_pub,
-                   sizeof (struct TALER_CoinSpendPublicKeyP)))
-    return; /* not the coin we're looking for */
+  if (GNUNET_SYSERR == rctx->check_transfer_result)
+    return; /* already had a serious issue; odd that we're called more than once as well... */
   if ( (0 != TALER_amount_cmp (amount_with_fee,
-                               &wdd->coin_value)) ||
-       (0 != TALER_amount_cmp (transfer_fee,
-                               &wdd->coin_fee)) )
+                               &ttd->coin_value)) ||
+       (0 != TALER_amount_cmp (deposit_fee,
+                               &ttd->coin_fee)) )
   {
     /* Disagreement between the exchange and us about how much this
        coin is worth! */
     GNUNET_break_op (0);
     rctx->check_transfer_result = GNUNET_SYSERR;
+    /* Build the `TrackTransferConflictDetails` */
+    rctx->response
+      = TMH_RESPONSE_make_json_pack ("{s:s, s:O, s:I, s:O, s:o, s:I, s:o, s:o}",
+                                     "hint", "disagreement about deposit valuation",
+                                     "exchange_deposit_proof", exchange_proof,
+                                     "conflict_offset", (json_int_t) rctx->current_offset,
+                                     "exchange_transfer_proof", rctx->original_response,
+                                     "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
+                                     "transaction_id", (json_int_t) transaction_id,
+                                     "amount_with_fee", TALER_JSON_from_amount (amount_with_fee),
+                                     "deposit_fee", TALER_JSON_from_amount (deposit_fee));
     return;
   }
   rctx->check_transfer_result = GNUNET_OK;
@@ -284,40 +308,73 @@ wire_transfer_cb (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to persist wire transfer proof in DB\n");
+    resume_track_transfer_with_response
+      (rctx,
+       MHD_HTTP_INTERNAL_SERVER_ERROR,
+       TMH_RESPONSE_make_json_pack ("{s:s}",
+                                    "details", "failed to store response from exchange to local database"));
+    return;
   }
-
+  rctx->original_response = json;
   for (i=0;i<details_length;i++)
   {
+    rctx->current_offset = i;
     rctx->current_detail = &details[i];
     rctx->check_transfer_result = GNUNET_NO;
-    ret = db->find_payments_by_id (db->cls,
-                                   details[i].transaction_id,
-                                   &check_transfer,
-                                   rctx);
+    ret = db->find_payments_by_id_and_coin (db->cls,
+                                            details[i].transaction_id,
+                                            &rctx->mi->pubkey,
+                                            &details[i].coin_pub,
+                                            &check_transfer,
+                                            rctx);
     if (GNUNET_SYSERR == ret)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to verify existing payment data in DB\n");
+                  "Failed to obtain existing payment data from DB\n");
+      resume_track_transfer_with_response
+        (rctx,
+         MHD_HTTP_INTERNAL_SERVER_ERROR,
+         TMH_RESPONSE_make_json_pack ("{s:s}",
+                                      "details", "failed to obtain deposit data from local database"));
+      return;
     }
-    if ( (GNUNET_NO == ret) ||
-         (GNUNET_NO == rctx->check_transfer_result) )
+    if (GNUNET_NO == ret)
     {
+      /* The exchange says we made this deposit, but WE do not
+         recall making it! Well, let's say thanks and accept the
+         money! */
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Failed to find payment data in DB\n");
+      rctx->check_transfer_result = GNUNET_OK;
+    }
+    if (GNUNET_NO == rctx->check_transfer_result)
+    {
+      /* Internal error: how can we have called #check_transfer()
+         but still have no result? */
+      GNUNET_break (0);
+      resume_track_transfer_with_response
+        (rctx,
+         MHD_HTTP_INTERNAL_SERVER_ERROR,
+         TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:s}",
+                                      "details", "internal logic error",
+                                      "line", (json_int_t) __LINE__,
+                                      "file", __FILE__));
+      return;
     }
     if (GNUNET_SYSERR == rctx->check_transfer_result)
     {
-      /* #check_transfer() failed, do something! */
-      GNUNET_break (0);
-      /* FIXME: generate nicer custom response */
+      /* #check_transfer() failed, report conflict! */
+      GNUNET_break_op (0);
+      GNUNET_assert (NULL != rctx->response);
       resume_track_transfer_with_response
         (rctx,
-         MHD_HTTP_FAILED_DEPENDENCY,
-         TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
-                                      "index", (json_int_t) i,
-                                      "details", json));
+         MHD_HTTP_CONFLICT,
+         rctx->response);
+      rctx->response = NULL;
       return;
     }
+    /* Response is consistent with the /deposit we made, remember
+       it for future reference */
     ret = db->store_coin_to_transfer (db->cls,
                                       details[i].transaction_id,
                                       &details[i].coin_pub,
@@ -326,15 +383,19 @@ wire_transfer_cb (void *cls,
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Failed to persist coin to wire transfer mapping in DB\n");
+      resume_track_transfer_with_response
+        (rctx,
+         MHD_HTTP_INTERNAL_SERVER_ERROR,
+         TMH_RESPONSE_make_json_pack ("{s:s}",
+                                      "details", "failed to store response from exchange to local database"));
+      return;
     }
   }
-  /* FIXME: might want a more custom response here... */
+  rctx->original_response = NULL;
   resume_track_transfer_with_response
     (rctx,
      MHD_HTTP_OK,
-     TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
-                                  "exchange_status", (json_int_t) http_status,
-                                  "details", json));
+     TMH_RESPONSE_make_json (json));
 }
 
 
@@ -355,9 +416,9 @@ process_track_transfer_with_exchange (void *cls,
   rctx->fo = NULL;
   rctx->eh = eh;
   rctx->wdh = TALER_EXCHANGE_track_transfer (eh,
-                                            &rctx->wtid,
-                                            &wire_transfer_cb,
-                                            rctx);
+                                             &rctx->wtid,
+                                             &wire_transfer_cb,
+                                             rctx);
   if (NULL == rctx->wdh)
   {
     GNUNET_break (0);
@@ -400,7 +461,9 @@ handle_track_transfer_timeout (void *cls)
  * Generate a response based on the given @a proof.
  *
  * @param cls closure
- * @param proof proof from exchange about what the wire transfer was for
+ * @param proof proof from exchange about what the wire transfer was for.
+ *              should match the `TrackTransactionResponse` format
+ *              of the exchange
  */
 static void
 proof_cb (void *cls,
@@ -409,10 +472,7 @@ proof_cb (void *cls,
   struct TrackTransferContext *rctx = cls;
 
   rctx->response_code = MHD_HTTP_OK;
-  /* FIXME: might want a more custom response here... */
-  rctx->response = TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
-                                                "exchange_status", (json_int_t) MHD_HTTP_OK,
-                                                "details", proof);
+  rctx->response = TMH_RESPONSE_make_json (proof);
 }
 
 
@@ -438,6 +498,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   struct TrackTransferContext *rctx;
   const char *str;
   const char *uri;
+  const char *receiver_str;
   int ret;
 
   if (NULL == *connection_cls)
@@ -492,6 +553,15 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                            "exchange argument missing");
   rctx->uri = GNUNET_strdup (uri);
 
+  receiver_str = MHD_lookup_connection_value (connection,
+                                              MHD_GET_ARGUMENT_KIND,
+                                              "instance");
+  if (NULL == receiver_str)
+    receiver_str = "default";
+  rctx->mi = TMH_lookup_instance (receiver_str);
+  if (NULL == rctx->mi)
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         "instance unknown");
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "wtid");
