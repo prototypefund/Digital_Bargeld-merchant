@@ -285,12 +285,11 @@ struct TALER_MERCHANTDB_Plugin
    *         #GNUNET_SYSERR on hard errors
    */
   int
-  (*find_payments_by_id) (void *cls,
-                          uint64_t transaction_id,
-                          const struct TALER_MerchantPublicKeyP *merchant_pub,
-                          TALER_MERCHANTDB_CoinDepositCallback cb,
-                          void *cb_cls);
-
+  (*find_payments) (void *cls,
+                    uint64_t transaction_id,
+                    const struct TALER_MerchantPublicKeyP *merchant_pub,
+                    TALER_MERCHANTDB_CoinDepositCallback cb,
+                    void *cb_cls);
 
   /**
    * Lookup information about coin payments by transaction ID and coin.

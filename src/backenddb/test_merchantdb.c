@@ -381,11 +381,11 @@ run (void *cls)
                                              NULL));
 
   FAILIF (GNUNET_OK !=
-          plugin->find_payments_by_id (plugin->cls,
-                                       transaction_id,
-                                       &merchant_pub,
-                                       &deposit_cb,
-                                       NULL));
+          plugin->find_payments (plugin->cls,
+                                 transaction_id,
+                                 &merchant_pub,
+                                 &deposit_cb,
+                                 NULL));
   FAILIF (GNUNET_OK !=
           plugin->find_transfers_by_id (plugin->cls,
                                         transaction_id,
