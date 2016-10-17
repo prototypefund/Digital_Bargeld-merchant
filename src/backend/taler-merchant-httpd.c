@@ -434,7 +434,8 @@ instances_iterator_cb (void *cls,
   iic = cls;
   substr = strstr (section, "merchant-instance-");
 
-  if (NULL == substr)
+  if ((NULL == substr)
+      || (NULL != strstr (section, "merchant-instance-wireformat-")))
     return;
 
   if (substr != section)
@@ -491,7 +492,7 @@ instances_iterator_cb (void *cls,
     iic->default_instance = GNUNET_YES;
 
   GNUNET_asprintf (&instance_wiresection,
-                   "%s-wireformat",
+                   "merchant-instance-wireformat-%s",
                    mi->id);
 
   mi->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
