@@ -2178,6 +2178,7 @@ run (void *cls)
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
                   \"expiry\":\"\\/Date(999999999)\\/\",\
                   \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
+		  \"summary\": \"merchant-lib testcase\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }"},
     { .oc = OC_PAY,
