@@ -154,7 +154,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   json_t *products;
   struct GNUNET_TIME_Absolute timestamp;
   struct GNUNET_TIME_Absolute refund_deadline;
-  struct GNUNET_TIME_Absolute expiry;
+  struct GNUNET_TIME_Absolute pay_deadline;
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
     TALER_JSON_spec_amount ("max_fee", &max_fee),
@@ -164,7 +164,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
     GNUNET_JSON_spec_json ("products", &products),
     GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
     GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
-    GNUNET_JSON_spec_absolute_time ("expiry", &expiry),
+    GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
     GNUNET_JSON_spec_end()
   };
 
