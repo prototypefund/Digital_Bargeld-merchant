@@ -245,7 +245,8 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
-                                       "{s:s}",
+                                       "{s:I, s:s}",
+				       "code", (json_int_t) TALER_EC_JSON_INVALID,
                                        "error", "invalid json");
 }
 

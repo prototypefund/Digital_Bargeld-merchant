@@ -928,9 +928,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if (GNUNET_SYSERR == res)
   {
     GNUNET_break (0);
-    return TMH_RESPONSE_reply_external_error (connection,
-					      TALER_EC_JSON_INVALID,
-					      "failed to parse JSON body");
+    return TMH_RESPONSE_reply_invalid_json (connection);
   }
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES; /* the POST's body has to be further fetched */
