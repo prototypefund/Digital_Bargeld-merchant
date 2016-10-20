@@ -23,6 +23,7 @@
 #define _TALER_MERCHANT_SERVICE_H
 
 #include <taler/taler_util.h>
+#include <taler/taler_error_codes.h>
 #include <gnunet/gnunet_curl_lib.h>
 #include <jansson.h>
 
@@ -43,6 +44,7 @@ struct TALER_MERCHANT_ContractOperation;
  * @param cls closure
  * @param http_status HTTP response code, 200 indicates success;
  *                    0 if the backend's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code 
  * @param obj the full received JSON reply, or
  *            error details if the request failed
  * @param contract completed contract, NULL on error
@@ -52,6 +54,7 @@ struct TALER_MERCHANT_ContractOperation;
 typedef void
 (*TALER_MERCHANT_ContractCallback) (void *cls,
                                     unsigned int http_status,
+				    enum TALER_ErrorCode ec,
                                     const json_t *obj,
                                     const json_t *contract,
                                     const struct TALER_MerchantSignatureP *sig,
@@ -110,11 +113,13 @@ struct TALER_MERCHANT_Pay;
  *                    can indicate success, depending on whether the interaction
  *                    was with a merchant frontend or backend;
  *                    0 if the merchant's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code 
  * @param obj the received JSON reply, with error details if the request failed
  */
 typedef void
 (*TALER_MERCHANT_PayCallback) (void *cls,
                                unsigned int http_status,
+			       enum TALER_ErrorCode ec,
                                const json_t *obj);
 
 
@@ -317,6 +322,7 @@ struct TALER_MERCHANT_TrackTransferHandle;
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param ec taler-specific error code 
  * @param sign_key exchange key used to sign @a json, or NULL
  * @param json original json reply (may include signatures, those have then been
  *        validated already)
@@ -329,6 +335,7 @@ struct TALER_MERCHANT_TrackTransferHandle;
 typedef void
 (*TALER_MERCHANT_TrackTransferCallback) (void *cls,
                                          unsigned int http_status,
+					 enum TALER_ErrorCode ec,
                                          const struct TALER_ExchangePublicKeyP *sign_key,
                                          const json_t *json,
                                          const struct GNUNET_HashCode *h_wire,
@@ -436,6 +443,7 @@ struct TALER_MERCHANT_TransactionWireTransfer
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param ec taler-specific error code 
  * @param json original json reply from the backend
  * @param num_transfers number of wire transfers the exchange used for the transaction
  * @param transfers details about each transfer and which coins are aggregated in it
@@ -443,6 +451,7 @@ struct TALER_MERCHANT_TransactionWireTransfer
 typedef void
 (*TALER_MERCHANT_TrackTransactionCallback) (void *cls,
                                             unsigned int http_status,
+					    enum TALER_ErrorCode ec,
                                             const json_t *json,
                                             unsigned int num_transfers,
                                             const struct TALER_MERCHANT_TransactionWireTransfer *transfers);
@@ -488,11 +497,13 @@ struct TALER_MERCHANT_HistoryOperation;
  *
  * @param cls closure
  * @param http_status HTTP status returned by the merchant backend
+ * @param ec taler-specific error code 
  * @param json actual body containing history
  */
 typedef void
 (*TALER_MERCHANT_HistoryOperationCallback) (void *cls,
                                             unsigned int http_status,
+					    enum TALER_ErrorCode ec,
                                             const json_t *json);
 
 /**

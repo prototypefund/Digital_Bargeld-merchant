@@ -241,6 +241,7 @@ handle_pay_finished (void *cls,
               (unsigned int) response_code);
   ph->cb (ph->cb_cls,
           response_code,
+	  TALER_JSON_get_error_code (json),
           json);
   TALER_MERCHANT_pay_cancel (ph);
 }

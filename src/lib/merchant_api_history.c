@@ -81,7 +81,7 @@ TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *ho)
 
 /**
  * Function called when we're done processing the
- * HTTP /track/transaction request.
+ * HTTP /history request.
  *
  * @param cls the `struct TALER_MERCHANT_TrackTransactionHandle`
  * @param response_code HTTP response code, 0 on error
@@ -102,16 +102,18 @@ history_raw_cb (void *cls,
     break;
   case MHD_HTTP_OK:
     ho->cb (ho->cb_cls,
-            response_code,
+            MHD_HTTP_OK,
+	    TALER_EC_NONE,
             json);
     return;
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "history URI not found\n");
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+		"/history URI not found\n");
     break;
-  
   case MHD_HTTP_BAD_REQUEST:
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "Wrong parameter passed in URL\n");
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+		"Wrong parameter passed in URL\n");
     break;
   default:
     /* unexpected response code */
@@ -124,9 +126,11 @@ history_raw_cb (void *cls,
   }
   ho->cb (ho->cb_cls,
           response_code,
+	  TALER_JSON_get_error_code (json),
           json);
   TALER_MERCHANT_history_cancel (ho);
 }
+
 
 /**
  * Issue a /history request to the backend.
@@ -135,7 +139,7 @@ history_raw_cb (void *cls,
  * @param backend_uri base URL of the merchant backend
  * @param date only transactions younger than/equals to date will be returned
  * @param history_cb callback which will work the response gotten from the backend
- * @param history_cb_cls closure to pass to history_cb
+ * @param history_cb_cls closure to pass to @a history_cb
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_HistoryOperation *

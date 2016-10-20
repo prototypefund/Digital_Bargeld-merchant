@@ -138,6 +138,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
     }
     wdh->cb (wdh->cb_cls,
              MHD_HTTP_OK,
+	     TALER_EC_NONE,
              &exchange_pub,
              json,
              &h_wire,
@@ -198,6 +199,7 @@ handle_track_transfer_finished (void *cls,
   }
   tdo->cb (tdo->cb_cls,
            response_code,
+	   TALER_JSON_get_error_code (json),
            NULL,
            json,
            NULL,

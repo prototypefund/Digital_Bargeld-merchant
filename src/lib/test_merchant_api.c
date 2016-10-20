@@ -744,11 +744,13 @@ add_incoming_cb (void *cls,
  *
  * @param cls closure
  * @param http_status HTTP status returned by the merchant backend
+ * @param ec taler-specific error code
  * @param json actual body containing history
  */
-void
+static void
 history_cb (void *cls,
             unsigned int http_status,
+	    enum TALER_ErrorCode ec,
             const json_t *json)
 {
   struct InterpreterState *is = cls;
@@ -962,6 +964,7 @@ reserve_status_cb (void *cls,
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code
  * @param sig signature over the coin, NULL on error
  * @param full_response full response from the exchange (for logging, in case of errors)
  */
@@ -1018,6 +1021,7 @@ reserve_withdraw_cb (void *cls,
  * @param cls closure
  * @param http_status HTTP response code, 200 indicates success;
  *                    0 if the backend's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code
  * @param obj the full received JSON reply, or
  *            error details if the request failed
  * @param contract completed contract, NULL on error
@@ -1027,6 +1031,7 @@ reserve_withdraw_cb (void *cls,
 static void
 contract_cb (void *cls,
              unsigned int http_status,
+	     enum TALER_ErrorCode ec,
              const json_t *obj,
              const json_t *contract,
              const struct TALER_MerchantSignatureP *sig,
@@ -1063,12 +1068,14 @@ contract_cb (void *cls,
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code
  * @param obj the received JSON reply, should be kept as proof (and, in case of errors,
  *            be forwarded to the customer)
  */
 static void
 pay_cb (void *cls,
         unsigned int http_status,
+	enum TALER_ErrorCode ec,
         const json_t *obj)
 {
   struct InterpreterState *is = cls;
@@ -1162,6 +1169,7 @@ maint_child_death (void *cls)
  *
  * @param cls closure for this function
  * @param http_status HTTP response code returned by the server
+ * @param ec taler-specific error code
  * @param sign_key exchange key used to sign @a json, or NULL
  * @param json original json reply (may include signatures, those have then been
  *        validated already)
@@ -1174,6 +1182,7 @@ maint_child_death (void *cls)
 static void
 track_transfer_cb (void *cls,
                    unsigned int http_status,
+		   enum TALER_ErrorCode ec,
                    const struct TALER_ExchangePublicKeyP *sign_key,
                    const json_t *json,
                    const struct GNUNET_HashCode *h_wire,
@@ -1270,6 +1279,7 @@ track_transfer_cb (void *cls,
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param ec taler-specific error code
  * @param json original json reply
  * @param num_transfers number of wire transfers involved in setting the transaction
  * @param transfers detailed list of transfers involved and their coins
@@ -1277,6 +1287,7 @@ track_transfer_cb (void *cls,
 static void
 track_transaction_cb (void *cls,
                       unsigned int http_status,
+		      enum TALER_ErrorCode ec,
                       const json_t *json,
                       unsigned int num_transfers,
                       const struct TALER_MERCHANT_TransactionWireTransfer *transfers)
