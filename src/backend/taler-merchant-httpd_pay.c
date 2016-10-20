@@ -1145,9 +1145,16 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     now = GNUNET_TIME_absolute_get (); 
     if (now.abs_value_us > pc->pay_deadline.abs_value_us)
     {
-      /* Time expired, the customer cannot pay! */
+      /* Time expired, we don't accept this payment now! */
+      const char *pd_str;
+      pd_str = GNUNET_STRINGS_absolute_time_to_string (pc->pay_deadline);
+
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Attempt to get coins for expired contract. Deadline: '%s'\n",
+		  pd_str);
+
       return TMH_RESPONSE_reply_bad_request (connection,
-                                             "The time to pay for this contract has expired");
+                                             "The time to pay for this contract has expired.");
     }
 
     if (GNUNET_OK !=

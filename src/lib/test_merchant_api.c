@@ -1661,6 +1661,7 @@ interpreter_run (void *cls)
       struct TALER_MERCHANT_PayCoin pc;
       uint64_t transaction_id;
       struct GNUNET_TIME_Absolute refund_deadline;
+      struct GNUNET_TIME_Absolute pay_deadline;
       struct GNUNET_TIME_Absolute timestamp;
       struct GNUNET_HashCode h_wire;
       struct TALER_MerchantPublicKeyP merchant_pub;
@@ -1682,6 +1683,7 @@ interpreter_run (void *cls)
         struct GNUNET_JSON_Specification spec[] = {
           GNUNET_JSON_spec_uint64 ("transaction_id", &transaction_id),
           GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
+          GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
           GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
           GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
           GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
@@ -1765,6 +1767,7 @@ interpreter_run (void *cls)
                                      &merchant_sig,
 				     timestamp,
 				     refund_deadline,
+				     pay_deadline,
 				     &h_wire,
 				     EXCHANGE_URI,
 				     1 /* num_coins */,
@@ -2176,7 +2179,7 @@ run (void *cls)
                   \"transaction_id\":1,\
                   \"timestamp\":\"\\/Date(42)\\/\",\
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"pay_deadline\":\"\\/Date(999999999)\\/\",\
+                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
                   \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
 		  \"summary\": \"merchant-lib testcase\",\
                   \"products\":\
@@ -2199,7 +2202,7 @@ run (void *cls)
                   \"transaction_id\":2,\
                   \"timestamp\":\"\\/Date(42)\\/\",\
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"pay_deadline\":\"\\/Date(999999999)\\/\",\
+                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
                   \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
