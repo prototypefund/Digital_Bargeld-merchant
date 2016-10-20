@@ -42,9 +42,11 @@ TMH_RESPONSE_make_json (const json_t *json)
   struct MHD_Response *resp;
   char *json_str;
 
-  json_str = json_dumps (json, JSON_INDENT(2));
+  json_str = json_dumps (json,
+			 JSON_INDENT(2));
   GNUNET_assert (NULL != json_str);
-  resp = MHD_create_response_from_buffer (strlen (json_str), json_str,
+  resp = MHD_create_response_from_buffer (strlen (json_str),
+					  json_str,
                                           MHD_RESPMEM_MUST_FREE);
   if (NULL == resp)
   {
@@ -103,7 +105,10 @@ TMH_RESPONSE_make_json_pack (const char *fmt,
   json_error_t jerror;
 
   va_start (argp, fmt);
-  json = json_vpack_ex (&jerror, 0, fmt, argp);
+  json = json_vpack_ex (&jerror,
+			0,
+			fmt,
+			argp);
   va_end (argp);
   if (NULL == json)
   {
@@ -142,7 +147,10 @@ TMH_RESPONSE_reply_json_pack (struct MHD_Connection *connection,
   json_error_t jerror;
 
   va_start (argp, fmt);
-  json = json_vpack_ex (&jerror, 0, fmt, argp);
+  json = json_vpack_ex (&jerror,
+			0,
+			fmt,
+			argp);
   va_end (argp);
   if (NULL == json)
   {
@@ -164,14 +172,17 @@ TMH_RESPONSE_reply_json_pack (struct MHD_Connection *connection,
 /**
  * Create a response indicating an internal error.
  *
+ * @param ec error code to return
  * @param hint hint about the internal error's nature
  * @return a MHD response object
  */
 struct MHD_Response *
-TMH_RESPONSE_make_internal_error (const char *hint)
+TMH_RESPONSE_make_internal_error (enum TALER_ErrorCode ec,
+				  const char *hint)
 {
-  return TMH_RESPONSE_make_json_pack ("{s:s, s:s}",
+  return TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:s}",
                                       "error", "internal error",
+				      "code", (json_int_t) ec,
                                       "hint", hint);
 }
 
@@ -180,17 +191,20 @@ TMH_RESPONSE_make_internal_error (const char *hint)
  * Send a response indicating an internal error.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param hint hint about the internal error's nature
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
+				   enum TALER_ErrorCode ec,
                                    const char *hint)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       "{s:s, s:s}",
+                                       "{s:s, s:I, s:s}",
                                        "error", "internal error",
+				       "code", (json_int_t) ec,
                                        "hint", hint);
 }
 
@@ -232,8 +246,7 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection)
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
                                        "{s:s}",
-                                       "error",
-                                       "invalid json");
+                                       "error", "invalid json");
 }
 
 
@@ -242,18 +255,20 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection)
  * needed for the reply.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param object name of the object we did not find
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
+			      enum TALER_ErrorCode ec,
                               const char *object)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_NOT_FOUND,
-                                       "{s:s}",
-                                       "error",
-                                       object);
+                                       "{s:I, s:s}",
+				       "code", (json_int_t) ec,       
+                                       "error", object);
 }
 
 
@@ -261,18 +276,20 @@ TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
  * Send a response indicating that the request was malformed.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param issue description of what was wrong with the request
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_bad_request (struct MHD_Connection *connection,
+				enum TALER_ErrorCode ec,
                                 const char *issue)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
-                                       "{s:s}",
-                                       "error",
-                                       issue);
+                                       "{s:I, s:s}",
+				       "code", (json_int_t) ec,
+                                       "error", issue);
 }
 
 
@@ -297,17 +314,20 @@ TMH_RESPONSE_add_global_headers (struct MHD_Response *response)
  * Send a response indicating an external error.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param hint hint about the error's nature
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
+				   enum TALER_ErrorCode ec,
                                    const char *hint)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
-                                       "{s:s, s:s}",
+                                       "{s:s, s:I, s:s}",
                                        "error", "client error",
+				       "code", (json_int_t) ec,
                                        "hint", hint);
 }
 
@@ -315,32 +335,39 @@ TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
 /**
  * Create a response indicating an external error.
  *
+ * @param ec error code to return
  * @param hint hint about the internal error's nature
  * @return a MHD response object
  */
 struct MHD_Response *
-TMH_RESPONSE_make_external_error (const char *hint)
+TMH_RESPONSE_make_external_error (enum TALER_ErrorCode ec,
+				  const char *hint)
 {
-  return TMH_RESPONSE_make_json_pack ("{s:s, s:s}",
+  return TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:s}",
                                       "error", "client error",
+				      "code", (json_int_t) ec,
                                       "hint", hint);
 }
+
 
 /**
  * Send a response indicating a missing argument.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param param_name the parameter that is missing
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
+				enum TALER_ErrorCode ec,
                                 const char *param_name)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
-                                       "{ s:s, s:s}",
+                                       "{ s:s, s:I, s:s}",
                                        "error", "missing parameter",
+				       "code", (json_int_t) ec,
                                        "parameter", param_name);
 }
 
@@ -349,17 +376,20 @@ TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
  * Send a response indicating an invalid argument.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param param_name the parameter that is invalid
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_arg_invalid (struct MHD_Connection *connection,
-                                const char *param_name)
+				enum TALER_ErrorCode ec,
+				const char *param_name)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
-                                       "{s:s, s:s}",
+                                       "{s:s, s:I, s:s}",
                                        "error", "invalid parameter",
+				       "code", (json_int_t) ec,
                                        "parameter", param_name);
 }
 

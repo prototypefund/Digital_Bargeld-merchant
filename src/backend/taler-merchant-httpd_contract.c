@@ -114,8 +114,10 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
   GNUNET_free (jpc);
 }
 
+
 extern struct MerchantInstance *
 get_instance (struct json_t *json);
+
 
 /**
  * Manage a contract request. In practical terms, it adds the fields
@@ -190,13 +192,14 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
-  jcontract = json_object_get (root, "contract");
-
+  jcontract = json_object_get (root,
+			       "contract");
   if (NULL == jcontract)
   {
     json_decref (root);
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "contract request malformed");
+    return TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+					   "contract");
   }
   /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection,
@@ -210,29 +213,32 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   if (GNUNET_SYSERR == res)
   {
     json_decref (root);
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "contract request malformed");
+    return TMH_RESPONSE_reply_arg_invalid (connection,
+					   TALER_EC_PARAMETER_MALFORMED,
+					   "contract");
   }
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))
   {
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "products in contract request malformed");
+    return TMH_RESPONSE_reply_arg_invalid (connection,
+					   TALER_EC_PARAMETER_MALFORMED,
+					   "contract:products");
   }
 
   mi = get_instance (jcontract);
   if (NULL == mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Not able to find the specified receiver\n"); 
+                "Not able to find the specified instance\n"); 
     json_decref (root);
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              "Unknown receiver given");
+    return TMH_RESPONSE_reply_not_found (connection,
+					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
+					 "Unknown instance given");
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Signing contract on behalf of receiver '%s'\n",
+              "Signing contract on behalf of instance '%s'\n",
               mi->id);
   /* add fields to the contract that the backend should provide */
   json_object_set (jcontract,
