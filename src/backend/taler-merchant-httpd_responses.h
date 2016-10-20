@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015 GNUnet e.V.
+  Copyright (C) 2014, 2015, 2016 GNUnet e.V.
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -30,6 +30,7 @@
 #include <microhttpd.h>
 #include <pthread.h>
 /* just need some structs, not the actual API */
+#include <taler/taler_error_codes.h>
 #include "taler_merchant_service.h"
 
 /**
@@ -112,11 +113,13 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection);
  * needed for the reply.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param object name of the object we did not find
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
+			      enum TALER_ErrorCode ec,
                               const char *object);
 
 
@@ -124,11 +127,13 @@ TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
  * Send a response indicating that the request was malformed.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param issue description of what was wrong with the request
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_bad_request (struct MHD_Connection *connection,
+				enum TALER_ErrorCode ec,
                                 const char *issue);
 
 
@@ -136,44 +141,52 @@ TMH_RESPONSE_reply_bad_request (struct MHD_Connection *connection,
  * Send a response indicating an internal error.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param hint hint about the internal error's nature
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
+				   enum TALER_ErrorCode ec,
                                    const char *hint);
 
 
 /**
  * Create a response indicating an internal error.
  *
+ * @param ec error code to return
  * @param hint hint about the internal error's nature
  * @return a MHD response object
  */
 struct MHD_Response *
-TMH_RESPONSE_make_internal_error (const char *hint);
-
+TMH_RESPONSE_make_internal_error (enum TALER_ErrorCode ec,
+				  const char *hint);
+  
 
 /**
  * Send a response indicating an external error.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param hint hint about the error's nature
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
+				   enum TALER_ErrorCode ec,
                                    const char *hint);
 
 
 /**
  * Create a response indicating an external error.
  *
+ * @param ec error code to return
  * @param hint hint about the internal error's nature
  * @return a MHD response object
  */
 struct MHD_Response *
-TMH_RESPONSE_make_external_error (const char *hint);
+TMH_RESPONSE_make_external_error (enum TALER_ErrorCode ec,
+				  const char *hint);
 
 
 /**
@@ -196,25 +209,32 @@ TMH_RESPONSE_reply_request_too_large (struct MHD_Connection *connection);
 void
 TMH_RESPONSE_add_global_headers (struct MHD_Response *response);
 
+
 /**
  * Send a response indicating a missing argument.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param param_name the parameter that is missing
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
+				enum TALER_ErrorCode ec,
                                 const char *param_name);
+
 
 /**
  * Send a response indicating an invalid argument.
  *
  * @param connection the MHD connection to use
+ * @param ec error code to return
  * @param param_name the parameter that is invalid
  * @return a MHD result code
  */
 int
 TMH_RESPONSE_reply_arg_invalid (struct MHD_Connection *connection,
+				enum TALER_ErrorCode ec,
                                 const char *param_name);
+
 #endif

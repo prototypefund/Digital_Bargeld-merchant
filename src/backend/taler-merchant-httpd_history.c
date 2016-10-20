@@ -96,23 +96,27 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                      "date");
 
   if (NULL == str)
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           "date argument missing");
+    return TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+                                           "date");
 
   if (1 != sscanf (str, "%llu", &seconds))
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           "date argument must be a timestamp");
+    return TMH_RESPONSE_reply_arg_invalid (connection,
+					   TALER_EC_PARAMETER_MALFORMED,
+                                           "date");
   date.abs_value_us = seconds * 1000LL * 1000LL;
   if (date.abs_value_us / 1000LL / 1000LL != seconds)
     return TMH_RESPONSE_reply_bad_request (connection,
+					   TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
                                            "Timestamp overflowed");
   ret = db->find_transactions_by_date (db->cls,
                                        date,
                                        history_cb,
                                        response);
   if (GNUNET_SYSERR == ret)
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                "db error to get history");
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_HISTORY_DB_FETCH_ERROR,
+					      "db error to get history");
   return TMH_RESPONSE_reply_json (connection,
                                   response,
                                   MHD_HTTP_OK);

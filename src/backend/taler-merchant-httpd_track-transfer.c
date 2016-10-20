@@ -452,7 +452,8 @@ handle_track_transfer_timeout (void *cls)
   }
   resume_track_transfer_with_response (rctx,
                                        MHD_HTTP_SERVICE_UNAVAILABLE,
-                                       TMH_RESPONSE_make_internal_error ("exchange not reachable"));
+                                       TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_EXCHANGE_TIMEOUT,
+									 "exchange not reachable"));
 }
 
 
@@ -549,33 +550,37 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                      MHD_GET_ARGUMENT_KIND,
                                      "exchange");
   if (NULL == uri)
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           "exchange argument missing");
+    return TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+                                           "exchange");
   rctx->uri = GNUNET_strdup (uri);
 
   receiver_str = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,
-                                              "receiver");
+                                              "receiver" /* FIXME: instance */);
   if (NULL == receiver_str)
     receiver_str = "default";
   rctx->mi = TMH_lookup_instance (receiver_str);
   if (NULL == rctx->mi)
     return TMH_RESPONSE_reply_not_found (connection,
+					 TALER_EC_TRACK_TRANSFER_INSTANCE_UNKNOWN,
                                          "instance unknown");
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "wtid");
   if (NULL == str)
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           "wtid argument missing");
+    return TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+                                           "wtid");
   if (GNUNET_OK !=
       GNUNET_STRINGS_string_to_data (str,
                                      strlen (str),
                                      &rctx->wtid,
                                      sizeof (rctx->wtid)))
   {
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           "wtid argument malformed");
+    return TMH_RESPONSE_reply_arg_invalid (connection,
+					   TALER_EC_PARAMETER_MALFORMED,
+                                           "wtid");
   }
 
   /* Check if reply is already in database! */

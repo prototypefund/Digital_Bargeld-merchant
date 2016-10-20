@@ -688,7 +688,8 @@ handle_track_transaction_timeout (void *cls)
   }
   resume_track_transaction_with_response (tctx,
                                           MHD_HTTP_SERVICE_UNAVAILABLE,
-                                          TMH_RESPONSE_make_internal_error ("exchange not reachable"));
+                                          TMH_RESPONSE_make_internal_error (TALER_EC_PAY_EXCHANGE_TIMEOUT,
+									    "exchange not reachable"));
 }
 
 
@@ -872,11 +873,12 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                      MHD_GET_ARGUMENT_KIND,
                                      "id");
   if (NULL == str)
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           "id argument missing");
+    return TMH_RESPONSE_reply_arg_missing (connection,
+                                           TALER_EC_PARAMETER_MISSING,
+					   "id");
   receiver = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
-                                          "receiver");
+                                          "receiver" /* FIXME: rename to 'instance' */);
   if (NULL == receiver)
     receiver = "default";
   GNUNET_CRYPTO_hash (receiver,
@@ -885,14 +887,16 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   tctx->mi = GNUNET_CONTAINER_multihashmap_get (by_id_map,
                                                 &h_receiver);
   if (NULL == tctx->mi)
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           "unknown receiver");
+    return TMH_RESPONSE_reply_not_found (connection,
+					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
+					 "unknown instance");
   if (1 !=
       sscanf (str,
               "%llu",
               &transaction_id))
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           "id argument must be a number");
+    return TMH_RESPONSE_reply_arg_invalid (connection,
+					   TALER_EC_PARAMETER_MALFORMED,
+                                           "id");
 
   ret = db->find_transaction (db->cls,
                               transaction_id,
@@ -902,6 +906,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   if (GNUNET_NO == ret)
   {
     return TMH_RESPONSE_reply_not_found (connection,
+					 TALER_EC_TRACK_TRANSACTION_TRANSACTION_UNKNOWN,
                                          "id");
   }
   if ( (GNUNET_SYSERR == ret) ||
@@ -910,6 +915,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   {
     GNUNET_break (0);
     return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
                                               "Database error");
   }
   ret = db->find_payments (db->cls,
@@ -921,11 +927,13 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   {
     GNUNET_break (0);
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              "Database error");
+                                              TALER_EC_TRACK_TRANSACTION_DB_FETCH_PAYMENT_ERROR,
+					      "Database error");
   }
   if (GNUNET_NO == ret)
   {
     return TMH_RESPONSE_reply_not_found (connection,
+					 TALER_EC_TRACK_TRANSACTION_DB_NO_DEPOSITS_ERROR,
                                          "deposits");
   }
   *connection_cls = tctx;
@@ -937,9 +945,10 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                           &process_track_transaction_with_exchange,
                                           tctx);
 
-  tctx->timeout_task = GNUNET_SCHEDULER_add_delayed (TRACK_TIMEOUT,
-                                                     &handle_track_transaction_timeout,
-                                                     tctx);
+  tctx->timeout_task
+    = GNUNET_SCHEDULER_add_delayed (TRACK_TIMEOUT,
+				    &handle_track_transaction_timeout,
+				    tctx);
   return MHD_YES;
 }
 

@@ -364,8 +364,10 @@ deposit_cb (void *cls,
       /* FIXME: any useful information we can include? */
       resume_pay_with_response (pc,
                                 MHD_HTTP_SERVICE_UNAVAILABLE,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:s}",
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:I, s:s}",
                                                              "error", "exchange failed",
+							     "code", (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
+							     "exchange-http-status", (json_int_t) http_status,
                                                              "hint", "The exchange provided an unexpected response"));
     }
     else
@@ -402,7 +404,8 @@ deposit_cb (void *cls,
     /* Forward error including 'proof' for the body */
     resume_pay_with_response (pc,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TMH_RESPONSE_make_internal_error ("Merchant database error"));
+                              TMH_RESPONSE_make_internal_error (TALER_EC_PAY_DB_STORE_PAY_ERROR,
+								"Merchant database error"));
     return;
   }
 
@@ -512,7 +515,8 @@ process_pay_with_exchange (void *cls,
     GNUNET_break_op (0);
     resume_pay_with_response (pc,
                               MHD_HTTP_PRECONDITION_FAILED,
-                              TMH_RESPONSE_make_external_error ("exchange not supported"));
+                              TMH_RESPONSE_make_external_error (TALER_EC_PAY_EXCHANGE_REJECTED,
+								"exchange not supported"));
     return;
   }
   pc->mh = mh;
@@ -523,7 +527,8 @@ process_pay_with_exchange (void *cls,
     GNUNET_break (0);
     resume_pay_with_response (pc,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TMH_RESPONSE_make_internal_error ("no keys"));
+                              TMH_RESPONSE_make_internal_error (TALER_EC_PAY_EXCHANGE_KEYS_FAILURE,
+								"no keys"));
     return;
   }
 
@@ -542,8 +547,9 @@ process_pay_with_exchange (void *cls,
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:o, s:o}",
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:o, s:o}",
                                                              "error", "denomination not found",
+							     "code", TALER_EC_PAY_DENOMINATION_KEY_NOT_FOUND,
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key),
                                                              "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
@@ -563,8 +569,9 @@ process_pay_with_exchange (void *cls,
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:o}",
                                                              "error", "invalid denomination",
+							     "code", (json_int_t) TALER_EC_PAY_DENOMINATION_KEY_AUDITOR_FAILURE,
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
       denom_enc = denomination_to_string_alloc (&dc->denom);
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -594,7 +601,8 @@ process_pay_with_exchange (void *cls,
 	/* Overflow in these amounts? Very strange. */
 	resume_pay_with_response (pc,
 				  MHD_HTTP_BAD_REQUEST,
-				  TMH_RESPONSE_make_internal_error ("Overflow adding up amounts"));
+				  TMH_RESPONSE_make_internal_error (TALER_EC_PAY_AMOUNT_OVERFLOW,
+								    "Overflow adding up amounts"));
 	return;
       }
     }
@@ -606,8 +614,9 @@ process_pay_with_exchange (void *cls,
       /* fee higher than residual coin value, makes no sense. */
       resume_pay_with_response (pc,
 				MHD_HTTP_BAD_REQUEST,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:o, s:o}",
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:o, s:o}",
                                                              "hint", "fee higher than coin value",
+							     "code", (json_int_t) TALER_EC_PAY_FEES_EXCEED_PAYMENT,
                                                              "f" /* FIXME */, TALER_JSON_from_amount (&dc->amount_with_fee),
                                                              "fee_deposit", TALER_JSON_from_amount (&denom_details->fee_deposit)));
       return;
@@ -636,7 +645,8 @@ process_pay_with_exchange (void *cls,
       GNUNET_break (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                TMH_RESPONSE_make_internal_error ("overflow"));
+                                TMH_RESPONSE_make_internal_error (TALER_EC_PAY_AMOUNT_OVERFLOW,
+								  "overflow"));
       return;
     }
     /* check if total payment sufficies */
@@ -646,7 +656,8 @@ process_pay_with_exchange (void *cls,
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_NOT_ACCEPTABLE,
-                                TMH_RESPONSE_make_external_error ("insufficient funds (including excessive exchange fees to be covered by customer)"));
+                                TMH_RESPONSE_make_external_error (TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES,
+								  "insufficient funds (including excessive exchange fees to be covered by customer)"));
       return;
     }
   }
@@ -659,7 +670,8 @@ process_pay_with_exchange (void *cls,
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_NOT_ACCEPTABLE,
-                                TMH_RESPONSE_make_external_error ("insufficient funds"));
+                                TMH_RESPONSE_make_external_error (TALER_EC_PAY_PAYMENT_INSUFFICIENT,
+								  "insufficient funds"));
       return;
     }
   }
@@ -703,8 +715,10 @@ process_pay_with_exchange (void *cls,
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_UNAUTHORIZED,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:i}",
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:i}",
                                                              "hint", "Coin signature invalid.",
+							     "code", (json_int_t) TALER_EC_PAY_COIN_SIGNATURE_INVALID,
+								      
                                                              "coin_idx", i));
       return;
     }
@@ -735,7 +749,8 @@ handle_pay_timeout (void *cls)
 
   resume_pay_with_response (pc,
                             MHD_HTTP_SERVICE_UNAVAILABLE,
-                            TMH_RESPONSE_make_internal_error ("exchange not reachable"));
+                            TMH_RESPONSE_make_internal_error (TALER_EC_PAY_EXCHANGE_TIMEOUT,
+							      "exchange not reachable"));
 }
 
 
@@ -906,6 +921,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   {
     GNUNET_break (0);
     return TMH_RESPONSE_reply_external_error (connection,
+					      TALER_EC_JSON_INVALID,
 					      "failed to parse JSON body");
   }
   if ((GNUNET_NO == res) || (NULL == root))
@@ -951,15 +967,17 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     if (NULL == pc->mi)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		  "Not able to find the specified receiver\n");
+		  "Not able to find the specified instance\n");
       json_decref (root);
-      return TMH_RESPONSE_reply_external_error (connection,
-					      "Unknown receiver given");
+      return TMH_RESPONSE_reply_not_found (connection,
+					   TALER_EC_PAY_INSTANCE_UNKNOWN,
+					   "Unknown instance given");
     }
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 		"The receiver for this deposit is '%s', whose bank details are '%s'\n",
 		pc->mi->id,
-		json_dumps (pc->mi->j_wire, JSON_COMPACT));
+		json_dumps (pc->mi->j_wire,
+			    JSON_COMPACT));
     pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 		"Parsed JSON for /pay.\n");
@@ -982,6 +1000,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       GNUNET_JSON_parse_free (spec);
       json_decref (root);
       return TMH_RESPONSE_reply_external_error (connection,
+						TALER_EC_PAY_MERCHANT_SIGNATURE_INVALID,
 						"invalid merchant signature supplied");
     }
 
@@ -991,8 +1010,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     if (NULL == json_object_get (root,
 				 "wire_transfer_deadline"))
     {
-      pc->wire_transfer_deadline = GNUNET_TIME_absolute_add (pc->timestamp,
-							     wire_transfer_delay);
+      pc->wire_transfer_deadline
+	= GNUNET_TIME_absolute_add (pc->timestamp,
+				    wire_transfer_delay);
       if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
       {
 	/* Refund value very large, delay wire transfer accordingly */
@@ -1023,6 +1043,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 	GNUNET_JSON_parse_free (spec);
 	json_decref (root);
 	return TMH_RESPONSE_reply_external_error (connection,
+						  TALER_EC_PAY_REFUND_DEADLINE_PAST_WIRE_TRANSFER_DEADLINE,
 						  "refund deadline after wire transfer deadline");
       }
     }
@@ -1033,8 +1054,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     {
       GNUNET_JSON_parse_free (spec);
       json_decref (root);
-      return TMH_RESPONSE_reply_external_error (connection,
-						"no coins given");
+      return TMH_RESPONSE_reply_arg_invalid (connection,
+					     TALER_EC_PAY_COINS_ARRAY_EMPTY,
+					     "coins");
     }
     /* note: 1 coin = 1 deposit confirmation expected */
     pc->dc = GNUNET_new_array (pc->coins_cnt,
@@ -1093,6 +1115,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     GNUNET_break (0);
     json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
 					      "Merchant database error");
   }
   if (0 == pc->pending)
@@ -1123,14 +1146,16 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     GNUNET_break (0);
     json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
                                                "Merchant database error");
   }
   if (GNUNET_SYSERR == pc->transaction_exits)
   {
     GNUNET_break (0);
     json_decref (root);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              "Transaction ID reused with different transaction details");
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              TALER_EC_PAY_DB_TRANSACTION_ID_CONFLICT,
+					      "Transaction ID reused with different transaction details");
   }
   if (GNUNET_NO == pc->transaction_exits)
   {
@@ -1148,7 +1173,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       GNUNET_break (0);
       json_decref (root);
       return TMH_RESPONSE_reply_internal_error (connection,
-                                               "Merchant database error");
+						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+						"Merchant database error");
     }
   }
 

@@ -27,6 +27,8 @@
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 
+/* FIXME: de-duplicate code with taler-exchange-httpd_parsing.c
+   and taler-exchange-httpd_response.c */
 
 /**
  * Initial size for POST request buffer.
@@ -209,6 +211,7 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
       GNUNET_free (r);
       return (MHD_NO ==
               TMH_RESPONSE_reply_internal_error (connection,
+						 TALER_EC_PARSER_OUT_OF_MEMORY,
                                                  "out of memory"))
         ? GNUNET_SYSERR : GNUNET_NO;
     }
@@ -337,7 +340,9 @@ TMH_PARSE_mhd_request_arg_data (struct MHD_Connection *connection,
   if (NULL == str)
   {
     return (MHD_NO ==
-            TMH_RESPONSE_reply_arg_missing (connection, param_name))
+            TMH_RESPONSE_reply_arg_missing (connection,
+					    TALER_EC_PARAMETER_MISSING,
+					    param_name))
       ? GNUNET_SYSERR : GNUNET_NO;
   }
   if (GNUNET_OK !=
@@ -346,7 +351,9 @@ TMH_PARSE_mhd_request_arg_data (struct MHD_Connection *connection,
                                      out_data,
                                      out_size))
     return (MHD_NO ==
-            TMH_RESPONSE_reply_arg_invalid (connection, param_name))
+            TMH_RESPONSE_reply_arg_invalid (connection,
+					    TALER_EC_PARAMETER_MALFORMED,
+					    param_name))
       ? GNUNET_SYSERR : GNUNET_NO;
   return GNUNET_OK;
 }
