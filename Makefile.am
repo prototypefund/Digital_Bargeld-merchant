@@ -1,6 +1,10 @@
 # This Makefile is in the public domain
 
 SUBDIRS = src copylib examples
+if WITH_DOC
+  SUBDIRS += doc
+endif
+
 ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = AUTHORS COPYING.GPL COPYING.AGPL COPYING.LGPL
 
