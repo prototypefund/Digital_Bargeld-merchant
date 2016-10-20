@@ -714,11 +714,13 @@ next_command (struct InterpreterState *is)
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code, #TALER_EC_NONE on success
  * @param full_response full response from the exchange (for logging, in case of errors)
  */
 static void
 add_incoming_cb (void *cls,
                  unsigned int http_status,
+		 enum TALER_ErrorCode ec,
                  const json_t *full_response)
 {
   struct InterpreterState *is = cls;
@@ -853,6 +855,7 @@ compare_reserve_withdraw_history (const struct TALER_EXCHANGE_ReserveHistory *h,
 static void
 reserve_status_cb (void *cls,
                    unsigned int http_status,
+		   enum TALER_ErrorCode ec,
                    const json_t *json,
                    const struct TALER_Amount *balance,
                    unsigned int history_length,
@@ -965,6 +968,7 @@ reserve_status_cb (void *cls,
 static void
 reserve_withdraw_cb (void *cls,
                      unsigned int http_status,
+		     enum TALER_ErrorCode ec,
                      const struct TALER_DenominationSignature *sig,
                      const json_t *full_response)
 {

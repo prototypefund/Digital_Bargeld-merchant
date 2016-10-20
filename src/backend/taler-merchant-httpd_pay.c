@@ -337,6 +337,7 @@ abort_deposit (struct PayContext *pc)
  * @param http_status HTTP response code, #MHD_HTTP_OK
  *   (200) for successful deposit; 0 if the exchange's reply is bogus (fails
  *   to follow the protocol)
+ * @param ec taler-specific error code, #TALER_EC_NONE on success
  * @param sign_key which key did the exchange use to sign the @a proof
  * @param proof the received JSON reply,
  *   should be kept as proof (and, in case of errors, be forwarded to
@@ -345,6 +346,7 @@ abort_deposit (struct PayContext *pc)
 static void
 deposit_cb (void *cls,
             unsigned int http_status,
+	    enum TALER_ErrorCode ec,
             const struct TALER_ExchangePublicKeyP *sign_key,
             const json_t *proof)
 {
@@ -366,12 +368,12 @@ deposit_cb (void *cls,
     if (NULL == proof)
     {
       /* We can't do anything meaningful here, the exchange did something wrong */
-      /* FIXME: any useful information we can include? */
       resume_pay_with_response (pc,
                                 MHD_HTTP_SERVICE_UNAVAILABLE,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:I, s:s}",
                                                              "error", "exchange failed",
 							     "code", (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
+							     "exchange-code", (json_int_t) ec,
 							     "exchange-http-status", (json_int_t) http_status,
                                                              "hint", "The exchange provided an unexpected response"));
     }

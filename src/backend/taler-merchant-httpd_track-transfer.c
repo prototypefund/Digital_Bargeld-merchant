@@ -258,6 +258,7 @@ check_transfer (void *cls,
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param ec taler-specific error code for the operation, #TALER_EC_NONE on success
  * @param exchange_pub public key of the exchange used to sign @a json
  * @param json original json reply (may include signatures, those have then been
  *        validated already)
@@ -271,6 +272,7 @@ check_transfer (void *cls,
 static void
 wire_transfer_cb (void *cls,
                   unsigned int http_status,
+		  enum TALER_ErrorCode ec,
                   const struct TALER_ExchangePublicKeyP *exchange_pub,
                   const json_t *json,
                   const struct GNUNET_HashCode *h_wire,
@@ -292,8 +294,10 @@ wire_transfer_cb (void *cls,
     resume_track_transfer_with_response
       (rctx,
        MHD_HTTP_FAILED_DEPENDENCY,
-       TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
-                                    "exchange_status", (json_int_t) http_status,
+       TMH_RESPONSE_make_json_pack ("{s:I, s:I, s:I, s:O}",
+				    "code", (json_int_t) TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
+                                    "exchange-code", (json_int_t) ec,
+                                    "exchange-http-status", (json_int_t) http_status,
                                     "details", json));
     return;
   }
@@ -311,7 +315,8 @@ wire_transfer_cb (void *cls,
     resume_track_transfer_with_response
       (rctx,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
-       TMH_RESPONSE_make_json_pack ("{s:s}",
+       TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+				    "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_STORE_TRANSER_ERROR,
                                     "details", "failed to store response from exchange to local database"));
     return;
   }
@@ -334,7 +339,8 @@ wire_transfer_cb (void *cls,
       resume_track_transfer_with_response
         (rctx,
          MHD_HTTP_INTERNAL_SERVER_ERROR,
-         TMH_RESPONSE_make_json_pack ("{s:s}",
+         TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+				      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_FETCH_DEPOSIT_ERROR,
                                       "details", "failed to obtain deposit data from local database"));
       return;
     }
@@ -355,7 +361,8 @@ wire_transfer_cb (void *cls,
       resume_track_transfer_with_response
         (rctx,
          MHD_HTTP_INTERNAL_SERVER_ERROR,
-         TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:s}",
+         TMH_RESPONSE_make_json_pack ("{s:I, s:s, s:I, s:s}",
+				      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_INTERNAL_LOGIC_ERROR,
                                       "details", "internal logic error",
                                       "line", (json_int_t) __LINE__,
                                       "file", __FILE__));
@@ -368,7 +375,7 @@ wire_transfer_cb (void *cls,
       GNUNET_assert (NULL != rctx->response);
       resume_track_transfer_with_response
         (rctx,
-         MHD_HTTP_CONFLICT,
+         MHD_HTTP_FAILED_DEPENDENCY,
          rctx->response);
       rctx->response = NULL;
       return;
@@ -386,7 +393,8 @@ wire_transfer_cb (void *cls,
       resume_track_transfer_with_response
         (rctx,
          MHD_HTTP_INTERNAL_SERVER_ERROR,
-         TMH_RESPONSE_make_json_pack ("{s:s}",
+         TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+				      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_STORE_COIN_ERROR,
                                       "details", "failed to store response from exchange to local database"));
       return;
     }
@@ -425,7 +433,8 @@ process_track_transfer_with_exchange (void *cls,
     resume_track_transfer_with_response
       (rctx,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
-       TMH_RESPONSE_make_json_pack ("{s:s}",
+       TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+				    "code", (json_int_t) TALER_EC_TRACK_TRANSFER_REQUEST_ERROR,
                                     "error", "failed to run /track/transfer on exchange"));
   }
 }
