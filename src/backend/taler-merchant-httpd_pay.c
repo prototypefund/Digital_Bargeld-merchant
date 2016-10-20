@@ -1179,6 +1179,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 		  pd_str);
 
       return TMH_RESPONSE_reply_bad_request (connection,
+					     TALER_EC_PAY_OFFER_EXPIRED,
                                              "The time to pay for this contract has expired.");
     }
 
