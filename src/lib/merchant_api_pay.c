@@ -263,6 +263,7 @@ handle_pay_finished (void *cls,
  * @param transaction_id transaction id for the transaction between merchant and customer
  * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
+ * @param pay_deadline maximum time limit to pay for this contract
  * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
@@ -285,6 +286,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
                            const struct TALER_MerchantSignatureP *merchant_sig,
                            struct GNUNET_TIME_Absolute timestamp,
                            struct GNUNET_TIME_Absolute refund_deadline,
+                           struct GNUNET_TIME_Absolute pay_deadline,
                            const struct GNUNET_HashCode *h_wire,
 			   const char *exchange_uri,
                            unsigned int num_coins,
@@ -295,6 +297,10 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
   unsigned int i;
   struct TALER_DepositRequestPS dr;
   struct TALER_MERCHANT_PaidCoin pc[num_coins];
+
+  (void) GNUNET_TIME_round_abs (&timestamp);
+  (void) GNUNET_TIME_round_abs (&pay_deadline);
+  (void) GNUNET_TIME_round_abs (&refund_deadline);
 
   dr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_COIN_DEPOSIT);
   dr.purpose.size = htonl (sizeof (struct TALER_DepositRequestPS));
@@ -346,6 +352,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 				      transaction_id,
 				      merchant_sig,
 				      refund_deadline,
+				      pay_deadline,
 				      timestamp,
 				      GNUNET_TIME_UNIT_ZERO_ABS,
 				      exchange_uri,
@@ -369,6 +376,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param transaction_id transaction id for the transaction between merchant and customer
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
+ * @param deadline to pay for this contract
  * @param wire_transfer_deadline date by which the merchant would like the exchange to execute the wire transfer (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
  * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
@@ -390,6 +398,7 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
                              uint64_t transaction_id,
                              const struct TALER_MerchantSignatureP *merchant_sig,
                              struct GNUNET_TIME_Absolute refund_deadline,
+                             struct GNUNET_TIME_Absolute pay_deadline,
                              struct GNUNET_TIME_Absolute timestamp,
                              struct GNUNET_TIME_Absolute wire_transfer_deadline,
 			     const char *exchange_uri,
@@ -405,6 +414,10 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   struct TALER_Amount total_fee;
   struct TALER_Amount total_amount;
   unsigned int i;
+
+  (void) GNUNET_TIME_round_abs (&timestamp);
+  (void) GNUNET_TIME_round_abs (&refund_deadline);
+  (void) GNUNET_TIME_round_abs (&wire_transfer_deadline);
 
   if (GNUNET_YES !=
       TALER_amount_cmp_currency (amount,
@@ -550,13 +563,15 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 
   pay_obj = json_pack ("{s:o," /* H_contract */
                        " s:I, s:o," /* transaction id, timestamp */
-                       " s:o, s:s," /* refund_deadline, exchange */
+                       " s:o, s:o," /* refund_deadline, pay_deadline */
+                       " s:s," /* exchange */
                        " s:o, s:o," /* coins, max_fee */
                        " s:o, s:o}",/* amount, signature */
                        "H_contract", GNUNET_JSON_from_data_auto (h_contract),
                        "transaction_id", (json_int_t) transaction_id,
                        "timestamp", GNUNET_JSON_from_time_abs (timestamp),
                        "refund_deadline", GNUNET_JSON_from_time_abs (refund_deadline),
+                       "pay_deadline", GNUNET_JSON_from_time_abs (pay_deadline),
 		       "exchange", exchange_uri,
 		       "coins", j_coins,
                        "max_fee", TALER_JSON_from_amount (max_fee),

@@ -186,6 +186,11 @@ struct PayContext
   struct GNUNET_TIME_Absolute refund_deadline;
 
   /**
+   * Deadline for the customer to pay for this contract.
+   */
+  struct GNUNET_TIME_Absolute pay_deadline;
+
+  /**
    * "H_contract" from @e root.
    */
   struct GNUNET_HashCode h_contract;
@@ -869,6 +874,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct PayContext *pc;
   int res;
   json_t *root;
+  struct GNUNET_TIME_Absolute now;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "In handler for /pay.\n");
@@ -945,6 +951,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       GNUNET_JSON_spec_fixed_auto ("merchant_sig", &merchant_sig),
       GNUNET_JSON_spec_string ("exchange", &chosen_exchange),
       GNUNET_JSON_spec_absolute_time ("refund_deadline", &pc->refund_deadline),
+      GNUNET_JSON_spec_absolute_time ("pay_deadline", &pc->pay_deadline),
       GNUNET_JSON_spec_absolute_time ("timestamp", &pc->timestamp),
       GNUNET_JSON_spec_uint64 ("transaction_id", &pc->transaction_id),
       GNUNET_JSON_spec_end()
@@ -1159,6 +1166,22 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_NO == pc->transaction_exits)
   {
+    /* #4521 goes here: Check if the customer respects pay_deadline */
+    now = GNUNET_TIME_absolute_get (); 
+    if (now.abs_value_us > pc->pay_deadline.abs_value_us)
+    {
+      /* Time expired, we don't accept this payment now! */
+      const char *pd_str;
+      pd_str = GNUNET_STRINGS_absolute_time_to_string (pc->pay_deadline);
+
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Attempt to get coins for expired contract. Deadline: '%s'\n",
+		  pd_str);
+
+      return TMH_RESPONSE_reply_bad_request (connection,
+                                             "The time to pay for this contract has expired.");
+    }
+
     if (GNUNET_OK !=
         db->store_transaction (db->cls,
                                pc->transaction_id,
