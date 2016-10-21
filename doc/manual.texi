@@ -177,12 +177,12 @@ The file @code{$HOME/.config/taler.conf} is responsible to ovveride the defaults
 
 What needs to be tuned:
 @itemize
-@item Serving: TCP or UNIX sockets?
-@item Currency: which currency we work with?
-@item Database: what is database's name?
-@item Exchanges: which exchanges do we work with?
-@item Keying: configure our private key.
-@item Instances: which bank accounts do we associate with this Merchant backend?
+@item Serving
+@item Currency
+@item Database
+@item Exchanges
+@item Wireformat
+@item Instances
 @end itemize
 
 In the following table, the notation @code{[secion]/option} denotes the option
@@ -236,18 +236,70 @@ the actual database name under DBMS. Note that DBMS must match what given in
 @item Exchange
 An exchange we want to work with is added by setting the following options
 
-@itemize
-@item @code{[merchant-exchange-myexchange]/uri}, 
+@display
+[merchant-exchange-myexchange]/uri
+@end display
+
 Takes the exchanges base URL, e.g. @code{https://exchange.test.taler.net/}
-@item @code{[merchant-exchange-myexchange]/master_key}, 
+
+@display
+[merchant-exchange-myexchange]/master_key
+@end display
+
 Takes the base32 encoding of the exchanges master key.
-@end itemize
+
+Note that multiple exchanges can be added to the system, just by using different
+tokens in place of @code{myexchange} above.
+
+@item Wireformat
+In order to receive money from the exchange, the merchant backend needs to tell
+ts bank details to the latter. That is controlled by the following option:
+
+@display
+[merchant]/wireformat
+@end display
+
+Currently, only the value @code{test} can be given. A wireformat of type @code{SEPA}
+will be supported in the future.
+
+@item Instances
+In Taler terminology, the Merchant backend allows the user to define
+different @i{instances}. An instance can be viewd as a "business entity": something
+that can receive money and sign contracts. To that purpose, any instance must
+provide its private key and wire details. It is mandatory to provide the "default"
+instance, with
+
+@display
+[merchant-instance-default]/keyfile
+@end display
+
+Provide here the path to the instance's private key
+
+@display
+[merchant-instance-wireformat-default]/test_response_file
+@end display
+
+Provide here the path to the file in JSON format that describes
+the instance's wire details. This JSON file must be in the format given to the
+option @code{[merchant]/wireformat}. Below there is an example of a "test" wire format
+file:
+
+@display
+@{
+  "type": "test",
+  "bank_uri": "https://bank.test.taler.net/",
+  "sig": "MERCHANTSIGNATURE",
+  "account_number": 5,
+  "salt": "SALT"
+@}
+@end display
+
+Note that multiple instances can be added to the Merchant backend just by
+using different tokens in place of "default"
 
 @end table
 
 @node hello-world
 @chapter How to set up a minimalistic shop
-
-FIXME Unify ALL options: either @itemize or @display style.
 
 @bye
