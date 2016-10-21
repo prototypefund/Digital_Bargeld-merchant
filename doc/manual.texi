@@ -76,8 +76,8 @@ backend all the libraries it depends on.
 @itemize
 @item GNUnet
 @item Taler Exchange
-@item Libmicrohttpd
-@item Libjansson
+@item libmicrohttpd
+@item libjansson
 @end itemize
 
 @section Installing GNUnet
@@ -85,10 +85,38 @@ GNUnet provides the backend all the routines for doing: cryptography,
 string manupulation, interfacing with DB, non-Taler specific JSON manupulation,
 logging, operating system interfacing.
 
-Downloading GNUnet
+Downloading GNUnet:
 
 @code{wget https://gnunet.org/gnunet0-10-1}
 
+Provide the following dependencies:
+@itemize
+@item @code{libpq} for interfacing with the Postgresql database
+@item libgcrypt
+@item libjansson
+@item libunistring
+@item libcurl
+@end itemize
+
+Then configure GNUnet as follows:
+
+@verbatim
+
+# From GNUnet's top directory.
+$ ./bootstrap
+$ ./configure [--prefix=PFX] \
+              [--with-libgcrypt-prefix=LIBGCRYPTPFX] \
+	      [--with-libcurl=LIBCURLPFX] \
+	      [--with-libjansson=LIBJANSSONPFX] \ #Warning #4746
+	      [--with-libunistring-prefix=LIBUNISTRINGPFX] \
+	      --without-idn \
+	      --wit-zlib=no \
+	      [--with-libcurl=LIBCURLPFX] \
+	      [--with-postgresql=LIBPQPFX]
+$ make
+$ make install
+
+@end verbatim
 
 @section Installing The Exchange
 @section Installing Libmicrohttpd
