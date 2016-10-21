@@ -331,6 +331,7 @@ trace_coins (struct TrackTransactionContext *tctx);
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param ec taler-specific error code
  * @param exchange_pub public key of the exchange used for signing
  * @param json original json reply (may include signatures, those have then been
  *        validated already)
@@ -345,6 +346,7 @@ trace_coins (struct TrackTransactionContext *tctx);
 static void
 wire_deposits_cb (void *cls,
                   unsigned int http_status,
+		  enum TALER_ErrorCode ec,
                   const struct TALER_ExchangePublicKeyP *exchange_pub,
                   const json_t *json,
                   const struct GNUNET_HashCode *h_wire,
@@ -363,8 +365,10 @@ wire_deposits_cb (void *cls,
     resume_track_transaction_with_response
       (tctx,
        MHD_HTTP_FAILED_DEPENDENCY,
-       TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
-                                    "exchange_status", (json_int_t) http_status,
+       TMH_RESPONSE_make_json_pack ("{s:I, s:I, s:I, s:O}",
+				    "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
+                                    "exchange-http-status", (json_int_t) http_status,
+				    "exchange-code", (json_int_t) ec,
                                     "details", json));
     return;
   }
@@ -454,6 +458,7 @@ proof_cb (void *cls,
  *
  * @param cls closure with a `struct TrackCoinContext`
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
+ * @param ec taler-specific error code, #TALER_EC_NONE on success
  * @param exchange_pub public key of the exchange used for signing @a json
  * @param json original json reply (may include signatures, those have then been
  *        validated already), should be a `TrackTransactionResponse`
@@ -466,6 +471,7 @@ proof_cb (void *cls,
 static void
 wtid_cb (void *cls,
          unsigned int http_status,
+	 enum TALER_ErrorCode ec,
          const struct TALER_ExchangePublicKeyP *exchange_pub,
          const json_t *json,
          const struct TALER_WireTransferIdentifierRawP *wtid,
@@ -487,8 +493,10 @@ wtid_cb (void *cls,
        (MHD_HTTP_ACCEPTED == http_status)
        ? MHD_HTTP_ACCEPTED
        : MHD_HTTP_FAILED_DEPENDENCY,
-       TMH_RESPONSE_make_json_pack ("{s:I, s:O}",
-                                    "exchange_status", (json_int_t) http_status,
+       TMH_RESPONSE_make_json_pack ("{s:I, s:I, s:I, s:O}",
+                                    "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_COIN_TRACE_ERROR,
+                                    "exchange-http-status", (json_int_t) http_status,
+                                    "exchange-code", (json_int_t) ec,
                                     "details", json));
     return;
   }
@@ -505,8 +513,9 @@ wtid_cb (void *cls,
     GNUNET_break_op (0);
     resume_track_transaction_with_response
       (tcc->tctx,
-       MHD_HTTP_CONFLICT,
-       TMH_RESPONSE_make_json_pack ("{s:s, s:O, s:o, s:o}",
+       MHD_HTTP_FAILED_DEPENDENCY,
+       TMH_RESPONSE_make_json_pack ("{s:I, s:s, s:O, s:o, s:o}",
+				    "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_CONFLICTING_REPORTS,
                                     "error", "conflicting transfer data from exchange",
                                     "transaction_tracking_claim", json,
                                     "wtid_tracking_claim", pcc.p_ret,

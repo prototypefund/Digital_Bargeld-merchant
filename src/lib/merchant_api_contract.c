@@ -148,6 +148,7 @@ handle_contract_finished (void *cls,
   }
   co->cb (co->cb_cls,
           response_code,
+	  TALER_JSON_get_error_code (json),
           json,
           contract,
           sigp,

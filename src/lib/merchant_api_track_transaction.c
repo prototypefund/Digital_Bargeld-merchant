@@ -155,6 +155,7 @@ parse_track_transaction_ok (struct TALER_MERCHANT_TrackTransactionHandle *tdo,
   }
   tdo->cb (tdo->cb_cls,
            MHD_HTTP_OK,
+	   TALER_EC_NONE,
            json,
            num_transfers,
            transfers);
@@ -218,6 +219,7 @@ handle_track_transaction_finished (void *cls,
   }
   tdo->cb (tdo->cb_cls,
            response_code,
+	   TALER_JSON_get_error_code (json),
            json,
            0,
            NULL);
