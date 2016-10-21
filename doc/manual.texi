@@ -290,8 +290,8 @@ file:
   "type": "test",
   "bank_uri": "https://bank.test.taler.net/",
   "sig": "MERCHANTSIGNATURE",
-  "account_number": 5,
-  "salt": "RANDOMSALT"
+"account_number": 5,
+"salt": "RANDOMSALT"
 @}
 @end display
 
@@ -302,5 +302,66 @@ using different tokens in place of @code{default}
 
 @node hello-world
 @chapter How to set up a minimalistic shop
+
+In this section, we set up a minimalistic shop, which exposes a
+button to get donations via Taler. The expected behaviour is that
+once the button is clicked, the customer will either receive a Taler
+contract, if they have the wallet installed, or be prompted with a
+classic paywall for credit cards.
+
+@section Backend configuration
+
+@subsection Wireformat
+
+Let's say that all the donations go to the following recipient,
+expressed in @code{SEPA} format@footnote{As said, supporting SEPA is still
+work in progress}.
+
+@display
+@{
+  "type": "SEPA",
+  "IBAN": "XY00 1111 2222 3333 4444 5555 6666",
+  "name": "Taler charity program",
+  "BIC": "XXXXAB99",
+  "salt": "RANDOMSALT"
+@}
+
+@end display
+
+Assume this information is stored in file @code{$DATADIR/sepa.json}.
+
+@subsection Serving
+
+The backend will be listening on port 9898 on the host @code{example.taler.net}
+
+@subsection Key
+
+The backend's key lies at @code{$DATADIR/key.priv}
+
+@subsection Database
+
+The backend will use a database named @code{donations} within Postgresql.
+
+@subsection Exchange
+
+The backend will deposit the coins it receives to the exchange at
+@code{https://exchange.demo.taler.net/}, having the master key
+"EXAMPLEMASTERKEY".
+
+@subsection Final configuration
+
+In the following configuration example, we assume the file @code{$HOME/.config/taler.conf} is being edited. It is the default file looked by the Merchant backend, but we can pass it config files from other locations using the @code{-c} option.
+
+@display
+
+[merchant]
+wireformat = SEPA
+
+[merchant-instance-default]
+SEPA_RESPONSE_FILE = $DATADIR/sepa.json
+
+@end display
+
+
 
 @bye
