@@ -190,7 +190,7 @@ In the following table, the notation @code{[secion]/option} denotes the option
 @table @code
 
 @item Serving
-Regulates the Merchant backend transport layer, it is controlled by:
+The following option sets the transport layer used by the Merchant backend:
 
 @example
 [merchant]/serve = TCP | UNIX
@@ -203,18 +203,18 @@ If given,
 @code{[merchant]/unixpath} and @code{[merchant]/unixpath_mode}. The last takes
 the usual permission mask give as number, like 660.
 @end itemize
-The frontend and backend will then communicate HTTP over the chosen serving option.
+The frontend and backend will then speak HTTP over the chosen serving option.
 
 @item Currency
-Instructs the backend on the currency to work with. Controlled by:
+Instructs the backend on the currency to work with. Set the option:
 
 @example
 [merchant]/currency
 @end example
 
 @item Database
-By design, it is possible to work with different DBMSs, so the Merchant backend needs
-to know which one is going to be used. Set this option in
+By design, it is possible to work with different DBMSs, so the Merchant
+backend needs to know which one is going to be used. Set this option in:
 
 @example
 [merchant]/db
@@ -223,18 +223,18 @@ to know which one is going to be used. Set this option in
 currently only the value "postgres" is supported.
 
 After configuring the DBMS, we need to instruct the Merchant backend on how the
-database is named. Set this option in
+database is named. Set the option:
 
 @example
 [merchantdb-DBMS]/config
 @end example
 
 this option needs to comply with the format "DBMS:///dbname", where "dbname" is
-the actual database name under DBMS. Note that DBMS must match what given in
+the actual database name under DBMS. Note that DBMS must match what it's given in
 @code{[merchant]/db}.
 
 @item Exchange
-An exchange we want to work with is added by setting the following options
+In order to add an exchange to the list of trusted ones, set the options:
 
 @display
 [merchant-exchange-myexchange]/uri
@@ -252,8 +252,8 @@ Note that multiple exchanges can be added to the system, just by using different
 tokens in place of @code{myexchange} above.
 
 @item Wireformat
-In order to receive money from the exchange, the merchant backend needs to tell
-ts bank details to the latter. That is controlled by the following option:
+In order to receive money, the merchant backend needs to tell its bank
+details to the exchange. Set the option:
 
 @display
 [merchant]/wireformat
@@ -267,21 +267,22 @@ In Taler terminology, the Merchant backend allows the user to define
 different @i{instances}. An instance can be viewd as a "business entity": something
 that can receive money and sign contracts. To that purpose, any instance must
 provide its private key and wire details. It is mandatory to provide the "default"
-instance, with
+instance, with:
 
 @display
 [merchant-instance-default]/keyfile
 @end display
 
-Provide here the path to the instance's private key
+Provide here the path to the instance's private key.
 
 @display
 [merchant-instance-wireformat-default]/test_response_file
 @end display
 
 Provide here the path to the file in JSON format that describes
-the instance's wire details. This JSON file must be in the format given to the
-option @code{[merchant]/wireformat}. Below there is an example of a "test" wire format
+the instance's wire details. This JSON file must be in the format
+given to the option @code{[merchant]/wireformat}. Below there is
+an example of a @code{test} wire format
 file:
 
 @display
@@ -290,12 +291,12 @@ file:
   "bank_uri": "https://bank.test.taler.net/",
   "sig": "MERCHANTSIGNATURE",
   "account_number": 5,
-  "salt": "SALT"
+  "salt": "RANDOMSALT"
 @}
 @end display
 
 Note that multiple instances can be added to the Merchant backend just by
-using different tokens in place of "default"
+using different tokens in place of @code{default}
 
 @end table
 
