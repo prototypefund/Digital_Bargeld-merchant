@@ -53,15 +53,18 @@ Texts.  A copy of the license is included in the section entitled
 @menu
 * introduction::	Whom this manual is addressed to	
 * dependencies::	Needed libraries to build the backend
+* installation::        Installing the Merchant backend
+* configuration::       How to set up the Merchant backend
+* hello-world::         How to set up a minimalistic shop
 @end menu
 
 @node introduction
 @chapter Whom this manual is addressed to
 This manual is addressed to people who want to integrate Taler
 in their online shop. The goal is to install a Taler @emph{backend} and
-make it communicate with your existing shop (the @emph{frontend}).
+make it communicate with their existing shop (the @emph{frontend}).
 In Taler terminology, the backend is the component that provides RESTful
-API to the frontend and that will do all the crypto work and communication
+API to the frontend and that will do all crypto work and communication
 with the Taler exchange. In other words, the frontend will never directly
 communicate with the exchange.
 See official documentation@footnote{@*https://api.taler.net@*https://taler.net}
@@ -78,6 +81,8 @@ backend all the libraries it depends on.
 @item Taler Exchange
 @item libmicrohttpd
 @item libjansson
+@item libcurl
+@item libpq
 @end itemize
 
 @section Installing GNUnet
@@ -100,27 +105,149 @@ Provide the following dependencies:
 
 Then configure GNUnet as follows:
 
-@verbatim
+@example
 
 # From GNUnet's top directory.
 $ ./bootstrap
 $ ./configure [--prefix=PFX] \
-              [--with-libgcrypt-prefix=LIBGCRYPTPFX] \
-	      [--with-libcurl=LIBCURLPFX] \
-	      [--with-libjansson=LIBJANSSONPFX] \ #Warning #4746
-	      [--with-libunistring-prefix=LIBUNISTRINGPFX] \
-	      --without-idn \
-	      --wit-zlib=no \
-	      [--with-libcurl=LIBCURLPFX] \
-	      [--with-postgresql=LIBPQPFX]
+               --without-idn \
+               --wit-zlib=no \
+               --disable-nls \
+               [--with-...]
+$ # Each dependency can be fetched from non standard locations via
+$ # the '--with-<LIBNAME>' option. See './configure --help'.
 $ make
 $ make install
 
-@end verbatim
+@end example
 
 @section Installing The Exchange
-@section Installing Libmicrohttpd
-@section Installing Libjansson
 
+Get the latest code:
+@code{git clone git://taler.net/exchange}
+
+Provide the following dependencies:
+@itemize
+@item @code{libpq} for interfacing with the Postgresql database
+@item libjansson
+@item libmicrohttpd
+@item GNUnet
+@end itemize
+
+Then configure the exchange as follows:
+
+@example
+$ # From exchange's top directory
+$ ./bootstrap
+$ ./configure [--prefix=PFX] \
+              [--with-gnunet=GNUNETPFX] \
+              [--with-...]
+$ # Each dependency can be fetched from non standard locations via
+$ # the '--with-<LIBNAME>' option. See './configure --help'.
+$ make
+$ make install
+@end example
+
+@node installation
+@chapter Installing the Merchant backend
+
+The following steps assumes all dependencies are installed. @xref{dependencies}.
+
+Get the code: @code{git clone git://taler.net/merchant}. Configure and install
+as follows:
+
+@example
+$ # From merchant's top directory
+$ ./bootstrap
+$ ./configure [--prefix=PFX] \
+              [--with-gnunet=GNUNETPFX] \
+              [--with-exchange=GNUNETPFX] \
+              [--with-...]
+$ # Each dependency can be fetched from non standard locations via
+$ # the '--with-<LIBNAME>' option. See './configure --help'.
+$ make
+$ make install
+@end example
+
+@node configuration
+@chapter How to set up the Merchant backend
+The installation already provides reasonable defaults for some of the
+configuration options, but some of them must be tuned to the particular case.
+The file @code{$HOME/.config/taler.conf} is responsible to ovveride the defaults.
+
+What needs to be tuned:
+@itemize
+@item Serving: TCP or UNIX sockets?
+@item Currency: which currency we work with?
+@item Database: what is database's name?
+@item Exchanges: which exchanges do we work with?
+@item Keying: configure our private key.
+@item Instances: which bank accounts do we associate with this Merchant backend?
+@end itemize
+
+In the following table, the notation @code{[secion]/option} denotes the option
+@code{option} under the section @code{[section]} in the configuration file.
+@table @code
+
+@item Serving
+Regulates the Merchant backend transport layer, it is controlled by:
+
+@example
+[merchant]/serve = TCP | UNIX
+@end example
+
+If given,
+@itemize
+@item @code{TCP}, then we need to set the port in @code{[merchant]/port}
+@item @code{UNIX}, then we need to set the unix socket path and mode in
+@code{[merchant]/unixpath} and @code{[merchant]/unixpath_mode}. The last takes
+the usual permission mask give as number, like 660.
+@end itemize
+The frontend and backend will then communicate HTTP over the chosen serving option.
+
+@item Currency
+Instructs the backend on the currency to work with. Controlled by:
+
+@example
+[merchant]/currency
+@end example
+
+@item Database
+By design, it is possible to work with different DBMSs, so the Merchant backend needs
+to know which one is going to be used. Set this option in
+
+@example
+[merchant]/db
+@end example
+
+currently only the value "postgres" is supported.
+
+After configuring the DBMS, we need to instruct the Merchant backend on how the
+database is named. Set this option in
+
+@example
+[merchantdb-DBMS]/config
+@end example
+
+this option needs to comply with the format "DBMS:///dbname", where "dbname" is
+the actual database name under DBMS. Note that DBMS must match what given in
+@code{[merchant]/db}.
+
+@item Exchange
+An exchange we want to work with is added by setting the following options
+
+@itemize
+@item @code{[merchant-exchange-myexchange]/uri}, 
+Takes the exchanges base URL, e.g. @code{https://exchange.test.taler.net/}
+@item @code{[merchant-exchange-myexchange]/master_key}, 
+Takes the base32 encoding of the exchanges master key.
+@end itemize
+
+@end table
+
+@node hello-world
+@chapter How to set up a minimalistic shop
+
+FIXME Unify ALL options: either @itemize or @display style.
 
 @bye
