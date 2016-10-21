@@ -2,7 +2,7 @@
 @c %**start of header
 @setfilename manual.info
 @include version.texi
-@settitle GNU Taler, merchant backend manual @value{VERSION}
+@settitle The GNU Taler manual for Merchants@value{VERSION}
 
 @c Define a new index for options.
 @defcodeindex op
@@ -26,8 +26,73 @@ Texts.  A copy of the license is included in the section entitled
 @end quotation
 @end copying
 @c If your manual is published on paper by the FSF, it should include
-@c the standard FSF Front-Cover and Back-Cover Texts, as given in
+@c The standard FSF Front-Cover and Back-Cover Texts, as given in
 @c maintain.texi.
-@printindex cp
+@c
+@c Titlepage
+@c
+@titlepage
+@title The GNU Taler manual for Merchants
+@subtitle Version @value{VERSION}
+@subtitle @value{UPDATED}
+@author Marcello Stanisci (@email{marcello.stanisci@@inria.fr})
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@summarycontents
+@contents
+
+@ifnottex
+@node Top
+@top The GNU libmicrohttpd Library
+@insertcopying
+@end ifnottex
+
+@menu
+* introduction::	Whom this manual is addressed to	
+* dependencies::	Needed libraries to build the backend
+@end menu
+
+@node introduction
+@chapter Whom this manual is addressed to
+This manual is addressed to people who want to integrate Taler
+in their online shop. The goal is to install a Taler @emph{backend} and
+make it communicate with your existing shop (the @emph{frontend}).
+In Taler terminology, the backend is the component that provides RESTful
+API to the frontend and that will do all the crypto work and communication
+with the Taler exchange. In other words, the frontend will never directly
+communicate with the exchange.
+See official documentation@footnote{@*https://api.taler.net@*https://taler.net}
+about Taler protocols.
+
+@node dependencies
+@chapter Needed libraries to build the backend
+
+The following packages need to be installed, in order to provide the
+backend all the libraries it depends on.
+
+@itemize
+@item GNUnet
+@item Taler Exchange
+@item Libmicrohttpd
+@item Libjansson
+@end itemize
+
+@section Installing GNUnet
+GNUnet provides the backend all the routines for doing: cryptography,
+string manupulation, interfacing with DB, non-Taler specific JSON manupulation,
+logging, operating system interfacing.
+
+Downloading GNUnet
+
+@code{wget https://gnunet.org/gnunet0-10-1}
+
+
+@section Installing The Exchange
+@section Installing Libmicrohttpd
+@section Installing Libjansson
+
 
 @bye
