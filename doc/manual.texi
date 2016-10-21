@@ -187,7 +187,7 @@ What needs to be tuned:
 
 In the following table, the notation @code{[secion]/option} denotes the option
 @code{option} under the section @code{[section]} in the configuration file.
-@table @code
+@table @asis
 
 @item Serving
 The following option sets the transport layer used by the Merchant backend:
@@ -236,15 +236,15 @@ the actual database name under DBMS. Note that DBMS must match what it's given i
 @item Exchange
 In order to add an exchange to the list of trusted ones, set the options:
 
-@display
+@example
 [merchant-exchange-myexchange]/uri
-@end display
+@end example
 
 Takes the exchanges base URL, e.g. @code{https://exchange.test.taler.net/}
 
-@display
+@example
 [merchant-exchange-myexchange]/master_key
-@end display
+@end example
 
 Takes the base32 encoding of the exchanges master key.
 
@@ -255,9 +255,9 @@ tokens in place of @code{myexchange} above.
 In order to receive money, the merchant backend needs to tell its bank
 details to the exchange. Set the option:
 
-@display
+@example
 [merchant]/wireformat
-@end display
+@end example
 
 Currently, only the value @code{test} can be given. A wireformat of type @code{SEPA}
 will be supported in the future.
@@ -269,31 +269,30 @@ that can receive money and sign contracts. To that purpose, any instance must
 provide its private key and wire details. It is mandatory to provide the "default"
 instance, with:
 
-@display
+@example
 [merchant-instance-default]/keyfile
-@end display
+@end example
 
 Provide here the path to the instance's private key.
 
-@display
+@example
 [merchant-instance-wireformat-default]/test_response_file
-@end display
+@end example
 
 Provide here the path to the file in JSON format that describes
 the instance's wire details. This JSON file must be in the format
 given to the option @code{[merchant]/wireformat}. Below there is
-an example of a @code{test} wire format
-file:
+an example of a @code{test} wire format file:
 
-@display
-@{
+@verbatim
+{
   "type": "test",
   "bank_uri": "https://bank.test.taler.net/",
   "sig": "MERCHANTSIGNATURE",
-"account_number": 5,
-"salt": "RANDOMSALT"
-@}
-@end display
+  "account_number": 5,
+  "salt": "RANDOMSALT"
+}
+@end verbatim
 
 Note that multiple instances can be added to the Merchant backend just by
 using different tokens in place of @code{default}
@@ -317,16 +316,16 @@ Let's say that all the donations go to the following recipient,
 expressed in @code{SEPA} format@footnote{As said, supporting SEPA is still
 work in progress}.
 
-@display
-@{
+@verbatim
+{
   "type": "SEPA",
   "IBAN": "XY00 1111 2222 3333 4444 5555 6666",
   "name": "Taler charity program",
   "BIC": "XXXXAB99",
   "salt": "RANDOMSALT"
-@}
+}
 
-@end display
+@end verbatim
 
 Assume this information is stored in file @code{$DATADIR/sepa.json}.
 
@@ -350,17 +349,55 @@ The backend will deposit the coins it receives to the exchange at
 
 @subsection Final configuration
 
-In the following configuration example, we assume the file @code{$HOME/.config/taler.conf} is being edited. It is the default file looked by the Merchant backend, but we can pass it config files from other locations using the @code{-c} option.
+The following configuration will drive the Merchant backend to
+realize what we planned in the subsections above. We assume the file
+@code{$HOME/.config/taler.conf} is being edited. It is the default
+file looked by the Merchant backend, but we can pass it config
+files from other locations using the @code{-c} option.
 
-@display
+
+@example
 
 [merchant]
 wireformat = SEPA
+serve = TCP
+port = 9898
+currency = EUR
+database = postgres
 
 [merchant-instance-default]
+KEYFILE = $DATADIR/key.priv
+
+[merchant-instance-wireformat-default]
 SEPA_RESPONSE_FILE = $DATADIR/sepa.json
 
-@end display
+[merchantdb-postgres]
+config = postgres:///donations
+
+[merchant-demoexchange]
+uri = https://exchange.demo.taler.net/
+master_key = EXAMPLEMASTERKEY
+
+@end example
+
+The sysadmin should make sure that a database named @code{donations} is
+defined and accessible in the system. Once this configuration is ready,
+it suffices to run the Merchant backend with:
+
+@example
+taler-merchant-httpd
+@end example
+
+If everything worked as expected, the following command:
+@example
+$ curl http://example.taler.net/
+@end example
+
+should return the following message:
+
+@example
+Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.
+@end example
 
 
 
