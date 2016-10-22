@@ -232,7 +232,7 @@ handle_track_transaction_finished (void *cls,
  *
  * @param ctx execution context
  * @param backend_uri base URI of the backend
- * @param receiver which merchant instance is going to be tracked
+ * @param instance which merchant instance is going to be tracked
  * @param transaction_id which transaction should we trace
  * @param track_transaction_cb the callback to call when a reply for this request is available
  * @param track_transaction_cb_cls closure for @a track_transaction_cb
@@ -241,7 +241,7 @@ handle_track_transaction_finished (void *cls,
 struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                                   const char *backend_uri,
-                                  const char *receiver,
+                                  const char *instance,
                                   uint64_t transaction_id,
                                   TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
                                   void *track_transaction_cb_cls)
@@ -254,10 +254,10 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
   tdo->cb = track_transaction_cb;
   tdo->cb_cls = track_transaction_cb_cls;
   GNUNET_asprintf (&tdo->url,
-                   "%s/track/transaction?id=%llu&receiver=%s",
+                   "%s/track/transaction?id=%llu&instance=%s",
                    backend_uri,
                    (unsigned long long) transaction_id,
-                   receiver);
+                   instance);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,

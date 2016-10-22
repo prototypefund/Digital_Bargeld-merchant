@@ -243,7 +243,7 @@ struct PayContext
   int transaction_exits;
 
   /**
-   * Instance of the payment's receiver (in JSON format)
+   * Instance of the payment's instance (in JSON format)
    */
   struct MerchantInstance *mi;
 
@@ -981,7 +981,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 					   "Unknown instance given");
     }
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		"The receiver for this deposit is '%s', whose bank details are '%s'\n",
+		"The instance for this deposit is '%s', whose bank details are '%s'\n",
 		pc->mi->id,
 		json_dumps (pc->mi->j_wire,
 			    JSON_COMPACT));

@@ -508,7 +508,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   struct TrackTransferContext *rctx;
   const char *str;
   const char *uri;
-  const char *receiver_str;
+  const char *instance_str;
   int ret;
 
   if (NULL == *connection_cls)
@@ -564,12 +564,12 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                            "exchange");
   rctx->uri = GNUNET_strdup (uri);
 
-  receiver_str = MHD_lookup_connection_value (connection,
+  instance_str = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,
-                                              "receiver" /* FIXME: instance */);
-  if (NULL == receiver_str)
-    receiver_str = "default";
-  rctx->mi = TMH_lookup_instance (receiver_str);
+                                              "instance" /* FIXME: instance */);
+  if (NULL == instance_str)
+    instance_str = "default";
+  rctx->mi = TMH_lookup_instance (instance_str);
   if (NULL == rctx->mi)
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSFER_INSTANCE_UNKNOWN,

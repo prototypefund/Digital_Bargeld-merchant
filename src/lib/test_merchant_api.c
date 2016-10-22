@@ -66,24 +66,24 @@ static struct TALER_EXCHANGE_Handle *exchange;
 static struct GNUNET_CURL_Context *ctx;
 
 /**
- * Array of receivers to test against
+ * Array of instances to test against
  */
 static char **instances;
 
 /**
  * How many merchant instances this test runs
  */
-unsigned int nreceiver = 0;
+unsigned int ninstances = 0;
 
 /**
- * Current receiver
+ * Current instance
  */
-static char *receiver;
+static char *instance;
 
 /**
- * Current receiver being tested
+ * Current instance being tested
  */
-unsigned int receiver_idx = 0;
+unsigned int instance_idx = 0;
 
 /**
  * Task run on timeout.
@@ -648,7 +648,7 @@ get_new_contracts (struct Command *cmds)
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ]\
                 }",
-                receiver_idx + d);
+                instance_idx + d);
     }
 }
 
@@ -763,7 +763,7 @@ history_cb (void *cls,
     return;
   }
   nelements = json_array_size (json);
-  if (nelements != (cmd->details.history.nresult * (receiver_idx + 1)))
+  if (nelements != (cmd->details.history.nresult * (instance_idx + 1)))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Did not get as many history entries as expected\n"); 
@@ -1461,17 +1461,17 @@ interpreter_run (void *cls)
   {
   case OC_END:
     result = GNUNET_OK;
-    if (receiver_idx + 1 == nreceiver)
+    if (instance_idx + 1 == ninstances)
     {
       GNUNET_SCHEDULER_shutdown ();
       return;
     }
     is->ip = 0;
-    receiver_idx++;
-    receiver = instances[receiver_idx];
+    instance_idx++;
+    instance = instances[instance_idx];
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Switching instance: '%s'\n",
-                receiver);
+                instance);
     /*get_new_contracts(is->commands);*/
     is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
                                          is);
@@ -1640,10 +1640,10 @@ interpreter_run (void *cls)
       proposal = json_loads (cmd->details.contract.proposal,
                              JSON_REJECT_DUPLICATES,
                              &error);
-      if (NULL != receiver)
+      if (NULL != instance)
         json_object_set_new (proposal,
-                             "receiver",
-                             json_string (receiver));
+                             "instance",
+                             json_string (instance));
       if (NULL == proposal)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1773,7 +1773,7 @@ interpreter_run (void *cls)
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI,
-                                     receiver,
+                                     instance,
 				     &h_contract,
 				     transaction_id,
 				     &total_amount,
@@ -1870,7 +1870,7 @@ interpreter_run (void *cls)
     cmd->details.track_transfer.tdo =
       TALER_MERCHANT_track_transfer (ctx,
                                      MERCHANT_URI,
-                                     receiver,
+                                     instance,
                                      &ref->details.check_bank_transfer.wtid,
                                      EXCHANGE_URI,
                                      &track_transfer_cb,
@@ -1884,7 +1884,7 @@ interpreter_run (void *cls)
     cmd->details.track_transaction.tth =
       TALER_MERCHANT_track_transaction (ctx,
                                         MERCHANT_URI,
-                                        receiver, /* got it NULL, right now */
+                                        instance, /* got it NULL, right now */
                                         ref->details.pay.transaction_id,
                                         &track_transaction_cb,
                                         is);
@@ -2454,12 +2454,12 @@ main (int argc,
                                                        "INSTANCES",
                                                        &_instances));
   GNUNET_break (NULL != (token = strtok (_instances, " ")));
-  GNUNET_array_append (instances, nreceiver, token);
+  GNUNET_array_append (instances, ninstances, token);
 
   while (NULL != (token = strtok (NULL, " ")))
-    GNUNET_array_append(instances, nreceiver, token); 
+    GNUNET_array_append(instances, ninstances, token); 
 
-  receiver = instances[receiver_idx];
+  instance = instances[instance_idx];
   db = TALER_MERCHANTDB_plugin_load (cfg);
   if (NULL == db)
   {

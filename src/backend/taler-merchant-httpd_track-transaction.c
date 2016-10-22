@@ -831,9 +831,9 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   struct TrackTransactionContext *tctx;
   unsigned long long transaction_id;
   const char *str;
-  const char *receiver;
+  const char *instance;
   int ret;
-  struct GNUNET_HashCode h_receiver;
+  struct GNUNET_HashCode h_instance;
 
   if (NULL == *connection_cls)
   {
@@ -885,16 +885,16 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_arg_missing (connection,
                                            TALER_EC_PARAMETER_MISSING,
 					   "id");
-  receiver = MHD_lookup_connection_value (connection,
+  instance = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
-                                          "receiver" /* FIXME: rename to 'instance' */);
-  if (NULL == receiver)
-    receiver = "default";
-  GNUNET_CRYPTO_hash (receiver,
-                      strlen (receiver),
-                      &h_receiver);
+                                          "instance" /* FIXME: rename to 'instance' */);
+  if (NULL == instance)
+    instance = "default";
+  GNUNET_CRYPTO_hash (instance,
+                      strlen (instance),
+                      &h_instance);
   tctx->mi = GNUNET_CONTAINER_multihashmap_get (by_id_map,
-                                                &h_receiver);
+                                                &h_instance);
   if (NULL == tctx->mi)
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,

@@ -575,19 +575,19 @@ instances_iterator_cb (void *cls,
 struct MerchantInstance *
 TMH_lookup_instance (const char *name)
 {
-  struct GNUNET_HashCode h_receiver;
+  struct GNUNET_HashCode h_instance;
 
   GNUNET_CRYPTO_hash (name,
                       strlen (name),
-                      &h_receiver);
+                      &h_instance);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Looking for by-id key %s of '%s' in hashmap\n",
-              GNUNET_h2s (&h_receiver),
+              GNUNET_h2s (&h_instance),
               name);
   /* We're fine if that returns NULL, the calling routine knows how
      to handle that */
   return GNUNET_CONTAINER_multihashmap_get (by_id_map,
-                                            &h_receiver);
+                                            &h_instance);
 }
 
 
@@ -596,10 +596,10 @@ TMH_lookup_instance (const char *name)
  *
  * @param json the JSON to inspect; it is not required to
  * comply with any particular format. It will only be checked
- * if the field "receiver" is there.
+ * if the field "instance" is there.
  * @return a pointer to a #struct MerchantInstance. This will be
  * the 'default' merchant if the frontend did not specif any
- * "receiver" field. The user should not care to free the returned
+ * "instance" field. The user should not care to free the returned
  * value, as it is taken from a global array that will be freed
  * by the general shutdown routine. NULL if the frontend specified
  * a wrong instance
@@ -607,14 +607,14 @@ TMH_lookup_instance (const char *name)
 struct MerchantInstance *
 get_instance (struct json_t *json)
 {
-  struct json_t *receiver;
-  const char *receiver_str;
+  struct json_t *instance;
+  const char *instance_str;
 
-  if (NULL == (receiver = json_object_get (json, "receiver")))
-    receiver_str = "default";
+  if (NULL == (instance = json_object_get (json, "instance")))
+    instance_str = "default";
   else
-    receiver_str = json_string_value (receiver);
-  return TMH_lookup_instance (receiver_str);
+    instance_str = json_string_value (instance);
+  return TMH_lookup_instance (instance_str);
 }
 
 

@@ -166,7 +166,7 @@ struct TALER_MERCHANT_PayCoin
  *
  * @param ctx execution context
  * @param merchant_uri base URI of the merchant
- * @param receiver which merchant instance will receive this payment
+ * @param instance which merchant instance will receive this payment
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param transaction_id transaction id for the transaction between merchant and customer
@@ -188,7 +188,7 @@ struct TALER_MERCHANT_PayCoin
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 			   const char *merchant_uri,
-			   const char *receiver,
+			   const char *instance,
                            const struct GNUNET_HashCode *h_contract,
                            uint64_t transaction_id,
                            const struct TALER_Amount *amount,
@@ -258,7 +258,7 @@ struct TALER_MERCHANT_PaidCoin
  *
  * @param ctx execution context
  * @param merchant_uri base URI of the merchant
- * @param receiver which merchant instance will receive this payment
+ * @param instance which merchant instance will receive this payment
  * @param h_contract hash of the contact of the merchant with the customer
  * @param amount total value of the contract to be paid to the merchant
  * @param max_fee maximum fee covered by the merchant (according to the contract)
@@ -279,7 +279,7 @@ struct TALER_MERCHANT_PaidCoin
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const char *merchant_uri,
-			     const char *receiver,
+			     const char *instance,
                              const struct GNUNET_HashCode *h_contract,
 			     const struct TALER_Amount *amount,
 			     const struct TALER_Amount *max_fee,
@@ -348,7 +348,7 @@ typedef void
  *
  * @param ctx execution context
  * @param backend_uri base URI of the backend
- * @param receiver which merchant instance is going to be tracked
+ * @param instance which merchant instance is going to be tracked
  * @param wtid base32 string indicating a wtid
  * @param exchange base URL of the exchange in charge of returning the wanted information
  * @param track_transfer_cb the callback to call when a reply for this request is available
@@ -358,7 +358,7 @@ typedef void
 struct TALER_MERCHANT_TrackTransferHandle *
 TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                const char *backend_uri,
-                               const char *receiver,
+                               const char *instance,
                                const struct TALER_WireTransferIdentifierRawP *wtid,
                                const char *exchange_uri,
                                TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
@@ -462,7 +462,7 @@ typedef void
  *
  * @param ctx execution context
  * @param backend_uri base URI of the backend
- * @param receiver which merchant instance is going to be tracked
+ * @param instance which merchant instance is going to be tracked
  * @param transaction_id which transaction should we trace
  * @param track_transaction_cb the callback to call when a reply for this request is available
  * @param track_transaction_cb_cls closure for @a track_transaction_cb
@@ -471,7 +471,7 @@ typedef void
 struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                                   const char *backend_uri,
-                                  const char *receiver,
+                                  const char *instance,
                                   uint64_t transaction_id,
                                   TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
                                   void *track_transaction_cb_cls);

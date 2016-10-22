@@ -215,7 +215,7 @@ handle_track_transfer_finished (void *cls,
  *
  * @param ctx execution context
  * @param backend_uri base URI of the backend
- * @param receiver which merchant instance is going to be tracked
+ * @param instance which merchant instance is going to be tracked
  * @param wtid base32 string indicating a wtid
  * @param exchange base URL of the exchange in charge of returning the wanted information
  * @param track_transfer_cb the callback to call when a reply for this request is available
@@ -225,7 +225,7 @@ handle_track_transfer_finished (void *cls,
 struct TALER_MERCHANT_TrackTransferHandle *
 TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                const char *backend_uri,
-                               const char *receiver,
+                               const char *instance,
                                const struct TALER_WireTransferIdentifierRawP *wtid,
                                const char *exchange_uri,
                                TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
@@ -243,11 +243,11 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   tdo->cb_cls = track_transfer_cb_cls;
   /* TODO: do we need to escape 'exchange_uri' here? */
   GNUNET_asprintf (&tdo->url,
-                   "%s/track/transfer?wtid=%s&exchange=%s&receiver=%s",
+                   "%s/track/transfer?wtid=%s&exchange=%s&instance=%s",
                    backend_uri,
                    wtid_str,
                    exchange_uri,
-		   receiver);
+		   instance);
   GNUNET_free (wtid_str);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
