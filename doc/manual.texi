@@ -398,7 +398,8 @@ Let's see how @code{/generate-contract} handler should look like:
 
 # this variable is the JSON of a contract proposal,
 # see https://api.taler.net/api-merchant.html#post--contract
-$proposal = make_contract("1 KUDOS");
+# the second parameter is the transaction id
+$proposal = make_contract("1 KUDOS", rand(1,10000));
 
 # Here the frontend POSTs the proposal to the backend
 $response = post_to_backend("/contract", $proposal);
@@ -414,15 +415,47 @@ As said, @code{taler.offerContractFrom} will hand the contract to the wallet,
 which then will prompt the user a formatted version of it.
 
 The next step for the frontend is to accept the payment from the wallet,
-whenever the user will accept the contract. In Taler terminology, this action
+whenever the user accepts the contract. In Taler terminology, this action
 is managed by two pages: the @emph{fulfillment} and @emph{pay} page.
 
 By design, Taler payments @emph{can} be implemented in DB-less frontends, so the
-frontend needs a way to recall basic informations about a contract (e.g. which product,
-which price, the timestamp, etc.) before proceeding with the actual payment.
+frontend needs a way to recall what a contract is about (e.g. which product, which
+price, the timestamp, etc.), in order to proceed with the actual payment and
+eventually deliver the final product.
+
 That is achieved by @emph{reconstructing} the contract using the fulfillment page's
-parameters@footnote{the fulfillment URL equipped with all the parameters is included
-in the contract}.
+URL parameters@footnote{the fulfillment URL equipped with all the parameters is included
+in the contract}. Additionally, the fulfillment page is also in charge of @emph{delivering}
+the final product@footnote{In our example, that will be a page confirming that a donation
+has been made}.
+
+(FIXME Briefly explain the wallet's paying behaviour)
+
+Thus, a fulfillment URL for our example looks like the following:
+
+@example
+https://example.com/fulfillment?transaction_id=9
+@end example
+
+The @code{/fulfillment} handler will then perform the following actions:
+
+@example
+...
+
+# At first, check if the user has already paid for the product.
+# If so, then deliver the product.
+
+# TBD ...
+
+# Then, reconstruct the contract
+
+$contract = make_contract("1 KUDOS", $transaction_id);
+$response = post_to_backend("/contract", $proposal);
+
+
+
+
+@end example
 
 @section Backend configuration
 
