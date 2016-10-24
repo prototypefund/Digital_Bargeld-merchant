@@ -413,6 +413,17 @@ echo $response->body;
 As said, @code{taler.offerContractFrom} will hand the contract to the wallet,
 which then will prompt the user a formatted version of it.
 
+The next step for the frontend is to accept the payment from the wallet,
+whenever the user will accept the contract. In Taler terminology, this action
+is managed by two pages: the @emph{fulfillment} and @emph{pay} page.
+
+By design, Taler payments @emph{can} be implemented in DB-less frontends, so the
+frontend needs a way to recall basic informations about a contract (e.g. which product,
+which price, the timestamp, etc.) before proceeding with the actual payment.
+That is achieved by @emph{reconstructing} the contract using the fulfillment page's
+parameters@footnote{the fulfillment URL equipped with all the parameters is included
+in the contract}.
+
 @section Backend configuration
 
 @subsection Wireformat
