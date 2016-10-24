@@ -66,9 +66,9 @@ make it communicate with their existing shop (the @emph{frontend}).
 In Taler terminology, the backend is the component that provides RESTful
 API to the frontend and that will do all crypto work and communication
 with the Taler exchange. In other words, the frontend will never directly
-communicate with the exchange.
-See official documentation@footnote{@*https://api.taler.net@*https://taler.net}
-about Taler protocols.
+communicate with the exchange. It is strongly recommended to read the official
+documentation@footnote{@*https://api.taler.net@*https://taler.net} beforehand,
+especially before reading @xref{hello-world}.
 
 @node dependencies
 @chapter Needed libraries to build the backend
@@ -306,7 +306,118 @@ In this section, we set up a minimalistic shop, which exposes a
 button to get donations via Taler. The expected behaviour is that
 once the button is clicked, the customer will either receive a Taler
 contract, if they have the wallet installed, or be prompted with a
-classic paywall for credit cards.
+classic paywall for credit cards. In Taler parlance, the shop (and clearly
+the donation button) is the @emph{frontend}.
+
+@section How to trigger Taler payment
+The goal is to trigger a Taler payment once the customer has clicked
+on the donation button. The triggering happens when the frontend requests
+a @emph{contract} to the Merchant backend. According to the API
+@footnote{https://api.taler.net}, the backend generates contracts by
+serving HTTP requests addressed to @code{/contract}. So our button's goal
+is to trigger some server-side logic that will, in the end, issue a HTTP POST
+to the backend's @code{/contract}.
+Let's say the button will always donate 1 KUDOS to the 'Taler charity program',
+its HTML would be as follows:
+
+@example
+<form action="/donate">
+  <input type="submit" value="Donate!"></input>
+<form>
+@end example
+
+Namely, its work is merely invoking server-side logic.
+
+Note that we @emph{could} have bypassed the server-side logic to request
+the contract to the backend, and have requested it directly from the button's
+JavaScript. However, this is highly unpractical because the backend needs
+lots of information in the request's body, and we would end up hardcoding
+all that information in the JavaScript.
+
+When the server-side handler for @code{/donate} receives the form submission,
+it will return a HTML page that will take care of:
+
+@itemize
+@item showing a credit card paywall to the user, if no wallet is found.
+@item triggering contract generation (in JavaScript) to server-side logic.
+@end itemize
+
+A minimalistic @code{/donate} handler is shown below (in PHP):
+
+@display
+echo("fallback.html");
+@end display
+
+In practical terms, all the logic to detect the wallet in the browser and
+request the contract lies in @code{fallback.html}. Moreover, the frontend
+developer can get help by the @code{taler-wallet-lib.js} library, which
+abstracts the signaling between the HTML page and the wallet. Let's see
+below how @code{fallback.html} looks like:
+
+@display
+<html>
+  <head>
+    <script src="taler-wallet-lib.js" type="application/javascript"></script>
+    <script type="application/javascript">
+
+      /* This function will be called whenever the wallet signals its presence.
+      It then will use the library's function taler.offerContractFrom to
+      request the contract to the server-side logic. Finally, taler.offerContractFrom
+      will hand the contrat to the wallet once it gets it. */
+      function onWalletPresent()@{
+        contract_url = "/generate-contract";
+        taler.offerContractFrom(contract_url);
+      @}
+
+    /* The 'taler' object is exported by the library above */
+    taler.onPresent(onWalletPresent);
+  </head>
+  <body>
+    <!-- Put the credit card paywall here -->
+  </body>
+</script>
+@end display
+
+The result is that if a wallet is found, then the contract is requested so
+the user doesn't see the credit card paywall@footnote{In this simple
+implementation, the user will se the paywall as long as no contract is gotten.
+Nevertheless, it is easy to temporarily hide the paywall by using the
+@code{taler.onAbsent} handler}
+
+
+
+
+
+FIXME describe the 2 points above
+
+The following logic will generate a contract proposal about donating 1 KUDOS
+to the 'Taler charity program'. This proposal will then be POSTed to the backend
+at @code{/contract}@footnote{We assume that frontend and backend are reachable
+at the same host}. The main goal of POSTing the proposal to the backend is
+to get it signed, as by design the frontend does not perform any cryptographic
+work.
+
+Below we show an excerpt of the main operations of the @code{/generate-contract}
+handler:
+
+@display
+...
+
+# this variable is the JSON of a contract proposal,
+# see https://api.taler.net/api-merchant.html#post--contract
+$proposal = make_contract("1 KUDOS");
+
+# Here the frontend POSTs the proposal to the backend
+$response = post_to_backend("/contract", $proposal);
+
+if(200 != $response->status_code)@{
+  manage_error($response);
+  return;
+@}
+@end display
+
+Now, the frontend should return @code{$response} to the user's browser,
+by caring about:
 
 @section Backend configuration
 
