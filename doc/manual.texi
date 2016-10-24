@@ -384,21 +384,14 @@ Nevertheless, it is easy to temporarily hide the paywall by using the
 @code{taler.onAbsent} handler}, otherwise the page rests untouched and the
 paywall remains shown.
 
+Now, it's the server-side handler for @code{/generate-contract} that continues.
+It has to generate a contract proposal about donating 1 KUDOS to the 'Taler charity program'.
+This proposal will then be POSTed to the backend at @code{/contract}@footnote{We assume that
+frontend and backend are reachable at the same host}. The main goal of POSTing the proposal
+to the backend is to get it signed, as by design the frontend does not perform any
+cryptographic work.
 
-
-
-
-FIXME describe the 2 points above
-
-The following logic will generate a contract proposal about donating 1 KUDOS
-to the 'Taler charity program'. This proposal will then be POSTed to the backend
-at @code{/contract}@footnote{We assume that frontend and backend are reachable
-at the same host}. The main goal of POSTing the proposal to the backend is
-to get it signed, as by design the frontend does not perform any cryptographic
-work.
-
-Below we show an excerpt of the main operations of the @code{/generate-contract}
-handler:
+Let's see how @code{/generate-contract} handler should look like:
 
 @display
 ...
@@ -414,10 +407,11 @@ if(200 != $response->status_code)@{
   manage_error($response);
   return;
 @}
+echo $response->body;
 @end display
 
-Now, the frontend should return @code{$response} to the user's browser,
-by caring about:
+As said, @code{taler.offerContractFrom} will hand the contract to the wallet,
+which then will prompt the user a formatted version of it.
 
 @section Backend configuration
 
