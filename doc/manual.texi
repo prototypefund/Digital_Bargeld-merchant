@@ -368,21 +368,21 @@ below how @code{fallback.html} looks like:
         contract_url = "/generate-contract";
         taler.offerContractFrom(contract_url);
       @}
-
     /* The 'taler' object is exported by the library above */
     taler.onPresent(onWalletPresent);
+    </script>
   </head>
   <body>
     <!-- Put the credit card paywall here -->
   </body>
-</script>
 @end display
 
 The result is that if a wallet is found, then the contract is requested so
 the user doesn't see the credit card paywall@footnote{In this simple
-implementation, the user will se the paywall as long as no contract is gotten.
+implementation, the user will se the paywall as long as no contract is received.
 Nevertheless, it is easy to temporarily hide the paywall by using the
-@code{taler.onAbsent} handler}
+@code{taler.onAbsent} handler}, otherwise the page rests untouched and the
+paywall remains shown.
 
 
 
