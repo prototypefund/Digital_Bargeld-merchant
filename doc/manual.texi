@@ -2,7 +2,7 @@
 @c %**start of header
 @setfilename manual.info
 @include version.texi
-@settitle The GNU Taler manual for Merchants@value{VERSION}
+@settitle The GNU Taler manual for Web shop operators{VERSION}
 
 @c Define a new index for options.
 @defcodeindex op
@@ -12,7 +12,7 @@
 @c %**end of header
 
 @copying
-This manual is for GNU Taler merchant backend (version @value{VERSION}, @value{UPDATED}),
+This manual is for the GNU Taler merchant backend (version @value{VERSION}, @value{UPDATED}),
 
 Copyright @copyright{} 2016 INRIA
 
@@ -32,10 +32,11 @@ Texts.  A copy of the license is included in the section entitled
 @c Titlepage
 @c
 @titlepage
-@title The GNU Taler manual for Merchants
+@title The GNU Taler manual for Web shops
 @subtitle Version @value{VERSION}
 @subtitle @value{UPDATED}
 @author Marcello Stanisci (@email{marcello.stanisci@@inria.fr})
+@author Christian Grothoff (@email{christian.grothoff.fr})
 @page
 @vskip 0pt plus 1filll
 @insertcopying
@@ -46,151 +47,179 @@ Texts.  A copy of the license is included in the section entitled
 
 @ifnottex
 @node Top
-@top The GNU libmicrohttpd Library
+@top The GNU Taler manual for Web shops
 @insertcopying
 @end ifnottex
 
 @menu
-* introduction::	Whom this manual is addressed to	
-* dependencies::	Needed libraries to build the backend
-* installation::        Installing the Merchant backend
-* configuration::       How to set up the Merchant backend
-* hello-world::         How to set up a minimalistic shop
+* Introduction::	Whom this manual is addressed to	
+* Installation::        Installing the Merchant backend
+* Configuration::       How to set up the Merchant backend
+* Hello-world::         How to set up a minimalistic shop
 @end menu
 
-@node introduction
+@node Introduction
 @chapter Whom this manual is addressed to
-This manual is addressed to people who want to integrate Taler
-in their online shop. The goal is to install a Taler @emph{backend} and
-make it communicate with their existing shop (the @emph{frontend}).
-In Taler terminology, the backend is the component that provides RESTful
-API to the frontend and that will do all crypto work and communication
-with the Taler exchange. In other words, the frontend will never directly
-communicate with the exchange. It is strongly recommended to read the official
-documentation@footnote{@*https://api.taler.net@*https://taler.net} beforehand,
-especially before reading @xref{hello-world}.
 
-@node dependencies
-@chapter Needed libraries to build the backend
+This manual addresses how to integrate GNU Taler with Web shops.  It
+describes how to install a GNU Taler merchant @emph{backend} and make it
+communicate with an existing Web shop @emph{frontend}.  The backend
+provides the cryptographic support, stores Taler-specific financial
+information and communicates with the GNU Taler exchange. The frontend
+accesses the backend via a RESTful API.  As a result, the frontend
+never has to directly communicate with the exchange, and also does not
+deal with sensitive data (such as the merchant's signing keys and bank
+account information).
 
-The following packages need to be installed, in order to provide the
-backend all the libraries it depends on.
+@node Installation
+@chapter Installation
+
+This chapter describes how to install the GNU Taler merchant backend.
+
+@node Generic instructions
+@section Generic instructions
+
+This section provides generic instructions for the merchant
+backend installation independent of any particular operating system.
+Operating system specific instructions are provided in the following
+sections.  You should follow the operating system specific
+instructions if those are available, and only consult the generic
+instructions if no system-specific instructions are provided for your
+specific operating system.
+
+@node Dependencies
+@subsection Installation of dependencies
+
+The following packages need to be installed before we can compile the 
+backend:
 
 @itemize
+@item libcurl or libgnurl
+@item GNU libmicrohttpd, including GnuTLS
+@item GNU libgcrypt
+@item libjansson
+@item Postgres, including libpq
 @item GNUnet
-@item Taler Exchange
-@item libmicrohttpd
-@item libjansson
-@item libcurl
-@item libpq
+@item GNU Taler exchange
 @end itemize
 
-@section Installing GNUnet
-GNUnet provides the backend all the routines for doing: cryptography,
-string manupulation, interfacing with DB, non-Taler specific JSON manupulation,
-logging, operating system interfacing.
-
-Downloading GNUnet:
-
-@code{wget https://gnunet.org/gnunet0-10-1}
-
-Provide the following dependencies:
-@itemize
-@item @code{libpq} for interfacing with the Postgresql database
-@item libgcrypt
-@item libjansson
-@item libunistring
-@item libcurl
-@end itemize
-
-Then configure GNUnet as follows:
+The first five are available in most GNU/Linux distributions and should
+just be installed using the respective package manager, for example
+using
 
 @example
+# apt-get install libcurl4-gnutls-dev \
+  libmicrohttpd-dev \
+  libgnutls-dev \
+  libgcrypt20-dev \
+  libjansson-dev \
+  libpq-dev \
+  postgresql-9.5 
+@end example
 
-# From GNUnet's top directory.
+The following sections will provide detailed instructions for
+installing the GNUnet and GNU Taler exchange dependencies.  
+
+
+@subsection Installing GNUnet
+
+Note that a Web shop supporting GNU Taler does not actually need to run a
+GNUnet peer.  The requirement to have a minimal GNUnet installation
+arises from the fact that GNUnet provides some required routines for
+doing cryptography, string manupulation, interfacing with databases,
+JSON manipulation, logging and operating system abstractions.  Hence
+this manual does not describe how to actually run a GNUnet peer, and
+we also skip optional GNUnet dependencies that an ordinary peer might
+want to include in the installation.  Thus, do not be alarmed if the
+GNUnet build process warns you about missing (optional) dependencies.
+
+Before you install GNUnet, you should download and install the
+dependencies mentioned in the previous section, otherwise GNUnet may
+install but fail to export some of the tooling required by Taler.
+
+To download and install GNUnet, proceed as follows:
+
+@example
+$ svn checkout https://gnunet.org/svn/gnunet/
+$ cd gnunet/
 $ ./bootstrap
-$ ./configure [--prefix=PFX] \
-               --without-idn \
-               --wit-zlib=no \
-               --disable-nls \
-               [--with-...]
+$ ./configure [--prefix=GNUNETPFX]
 $ # Each dependency can be fetched from non standard locations via
 $ # the '--with-<LIBNAME>' option. See './configure --help'.
 $ make
-$ make install
-
+# make install
 @end example
 
-@section Installing The Exchange
+If you did not specify a prefix, GNUnet will install to
+@verb{/usr/local}, which requires you to run the last step as
+@verb{root}.
 
-Get the latest code:
-@code{git clone git://taler.net/exchange}
+@subsection Installing the GNU Taler exchange
 
-Provide the following dependencies:
-@itemize
-@item @code{libpq} for interfacing with the Postgresql database
-@item libjansson
-@item libmicrohttpd
-@item GNUnet
-@end itemize
-
-Then configure the exchange as follows:
+After installing GNUnet, you can download and install
+the exchange as follows:
 
 @example
-$ # From exchange's top directory
+$ git clone git://taler.net/exchange
+$ cd exchange
+$ ./bootstrap
+$ ./configure [--prefix=EXCHANGEPFX] \
+              [--with-gnunet=GNUNETPFX] 
+$ # Each dependency can be fetched from non standard locations via
+$ # the '--with-<LIBNAME>' option. See './configure --help'.
+$ make
+# make install
+@end example
+
+If you did not specify a prefix, the exchange will install to
+@verb{/usr/local}, which requires you to run the last step as
+@verb{root}.  Note that you have to specify
+@verb{--with-gnunet=/usr/local} if you installed GNUnet to
+@verb{/usr/local} in the previous step.
+
+
+@subsection Installing the GNU Taler merchant backend
+
+The following steps assume all dependencies are installed. @xref{dependencies}.
+
+Use the following commands to download and install the
+merchant backend:
+
+@example
+$ git clone git://taler.net/merchant
+$ cd merchant
 $ ./bootstrap
 $ ./configure [--prefix=PFX] \
               [--with-gnunet=GNUNETPFX] \
-              [--with-...]
+              [--with-exchange=EXCHANGEPFX] 
 $ # Each dependency can be fetched from non standard locations via
 $ # the '--with-<LIBNAME>' option. See './configure --help'.
 $ make
 $ make install
 @end example
 
-@node installation
-@chapter Installing the Merchant backend
+Note that you have to specify @verb{--with-exchange=/usr/local} if you
+installed the exchange to @verb{/usr/local} in the previous
+step.
 
-The following steps assumes all dependencies are installed. @xref{dependencies}.
 
-Get the code: @code{git clone git://taler.net/merchant}. Configure and install
-as follows:
+@node Configuration
+@chapter How to configure the Merchant backend
 
-@example
-$ # From merchant's top directory
-$ ./bootstrap
-$ ./configure [--prefix=PFX] \
-              [--with-gnunet=GNUNETPFX] \
-              [--with-exchange=GNUNETPFX] \
-              [--with-...]
-$ # Each dependency can be fetched from non standard locations via
-$ # the '--with-<LIBNAME>' option. See './configure --help'.
-$ make
-$ make install
-@end example
+The installation already provides reasonable defaults for most of the
+configuration options. However, some of them must be tuned to the
+particular Web shop.  By default, the file
+@code{$HOME/.config/taler.conf} is where the Web shop administrator
+specifies configuration values that augment or override the defaults.
 
-@node configuration
-@chapter How to set up the Merchant backend
-The installation already provides reasonable defaults for some of the
-configuration options, but some of them must be tuned to the particular case.
-The file @code{$HOME/.config/taler.conf} is responsible to ovveride the defaults.
-
-What needs to be tuned:
-@itemize
-@item Serving
-@item Currency
-@item Database
-@item Exchanges
-@item Wireformat
-@item Instances
-@end itemize
-
-In the following table, the notation @code{[secion]/option} denotes the option
+The following table describes the options that commonly need to be modified.
+Here, the notation @code{[section]/option} denotes the option
 @code{option} under the section @code{[section]} in the configuration file.
+
 @table @asis
 
-@item Serving
-The following option sets the transport layer used by the Merchant backend:
+@item Service address
+The following option sets the transport layer address used by the Merchant backend:
 
 @example
 [merchant]/serve = TCP | UNIX
@@ -198,91 +227,132 @@ The following option sets the transport layer used by the Merchant backend:
 
 If given,
 @itemize
-@item @code{TCP}, then we need to set the port in @code{[merchant]/port}
-@item @code{UNIX}, then we need to set the unix socket path and mode in
-@code{[merchant]/unixpath} and @code{[merchant]/unixpath_mode}. The last takes
-the usual permission mask give as number, like 660.
+@item @code{TCP}, then we need to set the TCP port in @code{[merchant]/port}
+@item @code{UNIX}, then we need to set the unix domain socket path and mode in
+@code{[merchant]/unixpath} and @code{[merchant]/unixpath_mode}. The latter takes
+the usual permission mask given as a number, e.g. 660 for user/group read-write access.
 @end itemize
-The frontend and backend will then speak HTTP over the chosen serving option.
+The frontend can then connect to the backend over HTTP using the specified address.
+If frontend and backend run within the same operating system, the use of
+a UNIX domain socket is recommended to avoid accidentally exposing the backend
+to the network.
+
+@c FIXME: we should offer an option to bind the TCP socket to a particular IP address (#4752)
 
 @item Currency
-Instructs the backend on the currency to work with. Set the option:
+Which currency the Web shop deals in, i.e. ``EUR'' or ``USD'', is specified using the option
 
 @example
 [merchant]/currency
 @end example
 
+For testing purposes, the currency should match ``KUDOS'' which is used by the Taler
+demonstration exchange at @url{https://exchange.demo.taler.net/}.
+
 @item Database
-By design, it is possible to work with different DBMSs, so the Merchant
-backend needs to know which one is going to be used. Set this option in:
+In principle is possible for the backend to support different DBMSs.
+The 
 
 @example
 [merchant]/db
 @end example
 
-currently only the value "postgres" is supported.
+option specifies which DBMS is to be used. However, currently only the value "postgres" is supported.
 
-After configuring the DBMS, we need to instruct the Merchant backend on how the
-database is named. Set the option:
+In addition to selecting the DBMS software, the backend requires DBMS-specific options to access the database.
+
+For postgres, you need to provide:
 
 @example
-[merchantdb-DBMS]/config
+[merchantdb-postgres]/config
 @end example
 
-this option needs to comply with the format "DBMS:///dbname", where "dbname" is
-the actual database name under DBMS. Note that DBMS must match what it's given in
-@code{[merchant]/db}.
+This option specifies a postgres access path using the format
+"postgres:///DBNAME", where DBNAME is the name of the Postgres
+database you want to use.  Suppose USER is the name of the
+user who will run the backend process.  Then, you need to first run
+
+@example
+$ createuser -d USER
+@end example
+
+as the @verb{postgres} database administrator to grant USER
+the ability to create new databases.  Next, you should as
+USER run
+
+@example
+$ createdb DBNAME
+@end example
+
+to create the backend's database.  Here, DBNAME must match the database name
+given in the configuration file.
 
 @item Exchange
-In order to add an exchange to the list of trusted ones, set the options:
+To add an exchange to the list of trusted payment service providers,
+you create a section with a name that starts with ``merchant-exchange-''
+and set the following options in that section:
 
 @example
-[merchant-exchange-myexchange]/uri
+[merchant-exchange-MYEXCHANGE]/uri
 @end example
 
-Takes the exchanges base URL, e.g. @code{https://exchange.test.taler.net/}
+Takes the exchanges base URL, e.g. @code{https://exchange.demo.taler.net/}
 
 @example
-[merchant-exchange-myexchange]/master_key
+[merchant-exchange-MYEXCHANGE]/master_key
 @end example
 
-Takes the base32 encoding of the exchanges master key.
+Takes the base32 encoding of the exchange's master public key.
 
-Note that multiple exchanges can be added to the system, just by using different
-tokens in place of @code{myexchange} above.
+Note that multiple exchanges can be added to the system by using different
+tokens in place of @code{MYEXCHANGE} in the example above.
+
+@c FIXME: We should provide the master public key of the demo exchange here!
+
+@c FIXME: In the future, we need to describe specifying auditors here.
 
 @item Wireformat
-In order to receive money, the merchant backend needs to tell its bank
-details to the exchange. Set the option:
+
+In order to receive payments, the merchant backend needs to communicate bank
+account details to the exchange.  This banking system used is specified using the
+following global option:
 
 @example
 [merchant]/wireformat
 @end example
 
-Currently, only the value @code{test} can be given. A wireformat of type @code{SEPA}
-will be supported in the future.
+The value @code{test} can be used to interact with the Taler
+demonstrator at @url{https://bank.demo.taler.net/}.  Other wireformats
+will be supported in the future to interact with actual banks.
+
 
 @item Instances
-In Taler terminology, the Merchant backend allows the user to define
-different @i{instances}. An instance can be viewd as a "business entity": something
-that can receive money and sign contracts. To that purpose, any instance must
-provide its private key and wire details. It is mandatory to provide the "default"
-instance, with:
+
+The backend allows the user to run multiple instances of shops with
+distinct business entities against a single backend.  Each instance
+uses its own bank account and key for signing contracts.  It is
+mandatory to configure a "default" instance using the following
+options:
 
 @example
 [merchant-instance-default]/keyfile
 @end example
 
-Provide here the path to the instance's private key.
+Specifies the path to the instance's private key.  You do not need to
+create a key at this time, the backend will generate it automatically
+if it is missing.  While generally unnecessary, it is possible to
+generate the key and to display the public key using the
+@code{gnunet-ecc} command-line tool.
 
 @example
 [merchant-instance-wireformat-default]/test_response_file
 @end example
 
-Provide here the path to the file in JSON format that describes
-the instance's wire details. This JSON file must be in the format
-given to the option @code{[merchant]/wireformat}. Below there is
-an example of a @code{test} wire format file:
+This option specifies the path to a file that describes the instance's
+wire details in JSON format.  The specific format depends slightly
+on the banking system selected via the @verb{wireformat} option.
+
+For the @code{test} wire format, a sample specification looks as follows:
 
 @verbatim
 {
@@ -294,20 +364,32 @@ an example of a @code{test} wire format file:
 }
 @end verbatim
 
-Note that multiple instances can be added to the Merchant backend just by
-using different tokens in place of @code{default}
+@c FIXME: is ``sig'' required here? This is odd.  If so, describe
+@c how to generate it.  Also explain RANDOMSALT.
+
+@c FIXME: We should provide instructions for how to get an account
+@c number for the demo bank!
+
+
+Note that additional instances can be specified using different tokens
+in the section name instead of @code{default}.
 
 @end table
 
-@node hello-world
-@chapter How to set up a minimalistic shop
 
-In this section, we set up a minimalistic shop, which exposes a
-button to get donations via Taler. The expected behaviour is that
-once the button is clicked, the customer will either receive a Taler
-contract, if they have the wallet installed, or be prompted with a
-classic paywall for credit cards. In Taler parlance, the shop (and clearly
-the donation button) is the @emph{frontend}.
+@node Hello-world
+@chapter Setting up a simple Web shop with GNU Taler
+
+This section describes how to setup a simple shop, which exposes a
+button to get donations via Taler. The expected behaviour is that once
+the ``donate'' button is clicked, the customer will receive a Taler
+contract offering him the opportunity to make a fixed donation,
+for example to donate 1 KUDOS to the charity operating the shop.
+
+Note that if the customer does not have the Taler wallet installed,
+they should instead be prompted to proceed with a classic dialog for
+credit card payments.
+
 
 @section How to trigger Taler payment
 The goal is to trigger a Taler payment once the customer has clicked
@@ -317,8 +399,7 @@ a @emph{contract} to the Merchant backend. According to the API
 serving HTTP requests addressed to @code{/contract}. So our button's goal
 is to trigger some server-side logic that will, in the end, issue a HTTP POST
 to the backend's @code{/contract}.
-Let's say the button will always donate 1 KUDOS to the 'Taler charity program',
-its HTML would be as follows:
+Then, its HTML would be as follows:
 
 @example
 <form action="/donate">
