@@ -363,7 +363,7 @@ tokens in place of @code{MYEXCHANGE} in the example above.
 @item Wireformat
 
 In order to receive payments, the merchant backend needs to communicate bank
-account details to the exchange.  This banking system used is specified using the
+account details to the exchange.  The banking system used is specified using the
 following global option:
 
 @example
