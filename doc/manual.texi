@@ -414,6 +414,8 @@ echo $response->body;
 As said, @code{taler.offerContractFrom} will hand the contract to the wallet,
 which then will prompt the user a formatted version of it.
 
+@section How to pay via Taler
+
 The next step for the frontend is to accept the payment from the wallet,
 whenever the user accepts the contract. In Taler terminology, this action
 is managed by two pages: the @emph{fulfillment} and @emph{pay} page.
@@ -437,10 +439,10 @@ in the contract}.
 
 In order to implement property (2), the frontend will firstly check the state to see if
 the product claimed among the fulfillment URL parameter has been paid; if so, the product
-is given to the customer. Otherwise, the frontend sets the payment as pending in the state
+is given to the customer. Otherwise, the frontend sets the payment as "pending" in the state
 and @emph{executes} it in the wallet. The payment execution is performed by returning JavaScript
 code from @code{taler-wallet-lib.js} that triggers the wallet to send the payment to the pay page.
-Once the pay page receives the payment, it sets the state for the purchase as "payed".
+Once the pay page receives the payment, it sets the state for the payment as "payed".
 
 In this scenario, the wallet's behaviour upon payment execution is to send the payment to the pay
 page and, if the payment is successful, visit again the fulfillment URL which then (thanks to the
@@ -459,17 +461,83 @@ The @code{/fulfillment} handler will then perform the following actions:
 ...
 
 # At first, check if the user has already paid for the product.
-# If so, then deliver the product.
+# If so, deliver the product.
+session_start();
+if(!isset($_SESSION['payed']))@{
+  # set as pending
+  $_SESSION['payed'] = false;
+@}
+else@{
+  if($_SESSION['payed'])@{
+    echo "<p>Thanks!</p>";
+    return;
+  @}
+  else@{
+    echo "<p>Payment still pending</p>";
+    return;
+  @}
+@}
 
-# TBD ...
+# Reconstruct the contract
+$rec_proposal = make_contract("1 KUDOS", $_GET['transaction_id']);
+# $response obeys to the specification at: https://api.taler.net/api-merchant.html#offer
+$response = post_to_backend("/contract", $rec_proposal);
 
-# Then, reconstruct the contract
+# Return JavaScript that executes the contract in the wallet
+echo "<html>
+       <head>
+        <script src="taler-wallet-lib.js"></script>
+        <script>
+          taler.executePayment($response['H_contract'],
+                               '/frontend-pay',
+                               '/donate');
+        </script>
+      </head>
+    </html>";
+@end example
 
-$contract = make_contract("1 KUDOS", $transaction_id);
-$response = post_to_backend("/contract", $proposal);
+The function @code{executePayment} exported by @code{taler-wallet-lib.js} will basically
+hand its three parameters to the wallet which implements the following semantics:@*
+check in the internal DB if @code{$response['H_contract']} has an entry, and:
+@itemize
+@item if that is the case, then the user accepted the contract previously and the wallet
+sends a deposit permission @footnote{Roughly speaking, a deposit permission is a JSON
+containing the coins to pay for a contract. Its full specification is available at:
+https://api.taler.net/api-merchant.html#depositpermission} to @code{/frontend-pay}.
+If this operation succeeds, then visit again the fulfillment URL, and finally enjoy
+the product.
+@item if not, redirect the browser to @code{/donate} (which will then reinitiate the
+whole contract negotiation). This happens when the user visits a shared fulfillment URL.
+The idea is to let that user buy the same products as the user who shared the fulfillment
+URL. Nonetheless, the shop is not forced to follow this semantics when provides the third
+parameter to @code{executePayment}.
+@end itemize
 
+By design, the wallet can send infinite times the @emph{same} deposit permission
+for exactly the same contract, and get again the related product. No new coins
+will be consumed starting from the second time.
 
+The last step is the @code{/frontend-pay} handler. As said, its duty is
+to receive the deposit permission from the wallet, forward it to the backend, and set
+the state as "paid", if the payment is valid. See the figure below:
 
+@example
+
+# Check if a session exists already
+session_start();
+if(!isset($_SESSION['payed']))@{
+  echo "<p>There is no session for this purchase. Pass through the fulfillment URL first</p>";
+  return;
+@}
+# Get the HTTP POST body
+$deposit_permission = file_get_contents('php://input');
+$response = post_to_backend("/pay", $deposit_permission);
+if(200 != $response->status_code)@{
+  manage_error($response);  
+  return;
+@}
+$_SESSION['payed'] = true;
+return $response->body;
 
 @end example
 
