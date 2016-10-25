@@ -151,8 +151,8 @@ $ make
 @end example
 
 If you did not specify a prefix, GNUnet will install to
-@verb{/usr/local}, which requires you to run the last step as
-@verb{root}.
+@code{/usr/local}, which requires you to run the last step as
+@code{root}.
 
 @subsection Installing the GNU Taler exchange
 
@@ -172,10 +172,10 @@ $ make
 @end example
 
 If you did not specify a prefix, the exchange will install to
-@verb{/usr/local}, which requires you to run the last step as
-@verb{root}.  Note that you have to specify
-@verb{--with-gnunet=/usr/local} if you installed GNUnet to
-@verb{/usr/local} in the previous step.
+@code{/usr/local}, which requires you to run the last step as
+@code{root}.  Note that you have to specify
+@code{--with-gnunet=/usr/local} if you installed GNUnet to
+@code{/usr/local} in the previous step.
 
 
 @subsection Installing the GNU Taler merchant backend
@@ -198,8 +198,8 @@ $ make
 $ make install
 @end example
 
-Note that you have to specify @verb{--with-exchange=/usr/local} if you
-installed the exchange to @verb{/usr/local} in the previous
+Note that you have to specify @code{--with-exchange=/usr/local} if you
+installed the exchange to @code{/usr/local} in the previous
 step.
 
 
@@ -232,6 +232,7 @@ If given,
 @code{[merchant]/unixpath} and @code{[merchant]/unixpath_mode}. The latter takes
 the usual permission mask given as a number, e.g. 660 for user/group read-write access.
 @end itemize
+
 The frontend can then connect to the backend over HTTP using the specified address.
 If frontend and backend run within the same operating system, the use of
 a UNIX domain socket is recommended to avoid accidentally exposing the backend
@@ -251,13 +252,13 @@ demonstration exchange at @url{https://exchange.demo.taler.net/}.
 
 @item Database
 In principle is possible for the backend to support different DBMSs.
-The 
+The option
 
 @example
 [merchant]/db
 @end example
 
-option specifies which DBMS is to be used. However, currently only the value "postgres" is supported.
+specifies which DBMS is to be used. However, currently only the value "postgres" is supported.
 
 In addition to selecting the DBMS software, the backend requires DBMS-specific options to access the database.
 
@@ -276,7 +277,7 @@ user who will run the backend process.  Then, you need to first run
 $ createuser -d USER
 @end example
 
-as the @verb{postgres} database administrator to grant USER
+as the @code{postgres} database administrator to grant USER
 the ability to create new databases.  Next, you should as
 USER run
 
@@ -296,7 +297,7 @@ and set the following options in that section:
 [merchant-exchange-MYEXCHANGE]/uri
 @end example
 
-Takes the exchanges base URL, e.g. @code{https://exchange.demo.taler.net/}
+Takes the exchanges base URL, e.g. @url{https://exchange.demo.taler.net/}.
 
 @example
 [merchant-exchange-MYEXCHANGE]/master_key
@@ -350,7 +351,7 @@ generate the key and to display the public key using the
 
 This option specifies the path to a file that describes the instance's
 wire details in JSON format.  The specific format depends slightly
-on the banking system selected via the @verb{wireformat} option.
+on the banking system selected via the @code{wireformat} option.
 
 For the @code{test} wire format, a sample specification looks as follows:
 
@@ -395,7 +396,7 @@ credit card payments.
 The goal is to trigger a Taler payment once the customer has clicked
 on the donation button. The triggering happens when the frontend requests
 a @emph{contract} to the Merchant backend. According to the API
-@footnote{https://api.taler.net}, the backend generates contracts by
+@footnote{Full specification available at @url{https://api.taler.net/}}, the backend generates contracts by
 serving HTTP requests addressed to @code{/contract}. So our button's goal
 is to trigger some server-side logic that will, in the end, issue a HTTP POST
 to the backend's @code{/contract}.
@@ -584,7 +585,7 @@ check in the internal DB if @code{$response['H_contract']} has an entry, and:
 @item if that is the case, then the user accepted the contract previously and the wallet
 sends a deposit permission @footnote{Roughly speaking, a deposit permission is a JSON
 containing the coins to pay for a contract. Its full specification is available at:
-https://api.taler.net/api-merchant.html#depositpermission} to @code{/frontend-pay}.
+@url{https://api.taler.net/api-merchant.html#depositpermission}} to @code{/frontend-pay}.
 If this operation succeeds, then visit again the fulfillment URL, and finally enjoy
 the product.
 @item if not, redirect the browser to @code{/donate} (which will then reinitiate the
@@ -649,7 +650,7 @@ The backend will be listening on port 9898 on the host @code{example.taler.net}
 
 @subsection Key
 
-The backend's key lies at @code{$DATADIR/key.priv}
+The backend's key is located at @code{$DATADIR/key.priv}
 
 @subsection Database
 
@@ -658,7 +659,7 @@ The backend will use a database named @code{donations} within Postgresql.
 @subsection Exchange
 
 The backend will deposit the coins it receives to the exchange at
-@code{https://exchange.demo.taler.net/}, having the master key
+@url{https://exchange.demo.taler.net/}, having the master key
 "EXAMPLEMASTERKEY".
 
 @subsection Final configuration
