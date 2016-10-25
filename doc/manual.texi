@@ -418,18 +418,34 @@ The next step for the frontend is to accept the payment from the wallet,
 whenever the user accepts the contract. In Taler terminology, this action
 is managed by two pages: the @emph{fulfillment} and @emph{pay} page.
 
-By design, Taler payments @emph{can} be implemented in DB-less frontends, so the
-frontend needs a way to recall what a contract is about (e.g. which product, which
-price, the timestamp, etc.), in order to proceed with the actual payment and
-eventually deliver the final product.
+The fulfillment page is in charge of implementing the following two properties:
 
+@enumerate
+@item Taler payments @emph{can} be implemented in DB-less frontends.
+
+@item Taler payments are replayable, meaning that each purchase is associated with
+a URL (the fulfillment URL) that shows the product each time it gets visited (and
+of course, only the first time takes the user's money).
+@end enumerate
+
+In order to implement property (1), the frontend needs a way to recall what a contract
+is about (e.g. which product, which price, the timestamp, etc.) before proceeding with
+the actual payment and eventually deliver the final product.
 That is achieved by @emph{reconstructing} the contract using the fulfillment page's
 URL parameters@footnote{the fulfillment URL equipped with all the parameters is included
-in the contract}. Additionally, the fulfillment page is also in charge of @emph{delivering}
-the final product@footnote{In our example, that will be a page confirming that a donation
-has been made}.
+in the contract}.
 
-(FIXME Briefly explain the wallet's paying behaviour)
+In order to implement property (2), the frontend will firstly check the state to see if
+the product claimed among the fulfillment URL parameter has been paid; if so, the product
+is given to the customer. Otherwise, the frontend sets the payment as pending in the state
+and @emph{executes} it in the wallet. The payment execution is performed by returning JavaScript
+code from @code{taler-wallet-lib.js} that triggers the wallet to send the payment to the pay page.
+Once the pay page receives the payment, it sets the state for the purchase as "payed".
+
+In this scenario, the wallet's behaviour upon payment execution is to send the payment to the pay
+page and, if the payment is successful, visit again the fulfillment URL which then (thanks to the
+new state set by the pay page) will return the final product.
+
 
 Thus, a fulfillment URL for our example looks like the following:
 
