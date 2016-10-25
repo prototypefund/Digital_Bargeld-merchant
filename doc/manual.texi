@@ -63,13 +63,25 @@ Texts.  A copy of the license is included in the section entitled
 
 This manual addresses how to integrate GNU Taler with Web shops.  It
 describes how to install a GNU Taler merchant @emph{backend} and make it
-communicate with an existing Web shop @emph{frontend}.  The backend
-provides the cryptographic support, stores Taler-specific financial
-information and communicates with the GNU Taler exchange. The frontend
-accesses the backend via a RESTful API.  As a result, the frontend
-never has to directly communicate with the exchange, and also does not
-deal with sensitive data (such as the merchant's signing keys and bank
-account information).
+communicate with an existing Web shop @emph{frontend}.
+
+@c FIXME: add summary of what the reader will learn.
+
+@c FIXME: explain target audience (system administrators and frontend Web developers)
+
+@section Architecture overview
+
+The backend provides the cryptographic support, stores Taler-specific
+financial information in a DBMS and communicates with the GNU Taler
+exchange. The frontend accesses the backend via a RESTful API.  As a
+result, the frontend never has to directly communicate with the
+exchange, and also does not deal with sensitive data (such as the
+merchant's signing keys and bank account information).
+
+@c FIXME: this needs an image!
+@c show browser, Web server (frontend), Taler backend, DBMS and Taler exchange,
+@c and possibly even back office (Web service for shop owner)
+@c and interactions (select products, pay, deposit, confirm, persist, track)
 
 @node Installation
 @chapter Installation
