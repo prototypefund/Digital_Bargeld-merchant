@@ -202,6 +202,42 @@ Note that you have to specify @code{--with-exchange=/usr/local} if you
 installed the exchange to @code{/usr/local} in the previous
 step.
 
+@node Installing Taler with GNU Guix
+@section Installing Taler with GNU Guix
+
+This section has not yet been written.
+
+
+@node Installing Taler using Docker
+@section Installing Taler using Docker
+
+This section has not yet been written.
+
+
+@node Installing Taler on Debian GNU/Linux
+@section Installing Taler on Debian GNU/Linux
+
+This section has not yet been written.
+
+
+@node Installing Taler on Arch Linux
+@section Installing Taler on Arch Linux
+
+This section has not yet been written.
+
+
+@node Installing Taler on Windows
+@section Installing Taler on Windows
+
+This section has not yet been written.
+
+
+@node Installing Taler on OS X
+@section Installing Taler on OS X
+
+This section has not yet been written.
+
+
 
 @node Configuration
 @chapter How to configure the Merchant backend
