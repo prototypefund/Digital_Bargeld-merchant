@@ -210,9 +210,9 @@ $ make
 $ make install
 @end example
 
-Note that you have to specify @code{--with-exchange=/usr/local} if you
-installed the exchange to @code{/usr/local} in the previous
-step.
+Note that you have to specify @code{--with-exchange=/usr/local} and/or
+@code{--with-exchange=/usr/local} if you installed the exchange and/or
+GNUnet to @code{/usr/local} in the previous steps.
 
 @node Installing Taler with GNU Guix
 @section Installing Taler with GNU Guix
