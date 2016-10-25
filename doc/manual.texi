@@ -456,7 +456,7 @@ master_key = EXAMPLEMASTERKEY
 @end example
 
 The configuration file is typically located at
-@code{$HOME/.config/taler.conf}.  An alternative location can nbe
+@code{$HOME/.config/taler.conf}.  An alternative location can be
 specified to @code{taler-merchant-httpd} using the @code{-c} option.
 
 The contents of the XXX.json might look like this:
