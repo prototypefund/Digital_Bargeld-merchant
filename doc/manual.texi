@@ -620,11 +620,11 @@ assuming the user accepts the contract.  For this, the frontend must
 implement a payment handler at the URI specified for as the
 @code{X-Taler-Pay-Url} in the example above.
 
-The role of the @code{/pay} handler is to receive the deposit
-permission from the wallet and forward it to the backend.  If the
-backend reports that the payment was successful, the handler needs to
-update the session state with the browser to remember that the user
-paid.  The following code implements this in PHP:
+The role of the @code{/pay} handler is to receive the payment from
+the wallet and forward it to the backend.  If the backend reports
+that the payment was successful, the handler needs to update the
+session state with the browser to remember that the user paid.
+The following code implements this in PHP:
 
 @c FIXME: do expand on ``manage_error''
 @example
@@ -635,8 +635,8 @@ if (! isset($_SESSION['paid'])) @{
   return;
 @}
 # Get the HTTP POST body
-$deposit_permission = file_get_contents('php://input');
-$response = post_to_backend("/pay", $deposit_permission);
+$payment = file_get_contents('php://input');
+$response = post_to_backend("/pay", $payment);
 if (200 != $response->status_code)@{
   manage_error($response);  
   return;
