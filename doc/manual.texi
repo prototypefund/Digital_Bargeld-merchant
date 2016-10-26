@@ -95,15 +95,21 @@ merchant's signing keys and bank account information).
 @node Installation
 
 @menu
-* Generic instructions:: Generic installation guidelines
-* Dependencies:: List all needed dependencies to install the backend
+* generic-instructions:: Generic installation guidelines
+* dependencies:: List all needed dependencies to install the backend
+* Installing Taler with GNU Guix:: Installing Taler with GNU Guix
+* Installing Taler using Docker:: Installing Taler using Docker
+* Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
+* Installing Taler on Arch Linux:: Installing Taler on Arch Linux
+* Installing Taler on Windows:: Installing Taler on Windows
+* Installing Taler on OS X:: Installing Taler on OS X
 @end menu
 
 @chapter Installation
 
 This chapter describes how to install the GNU Taler merchant backend.
 
-@node Generic instructions
+@node generic-instructions
 @section Generic instructions
 
 This section provides generic instructions for the merchant
@@ -114,7 +120,8 @@ instructions if those are available, and only consult the generic
 instructions if no system-specific instructions are provided for your
 specific operating system.
 
-@node Dependencies
+@node dependencies
+@section Dependencies
 @subsection Installation of dependencies
 
 The following packages need to be installed before we can compile the 
@@ -367,7 +374,10 @@ Takes the exchanges base URL, e.g. @url{https://exchange.demo.taler.net/}.
 @end example
 
 Takes the base32 encoding of the exchange's master public key,
-e.g. CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00.
+e.g.
+@iftex
+{\small CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00}.
+@end iftex
 
 Note that multiple exchanges can be added to the system by using different
 tokens in place of @code{MYEXCHANGE} in the example above.
