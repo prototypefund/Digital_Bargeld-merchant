@@ -1,0 +1,18 @@
+digraph G {
+
+  user[label="User browser"];
+  subgraph cluster_0 {
+    Frontend;
+    Backend;
+    DBMS;
+    label="Shop";
+  }
+  subgraph cluster_1 {
+    Exchange;
+    label="Exchange";
+  }
+  user->Frontend;
+  Frontend->Backend;
+  Backend->DBMS;
+  Backend->Exchange;
+}

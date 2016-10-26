@@ -85,11 +85,10 @@ result, the frontend never has to directly communicate with the
 exchange, and also does not deal with sensitive data (such as the
 merchant's signing keys and bank account information).
 
-@c FIXME: this needs an image!
-@c show browser, Web server (frontend), Taler backend, DBMS and Taler exchange,
+@center @image{arch, 3in, 4in}
 
 
-@c re-FIXME: image like screenshots or diagrams?
+@c FIXME: How?
 @c and possibly even back office (Web service for shop owner)
 @c and interactions (select products, pay, deposit, confirm, persist, track)
 
