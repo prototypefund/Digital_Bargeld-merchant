@@ -2,7 +2,7 @@
 @c %**start of header
 @setfilename manual.info
 @include version.texi
-@settitle The GNU Taler manual for Web shop operators{VERSION}
+@settitle The GNU Taler manual for Web shop operators @value{VERSION}
 
 @c Define a new index for options.
 @defcodeindex op
@@ -87,11 +87,19 @@ merchant's signing keys and bank account information).
 
 @c FIXME: this needs an image!
 @c show browser, Web server (frontend), Taler backend, DBMS and Taler exchange,
+
+
+@c re-FIXME: image like screenshots or diagrams?
 @c and possibly even back office (Web service for shop owner)
 @c and interactions (select products, pay, deposit, confirm, persist, track)
-@c re-FIXME: image like screenshots or diagrams?
 
 @node Installation
+
+@menu
+* Generic instructions:: Generic installation guidelines
+* Dependencies:: List all needed dependencies to install the backend
+@end menu
+
 @chapter Installation
 
 This chapter describes how to install the GNU Taler merchant backend.
@@ -200,7 +208,7 @@ If you did not specify a prefix, the exchange will install to
 
 @subsection Installing the GNU Taler merchant backend
 
-The following steps assume all dependencies are installed. @xref{dependencies}.
+The following steps assume all dependencies are installed.
 
 Use the following commands to download and install the
 merchant backend:
@@ -464,13 +472,12 @@ specified to @code{taler-merchant-httpd} using the @code{-c} option.
 The contents of @code{$DATADIR/test.json} might look like this:
 
 @example
-@verbatim
-{
+@{
   "type": "test",
   "bank_uri": "https://bank.example.com/",
   "account_number": 15,
   "salt": "1851695201"
-}
+@}
 @end example
 
 
@@ -571,7 +578,7 @@ A minimalistic @code{/donate} handler is shown below (in PHP):
 @end display
 
 Given this response, the Taler wallet will fetch the contract from
-@url{/contract} and display it to the user.  If the wallet is not
+@url{/generate-contract} and display it to the user.  If the wallet is not
 present, the HTML body will be shown and the Taler headers will be
 ignored by the browser.  Instead of specifying the contract via an
 URL, it is also possible to inline short contracts directly.
@@ -593,23 +600,85 @@ design the frontend does not perform any cryptographic work.
 
 A simple @code{/generate-contract} handler could look like this:
 
-@c FIXME: actually include the full PHP logic to create a sample contract!
-@c FIXME: where does 'post_to_backend' come from? Give a working example!
-@c FIXME: include reasonable implementation of 'manage error'!
-@c FIXME: include fulfillment URI in contract example!
 @display
-...
 
-# this variable is the JSON of a contract proposal,
-# see https://api.taler.net/api-merchant.html#post--contract
-# the second parameter is the transaction id
-$proposal = make_contract("1 KUDOS", rand(1, 10000));
+function make_contract($transaction_id, $now) @{
+  $contract = array ('amount' =>
+                array ('value' => 1,
+  		       'fraction' => 0,
+                       'currency' => "KUDOS"),
+  		'max_fee' =>
+		  array ('value' => 3,
+  		         'fraction' => 50000,
+  		         'currency' => "KUDOS"),
+                'transaction_id' => $transaction_id,
+                'products' => array (
+  		   array ('description' => "Donation to charity program",
+  		          'quantity' => 1,
+  		          'price' =>
+			    array ('value' => 1,
+  			           'fraction' => 0,
+                                   'currency' => "KUDOS"),
+  		          'product_id' => 0,
+  		          'taxes' => array(), // No taxes for donations
+  		          'delivery_date' => "Some Date Format",
+  		          'delivery_location' => 'LNAME1')),
+  	        'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
+  		'expiry' =>
+		  "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
+  		'refund_deadline' =>
+		  "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
+		'repurchase_correlation_id' => '',
+		'fulfillment_url' => "https://charity-shop.example.com/fulfillment?transaction_id=$transaction_id&timestamp=$now",
+  		'merchant' =>
+		  array ('address' => 'LNAME2',
+  		         'name' => "Charity donations shop",
+  		         'jurisdiction' => 'LNAME3'),
+                'locations' =>
+		  array ('LNAME1' =>
+		    array ('country' => 'Test Country',
+  			   'city' => 'Test City',
+  			   'state' => 'Test State',
+  			   'region' => 'Test Region',
+  			   'province' => 'Test Province',
+  			   'ZIP code' => 4908,
+  			   'street' => 'test street',
+  			   'street number' => 20),
+  			 'LNAME2' =>
+		    array ('country' => 'Test Country',
+  		           'city' => 'Test City',
+  		           'state' => 'Test State',
+  		           'region' => 'Test Region',
+  		           'province' => 'Test Province',
+  		           'ZIP code' => 4908,
+  		           'street' => 'test street',
+  		           'street number' => 20),
+  		         'LNAME3' =>
+		    array ('country' => 'Test Country',
+  		           'city' => 'Test City',
+  		           'state' => 'Test State',
+  		           'region' => 'Test Region',
+  		           'province' => 'Test Province',
+  		           'ZIP code' => 4908)));
+
+@}
+
+
+/* this variable is the JSON of a contract proposal,
+ see https://api.taler.net/api-merchant.html#post--contract
+ the second parameter is the transaction id */
+$transaction_id = rand(1,90000);
+$proposal = make_contract($transaction_id, new DateTime('now'));
 
 # Here the frontend POSTs the proposal to the backend
 $response = post_to_backend("/contract", $proposal);
 
-if (200 != $response->status_code) @{
-  manage_error($response);
+if (200 != $response->getResponseCode()) @{
+  echo json_encode(array(
+    'error' => "internal error",
+    'hint' => "failed to regenerate contract",
+    'detail' => $resp->body->toString()
+    ), JSON_PRETTY_PRINT);
   return;
 @}
 echo $response->body;
@@ -617,6 +686,26 @@ echo $response->body;
 
 After the browser has fetched the contract, the user will
 be given the opportunity to affirm the payment.
+
+The function @code{post_to_backend} is shown in the figure below, as it's
+not strictly part of the handler.
+
+@display
+function post_to_backend($backend_relative_url, $json)@{
+  $url = "https://charity-shop-backend.example.com$backend_relative_url";
+  
+  $req = new http\Client\Request("POST",
+                                 $url,
+                                 array ("Content-Type" => "application/json"));
+  
+  $req->getBody()->append($json);
+  
+  // Execute the HTTP request
+  $client = new http\Client;
+  $client->enqueue($req)->send();
+  return $client->getResponse();
+@}
+@end display
 
 
 @section Receiving payments via Taler
@@ -632,7 +721,6 @@ that the payment was successful, the handler needs to update the
 session state with the browser to remember that the user paid.
 The following code implements this in PHP:
 
-@c FIXME: do expand on ``manage_error''
 @example
 # Check if a session exists already
 session_start();
@@ -643,8 +731,12 @@ if (! isset($_SESSION['paid'])) @{
 # Get the HTTP POST body
 $payment = file_get_contents('php://input');
 $response = post_to_backend("/pay", $payment);
-if (200 != $response->status_code)@{
-  manage_error($response);  
+if (200 != $response->getResponseCode())@{
+  echo json_encode(array(
+    'error' => "internal error",
+    'hint' => "failed to POST coins to the backend",
+    'detail' => $response->body->toString()
+    ), JSON_PRETTY_PRINT);
   return;
 @}
 $_SESSION['paid'] = true;
@@ -667,53 +759,63 @@ fulfillment page must use the HTTP session state to detect if the
 payment has been performed already, and if not request payment from
 the wallet.
 
-For our example, we include the full contract details, including a
-transaction ID, in the URI of the fulfillment page to allow the page
-to determine which contract the user is trying to access.
-Thus, a fulfillment URL for our example looks like the following:
+For our example, we include in the URI of the fulfillment page the data
+which is needed to allow the page to determine which contract the user is
+trying to access.
+Thus, the fulfillment URL for our example looks like the following:
 
 @example
-https://shop/fulfillment?transaction_id=9
+https://charity-shop.example.com/fulfillment?transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @end example
 
 The @code{/fulfillment} handler will then perform the following actions:
 
-@c FIXME: convert to JS-less method!
-@c FIXME: provide complete example code!
 @example
-<?php
-  # At first, check if the user has already paid for the product.
-  # If so, deliver the product.
-  session_start();
-  if (! isset($_SESSION['paid']))@{
-    # set as pending
-    $_SESSION['paid'] = false;
-  @}
-  else@{
-    if($_SESSION['paid'])@{
-      echo "<p>Thanks for your donation!</p>";
-      return;
-    @}
-    else@{
-      echo "<!-- Put the credit card paywall here -->";
-      return;
-    @}
-  @}
-
-  # Reconstruct the contract
-  $rec_proposal = make_contract("1 KUDOS", $_GET['transaction_id']);
-  # $response obeys to the specification at: https://api.taler.net/api-merchant.html#offer
-  $response = post_to_backend("/contract", $rec_proposal);
-  
-  http_response_code (402);
-  header ('X-Taler-Contract-Hash: BASE32CONTRACTHASH');
-  header ('X-Taler-Offer-Url: /donate');
-  header ('X-Taler-Pay-Url: /pay');
-?>
+<html>
+  <head>
+    <title>Donation Fulfillment</titile>
+  </head>
+  <body>
+    <?php
+      # At first, check if the user has already paid for the product.
+      # If so, deliver the product.
+      session_start();
+      if (! isset($_SESSION['paid']))@{
+        # set as pending
+        $_SESSION['paid'] = false;
+      @}
+      else@{
+        if($_SESSION['paid'])@{
+          echo "<p>Thanks for your donation!</p>";
+          return;
+        @}
+        else@{
+          echo '<form action="/cc-payment">
+                  First name<br> <input type="text"></input><br>
+                  Family name<br> <input type="text"></input><br>
+                  Age<br> <input type="text"></input><br>
+                  Nationality<br> <input type="text"></input><br>
+                  CC number<br> <input type="text"></input><br>
+                  Cvv2 code<br> <input type="text"></input><br>
+                  <input type="radio" name="gender">Female</input><br>
+                  <input type="submit"></input>
+                </form>';
+          return;
+        @}
+      @}
+    
+      # Reconstruct the contract
+      $rec_proposal = make_contract($_GET['transaction_id'], $_GET['timestamp']);
+      # $response obeys to the specification at: https://api.taler.net/api-merchant.html#offer
+      $response = post_to_backend("/contract", $rec_proposal);
+      
+      http_response_code (402);
+      header ('X-Taler-Contract-Hash: json_decode($response)["H_contract"]');
+      header ('X-Taler-Offer-Url: /donate');
+      header ('X-Taler-Pay-Url: /pay'); ?>
+  </body>
+</html>
 @end example
-
-
-
 
 @chapter Advanced topics
 
@@ -792,8 +894,5 @@ performed by returning JavaScript code from @code{taler-wallet-lib.js}
 that triggers the wallet to send the payment to the pay page.  Once
 the pay page receives the payment, it sets the state for the payment
 as "payed".
-
-
-
 
 @bye
