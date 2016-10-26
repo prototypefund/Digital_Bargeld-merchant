@@ -66,8 +66,15 @@ describes how to install a GNU Taler merchant @emph{backend} and make it
 communicate with an existing Web shop @emph{frontend}.
 
 @c FIXME: add summary of what the reader will learn.
+In detail, the manual shows how to install all the required dependencies
+of the backend and how to tune its configuration to serve your shop.
+We conclude the initial part with a tutorial about a minimalistic frontend
+having a donation button which uses Taler payments.
 
 @c FIXME: explain target audience (system administrators and frontend Web developers)
+This manual is mainly addressed to system administrators, as the backend is
+a @emph{service}, and Web developers, as their sites need to interact with the
+backend.
 
 @section Architecture overview
 
@@ -82,6 +89,7 @@ merchant's signing keys and bank account information).
 @c show browser, Web server (frontend), Taler backend, DBMS and Taler exchange,
 @c and possibly even back office (Web service for shop owner)
 @c and interactions (select products, pay, deposit, confirm, persist, track)
+@c re-FIXME: image like screenshots or diagrams?
 
 @node Installation
 @chapter Installation
@@ -351,12 +359,11 @@ Takes the exchanges base URL, e.g. @url{https://exchange.demo.taler.net/}.
 [merchant-exchange-MYEXCHANGE]/master_key
 @end example
 
-Takes the base32 encoding of the exchange's master public key.
+Takes the base32 encoding of the exchange's master public key,
+e.g. CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00.
 
 Note that multiple exchanges can be added to the system by using different
 tokens in place of @code{MYEXCHANGE} in the example above.
-
-@c FIXME: We should provide the master public key of the demo exchange here!
 
 @c FIXME: In the future, we need to describe specifying auditors here.
 
@@ -407,18 +414,16 @@ For the @code{test} wire format, a sample specification looks as follows:
 {
   "type": "test",
   "bank_uri": "https://bank.test.taler.net/",
-  "sig": "MERCHANTSIGNATURE",
   "account_number": 5,
   "salt": "RANDOMSALT"
 }
 @end verbatim
 
-@c FIXME: is ``sig'' required here? This is odd.  If so, describe
-@c how to generate it.  Also explain RANDOMSALT.
+Those bank details above, are included in the contract in their hashed
+form, so the 'salt' field is needed to make harder brute-forcing them.
 
-@c FIXME: We should provide instructions for how to get an account
-@c number for the demo bank!
-
+In order to get an account number, register at @code{https://bank.demo.taler.net/},
+our demonstration bank.
 
 Note that additional instances can be specified using different tokens
 in the section name instead of @code{default}.
@@ -429,12 +434,9 @@ in the section name instead of @code{default}.
 
 The following is an example for a complete backend configuration:
 
-
-@c FIXME: change wire format to 'test'
-@c FIXME: provide actual master key of exchange.demo!
 @example
 [merchant]
-wireformat = SEPA
+wireformat = TEST
 serve = TCP
 port = 9898
 currency = EUR
@@ -444,14 +446,14 @@ database = postgres
 KEYFILE = $DATADIR/key.priv
 
 [merchant-instance-wireformat-default]
-SEPA_RESPONSE_FILE = $DATADIR/sepa.json
+TEST_RESPONSE_FILE = $DATADIR/test.json
 
 [merchantdb-postgres]
 config = postgres:///donations
 
 [merchant-demoexchange]
 uri = https://exchange.demo.taler.net/
-master_key = EXAMPLEMASTERKEY
+master_key = CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
 
 @end example
 
@@ -459,10 +461,16 @@ The configuration file is typically located at
 @code{$HOME/.config/taler.conf}.  An alternative location can be
 specified to @code{taler-merchant-httpd} using the @code{-c} option.
 
-The contents of the XXX.json might look like this:
+The contents of @code{$DATADIR/test.json} might look like this:
 
 @example
-FIXME: provide sample test wire transfer JSON file
+@verbatim
+{
+  "type": "test",
+  "bank_uri": "https://bank.example.com/",
+  "account_number": 15,
+  "salt": "1851695201"
+}
 @end example
 
 
@@ -479,8 +487,7 @@ Postgresql.
 
 The backend will deposit the coins it receives to the exchange at
 @url{https://exchange.demo.taler.net/}, which has the master key
-"EXAMPLEMASTERKEY".
-@c FIXME: include the actual key from demo!
+"CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00".
 
 
 @section Launching the backend
@@ -549,10 +556,9 @@ it will return a HTML page that will take care of:
 
 A minimalistic @code{/donate} handler is shown below (in PHP):
 @display
-<!php
+<?php
   http_response_code (402); // 402: Payment required
-  header ('X-Taler-Pay-Url: /pay');
-  header ('X-Taler-Offer-Url: /generate-contract');
+  header ('X-Taler-Contract-Url: /generate-contract');
 ?>
 <html>
   <head>
@@ -675,41 +681,35 @@ The @code{/fulfillment} handler will then perform the following actions:
 @c FIXME: convert to JS-less method!
 @c FIXME: provide complete example code!
 @example
-...
-# At first, check if the user has already paid for the product.
-# If so, deliver the product.
-session_start();
-if (! isset($_SESSION['paid']))@{
-  # set as pending
-  $_SESSION['paid'] = false;
-@}
-else@{
-  if($_SESSION['paid'])@{
-    echo "<p>Thanks for your donation!</p>";
-    return;
+<?php
+  # At first, check if the user has already paid for the product.
+  # If so, deliver the product.
+  session_start();
+  if (! isset($_SESSION['paid']))@{
+    # set as pending
+    $_SESSION['paid'] = false;
   @}
   else@{
-    echo "<!-- Put the credit card paywall here -->";
-    return;
+    if($_SESSION['paid'])@{
+      echo "<p>Thanks for your donation!</p>";
+      return;
+    @}
+    else@{
+      echo "<!-- Put the credit card paywall here -->";
+      return;
+    @}
   @}
-@}
 
-# Reconstruct the contract
-$rec_proposal = make_contract("1 KUDOS", $_GET['transaction_id']);
-# $response obeys to the specification at: https://api.taler.net/api-merchant.html#offer
-$response = post_to_backend("/contract", $rec_proposal);
-
-# Return JavaScript that executes the contract in the wallet
-echo "<html>
-       <head>
-        <script src="taler-wallet-lib.js"></script>
-        <script>
-          taler.executePayment($response['H_contract'],
-                               '/frontend-pay',
-                               '/donate');
-        </script>
-      </head>
-    </html>";
+  # Reconstruct the contract
+  $rec_proposal = make_contract("1 KUDOS", $_GET['transaction_id']);
+  # $response obeys to the specification at: https://api.taler.net/api-merchant.html#offer
+  $response = post_to_backend("/contract", $rec_proposal);
+  
+  http_response_code (402);
+  header ('X-Taler-Contract-Hash: BASE32CONTRACTHASH');
+  header ('X-Taler-Offer-Url: /donate');
+  header ('X-Taler-Pay-Url: /pay');
+?>
 @end example
 
 
