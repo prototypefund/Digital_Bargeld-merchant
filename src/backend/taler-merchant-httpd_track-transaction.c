@@ -390,10 +390,6 @@ wire_deposits_cb (void *cls,
       continue;
     for (i=0;i<details_length;i++)
     {
-      if (0 != memcmp (&details[i].coin_pub,
-                       &tcc->coin_pub,
-                       sizeof (struct TALER_CoinSpendPublicKeyP)))
-        continue;
       tcc->wtid = tctx->current_wtid;
       tcc->execution_time = tctx->current_execution_time;
       tcc->have_wtid = GNUNET_YES;
