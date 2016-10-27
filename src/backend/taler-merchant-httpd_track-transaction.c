@@ -503,7 +503,7 @@ wtid_cb (void *cls,
   tctx->current_wtid = *wtid;
   tctx->current_execution_time = execution_time;
   pcc.p_ret = NULL;
-  if (GNUNET_YES ==
+  if (GNUNET_OK == 
       db->find_proof_by_wtid (db->cls,
                               tctx->exchange_uri,
                               wtid,
@@ -887,7 +887,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 					   "id");
   instance = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
-                                          "instance" /* FIXME: rename to 'instance' */);
+                                          "instance");
   if (NULL == instance)
     instance = "default";
   GNUNET_CRYPTO_hash (instance,
