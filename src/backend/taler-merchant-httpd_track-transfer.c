@@ -316,7 +316,7 @@ wire_transfer_cb (void *cls,
       (rctx,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
        TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-				    "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_STORE_TRANSER_ERROR,
+				    "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_STORE_TRANSFER_ERROR,
                                     "details", "failed to store response from exchange to local database"));
     return;
   }
@@ -566,7 +566,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
 
   instance_str = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,
-                                              "instance" /* FIXME: instance */);
+                                              "instance");
   if (NULL == instance_str)
     instance_str = "default";
   rctx->mi = TMH_lookup_instance (instance_str);
