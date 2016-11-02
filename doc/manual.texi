@@ -62,35 +62,51 @@ Texts.  A copy of the license is included in the section entitled
 @chapter Introduction
 
 This manual addresses how to integrate GNU Taler with Web shops.  It
-describes how to install a GNU Taler merchant @emph{backend} and make it
-communicate with an existing Web shop @emph{frontend}.
+describes how to install a GNU Taler merchant @emph{backend} and how
+to integrate it with an existing Web shop @emph{frontend}.
 
-@c FIXME: add summary of what the reader will learn.
-In detail, the manual shows how to install all the required dependencies
+The manual explains how to install all the required dependencies
 of the backend and how to tune its configuration to serve your shop.
-We conclude the initial part with a tutorial about a minimalistic frontend
-having a donation button which uses Taler payments.
+The first part of the tutorial shows how to build a minimalistic frontend
+showing a button that enables donations using Taler.
 
-@c FIXME: explain target audience (system administrators and frontend Web developers)
-This manual is mainly addressed to system administrators, as the backend is
-a @emph{service}, and Web developers, as their sites need to interact with the
-backend.
+This manual is for system administrators and Web developers.  We expect
+some moderate familiarity with the compilation and installation of free
+software packages and of Web technology, in particular HTML and HTTP.
+An understanding of cryptography is not required.
+
 
 @section Architecture overview
 
-The backend provides the cryptographic support, stores Taler-specific
-financial information in a DBMS and communicates with the GNU Taler
-exchange. The frontend accesses the backend via a RESTful API.  As a
-result, the frontend never has to directly communicate with the
-exchange, and also does not deal with sensitive data (such as the
-merchant's signing keys and bank account information).
+The Taler software stack for a merchant consists of four main components:
+
+@itemize
+@item A frontend which interacts with the customer's browser. The
+  frontend enables the customer to build a shopping cart and place
+  an order.  Upon payment, it triggers the respective business logic
+  to satisfy the order.
+@item A back office application that enables the shop operators to
+  view customer orders, match them to financial transfers, and possibly
+  approve refunds if an order cannot be satisfied.
+@item A Taler-specific payment backend which makes it easy for the
+  frontend to process financial transactions with Taler.
+@item A DBMS which stores the transaction history for the Taler backend.
+@end itemize
+
+The following image illustrates the various interactions of these
+key components:
 
 @center @image{arch, 3in, 4in}
 
 
-@c FIXME: How?
-@c and possibly even back office (Web service for shop owner)
-@c and interactions (select products, pay, deposit, confirm, persist, track)
+Basically, the backend provides the cryptographic protocol support,
+stores Taler-specific financial information in a DBMS and communicates
+with the GNU Taler exchange over the Internet.  The frontend accesses
+the backend via a RESTful API.  As a result, the frontend never has to
+directly communicate with the exchange, and also does not deal with
+sensitive data.  In particular, the merchant's signing keys and bank
+account information is exclusively kept with the Taler backend.
+
 
 @node Installation
 
@@ -783,6 +799,7 @@ https://charity-shop.example.com/fulfillment? \
 transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @end smallexample
 
+
 @*The @code{/fulfillment} handler will then perform the following actions:
 
 @smallexample
@@ -805,7 +822,8 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
      return;
    @}
     else@{
-     echo '<form action="/cc-payment">
+      # Generate page to show for payments with credit cards instead.
+      echo '<form action="/cc-payment">
       First name<br> <input type="text"></input><br>
       Family name<br> <input type="text"></input><br>
       Age<br> <input type="text"></input><br>
@@ -821,17 +839,22 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
   
   # Reconstruct the contract
   $rec_proposal = make_contract($_GET['transaction_id'], $_GET['timestamp']);
-  # $response obeys to the specification at:
+  # $response corresponds to the specification at:
   # https://api.taler.net/api-merchant.html#offer
   $response = post_to_backend("/contract", $rec_proposal);
     
   http_response_code (402);
+# FIXME: this can't be right, you want to call "json_deocde", not
+# return it as a literal string in the header! (i.e. insert '. before json_decode and remove ' at the end)?
+# All this code should be tested!
   header ('X-Taler-Contract-Hash: json_decode($response)["H_contract"]');
   header ('X-Taler-Offer-Url: /donate');
   header ('X-Taler-Pay-Url: /pay'); ?>
  </body>
 </html>
 @end smallexample
+
+
 
 @chapter Advanced topics
 
