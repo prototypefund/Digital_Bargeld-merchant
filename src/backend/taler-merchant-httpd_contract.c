@@ -154,6 +154,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   struct TALER_Amount max_fee;
   uint64_t transaction_id;
   json_t *products;
+  json_t *merchant;
   struct GNUNET_TIME_Absolute timestamp;
   struct GNUNET_TIME_Absolute refund_deadline;
   struct GNUNET_TIME_Absolute pay_deadline;
@@ -164,6 +165,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
     /* The following entries we don't actually need, except to check that
        the contract is well-formed */
     GNUNET_JSON_spec_json ("products", &products),
+    GNUNET_JSON_spec_json ("merchant", &merchant),
     GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
     GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
     GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
@@ -227,7 +229,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
 					   "contract:products");
   }
 
-  mi = get_instance (jcontract);
+  mi = get_instance (merchant);
   if (NULL == mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,

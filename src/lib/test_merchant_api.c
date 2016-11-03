@@ -1641,9 +1641,16 @@ interpreter_run (void *cls)
                              JSON_REJECT_DUPLICATES,
                              &error);
       if (NULL != instance)
-        json_object_set_new (proposal,
+      {
+      
+        json_t *merchant;
+
+        merchant = json_object ();
+        json_object_set_new (merchant,
                              "instance",
                              json_string (instance));
+        json_object_set (proposal, "merchant", merchant);
+      }
       if (NULL == proposal)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -2443,7 +2450,7 @@ main (int argc,
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
   GNUNET_log_setup ("test-merchant-api",
-                    "WARNING",
+                    "DEBUG",
                     NULL);
   cfg = GNUNET_CONFIGURATION_create ();
   GNUNET_assert (GNUNET_OK ==
