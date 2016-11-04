@@ -238,6 +238,7 @@ check_transfer (void *cls,
     /* Build the `TrackTransferConflictDetails` */
     rctx->response
       = TMH_RESPONSE_make_json_pack ("{s:s, s:O, s:I, s:O, s:o, s:I, s:o, s:o}",
+                                     "code", (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
                                      "hint", "disagreement about deposit valuation",
                                      "exchange_deposit_proof", exchange_proof,
                                      "conflict_offset", (json_int_t) rctx->current_offset,
