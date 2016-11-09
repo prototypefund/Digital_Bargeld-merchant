@@ -584,7 +584,7 @@ in the section name instead of @code{default}.
 
 The following is an example for a complete backend configuration:
 
-@example
+@smallexample
 [merchant]
 wireformat = TEST
 serve = TCP
@@ -604,7 +604,7 @@ config = postgres:///donations
 [merchant-demoexchange]
 uri = https://exchange.demo.taler.net/
 master_key = CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
-@end example
+@end smallexample
 
 
 
@@ -666,11 +666,11 @@ on a donation button.  We will use a button that issues an HTTP POST
 to the frontend @code{/donate} URL.  For this, the HTML would be as
 follows:
 
-@example
+@smallexample
 <form action="/donate">
   <input type="submit" value="Donate!"></input>
 <form>
-@end example
+@end smallexample
 
 When the server-side handler for @code{/donate} receives the form submission,
 it will return a HTML page that will take care of:
@@ -681,7 +681,8 @@ it will return a HTML page that will take care of:
 @end itemize
 
 A minimalistic @code{/donate} handler is shown below (in PHP):
-@display
+
+@smallexample
 <?php
   http_response_code (402); // 402: Payment required
   header ('X-Taler-Contract-Url: /generate-contract');
@@ -694,7 +695,7 @@ A minimalistic @code{/donate} handler is shown below (in PHP):
     <!-- Put the credit card paywall here -->
   </body>
 </html>
-@end display
+@end smallexample
 
 Given this response, the Taler wallet will fetch the contract from
 @url{/generate-contract} and display it to the user.  If the wallet is not
@@ -704,20 +705,22 @@ URL, it is also possible to inline short contracts directly.
 
 Note that we @emph{could} have bypassed the POST request to trigger
 the payment, and performed the interaction with the wallet directly
-from the button's via JavaScript.  We will consider this case in a
-later chapter.
+from the button via JavaScript.
 
+@c We will consider this case in a later chapter.
+@c FIXME: not yet ;-)
 
 @section Generating the contract
 
 The server-side handler for @code{/generate-contract} now has to
 generate a contract proposal about donating 1 KUDOS to the 'Taler
-charity program'.  This proposed contract is then be POSTed to the
+charity program'.  This proposed contract is then POSTed to the
 backend at @code{/contract}.  The main result of POSTing the proposal
-to the backend is that it will be cryptographically signed, as by
-design the frontend does not perform any cryptographic work.
+to the backend is that it will be cryptographically signed.  This is
+necessary as by design the frontend does not perform any cryptographic
+work.
 
-A simple @code{/generate-contract} handler may look like this:
+A simple @code{/generate-contract} handler may thus look like this:
 
 @smallexample
 
@@ -729,7 +732,7 @@ function make_contract($transaction_id, $now) @{
     'fraction' => 0,
     'currency' => "KUDOS"),
    'max_fee' => array (
-    'value' => 3,
+    'value' => 0,
     'fraction' => 50000,
     'currency' => "KUDOS"),
    'transaction_id' => $transaction_id,
@@ -743,7 +746,7 @@ function make_contract($transaction_id, $now) @{
        'currency' => "KUDOS"),
       'product_id' => 0,
       'taxes' => array(), // No taxes for donations
-      'delivery_date' => "Some Date Format",
+      'delivery_date' => "/Date(" . $now->getTimestamp() . ")/",
       'delivery_location' => 'LNAME1')),
       'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
       'expiry' =>
@@ -752,46 +755,37 @@ function make_contract($transaction_id, $now) @{
        "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
       'repurchase_correlation_id' => '',
       'fulfillment_url' =>
-       "https://charity-shop.example.com/fulfillment?"
+       "https://shop.com/fulfillment?"
        . "transaction_id=$transaction_id&timestamp=$now",
       'merchant' => array (
-       'address' => 'LNAME2',
+       'address' => 'LNAME1',
        'name' => "Charity donations shop",
-       'jurisdiction' => 'LNAME3'),
+       'jurisdiction' => 'LNAME2'),
       'locations' => array (
        'LNAME1' =>
         array (
-	 'country' => 'Test Country',
-  	 'city' => 'Test City',
-  	 'state' => 'Test State',
-  	 'region' => 'Test Region',
-  	 'province' => 'Test Province',
-  	 'ZIP code' => 4908,
-  	 'street' => 'test street',
-  	 'street number' => 20),
-  	 'LNAME2' => array (
-	  'country' => 'Test Country',
-  	  'city' => 'Test City',
-  	  'state' => 'Test State',
-  	  'region' => 'Test Region',
-  	  'province' => 'Test Province',
-  	  'ZIP code' => 4908,
-  	  'street' => 'test street',
-  	  'street number' => 20),
-  	  'LNAME3' => array (
-	   'country' => 'Test Country',
-           'city' => 'Test City',
-           'state' => 'Test State',
-           'region' => 'Test Region',
-           'province' => 'Test Province',
-           'ZIP code' => 4908)));
+         'country' => 'Shop Country',
+         'city' => 'Shop City',
+         'state' => 'Shop State',
+       	 'region' => 'Shop Region',
+       	 'province' => 'Shop Province',
+       	 'ZIP code' => 4908,
+         'street' => 'Shop street',
+       	 'street number' => 20),
+       'LNAME2' => array (
+         'country' => 'Legal Country',
+         'city' => Legal City',
+         'state' => 'Legal State',
+         'region' => 'Legal Region',
+         'province' => 'Legal Province',
+         'ZIP code' => 4908)));
 @}
 
 
 /* this variable is the JSON of a contract proposal,
  see https://api.taler.net/api-merchant.html#post--contract
  the second parameter is the transaction id */
-$transaction_id = rand(1,90000);
+$transaction_id = rand(1,90000); // simplified, do not do this!
 $proposal = make_contract($transaction_id, new DateTime('now'));
 
 # Here the frontend POSTs the proposal to the backend
@@ -800,7 +794,7 @@ $response = post_to_backend("/contract", $proposal);
 if (200 != $response->getResponseCode()) @{
   echo json_encode(array(
     'error' => "internal error",
-    'hint' => "failed to regenerate contract",
+    'hint' => "failed to generate contract",
     'detail' => $resp->body->toString()
     ), JSON_PRETTY_PRINT);
   return;
@@ -808,15 +802,16 @@ if (200 != $response->getResponseCode()) @{
 echo $response->body;
 @end smallexample
 
-After the browser has fetched the contract, the user will
-be given the opportunity to affirm the payment.
+Note that in practice the frontend might want to generate a monotonically
+increasing series of transaction IDs to avoid a chance of collisions.
+Transaction IDs must be in the range of @math{[0:2^{51})}.
 
-The function @code{post_to_backend} is shown in the figure below, as it's
-not strictly part of the handler.
+The function @code{post_to_backend} is shown below; we will use it
+again in other examples:
 
 @smallexample
 function post_to_backend($backend_relative_url, $json)@{
-  $url = "https://charity-shop-backend.example.com$backend_relative_url";
+  $url = "https://shop.com$backend_relative_url";
 
   $req = new http\Client\Request("POST",
                                  $url,
@@ -830,6 +825,9 @@ function post_to_backend($backend_relative_url, $json)@{
   return $client->getResponse();
 @}
 @end smallexample
+
+After the browser has fetched the contract, the user will
+be given the opportunity to affirm the payment.
 
 
 @section Receiving payments via Taler
@@ -889,7 +887,7 @@ trying to access.
 Thus, the fulfillment URL for our example looks like the following:@*
 
 @smallexample
-https://charity-shop.example.com/fulfillment? \
+https://shop.com/fulfillment? \
 transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @end smallexample
 
