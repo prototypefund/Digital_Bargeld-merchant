@@ -63,8 +63,18 @@ Texts.  A copy of the license is included in the section entitled
 @node Introduction
 @chapter Introduction
 
-GNU Taler is an open protocol for an electronic payment system
-with a free software reference implementation.
+@section About GNU Taler
+
+GNU Taler is an open protocol for an electronic payment system with a
+free software reference implementation.  GNU Taler offers secure, fast
+and easy payment processing using well understood cryptographic
+techniques.  GNU Taler allows customers to remain anonymous, while
+ensuring that merchants can be held accountable by governments.
+Hence, GNU Taler is compatible with anti-money-laundering (AML) and
+know-your-customer (KYC) regulation, as well as data protection
+regulation (such as GDPR).
+
+@section About this manual
 
 This manual addresses how to integrate GNU Taler with Web shops.  It
 describes how to install a GNU Taler merchant @emph{backend} and how
@@ -100,7 +110,7 @@ The Taler software stack for a merchant consists of four main components:
 @item A DBMS which stores the transaction history for the Taler backend.
   For now, the GNU Taler reference implemenation only supports Postgres,
   but the code could be easily extended to support another DBMS. This
-  manual assumes that a reasonably recent Postgres installation ($\ge 9.5$)
+  manual assumes that a reasonably recent Postgres installation (@math{\ge 9.5})
   exists on the target system.
 @end itemize
 
