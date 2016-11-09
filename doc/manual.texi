@@ -862,6 +862,9 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @end smallexample
 
 
+@chapter Integration of GNU Taler with the back office
+
+
 
 @chapter Advanced topics
 
