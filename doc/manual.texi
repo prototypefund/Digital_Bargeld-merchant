@@ -943,6 +943,9 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @chapter Integration of GNU Taler with the back office
 
 
+@bye
+
+
 @node Advanced-topics
 @chapter Advanced topics
 
@@ -1021,5 +1024,3 @@ performed by returning JavaScript code from @code{taler-wallet-lib.js}
 that triggers the wallet to send the payment to the pay page.  Once
 the pay page receives the payment, it sets the state for the payment
 as "payed".
-
-@bye
