@@ -122,12 +122,12 @@ account information is encapsulated within the Taler backend.
 @node Installation
 @menu
 * generic-instructions:: Generic installation guidelines
-* Installing Taler with GNU Guix:: Installing Taler with GNU Guix
-* Installing Taler using Docker:: Installing Taler using Docker
-* Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
-* Installing Taler on Arch Linux:: Installing Taler on Arch Linux
-* Installing Taler on Windows:: Installing Taler on Windows
-* Installing Taler on OS X:: Installing Taler on OS X
+@c * Installing Taler with GNU Guix:: Installing Taler with GNU Guix
+@c * Installing Taler using Docker:: Installing Taler using Docker
+@c * Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
+@c * Installing Taler on Arch Linux:: Installing Taler on Arch Linux
+@c * Installing Taler on Windows:: Installing Taler on Windows
+@c * Installing Taler on OS X:: Installing Taler on OS X
 @end menu
 
 @chapter Installation
@@ -139,11 +139,8 @@ This chapter describes how to install the GNU Taler merchant backend.
 
 This section provides generic instructions for the merchant
 backend installation independent of any particular operating system.
-Operating system specific instructions are provided in the following
-sections.  You should follow the operating system specific
-instructions if those are available, and only consult the generic
-instructions if no system-specific instructions are provided for your
-specific operating system.
+@c Operating system specific instructions are provided in the following sections.
+@c You should follow the operating system specific instructions if those are available, and only consult the generic instructions if no system-specific instructions are provided for your specific operating system.
 
 @node dependencies
 @subsection Installation of dependencies
@@ -260,40 +257,40 @@ Note that you have to specify @code{--with-exchange=/usr/local} and/or
 @code{--with-exchange=/usr/local} if you installed the exchange and/or
 GNUnet to @code{/usr/local} in the previous steps.
 
-@node Installing Taler with GNU Guix
-@section Installing Taler with GNU Guix
+@c @node Installing Taler with GNU Guix
+@c @section Installing Taler with GNU Guix
 
-This section has not yet been written.
-
-
-@node Installing Taler using Docker
-@section Installing Taler using Docker
-
-This section has not yet been written.
+@c This section has not yet been written.
 
 
-@node Installing Taler on Debian GNU/Linux
-@section Installing Taler on Debian GNU/Linux
+@c @node Installing Taler using Docker
+@c @section Installing Taler using Docker
 
-This section has not yet been written.
-
-
-@node Installing Taler on Arch Linux
-@section Installing Taler on Arch Linux
-
-This section has not yet been written.
+@c This section has not yet been written.
 
 
-@node Installing Taler on Windows
-@section Installing Taler on Windows
+@c @node Installing Taler on Debian GNU/Linux
+@c @section Installing Taler on Debian GNU/Linux
 
-This section has not yet been written.
+@c This section has not yet been written.
 
 
-@node Installing Taler on OS X
-@section Installing Taler on OS X
+@c @node Installing Taler on Arch Linux
+@c @section Installing Taler on Arch Linux
 
-This section has not yet been written.
+@c This section has not yet been written.
+
+
+@c @node Installing Taler on Windows
+@c @section Installing Taler on Windows
+
+@c This section has not yet been written.
+
+
+@c @node Installing Taler on OS X
+@c @section Installing Taler on OS X
+
+@c This section has not yet been written.
 
 
 
@@ -301,14 +298,62 @@ This section has not yet been written.
 @chapter How to configure the merchant's backend
 
 The installation already provides reasonable defaults for most of the
-configuration options. However, some of them must be tuned to the
-particular Web shop.  By default, the file
-@code{$HOME/.config/taler.conf} is where the Web shop administrator
-specifies configuration values that augment or override the defaults.
+configuration options. However, some must be provided, in particular
+the database account and bank account that the backend should use.  By
+default, the file @code{$HOME/.config/taler.conf} is where the Web
+shop administrator specifies configuration values that augment or
+override the defaults.
+
+@section Using taler-config
+
+The tool @code{taler-config} can be used to
+extract or manipulate configuration values; however, the configuration
+use the well-known INI file format and can also be edited by hand.
+
+Run
+@example
+$ taler-config -s $SECTION
+@end example
+to list all of the configuration values in section @code{$SECTION}.
+
+Run
+@example
+$ taler-config -s $section -o $option
+@end example
+to extract the respective configuration value for option @code{$option}
+in section @code{$section}.
+
+Finally, to change a setting, run
+@example
+$ taler-config -s $section -o $option -V $value
+@end example
+to set the respective configuration value to @code{$value}. Note that you have to
+manually restart the Taler backend after you change the configuration to
+make the new configuration go into effect.
+
+Some default options will use $-variables, such as $code{$DATADIR}
+within their value.  To expand the @code{$DATADIR} or other $-variables
+in the configuration, pass the @code{-f} option to
+@code{taler-config}.  For example, compare:
+@example
+$ taler-config -s merchant-instance-wireformat-default \
+               -o test_response_file
+$ taler-config -f -s merchant-instance-wireformat-default \
+               -o test_response_file
+@end example
+
+While the configuration file is typically located at
+@code{$HOME/.config/taler.conf}, an alternative location can be
+specified to @code{taler-merchant-httpd} and @code{taler-config} using
+the @code{-c} option.
+
+
+@section Backend options
 
 The following table describes the options that commonly need to be modified.
-Here, the notation @code{[section]/option} denotes the option
-@code{option} under the section @code{[section]} in the configuration file.
+Here, the notation @code{[$section]/$option} denotes the option
+@code{$option} under the section @code{[$section]} in the configuration file.
+
 
 @table @asis
 
@@ -334,6 +379,13 @@ to the network.
 
 @c FIXME: we should offer an option to bind the TCP socket to a particular IP address (#4752)
 
+To run the Taler backend on TCP port 8888, use:
+@example
+$ taler-config -s merchant -o serve -V TCP
+$ taler-config -s merchant -o port -V 8888
+@end example
+
+
 @item Currency
 Which currency the Web shop deals in, i.e. ``EUR'' or ``USD'', is specified using the option
 
@@ -342,7 +394,12 @@ Which currency the Web shop deals in, i.e. ``EUR'' or ``USD'', is specified usin
 @end example
 
 For testing purposes, the currency should match ``KUDOS'' which is used by the Taler
-demonstration exchange at @url{https://exchange.demo.taler.net/}.
+demonstration exchange at @url{https://exchange.demo.taler.net/}:
+
+@example
+$ taler-config -s merchant -o currency -V KUDOS
+@end example
+
 
 @item Database
 In principle is possible for the backend to support different DBMSs.
@@ -352,7 +409,8 @@ The option
 [merchant]/db
 @end example
 
-specifies which DBMS is to be used. However, currently only the value "postgres" is supported.
+specifies which DBMS is to be used. However, currently only the value "postgres" is supported. This is also
+the default.
 
 In addition to selecting the DBMS software, the backend requires DBMS-specific options to access the database.
 
@@ -363,50 +421,66 @@ For postgres, you need to provide:
 @end example
 
 This option specifies a postgres access path using the format
-"postgres:///DBNAME", where DBNAME is the name of the Postgres
-database you want to use.  Suppose USER is the name of the
+@code{postgres:///$DBNAME}, where @code{$DBNAME} is the name of the Postgres
+database you want to use.  Suppose @code{$USER} is the name of the
 user who will run the backend process.  Then, you need to first run
 
 @example
-$ createuser -d USER
+$ createuser -d $USER
 @end example
 
-as the @code{postgres} database administrator to grant USER
+as the @code{postgres} database administrator to grant @code{$USER}
 the ability to create new databases.  Next, you should as
-USER run
+@code{$USER} run
 
 @example
-$ createdb DBNAME
+$ createdb $DBNAME
 @end example
 
-to create the backend's database.  Here, DBNAME must match the database name
+to create the backend's database.  Here, @code{$DBNAME} must match the database name
 given in the configuration file.
+
+To configure the Taler backend to use this database, run:
+@example
+$ taler-config -s merchantdb-postgres -o config \
+  -V postgres:///$DBNAME
+@end example
+
 
 @item Exchange
 To add an exchange to the list of trusted payment service providers,
-you create a section with a name that starts with ``merchant-exchange-''
-and set the following options in that section:
+you create a section with a name that starts with ``merchant-exchange-''.
+In that section, the following options need to be configured:
+
+@itemize
+
+@item
+The ``uri'' option specifies the exchange's base URL.  For example,
+to use the Taler demonstrator use:
 
 @example
-[merchant-exchange-MYEXCHANGE]/uri
+$ taler-config -s merchant-exchange-demo -o config \
+  -V https://exchange.demo.taler.net/
 @end example
 
-Takes the exchanges base URL, e.g. @url{https://exchange.demo.taler.net/}.
+@item
+The ``master_key'' option specifies the exchange's master public key in base32 encoding.
+For the Taler demonstrator, use:
 
 @example
-[merchant-exchange-MYEXCHANGE]/master_key
-@end example
-
-Takes the base32 encoding of the exchange's master public key,
-e.g.
-@example
-CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00.
+$ taler-config -s merchant-exchange-demo -o master_key \
+  -V CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
 @end example
 
 Note that multiple exchanges can be added to the system by using different
-tokens in place of @code{MYEXCHANGE} in the example above.
+tokens in place of @code{demo} in the example above.  Note that all
+of the exchanges must use the same currency.  If you need to support
+multiple currencies, you need to configure a backend per currency.
+
+@end itemize
 
 @c FIXME: In the future, we need to describe specifying auditors here.
+@c @item Auditors
 
 @item Wireformat
 
@@ -419,35 +493,46 @@ following global option:
 @end example
 
 The value @code{test} can be used to interact with the Taler
-demonstrator at @url{https://bank.demo.taler.net/}.  Other wireformats
-will be supported in the future to interact with actual banks.
+demonstrator at @url{https://bank.demo.taler.net/}:
 
+@example
+$ taler-config -s merchant -o wireformat -V test
+@end example
+
+Other wireformats will be supported in the future to interact with
+actual banks.
 
 @item Instances
 
 The backend allows the user to run multiple instances of shops with
 distinct business entities against a single backend.  Each instance
 uses its own bank account and key for signing contracts.  It is
-mandatory to configure a "default" instance using the following
+mandatory to configure a "default" instance
+using the following
 options:
 
-@example
-[merchant-instance-default]/keyfile
-@end example
+@itemize
 
-Specifies the path to the instance's private key.  You do not need to
+@item
+The option ``keyfile'' in the section ``merchant-instance-default''
+specifies the path to the instance's private key.  You do not need to
 create a key at this time, the backend will generate it automatically
 if it is missing.  While generally unnecessary, it is possible to
-generate the key and to display the public key using the
-@code{gnunet-ecc} command-line tool.
+generate the key and/or to display the existing public key using the
+@code{gnunet-ecc} command-line tool:
 
 @example
-[merchant-instance-wireformat-default]/test_response_file
+$ gnunet-ecc -p                                  \
+  `gnunet-config -f -s merchant-instance-default \
+                 -o keyfile`
 @end example
 
-This option specifies the path to a file that describes the instance's
-wire details in JSON format.  The specific format depends slightly
-on the banking system selected via the @code{wireformat} option.
+@item
+The option ``test_response_file'' in the section
+``merchant-instance-wireformat-default'' specifies the path to a file
+that describes the instance's wire details in JSON format.  The
+specific format depends slightly on the banking system selected via
+the @code{wireformat} option.
 
 For the @code{test} wire format, a sample specification looks as follows:
 
@@ -460,14 +545,28 @@ For the @code{test} wire format, a sample specification looks as follows:
 }
 @end verbatim
 
-Those bank details above, are included in the contract in their hashed
-form, so the 'salt' field is needed to make harder brute-forcing them.
+These bank details are included in the contract in their hashed
+form. Hence, the random @code{salt} is necessary to make it difficult
+for customers to invert the hash by brute-force.
 
-In order to get an account number, register at our demonstration bank:
-@url{https://bank.demo.taler.net/}
+You should substitute the account number with your actual account
+number.  In order to get an account number, register at our
+demonstration bank at @url{https://bank.demo.taler.net/} using your
+browser.
+
+Assuming this JSON specification is stored in a file @code{$TEST.json},
+run:
+
+@example
+$ gnunet-config -s merchant-instance-wireformat-default \
+                -o test_response_file -v $TEST.json
+@end example
+
 
 Note that additional instances can be specified using different tokens
 in the section name instead of @code{default}.
+
+@end itemize
 
 @end table
 
@@ -479,7 +578,7 @@ The following is an example for a complete backend configuration:
 [merchant]
 wireformat = TEST
 serve = TCP
-port = 9898
+port = 8888
 currency = EUR
 database = postgres
 
@@ -495,32 +594,9 @@ config = postgres:///donations
 [merchant-demoexchange]
 uri = https://exchange.demo.taler.net/
 master_key = CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
-
-@end example
-
-The configuration file is typically located at
-@code{$HOME/.config/taler.conf}.  An alternative location can be
-specified to @code{taler-merchant-httpd} using the @code{-c} option.
-
-The contents of @code{$DATADIR/test.json} might look like this:
-
-@example
-@{
-  "type": "test",
-  "bank_uri": "https://bank.example.com/",
-  "account_number": 15,
-  "salt": "1851695201"
-@}
 @end example
 
 
-The resulting backend will be listening on port 9898.
-
-The backend's private key will be located at @code{$DATADIR/key.priv}.
-You can determine the expaned path using
-@smallexample
-$ taler-config -f -s merchant-instance-wireformat-default -o TEST_RESPONSE_FILE
-@end smallexample
 
 The backend will use a database named @code{donations} within
 Postgresql.
@@ -544,7 +620,7 @@ $ taler-merchant-httpd
 If everything worked as expected, the command
 
 @example
-$ curl http://localhost:9898/
+$ curl http://localhost:8888/
 @end example
 
 should return the message
