@@ -36,7 +36,7 @@ Texts.  A copy of the license is included in the section entitled
 @subtitle Version @value{VERSION}
 @subtitle @value{UPDATED}
 @author Marcello Stanisci (@email{marcello.stanisci@@inria.fr})
-@author Christian Grothoff (@email{christian.grothoff.fr})
+@author Christian Grothoff (@email{christian.grothoff@@inria.fr})
 @page
 @vskip 0pt plus 1filll
 @insertcopying
