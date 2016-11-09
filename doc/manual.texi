@@ -916,13 +916,9 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
     else@{
       # Generate page to show for payments with credit cards instead.
       echo '<form action="/cc-payment">
-      First name<br> <input type="text"></input><br>
-      Family name<br> <input type="text"></input><br>
-      Age<br> <input type="text"></input><br>
-      Nationality<br> <input type="text"></input><br>
+      Name<br> <input type="text"></input><br>
       CC number<br> <input type="text"></input><br>
       Cvv2 code<br> <input type="text"></input><br>
-      <input type="radio" name="gender">Female</input><br>
       <input type="submit"></input>
       </form>';
       return;
