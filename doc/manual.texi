@@ -121,7 +121,6 @@ account information is encapsulated within the Taler backend.
 
 @menu
 * generic-instructions:: Generic installation guidelines
-* dependencies:: List all needed dependencies to install the backend
 * Installing Taler with GNU Guix:: Installing Taler with GNU Guix
 * Installing Taler using Docker:: Installing Taler using Docker
 * Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
