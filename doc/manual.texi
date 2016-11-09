@@ -52,7 +52,7 @@ Texts.  A copy of the license is included in the section entitled
 @end ifnottex
 
 @menu
-* Introduction::	Whom this manual is addressed to	
+* Introduction::	Whom this manual is addressed to
 * Installation::        Installing the Merchant backend
 * Configuration::       How to set up the Merchant backend
 * Hello-world::         How to set up a minimalistic shop
@@ -61,16 +61,14 @@ Texts.  A copy of the license is included in the section entitled
 @node Introduction
 @chapter Introduction
 
+GNU Taler is an open protocol for an electronic payment system
+with a free software reference implementation.
+
 This manual addresses how to integrate GNU Taler with Web shops.  It
 describes how to install a GNU Taler merchant @emph{backend} and how
 to integrate it with an existing Web shop @emph{frontend}.
 
-The manual explains how to install all the required dependencies
-of the backend and how to tune its configuration to serve your shop.
-The first part of the tutorial shows how to build a minimalistic frontend
-showing a button that enables donations using Taler.
-
-This manual is for system administrators and Web developers.  We expect
+The manual is for system administrators and Web developers.  We expect
 some moderate familiarity with the compilation and installation of free
 software packages and of Web technology, in particular HTML and HTTP.
 An understanding of cryptography is not required.
@@ -84,13 +82,24 @@ The Taler software stack for a merchant consists of four main components:
 @item A frontend which interacts with the customer's browser. The
   frontend enables the customer to build a shopping cart and place
   an order.  Upon payment, it triggers the respective business logic
-  to satisfy the order.
+  to satisfy the order.  This component is not included with Taler,
+  but rather assumed to exist at the merchant. This manual will
+  describe how to integrate Taler with Web shop frontends.
 @item A back office application that enables the shop operators to
   view customer orders, match them to financial transfers, and possibly
-  approve refunds if an order cannot be satisfied.
+  approve refunds if an order cannot be satisfied.  This component is
+  again not included with Taler, but rather assumed to exist at the
+  merchant. This manual will describe how to integrate such a component
+  to handle payments managed by Taler.
 @item A Taler-specific payment backend which makes it easy for the
-  frontend to process financial transactions with Taler.
+  frontend to process financial transactions with Taler.  The
+  next two chapters will describe how to install and configure
+  this backend.
 @item A DBMS which stores the transaction history for the Taler backend.
+  For now, the GNU Taler reference implemenation only supports Postgres,
+  but the code could be easily extended to support another DBMS. This
+  manual assumes that a reasonably recent Postgres installation ($\ge 9.5$)
+  exists on the target system.
 @end itemize
 
 The following image illustrates the various interactions of these
@@ -105,7 +114,7 @@ with the GNU Taler exchange over the Internet.  The frontend accesses
 the backend via a RESTful API.  As a result, the frontend never has to
 directly communicate with the exchange, and also does not deal with
 sensitive data.  In particular, the merchant's signing keys and bank
-account information is exclusively kept with the Taler backend.
+account information is encapsulated within the Taler backend.
 
 
 @node Installation
@@ -137,10 +146,9 @@ instructions if no system-specific instructions are provided for your
 specific operating system.
 
 @node dependencies
-@section Dependencies
 @subsection Installation of dependencies
 
-The following packages need to be installed before we can compile the 
+The following packages need to be installed before we can compile the
 backend:
 
 @itemize
@@ -164,11 +172,11 @@ using
   libgcrypt20-dev \
   libjansson-dev \
   libpq-dev \
-  postgresql-9.5 
+  postgresql-9.5
 @end example
 
 The following sections will provide detailed instructions for
-installing the GNUnet and GNU Taler exchange dependencies.  
+installing the GNUnet and GNU Taler exchange dependencies.
 
 
 @subsection Installing GNUnet
@@ -214,7 +222,7 @@ $ git clone git://taler.net/exchange
 $ cd exchange
 $ ./bootstrap
 $ ./configure [--prefix=EXCHANGEPFX] \
-              [--with-gnunet=GNUNETPFX] 
+              [--with-gnunet=GNUNETPFX]
 $ # Each dependency can be fetched from non standard locations via
 $ # the '--with-<LIBNAME>' option. See './configure --help'.
 $ make
@@ -241,7 +249,7 @@ $ cd merchant
 $ ./bootstrap
 $ ./configure [--prefix=PFX] \
               [--with-gnunet=GNUNETPFX] \
-              [--with-exchange=EXCHANGEPFX] 
+              [--with-exchange=EXCHANGEPFX]
 $ # Each dependency can be fetched from non standard locations via
 $ # the '--with-<LIBNAME>' option. See './configure --help'.
 $ make
@@ -526,7 +534,7 @@ The backend will deposit the coins it receives to the exchange at
 
 As mentioned previously, the system adminstrator should make sure that
 a database named @code{donations} is defined and accessible in the
-system. Once this configuration is ready, the 
+system. Once this configuration is ready, the
 merchant backend can be launched using:
 
 @example
@@ -723,13 +731,13 @@ not strictly part of the handler.
 @smallexample
 function post_to_backend($backend_relative_url, $json)@{
   $url = "https://charity-shop-backend.example.com$backend_relative_url";
-  
+
   $req = new http\Client\Request("POST",
                                  $url,
                                  array ("Content-Type" => "application/json"));
-  
+
   $req->getBody()->append($json);
-  
+
   // Execute the HTTP request
   $client = new http\Client;
   $client->enqueue($req)->send();
@@ -836,13 +844,13 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
       return;
    @}
   @}
-  
+
   # Reconstruct the contract
   $rec_proposal = make_contract($_GET['transaction_id'], $_GET['timestamp']);
   # $response corresponds to the specification at:
   # https://api.taler.net/api-merchant.html#offer
   $response = post_to_backend("/contract", $rec_proposal);
-    
+
   http_response_code (402);
 # FIXME: this can't be right, you want to call "json_deocde", not
 # return it as a literal string in the header! (i.e. insert '. before json_decode and remove ' at the end)?
