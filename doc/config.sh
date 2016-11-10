@@ -111,6 +111,6 @@ taler-config -s merchant-demoexchange -o master_key -V "CQQZ9DY3MZ1ARMN5K1VKDETS
 
 echo -ne "Done. Launch the backend with:\n\
 \$ taler-merchant-httpd\n\nTest it with:\n\
-\$ curl http://127.0.0.1:8888/\n\nIf everything worked\
+\$ curl http://127.0.0.1:8888/\n\nIf everything worked \
 fine, you should see:\n\n\
-'Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.'\n"
+'Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.'\n\n"
