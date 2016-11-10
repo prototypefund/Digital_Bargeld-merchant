@@ -60,11 +60,11 @@ echo -n "Setting section [merchant-instance-default]<ENTER> "
 read
 echo 
 
-echo -n "taler-config -s merchant-instance-default -o keyfile -V \${TALER_DATA_HOME}/key.priv<ENTER> "
+echo -ne "taler-config -s merchant-instance-default -o keyfile -V \${TALER_DATA_HOME}/key.priv\n\n\
+(The key will be dynamically generated once the backend starts)<ENTER> "
 read
 echo 
-taler-config -s merchant-instance-default -o keyfile -V ${TALER_DATA_HOME}/key.priv
-
+taler-config -s merchant-instance-default -o keyfile -V '${TALER_DATA_HOME}/key.priv'
 
 echo -n "Setting section [merchant-instance-wireformat-default]<ENTER> "
 read
@@ -73,7 +73,18 @@ echo
 echo -n "taler-config -s merchant-instance-wireformat-default -o test_response_file -V \${TALER_DATA_HOME}/test.json<ENTER> "
 read
 echo 
-taler-config -s merchant-instance-wireformat-default -o test_response_file -V ${TALER_DATA_HOME}/test.json
+taler-config -s merchant-instance-wireformat-default -o test_response_file -V '${TALER_DATA_HOME}/test.json'
+
+sleep 1
+echo -ne "Generating test.json..\n\n"
+DEST=$(taler-config -s merchant-instance-wireformat-default -o test_response_file -f)
+echo '{
+  "type": "test",
+  "bank_uri": "https://bank.test.taler.net/",
+  "sig": "MERCHANTSIGNATURE",
+  "account_number": 6,
+  "salt": "SALT"
+  }' > $DEST
 
 echo -n "Setting section [merchantdb-postgres]<ENTER> "
 read
@@ -97,3 +108,9 @@ echo -n "taler-config -s merchant-demoexchange -o master_key -V CQQZ9DY3MZ1ARMN5
 read
 echo 
 taler-config -s merchant-demoexchange -o master_key -V "CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00"
+
+echo -ne "Done. Launch the backend with:\n\
+\$ taler-merchant-httpd\n\nTest it with:\n\
+\$ curl http://127.0.0.1:8888/\n\nIf everything worked\
+fine, you should see:\n\n\
+'Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.'\n"

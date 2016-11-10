@@ -615,6 +615,9 @@ The backend will deposit the coins it receives to the exchange at
 @url{https://exchange.demo.taler.net/}, which has the master key @*
 "CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00".
 
+Please note that @code{doc/config.sh} will walk you through all
+configuration steps, showing how to invoke @code{taler-config}
+for each of them.
 
 @section Launching the backend
 
