@@ -686,7 +686,7 @@ it will return a HTML page that will take care of:
 A minimalistic @code{/donate} handler is shown below (in PHP):
 
 @smallexample
-@include donate_handler.php
+@include examples/donate_handler.php
 @end smallexample
 
 Please note that @code{doc/examples.zip} contains all the code samples
@@ -718,7 +718,7 @@ work.
 A simple @code{/generate-contract} handler may thus look like this:
 
 @smallexample
-@include generate_contract.php
+@include examples/generate_contract.php
 @end smallexample
 
 Note that in practice the frontend might want to generate a monotonically
@@ -729,7 +729,7 @@ The function @code{post_to_backend} is shown below; we will use it
 again in other examples:
 
 @smallexample
-@include post_to_backend.php
+@include examples/post_to_backend.php
 @end smallexample
 
 After the browser has fetched the contract, the user will
@@ -750,7 +750,7 @@ session state with the browser to remember that the user paid.
 The following code implements this in PHP:
 
 @smallexample
-@include pay_handler.php
+@include examples/pay_handler.php
 @end smallexample
 
 Do not be confused by the @code{isset} test for the session state.  In
@@ -783,7 +783,7 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @*The @code{/fulfillment} handler will then perform the following actions:
 
 @smallexample
-@include fulfillment_handler.php
+@include examples/fulfillment_handler.php
 @end smallexample
 
 
