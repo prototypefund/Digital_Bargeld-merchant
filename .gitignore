@@ -33,3 +33,4 @@ taler_merchant_config.h.in
 doc/*
 !doc/*.texi
 !doc/*.am
+!doc/*.sh
