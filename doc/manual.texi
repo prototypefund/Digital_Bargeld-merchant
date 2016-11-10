@@ -689,6 +689,9 @@ A minimalistic @code{/donate} handler is shown below (in PHP):
 @include donate_handler.php
 @end smallexample
 
+Please note that @code{doc/examples.zip} contains all the code samples
+which follow in this tutorial.
+
 Given this response, the Taler wallet will fetch the contract from
 @url{/generate-contract} and display it to the user.  If the wallet is not
 present, the HTML body will be shown and the Taler headers will be
