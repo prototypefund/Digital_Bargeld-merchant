@@ -686,18 +686,7 @@ it will return a HTML page that will take care of:
 A minimalistic @code{/donate} handler is shown below (in PHP):
 
 @smallexample
-<?php
-  http_response_code (402); // 402: Payment required
-  header ('X-Taler-Contract-Url: /generate-contract');
-?>
-<html>
-  <head>
-  <title>Select payment method</title>
-  </head>
-  <body>
-    <!-- Put the credit card paywall here -->
-  </body>
-</html>
+@include donate_handler.php
 @end smallexample
 
 Given this response, the Taler wallet will fetch the contract from
@@ -726,83 +715,7 @@ work.
 A simple @code{/generate-contract} handler may thus look like this:
 
 @smallexample
-
-function make_contract($transaction_id, $now) @{
- $contract =
-  array (
-   'amount' => array (
-    'value' => 1,
-    'fraction' => 0,
-    'currency' => "KUDOS"),
-   'max_fee' => array (
-    'value' => 0,
-    'fraction' => 50000,
-    'currency' => "KUDOS"),
-   'transaction_id' => $transaction_id,
-   'products' => array (
-     array (
-      'description' => "Donation to charity program",
-      'quantity' => 1,
-      'price' => array (
-       'value' => 1,
-       'fraction' => 0,
-       'currency' => "KUDOS"),
-      'product_id' => 0,
-      'taxes' => array(), // No taxes for donations
-      'delivery_date' => "/Date(" . $now->getTimestamp() . ")/",
-      'delivery_location' => 'LNAME1')),
-      'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
-      'expiry' =>
-       "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
-      'refund_deadline' =>
-       "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
-      'repurchase_correlation_id' => '',
-      'fulfillment_url' =>
-       "https://shop.com/fulfillment?"
-       . "transaction_id=$transaction_id&timestamp=$now",
-      'merchant' => array (
-       'address' => 'LNAME1',
-       'name' => "Charity donations shop",
-       'jurisdiction' => 'LNAME2'),
-      'locations' => array (
-       'LNAME1' =>
-        array (
-         'country' => 'Shop Country',
-         'city' => 'Shop City',
-         'state' => 'Shop State',
-       	 'region' => 'Shop Region',
-       	 'province' => 'Shop Province',
-       	 'ZIP code' => 4908,
-         'street' => 'Shop street',
-       	 'street number' => 20),
-       'LNAME2' => array (
-         'country' => 'Legal Country',
-         'city' => Legal City',
-         'state' => 'Legal State',
-         'region' => 'Legal Region',
-         'province' => 'Legal Province',
-         'ZIP code' => 4908)));
-@}
-
-
-/* this variable is the JSON of a contract proposal,
- see https://api.taler.net/api-merchant.html#post--contract
- the second parameter is the transaction id */
-$transaction_id = rand(1,90000); // simplified, do not do this!
-$proposal = make_contract($transaction_id, new DateTime('now'));
-
-# Here the frontend POSTs the proposal to the backend
-$response = post_to_backend("/contract", $proposal);
-
-if (200 != $response->getResponseCode()) @{
-  echo json_encode(array(
-    'error' => "internal error",
-    'hint' => "failed to generate contract",
-    'detail' => $resp->body->toString()
-    ), JSON_PRETTY_PRINT);
-  return;
-@}
-echo $response->body;
+@include generate_contract.php
 @end smallexample
 
 Note that in practice the frontend might want to generate a monotonically
@@ -813,20 +726,7 @@ The function @code{post_to_backend} is shown below; we will use it
 again in other examples:
 
 @smallexample
-function post_to_backend($backend_relative_url, $json)@{
-  $url = "https://shop.com$backend_relative_url";
-
-  $req = new http\Client\Request("POST",
-                                 $url,
-                                 array ("Content-Type" => "application/json"));
-
-  $req->getBody()->append($json);
-
-  // Execute the HTTP request
-  $client = new http\Client;
-  $client->enqueue($req)->send();
-  return $client->getResponse();
-@}
+@include post_to_backend.php
 @end smallexample
 
 After the browser has fetched the contract, the user will
@@ -847,25 +747,7 @@ session state with the browser to remember that the user paid.
 The following code implements this in PHP:
 
 @smallexample
-# Check if a session exists already
-session_start();
-if (! isset($_SESSION['paid'])) @{
-  echo "<p>There is no session for this purchase. Something is wrong.</p>";
-  return;
-@}
-# Get the HTTP POST body
-$payment = file_get_contents('php://input');
-$response = post_to_backend("/pay", $payment);
-if (200 != $response->getResponseCode())@{
-  echo json_encode(array(
-    'error' => "internal error",
-    'hint' => "failed to POST coins to the backend",
-    'detail' => $response->body->toString()
-    ), JSON_PRETTY_PRINT);
-  return;
-@}
-$_SESSION['paid'] = true;
-return $response->body;
+@include pay_handler.php
 @end smallexample
 
 Do not be confused by the @code{isset} test for the session state.  In
@@ -898,51 +780,7 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @*The @code{/fulfillment} handler will then perform the following actions:
 
 @smallexample
-<html>
- <head>
-  <title>Donation Fulfillment</titile>
- </head>
- <body>
-  <?php
-   # At first, check if the user has already paid for the product.
-   # If so, deliver the product.
-   session_start();
-   if (! isset($_SESSION['paid']))@{
-    # set as pending
-    $_SESSION['paid'] = false;
-   @}
-   else@{
-    if($_SESSION['paid'])@{
-     echo "<p>Thanks for your donation!</p>";
-     return;
-   @}
-    else@{
-      # Generate page to show for payments with credit cards instead.
-      echo '<form action="/cc-payment">
-      Name<br> <input type="text"></input><br>
-      CC number<br> <input type="text"></input><br>
-      Cvv2 code<br> <input type="text"></input><br>
-      <input type="submit"></input>
-      </form>';
-      return;
-   @}
-  @}
-
-  # Reconstruct the contract
-  $rec_proposal = make_contract($_GET['transaction_id'], $_GET['timestamp']);
-  # $response corresponds to the specification at:
-  # https://api.taler.net/api-merchant.html#offer
-  $response = post_to_backend("/contract", $rec_proposal);
-
-  http_response_code (402);
-# FIXME: this can't be right, you want to call "json_deocde", not
-# return it as a literal string in the header! (i.e. insert '. before json_decode and remove ' at the end)?
-# All this code should be tested!
-  header ('X-Taler-Contract-Hash: ' . json_decode($response)["H_contract"]);
-  header ('X-Taler-Offer-Url: /donate');
-  header ('X-Taler-Pay-Url: /pay'); ?>
- </body>
-</html>
+@include fulfillment_handler.php
 @end smallexample
 
 
