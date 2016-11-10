@@ -533,7 +533,7 @@ generate the key and/or to display the existing public key using the
 
 @example
 $ gnunet-ecc -p                                  \
-  `gnunet-config -f -s merchant-instance-default \
+  `taler-config -f -s merchant-instance-default \
                  -o keyfile`
 @end example
 
@@ -568,7 +568,7 @@ Assuming this JSON specification is stored in a file @code{$TEST.json},
 run:
 
 @example
-$ gnunet-config -s merchant-instance-wireformat-default \
+$ taler-config -s merchant-instance-wireformat-default \
                 -o test_response_file -v $TEST.json
 @end example
 
