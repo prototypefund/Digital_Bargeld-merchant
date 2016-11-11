@@ -453,7 +453,7 @@ given in the configuration file.
 
 To configure the Taler backend to use this database, run:
 @example
-$ taler-config -s merchantdb-postgres -o URI \
+$ taler-config -s merchantdb-postgres -o CONFIG \
   -V postgres:///$DBNAME
 @end example
 
@@ -470,7 +470,7 @@ The ``uri'' option specifies the exchange's base URL.  For example,
 to use the Taler demonstrator use:
 
 @example
-$ taler-config -s merchant-exchange-demo -o config \
+$ taler-config -s merchant-exchange-demo -o URI \
   -V https://exchange.demo.taler.net/
 @end example
 
