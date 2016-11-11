@@ -34,4 +34,4 @@ doc/*
 !doc/*.texi
 !doc/*.am
 !doc/*.sh
-!doc/*.php
+!doc/examples/
