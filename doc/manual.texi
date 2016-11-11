@@ -75,11 +75,14 @@ Hence, GNU Taler is compatible with anti-money-laundering (AML) and
 know-your-customer (KYC) regulation, as well as data protection
 regulation (such as GDPR).
 
+
 @section About this manual
 
 This manual addresses how to integrate GNU Taler with Web shops.  It
 describes how to install a GNU Taler merchant @emph{backend} and how
 to integrate it with an existing Web shop @emph{frontend}.
+
+@c split manual into two: one for sysadmins (Ch. 1-3,5), one for Web developers (1+4)
 
 The manual is for system administrators and Web developers.  We expect
 some moderate familiarity with the compilation and installation of free
@@ -88,6 +91,8 @@ An understanding of cryptography is not required.
 
 You can download all of the code examples given in this tutorial from
 @url{https://git.taler.net/merchant.git/tree/doc/examples/}.
+
+@c Add section giving an overview of what we will do in the tutorial!
 
 
 @section Architecture overview
@@ -170,7 +175,7 @@ backend:
 @item libltdl @math{\ge 2.4}
 @item libunistring @math{\ge 0.9.3}
 @item libcurl @math{\ge 7.26} (or libgnurl @math{\ge 7.26})
-@item GNU libmicrohttpd @math{\ge 0.9.37}
+@item GNU libmicrohttpd @math{\ge 0.9.39}
 @item GNU libgcrypt @math{\ge 1.6}
 @item libjansson @math{\ge 2.7}
 @item Postgres @math{\ge 9.4}, including libpq
@@ -630,6 +635,16 @@ to a UNIX domain socket or properly restrict access to the
 port.
 
 
+@c Add section describing how to test the backend.
+@c For this, we should write some tools that make it
+@c EASY to test the backend without going through the
+@c full manual frontend setup!
+@c NOTE: include explaining wallet installation to sysadmin
+
+
+@c FIXME: this should be a separate manual
+
+
 @node Hello-world
 @chapter Setting up a simple Web shop with GNU Taler
 
@@ -638,6 +653,8 @@ button to get donations via Taler. The expected behaviour is that once
 the ``donate'' button is clicked, the customer will receive a Taler
 contract offering him the opportunity to make a fixed donation,
 for example to donate 1 KUDOS to the charity operating the shop.
+
+@c NOTE: include explaining wallet installation to Web developer here!
 
 Note that if the customer does not have the Taler wallet installed,
 they should instead be prompted to proceed with a classic dialog for
@@ -652,7 +669,7 @@ to the frontend @code{/donate} URL.  For this, the HTML would be as
 follows:
 
 @smallexample
-<form action="/donate">
+<form action="/donate_handler">
   <input type="submit" value="Donate!"></input>
 <form>
 @end smallexample
@@ -665,7 +682,7 @@ it will return a HTML page that will take care of:
 @item fetching a Taler contract and passing it to the wallet if one is found
 @end itemize
 
-A minimalistic @code{/donate} handler is shown below (in PHP):
+A minimalistic @code{/donate_handler} implementation is shown below (in PHP):
 
 @smallexample
 // merchant/doc/examples/donate_handler.php

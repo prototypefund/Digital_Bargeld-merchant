@@ -7,6 +7,6 @@
   <title>Select payment method</title>
   </head>
   <body>
-    <!-- Put the credit card paywall here -->
+    Here you should put the HTML for the non-Taler (credit card) payment.
   </body>
 </html>
