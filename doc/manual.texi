@@ -155,7 +155,6 @@ backend installation independent of any particular operating system.
 @c Operating system specific instructions are provided in the following sections.
 @c You should follow the operating system specific instructions if those are available, and only consult the generic instructions if no system-specific instructions are provided for your specific operating system.
 
-@node dependencies
 @subsection Installation of dependencies
 
 The following packages need to be installed before we can compile the
