@@ -404,8 +404,8 @@ Which currency the Web shop deals in, i.e. ``EUR'' or ``USD'', is specified usin
 [merchant]/currency
 @end example
 
-For testing purposes, the currency should match ``KUDOS'' which is used by the Taler
-demonstration exchange at @url{https://exchange.demo.taler.net/}:
+For testing purposes, the currency MUST match ``KUDOS'' so that tests will work
+with the Taler demonstration exchange at @url{https://exchange.demo.taler.net/}:
 
 @example
 $ taler-config -s merchant -o currency -V KUDOS
@@ -437,12 +437,12 @@ database you want to use.  Suppose @code{$USER} is the name of the
 user who will run the backend process.  Then, you need to first run
 
 @example
-$ createuser -d $USER
+$ sudu -u postgres createuser -d $USER
 @end example
 
-as the @code{postgres} database administrator to grant @code{$USER}
-the ability to create new databases.  Next, you should as
-@code{$USER} run
+as the Postgres database administrator (usually @code{postgres}) to
+grant @code{$USER} the ability to create new databases.  Next, you
+should as @code{$USER} run:
 
 @example
 $ createdb $DBNAME
