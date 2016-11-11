@@ -85,6 +85,9 @@ some moderate familiarity with the compilation and installation of free
 software packages and of Web technology, in particular HTML and HTTP.
 An understanding of cryptography is not required.
 
+You can download all of the code examples given in this tutorial from
+@url{https://git.taler.net/merchant.git/tree/doc/examples/}.
+
 
 @section Architecture overview
 
@@ -341,7 +344,7 @@ to set the respective configuration value to @code{$value}. Note that you have t
 manually restart the Taler backend after you change the configuration to
 make the new configuration go into effect.
 
-Some default options will use $-variables, such as $code{$DATADIR}
+Some default options will use $-variables, such as @code{$DATADIR}
 within their value.  To expand the @code{$DATADIR} or other $-variables
 in the configuration, pass the @code{-f} option to
 @code{taler-config}.  For example, compare:
@@ -686,11 +689,10 @@ it will return a HTML page that will take care of:
 A minimalistic @code{/donate} handler is shown below (in PHP):
 
 @smallexample
+// donate_handler.php
 @include examples/donate_handler.php
 @end smallexample
 
-Please note that @code{doc/examples.zip} contains all the code samples
-which follow in this tutorial.
 
 Given this response, the Taler wallet will fetch the contract from
 @url{/generate-contract} and display it to the user.  If the wallet is not
@@ -718,6 +720,7 @@ work.
 A simple @code{/generate-contract} handler may thus look like this:
 
 @smallexample
+// generate_contract.php
 @include examples/generate_contract.php
 @end smallexample
 
@@ -729,6 +732,7 @@ The function @code{post_to_backend} is shown below; we will use it
 again in other examples:
 
 @smallexample
+// post_to_backend.php
 @include examples/post_to_backend.php
 @end smallexample
 
@@ -750,6 +754,7 @@ session state with the browser to remember that the user paid.
 The following code implements this in PHP:
 
 @smallexample
+// pay_handler.php
 @include examples/pay_handler.php
 @end smallexample
 
@@ -783,6 +788,7 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @*The @code{/fulfillment} handler will then perform the following actions:
 
 @smallexample
+// fulfillment_handler.php
 @include examples/fulfillment_handler.php
 @end smallexample
 
