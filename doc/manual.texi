@@ -453,7 +453,7 @@ given in the configuration file.
 
 To configure the Taler backend to use this database, run:
 @example
-$ taler-config -s merchantdb-postgres -o config \
+$ taler-config -s merchantdb-postgres -o URI \
   -V postgres:///$DBNAME
 @end example
 
@@ -518,39 +518,18 @@ actual banks.
 The backend allows the user to run multiple instances of shops with
 distinct business entities against a single backend.  Each instance
 uses its own bank account and key for signing contracts.  It is
-mandatory to configure a "default" instance
-using the following
-options:
+mandatory to configure a "default" instance.  The specific
+configuration format depends slightly on the banking system selected
+via the @code{wireformat} option.
 
 @itemize
-
 @item
-The option ``keyfile'' in the section ``merchant-instance-default''
-specifies the path to the instance's private key.  You do not need to
-create a key at this time, the backend will generate it automatically
-if it is missing.  While generally unnecessary, it is possible to
-generate the key and/or to display the existing public key using the
-@code{gnunet-ecc} command-line tool:
-
-@example
-$ gnunet-ecc -p                                  \
-  `taler-config -f -s merchant-instance-default \
-                 -o keyfile`
-@end example
-
-@item
-The option ``test_response_file'' in the section
-``merchant-instance-wireformat-default'' specifies the path to a file
-that describes the instance's wire details in JSON format.  The
-specific format depends slightly on the banking system selected via
-the @code{wireformat} option.
-
 For the @code{test} wire format, a sample specification looks as follows:
 
 @verbatim
 {
   "type": "test",
-  "bank_uri": "https://bank.test.taler.net/",
+  "bank_uri": "https://bank.demo.taler.net/",
   "account_number": 5,
   "salt": "RANDOMSALT"
 }
@@ -565,19 +544,21 @@ number.  In order to get an account number, register at our
 demonstration bank at @url{https://bank.demo.taler.net/} using your
 browser.
 
-Assuming this JSON specification is stored in a file @code{$TEST.json},
-run:
+The option ``test_response_file'' in the section
+``merchant-instance-wireformat-default'' specifies the path to this
+file.  Assuming this JSON specification is stored in a file
+@code{$TEST.json}, then run:
 
 @example
 $ taler-config -s merchant-instance-wireformat-default \
-                -o test_response_file -v $TEST.json
+                -o test_response_file -V $TEST.json
 @end example
 
+@c Document SEPA here once supported.
+@end itemize
 
 Note that additional instances can be specified using different tokens
 in the section name instead of @code{default}.
-
-@end itemize
 
 @end table
 
@@ -609,8 +590,8 @@ master_key = CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
 
 
 
-The backend will use a database named @code{donations} within
-Postgresql.
+Given the above configuration, the backend will use a database named
+@code{donations} within Postgresql.
 
 The backend will deposit the coins it receives to the exchange at
 @url{https://exchange.demo.taler.net/}, which has the master key @*
@@ -622,16 +603,16 @@ for each of them.
 
 @section Launching the backend
 
-As mentioned previously, the system adminstrator should make sure that
-a database named @code{donations} is defined and accessible in the
-system. Once this configuration is ready, the
-merchant backend can be launched using:
+Assuming you have configured everything correctly, you can launch the
+merchant backend using:
 
 @example
 $ taler-merchant-httpd
 @end example
 
-If everything worked as expected, the command
+When launched for the first time, this command will print a message
+about generating your private key. If everything worked as expected,
+the command
 
 @example
 $ curl http://localhost:8888/
@@ -687,7 +668,7 @@ it will return a HTML page that will take care of:
 A minimalistic @code{/donate} handler is shown below (in PHP):
 
 @smallexample
-// donate_handler.php
+// merchant/doc/examples/donate_handler.php
 @include examples/donate_handler.php
 @end smallexample
 
@@ -718,7 +699,7 @@ work.
 A simple @code{/generate-contract} handler may thus look like this:
 
 @smallexample
-// generate_contract.php
+// merchant/doc/examples/generate_contract.php
 @include examples/generate_contract.php
 @end smallexample
 
@@ -730,7 +711,7 @@ The function @code{post_to_backend} is shown below; we will use it
 again in other examples:
 
 @smallexample
-// post_to_backend.php
+// merchant/doc/examples/post_to_backend.php
 @include examples/post_to_backend.php
 @end smallexample
 
@@ -752,7 +733,7 @@ session state with the browser to remember that the user paid.
 The following code implements this in PHP:
 
 @smallexample
-// pay_handler.php
+// merchant/doc/examples/pay_handler.php
 @include examples/pay_handler.php
 @end smallexample
 
@@ -786,7 +767,7 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @*The @code{/fulfillment} handler will then perform the following actions:
 
 @smallexample
-// fulfillment_handler.php
+// merchant/doc/examples/fulfillment_handler.php
 @include examples/fulfillment_handler.php
 @end smallexample
 
@@ -845,6 +826,25 @@ While the configuration file is typically located at
 @code{$HOME/.config/taler.conf}, an alternative location can be
 specified to @code{taler-merchant-httpd} and @code{taler-config} using
 the @code{-c} option.
+
+
+@section Merchant key management
+
+The option ``KEYFILE'' in the section ``merchant-instance-default''
+specifies the path to the instance's private key.  You do not need to
+create a key manually, the backend will generate it automatically if
+it is missing.  While generally unnecessary, it is possible to display
+the corresponding public key using the @code{gnunet-ecc} command-line
+tool:
+
+@example
+$ gnunet-ecc -p                                  \
+  $(taler-config -f -s merchant-instance-default \
+                 -o keyfile)
+@end example
+
+@c Add more on how to add that key to X.509 CSRs once we can do that.
+
 
 
 
