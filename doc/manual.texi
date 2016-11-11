@@ -98,8 +98,8 @@ The Taler software stack for a merchant consists of four main components:
   frontend enables the customer to build a shopping cart and place
   an order.  Upon payment, it triggers the respective business logic
   to satisfy the order.  This component is not included with Taler,
-  but rather assumed to exist at the merchant. This manual will
-  describe how to integrate Taler with Web shop frontends.
+  but rather assumed to exist at the merchant. This manual
+  describes how to integrate Taler with Web shop frontends.
 @item A back office application that enables the shop operators to
   view customer orders, match them to financial transfers, and possibly
   approve refunds if an order cannot be satisfied.  This component is
@@ -161,13 +161,13 @@ The following packages need to be installed before we can compile the
 backend:
 
 @itemize
-@item libcurl or libgnurl
-@item GNU libmicrohttpd, including GnuTLS
-@item GNU libgcrypt
-@item libjansson
-@item Postgres, including libpq
-@item GNUnet
-@item GNU Taler exchange
+@item libcurl @math{\ge 7.26} (or libgnurl @math{\ge 7.26})
+@item GNU libmicrohttpd @math{\ge 0.9.37}
+@item GNU libgcrypt @math{\ge 1.6}
+@item libjansson @math{\ge 2.7}
+@item Postgres @math{\ge 9.4}, including libpq
+@item libgnunetutil (from Git)
+@item GNU Taler exchange (from Git)
 @end itemize
 
 The first five are available in most GNU/Linux distributions and should
@@ -185,29 +185,19 @@ using
 @end example
 
 The following sections will provide detailed instructions for
-installing the GNUnet and GNU Taler exchange dependencies.
+installing the libgnunetutil and GNU Taler exchange dependencies.
 
 
-@subsection Installing GNUnet
+@subsection Installing libgnunetutil
 
-Note that a Web shop supporting GNU Taler does not actually need to run a
-GNUnet peer.  The requirement to have a minimal GNUnet installation
-arises from the fact that GNUnet provides some required routines for
-doing cryptography, string manupulation, interfacing with databases,
-JSON manipulation, logging and operating system abstractions.  Hence
-this manual does not describe how to actually run a GNUnet peer, and
-we also skip optional GNUnet dependencies that an ordinary peer might
-want to include in the installation.  Thus, do not be alarmed if the
-GNUnet build process warns you about missing (optional) dependencies.
+Before you install libgnunetutil, you must download and install the
+dependencies mentioned in the previous section, otherwise the build
+may succeed but fail to export some of the tooling required by Taler.
 
-Before you install GNUnet, you should download and install the
-dependencies mentioned in the previous section, otherwise GNUnet may
-install but fail to export some of the tooling required by Taler.
-
-To download and install GNUnet, proceed as follows:
+To download and install libgnunetutil, proceed as follows:
 
 @example
-$ svn checkout https://gnunet.org/svn/gnunet/
+$ git clone https://gnunet.org/git/gnunet/
 $ cd gnunet/
 $ ./bootstrap
 $ ./configure [--prefix=GNUNETPFX]
