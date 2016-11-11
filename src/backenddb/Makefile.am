@@ -56,7 +56,7 @@ test_merchantdb_postgres_LDFLAGS = \
   -ljansson
 
 test_merchantdb_postgres_LDADD = \
-  $(top_srcdir)/src/backenddb/libtalermerchantdb.la
+  $(top_builddir)/src/backenddb/libtalermerchantdb.la
 
 TESTS = \
   test-merchantdb-postgres

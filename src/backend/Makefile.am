@@ -27,7 +27,7 @@ taler_merchant_httpd_SOURCES = \
 
 
 taler_merchant_httpd_LDADD = \
-  $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
+  $(top_builddir)/src/backenddb/libtalermerchantdb.la \
   -ltalerexchange \
   -ltalerjson \
   -ltalerutil \
