@@ -140,7 +140,8 @@ AS_CASE([$with_microhttpd],
         [LDFLAGS="-L$with_microhttpd/lib $LDFLAGS"
          CPPFLAGS="-I$with_microhttpd/include $CPPFLAGS"])
 AC_CHECK_LIB(microhttpd,MHD_start_daemon,
-  [AC_CHECK_HEADER([microhttpd.h],[microhttpd=1])])
+  [AC_CHECK_HEADER([microhttpd.h],
+   AC_CHECK_DECL([microhttpd=1])])
 AS_IF([test $microhttpd = 0],
   [AC_MSG_ERROR([[
 ***

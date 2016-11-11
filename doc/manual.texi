@@ -57,6 +57,7 @@ Texts.  A copy of the license is included in the section entitled
 * Configuration::           How to set up the Merchant backend
 * Hello-world::             How to set up a minimalistic shop
 * Back-office-integration:: How to integrate with the back office
+* Advanced topics::         Detailed solutions to specific issues
 @end menu
 
 
@@ -112,9 +113,7 @@ The Taler software stack for a merchant consists of four main components:
   this backend.
 @item A DBMS which stores the transaction history for the Taler backend.
   For now, the GNU Taler reference implemenation only supports Postgres,
-  but the code could be easily extended to support another DBMS. This
-  manual assumes that a reasonably recent Postgres installation (@math{\ge 9.5})
-  exists on the target system.
+  but the code could be easily extended to support another DBMS.
 @end itemize
 
 The following image illustrates the various interactions of these
@@ -135,9 +134,9 @@ account information is encapsulated within the Taler backend.
 @node Installation
 @menu
 * generic-instructions:: Generic installation guidelines
+* Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
 @c * Installing Taler with GNU Guix:: Installing Taler with GNU Guix
 @c * Installing Taler using Docker:: Installing Taler using Docker
-@c * Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
 @c * Installing Taler on Arch Linux:: Installing Taler on Arch Linux
 @c * Installing Taler on Windows:: Installing Taler on Windows
 @c * Installing Taler on OS X:: Installing Taler on OS X
@@ -150,10 +149,13 @@ This chapter describes how to install the GNU Taler merchant backend.
 @node generic-instructions
 @section Generic instructions
 
-This section provides generic instructions for the merchant
-backend installation independent of any particular operating system.
-@c Operating system specific instructions are provided in the following sections.
-@c You should follow the operating system specific instructions if those are available, and only consult the generic instructions if no system-specific instructions are provided for your specific operating system.
+This section provides generic instructions for the merchant backend
+installation independent of any particular operating system.
+Operating system specific instructions are provided in the following
+sections.  You should follow the operating system specific
+instructions if those are available, and only consult the generic
+instructions if no system-specific instructions are provided for your
+specific operating system.
 
 @subsection Installation of dependencies
 
@@ -161,6 +163,12 @@ The following packages need to be installed before we can compile the
 backend:
 
 @itemize
+@item autoconf @math{\ge 2.69}
+@item automake @math{\ge 1.14}
+@item libtool @math{\ge 2.4}
+@item autopoint @math{\ge 0.19}
+@item libltdl @math{\ge 2.4}
+@item libunistring @math{\ge 0.9.3}
 @item libcurl @math{\ge 7.26} (or libgnurl @math{\ge 7.26})
 @item GNU libmicrohttpd @math{\ge 0.9.37}
 @item GNU libgcrypt @math{\ge 1.6}
@@ -170,19 +178,9 @@ backend:
 @item GNU Taler exchange (from Git)
 @end itemize
 
-The first five are available in most GNU/Linux distributions and should
-just be installed using the respective package manager, for example
-using
-
-@example
-# apt-get install libcurl4-gnutls-dev \
-  libmicrohttpd-dev \
-  libgnutls-dev \
-  libgcrypt20-dev \
-  libjansson-dev \
-  libpq-dev \
-  postgresql-9.5
-@end example
+Except for the last two, these are available in most GNU/Linux
+distributions and should just be installed using the respective
+package manager.
 
 The following sections will provide detailed instructions for
 installing the libgnunetutil and GNU Taler exchange dependencies.
@@ -271,10 +269,60 @@ GNUnet to @code{/usr/local} in the previous steps.
 @c This section has not yet been written.
 
 
-@c @node Installing Taler on Debian GNU/Linux
-@c @section Installing Taler on Debian GNU/Linux
+@node Installing Taler on Debian GNU/Linux
+@section Installing Taler on Debian GNU/Linux
 
-@c This section has not yet been written.
+Debian wheezy is too old and lacks most of the packages required.
+
+On Debian jessie, only GNU libmicrohttpd needs to be compiled from
+source.  To install dependencies on Debian jesse, run the following
+commands:
+
+@example
+# apt-get install \
+  autoconf \
+  automake \
+  autopoint \
+  libtool \
+  libltdl-dev \
+  libunistring-dev \
+  libcurl4-gnutls-dev \
+  libgcrypt20-dev \
+  libjansson-dev \
+  libpq-dev \
+  postgresql-9.4
+# wget https://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-latest.tar.gz
+# wget https://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-latest.tar.gz.sig
+# gpg -v libmicrohttpd-latest.tar.gz # Should show signed by 939E6BE1E29FC3CC
+# tar xf libmicrohttpd-latest.tar.gz
+# cd libmicrohttpd-0*
+# ./configure
+# make install
+@end example
+
+For more recent versions of Debian, you should instead run:
+
+@example
+# apt-get install \
+  autoconf \
+  automake \
+  autopoint \
+  libtool \
+  libltdl-dev \
+  libunistring-dev \
+  libcurl4-gnutls-dev \
+  libgcrypt20-dev \
+  libjansson-dev \
+  libpq-dev \
+  postgresql-9.5 \
+  libmicrohttpd-dev
+@end example
+
+For the rest of the installation, follow the generic installation instructions
+starting with the installation of libgnunetutil.  Note that if you used the
+Debian wheezy instructions above, you need to pass
+@code{--with-microhttpd=/usr/local/} to all @code{configure} invocations.
+
 
 
 @c @node Installing Taler on Arch Linux
@@ -304,50 +352,10 @@ configuration options. However, some must be provided, in particular
 the database account and bank account that the backend should use.  By
 default, the file @code{$HOME/.config/taler.conf} is where the Web
 shop administrator specifies configuration values that augment or
-override the defaults.
-
-@section Using taler-config
-
-The tool @code{taler-config} can be used to
-extract or manipulate configuration values; however, the configuration
-use the well-known INI file format and can also be edited by hand.
-
-Run
-@example
-$ taler-config -s $SECTION
-@end example
-to list all of the configuration values in section @code{$SECTION}.
-
-Run
-@example
-$ taler-config -s $section -o $option
-@end example
-to extract the respective configuration value for option @code{$option}
-in section @code{$section}.
-
-Finally, to change a setting, run
-@example
-$ taler-config -s $section -o $option -V $value
-@end example
-to set the respective configuration value to @code{$value}. Note that you have to
-manually restart the Taler backend after you change the configuration to
-make the new configuration go into effect.
-
-Some default options will use $-variables, such as @code{$DATADIR}
-within their value.  To expand the @code{$DATADIR} or other $-variables
-in the configuration, pass the @code{-f} option to
-@code{taler-config}.  For example, compare:
-@example
-$ taler-config -s merchant-instance-wireformat-default \
-               -o test_response_file
-$ taler-config -f -s merchant-instance-wireformat-default \
-               -o test_response_file
-@end example
-
-While the configuration file is typically located at
-@code{$HOME/.config/taler.conf}, an alternative location can be
-specified to @code{taler-merchant-httpd} and @code{taler-config} using
-the @code{-c} option.
+override the defaults.  The format of the configuration file is
+the well-known INI file format.  You can edit the file by hand, or
+use the @code{taler-config} commands given as examples.
+For more information on @code{taler-config}, @pxref{Using taler-config}.
 
 
 @section Backend options
@@ -355,6 +363,7 @@ the @code{-c} option.
 The following table describes the options that commonly need to be modified.
 Here, the notation @code{[$section]/$option} denotes the option
 @code{$option} under the section @code{[$section]} in the configuration file.
+
 
 
 @table @asis
@@ -784,6 +793,60 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 
 @node Back-office-integration
 @chapter Integration of GNU Taler with the back office
+
+
+@node Advanced topics
+@chapter Advanced topics
+
+@menu
+* Using taler-config::      Introduction to the taler-config tool
+@end menu
+
+@node Using taler-config
+@section Using taler-config
+
+The tool @code{taler-config} can be used to
+extract or manipulate configuration values; however, the configuration
+use the well-known INI file format and can also be edited by hand.
+
+Run
+@example
+$ taler-config -s $SECTION
+@end example
+to list all of the configuration values in section @code{$SECTION}.
+
+Run
+@example
+$ taler-config -s $section -o $option
+@end example
+to extract the respective configuration value for option @code{$option}
+in section @code{$section}.
+
+Finally, to change a setting, run
+@example
+$ taler-config -s $section -o $option -V $value
+@end example
+to set the respective configuration value to @code{$value}. Note that you have to
+manually restart the Taler backend after you change the configuration to
+make the new configuration go into effect.
+
+Some default options will use $-variables, such as @code{$DATADIR}
+within their value.  To expand the @code{$DATADIR} or other $-variables
+in the configuration, pass the @code{-f} option to
+@code{taler-config}.  For example, compare:
+@example
+$ taler-config -s merchant-instance-wireformat-default \
+               -o test_response_file
+$ taler-config -f -s merchant-instance-wireformat-default \
+               -o test_response_file
+@end example
+
+While the configuration file is typically located at
+@code{$HOME/.config/taler.conf}, an alternative location can be
+specified to @code{taler-merchant-httpd} and @code{taler-config} using
+the @code{-c} option.
+
+
 
 
 @bye
