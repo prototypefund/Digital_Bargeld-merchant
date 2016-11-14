@@ -78,22 +78,15 @@ regulation (such as GDPR).
 
 @section About this manual
 
-This manual addresses how to integrate GNU Taler with Web shops.  It
-describes how to install a GNU Taler merchant @emph{backend} and how
-to integrate it with an existing Web shop @emph{frontend}.
+This manual describes how to install a GNU Taler merchant @emph{backend},
+so it is for system administrators.
 
 @c split manual into two: one for sysadmins (Ch. 1-3,5), one for Web developers (1+4)
 
-The manual is for system administrators and Web developers.  We expect
-some moderate familiarity with the compilation and installation of free
-software packages and of Web technology, in particular HTML and HTTP.
-An understanding of cryptography is not required.
-
-You can download all of the code examples given in this tutorial from
-@url{https://git.taler.net/merchant.git/tree/doc/examples/}.
+We expect some moderate familiarity with the compilation and installation
+of free software packages. An understanding of cryptography is not required.
 
 @c Add section giving an overview of what we will do in the tutorial!
-
 
 @section Architecture overview
 
@@ -644,155 +637,6 @@ port.
 
 @c FIXME: this should be a separate manual
 
-
-@node Hello-world
-@chapter Setting up a simple Web shop with GNU Taler
-
-This section describes how to setup a simple shop, which exposes a
-button to get donations via Taler. The expected behaviour is that once
-the ``donate'' button is clicked, the customer will receive a Taler
-contract offering him the opportunity to make a fixed donation,
-for example to donate 1 KUDOS to the charity operating the shop.
-
-@c NOTE: include explaining wallet installation to Web developer here!
-
-Note that if the customer does not have the Taler wallet installed,
-they should instead be prompted to proceed with a classic dialog for
-credit card payments.
-
-
-@section Prompting for payment
-
-Our goal is to trigger a Taler payment once the customer has clicked
-on a donation button.  We will use a button that issues an HTTP POST
-to the frontend @code{/donate} URL.  For this, the HTML would be as
-follows:
-
-@smallexample
-<form action="/donate-handler">
-  <input type="submit" value="Donate!"></input>
-</form>
-@end smallexample
-
-When the server-side handler for @code{/donate} receives the form submission,
-it will return a HTML page that will take care of:
-
-@itemize
-@item showing a credit card paywall to the user if no wallet is found, and
-@item fetching a Taler contract and passing it to the wallet if one is found
-@end itemize
-
-A minimalistic @code{/donate_handler} implementation is shown below (in PHP):
-
-@smallexample
-// merchant/doc/examples/donate_handler.php
-@include examples/donate_handler.php
-@end smallexample
-
-
-Given this response, the Taler wallet will fetch the contract from
-@url{/generate-contract} and display it to the user.  If the wallet is not
-present, the HTML body will be shown and the Taler headers will be
-ignored by the browser.  Instead of specifying the contract via an
-URL, it is also possible to inline short contracts directly.
-
-Note that we @emph{could} have bypassed the POST request to trigger
-the payment, and performed the interaction with the wallet directly
-from the button via JavaScript.
-
-@c We will consider this case in a later chapter.
-@c FIXME: not yet ;-)
-
-@section Generating the contract
-
-The server-side handler for @code{/generate-contract} now has to
-generate a contract proposal about donating 1 KUDOS to the 'Taler
-charity program'.  This proposed contract is then POSTed to the
-backend at @code{/contract}.  The main result of POSTing the proposal
-to the backend is that it will be cryptographically signed.  This is
-necessary as by design the frontend does not perform any cryptographic
-work.
-
-A simple @code{/generate-contract} handler may thus look like this:
-
-@smallexample
-// merchant/doc/examples/generate_contract.php
-@include examples/generate_contract.php
-@end smallexample
-
-Note that in practice the frontend might want to generate a monotonically
-increasing series of transaction IDs to avoid a chance of collisions.
-Transaction IDs must be in the range of @math{[0:2^{51})}.
-
-The function @code{post_to_backend} is shown below; we will use it
-again in other examples:
-
-@smallexample
-// merchant/doc/examples/post_to_backend.php
-@include examples/post_to_backend.php
-@end smallexample
-
-After the browser has fetched the contract, the user will
-be given the opportunity to affirm the payment.
-
-
-@section Receiving payments via Taler
-
-The next step for the frontend is to accept the payment from the wallet,
-assuming the user accepts the contract.  For this, the frontend must
-implement a payment handler at the URI specified for as the
-@code{X-Taler-Pay-Url} in the example above.
-
-The role of the @code{/pay} handler is to receive the payment from
-the wallet and forward it to the backend.  If the backend reports
-that the payment was successful, the handler needs to update the
-session state with the browser to remember that the user paid.
-The following code implements this in PHP:
-
-@smallexample
-// merchant/doc/examples/pay_handler.php
-@include examples/pay_handler.php
-@end smallexample
-
-Do not be confused by the @code{isset} test for the session state.  In
-our simple example, it will be set to ``false'' by the fulfillment URL
-which the browser actually always visits first.@footnote{This is for
-technical reasons; the natural logical progression would of course be
-to pay before accessing the fulfillment URL.}  We describe how the
-fulfillment URL works in the next section.
-
-
-@section The fulfillment page
-
-The fulfillment page can be called by users that have already paid for
-the item, as well as by users that have not yet paid at all.  The
-fulfillment page must use the HTTP session state to detect if the
-payment has been performed already, and if not request payment from
-the wallet.
-
-For our example, we include in the URI of the fulfillment page the data
-which is needed to allow the page to determine which contract the user is
-trying to access.
-Thus, the fulfillment URL for our example looks like the following:@*
-
-@smallexample
-https://shop.com/fulfillment? \
-transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
-@end smallexample
-
-
-@*The @code{/fulfillment} handler will then perform the following actions:
-
-@smallexample
-// merchant/doc/examples/fulfillment_handler.php
-@include examples/fulfillment_handler.php
-@end smallexample
-
-
-@node Back-office-integration
-@chapter Integration of GNU Taler with the back office
-
-
 @node Advanced topics
 @chapter Advanced topics
 
@@ -894,56 +738,3 @@ work in progress}.
 @end verbatim
 
 Assume this information is stored in file @code{$DATADIR/sepa.json}.
-
-
-
-@section Payments using JavaScript
-
-The function @code{executePayment} exported by @code{taler-wallet-lib.js} will basically
-hand its three parameters to the wallet which implements the following semantics:@*
-check in the internal DB if @code{$response['H_contract']} has an entry, and:
-@itemize
-@item if that is the case, then the user accepted the contract previously and the wallet
-sends a deposit permission @footnote{Roughly speaking, a deposit permission is a JSON
-containing the coins to pay for a contract. Its full specification is available at:
-@url{https://api.taler.net/api-merchant.html#depositpermission}} to @code{/frontend-pay}.
-If this operation succeeds, then visit again the fulfillment URL, and finally enjoy
-the product.
-@item if not, redirect the browser to @code{/donate} (which will then reinitiate the
-whole contract negotiation). This happens when the user visits a shared fulfillment URL.
-The idea is to let that user buy the same products as the user who shared the fulfillment
-URL. Nonetheless, the shop is not forced to follow this semantics when provides the third
-parameter to @code{executePayment}.
-@end itemize
-
-
-
-@section Design considerations for the fulfillment page
-
-The fulfillment page mechanism is designed to provide the following two properties:
-
-@enumerate
-@item Taler payments @emph{can} be implemented in DB-less frontends.
-
-@item Taler payments are replayable, meaning that each purchase is associated with
-a URL (the fulfillment URL) that shows the product each time it gets visited (and
-of course, only the first time takes the user's money).
-@end enumerate
-
-In order to implement property (1), the frontend needs a way to recall
-what a contract is about (e.g. which product, which price, the
-timestamp, etc.) before proceeding with the actual payment and
-eventually deliver the final product.  That is achieved by
-@emph{reconstructing} the contract using the fulfillment page's URL
-parameters@footnote{the fulfillment URL equipped with all the
-parameters is included in the contract}.
-
-In order to implement property (2), the frontend will firstly check
-the state to see if the product claimed among the fulfillment URL
-parameter has been paid; if so, the product is given to the
-customer. Otherwise, the frontend sets the payment as "pending" in the
-state and @emph{executes} it in the wallet. The payment execution is
-performed by returning JavaScript code from @code{taler-wallet-lib.js}
-that triggers the wallet to send the payment to the pay page.  Once
-the pay page receives the payment, it sets the state for the payment
-as "payed".
