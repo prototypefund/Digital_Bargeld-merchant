@@ -662,7 +662,7 @@ process_pay_with_exchange (void *cls,
     {
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
-                                MHD_HTTP_NOT_ACCEPTABLE,
+                                MHD_HTTP_METHOD_NOT_ACCEPTABLE,
                                 TMH_RESPONSE_make_external_error (TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES,
 								  "insufficient funds (including excessive exchange fees to be covered by customer)"));
       return;
@@ -676,7 +676,7 @@ process_pay_with_exchange (void *cls,
     {
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
-                                MHD_HTTP_NOT_ACCEPTABLE,
+                                MHD_HTTP_METHOD_NOT_ACCEPTABLE,
                                 TMH_RESPONSE_make_external_error (TALER_EC_PAY_PAYMENT_INSUFFICIENT,
 								  "insufficient funds"));
       return;
@@ -725,7 +725,7 @@ process_pay_with_exchange (void *cls,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:i}",
                                                              "hint", "Coin signature invalid.",
 							     "code", (json_int_t) TALER_EC_PAY_COIN_SIGNATURE_INVALID,
-								      
+
                                                              "coin_idx", i));
       return;
     }
@@ -1167,7 +1167,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if (GNUNET_NO == pc->transaction_exits)
   {
     /* #4521 goes here: Check if the customer respects pay_deadline */
-    now = GNUNET_TIME_absolute_get (); 
+    now = GNUNET_TIME_absolute_get ();
     if (now.abs_value_us > pc->pay_deadline.abs_value_us)
     {
       /* Time expired, we don't accept this payment now! */

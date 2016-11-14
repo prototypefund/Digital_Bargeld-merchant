@@ -57,6 +57,7 @@ Texts.  A copy of the license is included in the section entitled
 * Configuration::           How to set up the Merchant backend
 * Hello-world::             How to set up a minimalistic shop
 * Back-office-integration:: How to integrate with the back office
+* Advanced topics::         Detailed solutions to specific issues
 @end menu
 
 
@@ -74,16 +75,24 @@ Hence, GNU Taler is compatible with anti-money-laundering (AML) and
 know-your-customer (KYC) regulation, as well as data protection
 regulation (such as GDPR).
 
+
 @section About this manual
 
 This manual addresses how to integrate GNU Taler with Web shops.  It
 describes how to install a GNU Taler merchant @emph{backend} and how
 to integrate it with an existing Web shop @emph{frontend}.
 
+@c split manual into two: one for sysadmins (Ch. 1-3,5), one for Web developers (1+4)
+
 The manual is for system administrators and Web developers.  We expect
 some moderate familiarity with the compilation and installation of free
 software packages and of Web technology, in particular HTML and HTTP.
 An understanding of cryptography is not required.
+
+You can download all of the code examples given in this tutorial from
+@url{https://git.taler.net/merchant.git/tree/doc/examples/}.
+
+@c Add section giving an overview of what we will do in the tutorial!
 
 
 @section Architecture overview
@@ -95,8 +104,8 @@ The Taler software stack for a merchant consists of four main components:
   frontend enables the customer to build a shopping cart and place
   an order.  Upon payment, it triggers the respective business logic
   to satisfy the order.  This component is not included with Taler,
-  but rather assumed to exist at the merchant. This manual will
-  describe how to integrate Taler with Web shop frontends.
+  but rather assumed to exist at the merchant. This manual
+  describes how to integrate Taler with Web shop frontends.
 @item A back office application that enables the shop operators to
   view customer orders, match them to financial transfers, and possibly
   approve refunds if an order cannot be satisfied.  This component is
@@ -109,9 +118,7 @@ The Taler software stack for a merchant consists of four main components:
   this backend.
 @item A DBMS which stores the transaction history for the Taler backend.
   For now, the GNU Taler reference implemenation only supports Postgres,
-  but the code could be easily extended to support another DBMS. This
-  manual assumes that a reasonably recent Postgres installation (@math{\ge 9.5})
-  exists on the target system.
+  but the code could be easily extended to support another DBMS.
 @end itemize
 
 The following image illustrates the various interactions of these
@@ -132,9 +139,9 @@ account information is encapsulated within the Taler backend.
 @node Installation
 @menu
 * generic-instructions:: Generic installation guidelines
+* Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
 @c * Installing Taler with GNU Guix:: Installing Taler with GNU Guix
 @c * Installing Taler using Docker:: Installing Taler using Docker
-@c * Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
 @c * Installing Taler on Arch Linux:: Installing Taler on Arch Linux
 @c * Installing Taler on Windows:: Installing Taler on Windows
 @c * Installing Taler on OS X:: Installing Taler on OS X
@@ -147,65 +154,53 @@ This chapter describes how to install the GNU Taler merchant backend.
 @node generic-instructions
 @section Generic instructions
 
-This section provides generic instructions for the merchant
-backend installation independent of any particular operating system.
-@c Operating system specific instructions are provided in the following sections.
-@c You should follow the operating system specific instructions if those are available, and only consult the generic instructions if no system-specific instructions are provided for your specific operating system.
+This section provides generic instructions for the merchant backend
+installation independent of any particular operating system.
+Operating system specific instructions are provided in the following
+sections.  You should follow the operating system specific
+instructions if those are available, and only consult the generic
+instructions if no system-specific instructions are provided for your
+specific operating system.
 
-@node dependencies
 @subsection Installation of dependencies
 
 The following packages need to be installed before we can compile the
 backend:
 
 @itemize
-@item libcurl or libgnurl
-@item GNU libmicrohttpd, including GnuTLS
-@item GNU libgcrypt
-@item libjansson
-@item Postgres, including libpq
-@item GNUnet
-@item GNU Taler exchange
+@item autoconf @math{\ge 2.69}
+@item automake @math{\ge 1.14}
+@item libtool @math{\ge 2.4}
+@item autopoint @math{\ge 0.19}
+@item libltdl @math{\ge 2.4}
+@item libunistring @math{\ge 0.9.3}
+@item libcurl @math{\ge 7.26} (or libgnurl @math{\ge 7.26})
+@item GNU libmicrohttpd @math{\ge 0.9.39}
+@item GNU libgcrypt @math{\ge 1.6}
+@item libjansson @math{\ge 2.7}
+@item Postgres @math{\ge 9.4}, including libpq
+@item libgnunetutil (from Git)
+@item GNU Taler exchange (from Git)
 @end itemize
 
-The first five are available in most GNU/Linux distributions and should
-just be installed using the respective package manager, for example
-using
-
-@example
-# apt-get install libcurl4-gnutls-dev \
-  libmicrohttpd-dev \
-  libgnutls-dev \
-  libgcrypt20-dev \
-  libjansson-dev \
-  libpq-dev \
-  postgresql-9.5
-@end example
+Except for the last two, these are available in most GNU/Linux
+distributions and should just be installed using the respective
+package manager.
 
 The following sections will provide detailed instructions for
-installing the GNUnet and GNU Taler exchange dependencies.
+installing the libgnunetutil and GNU Taler exchange dependencies.
 
 
-@subsection Installing GNUnet
+@subsection Installing libgnunetutil
 
-Note that a Web shop supporting GNU Taler does not actually need to run a
-GNUnet peer.  The requirement to have a minimal GNUnet installation
-arises from the fact that GNUnet provides some required routines for
-doing cryptography, string manupulation, interfacing with databases,
-JSON manipulation, logging and operating system abstractions.  Hence
-this manual does not describe how to actually run a GNUnet peer, and
-we also skip optional GNUnet dependencies that an ordinary peer might
-want to include in the installation.  Thus, do not be alarmed if the
-GNUnet build process warns you about missing (optional) dependencies.
+Before you install libgnunetutil, you must download and install the
+dependencies mentioned in the previous section, otherwise the build
+may succeed but fail to export some of the tooling required by Taler.
 
-Before you install GNUnet, you should download and install the
-dependencies mentioned in the previous section, otherwise GNUnet may
-install but fail to export some of the tooling required by Taler.
-
-To download and install GNUnet, proceed as follows:
+To download and install libgnunetutil, proceed as follows:
 
 @example
-$ svn checkout https://gnunet.org/svn/gnunet/
+$ git clone https://gnunet.org/git/gnunet/
 $ cd gnunet/
 $ ./bootstrap
 $ ./configure [--prefix=GNUNETPFX]
@@ -279,10 +274,60 @@ GNUnet to @code{/usr/local} in the previous steps.
 @c This section has not yet been written.
 
 
-@c @node Installing Taler on Debian GNU/Linux
-@c @section Installing Taler on Debian GNU/Linux
+@node Installing Taler on Debian GNU/Linux
+@section Installing Taler on Debian GNU/Linux
 
-@c This section has not yet been written.
+Debian wheezy is too old and lacks most of the packages required.
+
+On Debian jessie, only GNU libmicrohttpd needs to be compiled from
+source.  To install dependencies on Debian jesse, run the following
+commands:
+
+@example
+# apt-get install \
+  autoconf \
+  automake \
+  autopoint \
+  libtool \
+  libltdl-dev \
+  libunistring-dev \
+  libcurl4-gnutls-dev \
+  libgcrypt20-dev \
+  libjansson-dev \
+  libpq-dev \
+  postgresql-9.4
+# wget https://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-latest.tar.gz
+# wget https://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-latest.tar.gz.sig
+# gpg -v libmicrohttpd-latest.tar.gz # Should show signed by 939E6BE1E29FC3CC
+# tar xf libmicrohttpd-latest.tar.gz
+# cd libmicrohttpd-0*
+# ./configure
+# make install
+@end example
+
+For more recent versions of Debian, you should instead run:
+
+@example
+# apt-get install \
+  autoconf \
+  automake \
+  autopoint \
+  libtool \
+  libltdl-dev \
+  libunistring-dev \
+  libcurl4-gnutls-dev \
+  libgcrypt20-dev \
+  libjansson-dev \
+  libpq-dev \
+  postgresql-9.5 \
+  libmicrohttpd-dev
+@end example
+
+For the rest of the installation, follow the generic installation instructions
+starting with the installation of libgnunetutil.  Note that if you used the
+Debian wheezy instructions above, you need to pass
+@code{--with-microhttpd=/usr/local/} to all @code{configure} invocations.
+
 
 
 @c @node Installing Taler on Arch Linux
@@ -312,50 +357,10 @@ configuration options. However, some must be provided, in particular
 the database account and bank account that the backend should use.  By
 default, the file @code{$HOME/.config/taler.conf} is where the Web
 shop administrator specifies configuration values that augment or
-override the defaults.
-
-@section Using taler-config
-
-The tool @code{taler-config} can be used to
-extract or manipulate configuration values; however, the configuration
-use the well-known INI file format and can also be edited by hand.
-
-Run
-@example
-$ taler-config -s $SECTION
-@end example
-to list all of the configuration values in section @code{$SECTION}.
-
-Run
-@example
-$ taler-config -s $section -o $option
-@end example
-to extract the respective configuration value for option @code{$option}
-in section @code{$section}.
-
-Finally, to change a setting, run
-@example
-$ taler-config -s $section -o $option -V $value
-@end example
-to set the respective configuration value to @code{$value}. Note that you have to
-manually restart the Taler backend after you change the configuration to
-make the new configuration go into effect.
-
-Some default options will use $-variables, such as $code{$DATADIR}
-within their value.  To expand the @code{$DATADIR} or other $-variables
-in the configuration, pass the @code{-f} option to
-@code{taler-config}.  For example, compare:
-@example
-$ taler-config -s merchant-instance-wireformat-default \
-               -o test_response_file
-$ taler-config -f -s merchant-instance-wireformat-default \
-               -o test_response_file
-@end example
-
-While the configuration file is typically located at
-@code{$HOME/.config/taler.conf}, an alternative location can be
-specified to @code{taler-merchant-httpd} and @code{taler-config} using
-the @code{-c} option.
+override the defaults.  The format of the configuration file is
+the well-known INI file format.  You can edit the file by hand, or
+use the @code{taler-config} commands given as examples.
+For more information on @code{taler-config}, @pxref{Using taler-config}.
 
 
 @section Backend options
@@ -363,6 +368,7 @@ the @code{-c} option.
 The following table describes the options that commonly need to be modified.
 Here, the notation @code{[$section]/$option} denotes the option
 @code{$option} under the section @code{[$section]} in the configuration file.
+
 
 
 @table @asis
@@ -403,8 +409,8 @@ Which currency the Web shop deals in, i.e. ``EUR'' or ``USD'', is specified usin
 [merchant]/currency
 @end example
 
-For testing purposes, the currency should match ``KUDOS'' which is used by the Taler
-demonstration exchange at @url{https://exchange.demo.taler.net/}:
+For testing purposes, the currency MUST match ``KUDOS'' so that tests will work
+with the Taler demonstration exchange at @url{https://exchange.demo.taler.net/}:
 
 @example
 $ taler-config -s merchant -o currency -V KUDOS
@@ -436,12 +442,12 @@ database you want to use.  Suppose @code{$USER} is the name of the
 user who will run the backend process.  Then, you need to first run
 
 @example
-$ createuser -d $USER
+$ sudu -u postgres createuser -d $USER
 @end example
 
-as the @code{postgres} database administrator to grant @code{$USER}
-the ability to create new databases.  Next, you should as
-@code{$USER} run
+as the Postgres database administrator (usually @code{postgres}) to
+grant @code{$USER} the ability to create new databases.  Next, you
+should as @code{$USER} run:
 
 @example
 $ createdb $DBNAME
@@ -452,7 +458,7 @@ given in the configuration file.
 
 To configure the Taler backend to use this database, run:
 @example
-$ taler-config -s merchantdb-postgres -o config \
+$ taler-config -s merchantdb-postgres -o CONFIG \
   -V postgres:///$DBNAME
 @end example
 
@@ -469,7 +475,7 @@ The ``uri'' option specifies the exchange's base URL.  For example,
 to use the Taler demonstrator use:
 
 @example
-$ taler-config -s merchant-exchange-demo -o config \
+$ taler-config -s merchant-exchange-demo -o URI \
   -V https://exchange.demo.taler.net/
 @end example
 
@@ -517,39 +523,18 @@ actual banks.
 The backend allows the user to run multiple instances of shops with
 distinct business entities against a single backend.  Each instance
 uses its own bank account and key for signing contracts.  It is
-mandatory to configure a "default" instance
-using the following
-options:
+mandatory to configure a "default" instance.  The specific
+configuration format depends slightly on the banking system selected
+via the @code{wireformat} option.
 
 @itemize
-
 @item
-The option ``keyfile'' in the section ``merchant-instance-default''
-specifies the path to the instance's private key.  You do not need to
-create a key at this time, the backend will generate it automatically
-if it is missing.  While generally unnecessary, it is possible to
-generate the key and/or to display the existing public key using the
-@code{gnunet-ecc} command-line tool:
-
-@example
-$ gnunet-ecc -p                                  \
-  `taler-config -f -s merchant-instance-default \
-                 -o keyfile`
-@end example
-
-@item
-The option ``test_response_file'' in the section
-``merchant-instance-wireformat-default'' specifies the path to a file
-that describes the instance's wire details in JSON format.  The
-specific format depends slightly on the banking system selected via
-the @code{wireformat} option.
-
 For the @code{test} wire format, a sample specification looks as follows:
 
 @verbatim
 {
   "type": "test",
-  "bank_uri": "https://bank.test.taler.net/",
+  "bank_uri": "https://bank.demo.taler.net/",
   "account_number": 5,
   "salt": "RANDOMSALT"
 }
@@ -564,19 +549,21 @@ number.  In order to get an account number, register at our
 demonstration bank at @url{https://bank.demo.taler.net/} using your
 browser.
 
-Assuming this JSON specification is stored in a file @code{$TEST.json},
-run:
+The option ``test_response_file'' in the section
+``merchant-instance-wireformat-default'' specifies the path to this
+file.  Assuming this JSON specification is stored in a file
+@code{$TEST.json}, then run:
 
 @example
 $ taler-config -s merchant-instance-wireformat-default \
-                -o test_response_file -v $TEST.json
+                -o test_response_file -V $TEST.json
 @end example
 
+@c Document SEPA here once supported.
+@end itemize
 
 Note that additional instances can be specified using different tokens
 in the section name instead of @code{default}.
-
-@end itemize
 
 @end table
 
@@ -608,26 +595,29 @@ master_key = CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
 
 
 
-The backend will use a database named @code{donations} within
-Postgresql.
+Given the above configuration, the backend will use a database named
+@code{donations} within Postgresql.
 
 The backend will deposit the coins it receives to the exchange at
 @url{https://exchange.demo.taler.net/}, which has the master key @*
 "CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00".
 
+Please note that @code{doc/config.sh} will walk you through all
+configuration steps, showing how to invoke @code{taler-config}
+for each of them.
 
 @section Launching the backend
 
-As mentioned previously, the system adminstrator should make sure that
-a database named @code{donations} is defined and accessible in the
-system. Once this configuration is ready, the
-merchant backend can be launched using:
+Assuming you have configured everything correctly, you can launch the
+merchant backend using:
 
 @example
 $ taler-merchant-httpd
 @end example
 
-If everything worked as expected, the command
+When launched for the first time, this command will print a message
+about generating your private key. If everything worked as expected,
+the command
 
 @example
 $ curl http://localhost:8888/
@@ -645,6 +635,16 @@ to a UNIX domain socket or properly restrict access to the
 port.
 
 
+@c Add section describing how to test the backend.
+@c For this, we should write some tools that make it
+@c EASY to test the backend without going through the
+@c full manual frontend setup!
+@c NOTE: include explaining wallet installation to sysadmin
+
+
+@c FIXME: this should be a separate manual
+
+
 @node Hello-world
 @chapter Setting up a simple Web shop with GNU Taler
 
@@ -653,6 +653,8 @@ button to get donations via Taler. The expected behaviour is that once
 the ``donate'' button is clicked, the customer will receive a Taler
 contract offering him the opportunity to make a fixed donation,
 for example to donate 1 KUDOS to the charity operating the shop.
+
+@c NOTE: include explaining wallet installation to Web developer here!
 
 Note that if the customer does not have the Taler wallet installed,
 they should instead be prompted to proceed with a classic dialog for
@@ -667,7 +669,7 @@ to the frontend @code{/donate} URL.  For this, the HTML would be as
 follows:
 
 @smallexample
-<form action="/donate">
+<form action="/donate_handler">
   <input type="submit" value="Donate!"></input>
 <form>
 @end smallexample
@@ -680,22 +682,13 @@ it will return a HTML page that will take care of:
 @item fetching a Taler contract and passing it to the wallet if one is found
 @end itemize
 
-A minimalistic @code{/donate} handler is shown below (in PHP):
+A minimalistic @code{/donate_handler} implementation is shown below (in PHP):
 
 @smallexample
-<?php
-  http_response_code (402); // 402: Payment required
-  header ('X-Taler-Contract-Url: /generate-contract');
-?>
-<html>
-  <head>
-  <title>Select payment method</title>
-  </head>
-  <body>
-    <!-- Put the credit card paywall here -->
-  </body>
-</html>
+// merchant/doc/examples/donate_handler.php
+@include examples/donate_handler.php
 @end smallexample
+
 
 Given this response, the Taler wallet will fetch the contract from
 @url{/generate-contract} and display it to the user.  If the wallet is not
@@ -723,83 +716,8 @@ work.
 A simple @code{/generate-contract} handler may thus look like this:
 
 @smallexample
-
-function make_contract($transaction_id, $now) @{
- $contract =
-  array (
-   'amount' => array (
-    'value' => 1,
-    'fraction' => 0,
-    'currency' => "KUDOS"),
-   'max_fee' => array (
-    'value' => 0,
-    'fraction' => 50000,
-    'currency' => "KUDOS"),
-   'transaction_id' => $transaction_id,
-   'products' => array (
-     array (
-      'description' => "Donation to charity program",
-      'quantity' => 1,
-      'price' => array (
-       'value' => 1,
-       'fraction' => 0,
-       'currency' => "KUDOS"),
-      'product_id' => 0,
-      'taxes' => array(), // No taxes for donations
-      'delivery_date' => "/Date(" . $now->getTimestamp() . ")/",
-      'delivery_location' => 'LNAME1')),
-      'timestamp' => "/Date(" . $now->getTimestamp() . ")/",
-      'expiry' =>
-       "/Date(" . $now->add(new DateInterval('P2W'))->getTimestamp() . ")/",
-      'refund_deadline' =>
-       "/Date(" . $now->add(new DateInterval('P3M'))->getTimestamp() . ")/",
-      'repurchase_correlation_id' => '',
-      'fulfillment_url' =>
-       "https://shop.com/fulfillment?"
-       . "transaction_id=$transaction_id&timestamp=$now",
-      'merchant' => array (
-       'address' => 'LNAME1',
-       'name' => "Charity donations shop",
-       'jurisdiction' => 'LNAME2'),
-      'locations' => array (
-       'LNAME1' =>
-        array (
-         'country' => 'Shop Country',
-         'city' => 'Shop City',
-         'state' => 'Shop State',
-       	 'region' => 'Shop Region',
-       	 'province' => 'Shop Province',
-       	 'ZIP code' => 4908,
-         'street' => 'Shop street',
-       	 'street number' => 20),
-       'LNAME2' => array (
-         'country' => 'Legal Country',
-         'city' => Legal City',
-         'state' => 'Legal State',
-         'region' => 'Legal Region',
-         'province' => 'Legal Province',
-         'ZIP code' => 4908)));
-@}
-
-
-/* this variable is the JSON of a contract proposal,
- see https://api.taler.net/api-merchant.html#post--contract
- the second parameter is the transaction id */
-$transaction_id = rand(1,90000); // simplified, do not do this!
-$proposal = make_contract($transaction_id, new DateTime('now'));
-
-# Here the frontend POSTs the proposal to the backend
-$response = post_to_backend("/contract", $proposal);
-
-if (200 != $response->getResponseCode()) @{
-  echo json_encode(array(
-    'error' => "internal error",
-    'hint' => "failed to generate contract",
-    'detail' => $resp->body->toString()
-    ), JSON_PRETTY_PRINT);
-  return;
-@}
-echo $response->body;
+// merchant/doc/examples/generate_contract.php
+@include examples/generate_contract.php
 @end smallexample
 
 Note that in practice the frontend might want to generate a monotonically
@@ -810,20 +728,8 @@ The function @code{post_to_backend} is shown below; we will use it
 again in other examples:
 
 @smallexample
-function post_to_backend($backend_relative_url, $json)@{
-  $url = "https://shop.com$backend_relative_url";
-
-  $req = new http\Client\Request("POST",
-                                 $url,
-                                 array ("Content-Type" => "application/json"));
-
-  $req->getBody()->append($json);
-
-  // Execute the HTTP request
-  $client = new http\Client;
-  $client->enqueue($req)->send();
-  return $client->getResponse();
-@}
+// merchant/doc/examples/post_to_backend.php
+@include examples/post_to_backend.php
 @end smallexample
 
 After the browser has fetched the contract, the user will
@@ -844,25 +750,8 @@ session state with the browser to remember that the user paid.
 The following code implements this in PHP:
 
 @smallexample
-# Check if a session exists already
-session_start();
-if (! isset($_SESSION['paid'])) @{
-  echo "<p>There is no session for this purchase. Something is wrong.</p>";
-  return;
-@}
-# Get the HTTP POST body
-$payment = file_get_contents('php://input');
-$response = post_to_backend("/pay", $payment);
-if (200 != $response->getResponseCode())@{
-  echo json_encode(array(
-    'error' => "internal error",
-    'hint' => "failed to POST coins to the backend",
-    'detail' => $response->body->toString()
-    ), JSON_PRETTY_PRINT);
-  return;
-@}
-$_SESSION['paid'] = true;
-return $response->body;
+// merchant/doc/examples/pay_handler.php
+@include examples/pay_handler.php
 @end smallexample
 
 Do not be confused by the @code{isset} test for the session state.  In
@@ -895,56 +784,86 @@ transaction_id=<TRANSACTION_ID>&timestamp=<CONTRACTTIMESTAMP>
 @*The @code{/fulfillment} handler will then perform the following actions:
 
 @smallexample
-<html>
- <head>
-  <title>Donation Fulfillment</titile>
- </head>
- <body>
-  <?php
-   # At first, check if the user has already paid for the product.
-   # If so, deliver the product.
-   session_start();
-   if (! isset($_SESSION['paid']))@{
-    # set as pending
-    $_SESSION['paid'] = false;
-   @}
-   else@{
-    if($_SESSION['paid'])@{
-     echo "<p>Thanks for your donation!</p>";
-     return;
-   @}
-    else@{
-      # Generate page to show for payments with credit cards instead.
-      echo '<form action="/cc-payment">
-      Name<br> <input type="text"></input><br>
-      CC number<br> <input type="text"></input><br>
-      Cvv2 code<br> <input type="text"></input><br>
-      <input type="submit"></input>
-      </form>';
-      return;
-   @}
-  @}
-
-  # Reconstruct the contract
-  $rec_proposal = make_contract($_GET['transaction_id'], $_GET['timestamp']);
-  # $response corresponds to the specification at:
-  # https://api.taler.net/api-merchant.html#offer
-  $response = post_to_backend("/contract", $rec_proposal);
-
-  http_response_code (402);
-# FIXME: this can't be right, you want to call "json_deocde", not
-# return it as a literal string in the header! (i.e. insert '. before json_decode and remove ' at the end)?
-# All this code should be tested!
-  header ('X-Taler-Contract-Hash: ' . json_decode($response)["H_contract"]);
-  header ('X-Taler-Offer-Url: /donate');
-  header ('X-Taler-Pay-Url: /pay'); ?>
- </body>
-</html>
+// merchant/doc/examples/fulfillment_handler.php
+@include examples/fulfillment_handler.php
 @end smallexample
 
 
 @node Back-office-integration
 @chapter Integration of GNU Taler with the back office
+
+
+@node Advanced topics
+@chapter Advanced topics
+
+@menu
+* Using taler-config::      Introduction to the taler-config tool
+@end menu
+
+@node Using taler-config
+@section Using taler-config
+
+The tool @code{taler-config} can be used to
+extract or manipulate configuration values; however, the configuration
+use the well-known INI file format and can also be edited by hand.
+
+Run
+@example
+$ taler-config -s $SECTION
+@end example
+to list all of the configuration values in section @code{$SECTION}.
+
+Run
+@example
+$ taler-config -s $section -o $option
+@end example
+to extract the respective configuration value for option @code{$option}
+in section @code{$section}.
+
+Finally, to change a setting, run
+@example
+$ taler-config -s $section -o $option -V $value
+@end example
+to set the respective configuration value to @code{$value}. Note that you have to
+manually restart the Taler backend after you change the configuration to
+make the new configuration go into effect.
+
+Some default options will use $-variables, such as @code{$DATADIR}
+within their value.  To expand the @code{$DATADIR} or other $-variables
+in the configuration, pass the @code{-f} option to
+@code{taler-config}.  For example, compare:
+@example
+$ taler-config -s merchant-instance-wireformat-default \
+               -o test_response_file
+$ taler-config -f -s merchant-instance-wireformat-default \
+               -o test_response_file
+@end example
+
+While the configuration file is typically located at
+@code{$HOME/.config/taler.conf}, an alternative location can be
+specified to @code{taler-merchant-httpd} and @code{taler-config} using
+the @code{-c} option.
+
+
+@section Merchant key management
+
+The option ``KEYFILE'' in the section ``merchant-instance-default''
+specifies the path to the instance's private key.  You do not need to
+create a key manually, the backend will generate it automatically if
+it is missing.  While generally unnecessary, it is possible to display
+the corresponding public key using the @code{gnunet-ecc} command-line
+tool:
+
+@example
+$ gnunet-ecc -p                                  \
+  $(taler-config -f -s merchant-instance-default \
+                 -o keyfile)
+@end example
+
+@c Add more on how to add that key to X.509 CSRs once we can do that.
+
+
+
 
 
 @bye

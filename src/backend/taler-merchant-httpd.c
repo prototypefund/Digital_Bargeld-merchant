@@ -543,7 +543,7 @@ instances_iterator_cb (void *cls,
   }
   #ifdef EXTRADEBUG
   else {
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Added element at %p, by by-id key %s of '%s' in hashmap\n",
                 mi,
                 GNUNET_h2s (&h_id),
