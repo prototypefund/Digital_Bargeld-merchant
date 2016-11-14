@@ -669,7 +669,7 @@ to the frontend @code{/donate} URL.  For this, the HTML would be as
 follows:
 
 @smallexample
-<form action="/donate_handler">
+<form action="/donate-handler">
   <input type="submit" value="Donate!"></input>
 </form>
 @end smallexample
