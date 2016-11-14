@@ -671,7 +671,7 @@ follows:
 @smallexample
 <form action="/donate_handler">
   <input type="submit" value="Donate!"></input>
-<form>
+</form>
 @end smallexample
 
 When the server-side handler for @code{/donate} receives the form submission,
