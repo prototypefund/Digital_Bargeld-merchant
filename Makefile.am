@@ -1,6 +1,6 @@
 # This Makefile is in the public domain
 
-SUBDIRS = src copylib examples
+SUBDIRS = src
 if WITH_DOC
   SUBDIRS += doc
 endif

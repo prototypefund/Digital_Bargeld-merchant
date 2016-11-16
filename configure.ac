@@ -274,13 +274,6 @@ AM_CONDITIONAL([HAVE_TSC], [test "x$tsc" = xyes])
 
 
 AC_CONFIG_FILES([Makefile
-examples/Makefile
-examples/blog/Makefile
-examples/blog/articles/Makefile
-examples/blog/web-common/Makefile
-examples/shop/Makefile
-examples/shop/web-common/Makefile
-copylib/Makefile
 doc/Makefile
 src/Makefile
 src/include/Makefile
