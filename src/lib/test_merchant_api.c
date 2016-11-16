@@ -1814,7 +1814,6 @@ interpreter_run (void *cls)
                                    NULL, NULL, NULL,
                                    "taler-exchange-aggregator",
                                    "taler-exchange-aggregator",
-				   "-l", "/tmp/a/log",
                                    "-c", "test_merchant_api.conf",
                                    "-t", /* exit when done */
                                    NULL);
