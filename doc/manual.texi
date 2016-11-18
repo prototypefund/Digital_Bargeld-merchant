@@ -2,7 +2,7 @@
 @c %**start of header
 @setfilename manual.info
 @include version.texi
-@settitle The GNU Taler manual for Web shop operators @value{VERSION}
+@settitle The GNU Taler merchant backend operator tutorial @value{VERSION}
 
 @c Define a new index for options.
 @defcodeindex op
@@ -32,7 +32,7 @@ Texts.  A copy of the license is included in the section entitled
 @c Titlepage
 @c
 @titlepage
-@title The GNU Taler manual for Web shops
+@title The GNU Taler merchant backend operator tutorial
 @subtitle Version @value{VERSION}
 @subtitle @value{UPDATED}
 @author Marcello Stanisci (@email{marcello.stanisci@@inria.fr})
