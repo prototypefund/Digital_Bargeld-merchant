@@ -430,6 +430,7 @@ instances_iterator_cb (void *cls,
   /* used as hashmap keys */
   struct GNUNET_HashCode h_pk;
   struct GNUNET_HashCode h_id;
+  char *emsg;
 
   iic = cls;
   substr = strstr (section, "merchant-instance-");
@@ -500,13 +501,17 @@ instances_iterator_cb (void *cls,
                                              instance_wiresection);
   GNUNET_free (instance_wiresection);
 
-  if (GNUNET_YES != iic->plugin->wire_validate (iic->plugin->cls,
-                                                mi->j_wire,
-                                                NULL))
+  if (TALER_EC_NONE !=
+      iic->plugin->wire_validate (iic->plugin->cls,
+                                  mi->j_wire,
+                                  NULL,
+                                  &emsg))
   {
 
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Malformed wireformat\n");
+                "Malformed wireformat: %s\n",
+                emsg);
+    GNUNET_free (emsg);
     iic->ret |= GNUNET_SYSERR;
   }
 
