@@ -2,6 +2,7 @@ digraph G {
 
   user[label="Customer browser"];
   admin[label="Shop admin"];
+  Backend [color="blue"];
   subgraph cluster_0 {
     Frontend;
     Backoffice;
