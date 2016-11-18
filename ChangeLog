@@ -1,3 +1,7 @@
+Fri Nov 18 18:54:07 CET 2016
+	Misc. minor updates to match API changes from exchange 0.2.
+	Releasing taler-merchant 0.2.0. -CG
+
 Mon Oct 10 16:27:57 CEST 2016
         Implementing:
         - /track API, to map transactions to wire transfers and
