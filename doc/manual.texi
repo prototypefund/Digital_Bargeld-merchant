@@ -55,8 +55,6 @@ Texts.  A copy of the license is included in the section entitled
 * Introduction::            Whom this manual is addressed to
 * Installation::            Installing the Merchant backend
 * Configuration::           How to set up the Merchant backend
-* Hello-world::             How to set up a minimalistic shop
-* Back-office-integration:: How to integrate with the back office
 * Advanced topics::         Detailed solutions to specific issues
 @end menu
 
