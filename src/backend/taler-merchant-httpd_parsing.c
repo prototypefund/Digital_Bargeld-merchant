@@ -84,8 +84,15 @@ buffer_init (struct Buffer *buf,
     return GNUNET_SYSERR;
   if (data_size > alloc_size)
     alloc_size = data_size;
+  if (0 == alloc_size)
+  {
+    buf->data = NULL;
+    return GNUNET_OK;
+  }
   buf->data = GNUNET_malloc (alloc_size);
-  memcpy (buf->data, data, data_size);
+  GNUNET_memcpy (buf->data,
+                 data,
+                 data_size);
   return GNUNET_OK;
 }
 
@@ -99,7 +106,7 @@ buffer_init (struct Buffer *buf,
 static void
 buffer_deinit (struct Buffer *buf)
 {
-  GNUNET_free (buf->data);
+  GNUNET_free_non_null (buf->data);
   buf->data = NULL;
 }
 

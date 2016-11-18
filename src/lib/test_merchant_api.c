@@ -53,7 +53,7 @@
 /**
  * Max size allowed for a contract
  */
-#define CONTRACT_MAX_SIZE 500
+#define CONTRACT_MAX_SIZE 1000
 
 /**
  * Handle to access the exchange.
@@ -541,16 +541,16 @@ struct Command
        * How many "rows" we expect in the result
        */
       unsigned int nresult;
-      
+
       /**
        * Handle to the merchant
        */
-      
+
       /**
        * Handle to /history request
        */
       struct TALER_MERCHANT_HistoryOperation *ho;
-      
+
     } history;
 
 
@@ -626,7 +626,7 @@ get_new_contracts (struct Command *cmds)
   unsigned int d = 0;
   struct Command *cmd;
   #define DELTA 1000
-  
+
   for (i=0;OC_END != (cmd = &cmds[i])->oc;i++)
     if ( (NULL != cmd->label) &&
          (OC_CONTRACT == cmd->oc) )
@@ -639,7 +639,7 @@ get_new_contracts (struct Command *cmds)
                 CONTRACT_MAX_SIZE,
                 "{\
                   \"max_fee\":\
-                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":500000},\
+                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
                   \"transaction_id\":%d,\
                   \"timestamp\":\"\\/Date(42)\\/\",\
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
@@ -766,13 +766,13 @@ history_cb (void *cls,
   if (nelements != (cmd->details.history.nresult * (instance_idx + 1)))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Did not get as many history entries as expected\n"); 
+                "Did not get as many history entries as expected\n");
     fail (is);
     return;
   }
 
   next_command (is);
-}	    
+}
 
 /**
  * Check if the given historic event @a h corresponds to the given
@@ -1099,11 +1099,11 @@ pay_cb (void *cls,
   }
   if (MHD_HTTP_OK == http_status)
   {
-    /* Check signature */ 
+    /* Check signature */
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_fixed_auto ("merchant_sig", &sig),
       GNUNET_JSON_spec_fixed_auto ("h_contract", &h_contract),
-      GNUNET_JSON_spec_end ()    
+      GNUNET_JSON_spec_end ()
     };
     if (GNUNET_OK !=
         GNUNET_JSON_parse (obj,
@@ -1133,9 +1133,9 @@ pay_cb (void *cls,
       fail (is);
       return;
     }
-  
+
   }
- 
+
   next_command (is);
 }
 
@@ -1642,7 +1642,7 @@ interpreter_run (void *cls)
                              &error);
       if (NULL != instance)
       {
-      
+
         json_t *merchant;
 
         merchant = json_object ();
@@ -1904,11 +1904,11 @@ interpreter_run (void *cls)
 							  history_cb,
 							  is)))
     {
-      fail (is); 
+      fail (is);
       return;
-    }							  
-  break; 
-    
+    }
+  break;
+
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
@@ -2061,7 +2061,7 @@ do_shutdown (void *cls)
       }
       break;
     case OC_HISTORY:
-      
+
       if (NULL != cmd->details.history.ho)
       {
         TALER_MERCHANT_history_cancel (cmd->details.history.ho);
@@ -2196,7 +2196,7 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.contract.proposal = "{\
                   \"max_fee\":\
-                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":500000},\
+                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
                   \"transaction_id\":1,\
                   \"timestamp\":\"\\/Date(42)\\/\",\
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
@@ -2219,7 +2219,7 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.contract.proposal = "{\
                   \"max_fee\":\
-                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":500000},\
+                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
                   \"transaction_id\":2,\
                   \"timestamp\":\"\\/Date(42)\\/\",\
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
@@ -2463,7 +2463,7 @@ main (int argc,
   GNUNET_array_append (instances, ninstances, token);
 
   while (NULL != (token = strtok (NULL, " ")))
-    GNUNET_array_append(instances, ninstances, token); 
+    GNUNET_array_append(instances, ninstances, token);
 
   instance = instances[instance_idx];
   db = TALER_MERCHANTDB_plugin_load (cfg);
