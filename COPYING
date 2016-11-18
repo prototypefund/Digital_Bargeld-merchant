@@ -7,16 +7,8 @@ GPL has little impact as the backend is not supposed to be
 directly accessible to the Internet).  The license for this
 code is in COPYING.GPL and COPYING.AGPL.
 
-The merchant's frontend logic (i.e. JavaScript interacting with
-the wallet, sample code for a shop) is under the GNU LGPL (but
-we may choose to change this to be in the public domain or
-BSD-licensed if necessary; the code is so short that there is
-anyway the question whether it is copyrightable).  Under this same
-license, it comes the merchant library (src/lib/) as it can be linked
-with more diverse licensed software.  The license text for this code
-is in COPYING.LGPL.
-
-
-In examples/blog/articles/ we included a book by Richard Stallman.
-It comes with its own permissive license (see COPYING in the
-directory).
+The merchant's library logic (src/lib/) is under the GNU LGPL (but we
+may choose to change this to be in the public domain or BSD-licensed
+if necessary).  Under this same license, it comes the merchant library
+(src/lib/) as it can be linked with more diverse licensed software.
+The license text for this code is in COPYING.LGPL.

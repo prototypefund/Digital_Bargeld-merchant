@@ -56,6 +56,21 @@ Texts.  A copy of the license is included in the section entitled
 * Installation::            Installing the Merchant backend
 * Configuration::           How to set up the Merchant backend
 * Advanced topics::         Detailed solutions to specific issues
+
+
+Appendices
+
+* GNU-LGPL::                     The GNU Lesser General Public License says how you
+                                 can use the code of libtalermerchant.so in your own projects.
+* GNU Affero GPL::               The Affero GNU General Public License says how you
+                                 can copy and share the Taler merchant backend.
+* GNU-FDL::                      The GNU Free Documentation License says how you
+                                 can copy and share the documentation of GNU Taler.
+
+Indices
+
+* Concept Index::               Index of concepts and programs.
+
 @end menu
 
 
@@ -73,40 +88,68 @@ Hence, GNU Taler is compatible with anti-money-laundering (AML) and
 know-your-customer (KYC) regulation, as well as data protection
 regulation (such as GDPR).
 
+GNU Taler is not yet production-ready, after following this manual
+you will have a backend that can process payments in ``KUDOS'', but
+not regular currencies.  This is not so much because of limitations
+in the backend, but because we are not aware of a Taler exchange
+operator offering regular currencies today.
 
 @section About this manual
 
-This manual describes how to install a GNU Taler merchant @emph{backend},
-so it is for system administrators.
-
-@c split manual into two: one for sysadmins (Ch. 1-3,5), one for Web developers (1+4)
+This tutorial targets system administrators who want to
+install a GNU Taler merchant @emph{backend}.
 
 We expect some moderate familiarity with the compilation and installation
 of free software packages. An understanding of cryptography is not required.
 
-@c Add section giving an overview of what we will do in the tutorial!
+This first chapter of the tutorial will give a brief overview of the overall
+Taler architecture, describing the environment in which the Taler backend
+operates.  The second chapter then explains how to install the software,
+including key dependencies.  The third chapter will explain how to
+configure the backend, including in particular the configuration of the
+bank account details of the merchant.
+
+@c The fouth chapter will explain how to test that the setup worked correctly.
+
+The last chapter gives some additional information about advanced topics
+which will be useful for system administrators but are not necessary for
+operating a basic backend.
 
 @section Architecture overview
+
+@cindex crypto-currency
+@cindex KUDOS
+Taler is a pure payment system, not a new crypto-currency. As such, it
+operates in a traditional banking context.  In particular, this means
+that in order to receive funds via Taler, the merchant must have a
+regular bank account, and payments can be executed in ordinary
+currencies such as USD or EUR.  For testing purposes, Taler uses a
+special currency ``KUDOS'' and includes its own special bank.
 
 The Taler software stack for a merchant consists of four main components:
 
 @itemize
+@cindex frontend
 @item A frontend which interacts with the customer's browser. The
   frontend enables the customer to build a shopping cart and place
   an order.  Upon payment, it triggers the respective business logic
   to satisfy the order.  This component is not included with Taler,
   but rather assumed to exist at the merchant. This manual
   describes how to integrate Taler with Web shop frontends.
+@cindex back office
 @item A back office application that enables the shop operators to
   view customer orders, match them to financial transfers, and possibly
   approve refunds if an order cannot be satisfied.  This component is
   again not included with Taler, but rather assumed to exist at the
   merchant. This manual will describe how to integrate such a component
   to handle payments managed by Taler.
+@cindex backend
 @item A Taler-specific payment backend which makes it easy for the
   frontend to process financial transactions with Taler.  The
   next two chapters will describe how to install and configure
   this backend.
+@cindex DBMS
+@cindex Postgres
 @item A DBMS which stores the transaction history for the Taler backend.
   For now, the GNU Taler reference implemenation only supports Postgres,
   but the code could be easily extended to support another DBMS.
@@ -117,7 +160,7 @@ key components:
 
 @center @image{arch, 3in, 4in}
 
-
+@cindex RESTful
 Basically, the backend provides the cryptographic protocol support,
 stores Taler-specific financial information in a DBMS and communicates
 with the GNU Taler exchange over the Internet.  The frontend accesses
@@ -184,6 +227,7 @@ installing the libgnunetutil and GNU Taler exchange dependencies.
 
 @subsection Installing libgnunetutil
 
+@cindex GNUnet
 Before you install libgnunetutil, you must download and install the
 dependencies mentioned in the previous section, otherwise the build
 may succeed but fail to export some of the tooling required by Taler.
@@ -207,6 +251,7 @@ If you did not specify a prefix, GNUnet will install to
 
 @subsection Installing the GNU Taler exchange
 
+@cindex exchange
 After installing GNUnet, you can download and install
 the exchange as follows:
 
@@ -231,6 +276,7 @@ If you did not specify a prefix, the exchange will install to
 
 @subsection Installing the GNU Taler merchant backend
 
+@cindex backend
 The following steps assume all dependencies are installed.
 
 Use the following commands to download and install the
@@ -268,6 +314,8 @@ GNUnet to @code{/usr/local} in the previous steps.
 @node Installing Taler on Debian GNU/Linux
 @section Installing Taler on Debian GNU/Linux
 
+@cindex Wheezy
+@cindex Debian
 Debian wheezy is too old and lacks most of the packages required.
 
 On Debian jessie, only GNU libmicrohttpd needs to be compiled from
@@ -343,6 +391,8 @@ Debian wheezy instructions above, you need to pass
 @node Configuration
 @chapter How to configure the merchant's backend
 
+@cindex taler-config
+@cindex taler.conf
 The installation already provides reasonable defaults for most of the
 configuration options. However, some must be provided, in particular
 the database account and bank account that the backend should use.  By
@@ -365,8 +415,10 @@ Here, the notation @code{[$section]/$option} denotes the option
 @table @asis
 
 @item Service address
-The following option sets the transport layer address used by the Merchant backend:
+The following option sets the transport layer address used by the merchant backend:
 
+@cindex UNIX domain socket
+@cindex TCP
 @example
 [merchant]/serve = TCP | UNIX
 @end example
@@ -386,6 +438,7 @@ to the network.
 
 @c FIXME: we should offer an option to bind the TCP socket to a particular IP address (#4752)
 
+@cindex port
 To run the Taler backend on TCP port 8888, use:
 @example
 $ taler-config -s merchant -o serve -V TCP
@@ -396,6 +449,8 @@ $ taler-config -s merchant -o port -V 8888
 @item Currency
 Which currency the Web shop deals in, i.e. ``EUR'' or ``USD'', is specified using the option
 
+@cindex currency
+@cindex KUDOS
 @example
 [merchant]/currency
 @end example
@@ -407,8 +462,8 @@ with the Taler demonstration exchange at @url{https://exchange.demo.taler.net/}:
 $ taler-config -s merchant -o currency -V KUDOS
 @end example
 
-
 @item Database
+@cindex DBMS
 In principle is possible for the backend to support different DBMSs.
 The option
 
@@ -426,6 +481,7 @@ For postgres, you need to provide:
 @example
 [merchantdb-postgres]/config
 @end example
+@cindex Postgres
 
 This option specifies a postgres access path using the format
 @code{postgres:///$DBNAME}, where @code{$DBNAME} is the name of the Postgres
@@ -455,6 +511,7 @@ $ taler-config -s merchantdb-postgres -o CONFIG \
 
 
 @item Exchange
+@cindex exchange
 To add an exchange to the list of trusted payment service providers,
 you create a section with a name that starts with ``merchant-exchange-''.
 In that section, the following options need to be configured:
@@ -471,6 +528,7 @@ $ taler-config -s merchant-exchange-demo -o URI \
 @end example
 
 @item
+@cindex master key
 The ``master_key'' option specifies the exchange's master public key in base32 encoding.
 For the Taler demonstrator, use:
 
@@ -490,7 +548,7 @@ multiple currencies, you need to configure a backend per currency.
 @c @item Auditors
 
 @item Wireformat
-
+@cindex wire format
 In order to receive payments, the merchant backend needs to communicate bank
 account details to the exchange.  The banking system used is specified using the
 following global option:
@@ -510,7 +568,7 @@ Other wireformats will be supported in the future to interact with
 actual banks.
 
 @item Instances
-
+@cindex instance
 The backend allows the user to run multiple instances of shops with
 distinct business entities against a single backend.  Each instance
 uses its own bank account and key for signing contracts.  It is
@@ -560,6 +618,7 @@ in the section name instead of @code{default}.
 
 @section Sample backend configuration
 
+@cindex configuration
 The following is an example for a complete backend configuration:
 
 @smallexample
@@ -585,9 +644,8 @@ master_key = CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
 @end smallexample
 
 
-
 Given the above configuration, the backend will use a database named
-@code{donations} within Postgresql.
+@code{donations} within Postgres.
 
 The backend will deposit the coins it receives to the exchange at
 @url{https://exchange.demo.taler.net/}, which has the master key @*
@@ -599,6 +657,8 @@ for each of them.
 
 @section Launching the backend
 
+@cindex backend
+@cindex taler-merchant-httpd
 Assuming you have configured everything correctly, you can launch the
 merchant backend using:
 
@@ -633,17 +693,18 @@ port.
 @c NOTE: include explaining wallet installation to sysadmin
 
 
-@c FIXME: this should be a separate manual
-
 @node Advanced topics
 @chapter Advanced topics
 
 @menu
 * Using taler-config::      Introduction to the taler-config tool
+* Key management::          Managing the merchant's cryptographic keys
+* SEPA configuration::      Configuring a SEPA bank account
 @end menu
 
 @node Using taler-config
 @section Using taler-config
+@cindex taler-config
 
 The tool @code{taler-config} can be used to
 extract or manipulate configuration values; however, the configuration
@@ -687,7 +748,10 @@ specified to @code{taler-merchant-httpd} and @code{taler-config} using
 the @code{-c} option.
 
 
+@node Key management
 @section Merchant key management
+@cindex merchant key
+@cindex KEYFILE
 
 The option ``KEYFILE'' in the section ``merchant-instance-default''
 specifies the path to the instance's private key.  You do not need to
@@ -704,25 +768,14 @@ $ gnunet-ecc -p                                  \
 
 @c Add more on how to add that key to X.509 CSRs once we can do that.
 
-
-
-
-
-@bye
-
-
-@node Advanced-topics
-@chapter Advanced topics
-
-This chapter includes draft texts for advanced topics which have
-not yet been properly integrated with the main text.
-
-
+@node SEPA configuration
 @section Using the SEPA wire transfer method
+@cindex SEPA
 
-Let's say that all the donations go to the following recipient,
-expressed in @code{SEPA} format@footnote{As said, supporting SEPA is still
-work in progress}.
+The following is a sample configuration for the SEPA wire transfer
+method:@footnote{Supporting SEPA is still
+work in progress; the backend will accept this configuration, but the
+exchange will not work with SEPA today.}.
 
 @verbatim
 {
@@ -735,4 +788,49 @@ work in progress}.
 
 @end verbatim
 
-Assume this information is stored in file @code{$DATADIR/sepa.json}.
+We will now assume that this information is stored in file @code{$@{DATADIR@}/sepa.json}.
+Then, to configure the backend for SEPA payments in EUR, the following configuration
+options need to be set:
+
+@example
+$ taler-config -s merchant -o currency -V EUR
+$ taler-config -s merchant -o wireformat -V sepa
+$ taler-config -s merchant-instance-wireformat-default \
+                -o sepa_response_file -V $@{DATADIR@}/sepa.json
+@end example
+
+Please note that you will also have to configure an exchange and/or
+auditors that support SEPA.  However, we cannot explain how to do this
+yet as such entities do not yet exist.  Once such entities do exist,
+we expect future versions of the Taler backend to ship with
+pre-configured exchanges and auditors for common denominations.
+
+
+@c **********************************************************
+@c *******************  Appendices  *************************
+@c **********************************************************
+
+@node GNU-LGPL
+@unnumbered GNU-LGPL
+@cindex license
+@cindex LGPL
+@include lgpl.texi
+
+@node GNU Affero GPL
+@unnumbered GNU Affero GPL
+@cindex license
+@cindex Affero GPL
+@include agpl.texi
+
+@node GNU-FDL
+@unnumbered GNU-FDL
+@cindex license
+@cindex GNU Free Documentation License
+@include fdl-1.3.texi
+
+@node Concept Index
+@unnumbered Concept Index
+
+@printindex cp
+
+@bye
