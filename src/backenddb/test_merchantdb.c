@@ -301,9 +301,21 @@ run (void *cls)
   struct GNUNET_TIME_Absolute fake_now;
   /* Data for 'store_payment()' */
 
-  FAILIF (NULL == (plugin = TALER_MERCHANTDB_plugin_load (cfg)));
-  (void)  plugin->drop_tables (plugin->cls);
-  FAILIF (GNUNET_OK != plugin->initialize (plugin->cls));
+  if (NULL == (plugin = TALER_MERCHANTDB_plugin_load (cfg)))
+  {
+    result = 77;
+    return;
+  }
+  if (GNUNET_OK != plugin->drop_tables (plugin->cls))
+  {
+    result = 77;
+    return;
+  }
+  if (GNUNET_OK != plugin->initialize (plugin->cls))
+  {
+    result = 77;
+    return;
+  }
 
   /* Prepare data for 'store_payment()' */
   RND_BLK (&h_contract);
