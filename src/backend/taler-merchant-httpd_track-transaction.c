@@ -504,7 +504,7 @@ wtid_cb (void *cls,
                               tctx->exchange_uri,
                               wtid,
                               &proof_cb,
-                              NULL))
+                              &pcc))
   {
     GNUNET_break_op (0);
     resume_track_transaction_with_response
