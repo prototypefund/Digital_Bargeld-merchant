@@ -237,7 +237,7 @@ check_transfer (void *cls,
     rctx->check_transfer_result = GNUNET_SYSERR;
     /* Build the `TrackTransferConflictDetails` */
     rctx->response
-      = TMH_RESPONSE_make_json_pack ("{s:s, s:O, s:I, s:O, s:o, s:I, s:o, s:o}",
+      = TMH_RESPONSE_make_json_pack ("{s:I, s:s, s:o, s:I, s:o, s:o, s:I, s:o, s:o}",
                                      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
                                      "hint", "disagreement about deposit valuation",
                                      "exchange_deposit_proof", exchange_proof,
@@ -570,6 +570,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                               "instance");
   if (NULL == instance_str)
     instance_str = "default";
+
   rctx->mi = TMH_lookup_instance (instance_str);
   if (NULL == rctx->mi)
     return TMH_RESPONSE_reply_not_found (connection,

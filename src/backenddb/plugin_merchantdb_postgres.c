@@ -878,6 +878,7 @@ postgres_find_payments_by_id_and_coin (void *cls,
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_end
   };
+
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_deposits_by_tid_and_coin",
                                     params);
