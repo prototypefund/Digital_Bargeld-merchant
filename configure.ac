@@ -279,6 +279,5 @@ src/Makefile
 src/include/Makefile
 src/backenddb/Makefile
 src/backend/Makefile
-src/merchant-tools/Makefile
 src/lib/Makefile])
 AC_OUTPUT
