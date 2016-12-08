@@ -2393,7 +2393,6 @@ run (void *cls)
     /* end of testcase */
     { .oc = OC_END }
   };
-  /*get_new_contracts (commands);*/
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Interpreter initializing\n");

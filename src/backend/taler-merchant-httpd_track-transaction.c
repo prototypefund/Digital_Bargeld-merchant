@@ -390,13 +390,20 @@ wire_deposits_cb (void *cls,
       continue;
     for (i=0;i<details_length;i++)
     {
-      tcc->wtid = tctx->current_wtid;
-      tcc->execution_time = tctx->current_execution_time;
-      tcc->have_wtid = GNUNET_YES;
+
+      if (0 == memcmp (&details[i].coin_pub,
+                       &tcc->coin_pub,
+                       sizeof (struct TALER_CoinSpendPublicKeyP)))
+      {
+        tcc->wtid = tctx->current_wtid;
+        tcc->execution_time = tctx->current_execution_time;
+        tcc->have_wtid = GNUNET_YES;
+      }
+
       if (GNUNET_OK !=
           db->store_coin_to_transfer (db->cls,
-                                      tctx->transaction_id,
-                                      &tcc->coin_pub,
+                                      details[i].transaction_id,
+                                      &details[i].coin_pub,
                                       &tctx->current_wtid))
       {
         /* Not good, but not fatal either, log error and continue */
@@ -499,6 +506,9 @@ wtid_cb (void *cls,
   tctx->current_wtid = *wtid;
   tctx->current_execution_time = execution_time;
   pcc.p_ret = NULL;
+  /* WARNING: if two transactions got aggregated under the same
+     WTID, then this branch is always taken (when attempting to
+     track the second transaction). */
   if (GNUNET_OK == 
       db->find_proof_by_wtid (db->cls,
                               tctx->exchange_uri,
@@ -506,6 +516,16 @@ wtid_cb (void *cls,
                               &proof_cb,
                               &pcc))
   {
+    /**
+     * Conflict semantics: when the *first* call to /track/transaction
+     * at the exchange returns, the merchant issues a call to /track/transfer
+     * (at the exchange) and when that second call returns, it updates
+     * the information for all other coins using that returned information.
+     * Thus since this function is only called as callback to /track/transaction
+     * at the exchange, then if we already know this WTID, then some coin was not
+     * accounted in what /track/transfer returned (otherwise we wouldn't have
+     * tried to track it).
+     */
     GNUNET_break_op (0);
     resume_track_transaction_with_response
       (tcc->tctx,
