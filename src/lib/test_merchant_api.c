@@ -1336,7 +1336,7 @@ track_transaction_cb (void *cls,
       }
       /* NOTE: this assumes that the wire transfer corresponds to a
          single coin involved in a pay/deposit.  Thus, this invariant
-         may not always hold in the future depending no how the
+         may not always hold in the future depending on how the
          testcases evolve. */
       if (1 != transfers[0].num_coins)
       {
