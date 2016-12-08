@@ -278,6 +278,13 @@ postgres_initialize (void *cls)
               2);
 
   PG_PREPARE (pg,
+              "find_contract",
+              "SELECT plain_contract FROM merchant_contract_maps"
+              " WHERE"
+              " h_contract=$1",
+              1);
+
+  PG_PREPARE (pg,
               "find_transactions_by_date",
               "SELECT"
               " transaction_id"
@@ -392,7 +399,7 @@ postgres_initialize (void *cls)
  */
 static int
 postgres_find_contract (void *cls,
-                        json_t *contract, /*Legal?*/
+                        json_t *contract,
                         struct GNUNET_HashCode *h_contract)
 {
   struct PostgresClosure *pg = cls;
@@ -408,12 +415,15 @@ postgres_find_contract (void *cls,
                                     "find_contract",
                                     params);
   i = PQntuples (result);
-  if (1 > i)
+  if (1 < i)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Mupltiple contracts share the same hashcode.\n");
     return GNUNET_SYSERR;
   }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "i, %d\n", i);
 
   if (0 == i)
     return GNUNET_NO;
