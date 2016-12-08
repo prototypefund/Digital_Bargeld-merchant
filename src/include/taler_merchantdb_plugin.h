@@ -159,9 +159,23 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*store_map) (void *cls,
-               struct GNUNET_HashCode *h_contract,
-               const json_t *contract);
+                struct GNUNET_HashCode *h_contract,
+                const json_t *contract);
 
+
+  /**
+   * Retrieve plain contract given its hashcode
+   *
+   * @param cls closure
+   * @param h_contract hashcode of the contract to retrieve
+   * @param contract where to store the retrieved contract
+   * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
+   * found, #GNUNET_SYSERR upon error
+   */
+  int
+  (*find_contract) (void *cls,
+                    json_t *contract,
+                    struct GNUNET_HashCode *h_contract);
 
   /**
    * Insert transaction data into the database.

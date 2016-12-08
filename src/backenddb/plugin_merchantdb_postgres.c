@@ -155,7 +155,7 @@ postgres_initialize (void *cls)
   /* Setup tables */
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_contract_maps ("
-           ",h_contract BYTEA NOT NULL CHECK (LENGTH(h_contract)=64)"
+           "h_contract BYTEA NOT NULL CHECK (LENGTH(h_contract)=64)"
            ",plain_contract BYTEA NOT NULL"
 	   ",PRIMARY KEY (h_contract)"
            ");");
@@ -378,6 +378,62 @@ postgres_initialize (void *cls)
               " WHERE wtid=$1"
               "  AND exchange_uri=$2",
               2);
+  return GNUNET_OK;
+}
+
+/**
+ * Retrieve plain contract given its hashcode
+ *
+ * @param cls closure
+ * @param h_contract hashcode of the contract to retrieve
+ * @param contract where to store the retrieved contract
+ * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
+ * found, #GNUNET_SYSERR upon error
+ */
+static int
+postgres_find_contract (void *cls,
+                        json_t *contract, /*Legal?*/
+                        struct GNUNET_HashCode *h_contract)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int i;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_contract",
+                                    params);
+  i = PQntuples (result);
+  if (1 > i)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Mupltiple contracts share the same hashcode.\n");
+    return GNUNET_SYSERR;
+  }
+
+  if (0 == i)
+    return GNUNET_NO;
+
+  /* FIXME, figure out how to pass back json_t's */
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_json ("plain_contract",
+                               &contract),
+    GNUNET_PQ_result_spec_end
+  };
+  if (GNUNET_OK !=
+      GNUNET_PQ_extract_result (result,
+                                rs,
+                                0))
+  {
+    GNUNET_break (0);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+
   return GNUNET_OK;
 }
 
@@ -1285,6 +1341,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
   plugin->store_map = &postgres_store_map;
+  plugin->find_contract = &postgres_find_contract;
 
   return plugin;
 }
