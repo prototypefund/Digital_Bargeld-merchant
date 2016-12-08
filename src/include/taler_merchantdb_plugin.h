@@ -150,6 +150,20 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
+   * Insert a hash to contract map into the database
+   *
+   * @param cls closure
+   * @param h_contract hashcode of @a contract
+   * @param contract contract to store
+   * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+   */
+  int
+  (*store_map) (void *cls,
+               struct GNUNET_HashCode *h_contract,
+               const json_t *contract);
+
+
+  /**
    * Insert transaction data into the database.
    *
    * @param cls closure

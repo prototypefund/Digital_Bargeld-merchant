@@ -154,6 +154,13 @@ postgres_initialize (void *cls)
 
   /* Setup tables */
   PG_EXEC (pg,
+           "CREATE TABLE IF NOT EXISTS merchant_contract_maps ("
+           ",h_contract BYTEA NOT NULL CHECK (LENGTH(h_contract)=64)"
+           ",plain_contract BYTEA NOT NULL"
+	   ",PRIMARY KEY (h_contract)"
+           ");");
+
+  PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_transactions ("
            " transaction_id INT8"
            ",exchange_uri VARCHAR NOT NULL"
@@ -262,6 +269,15 @@ postgres_initialize (void *cls)
               5);
 
   PG_PREPARE (pg,
+              "insert_map",
+              "INSERT INTO merchant_contract_maps"
+              "(h_contract"
+              ",plain_contract)"
+              " VALUES "
+              "($1, $2)",
+              2);
+
+  PG_PREPARE (pg,
               "find_transactions_by_date",
               "SELECT"
               " transaction_id"
@@ -365,6 +381,45 @@ postgres_initialize (void *cls)
   return GNUNET_OK;
 }
 
+
+/**
+ * Insert a hash to contract map into the database
+ *
+ * @param cls closure
+ * @param h_contract hashcode of @a contract
+ * @param contract contract to store
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ */
+static int
+postgres_store_map (void *cls,
+                    struct GNUNET_HashCode *h_contract,
+                    const json_t *contract)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  int ret;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract),
+    TALER_PQ_query_param_json (contract),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "insert_map",
+                                    params);
+  if (PGRES_COMMAND_OK != PQresultStatus (result))
+  {
+    ret = GNUNET_SYSERR;
+    BREAK_DB_ERR (result);
+  }
+  else
+  {
+    ret = GNUNET_OK;
+  }
+  PQclear (result);
+  return ret;
+}
 
 /**
  * Insert transaction data into the database.
@@ -1229,6 +1284,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_transfers_by_id = &postgres_find_transfers_by_id;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
+  plugin->store_map = &postgres_store_map;
 
   return plugin;
 }
