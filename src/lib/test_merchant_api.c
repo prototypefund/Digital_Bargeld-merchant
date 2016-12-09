@@ -118,6 +118,12 @@ enum OpCode
   OC_END = 0,
 
   /**
+   * Ask the backend to store a contract and its hashcode into
+   * the database.
+   */
+  OC_MAP_IN,
+
+  /**
    * Add funds to a reserve by (faking) incoming wire transfer.
    */
   OC_ADMIN_ADD_INCOMING,
@@ -290,6 +296,24 @@ struct Command
       struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
 
     } admin_add_incoming;
+
+    /**
+     * Information for a #OC_MAP_IN command.
+     */
+    struct
+    {
+
+      /**
+       * Reference to a contract we need to hash and store.
+       */
+      const char *contract_reference;
+
+      /**
+       * Handle to a /map/in operation
+       */
+      struct TALER_MERCHANT_MapInOperation *mio; 
+
+    } map_in;
 
     /**
      * Information for a #OC_WITHDRAW_STATUS command.
@@ -1476,6 +1500,8 @@ interpreter_run (void *cls)
     is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
                                          is);
     return;
+  case OC_MAP_IN:
+  /*TBD*/
   case OC_ADMIN_ADD_INCOMING:
     if (NULL !=
         cmd->details.admin_add_incoming.reserve_reference)
@@ -1961,6 +1987,17 @@ do_shutdown (void *cls)
     case OC_END:
       GNUNET_assert (0);
       break;
+    case OC_MAP_IN:
+      if (NULL != cmd->details.map_in.mio)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_map_in_cancel (cmd->details.map_in.mio);
+      }
+        break;
+
     case OC_ADMIN_ADD_INCOMING:
       if (NULL != cmd->details.admin_add_incoming.aih)
       {
@@ -2212,8 +2249,8 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-    /* Create another contract */
 
+    /* Create another contract */
     { .oc = OC_CONTRACT,
       .label = "create-contract-2",
       .expected_response_code = MHD_HTTP_OK,
