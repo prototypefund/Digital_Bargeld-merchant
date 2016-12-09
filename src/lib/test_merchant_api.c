@@ -1312,7 +1312,8 @@ map_in_cb (void *cls,
               "Cb for /map/in\n");
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
-
+  
+  cmd->details.map_in.mio = NULL;
   GNUNET_assert (cmd->expected_response_code == http_status);
   next_command (is);
 }
