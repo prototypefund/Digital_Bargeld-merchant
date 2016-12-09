@@ -94,9 +94,9 @@ handle_contract_finished (void *cls,
   h_contractp = NULL;
   switch (response_code)
   {
-  case 0:
-    break;
-  case MHD_HTTP_OK:
+    case 0:
+      break;
+    case MHD_HTTP_OK:
     {
       struct GNUNET_JSON_Specification spec[] = {
         GNUNET_JSON_spec_json ("contract", &contract),
@@ -104,7 +104,7 @@ handle_contract_finished (void *cls,
         GNUNET_JSON_spec_fixed_auto ("H_contract", &h_contract),
         GNUNET_JSON_spec_end()
       };
-
+  
       if (GNUNET_OK !=
           GNUNET_JSON_parse (json,
                              spec,
@@ -117,34 +117,33 @@ handle_contract_finished (void *cls,
       h_contractp = &h_contract;
       sigp = &sig;
     }
-    break;
-  case MHD_HTTP_BAD_REQUEST:
-    /* This should never happen, either us or the merchant is buggy
-       (or API version conflict); just pass JSON reply to the application */
-    break;
-  case MHD_HTTP_FORBIDDEN:
-    break;
-  case MHD_HTTP_UNAUTHORIZED:
-    /* Nothing really to verify, merchant says one of the signatures is
-       invalid; as we checked them, this should never happen, we
-       should pass the JSON reply to the application */
-    break;
-  case MHD_HTTP_NOT_FOUND:
-    /* Nothing really to verify, this should never
-       happen, we should pass the JSON reply to the application */
-    break;
-  case MHD_HTTP_INTERNAL_SERVER_ERROR:
-    /* Server had an internal issue; we should retry, but this API
-       leaves this to the application */
-    break;
-  default:
-    /* unexpected response code */
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u\n",
-                (unsigned int) response_code);
-    GNUNET_break (0);
-    response_code = 0;
-    break;
+      break;
+    case MHD_HTTP_BAD_REQUEST:
+      /* This should never happen, either us or the merchant is buggy
+         (or API version conflict); just pass JSON reply to the application */
+      break;
+    case MHD_HTTP_FORBIDDEN:
+      break;
+    case MHD_HTTP_UNAUTHORIZED:
+      /* Nothing really to verify, merchant says one of the signatures is
+         invalid; as we checked them, this should never happen, we
+         should pass the JSON reply to the application */
+      break;
+    case MHD_HTTP_NOT_FOUND:
+      /* Nothing really to verify, this should never
+         happen, we should pass the JSON reply to the application */
+      break;
+    case MHD_HTTP_INTERNAL_SERVER_ERROR:
+      /* Server had an internal issue; we should retry, but this API
+         leaves this to the application */
+      break;
+    default:
+      /* unexpected response code */
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Unexpected response code %u\n",
+                  (unsigned int) response_code);
+      GNUNET_break (0);
+      response_code = 0;
   }
   co->cb (co->cb_cls,
           response_code,

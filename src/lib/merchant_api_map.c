@@ -38,7 +38,7 @@ struct TALER_MERCHANT_MapInOperation
   /**
    * Request's body
    */
-  json_t *json_enc;
+  char *json_enc;
 
   /**
    * Handle for the request.
@@ -63,23 +63,47 @@ struct TALER_MERCHANT_MapInOperation
 };
 
 /**
+ * Cancel a /map/in request.
+ *
+ * @param mio handle to the request to be canceled
+ */
+void
+TALER_MERCHANT_map_in_cancel (struct TALER_MERCHANT_MapInOperation *mio)
+{
+  if (NULL != mio->job)
+  {
+    GNUNET_CURL_job_cancel (mio->job);
+    mio->job = NULL;
+  }
+  GNUNET_free (mio->url);
+  GNUNET_free (mio->json_enc);
+  GNUNET_free (mio);
+}
+
+/**
  * Function called when we're done processing the
  * HTTP /map/in request.
  *
  * @param cls the `struct TALER_MERCHANT_FIXME`
  * @param response_code HTTP response code, 0 on error
- * @param json response body, NULL if not in JSON
+ * @param json response body, should be NULL
  */
 static void
-handle_contract_finished (void *cls,
+handle_map_in_finished (void *cls,
                           long response_code,
                           const json_t *json)
 {
+  struct TALER_MERCHANT_MapInOperation *mio = cls;
 
   /**
-   * 1 Check if errors occurred
-   * 2 Call callback
+   * As no data is supposed to be extracted from this
+   * call, we just invoke the provided callback from here.
    */
+  mio->cb (mio->cb_cls,
+           response_code);
+
+  /* Right to call this here? */
+  TALER_MERCHANT_map_in_cancel (mio);
 }
 
 /**
@@ -93,13 +117,13 @@ handle_contract_finished (void *cls,
  * @param map_in_cb_cls closure to pass to @a history_cb
  * @return handle for this operation, NULL upon errors
  */
-struct TALER_MERCHANT_HistoryOperation *
-TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
-                        const char *backend_uri,
-                        const json_t *contract,
-                        const struct GNUNET_HashCode *h_contract,
-                        TALER_MERCHANT_MapInOperationCallback map_in_cb,
-                        void *map_in_cb_cls)
+struct TALER_MERCHANT_MapInOperation *
+TALER_MERCHANT_map_in (struct GNUNET_CURL_Context *ctx,
+                       const char *backend_uri,
+                       const json_t *contract,
+                       const struct GNUNET_HashCode *h_contract,
+                       TALER_MERCHANT_MapInOperationCallback map_in_cb,
+                       void *map_in_cb_cls)
 {
   struct TALER_MERCHANT_MapInOperation *mio;
   CURL *eh;
