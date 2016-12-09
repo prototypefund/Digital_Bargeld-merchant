@@ -40,6 +40,7 @@
 #include "taler-merchant-httpd_track-transaction.h"
 #include "taler-merchant-httpd_track-transfer.h"
 #include "taler-merchant-httpd_history.h"
+#include "taler-merchant-httpd_map.h"
 
 /**
  * Backlog for listen operation on unix-domain sockets.
@@ -191,6 +192,12 @@ url_handler (void *cls,
       { "/history", MHD_HTTP_METHOD_GET, "text/plain",
         "Only GET is allowed", 0,
         &MH_handler_history, MHD_HTTP_OK},
+      { "/map/in", MHD_HTTP_METHOD_POST, "text/plain",
+        "Only POST is allowed", 0,
+        &MH_handler_map_in, MHD_HTTP_OK},
+      { "/map/out", MHD_HTTP_METHOD_GET, "text/plain",
+        "Only GET is allowed", 0,
+        &MH_handler_map_out, MHD_HTTP_OK},
       {NULL, NULL, NULL, NULL, 0, 0 }
     };
   static struct TMH_RequestHandler h404 =
