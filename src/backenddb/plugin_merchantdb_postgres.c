@@ -137,6 +137,7 @@ postgres_drop_tables (void *cls)
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_deposits;");
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_transactions;");
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_proofs;");
+  PG_EXEC_INDEX (pg, "DROP TABLE merchant_contract_maps;");
   return GNUNET_OK;
 }
 

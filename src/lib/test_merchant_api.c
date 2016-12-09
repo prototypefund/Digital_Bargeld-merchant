@@ -1297,6 +1297,25 @@ track_transfer_cb (void *cls,
   next_command (is);
 }
 
+/**
+ * Callback for /map/in issued at backend. Just check
+ * whether response code is as expected.
+ *
+ * @param cls closure
+ * @param http_status HTTP status code we got
+ */
+static void
+map_in_cb (void *cls,
+           unsigned int http_status)
+{
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Cb for /map/in\n");
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  GNUNET_assert (cmd->expected_response_code == http_status);
+  next_command (is);
+}
 
 /**
  * Function called with detailed wire transfer data.
@@ -1501,11 +1520,10 @@ interpreter_run (void *cls)
                                          is);
     return;
   case OC_MAP_IN:
-    /*TBD*/
+  {
     struct GNUNET_HashCode h_proposal;
     json_error_t error;
-    json_t *proposal;
-
+    json_t *proposal; 
     // get contract (proposal)
     // hash it
     // call lib
@@ -1517,7 +1535,7 @@ interpreter_run (void *cls)
      * WARNING, make sure what is hashed here, is exactly the same
      * contract hashed then by /map/in handler.
      */
-    proposal = json_loads (cmd->details.map_in.proposal,
+    proposal = json_loads (ref->details.contract.proposal,
                            JSON_REJECT_DUPLICATES,
                            &error);
 
@@ -1528,9 +1546,12 @@ interpreter_run (void *cls)
                    TALER_MERCHANT_map_in (ctx,
                                           MERCHANT_URI,
                                           proposal,
-                                          /*CB - TBD*/,
-                                          is)); /* Needs 'is' to "move on" the cmd*/
+                                          &h_proposal,
+                                          map_in_cb,
+                                          is));
   
+  }
+    return;
   case OC_ADMIN_ADD_INCOMING:
     if (NULL !=
         cmd->details.admin_add_incoming.reserve_reference)
@@ -2278,6 +2299,14 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
+
+    /* Store contract-1 */
+    {
+      .oc = OC_MAP_IN, 
+      .label = "store-contract-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.map_in.contract_reference = "create-contract-1",
+    },
 
     /* Create another contract */
     { .oc = OC_CONTRACT,
