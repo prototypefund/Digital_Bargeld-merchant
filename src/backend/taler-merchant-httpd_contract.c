@@ -215,9 +215,9 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   if (GNUNET_SYSERR == res)
   {
     json_decref (root);
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-					   TALER_EC_PARAMETER_MALFORMED,
-					   "contract");
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_NONE,
+					      "Impossible to parse contract");
   }
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))

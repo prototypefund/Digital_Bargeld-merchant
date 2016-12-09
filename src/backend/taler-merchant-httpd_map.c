@@ -118,23 +118,67 @@ MH_handler_map_in (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
+  res = TMH_PARSE_json_data (connection,
+                             root,
+                             spec);
+  if (GNUNET_NO == res)
+  {
+    json_decref (root);
+    return MHD_YES;
+  }
+  if (GNUNET_SYSERR == res)
+  {
+    json_decref (root);
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_NONE,
+					      "Impossible to parse JSON");
+  }
+
   /* Sanity checks */
-  GNUNET_assert (GNUNET_OK ==
-                 TALER_JSON_hash (contract,
-                                  &tmp));
-  /* Check hashes match */
-  
+  if (GNUNET_SYSERR ==
+      TALER_JSON_hash (contract,
+                       &tmp))
+    return TMH_RESPONSE_reply_invalid_json (connection); 
+
+  /**
+   * Check hashes match. This check does NOT detect invalid
+   * contracts though.
+   */
+
+  if (0 != memcmp (&tmp,
+                   &h_contract,
+                   sizeof (struct GNUNET_HashCode)))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "'h_contract' does not match 'contract'\n");
+    return TMH_RESPONSE_reply_json_pack
+             (connection,
+              MHD_HTTP_UNPROCESSABLE_ENTITY,
+              "{s:I, s:s}",
+              "code", (json_int_t) TALER_EC_MAP_IN_UNMATCHED_HASH,
+              "error", "field 'h_contract' is not hash of 'contract'");
+  }
 
   /* Store body */
+  if (GNUNET_OK != db->store_map (db->cls,
+                                  &h_contract,
+                                  contract))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Data was good, but could not store it into db\n");
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_MAP_IN_STORE_DB_ERROR,
+                                              "Could not store data into db");
+  }
 
   /* Test */
   json_t *hello;
   
-  hello = json_pack ("{ss}", "ok", "computer");
+  hello = json_pack ("{s:s}", "ok", "computer");
   return TMH_RESPONSE_reply_json (connection,
                                   hello,
                                   MHD_HTTP_OK);
-
+ 
 
 }
 
