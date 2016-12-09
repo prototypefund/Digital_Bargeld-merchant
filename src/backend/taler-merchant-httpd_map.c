@@ -85,6 +85,7 @@ MH_handler_map_in (struct TMH_RequestHandler *rh,
   json_t *root;
   json_t *contract;
   struct GNUNET_HashCode h_contract;
+  struct GNUNET_HashCode tmp;
   struct TMH_JsonParseContext *ctx;
 
 /* Fetch body */
@@ -117,8 +118,23 @@ MH_handler_map_in (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
- 
-/* Store body */
+  /* Sanity checks */
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_JSON_hash (contract,
+                                  &tmp));
+  /* Check hashes match */
+  
+
+  /* Store body */
+
+  /* Test */
+  json_t *hello;
+  
+  hello = json_pack ("{ss}", "ok", "computer");
+  return TMH_RESPONSE_reply_json (connection,
+                                  hello,
+                                  MHD_HTTP_OK);
+
 
 }
 
