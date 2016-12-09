@@ -1501,7 +1501,36 @@ interpreter_run (void *cls)
                                          is);
     return;
   case OC_MAP_IN:
-  /*TBD*/
+    /*TBD*/
+    struct GNUNET_HashCode h_proposal;
+    json_error_t error;
+    json_t *proposal;
+
+    // get contract (proposal)
+    // hash it
+    // call lib
+    GNUNET_assert (NULL != cmd->details.map_in.contract_reference);
+    ref = find_command (is, cmd->details.map_in.contract_reference);
+    GNUNET_assert (NULL != ref);
+
+    /**
+     * WARNING, make sure what is hashed here, is exactly the same
+     * contract hashed then by /map/in handler.
+     */
+    proposal = json_loads (cmd->details.map_in.proposal,
+                           JSON_REJECT_DUPLICATES,
+                           &error);
+
+    GNUNET_assert (GNUNET_SYSERR !=
+                   TALER_JSON_hash (proposal, &h_proposal));
+
+    GNUNET_assert (NULL !=
+                   TALER_MERCHANT_map_in (ctx,
+                                          MERCHANT_URI,
+                                          proposal,
+                                          /*CB - TBD*/,
+                                          is)); /* Needs 'is' to "move on" the cmd*/
+  
   case OC_ADMIN_ADD_INCOMING:
     if (NULL !=
         cmd->details.admin_add_incoming.reserve_reference)
