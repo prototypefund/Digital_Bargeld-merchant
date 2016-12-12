@@ -128,7 +128,6 @@ history_raw_cb (void *cls,
           response_code,
 	  TALER_JSON_get_error_code (json),
           json);
-  TALER_MERCHANT_history_cancel (ho);
 }
 
 

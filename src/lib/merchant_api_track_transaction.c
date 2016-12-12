@@ -161,7 +161,6 @@ parse_track_transaction_ok (struct TALER_MERCHANT_TrackTransactionHandle *tdo,
            transfers);
   free_transfers (num_transfers,
                   transfers);
-  TALER_MERCHANT_track_transaction_cancel (tdo);
   return GNUNET_OK;
 }
 
@@ -223,7 +222,6 @@ handle_track_transaction_finished (void *cls,
            json,
            0,
            NULL);
-  TALER_MERCHANT_track_transaction_cancel (tdo);
 }
 
 

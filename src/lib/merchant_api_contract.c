@@ -154,7 +154,6 @@ handle_contract_finished (void *cls,
           h_contractp);
   if (NULL != contract)
     json_decref (contract);
-  TALER_MERCHANT_contract_sign_cancel (co);
 }
 
 

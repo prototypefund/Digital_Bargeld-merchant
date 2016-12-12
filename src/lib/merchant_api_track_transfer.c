@@ -147,7 +147,6 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
              details);
   }
   GNUNET_JSON_parse_free (inner_spec);
-  TALER_MERCHANT_track_transfer_cancel (wdh);
   return GNUNET_OK;
 }
 
@@ -206,7 +205,6 @@ handle_track_transfer_finished (void *cls,
            NULL,
            0,
            NULL);
-  TALER_MERCHANT_track_transfer_cancel (tdo);
 }
 
 
