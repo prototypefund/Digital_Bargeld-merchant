@@ -28,7 +28,13 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 
-struct TALER_MERCHANT_MapInOperation
+
+/**
+ * This structure acts like a "handle" for both /map/in and
+ * /map/out operations, as they only differ about the 'json_enc'
+ * field (which is just left NULL when not needed).
+ */
+struct TALER_MERCHANT_MapOperation
 {
   /**
    * Full URI, includes "/map/in".
@@ -36,7 +42,7 @@ struct TALER_MERCHANT_MapInOperation
   char *url;
 
   /**
-   * Request's body
+   * Request's body.  Left NULL in case of /map/out.
    */
   char *json_enc;
 
@@ -48,7 +54,7 @@ struct TALER_MERCHANT_MapInOperation
   /**
    * Function to call with the result.
    */
-  TALER_MERCHANT_MapInOperationCallback cb;
+  TALER_MERCHANT_MapOperationCallback cb;
 
   /**
    * Closure for @a cb.
@@ -62,46 +68,100 @@ struct TALER_MERCHANT_MapInOperation
 
 };
 
+
 /**
- * Cancel a /map/in request.
+ * Cancel a /map/{in,out} request.
  *
  * @param mio handle to the request to be canceled
  */
 void
-TALER_MERCHANT_map_in_cancel (struct TALER_MERCHANT_MapInOperation *mio)
+TALER_MERCHANT_map_cancel (struct TALER_MERCHANT_MapOperation *mo)
 {
-  if (NULL != mio->job)
+  if (NULL != mo->job)
   {
-    GNUNET_CURL_job_cancel (mio->job);
-    mio->job = NULL;
+    GNUNET_CURL_job_cancel (mo->job);
+    mo->job = NULL;
   }
-  GNUNET_free (mio->url);
-  GNUNET_free (mio->json_enc);
-  GNUNET_free (mio);
+  GNUNET_free (mo->url);
+  GNUNET_free_non_null (mo->json_enc);
+  GNUNET_free (mo);
 }
 
+
 /**
- * Function called when we're done processing the
- * HTTP /map/in request.
+ * Function called when we're done processing the HTTP /map/{in,out} request.
  *
- * @param cls the `struct TALER_MERCHANT_FIXME`
+ * @param cls the `struct TALER_MERCHANT_MapInOperation`
  * @param response_code HTTP response code, 0 on error
  * @param json response body, should be NULL
  */
 static void
-handle_map_in_finished (void *cls,
-                          long response_code,
-                          const json_t *json)
+handle_map_finished (void *cls,
+                     long response_code,
+                     const json_t *json)
 {
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "|\n");
-  struct TALER_MERCHANT_MapInOperation *mio = cls;
+  struct TALER_MERCHANT_MapOperation *mo = cls;
 
   /**
    * As no data is supposed to be extracted from this
    * call, we just invoke the provided callback from here.
    */
-  mio->cb (mio->cb_cls,
-           response_code);
+  mo->cb (mo->cb_cls,
+          response_code,
+          json);
+}
+
+/**
+ * Issue a /map/out request to the backend.
+ *
+ * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
+ * @param h_contract hashcode of `contract`
+ * @param map_in_cb callback which will work the response gotten from the backend
+ * @param map_in_cb_cls closure to pass to @a history_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_MapOperation *
+TALER_MERCHANT_map_out (struct GNUNET_CURL_Context *ctx,
+                        const char *backend_uri,
+                        const struct GNUNET_HashCode *h_contract,
+                        TALER_MERCHANT_MapOperationCallback map_cb,
+                        void *map_cb_cls)
+{
+  struct TALER_MERCHANT_MapOperation *mo;
+  CURL *eh;
+  char *hash_enc;
+
+  mo = GNUNET_new (struct TALER_MERCHANT_MapOperation);
+  mo->ctx = ctx;
+  mo->cb = map_cb;
+  mo->cb_cls = map_cb_cls;
+
+  hash_enc = GNUNET_STRINGS_data_to_string_alloc (h_contract,
+                                                  sizeof (struct GNUNET_HashCode));
+  GNUNET_asprintf (&mo->url,
+                   "%s/map/out?h_contract=%s",
+                   backend_uri,
+                   hash_enc);
+  eh = curl_easy_init ();
+  if (CURLE_OK != curl_easy_setopt (eh,
+                                    CURLOPT_URL,
+                                    mo->url))
+  {
+    GNUNET_break (0);  
+    return NULL;
+  }
+
+  if (NULL == (mo->job = GNUNET_CURL_job_add (ctx,
+                                              eh,
+                                              GNUNET_YES,
+                                              &handle_map_finished,
+                                              mo)))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+  return mo;
 }
 
 /**
@@ -115,24 +175,24 @@ handle_map_in_finished (void *cls,
  * @param map_in_cb_cls closure to pass to @a history_cb
  * @return handle for this operation, NULL upon errors
  */
-struct TALER_MERCHANT_MapInOperation *
+struct TALER_MERCHANT_MapOperation *
 TALER_MERCHANT_map_in (struct GNUNET_CURL_Context *ctx,
                        const char *backend_uri,
                        const json_t *contract,
                        const struct GNUNET_HashCode *h_contract,
-                       TALER_MERCHANT_MapInOperationCallback map_in_cb,
-                       void *map_in_cb_cls)
+                       TALER_MERCHANT_MapOperationCallback map_cb,
+                       void *map_cb_cls)
 {
-  struct TALER_MERCHANT_MapInOperation *mio;
+  struct TALER_MERCHANT_MapOperation *mo;
   CURL *eh;
   json_t *req;
   
-  mio = GNUNET_new (struct TALER_MERCHANT_MapInOperation);
-  mio->ctx = ctx;
-  mio->cb = map_in_cb;
-  mio->cb_cls = map_in_cb_cls;
+  mo = GNUNET_new (struct TALER_MERCHANT_MapOperation);
+  mo->ctx = ctx;
+  mo->cb = map_cb;
+  mo->cb_cls = map_cb_cls;
 
-  GNUNET_asprintf (&mio->url,
+  GNUNET_asprintf (&mo->url,
                    "%s%s",
                    backend_uri,
                    "/map/in");
@@ -143,7 +203,7 @@ TALER_MERCHANT_map_in (struct GNUNET_CURL_Context *ctx,
                    "h_contract", GNUNET_JSON_from_data_auto (h_contract));
 
   GNUNET_assert (NULL !=
-                  (mio->json_enc = json_dumps (req, JSON_COMPACT))
+                  (mo->json_enc = json_dumps (req, JSON_COMPACT))
                 );
 
   json_decref (req);
@@ -152,19 +212,19 @@ TALER_MERCHANT_map_in (struct GNUNET_CURL_Context *ctx,
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
-                                   mio->url));
+                                   mo->url));
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_POSTFIELDS,
-                                   mio->json_enc));
+                                   mo->json_enc));
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_POSTFIELDSIZE,
-                                   strlen (mio->json_enc)));
-  mio->job = GNUNET_CURL_job_add (ctx,
-                                  eh,
-                                  GNUNET_YES,
-                                  &handle_map_in_finished,
-                                  mio);
-  return mio;
+                                   strlen (mo->json_enc)));
+  mo->job = GNUNET_CURL_job_add (ctx,
+                                 eh,
+                                 GNUNET_YES,
+                                 &handle_map_finished,
+                                 mo);
+  return mo;
 }

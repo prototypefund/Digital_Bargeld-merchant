@@ -174,7 +174,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*find_contract) (void *cls,
-                    json_t *contract,
+                    json_t **contract,
                     struct GNUNET_HashCode *h_contract);
 
   /**

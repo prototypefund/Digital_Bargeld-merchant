@@ -27,13 +27,32 @@
 #include <gnunet/gnunet_curl_lib.h>
 #include <jansson.h>
 
-/* *********************  /map/in *********************** */
 
-struct TALER_MERCHANT_MapInOperation;
+/* ********************* /map/{in,out} *********************** */
+
+struct TALER_MERCHANT_MapOutOperation;
 
 typedef void
-(*TALER_MERCHANT_MapInOperationCallback) (void *cls,
-                                          unsigned int http_status);
+(*TALER_MERCHANT_MapOperationCallback) (void *cls,
+                                        unsigned int http_status,
+                                        const json_t *body);
+
+/**
+ * Issue a /map/out request to the backend.
+ *
+ * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
+ * @param h_contract hashcode of `contract`
+ * @param map_in_cb callback which will work the response gotten from the backend
+ * @param map_in_cb_cls closure to pass to @a history_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_MapOperation *
+TALER_MERCHANT_map_out (struct GNUNET_CURL_Context *ctx,
+                        const char *backend_uri,
+                        const struct GNUNET_HashCode *h_contract,
+                        TALER_MERCHANT_MapOperationCallback map_cb,
+                        void *map_cb_cls);
 
 /**
  * Issue a /map/in request to the backend.
@@ -46,13 +65,13 @@ typedef void
  * @param map_in_cb_cls closure to pass to @a history_cb
  * @return handle for this operation, NULL upon errors
  */
-struct TALER_MERCHANT_MapInOperation *
+struct TALER_MERCHANT_MapOperation *
 TALER_MERCHANT_map_in (struct GNUNET_CURL_Context *ctx,
                        const char *backend_uri,
                        const json_t *contract,
                        const struct GNUNET_HashCode *h_contract,
-                       TALER_MERCHANT_MapInOperationCallback map_in_cb,
-                       void *map_in_cb_cls);
+                       TALER_MERCHANT_MapOperationCallback map_cb,
+                       void *map_cb_cls);
 
 /**
  * Cancel a /map/in request.
@@ -60,7 +79,7 @@ TALER_MERCHANT_map_in (struct GNUNET_CURL_Context *ctx,
  * @param mio handle to the request to be canceled
  */
 void
-TALER_MERCHANT_map_in_cancel (struct TALER_MERCHANT_MapInOperation *mio);
+TALER_MERCHANT_map_cancel (struct TALER_MERCHANT_MapOperation *mo);
 
 
 /* *********************  /contract *********************** */

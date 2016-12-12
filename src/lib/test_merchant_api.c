@@ -124,6 +124,12 @@ enum OpCode
   OC_MAP_IN,
 
   /**
+   * Ask the backend to retrieve a contract from the database, according
+   * to its hashcode.
+   */
+  OC_MAP_OUT,
+
+  /**
    * Add funds to a reserve by (faking) incoming wire transfer.
    */
   OC_ADMIN_ADD_INCOMING,
@@ -298,7 +304,7 @@ struct Command
     } admin_add_incoming;
 
     /**
-     * Information for a #OC_MAP_IN command.
+     * Information for both #OC_MAP_{IN,OUT} command.
      */
     struct
     {
@@ -308,12 +314,9 @@ struct Command
        */
       const char *contract_reference;
 
-      /**
-       * Handle to a /map/in operation
-       */
-      struct TALER_MERCHANT_MapInOperation *mio; 
+      struct TALER_MERCHANT_MapOperation *mo;
 
-    } map_in;
+    } map;
 
     /**
      * Information for a #OC_WITHDRAW_STATUS command.
@@ -1305,15 +1308,14 @@ track_transfer_cb (void *cls,
  * @param http_status HTTP status code we got
  */
 static void
-map_in_cb (void *cls,
-           unsigned int http_status)
+map_cb (void *cls,
+        unsigned int http_status,
+        const json_t *json)
 {
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Cb for /map/in\n");
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
   
-  cmd->details.map_in.mio = NULL;
+  cmd->details.map.mo = NULL;
   GNUNET_assert (cmd->expected_response_code == http_status);
   next_command (is);
 }
@@ -1520,14 +1522,16 @@ interpreter_run (void *cls)
     is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
                                          is);
     return;
+
   case OC_MAP_IN:
+  case OC_MAP_OUT:
   {
     struct GNUNET_HashCode h_proposal;
     json_error_t error;
     json_t *proposal; 
 
-    GNUNET_assert (NULL != cmd->details.map_in.contract_reference);
-    ref = find_command (is, cmd->details.map_in.contract_reference);
+    GNUNET_assert (NULL != cmd->details.map.contract_reference);
+    ref = find_command (is, cmd->details.map.contract_reference);
     GNUNET_assert (NULL != ref);
 
     /**
@@ -1541,16 +1545,27 @@ interpreter_run (void *cls)
     GNUNET_assert (GNUNET_SYSERR !=
                    TALER_JSON_hash (proposal, &h_proposal));
 
-    GNUNET_assert (NULL !=
-                   TALER_MERCHANT_map_in (ctx,
-                                          MERCHANT_URI,
-                                          proposal,
-                                          &h_proposal,
-                                          map_in_cb,
-                                          is));
+    if (OC_MAP_IN == cmd->oc)
+      GNUNET_assert (NULL !=
+                      (cmd->details.map.mo
+                       = TALER_MERCHANT_map_in (ctx,
+                                                MERCHANT_URI,
+                                                proposal,
+                                                &h_proposal,
+                                                map_cb,
+                                                is)));
+   else
+     GNUNET_assert (NULL !=
+                     (cmd->details.map.mo 
+                      = TALER_MERCHANT_map_out (ctx,
+                                                MERCHANT_URI,
+                                                &h_proposal,
+                                                map_cb,
+                                                is)));
   
   }
     return;
+
   case OC_ADMIN_ADD_INCOMING:
     if (NULL !=
         cmd->details.admin_add_incoming.reserve_reference)
@@ -2037,13 +2052,14 @@ do_shutdown (void *cls)
       GNUNET_assert (0);
       break;
     case OC_MAP_IN:
-      if (NULL != cmd->details.map_in.mio)
+    case OC_MAP_OUT:
+      if (NULL != cmd->details.map.mo)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                     "Command %u (%s) did not complete\n",
                     i,
                     cmd->label);
-        TALER_MERCHANT_map_in_cancel (cmd->details.map_in.mio);
+        TALER_MERCHANT_map_cancel (cmd->details.map.mo);
       }
         break;
 
@@ -2304,7 +2320,7 @@ run (void *cls)
       .oc = OC_MAP_IN, 
       .label = "store-contract-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.map_in.contract_reference = "create-contract-1",
+      .details.map.contract_reference = "create-contract-1",
     },
 
     /* Create another contract */
@@ -2344,7 +2360,7 @@ run (void *cls)
       .oc = OC_MAP_IN, 
       .label = "store-contract-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.map_in.contract_reference = "create-contract-2",
+      .details.map.contract_reference = "create-contract-2",
     },
 
     /* Add another 4.01 EUR to reserve #2 */

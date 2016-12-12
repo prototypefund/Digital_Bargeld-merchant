@@ -363,7 +363,7 @@ run (void *cls)
 
   FAILIF (GNUNET_OK !=
           plugin->find_contract (plugin->cls,
-                                 out,
+                                 &out,
                                  &h_contract));
 
   FAILIF (GNUNET_OK !=

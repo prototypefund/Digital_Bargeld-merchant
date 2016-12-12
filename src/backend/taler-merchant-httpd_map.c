@@ -45,8 +45,6 @@ struct TMH_JsonParseContext
   void *json_parse_context;
 };
 
-
-
 /**
  * Custom cleanup routine for a `struct TMH_JsonParseContext`.
  *
@@ -199,7 +197,50 @@ MH_handler_map_out (struct TMH_RequestHandler *rh,
                     const char *upload_data,
                     size_t *upload_data_size)
 {
+  const char *h_contract_enc;
+  struct GNUNET_HashCode h_contract;
+  int res;
+  json_t *contract;
 
+  h_contract_enc = MHD_lookup_connection_value (connection,
+                                                MHD_GET_ARGUMENT_KIND,
+                                                "h_contract");
+  if (NULL == h_contract_enc)
+    return TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+                                           "h_contract");
 
+  if (GNUNET_OK != GNUNET_STRINGS_string_to_data (h_contract_enc,
+                                                  strlen (h_contract_enc),
+                                                  &h_contract, 
+                                                  sizeof (h_contract)))
+  {
+    GNUNET_break_op (0);
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           TALER_EC_PARAMETER_MALFORMED,
+                                           "Could not decode hashcode into binary form"); 
+  }
+
+  res = db->find_contract (db->cls,
+                           &contract,
+                           &h_contract);
+
+  if (GNUNET_SYSERR == res)
+  {
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_MAP_OUT_GET_FROM_DB_ERROR,
+                                              "Could not retrieve data from db");
+  }
+
+  if (GNUNET_NO == res)
+  {
+    return TMH_RESPONSE_reply_not_found (connection, 
+                                         TALER_EC_MAP_OUT_CONTRACT_UNKNOWN,
+                                         "contract");
+  }
+
+  return TMH_RESPONSE_reply_json (connection,
+                                  contract,
+                                  MHD_HTTP_OK); 
 }
 /* end of taler-merchant-httpd_history.c */

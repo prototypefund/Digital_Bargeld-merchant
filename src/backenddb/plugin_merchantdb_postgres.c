@@ -408,7 +408,7 @@ postgres_initialize (void *cls)
  */
 static int
 postgres_find_contract (void *cls,
-                        json_t *contract,
+                        json_t **contract,
                         struct GNUNET_HashCode *h_contract)
 {
   struct PostgresClosure *pg = cls;
@@ -440,7 +440,7 @@ postgres_find_contract (void *cls,
   /* FIXME, figure out how to pass back json_t's */
   struct GNUNET_PQ_ResultSpec rs[] = {
     TALER_PQ_result_spec_json ("plain_contract",
-                               &contract),
+                               contract),
     GNUNET_PQ_result_spec_end
   };
   if (GNUNET_OK !=

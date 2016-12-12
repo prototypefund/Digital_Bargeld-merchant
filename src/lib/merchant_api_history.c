@@ -170,8 +170,6 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
     return NULL;
   }    
 
-
-
   if (NULL == (ho->job = GNUNET_CURL_job_add (ctx,
                                               eh,
                                               GNUNET_YES,
