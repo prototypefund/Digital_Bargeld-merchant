@@ -55,6 +55,9 @@
  */
 #define CONTRACT_MAX_SIZE 1000
 
+#define RND_BLK(ptr)                                                    \
+  GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK, ptr, sizeof (*ptr))
+
 
 /**
  * Handle to database.
@@ -1519,6 +1522,11 @@ interpreter_run (void *cls)
                    TALER_JSON_hash (proposal, &h_proposal));
 
     if (OC_MAP_IN == cmd->oc)
+    {
+
+      if (MHD_HTTP_UNPROCESSABLE_ENTITY == cmd->expected_response_code)
+        RND_BLK (&h_proposal);
+
       GNUNET_assert (NULL !=
                       (cmd->details.map.mo
                        = TALER_MERCHANT_map_in (ctx,
@@ -1527,6 +1535,7 @@ interpreter_run (void *cls)
                                                 &h_proposal,
                                                 map_cb,
                                                 is)));
+    }
    else
      GNUNET_assert (NULL !=
                      (cmd->details.map.mo 
@@ -2492,14 +2501,14 @@ run (void *cls)
       .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
       .details.history.nresult = 0
     },
-    /* Store contract-1 */
+    /* Retrieve via /map/out a contract NOT stored previously. */
     {
       .oc = OC_MAP_OUT, 
       .label = "fetch-contract-not-found",
       .expected_response_code = MHD_HTTP_NOT_FOUND,
       .details.map.contract_reference = "create-contract-3" },
 
-    /* Create another contract */
+    /* Create another contract, NOT to be stored. */
     { .oc = OC_CONTRACT,
       .label = "create-contract-3",
       .expected_response_code = MHD_HTTP_OK,
@@ -2514,6 +2523,12 @@ run (void *cls)
                   \"products\":\
                      [ {\"description\":\"bogus\", \"value\":\"{EUR:1}\"} ] }" },
 
+    /* Try to store a contract passing a bogus hashcode. */
+    {
+      .oc = OC_MAP_IN, 
+      .label = "store-contract-bogus",
+      .expected_response_code = MHD_HTTP_UNPROCESSABLE_ENTITY,
+      .details.map.contract_reference = "create-contract-3" },
     /* end of testcase */
     { .oc = OC_END }
   };
