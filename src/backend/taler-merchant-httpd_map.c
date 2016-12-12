@@ -85,6 +85,7 @@ MH_handler_map_in (struct TMH_RequestHandler *rh,
   struct GNUNET_HashCode h_contract;
   struct GNUNET_HashCode tmp;
   struct TMH_JsonParseContext *ctx;
+  struct MHD_Response *response;
 
 /* Fetch body */
 
@@ -167,14 +168,8 @@ MH_handler_map_in (struct TMH_RequestHandler *rh,
                                               "Could not store data into db");
   }
 
-  /* Test */
-  json_t *hello;
-  
-  hello = json_pack ("{s:s}", "ok", "computer");
-  return TMH_RESPONSE_reply_json (connection,
-                                  hello,
-                                  MHD_HTTP_OK);
- 
+ response = MHD_create_response_from_buffer (0, NULL, MHD_RESPMEM_PERSISTENT); 
+ return MHD_queue_response (connection, MHD_HTTP_OK, response);
 
 }
 
