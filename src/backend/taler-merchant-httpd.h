@@ -190,7 +190,7 @@ typedef void
  * Each MHD response handler that sets the "connection_cls" to a
  * non-NULL value must use a struct that has this struct as its first
  * member.  This struct contains a single callback, which will be
- * invoked to clean up the memory when the contection is completed.
+ * invoked to clean up the memory when the connection is completed.
  */
 struct TM_HandlerContext
 {

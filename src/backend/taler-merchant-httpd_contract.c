@@ -81,7 +81,7 @@ check_products (json_t *products)
 
 
 /**
- * Information we keep for an individual calls
+ * Information we keep for individual calls
  * to requests that parse JSON, but keep no other state.
  */
 struct TMH_JsonParseContext
@@ -169,7 +169,7 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
     GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
     GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
     GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
 
   if (NULL == *connection_cls)
@@ -215,9 +215,9 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   if (GNUNET_SYSERR == res)
   {
     json_decref (root);
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-					   TALER_EC_PARAMETER_MALFORMED,
-					   "contract");
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_NONE,
+					      "Impossible to parse contract");
   }
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))

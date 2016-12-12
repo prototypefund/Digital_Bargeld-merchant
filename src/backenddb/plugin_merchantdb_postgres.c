@@ -41,6 +41,14 @@ struct PostgresClosure
 
 };
 
+/**
+ * Extract error code.
+ *
+ * @param res postgres result object with error details
+ */
+#define EXTRACT_DB_ERROR(res)                                         \
+  PQresultErrorField(res, PG_DIAG_SQLSTATE)
+
 
 /**
  * Log error from PostGres.
@@ -137,6 +145,7 @@ postgres_drop_tables (void *cls)
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_deposits;");
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_transactions;");
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_proofs;");
+  PG_EXEC_INDEX (pg, "DROP TABLE merchant_contract_maps;");
   return GNUNET_OK;
 }
 
@@ -153,6 +162,13 @@ postgres_initialize (void *cls)
   struct PostgresClosure *pg = cls;
 
   /* Setup tables */
+  PG_EXEC (pg,
+           "CREATE TABLE IF NOT EXISTS merchant_contract_maps ("
+           "h_contract BYTEA NOT NULL CHECK (LENGTH(h_contract)=64)"
+           ",plain_contract BYTEA NOT NULL"
+	   ",PRIMARY KEY (h_contract)"
+           ");");
+
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_transactions ("
            " transaction_id INT8"
@@ -262,6 +278,22 @@ postgres_initialize (void *cls)
               5);
 
   PG_PREPARE (pg,
+              "insert_map",
+              "INSERT INTO merchant_contract_maps"
+              "(h_contract"
+              ",plain_contract)"
+              " VALUES "
+              "($1, $2)",
+              2);
+
+  PG_PREPARE (pg,
+              "find_contract",
+              "SELECT plain_contract FROM merchant_contract_maps"
+              " WHERE"
+              " h_contract=$1",
+              1);
+
+  PG_PREPARE (pg,
               "find_transactions_by_date",
               "SELECT"
               " transaction_id"
@@ -365,6 +397,114 @@ postgres_initialize (void *cls)
   return GNUNET_OK;
 }
 
+/**
+ * Retrieve plain contract given its hashcode
+ *
+ * @param cls closure
+ * @param h_contract hashcode of the contract to retrieve
+ * @param contract where to store the retrieved contract
+ * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
+ * found, #GNUNET_SYSERR upon error
+ */
+static int
+postgres_find_contract (void *cls,
+                        json_t **contract,
+                        struct GNUNET_HashCode *h_contract)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int i;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_contract",
+                                    params);
+  i = PQntuples (result);
+  if (1 < i)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Mupltiple contracts share the same hashcode.\n");
+    return GNUNET_SYSERR;
+  }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "i, %d\n", i);
+
+  if (0 == i)
+    return GNUNET_NO;
+
+  /* FIXME, figure out how to pass back json_t's */
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_json ("plain_contract",
+                               contract),
+    GNUNET_PQ_result_spec_end
+  };
+  if (GNUNET_OK !=
+      GNUNET_PQ_extract_result (result,
+                                rs,
+                                0))
+  {
+    GNUNET_break (0);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+
+  return GNUNET_OK;
+}
+
+
+/**
+ * Insert a hash to contract map into the database
+ *
+ * @param cls closure
+ * @param h_contract hashcode of @a contract
+ * @param contract contract to store
+ * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ */
+static int
+postgres_store_map (void *cls,
+                    struct GNUNET_HashCode *h_contract,
+                    const json_t *contract)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  int ret;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract),
+    TALER_PQ_query_param_json (contract),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "insert_map",
+                                    params);
+
+  /**
+   * We don't treat a unique_violation (code '23505') error as
+   * an actual error, since there is no problem if a frontend tries
+   * to store twice the same contract.  That is especially needed
+   * when DB-less frontends perform replayed payments.
+   */
+  if (PGRES_COMMAND_OK != PQresultStatus (result)
+      && (0 != memcmp ("23505",
+                       EXTRACT_DB_ERROR (result),
+                       5)))
+  {
+    ret = GNUNET_SYSERR;
+    BREAK_DB_ERR (result);
+  }
+  else
+  {
+    ret = GNUNET_OK;
+  }
+  PQclear (result);
+  return ret;
+}
 
 /**
  * Insert transaction data into the database.
@@ -1229,6 +1369,8 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_transfers_by_id = &postgres_find_transfers_by_id;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
+  plugin->store_map = &postgres_store_map;
+  plugin->find_contract = &postgres_find_contract;
 
   return plugin;
 }

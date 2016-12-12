@@ -55,6 +55,20 @@
  */
 #define CONTRACT_MAX_SIZE 1000
 
+#define RND_BLK(ptr)                                                    \
+  GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK, ptr, sizeof (*ptr))
+
+
+/**
+ * Handle to database.
+ */
+struct TALER_MERCHANTDB_Plugin *db;
+
+/**
+ * Configuration handle.
+ */
+struct GNUNET_CONFIGURATION_Handle *cfg;
+
 /**
  * Handle to access the exchange.
  */
@@ -116,6 +130,18 @@ enum OpCode
    * Termination code, stops the interpreter loop (with success).
    */
   OC_END = 0,
+
+  /**
+   * Ask the backend to store a contract and its hashcode into
+   * the database.
+   */
+  OC_MAP_IN,
+
+  /**
+   * Ask the backend to retrieve a contract from the database, according
+   * to its hashcode.
+   */
+  OC_MAP_OUT,
 
   /**
    * Add funds to a reserve by (faking) incoming wire transfer.
@@ -290,6 +316,21 @@ struct Command
       struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
 
     } admin_add_incoming;
+
+    /**
+     * Information for both #OC_MAP_{IN,OUT} command.
+     */
+    struct
+    {
+
+      /**
+       * Reference to a contract we need to hash and store.
+       */
+      const char *contract_reference;
+
+      struct TALER_MERCHANT_MapOperation *mo;
+
+    } map;
 
     /**
      * Information for a #OC_WITHDRAW_STATUS command.
@@ -609,47 +650,6 @@ fail (struct InterpreterState *is)
               is->ip);
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_shutdown ();
-}
-
-/**
- * Get a new contract proposal for each OC_CONTRACT
- * in the list of command. It's used when we run multiple
- * instances beacuse we can't have the same transaction_id
- * for two instances.
- *
- * @param cmds the list of commands
- */
-void
-get_new_contracts (struct Command *cmds)
-{
-  unsigned int i;
-  unsigned int d = 0;
-  struct Command *cmd;
-  #define DELTA 1000
-
-  for (i=0;OC_END != (cmd = &cmds[i])->oc;i++)
-    if ( (NULL != cmd->label) &&
-         (OC_CONTRACT == cmd->oc) )
-    {
-
-      if (0 == strcmp (cmd->label, "create-contract-2"))
-        d = DELTA;
-
-      snprintf (cmd->details.contract.proposal,
-                CONTRACT_MAX_SIZE,
-                "{\
-                  \"max_fee\":\
-                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
-                  \"transaction_id\":%d,\
-                  \"timestamp\":\"\\/Date(42)\\/\",\
-                  \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"expiry\":\"\\/Date(999999999)\\/\",\
-                  \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
-                  \"products\":\
-                     [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ]\
-                }",
-                instance_idx + d);
-    }
 }
 
 
@@ -1273,6 +1273,28 @@ track_transfer_cb (void *cls,
   next_command (is);
 }
 
+/**
+ * Callback for /map/in issued at backend. Just check
+ * whether response code is as expected.
+ *
+ * @param cls closure
+ * @param http_status HTTP status code we got
+ */
+static void
+map_cb (void *cls,
+        unsigned int http_status,
+        const json_t *json)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  
+  cmd->details.map.mo = NULL;
+
+  if (cmd->expected_response_code != http_status)
+    fail (is);
+
+  next_command (is);
+}
 
 /**
  * Function called with detailed wire transfer data.
@@ -1472,10 +1494,60 @@ interpreter_run (void *cls)
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Switching instance: '%s'\n",
                 instance);
-    /*get_new_contracts(is->commands);*/
+
     is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
                                          is);
     return;
+
+  case OC_MAP_IN:
+  case OC_MAP_OUT:
+  {
+    struct GNUNET_HashCode h_proposal;
+    json_error_t error;
+    json_t *proposal; 
+
+    GNUNET_assert (NULL != cmd->details.map.contract_reference);
+    ref = find_command (is, cmd->details.map.contract_reference);
+    GNUNET_assert (NULL != ref);
+
+    /**
+     * WARNING, make sure what is hashed here, is exactly the same
+     * contract hashed then by /map/in handler.
+     */
+    proposal = json_loads (ref->details.contract.proposal,
+                           JSON_REJECT_DUPLICATES,
+                           &error);
+
+    GNUNET_assert (GNUNET_SYSERR !=
+                   TALER_JSON_hash (proposal, &h_proposal));
+
+    if (OC_MAP_IN == cmd->oc)
+    {
+
+      if (MHD_HTTP_UNPROCESSABLE_ENTITY == cmd->expected_response_code)
+        RND_BLK (&h_proposal);
+
+      GNUNET_assert (NULL !=
+                      (cmd->details.map.mo
+                       = TALER_MERCHANT_map_in (ctx,
+                                                MERCHANT_URI,
+                                                proposal,
+                                                &h_proposal,
+                                                map_cb,
+                                                is)));
+    }
+   else
+     GNUNET_assert (NULL !=
+                     (cmd->details.map.mo 
+                      = TALER_MERCHANT_map_out (ctx,
+                                                MERCHANT_URI,
+                                                &h_proposal,
+                                                map_cb,
+                                                is)));
+  
+  }
+    return;
+
   case OC_ADMIN_ADD_INCOMING:
     if (NULL !=
         cmd->details.admin_add_incoming.reserve_reference)
@@ -1961,6 +2033,18 @@ do_shutdown (void *cls)
     case OC_END:
       GNUNET_assert (0);
       break;
+    case OC_MAP_IN:
+    case OC_MAP_OUT:
+      if (NULL != cmd->details.map.mo)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_map_cancel (cmd->details.map.mo);
+      }
+        break;
+
     case OC_ADMIN_ADD_INCOMING:
       if (NULL != cmd->details.admin_add_incoming.aih)
       {
@@ -2102,6 +2186,10 @@ do_shutdown (void *cls)
   }
   TALER_FAKEBANK_stop (fakebank);
   fakebank = NULL;
+
+  db->drop_tables (db->cls);
+  TALER_MERCHANTDB_plugin_unload (db);
+  GNUNET_CONFIGURATION_destroy (cfg);
 }
 
 
@@ -2212,8 +2300,15 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-    /* Create another contract */
 
+    /* Store contract-1 */
+    {
+      .oc = OC_MAP_IN, 
+      .label = "store-contract-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.map.contract_reference = "create-contract-1" },
+
+    /* Create another contract */
     { .oc = OC_CONTRACT,
       .label = "create-contract-2",
       .expected_response_code = MHD_HTTP_OK,
@@ -2227,6 +2322,7 @@ run (void *cls)
                   \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
+
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        transaction ID) */
     { .oc = OC_PAY,
@@ -2245,6 +2341,14 @@ run (void *cls)
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 2}",
       .details.admin_add_incoming.amount = "EUR:1" },
 
+    /* Store contract-1 */
+    {
+      .oc = OC_MAP_IN, 
+      .label = "store-contract-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.map.contract_reference = "create-contract-2",
+    },
+
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2b",
@@ -2260,6 +2364,13 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
+
+    /* Fetch contract-1 */
+    {
+      .oc = OC_MAP_OUT, 
+      .label = "fetch-contract-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.map.contract_reference = "create-contract-2" },
 
     /* Check nothing happened on the bank side so far */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
@@ -2390,6 +2501,34 @@ run (void *cls)
       .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
       .details.history.nresult = 0
     },
+    /* Retrieve via /map/out a contract NOT stored previously. */
+    {
+      .oc = OC_MAP_OUT, 
+      .label = "fetch-contract-not-found",
+      .expected_response_code = MHD_HTTP_NOT_FOUND,
+      .details.map.contract_reference = "create-contract-3" },
+
+    /* Create another contract, NOT to be stored. */
+    { .oc = OC_CONTRACT,
+      .label = "create-contract-3",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.contract.proposal = "{\
+                  \"max_fee\":\
+                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":10000},\
+                  \"transaction_id\":3,\
+                  \"timestamp\":\"\\/Date(42)\\/\",\
+                  \"refund_deadline\":\"\\/Date(0)\\/\",\
+                  \"pay_deadline\":\"\\/Date(0)\\/\",\
+                  \"amount\":{\"currency\":\"EUR\", \"value\":1, \"fraction\":0},\
+                  \"products\":\
+                     [ {\"description\":\"bogus\", \"value\":\"{EUR:1}\"} ] }" },
+
+    /* Try to store a contract passing a bogus hashcode. */
+    {
+      .oc = OC_MAP_IN, 
+      .label = "store-contract-bogus",
+      .expected_response_code = MHD_HTTP_UNPROCESSABLE_ENTITY,
+      .details.map.contract_reference = "create-contract-3" },
     /* end of testcase */
     { .oc = OC_END }
   };
@@ -2440,8 +2579,6 @@ main (int argc,
   struct GNUNET_OS_Process *proc;
   struct GNUNET_OS_Process *exchanged;
   struct GNUNET_OS_Process *merchantd;
-  struct TALER_MERCHANTDB_Plugin *db;
-  struct GNUNET_CONFIGURATION_Handle *cfg;
   unsigned int cnt;
   struct GNUNET_SIGNAL_Context *shc_chld;
 
@@ -2478,9 +2615,6 @@ main (int argc,
     GNUNET_CONFIGURATION_destroy (cfg);
     return 77;
   }
-  TALER_MERCHANTDB_plugin_unload (db);
-  GNUNET_CONFIGURATION_destroy (cfg);
-
   proc = GNUNET_OS_start_process (GNUNET_NO,
                                   GNUNET_OS_INHERIT_STD_ALL,
                                   NULL, NULL, NULL,

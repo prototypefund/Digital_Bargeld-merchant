@@ -130,6 +130,11 @@ static json_t *deposit_proof;
  */
 static json_t *transfer_proof;
 
+/**
+ * A mock contract, not need to be well-formed
+ */
+static json_t *contract;
+
 
 /**
  * Function called with information about a transaction.
@@ -347,6 +352,20 @@ run (void *cls)
                  json_object_set_new (transfer_proof,
                                       "test",
                                       json_string ("backenddb test B")));
+  contract = json_object ();
+
+  FAILIF (GNUNET_OK !=
+          plugin->store_map (plugin->cls,
+                             &h_contract,
+                             contract));
+
+  json_t *out;
+
+  FAILIF (GNUNET_OK !=
+          plugin->find_contract (plugin->cls,
+                                 &out,
+                                 &h_contract));
+
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,
                                      transaction_id,

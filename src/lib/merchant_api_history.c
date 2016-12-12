@@ -128,7 +128,6 @@ history_raw_cb (void *cls,
           response_code,
 	  TALER_JSON_get_error_code (json),
           json);
-  TALER_MERCHANT_history_cancel (ho);
 }
 
 
@@ -170,8 +169,6 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
     GNUNET_break (0);  
     return NULL;
   }    
-
-
 
   if (NULL == (ho->job = GNUNET_CURL_job_add (ctx,
                                               eh,
