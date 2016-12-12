@@ -41,6 +41,14 @@ struct PostgresClosure
 
 };
 
+/**
+ * Extract error code.
+ *
+ * @param res postgres result object with error details
+ */
+#define EXTRACT_DB_ERROR(res)                                         \
+  PQresultErrorField(res, PG_DIAG_SQLSTATE)
+
 
 /**
  * Log error from PostGres.
@@ -475,7 +483,17 @@ postgres_store_map (void *cls,
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "insert_map",
                                     params);
-  if (PGRES_COMMAND_OK != PQresultStatus (result))
+
+  /**
+   * We don't treat a unique_violation (code '23505') error as
+   * an actual error, since there is no problem if a frontend tries
+   * to store twice the same contract.  That is especially needed
+   * when DB-less frontends perform replayed payments.
+   */
+  if (PGRES_COMMAND_OK != PQresultStatus (result)
+      && (0 != memcmp ("23505",
+                       EXTRACT_DB_ERROR (result),
+                       5)))
   {
     ret = GNUNET_SYSERR;
     BREAK_DB_ERR (result);

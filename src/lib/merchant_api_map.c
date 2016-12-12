@@ -93,6 +93,7 @@ handle_map_in_finished (void *cls,
                           long response_code,
                           const json_t *json)
 {
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "|\n");
   struct TALER_MERCHANT_MapInOperation *mio = cls;
 
   /**
@@ -101,9 +102,6 @@ handle_map_in_finished (void *cls,
    */
   mio->cb (mio->cb_cls,
            response_code);
-
-  /* Right to call this here? */
-  TALER_MERCHANT_map_in_cancel (mio);
 }
 
 /**

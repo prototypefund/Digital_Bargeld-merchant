@@ -1525,9 +1525,7 @@ interpreter_run (void *cls)
     struct GNUNET_HashCode h_proposal;
     json_error_t error;
     json_t *proposal; 
-    // get contract (proposal)
-    // hash it
-    // call lib
+
     GNUNET_assert (NULL != cmd->details.map_in.contract_reference);
     ref = find_command (is, cmd->details.map_in.contract_reference);
     GNUNET_assert (NULL != ref);
@@ -2340,6 +2338,14 @@ run (void *cls)
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":63, \"uuid\":2 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 2}",
       .details.admin_add_incoming.amount = "EUR:1" },
+
+    /* Store contract-1 */
+    {
+      .oc = OC_MAP_IN, 
+      .label = "store-contract-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.map_in.contract_reference = "create-contract-2",
+    },
 
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,

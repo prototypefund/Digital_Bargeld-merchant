@@ -164,8 +164,6 @@ MH_handler_map_in (struct TMH_RequestHandler *rh,
                                   &h_contract,
                                   contract))
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Data was good, but could not store it into db\n");
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_MAP_IN_STORE_DB_ERROR,
                                               "Could not store data into db");
