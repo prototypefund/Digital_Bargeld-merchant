@@ -431,9 +431,6 @@ postgres_find_contract (void *cls,
     return GNUNET_SYSERR;
   }
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "i, %d\n", i);
-
   if (0 == i)
     return GNUNET_NO;
 
