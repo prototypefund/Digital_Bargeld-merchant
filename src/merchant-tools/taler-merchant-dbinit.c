@@ -20,8 +20,9 @@
  * @author Marcello Stanisci
  */
 #include "platform.h"
+#include <taler/taler_util.h>
 #include <gnunet/gnunet_util_lib.h>
-#include "taler_merchantdb_plugin.h"
+#include "taler_merchantdb_lib.h"
 
 
 /**
