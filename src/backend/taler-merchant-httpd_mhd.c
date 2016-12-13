@@ -1,4 +1,4 @@
-return /*
+/*
   This file is part of TALER
   Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
 
