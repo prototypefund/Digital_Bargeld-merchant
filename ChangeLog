@@ -1,3 +1,10 @@
+Thu Dec 15 10:37:08 CET 2016
+        Implementing:
+        - /map/in, /map/out API, to allow frontends to store
+        plain text contracts in database and retrieving them
+        by looking for their hashcodes.
+
+
 Fri Nov 18 18:54:07 CET 2016
 	Misc. minor updates to match API changes from exchange 0.2.
 	Releasing taler-merchant 0.2.0. -CG
