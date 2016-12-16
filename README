@@ -33,8 +33,4 @@ PHP:  PHP License, AGPL- and LGPL-Compatible, owned by The PHP Group
 
 - 'src/' contains the "backend", a C piece of software which implements cryto routines
   and communication with the 'exchange'
-- 'examples/' contains examples of merchants using Taler, as may be a simple donation
-  shop or a blog
-- 'copylib/' contains commons routines that any merchant using Taler needs; for example,
-  some JavaScript which detects if the user has a Taler wallet installed
-- 'doc/' contains documentation files, like TeXinfo
+ 'doc/' contains documentation files, like TeXinfo
