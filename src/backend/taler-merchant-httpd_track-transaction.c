@@ -662,7 +662,8 @@ trace_coins (struct TrackTransactionContext *tctx)
     GNUNET_assert (wtid_off == num_wtid);
 
     resp = TMH_RESPONSE_make_track_transaction_ok (num_wtid,
-                                                   wts);
+                                                   wts,
+                                                   tctx->exchange_uri);
     for (wtid_off=0;wtid_off < num_wtid; wtid_off++)
       GNUNET_free (wts[wtid_off].coins);
     resume_track_transaction_with_response (tctx,

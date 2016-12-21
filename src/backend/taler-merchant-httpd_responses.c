@@ -400,11 +400,13 @@ TMH_RESPONSE_reply_arg_invalid (struct MHD_Connection *connection,
  *
  * @param num_transfers how many wire transfers make up the transaction
  * @param transfers data on each wire transfer
+ * @param exchange_uri URI of the exchange that made the transfer
  * @return MHD response object
  */
 struct MHD_Response *
 TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
-                                        const struct TALER_MERCHANT_TransactionWireTransfer *transfers)
+                                        const struct TALER_MERCHANT_TransactionWireTransfer *transfers,
+                                        const char *exchange_uri)
 {
   struct MHD_Response *ret;
   unsigned int i;
@@ -431,7 +433,8 @@ TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
     }
     GNUNET_assert (0 ==
                    json_array_append_new (j_transfers,
-                                          json_pack ("{s:o, s:o, s:o}",
+                                          json_pack ("{s:s, s:o, s:o, s:o}",
+                                                     "exchange", exchange_uri,
                                                      "wtid", GNUNET_JSON_from_data_auto (&transfer->wtid),
                                                      "execution_time", GNUNET_JSON_from_time_abs (transfer->execution_time),
                                                      "coins", j_coins)));

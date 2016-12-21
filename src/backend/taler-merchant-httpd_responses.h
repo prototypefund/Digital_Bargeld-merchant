@@ -74,11 +74,13 @@ TMH_RESPONSE_make_json_pack (const char *fmt,
  *
  * @param num_transfers how many wire transfers make up the transaction
  * @param transfers data on each wire transfer
+ * @param exchange_uri URI of the exchange that made the transfer
  * @return MHD response object
  */
 struct MHD_Response *
 TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
-                                        const struct TALER_MERCHANT_TransactionWireTransfer *transfers);
+                                        const struct TALER_MERCHANT_TransactionWireTransfer *transfers,
+                                        const char *exchange_uri);
 
 
 /**
