@@ -51,6 +51,10 @@
 /* Do not use deprecated functions from gcrypt */
 #define GCRYPT_NO_DEPRECATED 1
 
+/* Ignore MHD deprecations for now as we want to be compatible
+   to "ancient" MHD releases. */
+#define MHD_NO_DEPRECATION 1
+
 #endif  /* PLATFORM_H_ */
 
 /* end of platform.h */
