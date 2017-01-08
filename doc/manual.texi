@@ -175,7 +175,7 @@ account information is encapsulated within the Taler backend.
 * generic-instructions:: Generic installation guidelines
 * Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
 @c * Installing Taler with GNU Guix:: Installing Taler with GNU Guix
-@c * Installing Taler using Docker:: Installing Taler using Docker
+* Installing Taler using Docker:: Installing Taler using Docker
 @c * Installing Taler on Arch Linux:: Installing Taler on Arch Linux
 @c * Installing Taler on Windows:: Installing Taler on Windows
 @c * Installing Taler on OS X:: Installing Taler on OS X
@@ -184,6 +184,61 @@ account information is encapsulated within the Taler backend.
 @chapter Installation
 
 This chapter describes how to install the GNU Taler merchant backend.
+
+@node Installing Taler using Docker
+@section Installing Taler using Docker
+
+This section provides instructions for the merchant backend
+installation using `Docker`.
+
+For security reasons, we run Docker against a VirtualBox instance,
+so the @code{docker} command should connect to a @code{docker-machine}
+instance that uses the VirtualBox driver.
+
+Therefore, the needed tools are: ``docker``, ``docker-machine``, and
+``docker-compose``.  Please refer to Docker's official
+@footnote{https://docs.docker.com/}documentation in order
+to get those components installed, as that is not in this manual's scope.
+
+Before starting to build the merchant's image, make sure a
+``docker-machine`` instance is up and running.
+
+Because all of the Docker source file are kept in our ``deployment``
+repository, we start by checking out the
+@code{git://taler.net/deployment} codebase:
+
+@smallexample
+$ git clone git://taler.net/deployment
+@end smallexample
+
+Now we actually build the merchant's image.  From the same
+directory as above:
+
+@smallexample
+$ cd deployment/docker/merchant/
+$ docker-compose build
+@end smallexample
+
+If everything worked as expected, the merchant is ready to be
+launched.  From the same directory as the previous step:
+
+@smallexample
+# Recall: the docker-machine should be up and running.
+$ docker-compose up
+@end smallexample
+
+You should see some live logging from all the involved containers.
+At this stage of development, you should also ignore some (harmless)
+error message from postresql about already existing roles and databases.
+
+To test if everything worked as expected, it suffices to issue a
+simple request to the merchant, as:
+
+@smallexample
+$ curl http://$(docker-machine ip)/
+# A greeting message should be returned by the merchant.
+@end smallexample
+
 
 @node generic-instructions
 @section Generic instructions
