@@ -990,13 +990,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 		"Parsed JSON for /pay.\n");
     cp.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
     cp.purpose.size = htonl (sizeof (struct TALER_ContractPS));
-    cp.transaction_id = GNUNET_htonll (pc->transaction_id);
-    TALER_amount_hton (&cp.total_amount,
-		       &pc->amount);
-    TALER_amount_hton (&cp.max_fee,
-		       &pc->max_fee);
     cp.h_contract = pc->h_contract;
-    cp.merchant_pub = pc->mi->pubkey;
     if (GNUNET_OK !=
 	GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_CONTRACT,
 				    &cp.purpose,

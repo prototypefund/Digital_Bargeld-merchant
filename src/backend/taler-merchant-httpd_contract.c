@@ -259,15 +259,9 @@ MH_handler_contract (struct TMH_RequestHandler *rh,
   /* create contract signature */
   contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   contract.purpose.size = htonl (sizeof (contract));
-  contract.transaction_id = GNUNET_htonll (transaction_id);
-  TALER_amount_hton (&contract.total_amount,
-                     &total);
-  TALER_amount_hton (&contract.max_fee,
-                     &max_fee);
   GNUNET_assert (GNUNET_OK ==
                  TALER_JSON_hash (jcontract,
                                   &contract.h_contract));
-  contract.merchant_pub = mi->pubkey;
   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                             &contract.purpose,
                             &contract_sig);
