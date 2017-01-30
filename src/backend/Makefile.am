@@ -19,7 +19,7 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
   taler-merchant-httpd_auditors.c taler-merchant-httpd_auditors.h \
   taler-merchant-httpd_exchanges.c taler-merchant-httpd_exchanges.h \
-  taler-merchant-httpd_contract.c taler-merchant-httpd_contract.h \
+  taler-merchant-httpd_propose.c taler-merchant-httpd_propose.h \
   taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h \
   taler-merchant-httpd_history.c taler-merchant-httpd_history.h \
   taler-merchant-httpd_track-transaction.c taler-merchant-httpd_track-transaction.h \

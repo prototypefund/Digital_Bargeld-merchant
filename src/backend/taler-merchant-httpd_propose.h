@@ -14,7 +14,7 @@
   TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_contract.h
+ * @file backend/taler-merchant-httpd_propose.h
  * @brief headers for /contract handler
  * @author Marcello Stanisci
  */
@@ -34,7 +34,7 @@
  * @return MHD result code
  */
 int
-MH_handler_contract (struct TMH_RequestHandler *rh,
+MH_handler_propose (struct TMH_RequestHandler *rh,
                      struct MHD_Connection *connection,
                      void **connection_cls,
                      const char *upload_data,

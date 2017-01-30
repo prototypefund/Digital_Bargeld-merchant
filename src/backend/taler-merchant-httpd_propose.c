@@ -14,7 +14,7 @@
   TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_contract.c
+ * @file backend/taler-merchant-httpd_propose.c
  * @brief HTTP serving layer mainly intended to communicate with the frontend
  * @author Marcello Stanisci
  */
@@ -136,11 +136,11 @@ get_instance (struct json_t *json);
  * @return MHD result code
  */
 int
-MH_handler_contract (struct TMH_RequestHandler *rh,
-                     struct MHD_Connection *connection,
-                     void **connection_cls,
-                     const char *upload_data,
-                     size_t *upload_data_size)
+MH_handler_propose (struct TMH_RequestHandler *rh,
+                    struct MHD_Connection *connection,
+                    void **connection_cls,
+                    const char *upload_data,
+                    size_t *upload_data_size)
 {
 
   json_t *root;

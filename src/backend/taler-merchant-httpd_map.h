@@ -14,7 +14,7 @@
   TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_contract.c
+ * @file backend/taler-merchant-httpd_map.c
  * @brief HTTP serving layer mainly intended to communicate with the frontend
  * @author Marcello Stanisci
  */
