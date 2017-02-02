@@ -15,9 +15,10 @@
   <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_contract.c
- * @brief Implementation of the /contract request of the merchant's HTTP API
+ * @file lib/merchant_api_proposal.c
+ * @brief Implementation of the /proposal PUT and GET
  * @author Christian Grothoff
+ * @author Marcello Stanisci
  */
 #include "platform.h"
 #include <curl/curl.h>
@@ -158,8 +159,8 @@ handle_contract_finished (void *cls,
 
 
 /**
- * Request backend to sign a contract (and add fields like wire transfer
- * details).
+ * PUT an order to the backend and receives the related
+ * proposal.
  *
  * @param ctx execution context
  * @param backend_uri URI of the backend
@@ -169,11 +170,11 @@ handle_contract_finished (void *cls,
  * @return a handle for this request
  */
 struct TALER_MERCHANT_ContractOperation *
-TALER_MERCHANT_contract_sign (struct GNUNET_CURL_Context *ctx,
-                              const char *backend_uri,
-                              const json_t *contract,
-                              TALER_MERCHANT_ContractCallback contract_cb,
-                              void *contract_cb_cls)
+TALER_MERCHANT_put_order (struct GNUNET_CURL_Context *ctx,
+                          const char *backend_uri,
+                          const json_t *order,
+                          TALER_MERCHANT_ProposalCallback proposal_cb,
+                          void *proposal_cb_cls)
 {
   struct TALER_MERCHANT_ContractOperation *co;
   json_t *req;

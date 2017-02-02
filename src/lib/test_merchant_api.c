@@ -132,12 +132,6 @@ enum OpCode
   OC_END = 0,
 
   /**
-   * Ask the backend to store a contract and its hashcode into
-   * the database.
-   */
-  OC_MAP_IN,
-
-  /**
    * Ask the backend to retrieve a contract from the database, according
    * to its hashcode.
    */
@@ -1499,7 +1493,6 @@ interpreter_run (void *cls)
                                          is);
     return;
 
-  case OC_MAP_IN:
   case OC_MAP_OUT:
   {
     struct GNUNET_HashCode h_proposal;
@@ -1521,29 +1514,13 @@ interpreter_run (void *cls)
     GNUNET_assert (GNUNET_SYSERR !=
                    TALER_JSON_hash (proposal, &h_proposal));
 
-    if (OC_MAP_IN == cmd->oc)
-    {
-
-      if (MHD_HTTP_UNPROCESSABLE_ENTITY == cmd->expected_response_code)
-        RND_BLK (&h_proposal);
-
-      GNUNET_assert (NULL !=
-                      (cmd->details.map.mo
-                       = TALER_MERCHANT_map_in (ctx,
-                                                MERCHANT_URI,
-                                                proposal,
-                                                &h_proposal,
-                                                map_cb,
-                                                is)));
-    }
-   else
-     GNUNET_assert (NULL !=
-                     (cmd->details.map.mo 
-                      = TALER_MERCHANT_map_out (ctx,
-                                                MERCHANT_URI,
-                                                &h_proposal,
-                                                map_cb,
-                                                is)));
+    GNUNET_assert (NULL !=
+                    (cmd->details.map.mo 
+                     = TALER_MERCHANT_map_out (ctx,
+                                               MERCHANT_URI,
+                                               &h_proposal,
+                                               map_cb,
+                                               is)));
   
   }
     return;
@@ -2033,7 +2010,6 @@ do_shutdown (void *cls)
     case OC_END:
       GNUNET_assert (0);
       break;
-    case OC_MAP_IN:
     case OC_MAP_OUT:
       if (NULL != cmd->details.map.mo)
       {
@@ -2301,12 +2277,6 @@ run (void *cls)
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
-    /* Store contract-1 */
-    {
-      .oc = OC_MAP_IN, 
-      .label = "store-contract-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.map.contract_reference = "create-contract-1" },
 
     /* Create another contract */
     { .oc = OC_CONTRACT,
@@ -2340,14 +2310,6 @@ run (void *cls)
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":63, \"uuid\":2 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 2}",
       .details.admin_add_incoming.amount = "EUR:1" },
-
-    /* Store contract-1 */
-    {
-      .oc = OC_MAP_IN, 
-      .label = "store-contract-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.map.contract_reference = "create-contract-2",
-    },
 
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,
@@ -2523,12 +2485,6 @@ run (void *cls)
                   \"products\":\
                      [ {\"description\":\"bogus\", \"value\":\"{EUR:1}\"} ] }" },
 
-    /* Try to store a contract passing a bogus hashcode. */
-    {
-      .oc = OC_MAP_IN, 
-      .label = "store-contract-bogus",
-      .expected_response_code = MHD_HTTP_UNPROCESSABLE_ENTITY,
-      .details.map.contract_reference = "create-contract-3" },
     /* end of testcase */
     { .oc = OC_END }
   };
