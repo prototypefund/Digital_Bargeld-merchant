@@ -65,6 +65,13 @@ static struct TALER_MERCHANTDB_Plugin *plugin;
 static struct GNUNET_HashCode h_contract;
 
 /**
+ * Hash of the (fictitious) transaction id.  Set to some random value.
+ */
+static struct GNUNET_HashCode h_transaction_id;
+
+
+
+/**
  * Hash of the wire transfer address.  Set to some random value.
  */
 static struct GNUNET_HashCode h_wire;
@@ -134,6 +141,12 @@ static json_t *transfer_proof;
  * A mock contract, not need to be well-formed
  */
 static json_t *contract;
+
+/**
+ * Mock proposal data, not need to be well-formed
+ */
+static json_t *proposal_data;
+
 
 
 /**
@@ -324,6 +337,7 @@ run (void *cls)
 
   /* Prepare data for 'store_payment()' */
   RND_BLK (&h_contract);
+  RND_BLK (&h_transaction_id);
   RND_BLK (&h_wire);
   RND_BLK (&transaction_id);
   RND_BLK (&signkey_pub);
@@ -353,18 +367,19 @@ run (void *cls)
                                       "test",
                                       json_string ("backenddb test B")));
   contract = json_object ();
+  proposal_data = json_object ();
 
   FAILIF (GNUNET_OK !=
-          plugin->store_map (plugin->cls,
-                             &h_contract,
-                             contract));
+          plugin->insert_proposal_data (plugin->cls,
+                                        &h_transaction_id,
+                                        proposal_data));
 
   json_t *out;
 
   FAILIF (GNUNET_OK !=
-          plugin->find_contract (plugin->cls,
-                                 &out,
-                                 &h_contract));
+          plugin->find_proposal_data (plugin->cls,
+                                      &out, // plain data
+                                      &h_transaction_id));
 
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,

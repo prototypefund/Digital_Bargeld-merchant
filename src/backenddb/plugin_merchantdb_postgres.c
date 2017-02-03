@@ -163,10 +163,10 @@ postgres_initialize (void *cls)
 
   /* Setup tables */
   PG_EXEC (pg,
-           "CREATE TABLE IF NOT EXISTS merchant_contract_maps ("
-           "h_contract BYTEA NOT NULL CHECK (LENGTH(h_contract)=64)"
-           ",plain_contract BYTEA NOT NULL"
-	   ",PRIMARY KEY (h_contract)"
+           "CREATE TABLE IF NOT EXISTS merchant_proposal_data ("
+           "h_transaction_id BYTEA NOT NULL CHECK (LENGTH(h_transaction_id)=64)"
+           ",proposal_data BYTEA NOT NULL"
+	   ",PRIMARY KEY (h_transaction_id)"
            ");");
 
   PG_EXEC (pg,
@@ -278,19 +278,19 @@ postgres_initialize (void *cls)
               5);
 
   PG_PREPARE (pg,
-              "insert_map",
-              "INSERT INTO merchant_contract_maps"
-              "(h_contract"
-              ",plain_contract)"
+              "insert_proposal_data",
+              "INSERT INTO merchant_proposal_data"
+              "(h_transaction_id"
+              ",proposal_data)"
               " VALUES "
               "($1, $2)",
               2);
 
   PG_PREPARE (pg,
-              "find_contract",
-              "SELECT plain_contract FROM merchant_contract_maps"
+              "find_proposal_data",
+              "SELECT proposal_data FROM merchant_proposal_data"
               " WHERE"
-              " h_contract=$1",
+              " h_transaction_id=$1",
               1);
 
   PG_PREPARE (pg,
@@ -398,46 +398,46 @@ postgres_initialize (void *cls)
 }
 
 /**
- * Retrieve plain contract given its hashcode
+ * Retrieve proposal data given its transaction id's hashcode
  *
  * @param cls closure
- * @param h_contract hashcode of the contract to retrieve
- * @param contract where to store the retrieved contract
+ * @param h_transaction_id hashcode of the transaction id mentioned in this
+ * proposal data
+ * @param proposal_data where to store the retrieved proposal data
  * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
  * found, #GNUNET_SYSERR upon error
  */
 static int
-postgres_find_contract (void *cls,
-                        json_t **contract,
-                        struct GNUNET_HashCode *h_contract)
+postgres_find_proposal_data (void *cls,
+                             json_t **proposal_data,
+                             struct GNUNET_HashCode *h_transaction_id)
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_contract),
+    GNUNET_PQ_query_param_auto_from_type (h_transaction_id),
     GNUNET_PQ_query_param_end
   };
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_contract",
+                                    "find_proposal_data",
                                     params);
   i = PQntuples (result);
   if (1 < i)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Mupltiple contracts share the same hashcode.\n");
+                "Mupltiple proposal data share the same hashcode.\n");
     return GNUNET_SYSERR;
   }
 
   if (0 == i)
     return GNUNET_NO;
 
-  /* FIXME, figure out how to pass back json_t's */
   struct GNUNET_PQ_ResultSpec rs[] = {
-    TALER_PQ_result_spec_json ("plain_contract",
-                               contract),
+    TALER_PQ_result_spec_json ("proposal_data",
+                               proposal_data),
     GNUNET_PQ_result_spec_end
   };
   if (GNUNET_OK !=
@@ -455,30 +455,31 @@ postgres_find_contract (void *cls,
 
 
 /**
- * Insert a hash to contract map into the database
+ * Insert proposal data and its transaction id's hashcode into db
  *
  * @param cls closure
- * @param h_contract hashcode of @a contract
- * @param contract contract to store
+ * @param h_transaction_id hashcode of the transaction id mentioned in this
+ * proposal data
+ * @param proposal_data proposal data to store
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
  */
 static int
-postgres_store_map (void *cls,
-                    struct GNUNET_HashCode *h_contract,
-                    const json_t *contract)
+postgres_insert_proposal_data (void *cls,
+                               struct GNUNET_HashCode *h_transaction_id,
+                               const json_t *proposal_data)
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
   int ret;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_contract),
-    TALER_PQ_query_param_json (contract),
+    GNUNET_PQ_query_param_auto_from_type (h_transaction_id),
+    TALER_PQ_query_param_json (proposal_data),
     GNUNET_PQ_query_param_end
   };
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "insert_map",
+                                    "insert_proposal_data",
                                     params);
 
   /**
@@ -1366,8 +1367,8 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_transfers_by_id = &postgres_find_transfers_by_id;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
-  plugin->store_map = &postgres_store_map;
-  plugin->find_contract = &postgres_find_contract;
+  plugin->insert_proposal_data = &postgres_insert_proposal_data;
+  plugin->find_proposal_data = &postgres_find_proposal_data;
 
   return plugin;
 }
