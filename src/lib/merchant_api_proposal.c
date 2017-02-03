@@ -34,7 +34,7 @@
 /**
  * @brief A Contract Operation Handle
  */
-struct TALER_MERCHANT_ContractOperation
+struct TALER_MERCHANT_ProposalOperation
 {
 
   /**
@@ -55,7 +55,7 @@ struct TALER_MERCHANT_ContractOperation
   /**
    * Function to call with the result.
    */
-  TALER_MERCHANT_ContractCallback cb;
+  TALER_MERCHANT_ProposalCallback cb;
 
   /**
    * Closure for @a cb.
@@ -68,31 +68,63 @@ struct TALER_MERCHANT_ContractOperation
   struct GNUNET_CURL_Context *ctx;
 };
 
+/**
+ * Structure representing a GET /proposal operation.
+ */
+struct TALER_MERCHANT_ProposalLookupOperation
+{
+  /**
+   * Full URI, includes "/proposal".
+   */
+  char *url;
+
+  /**
+   * Handle for the request.
+   */
+  struct GNUNET_CURL_Job *job;
+
+  /**
+   * Function to call with the result.
+   */
+  TALER_MERCHANT_ProposalLookupOperationCallback cb;
+
+  /**
+   * Closure for @a cb.
+   */
+  void *cb_cls;
+
+  /**
+   * Reference to the execution context.
+   */
+  struct GNUNET_CURL_Context *ctx;
+
+};
+
 
 /**
  * Function called when we're done processing the
- * HTTP /contract request.
+ * HTTP PUT /proposal request.
  *
- * @param cls the `struct TALER_MERCHANT_Pay`
+ * @param cls the `struct TALER_MERCHANT_ProposalOperation`
  * @param response_code HTTP response code, 0 on error
  * @param json response body, NULL if not in JSON
  */
 static void
-handle_contract_finished (void *cls,
+handle_proposal_finished (void *cls,
                           long response_code,
                           const json_t *json)
 {
-  struct TALER_MERCHANT_ContractOperation *co = cls;
-  json_t *contract;
+  struct TALER_MERCHANT_ProposalOperation *po = cls;
+  json_t *proposal_data;
   const struct TALER_MerchantSignatureP *sigp;
-  const struct GNUNET_HashCode *h_contractp;
+  const struct GNUNET_HashCode *h_proposal_datap;
   struct TALER_MerchantSignatureP sig;
-  struct GNUNET_HashCode h_contract;
+  struct GNUNET_HashCode h_proposal_data;
 
-  co->job = NULL;
-  contract = NULL;
+  po->job = NULL;
+  proposal_data = NULL;
   sigp = NULL;
-  h_contractp = NULL;
+  h_proposal_datap = NULL;
   switch (response_code)
   {
     case 0:
@@ -100,9 +132,9 @@ handle_contract_finished (void *cls,
     case MHD_HTTP_OK:
     {
       struct GNUNET_JSON_Specification spec[] = {
-        GNUNET_JSON_spec_json ("contract", &contract),
+        GNUNET_JSON_spec_json ("proposal_data", &proposal_data),
         GNUNET_JSON_spec_fixed_auto ("merchant_sig", &sig),
-        GNUNET_JSON_spec_fixed_auto ("H_contract", &h_contract),
+        GNUNET_JSON_spec_fixed_auto ("h_proposal_data", &h_proposal_data),
         GNUNET_JSON_spec_end()
       };
   
@@ -115,7 +147,7 @@ handle_contract_finished (void *cls,
         response_code = 0;
         break;
       }
-      h_contractp = &h_contract;
+      h_proposal_datap = &h_proposal_data;
       sigp = &sig;
     }
       break;
@@ -146,95 +178,187 @@ handle_contract_finished (void *cls,
       GNUNET_break (0);
       response_code = 0;
   }
-  co->cb (co->cb_cls,
+  po->cb (po->cb_cls,
           response_code,
 	  TALER_JSON_get_error_code (json),
           json,
-          contract,
+          proposal_data,
           sigp,
-          h_contractp);
-  if (NULL != contract)
-    json_decref (contract);
+          h_proposal_datap);
+  if (NULL != proposal_data)
+    json_decref (proposal_data);
 }
 
 
 /**
- * PUT an order to the backend and receives the related
- * proposal.
+ * PUT an order to the backend and receives the related proposal.
  *
  * @param ctx execution context
  * @param backend_uri URI of the backend
- * @param contract prototype of the contract
- * @param contract_cb the callback to call when a reply for this request is available
- * @param contract_cb_cls closure for @a contract_cb
+ * @param order basic information about this purchase, to be extended by the
+ * backend
+ * @param proposal_cb the callback to call when a reply for this request is
+ * available
+ * @param proposal_cb_cls closure for @a proposal_cb
  * @return a handle for this request
  */
-struct TALER_MERCHANT_ContractOperation *
-TALER_MERCHANT_put_order (struct GNUNET_CURL_Context *ctx,
+struct TALER_MERCHANT_ProposalOperation *
+TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
                           const char *backend_uri,
                           const json_t *order,
                           TALER_MERCHANT_ProposalCallback proposal_cb,
                           void *proposal_cb_cls)
 {
-  struct TALER_MERCHANT_ContractOperation *co;
+  struct TALER_MERCHANT_ProposalOperation *po;
   json_t *req;
   CURL *eh;
 
-  co = GNUNET_new (struct TALER_MERCHANT_ContractOperation);
-  co->ctx = ctx;
-  co->cb = contract_cb;
-  co->cb_cls = contract_cb_cls;
-  GNUNET_asprintf (&co->url,
+  po = GNUNET_new (struct TALER_MERCHANT_ProposalOperation);
+  po->ctx = ctx;
+  po->cb = proposal_cb;
+  po->cb_cls = proposal_cb_cls;
+  GNUNET_asprintf (&po->url,
                    "%s%s",
                    backend_uri,
-                   "/contract");
+                   "/proposal");
 
   req = json_pack ("{s:O}",
-                   "contract", (json_t *) contract);
+                   "order", (json_t *) order);
   eh = curl_easy_init ();
-  GNUNET_assert (NULL != (co->json_enc =
+  GNUNET_assert (NULL != (po->json_enc =
                           json_dumps (req,
                                       JSON_COMPACT)));
   json_decref (req);
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
-                                   co->url));
+                                   po->url));
+  /* FIXME: as for the specs, POST becomes PUT */
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_POSTFIELDS,
-                                   co->json_enc));
+                                   po->json_enc));
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_POSTFIELDSIZE,
-                                   strlen (co->json_enc)));
-  co->job = GNUNET_CURL_job_add (ctx,
+                                   strlen (po->json_enc)));
+  po->job = GNUNET_CURL_job_add (ctx,
                                  eh,
                                  GNUNET_YES,
-                                 &handle_contract_finished,
-                                 co);
-  return co;
+                                 &handle_proposal_finished,
+                                 po);
+  return po;
 }
-
 
 /**
- * Cancel a /contract request.  This function cannot be used
- * on a request handle if a response is already served for it.
+ * Function called when we're done processing the GET /proposal request.
  *
- * @param co the contract operation request handle
+ * @param cls the `struct TALER_MERCHANT_ProposalLookupOperation`
+ * @param response_code HTTP response code, 0 on error
+ * @param json response body, should be NULL
  */
-void
-TALER_MERCHANT_contract_sign_cancel (struct TALER_MERCHANT_ContractOperation *co)
+static void
+handle_proposal_lookup_finished (void *cls,
+                                 long response_code,
+                                 const json_t *json)
 {
-  if (NULL != co->job)
-  {
-    GNUNET_CURL_job_cancel (co->job);
-    co->job = NULL;
-  }
-  GNUNET_free (co->url);
-  GNUNET_free (co->json_enc);
-  GNUNET_free (co);
+  struct TALER_MERCHANT_ProposalLookupOperation *plo = cls;
+
+  /**
+   * As no data is supposed to be extracted from this
+   * call, we just invoke the provided callback.
+   */
+  plo->cb (plo->cb_cls,
+           response_code,
+           json);
 }
 
+/**
+ * Calls the GET /proposal API at the backend.  That is,
+ * retrieve a proposal data by providing its transaction id.
+ *
+ * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
+ * @param transaction_id transaction id used to perform the lookup
+ * @param plo_cb callback which will work the response gotten from the backend
+ * @param plo_cb_cls closure to pass to @a history_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_ProposalLookupOperation *
+TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
+                                const char *backend_uri,
+                                const char *transaction_id,
+                                TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
+                                void *plo_cb_cls)
+{
+  struct TALER_MERCHANT_ProposalLookupOperation *plo;
+  CURL *eh;
+
+  plo = GNUNET_new (struct TALER_MERCHANT_ProposalLookupOperation);
+  plo->ctx = ctx;
+  plo->cb = plo_cb;
+  plo->cb_cls = plo_cb_cls;
+
+  GNUNET_asprintf (&plo->url,
+                   "%s/proposal?transaction_id=%s",
+                   backend_uri,
+                   transaction_id);
+  eh = curl_easy_init ();
+  if (CURLE_OK != curl_easy_setopt (eh,
+                                    CURLOPT_URL,
+                                    plo->url))
+  {
+    GNUNET_break (0);  
+    return NULL;
+  }
+
+  if (NULL == (plo->job = GNUNET_CURL_job_add (ctx,
+                                               eh,
+                                               GNUNET_YES,
+                                               &handle_proposal_lookup_finished,
+                                               plo)))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+  return plo;
+
+}
+
+/**
+ * Cancel a PUT /proposal request.  This function cannot be used
+ * on a request handle if a response is already served for it.
+ *
+ * @param po the proposal operation request handle
+ */
+void
+TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po)
+{
+  if (NULL != po->job)
+  {
+    GNUNET_CURL_job_cancel (po->job);
+    po->job = NULL;
+  }
+  GNUNET_free (po->url);
+  GNUNET_free (po->json_enc);
+  GNUNET_free (po);
+}
+
+/**
+ * Cancel a GET /proposal request.
+ *
+ * @param plo handle to the request to be canceled
+ */
+void
+TALER_MERCHANT_proposal_lookup_cancel (struct TALER_MERCHANT_ProposalLookupOperation *plo)
+{
+  if (NULL != plo->job)
+  {
+    GNUNET_CURL_job_cancel (plo->job);
+    plo->job = NULL;
+  }
+  GNUNET_free (plo->url);
+  GNUNET_free (plo);
+}
 
 /* end of merchant_api_contract.c */

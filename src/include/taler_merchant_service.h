@@ -30,66 +30,18 @@
 
 /* ********************* /map/{in,out} *********************** */
 
-struct TALER_MERCHANT_MapOutOperation;
-
-typedef void
-(*TALER_MERCHANT_MapOperationCallback) (void *cls,
-                                        unsigned int http_status,
-                                        const json_t *body);
-
-/**
- * Issue a /map/out request to the backend.
- *
- * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
- * @param h_contract hashcode of `contract`
- * @param map_in_cb callback which will work the response gotten from the backend
- * @param map_in_cb_cls closure to pass to @a history_cb
- * @return handle for this operation, NULL upon errors
- */
-struct TALER_MERCHANT_MapOperation *
-TALER_MERCHANT_map_out (struct GNUNET_CURL_Context *ctx,
-                        const char *backend_uri,
-                        const struct GNUNET_HashCode *h_contract,
-                        TALER_MERCHANT_MapOperationCallback map_cb,
-                        void *map_cb_cls);
-
-/**
- * Issue a /map/in request to the backend.
- *
- * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
- * @param contract contract to store
- * @param h_contract hashcode of `contract`
- * @param map_in_cb callback which will work the response gotten from the backend
- * @param map_in_cb_cls closure to pass to @a history_cb
- * @return handle for this operation, NULL upon errors
- */
-struct TALER_MERCHANT_MapOperation *
-TALER_MERCHANT_map_in (struct GNUNET_CURL_Context *ctx,
-                       const char *backend_uri,
-                       const json_t *contract,
-                       const struct GNUNET_HashCode *h_contract,
-                       TALER_MERCHANT_MapOperationCallback map_cb,
-                       void *map_cb_cls);
-
-/**
- * Cancel a /map/in request.
- *
- * @param mio handle to the request to be canceled
- */
-void
-TALER_MERCHANT_map_cancel (struct TALER_MERCHANT_MapOperation *mo);
-
-
-/* *********************  /contract *********************** */
+/* *********************  /proposal *********************** */
 
 
 /**
- * @brief Handle to a /contract operation at a merchant's backend.
+ * Handle to a PUT /proposal operation
  */
-struct TALER_MERCHANT_ContractOperation;
+struct TALER_MERCHANT_ProposalOperation;
 
+/**
+ * Handle to a GET /proposal operation
+ */
+struct TALER_MERCHANT_ProposalLookupOperation;
 
 /**
  * Callbacks of this type are used to serve the result of submitting a
@@ -99,48 +51,90 @@ struct TALER_MERCHANT_ContractOperation;
  * @param http_status HTTP response code, 200 indicates success;
  *                    0 if the backend's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code 
- * @param obj the full received JSON reply, or
- *            error details if the request failed
- * @param contract completed contract, NULL on error
+ * @param obj raw JSON reply, or error details if the request failed
+ * @param proposal_data completed contract, NULL on error
  * @param sig merchant's signature over the contract, NULL on error
- * @param h_contract hash of the contract, NULL on error
+ * @param h_proposal_data proposal data's hashcode, NULL on error
  */
 typedef void
-(*TALER_MERCHANT_ContractCallback) (void *cls,
+(*TALER_MERCHANT_ProposalCallback) (void *cls,
                                     unsigned int http_status,
 				    enum TALER_ErrorCode ec,
                                     const json_t *obj,
-                                    const json_t *contract,
+                                    const json_t *proposal_data,
                                     const struct TALER_MerchantSignatureP *sig,
-                                    const struct GNUNET_HashCode *h_contract);
+                                    const struct GNUNET_HashCode *h_proposal_data);
 
 
 /**
- * Request backend to sign a contract (and add fields like wire transfer
- * details).
+ * Callback called to work a GET /proposal response.
+ *
+ * @param cls closure
+ * @param http_status HTTP status code of the request
+ * @param body JSON containing the response's payload.
+ * In case of errors, it contains the appropriate error encoding.
+ */
+typedef void
+(*TALER_MERCHANT_ProposalLookupOperationCallback) (void *cls,
+                                                   unsigned int http_status,
+                                                   const json_t *body);
+
+/**
+ * PUT an order to the backend and receives the related proposal.
  *
  * @param ctx execution context
- * @param backend_uri base URI of the backend
- * @param contract prototype of the contract
- * @param contract_cb the callback to call when a reply for this request is available
- * @param contract_cb_cls closure for @a contract_cb
+ * @param backend_uri URI of the backend
+ * @param order basic information about this purchase, to be extended by the
+ * backend
+ * @param proposal_cb the callback to call when a reply for this request is available
+ * @param proposal_cb_cls closure for @a proposal_cb
  * @return a handle for this request
  */
-struct TALER_MERCHANT_ContractOperation *
-TALER_MERCHANT_contract_sign (struct GNUNET_CURL_Context *ctx,
-                              const char *backend_uri,
-                              const json_t *contract,
-                              TALER_MERCHANT_ContractCallback contract_cb,
-                              void *contract_cb_cls);
+struct TALER_MERCHANT_ProposalOperation *
+TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
+                          const char *backend_uri,
+                          const json_t *order,
+                          TALER_MERCHANT_ProposalCallback proposal_cb,
+                          void *proposal_cb_cls);
 
 
 /**
- * Cancel a /contract request.
+ * Cancel a PUT /proposal request.  This function cannot be used
+ * on a request handle if a response is already served for it.
  *
- * @param co the contract operation handle
+ * @param po the proposal operation request handle
  */
 void
-TALER_MERCHANT_contract_sign_cancel (struct TALER_MERCHANT_ContractOperation *co);
+TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po);
+
+
+/**
+ * Calls the GET /proposal API at the backend.  That is,
+ * retrieve a proposal data by providing its transaction id.
+ *
+ * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
+ * @param transaction_id transaction id used to perform the lookup
+ * @param plo_cb callback which will work the response gotten from the backend
+ * @param plo_cb_cls closure to pass to @a history_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_ProposalLookupOperation *
+TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
+                                const char *backend_uri,
+                                const char *transaction_id,
+                                TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
+                                void *plo_cb_cls);
+
+
+/**
+ * Cancel a GET /proposal request.
+ *
+ * @param plo handle to the request to be canceled
+ */
+void
+TALER_MERCHANT_proposal_lookup_cancel (struct TALER_MERCHANT_ProposalLookupOperation *plo);
+
 
 
 /* *********************  /pay *********************** */
