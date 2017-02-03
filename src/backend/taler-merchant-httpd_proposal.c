@@ -120,15 +120,11 @@ get_instance (struct json_t *json);
 
 
 /**
- * Manage a contract request. In practical terms, it adds the fields
- * 'exchanges', 'merchant_pub', and 'H_wire' to the contract 'proposition'
- * gotten from the frontend. Finally, it adds (outside of the
- * contract) a signature of the (hashed stringification) of the
- * contract (and the hashed stringification of this contract as well
- * to aid diagnostics) to the final bundle, which is then send back to
- * the frontend.
+ * Generate a proposal, given its order. In practical terms, it adds the
+ * fields  'exchanges', 'merchant_pub', and 'H_wire' to the order gotten
+ * from the frontend. Finally, it signs this data, and returns it to the
+ * frontend.
  *
- * @param rh context of the handler
  * @param connection the MHD connection to handle
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
@@ -136,23 +132,24 @@ get_instance (struct json_t *json);
  * @return MHD result code
  */
 int
-MH_handler_propose (struct TMH_RequestHandler *rh,
-                    struct MHD_Connection *connection,
-                    void **connection_cls,
-                    const char *upload_data,
-                    size_t *upload_data_size)
+MH_handler_proposal_put (struct TMH_RequestHandler *rh,
+                         struct MHD_Connection *connection,
+                         void **connection_cls,
+                         const char *upload_data,
+                         size_t *upload_data_size)
 {
 
   json_t *root;
-  json_t *jcontract;
+  json_t *order;
   int res;
   struct MerchantInstance *mi;
   struct TMH_JsonParseContext *ctx;
-  struct TALER_ContractPS contract;
-  struct GNUNET_CRYPTO_EddsaSignature contract_sig;
+  struct TALER_ProposalDataPS pdps;
+  struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
   struct TALER_Amount total;
   struct TALER_Amount max_fee;
-  uint64_t transaction_id;
+  const char *transaction_id;
+  struct GNUNET_HashCode h_tid;
   json_t *products;
   json_t *merchant;
   struct GNUNET_TIME_Absolute timestamp;
@@ -161,9 +158,9 @@ MH_handler_propose (struct TMH_RequestHandler *rh,
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
     TALER_JSON_spec_amount ("max_fee", &max_fee),
-    GNUNET_JSON_spec_uint64 ("transaction_id", &transaction_id),
+    GNUNET_JSON_spec_string ("transaction_id", &transaction_id),
     /* The following entries we don't actually need, except to check that
-       the contract is well-formed */
+       the order is well-formed */
     GNUNET_JSON_spec_json ("products", &products),
     GNUNET_JSON_spec_json ("merchant", &merchant),
     GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
@@ -194,18 +191,18 @@ MH_handler_propose (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
-  jcontract = json_object_get (root,
-			       "contract");
-  if (NULL == jcontract)
+  order = json_object_get (root,
+                           "order");
+  if (NULL == order)
   {
     json_decref (root);
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
-					   "contract");
+					   "order");
   }
   /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection,
-                             jcontract,
+                             order,
                              spec);
   if (GNUNET_NO == res)
   {
@@ -217,7 +214,7 @@ MH_handler_propose (struct TMH_RequestHandler *rh,
     json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_NONE,
-					      "Impossible to parse contract");
+					      "Impossible to parse the order");
   }
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))
@@ -226,7 +223,7 @@ MH_handler_propose (struct TMH_RequestHandler *rh,
     json_decref (root);
     return TMH_RESPONSE_reply_arg_invalid (connection,
 					   TALER_EC_PARAMETER_MALFORMED,
-					   "contract:products");
+					   "order:products");
   }
 
   mi = get_instance (merchant);
@@ -243,39 +240,108 @@ MH_handler_propose (struct TMH_RequestHandler *rh,
               "Signing contract on behalf of instance '%s'\n",
               mi->id);
   /* add fields to the contract that the backend should provide */
-  json_object_set (jcontract,
+  json_object_set (order,
                    "exchanges",
                    trusted_exchanges);
-  json_object_set (jcontract,
+  json_object_set (order,
                    "auditors",
                    j_auditors);
-  json_object_set_new (jcontract,
+  json_object_set_new (order,
                        "H_wire",
 		       GNUNET_JSON_from_data_auto (&mi->h_wire));
-  json_object_set_new (jcontract,
+  json_object_set_new (order,
                        "merchant_pub",
 		       GNUNET_JSON_from_data_auto (&mi->pubkey));
 
-  /* create contract signature */
-  contract.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
-  contract.purpose.size = htonl (sizeof (contract));
+  /* create proposal signature */
+  pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
+  pdps.purpose.size = htonl (sizeof (pdps));
   GNUNET_assert (GNUNET_OK ==
-                 TALER_JSON_hash (jcontract,
-                                  &contract.h_contract));
+                 TALER_JSON_hash (order,
+                                  &pdps.h_proposal_data));
   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
-                            &contract.purpose,
-                            &contract_sig);
+                            &pdps.purpose,
+                            &merchant_sig);
+  
 
-  /* return final response */
+  GNUNET_CRYPTO_hash (transaction_id,
+                      strlen (transaction_id),
+                      &h_tid);
+  if (GNUNET_OK !=
+      db->insert_proposal_data (db->cls,
+                                &h_tid,
+                                order))
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_PROPOSAL_STORE_DB_ERROR,
+                                              "db error: could not store this proposal's data into db");
+  
+
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
                                       "{s:O, s:o s:o}",
-                                      "contract", jcontract,
-                                      "merchant_sig", GNUNET_JSON_from_data_auto (&contract_sig),
-                                      "H_contract", GNUNET_JSON_from_data_auto (&contract.h_contract));
+                                      "data", order,
+                                      "merchant_sig", GNUNET_JSON_from_data_auto (&merchant_sig),
+                                      "hash", GNUNET_JSON_from_data_auto (&pdps.h_proposal_data));
   GNUNET_JSON_parse_free (spec);
   json_decref (root);
   return res;
 }
+
+/**
+ * Manage a GET /proposal request. Query the db and returns the
+ * proposal's data related to the transaction id given as the URL's
+ * parameter.
+ *
+ * @param rh context of the handler
+ * @param connection the MHD connection to handle
+ * @param[in,out] connection_cls the connection's closure (can be updated)
+ * @param upload_data upload data
+ * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @return MHD result code
+ */
+int
+MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
+                            struct MHD_Connection *connection,
+                            void **connection_cls,
+                            const char *upload_data,
+                            size_t *upload_data_size)
+{
+  const char *transaction_id;
+  struct GNUNET_HashCode h_tid;
+  int res;
+  json_t *proposal_data;
+
+  transaction_id = MHD_lookup_connection_value (connection,
+                                                MHD_GET_ARGUMENT_KIND,
+                                                "transaction_id");
+  if (NULL == transaction_id)
+    return TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+                                           "transaction_id");
+  GNUNET_CRYPTO_hash (transaction_id,
+                      strlen (transaction_id),
+                      &h_tid);
+
+  res = db->find_proposal_data (db->cls,
+                                &proposal_data,
+                                &h_tid);
+  if (GNUNET_NO == res)
+    return TMH_RESPONSE_reply_not_found (connection, 
+                                         TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
+                                         "unknown transaction id");
+
+  if (GNUNET_SYSERR == res)
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_PROPOSAL_LOOKUP_DB_ERROR,
+                                              "An error occurred while retrieving proposal data from db");
+
+  
+  return TMH_RESPONSE_reply_json (connection,
+                                  proposal_data,
+                                  MHD_HTTP_OK); 
+
+
+}
+
 
 /* end of taler-merchant-httpd_contract.c */

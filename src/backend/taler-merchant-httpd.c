@@ -35,7 +35,7 @@
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_propose.h"
+#include "taler-merchant-httpd_proposal.h"
 #include "taler-merchant-httpd_pay.h"
 #include "taler-merchant-httpd_track-transaction.h"
 #include "taler-merchant-httpd_track-transfer.h"
@@ -164,13 +164,9 @@ url_handler (void *cls,
       { "/", MHD_HTTP_METHOD_GET, "text/plain",
         "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK },
-      { "/contract", MHD_HTTP_METHOD_POST, "application/json",
+      { "/proposal", MHD_HTTP_METHOD_PUT, "application/json",
         NULL, 0,
-        &MH_handler_propose, MHD_HTTP_OK },
-      { "/contract/propose", NULL, "text/plain",
-        "Only POST is allowed", 0,
-        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
-
+        &MH_handler_proposal_put, MHD_HTTP_OK },
       { "/pay", MHD_HTTP_METHOD_POST, "application/json",
         NULL, 0,
         &MH_handler_pay, MHD_HTTP_OK },
@@ -192,9 +188,13 @@ url_handler (void *cls,
       { "/history", MHD_HTTP_METHOD_GET, "text/plain",
         "Only GET is allowed", 0,
         &MH_handler_history, MHD_HTTP_OK},
-      { "/contract/lookup", MHD_HTTP_METHOD_GET, "text/plain",
+      { "/proposal", MHD_HTTP_METHOD_GET, "text/plain",
         "Only GET is allowed", 0,
-        &MH_handler_map_out, MHD_HTTP_OK},
+        &MH_handler_proposal_lookup, MHD_HTTP_OK},
+      { "/proposal", NULL, "text/plain",
+        "Only GET/PUT are allowed", 0,
+        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
+
       {NULL, NULL, NULL, NULL, 0, 0 }
     };
   static struct TMH_RequestHandler h404 =

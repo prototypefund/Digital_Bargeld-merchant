@@ -409,7 +409,7 @@ struct Command
        * It's dynamically generated because we need different transaction_id
        * for different merchant instances.
        */
-      char order[OFFER_MAX_SIZE];
+      char order[ORDER_MAX_SIZE];
 
       /**
        * Handle to the active PUT /proposal operation, or NULL.
@@ -1497,14 +1497,13 @@ interpreter_run (void *cls)
 
   case OC_PROPOSAL_LOOKUP:
   {
-    char *transaction_id;
-    json_error_t error;
+    const char *transaction_id;
 
     GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
     ref = find_command (is, cmd->details.proposal_lookup.proposal_reference);
     GNUNET_assert (NULL != ref);
 
-    transaction_id = json_object_get (ref->details.proposal.proposal, "transaction_id");
+    transaction_id = json_string_value (json_object_get (ref->details.proposal.proposal_data, "transaction_id"));
     GNUNET_assert (NULL !=
                     (cmd->details.proposal_lookup.plo
                      = TALER_MERCHANT_proposal_lookup (ctx,
@@ -1677,7 +1676,7 @@ interpreter_run (void *cls)
       json_t *order;
       json_error_t error;
 
-      order = json_loads (cmd->details.contract.order,
+      order = json_loads (cmd->details.proposal.order,
                           JSON_REJECT_DUPLICATES,
                           &error);
       if (NULL != instance)
@@ -1695,21 +1694,21 @@ interpreter_run (void *cls)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                     "Failed to parse the order `%s' at command #%u: %s at %u\n",
-                    cmd->details.contract.order,
+                    cmd->details.proposal.order,
                     is->ip,
                     error.text,
                     (unsigned int) error.column);
         fail (is);
         return;
       }
-      cmd->details.contract.po
-        = TALER_MERCHANT_proposal (ctx,
-                                   MERCHANT_URI,
-                                   order,
-                                   &proposal_cb,
-                                   is);
+      cmd->details.proposal.po
+        = TALER_MERCHANT_order_put (ctx,
+                                    MERCHANT_URI,
+                                    order,
+                                    &proposal_cb,
+                                    is);
       json_decref (order);
-      if (NULL == cmd->details.contract.po)
+      if (NULL == cmd->details.proposal.po)
       {
         GNUNET_break (0);
         fail (is);
@@ -1727,7 +1726,6 @@ interpreter_run (void *cls)
       struct GNUNET_HashCode h_wire;
       struct TALER_MerchantPublicKeyP merchant_pub;
       struct TALER_MerchantSignatureP merchant_sig;
-      struct GNUNET_HashCode h_contract;
       struct TALER_Amount total_amount;
       struct TALER_Amount max_fee;
       const char *error_name;
@@ -1737,8 +1735,8 @@ interpreter_run (void *cls)
       ref = find_command (is,
                           cmd->details.pay.contract_ref);
       GNUNET_assert (NULL != ref);
-      merchant_sig = ref->details.contract.merchant_sig;
-      GNUNET_assert (NULL != ref->details.contract.contract);
+      merchant_sig = ref->details.proposal.merchant_sig;
+      GNUNET_assert (NULL != ref->details.proposal.proposal_data);
       {
         /* Get information that need to be replied in the deposit permission */
         struct GNUNET_JSON_Specification spec[] = {
@@ -1754,7 +1752,7 @@ interpreter_run (void *cls)
         };
 
         if (GNUNET_OK !=
-            GNUNET_JSON_parse (ref->details.contract.contract,
+            GNUNET_JSON_parse (ref->details.proposal.proposal_data,
                                spec,
                                &error_name,
                                &error_line))
@@ -1770,9 +1768,6 @@ interpreter_run (void *cls)
         cmd->details.pay.transaction_id = transaction_id;
         cmd->details.pay.merchant_pub = merchant_pub;
       }
-
-      TALER_JSON_hash (ref->details.contract.contract,
-		       &h_contract);
 
       /* initialize 'pc' (FIXME: to do in a loop later...) */
       {
@@ -1820,7 +1815,7 @@ interpreter_run (void *cls)
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI,
                                      instance,
-				     &h_contract,
+				     &ref->details.proposal.h_proposal_data,
 				     transaction_id,
 				     &total_amount,
 				     &max_fee,
@@ -2007,7 +2002,7 @@ do_shutdown (void *cls)
                     "Command %u (%s) did not complete\n",
                     i,
                     cmd->label);
-        TALER_MERCHANT_map_cancel (cmd->details.proposal_lookup.plo);
+        TALER_MERCHANT_proposal_lookup_cancel (cmd->details.proposal_lookup.plo);
       }
         break;
 
@@ -2059,10 +2054,10 @@ do_shutdown (void *cls)
         TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
         cmd->details.proposal.po = NULL;
       }
-      if (NULL != cmd->details.proposal.proposal)
+      if (NULL != cmd->details.proposal.proposal_data)
       {
-        json_decref (cmd->details.proposal.proposal);
-        cmd->details.proposal.proposal = NULL;
+        json_decref (cmd->details.proposal.proposal_data);
+        cmd->details.proposal.proposal_data = NULL;
       }
       break;
     case OC_PAY:
@@ -2244,11 +2239,11 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_status.reserve_reference = "create-reserve-1",
       .details.reserve_status.expected_balance = "EUR:0" },
-    /* Create contract */
-    { .oc = OC_CONTRACT,
-      .label = "create-contract-1",
+    /* Create proposal */
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.contract.order = "{\
+      .details.proposal.order = "{\
                   \"max_fee\":\
                      {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
                   \"transaction_id\":1,\
@@ -2269,10 +2264,10 @@ run (void *cls)
 
 
     /* Create another contract */
-    { .oc = OC_CONTRACT,
-      .label = "create-contract-2",
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.contract.order = "{\
+      .details.proposal.order = "{\
                   \"max_fee\":\
                      {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
                   \"transaction_id\":2,\
@@ -2319,10 +2314,10 @@ run (void *cls)
 
     /* Fetch contract-1 */
     {
-      .oc = OC_MAP_OUT, 
-      .label = "fetch-contract-2",
+      .oc = OC_PROPOSAL_LOOKUP, 
+      .label = "fetch-proposal-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.map.contract_reference = "create-contract-2" },
+      .details.proposal_lookup.proposal_reference = "create-proposal-2" },
 
     /* Check nothing happened on the bank side so far */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
@@ -2455,16 +2450,16 @@ run (void *cls)
     },
     /* Retrieve via /map/out a contract NOT stored previously. */
     {
-      .oc = OC_MAP_OUT, 
-      .label = "fetch-contract-not-found",
+      .oc = OC_PROPOSAL_LOOKUP, 
+      .label = "fetch-proposal-not-found",
       .expected_response_code = MHD_HTTP_NOT_FOUND,
-      .details.map.contract_reference = "create-contract-3" },
+      .details.proposal_lookup.proposal_reference = "create-proposal-3" },
 
     /* Create another contract, NOT to be stored. */
-    { .oc = OC_CONTRACT,
-      .label = "create-contract-3",
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-3",
       .expected_response_code = MHD_HTTP_OK,
-      .details.contract.order = "{\
+      .details.proposal.order = "{\
                   \"max_fee\":\
                      {\"currency\":\"EUR\", \"value\":0, \"fraction\":10000},\
                   \"transaction_id\":3,\

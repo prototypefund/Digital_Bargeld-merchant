@@ -23,8 +23,7 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h \
   taler-merchant-httpd_history.c taler-merchant-httpd_history.h \
   taler-merchant-httpd_track-transaction.c taler-merchant-httpd_track-transaction.h \
-  taler-merchant-httpd_track-transfer.c taler-merchant-httpd_track-transfer.h \
-  taler-merchant-httpd_map.c taler-merchant-httpd_map.h
+  taler-merchant-httpd_track-transfer.c taler-merchant-httpd_track-transfer.h
 
 
 taler_merchant_httpd_LDADD = \

@@ -941,7 +941,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     json_t *coin;
     unsigned int coins_index;
     struct TALER_MerchantSignatureP merchant_sig;
-    struct TALER_ContractPS cp;
+    struct TALER_ProposalDataPS pdps;
     const char *chosen_exchange;
     struct GNUNET_JSON_Specification spec[] = {
       TALER_JSON_spec_amount ("amount", &pc->amount),
@@ -988,12 +988,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 		"Parsed JSON for /pay.\n");
-    cp.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
-    cp.purpose.size = htonl (sizeof (struct TALER_ContractPS));
-    cp.h_contract = pc->h_contract;
+    pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
+    pdps.purpose.size = htonl (sizeof (pdps));
+    pdps.h_proposal_data = pc->h_contract;
     if (GNUNET_OK !=
 	GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_CONTRACT,
-				    &cp.purpose,
+				    &pdps.purpose,
 				    &merchant_sig.eddsa_sig,
 				    &pc->mi->pubkey.eddsa_pub))
     {
