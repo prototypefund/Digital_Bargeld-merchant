@@ -26,8 +26,7 @@
 #include "taler-merchant-httpd_responses.h"
 
 /**
- * Function called with information about a transaction. Checks whether the
- * returned tuple
+ * Function called with information about a transaction.
  *
  * @param cls closure
  * @param transaction_id of the contract
