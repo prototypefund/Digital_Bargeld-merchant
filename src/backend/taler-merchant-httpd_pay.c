@@ -193,7 +193,7 @@ struct PayContext
   /**
    * "H_contract" from @e root.
    */
-  struct GNUNET_HashCode h_contract;
+  struct GNUNET_HashCode h_proposal_data;
 
   /**
    * Wire transfer deadline. How soon would the merchant like the
@@ -422,7 +422,7 @@ deposit_cb (void *cls,
 
   mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
   mr.purpose.size = htonl (sizeof (mr));
-  mr.h_contract = pc->h_contract;
+  mr.h_proposal_data = pc->h_proposal_data;
 
   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                             &mr.purpose,
@@ -432,8 +432,8 @@ deposit_cb (void *cls,
                             TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                          "merchant_sig",
 							 json_string_value (GNUNET_JSON_from_data_auto (&sig)),
-                                                         "h_contract",
-                                                         GNUNET_JSON_from_data (&pc->h_contract,
+                                                         "h_proposal_data",
+                                                         GNUNET_JSON_from_data (&pc->h_proposal_data,
                                                                                 sizeof (struct GNUNET_HashCode))));
 }
 
@@ -704,7 +704,7 @@ process_pay_with_exchange (void *cls,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
                                      pc->mi->j_wire,
-                                     &pc->h_contract,
+                                     &pc->h_proposal_data,
                                      &dc->coin_pub,
                                      &dc->ub_sig,
                                      &dc->denom,
@@ -811,7 +811,7 @@ check_coin_paid (void *cls,
  * @param transaction_id of the contract
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
- * @param h_contract hash of the contract
+ * @param h_proposal_data hash of the contract
  * @param h_xwire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -822,7 +822,7 @@ check_transaction_exists (void *cls,
 			  uint64_t transaction_id,
 			  const struct TALER_MerchantPublicKeyP *merchant_pub,
 			  const char *exchange_uri,
-			  const struct GNUNET_HashCode *h_contract,
+			  const struct GNUNET_HashCode *h_proposal_data,
 			  const struct GNUNET_HashCode *h_xwire,
 			  struct GNUNET_TIME_Absolute timestamp,
 			  struct GNUNET_TIME_Absolute refund,
@@ -830,8 +830,8 @@ check_transaction_exists (void *cls,
 {
   struct PayContext *pc = cls;
 
-  if ( (0 == memcmp (h_contract,
-		     &pc->h_contract,
+  if ( (0 == memcmp (h_proposal_data,
+		     &pc->h_proposal_data,
 		     sizeof (struct GNUNET_HashCode))) &&
        (0 == memcmp (h_xwire,
 		     &pc->mi->h_wire,
@@ -946,7 +946,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     struct GNUNET_JSON_Specification spec[] = {
       TALER_JSON_spec_amount ("amount", &pc->amount),
       GNUNET_JSON_spec_json ("coins", &coins),
-      GNUNET_JSON_spec_fixed_auto ("H_contract", &pc->h_contract),
+      GNUNET_JSON_spec_fixed_auto ("H_contract", &pc->h_proposal_data),
       TALER_JSON_spec_amount ("max_fee", &pc->max_fee),
       GNUNET_JSON_spec_fixed_auto ("merchant_sig", &merchant_sig),
       GNUNET_JSON_spec_string ("exchange", &chosen_exchange),
@@ -990,7 +990,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 		"Parsed JSON for /pay.\n");
     pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
     pdps.purpose.size = htonl (sizeof (pdps));
-    pdps.h_proposal_data = pc->h_contract;
+    pdps.h_proposal_data = pc->h_proposal_data;
     if (GNUNET_OK !=
 	GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_CONTRACT,
 				    &pdps.purpose,
@@ -1182,7 +1182,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                pc->transaction_id,
                                &pc->mi->pubkey,
                                pc->chosen_exchange,
-                               &pc->h_contract,
+                               &pc->h_proposal_data,
                                &pc->mi->h_wire,
                                pc->timestamp,
                                pc->refund_deadline,
