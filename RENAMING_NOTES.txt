@@ -5,6 +5,5 @@ Files to be cleaned from the 'h/H_contract' presence.
 - postgres plugin
 - db testcase
 - merchant service include
-- db plugin include
 - pay lib
 - lib testcase

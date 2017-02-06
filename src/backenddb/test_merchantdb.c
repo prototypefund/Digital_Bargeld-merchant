@@ -60,16 +60,9 @@ static int result;
 static struct TALER_MERCHANTDB_Plugin *plugin;
 
 /**
- * Hash of the contract.  Set to some random value.
- */
-static struct GNUNET_HashCode h_contract;
-
-/**
  * Hash of the (fictitious) transaction id.  Set to some random value.
  */
 static struct GNUNET_HashCode h_transaction_id;
-
-
 
 /**
  * Hash of the wire transfer address.  Set to some random value.
@@ -79,7 +72,7 @@ static struct GNUNET_HashCode h_wire;
 /**
  * Transaction ID.
  */
-static uint64_t transaction_id;
+char *transaction_id;
 
 /**
  * Time of the transaction.
@@ -156,7 +149,6 @@ static json_t *proposal_data;
  * @param transaction_id of the contract
  * @param merchant_pub public key of the merchant
  * @param exchange_uri URI of the exchange
- * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund_deadline refund deadline
@@ -164,25 +156,22 @@ static json_t *proposal_data;
  */
 static void
 transaction_cb (void *cls,
-                uint64_t atransaction_id,
 		const struct TALER_MerchantPublicKeyP *amerchant_pub,
                 const char *aexchange_uri,
-                const struct GNUNET_HashCode *ah_contract,
+                const char *atransaction_id,
                 const struct GNUNET_HashCode *ah_wire,
                 struct GNUNET_TIME_Absolute atimestamp,
                 struct GNUNET_TIME_Absolute arefund_deadline,
                 const struct TALER_Amount *atotal_amount)
 {
 #define CHECK(a) do { if (! (a)) { GNUNET_break (0); result = 3; } } while (0)
-  CHECK (atransaction_id == transaction_id);
   CHECK (0 == memcmp (amerchant_pub,
                       &merchant_pub,
 		      sizeof (struct TALER_MerchantPublicKeyP)));
+  CHECK (0 == strcmp (atransaction_id,
+                      transaction_id));
   CHECK (0 == strcmp (aexchange_uri,
                       EXCHANGE_URI));
-  CHECK (0 == memcmp (ah_contract,
-                      &h_contract,
-                      sizeof (struct GNUNET_HashCode)));
   CHECK (0 == memcmp (ah_wire,
                       &h_wire,
                       sizeof (struct GNUNET_HashCode)));
@@ -201,7 +190,6 @@ transaction_cb (void *cls,
  * @param transaction_id of the contract
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
- * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -210,10 +198,9 @@ transaction_cb (void *cls,
 
 static void
 history_cb (void *cls,
-            uint64_t transaction_id,
 	    const struct TALER_MerchantPublicKeyP *merchant_pub,
             const char *exchange_uri,
-            const struct GNUNET_HashCode *h_contract,
+            const char *transaction_id,
             const struct GNUNET_HashCode *h_wire,
             struct GNUNET_TIME_Absolute timestamp,
             struct GNUNET_TIME_Absolute refund,
@@ -235,13 +222,14 @@ history_cb (void *cls,
  */
 static void
 deposit_cb (void *cls,
-            uint64_t atransaction_id,
+            const char *atransaction_id,
             const struct TALER_CoinSpendPublicKeyP *acoin_pub,
             const struct TALER_Amount *aamount_with_fee,
             const struct TALER_Amount *adeposit_fee,
             const json_t *aexchange_proof)
 {
-  CHECK (atransaction_id == transaction_id);
+  CHECK ((0 == strcmp (atransaction_id,
+                       transaction_id)));
   CHECK (0 == memcmp (acoin_pub,
                       &coin_pub,
                       sizeof (struct TALER_CoinSpendPublicKeyP)));
@@ -273,7 +261,7 @@ deposit_cb (void *cls,
  */
 static void
 transfer_cb (void *cls,
-             uint64_t atransaction_id,
+             const char *atransaction_id,
              const struct TALER_CoinSpendPublicKeyP *acoin_pub,
              const struct TALER_WireTransferIdentifierRawP *awtid,
              struct GNUNET_TIME_Absolute execution_time,
@@ -336,10 +324,11 @@ run (void *cls)
   }
 
   /* Prepare data for 'store_payment()' */
-  RND_BLK (&h_contract);
-  RND_BLK (&h_transaction_id);
   RND_BLK (&h_wire);
-  RND_BLK (&transaction_id);
+  transaction_id = "test_ID";
+  GNUNET_CRYPTO_hash (transaction_id,
+                      strlen (transaction_id),
+                      &h_transaction_id);
   RND_BLK (&signkey_pub);
   RND_BLK (&merchant_pub);
   RND_BLK (&wtid);
@@ -386,7 +375,6 @@ run (void *cls)
                                      transaction_id,
 				     &merchant_pub,
                                      EXCHANGE_URI,
-                                     &h_contract,
                                      &h_wire,
                                      timestamp,
                                      refund_deadline,

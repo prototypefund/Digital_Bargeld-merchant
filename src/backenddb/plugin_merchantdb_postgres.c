@@ -174,7 +174,6 @@ postgres_initialize (void *cls)
            " transaction_id VARCHAR NOT NULL"
            ",exchange_uri VARCHAR NOT NULL"
 	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-           ",h_contract BYTEA NOT NULL CHECK (LENGTH(h_contract)=64)"
            ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
            ",timestamp INT8 NOT NULL"
            ",refund_deadline INT8 NOT NULL"
@@ -232,7 +231,6 @@ postgres_initialize (void *cls)
               "(transaction_id"
               ",exchange_uri"
 	      ",merchant_pub"
-              ",h_contract"
               ",h_wire"
               ",timestamp"
               ",refund_deadline"
@@ -240,8 +238,8 @@ postgres_initialize (void *cls)
               ",total_amount_frac"
               ",total_amount_curr"
               ") VALUES "
-              "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-              10);
+              "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+              9);
   PG_PREPARE (pg,
               "insert_deposit",
               "INSERT INTO merchant_deposits"
@@ -299,7 +297,6 @@ postgres_initialize (void *cls)
               " transaction_id"
 	      ",merchant_pub"
               ",exchange_uri"
-              ",h_contract"
               ",h_wire"
               ",timestamp"
               ",refund_deadline"
@@ -315,7 +312,6 @@ postgres_initialize (void *cls)
               "find_transaction",
               "SELECT"
               " exchange_uri"
-              ",h_contract"
               ",h_wire"
               ",timestamp"
               ",refund_deadline"
@@ -511,7 +507,6 @@ postgres_insert_proposal_data (void *cls,
  * @param transaction_id of the proposal
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
- * @param h_contract hash of the contract
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -523,7 +518,6 @@ postgres_store_transaction (void *cls,
                             const char *transaction_id,
 			    const struct TALER_MerchantPublicKeyP *merchant_pub,
                             const char *exchange_uri,
-                            const struct GNUNET_HashCode *h_contract,
                             const struct GNUNET_HashCode *h_wire,
                             struct GNUNET_TIME_Absolute timestamp,
                             struct GNUNET_TIME_Absolute refund,
@@ -533,17 +527,19 @@ postgres_store_transaction (void *cls,
   PGresult *result;
   int ret;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "dbtc: %s\n", total_amount->currency);
+
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (transaction_id),
     GNUNET_PQ_query_param_string (exchange_uri),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_auto_from_type (h_contract),
     GNUNET_PQ_query_param_auto_from_type (h_wire),
     GNUNET_PQ_query_param_absolute_time (&timestamp),
     GNUNET_PQ_query_param_absolute_time (&refund),
     TALER_PQ_query_param_amount (total_amount),
     GNUNET_PQ_query_param_end
   };
+
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "insert_transaction",
@@ -753,7 +749,6 @@ postgres_find_transactions_by_date (void *cls,
   {
     struct TALER_MerchantPublicKeyP merchant_pub;
     char *exchange_uri;
-    struct GNUNET_HashCode h_contract;
     struct GNUNET_HashCode h_wire;
     struct GNUNET_TIME_Absolute timestamp;
     struct GNUNET_TIME_Absolute refund_deadline;
@@ -766,8 +761,6 @@ postgres_find_transactions_by_date (void *cls,
                                     &transaction_id),
       GNUNET_PQ_result_spec_auto_from_type ("merchant_pub",
                                             &merchant_pub),
-      GNUNET_PQ_result_spec_auto_from_type ("h_contract",
-                                            &h_contract),
       GNUNET_PQ_result_spec_auto_from_type ("h_wire",
                                             &h_wire),
       GNUNET_PQ_result_spec_absolute_time ("timestamp",
@@ -852,7 +845,6 @@ postgres_find_transaction (void *cls,
 
   {
     char *exchange_uri;
-    struct GNUNET_HashCode h_contract;
     struct GNUNET_HashCode h_wire;
     struct GNUNET_TIME_Absolute timestamp;
     struct GNUNET_TIME_Absolute refund_deadline;
@@ -860,8 +852,6 @@ postgres_find_transaction (void *cls,
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_string ("exchange_uri",
                                     &exchange_uri),
-      GNUNET_PQ_result_spec_auto_from_type ("h_contract",
-                                            &h_contract),
       GNUNET_PQ_result_spec_auto_from_type ("h_wire",
                                             &h_wire),
       GNUNET_PQ_result_spec_absolute_time ("timestamp",

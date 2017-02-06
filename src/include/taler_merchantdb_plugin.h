@@ -198,7 +198,6 @@ struct TALER_MERCHANTDB_Plugin
                         const char *transaction_id,
 			const struct TALER_MerchantPublicKeyP *merchant_pub,
                         const char *exchange_uri,
-                        const struct GNUNET_HashCode *h_contract,
                         const struct GNUNET_HashCode *h_wire,
                         struct GNUNET_TIME_Absolute timestamp,
                         struct GNUNET_TIME_Absolute refund,
