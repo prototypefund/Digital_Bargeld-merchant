@@ -1,6 +1,5 @@
 Files to be cleaned from the 'h/H_contract' presence.
 
-- history
 - track-transaction
 - track-transfer
 - postgres plugin
