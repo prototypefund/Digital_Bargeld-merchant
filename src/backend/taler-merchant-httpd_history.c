@@ -29,10 +29,9 @@
  * Function called with information about a transaction.
  *
  * @param cls closure
- * @param transaction_id of the contract
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
- * @param h_contract hash of the contract
+ * @param transaction_id proposal's transaction id
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -41,10 +40,9 @@
 
 static void
 history_cb (void *cls,
-            uint64_t transaction_id,
 	    const struct TALER_MerchantPublicKeyP *merchant_pub,
             const char *exchange_uri,
-            const struct GNUNET_HashCode *h_contract,
+            const char *transaction_id,
             const struct GNUNET_HashCode *h_wire,
             struct GNUNET_TIME_Absolute timestamp,
             struct GNUNET_TIME_Absolute refund,
@@ -54,10 +52,10 @@ history_cb (void *cls,
   json_t *entry;
 
   GNUNET_break (NULL !=
-               (entry = json_pack ("{s:I, s:s, s:o, s:o, s:o}",
+               (entry = json_pack ("{s:s, s:s, s:s, s:o}",
                                    "transaction_id", transaction_id,
                                    "exchange", exchange_uri,
-                                   "h_contract", GNUNET_JSON_from_data_auto (h_contract),
+                                   "transaction_id", transaction_id,
                                    "timestamp", GNUNET_JSON_from_time_abs (timestamp),
                                    "total_amount",
                                    TALER_JSON_from_amount (total_amount))));
