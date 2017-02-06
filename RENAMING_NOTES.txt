@@ -1,9 +1,7 @@
 Files to be cleaned from the 'h/H_contract' presence.
 
-- track-transaction
-- track-transfer
-- postgres plugin
-- db testcase
 - merchant service include
 - pay lib
+- track-lib: references to H_contract to be removed.
+  especially when the logic reads JSON responses.
 - lib testcase

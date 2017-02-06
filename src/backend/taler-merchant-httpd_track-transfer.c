@@ -215,7 +215,7 @@ track_transfer_cleanup (struct TM_HandlerContext *hc)
  */
 static void
 check_transfer (void *cls,
-                uint64_t transaction_id,
+                const char *transaction_id,
                 const struct TALER_CoinSpendPublicKeyP *coin_pub,
                 const struct TALER_Amount *amount_with_fee,
                 const struct TALER_Amount *deposit_fee,
@@ -237,14 +237,14 @@ check_transfer (void *cls,
     rctx->check_transfer_result = GNUNET_SYSERR;
     /* Build the `TrackTransferConflictDetails` */
     rctx->response
-      = TMH_RESPONSE_make_json_pack ("{s:I, s:s, s:o, s:I, s:o, s:o, s:I, s:o, s:o}",
+      = TMH_RESPONSE_make_json_pack ("{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
                                      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
                                      "hint", "disagreement about deposit valuation",
                                      "exchange_deposit_proof", exchange_proof,
                                      "conflict_offset", (json_int_t) rctx->current_offset,
                                      "exchange_transfer_proof", rctx->original_response,
                                      "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
-                                     "transaction_id", (json_int_t) transaction_id,
+                                     "transaction_id", transaction_id,
                                      "amount_with_fee", TALER_JSON_from_amount (amount_with_fee),
                                      "deposit_fee", TALER_JSON_from_amount (deposit_fee));
     return;
