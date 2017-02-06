@@ -349,14 +349,14 @@ wire_deposits_cb (void *cls,
                   const struct TALER_Amount *total_amount,
                   unsigned int details_length,
                   const struct TALER_TrackTransferDetails *details)
-{
-  struct TrackTransactionContext *tctx = cls;
-  struct TrackCoinContext *tcc;
-  unsigned int i;
+    {
+      struct TrackTransactionContext *tctx = cls;
+      struct TrackCoinContext *tcc;
+      unsigned int i;
 
-  tctx->wdh = NULL;
-  if (MHD_HTTP_OK != http_status)
-  {
+      tctx->wdh = NULL;
+      if (MHD_HTTP_OK != http_status)
+      {
     resume_track_transaction_with_response
       (tctx,
        MHD_HTTP_FAILED_DEPENDENCY,
@@ -564,7 +564,7 @@ trace_coins (struct TrackTransactionContext *tctx)
                                                  &tctx->mi->privkey,
                                                  &tctx->h_wire,
                                                  &tcc->coin_pub,
-                                                 tctx->transaction_id,
+                                                 0, /*FIXME: tid*/
                                                  &wtid_cb,
                                                  tcc);
     return;

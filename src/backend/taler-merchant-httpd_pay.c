@@ -709,7 +709,7 @@ process_pay_with_exchange (void *cls,
                                      &dc->ub_sig,
                                      &dc->denom,
                                      pc->timestamp,
-                                     pc->transaction_id,
+                                     0, /*FIXME: tid*/
                                      &pc->mi->pubkey,
                                      pc->refund_deadline,
                                      &dc->coin_sig,
