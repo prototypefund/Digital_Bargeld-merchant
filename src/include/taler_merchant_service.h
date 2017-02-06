@@ -54,7 +54,7 @@ struct TALER_MERCHANT_ProposalLookupOperation;
  * @param obj raw JSON reply, or error details if the request failed
  * @param proposal_data completed contract, NULL on error
  * @param sig merchant's signature over the contract, NULL on error
- * @param h_proposal_data proposal data's hashcode, NULL on error
+ * @param hash proposal data's hashcode, NULL on error
  */
 typedef void
 (*TALER_MERCHANT_ProposalCallback) (void *cls,
@@ -63,7 +63,7 @@ typedef void
                                     const json_t *obj,
                                     const json_t *proposal_data,
                                     const struct TALER_MerchantSignatureP *sig,
-                                    const struct GNUNET_HashCode *h_proposal_data);
+                                    const struct GNUNET_HashCode *hash);
 
 
 /**

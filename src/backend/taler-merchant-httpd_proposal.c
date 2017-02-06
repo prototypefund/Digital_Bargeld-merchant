@@ -258,7 +258,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   pdps.purpose.size = htonl (sizeof (pdps));
   GNUNET_assert (GNUNET_OK ==
                  TALER_JSON_hash (order,
-                                  &pdps.h_proposal_data));
+                                  &pdps.hash));
   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                             &pdps.purpose,
                             &merchant_sig);
@@ -281,7 +281,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                                       "{s:O, s:o s:o}",
                                       "data", order,
                                       "merchant_sig", GNUNET_JSON_from_data_auto (&merchant_sig),
-                                      "hash", GNUNET_JSON_from_data_auto (&pdps.h_proposal_data));
+                                      "hash", GNUNET_JSON_from_data_auto (&pdps.hash));
   GNUNET_JSON_parse_free (spec);
   json_decref (root);
   return res;

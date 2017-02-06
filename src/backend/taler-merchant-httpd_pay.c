@@ -159,7 +159,7 @@ struct PayContext
   /**
    * Transaction ID given in @e root.
    */
-  uint64_t transaction_id;
+  const char *transaction_id;
 
   /**
    * Maximum fee the merchant is willing to pay, from @e root.
@@ -432,7 +432,7 @@ deposit_cb (void *cls,
                             TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
                                                          "merchant_sig",
 							 json_string_value (GNUNET_JSON_from_data_auto (&sig)),
-                                                         "h_proposal_data",
+                                                         "hash",
                                                          GNUNET_JSON_from_data (&pc->h_proposal_data,
                                                                                 sizeof (struct GNUNET_HashCode))));
 }
@@ -773,7 +773,7 @@ handle_pay_timeout (void *cls)
  */
 static void
 check_coin_paid (void *cls,
-                 uint64_t transaction_id,
+                 const char *transaction_id,
                  const struct TALER_CoinSpendPublicKeyP *coin_pub,
                  const struct TALER_Amount *amount_with_fee,
                  const struct TALER_Amount *deposit_fee,
@@ -782,7 +782,8 @@ check_coin_paid (void *cls,
   struct PayContext *pc = cls;
   unsigned int i;
 
-  if (pc->transaction_id != transaction_id)
+  if (0 != strcmp (pc->transaction_id,
+                   transaction_id))
   {
     GNUNET_break (0);
     return;
@@ -811,7 +812,6 @@ check_coin_paid (void *cls,
  * @param transaction_id of the contract
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
- * @param h_proposal_data hash of the contract
  * @param h_xwire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -819,10 +819,9 @@ check_coin_paid (void *cls,
  */
 static void
 check_transaction_exists (void *cls,
-			  uint64_t transaction_id,
 			  const struct TALER_MerchantPublicKeyP *merchant_pub,
 			  const char *exchange_uri,
-			  const struct GNUNET_HashCode *h_proposal_data,
+			  const char *transaction_id,
 			  const struct GNUNET_HashCode *h_xwire,
 			  struct GNUNET_TIME_Absolute timestamp,
 			  struct GNUNET_TIME_Absolute refund,
@@ -830,9 +829,8 @@ check_transaction_exists (void *cls,
 {
   struct PayContext *pc = cls;
 
-  if ( (0 == memcmp (h_proposal_data,
-		     &pc->h_proposal_data,
-		     sizeof (struct GNUNET_HashCode))) &&
+  if ( (0 == strcmp (transaction_id,
+		     pc->transaction_id)) &&
        (0 == memcmp (h_xwire,
 		     &pc->mi->h_wire,
 		     sizeof (struct GNUNET_HashCode))) &&
@@ -953,7 +951,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
       GNUNET_JSON_spec_absolute_time ("refund_deadline", &pc->refund_deadline),
       GNUNET_JSON_spec_absolute_time ("pay_deadline", &pc->pay_deadline),
       GNUNET_JSON_spec_absolute_time ("timestamp", &pc->timestamp),
-      GNUNET_JSON_spec_uint64 ("transaction_id", &pc->transaction_id),
+      GNUNET_JSON_spec_string ("transaction_id", &pc->transaction_id),
       GNUNET_JSON_spec_end()
     };
 
@@ -990,7 +988,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 		"Parsed JSON for /pay.\n");
     pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
     pdps.purpose.size = htonl (sizeof (pdps));
-    pdps.h_proposal_data = pc->h_proposal_data;
+    pdps.hash = pc->h_proposal_data;
     if (GNUNET_OK !=
 	GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_CONTRACT,
 				    &pdps.purpose,
@@ -1182,7 +1180,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                pc->transaction_id,
                                &pc->mi->pubkey,
                                pc->chosen_exchange,
-                               &pc->h_proposal_data,
                                &pc->mi->h_wire,
                                pc->timestamp,
                                pc->refund_deadline,

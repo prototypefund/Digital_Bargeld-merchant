@@ -185,11 +185,6 @@ struct TrackTransactionContext
   struct GNUNET_HashCode h_wire;
 
   /**
-   * Hash of the contract.
-   */
-  struct GNUNET_HashCode h_contract;
-
-  /**
    * Timestamp of the transaction.
    */
   struct GNUNET_TIME_Absolute timestamp;
@@ -207,7 +202,7 @@ struct TrackTransactionContext
   /**
    * Transaction this request is about.
    */
-  uint64_t transaction_id;
+  const char *transaction_id;
 
   /**
    * Response code to return upon resume.
@@ -568,7 +563,6 @@ trace_coins (struct TrackTransactionContext *tctx)
     tcc->dwh = TALER_EXCHANGE_track_transaction (tctx->eh,
                                                  &tctx->mi->privkey,
                                                  &tctx->h_wire,
-                                                 &tctx->h_contract,
                                                  &tcc->coin_pub,
                                                  tctx->transaction_id,
                                                  &wtid_cb,
@@ -734,10 +728,9 @@ handle_track_transaction_timeout (void *cls)
  */
 static void
 transaction_cb (void *cls,
-                uint64_t transaction_id,
 		const struct TALER_MerchantPublicKeyP *merchant_pub,
                 const char *exchange_uri,
-                const struct GNUNET_HashCode *h_contract,
+                const char *transaction_id,
                 const struct GNUNET_HashCode *h_wire,
                 struct GNUNET_TIME_Absolute timestamp,
                 struct GNUNET_TIME_Absolute refund,
@@ -745,9 +738,8 @@ transaction_cb (void *cls,
 {
   struct TrackTransactionContext *tctx = cls;
 
-  tctx->transaction_id = transaction_id;
+  tctx->transaction_id = GNUNET_strdup (transaction_id);
   tctx->exchange_uri = GNUNET_strdup (exchange_uri);
-  tctx->h_contract = *h_contract;
   tctx->h_wire = *h_wire;
   tctx->timestamp = timestamp;
   tctx->refund_deadline = refund;
@@ -774,7 +766,7 @@ transaction_cb (void *cls,
  */
 static void
 transfer_cb (void *cls,
-             uint64_t transaction_id,
+             const char *transaction_id,
              const struct TALER_CoinSpendPublicKeyP *coin_pub,
              const struct TALER_WireTransferIdentifierRawP *wtid,
              struct GNUNET_TIME_Absolute execution_time,
@@ -804,7 +796,7 @@ transfer_cb (void *cls,
  */
 static void
 coin_cb (void *cls,
-         uint64_t transaction_id,
+         const char *transaction_id,
          const struct TALER_CoinSpendPublicKeyP *coin_pub,
          const struct TALER_Amount *amount_with_fee,
          const struct TALER_Amount *deposit_fee,
@@ -846,8 +838,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                               size_t *upload_data_size)
 {
   struct TrackTransactionContext *tctx;
-  unsigned long long transaction_id;
-  const char *str;
+  const char *transaction_id;
   const char *instance;
   int ret;
   struct GNUNET_HashCode h_instance;
@@ -895,10 +886,10 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                 "Not sure why we are here, should be suspended\n");
     return MHD_YES; /* still work in progress */
   }
-  str = MHD_lookup_connection_value (connection,
-                                     MHD_GET_ARGUMENT_KIND,
-                                     "id");
-  if (NULL == str)
+  transaction_id = MHD_lookup_connection_value (connection,
+                                                MHD_GET_ARGUMENT_KIND,
+                                                "id");
+  if (NULL == transaction_id)
     return TMH_RESPONSE_reply_arg_missing (connection,
                                            TALER_EC_PARAMETER_MISSING,
 					   "id");
@@ -916,14 +907,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
 					 "unknown instance");
-  if (1 !=
-      sscanf (str,
-              "%llu",
-              &transaction_id))
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-					   TALER_EC_PARAMETER_MALFORMED,
-                                           "id");
-
   ret = db->find_transaction (db->cls,
                               transaction_id,
 			      &tctx->mi->pubkey,
@@ -936,7 +919,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                          "id");
   }
   if ( (GNUNET_SYSERR == ret) ||
-       (tctx->transaction_id != (uint64_t) transaction_id) ||
+       (0 != strcmp (tctx->transaction_id, transaction_id)) ||
        (NULL == tctx->exchange_uri) )
   {
     GNUNET_break (0);

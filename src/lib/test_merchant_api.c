@@ -431,7 +431,7 @@ struct Command
       /**
        * Proposal data's hashcode.
        */
-      struct GNUNET_HashCode h_proposal_data;
+      struct GNUNET_HashCode hash;
 
     } proposal;
 
@@ -1031,7 +1031,7 @@ proposal_cb (void *cls,
              const json_t *obj,
              const json_t *proposal_data,
              const struct TALER_MerchantSignatureP *sig,
-             const struct GNUNET_HashCode *h_proposal_data)
+             const struct GNUNET_HashCode *hash)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -1042,7 +1042,7 @@ proposal_cb (void *cls,
   case MHD_HTTP_OK:
     cmd->details.proposal.proposal_data = json_incref ((json_t *) proposal_data);
     cmd->details.proposal.merchant_sig = *sig;
-    cmd->details.proposal.h_proposal_data = *h_proposal_data;
+    cmd->details.proposal.hash = *hash;
     break;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1815,7 +1815,7 @@ interpreter_run (void *cls)
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI,
                                      instance,
-				     &ref->details.proposal.h_proposal_data,
+				     &ref->details.proposal.hash,
 				     transaction_id,
 				     &total_amount,
 				     &max_fee,
