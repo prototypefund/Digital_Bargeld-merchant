@@ -219,7 +219,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*store_deposit) (void *cls,
-                    const char *transaction_id,
+                    const struct GNUNET_HashCode *h_proposal_data,
                     const struct TALER_MerchantPublicKeyP *merchant_pub,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
                     const struct TALER_Amount *amount_with_fee,

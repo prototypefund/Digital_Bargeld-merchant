@@ -184,9 +184,9 @@ postgres_initialize (void *cls)
            ");");
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_deposits ("
-	   " h_proposal_data BTYEA NOT NULL"
+	   " h_proposal_data BYTEA NOT NULL"
 	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-	   ",FOREIGN KEY (transaction_id, merchant_pub) REFERENCES merchant_transactions (transaction_id, merchant_pub)"
+	   ",FOREIGN KEY (h_proposal_data, merchant_pub) REFERENCES merchant_transactions (h_proposal_data, merchant_pub)"
            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
            ",amount_with_fee_val INT8 NOT NULL"
            ",amount_with_fee_frac INT4 NOT NULL"
@@ -243,7 +243,7 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "insert_deposit",
               "INSERT INTO merchant_deposits"
-              "(transaction_id"
+              "(h_proposal_data"
 	      ",merchant_pub"
               ",coin_pub"
               ",amount_with_fee_val"
@@ -527,8 +527,6 @@ postgres_store_transaction (void *cls,
   PGresult *result;
   int ret;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "dbtc: %s\n", total_amount->currency);
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
     GNUNET_PQ_query_param_string (exchange_uri),
@@ -573,7 +571,7 @@ postgres_store_transaction (void *cls,
  */
 static int
 postgres_store_deposit (void *cls,
-                        const char *transaction_id,
+                        const struct GNUNET_HashCode *h_proposal_data,
                         const struct TALER_MerchantPublicKeyP *merchant_pub,
                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
                         const struct TALER_Amount *amount_with_fee,
@@ -586,7 +584,7 @@ postgres_store_deposit (void *cls,
   int ret;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     TALER_PQ_query_param_amount (amount_with_fee),

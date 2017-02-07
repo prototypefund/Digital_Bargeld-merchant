@@ -75,6 +75,11 @@ static struct GNUNET_HashCode h_wire;
 char *transaction_id;
 
 /**
+ * Proposal's hash
+ */
+struct GNUNET_HashCode h_proposal_data;
+
+/**
  * Time of the transaction.
  */
 static struct GNUNET_TIME_Absolute timestamp;
@@ -158,7 +163,7 @@ static void
 transaction_cb (void *cls,
 		const struct TALER_MerchantPublicKeyP *amerchant_pub,
                 const char *aexchange_uri,
-                const char *atransaction_id,
+                const struct GNUNET_HashCode *ah_proposal_data,
                 const struct GNUNET_HashCode *ah_wire,
                 struct GNUNET_TIME_Absolute atimestamp,
                 struct GNUNET_TIME_Absolute arefund_deadline,
@@ -168,8 +173,9 @@ transaction_cb (void *cls,
   CHECK (0 == memcmp (amerchant_pub,
                       &merchant_pub,
 		      sizeof (struct TALER_MerchantPublicKeyP)));
-  CHECK (0 == strcmp (atransaction_id,
-                      transaction_id));
+  CHECK (0 == memcmp (ah_proposal_data,
+                      &h_proposal_data,
+                      sizeof (struct GNUNET_HashCode)));
   CHECK (0 == strcmp (aexchange_uri,
                       EXCHANGE_URI));
   CHECK (0 == memcmp (ah_wire,
@@ -200,7 +206,7 @@ static void
 history_cb (void *cls,
 	    const struct TALER_MerchantPublicKeyP *merchant_pub,
             const char *exchange_uri,
-            const char *transaction_id,
+            const struct GNUNET_HashCode *h_proposal_data,
             const struct GNUNET_HashCode *h_wire,
             struct GNUNET_TIME_Absolute timestamp,
             struct GNUNET_TIME_Absolute refund,
@@ -222,14 +228,15 @@ history_cb (void *cls,
  */
 static void
 deposit_cb (void *cls,
-            const char *atransaction_id,
+            const struct GNUNET_HashCode *ah_proposal_data,
             const struct TALER_CoinSpendPublicKeyP *acoin_pub,
             const struct TALER_Amount *aamount_with_fee,
             const struct TALER_Amount *adeposit_fee,
             const json_t *aexchange_proof)
 {
-  CHECK ((0 == strcmp (atransaction_id,
-                       transaction_id)));
+  CHECK ((0 == memcmp (ah_proposal_data,
+                       &h_proposal_data,
+                       sizeof (struct GNUNET_HashCode))));
   CHECK (0 == memcmp (acoin_pub,
                       &coin_pub,
                       sizeof (struct TALER_CoinSpendPublicKeyP)));
@@ -261,13 +268,16 @@ deposit_cb (void *cls,
  */
 static void
 transfer_cb (void *cls,
-             const char *atransaction_id,
+             const struct GNUNET_HashCode *ah_proposal_data,
              const struct TALER_CoinSpendPublicKeyP *acoin_pub,
              const struct TALER_WireTransferIdentifierRawP *awtid,
              struct GNUNET_TIME_Absolute execution_time,
              const json_t *exchange_proof)
 {
-  CHECK (atransaction_id == transaction_id);
+  CHECK (0 == memcmp (ah_proposal_data,
+                      &h_proposal_data,
+                      sizeof (struct GNUNET_HashCode)));
+
   CHECK (0 == memcmp (acoin_pub,
                       &coin_pub,
                       sizeof (struct TALER_CoinSpendPublicKeyP)));
@@ -325,6 +335,7 @@ run (void *cls)
 
   /* Prepare data for 'store_payment()' */
   RND_BLK (&h_wire);
+  RND_BLK (&h_proposal_data);
   transaction_id = "test_ID";
   GNUNET_CRYPTO_hash (transaction_id,
                       strlen (transaction_id),
@@ -372,7 +383,7 @@ run (void *cls)
 
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,
-                                     transaction_id,
+                                     &h_proposal_data,
 				     &merchant_pub,
                                      EXCHANGE_URI,
                                      &h_wire,
@@ -381,7 +392,7 @@ run (void *cls)
                                      &amount_with_fee));
   FAILIF (GNUNET_OK !=
           plugin->store_deposit (plugin->cls,
-                                 transaction_id,
+                                 &h_proposal_data,
 				 &merchant_pub,
                                  &coin_pub,
                                  &amount_with_fee,
@@ -390,7 +401,7 @@ run (void *cls)
                                  deposit_proof));
   FAILIF (GNUNET_OK !=
           plugin->store_coin_to_transfer (plugin->cls,
-                                          transaction_id,
+                                          &h_proposal_data,
                                           &coin_pub,
                                           &wtid));
   FAILIF (GNUNET_OK !=
@@ -402,7 +413,7 @@ run (void *cls)
                                            transfer_proof));
   FAILIF (GNUNET_OK !=
           plugin->find_transaction (plugin->cls,
-                                    transaction_id,
+                                    &h_proposal_data,
 				    &merchant_pub,
                                     &transaction_cb,
                                     NULL));
@@ -416,13 +427,13 @@ run (void *cls)
 
   FAILIF (GNUNET_OK !=
           plugin->find_payments (plugin->cls,
-                                 transaction_id,
+                                 &h_proposal_data,
                                  &merchant_pub,
                                  &deposit_cb,
                                  NULL));
   FAILIF (GNUNET_OK !=
-          plugin->find_transfers_by_id (plugin->cls,
-                                        transaction_id,
+          plugin->find_transfers_by_hash (plugin->cls,
+                                        &h_proposal_data,
                                         &transfer_cb,
                                         NULL));
   FAILIF (GNUNET_OK !=
