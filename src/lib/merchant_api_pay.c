@@ -278,7 +278,7 @@ struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 			   const char *merchant_uri,
 			   const char *instance,
-                           const struct GNUNET_HashCode *h_contract,
+                           const struct GNUNET_HashCode *h_proposal_data,
                            uint64_t transaction_id,
 			   const struct TALER_Amount *amount,
 			   const struct TALER_Amount *max_fee,
@@ -304,11 +304,10 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 
   dr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_COIN_DEPOSIT);
   dr.purpose.size = htonl (sizeof (struct TALER_DepositRequestPS));
-  dr.h_contract = *h_contract;
+  dr.h_proposal_data = *h_proposal_data;
   dr.h_wire = *h_wire;
   dr.timestamp = GNUNET_TIME_absolute_hton (timestamp);
   dr.refund_deadline = GNUNET_TIME_absolute_hton (refund_deadline);
-  dr.transaction_id = GNUNET_htonll (transaction_id);
   dr.merchant = *merchant_pub;
   for (i=0;i<num_coins;i++)
   {
@@ -346,7 +345,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
   return TALER_MERCHANT_pay_frontend (ctx,
 				      merchant_uri,
                                       instance,
-				      h_contract,
+				      h_proposal_data,
                                       amount,
 				      max_fee,
 				      transaction_id,

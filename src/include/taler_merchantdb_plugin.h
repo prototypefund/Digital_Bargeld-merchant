@@ -47,7 +47,7 @@ typedef void
 (*TALER_MERCHANTDB_TransactionCallback)(void *cls,
 					const struct TALER_MerchantPublicKeyP *merchant_pub,
                                         const char *exchange_uri,
-                                        const char *transaction_id,
+                                        const struct GNUNET_HashCode *h_proposal_data,
                                         const struct GNUNET_HashCode *h_wire,
                                         struct GNUNET_TIME_Absolute timestamp,
                                         struct GNUNET_TIME_Absolute refund,
@@ -67,7 +67,7 @@ typedef void
  */
 typedef void
 (*TALER_MERCHANTDB_CoinDepositCallback)(void *cls,
-                                        const char *transaction_id,
+                                        const struct GNUNET_HashCode *h_proposal_data,
                                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                         const struct TALER_Amount *amount_with_fee,
                                         const struct TALER_Amount *deposit_fee,
@@ -93,7 +93,7 @@ typedef void
  */
 typedef void
 (*TALER_MERCHANTDB_TransferCallback)(void *cls,
-                                     const char *transaction_id,
+                                     const struct GNUNET_HashCode *h_proposal_data,
                                      const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                      const struct TALER_WireTransferIdentifierRawP *wtid,
                                      struct GNUNET_TIME_Absolute execution_time,
@@ -195,7 +195,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*store_transaction) (void *cls,
-                        const char *transaction_id,
+                        const struct GNUNET_HashCode *h_proposal_data,
 			const struct TALER_MerchantPublicKeyP *merchant_pub,
                         const char *exchange_uri,
                         const struct GNUNET_HashCode *h_wire,
@@ -241,7 +241,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*store_coin_to_transfer) (void *cls,
-                             const char *transaction_id,
+                             const struct GNUNET_HashCode *h_proposal_data,
                              const struct TALER_CoinSpendPublicKeyP *coin_pub,
                              const struct TALER_WireTransferIdentifierRawP *wtid);
 
@@ -295,7 +295,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*find_transaction) (void *cls,
-                       const char *transaction_id,
+                       const struct GNUNET_HashCode *h_proposal_data,
 		       const struct TALER_MerchantPublicKeyP *merchant_pub,
                        TALER_MERCHANTDB_TransactionCallback cb,
                        void *cb_cls);
@@ -315,7 +315,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*find_payments) (void *cls,
-                    const char *transaction_id,
+                    const struct GNUNET_HashCode *h_proposal_data,
                     const struct TALER_MerchantPublicKeyP *merchant_pub,
                     TALER_MERCHANTDB_CoinDepositCallback cb,
                     void *cb_cls);
@@ -334,12 +334,12 @@ struct TALER_MERCHANTDB_Plugin
    *         #GNUNET_SYSERR on hard errors
    */
   int
-  (*find_payments_by_id_and_coin) (void *cls,
-                                   const char *transaction_id,
-                                   const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                   const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                                   TALER_MERCHANTDB_CoinDepositCallback cb,
-                                   void *cb_cls);
+  (*find_payments_by_hash_and_coin) (void *cls,
+                                     const struct GNUNET_HashCode *h_proposal_data,
+                                     const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                     TALER_MERCHANTDB_CoinDepositCallback cb,
+                                     void *cb_cls);
 
 
   /**
@@ -357,10 +357,10 @@ struct TALER_MERCHANTDB_Plugin
    *         #GNUNET_SYSERR on hard errors
    */
   int
-  (*find_transfers_by_id) (void *cls,
-                           const char *transaction_id,
-                           TALER_MERCHANTDB_TransferCallback cb,
-                           void *cb_cls);
+  (*find_transfers_by_hash) (void *cls,
+                             const struct GNUNET_HashCode *h_proposal_data,
+                             TALER_MERCHANTDB_TransferCallback cb,
+                             void *cb_cls);
 
 
   /**

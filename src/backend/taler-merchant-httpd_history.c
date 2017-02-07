@@ -42,7 +42,7 @@ static void
 history_cb (void *cls,
 	    const struct TALER_MerchantPublicKeyP *merchant_pub,
             const char *exchange_uri,
-            const char *transaction_id,
+            const struct GNUNET_HashCode *h_proposal_data,
             const struct GNUNET_HashCode *h_wire,
             struct GNUNET_TIME_Absolute timestamp,
             struct GNUNET_TIME_Absolute refund,
@@ -52,10 +52,9 @@ history_cb (void *cls,
   json_t *entry;
 
   GNUNET_break (NULL !=
-               (entry = json_pack ("{s:s, s:s, s:s, s:o}",
-                                   "transaction_id", transaction_id,
+               (entry = json_pack ("{s:o, s:s, s:s, s:o}",
+                                   "h_proposal_data", GNUNET_JSON_from_data_auto (h_proposal_data),
                                    "exchange", exchange_uri,
-                                   "transaction_id", transaction_id,
                                    "timestamp", GNUNET_JSON_from_time_abs (timestamp),
                                    "total_amount",
                                    TALER_JSON_from_amount (total_amount))));

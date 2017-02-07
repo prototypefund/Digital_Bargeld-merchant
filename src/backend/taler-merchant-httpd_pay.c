@@ -709,7 +709,6 @@ process_pay_with_exchange (void *cls,
                                      &dc->ub_sig,
                                      &dc->denom,
                                      pc->timestamp,
-                                     0, /*FIXME: tid*/
                                      &pc->mi->pubkey,
                                      pc->refund_deadline,
                                      &dc->coin_sig,
@@ -773,7 +772,7 @@ handle_pay_timeout (void *cls)
  */
 static void
 check_coin_paid (void *cls,
-                 const char *transaction_id,
+                 const struct GNUNET_HashCode *h_proposal_data,
                  const struct TALER_CoinSpendPublicKeyP *coin_pub,
                  const struct TALER_Amount *amount_with_fee,
                  const struct TALER_Amount *deposit_fee,
@@ -782,8 +781,9 @@ check_coin_paid (void *cls,
   struct PayContext *pc = cls;
   unsigned int i;
 
-  if (0 != strcmp (pc->transaction_id,
-                   transaction_id))
+  if (0 != memcmp (&pc->h_proposal_data,
+                   h_proposal_data,
+                   sizeof (struct GNUNET_HashCode)))
   {
     GNUNET_break (0);
     return;
@@ -821,7 +821,7 @@ static void
 check_transaction_exists (void *cls,
 			  const struct TALER_MerchantPublicKeyP *merchant_pub,
 			  const char *exchange_uri,
-			  const char *transaction_id,
+			  const struct GNUNET_HashCode *h_proposal_data,
 			  const struct GNUNET_HashCode *h_xwire,
 			  struct GNUNET_TIME_Absolute timestamp,
 			  struct GNUNET_TIME_Absolute refund,
@@ -829,8 +829,9 @@ check_transaction_exists (void *cls,
 {
   struct PayContext *pc = cls;
 
-  if ( (0 == strcmp (transaction_id,
-		     pc->transaction_id)) &&
+  if ( (0 == memcmp (h_proposal_data,
+		     &pc->h_proposal_data,
+                     sizeof (struct GNUNET_HashCode))) &&
        (0 == memcmp (h_xwire,
 		     &pc->mi->h_wire,
 		     sizeof (struct GNUNET_HashCode))) &&
@@ -1106,7 +1107,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   /* Check if this payment attempt has already succeeded */
   if (GNUNET_SYSERR ==
       db->find_payments (db->cls,
-		         pc->transaction_id,
+		         &pc->h_proposal_data,
                          &pc->mi->pubkey,
 		         &check_coin_paid,
 		         pc))
@@ -1137,7 +1138,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   /* Check if transaction is already known, if not store it. */
   if (GNUNET_SYSERR ==
       db->find_transaction (db->cls,
-			    pc->transaction_id,
+			    &pc->h_proposal_data,
 			    &pc->mi->pubkey,
 			    &check_transaction_exists,
                             pc))
@@ -1177,7 +1178,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 
     if (GNUNET_OK !=
         db->store_transaction (db->cls,
-                               pc->transaction_id,
+                               &pc->h_proposal_data,
                                &pc->mi->pubkey,
                                pc->chosen_exchange,
                                &pc->mi->h_wire,

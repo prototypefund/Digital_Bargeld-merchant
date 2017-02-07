@@ -215,7 +215,7 @@ track_transfer_cleanup (struct TM_HandlerContext *hc)
  */
 static void
 check_transfer (void *cls,
-                const char *transaction_id,
+                const struct GNUNET_HashCode *h_proposal_data,
                 const struct TALER_CoinSpendPublicKeyP *coin_pub,
                 const struct TALER_Amount *amount_with_fee,
                 const struct TALER_Amount *deposit_fee,
@@ -244,7 +244,7 @@ check_transfer (void *cls,
                                      "conflict_offset", (json_int_t) rctx->current_offset,
                                      "exchange_transfer_proof", rctx->original_response,
                                      "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
-                                     "transaction_id", transaction_id,
+                                     "h_proposal_data", GNUNET_JSON_from_data_auto (&ttd->h_proposal_data),
                                      "amount_with_fee", TALER_JSON_from_amount (amount_with_fee),
                                      "deposit_fee", TALER_JSON_from_amount (deposit_fee));
     return;
@@ -327,12 +327,12 @@ wire_transfer_cb (void *cls,
     rctx->current_offset = i;
     rctx->current_detail = &details[i];
     rctx->check_transfer_result = GNUNET_NO;
-    ret = db->find_payments_by_id_and_coin (db->cls,
-                                            details[i].transaction_id,
-                                            &rctx->mi->pubkey,
-                                            &details[i].coin_pub,
-                                            &check_transfer,
-                                            rctx);
+    ret = db->find_payments_by_hash_and_coin (db->cls,
+                                              &details[i].h_proposal_data,
+                                              &rctx->mi->pubkey,
+                                              &details[i].coin_pub,
+                                              &check_transfer,
+                                              rctx);
     if (GNUNET_SYSERR == ret)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -384,7 +384,7 @@ wire_transfer_cb (void *cls,
     /* Response is consistent with the /deposit we made, remember
        it for future reference */
     ret = db->store_coin_to_transfer (db->cls,
-                                      details[i].transaction_id,
+                                      &details[i].h_proposal_data,
                                       &details[i].coin_pub,
                                       &rctx->wtid);
     if (GNUNET_OK != ret)

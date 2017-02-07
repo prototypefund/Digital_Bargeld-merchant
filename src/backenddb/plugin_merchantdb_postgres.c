@@ -164,14 +164,14 @@ postgres_initialize (void *cls)
   /* Setup tables */
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_proposal_data ("
-           "h_transaction_id BYTEA NOT NULL CHECK (LENGTH(h_transaction_id)=64)"
+           "h_proposal_data BYTEA NOT NULL CHECK (LENGTH(h_proposal_data)=64)"
            ",proposal_data BYTEA NOT NULL"
-	   ",PRIMARY KEY (h_transaction_id)"
+	   ",PRIMARY KEY (h_proposal_data)"
            ");");
 
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_transactions ("
-           " transaction_id VARCHAR NOT NULL"
+           " h_proposal_data BYTEA NOT NULL"
            ",exchange_uri VARCHAR NOT NULL"
 	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
            ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
@@ -180,11 +180,11 @@ postgres_initialize (void *cls)
            ",total_amount_val INT8 NOT NULL"
            ",total_amount_frac INT4 NOT NULL"
            ",total_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
-	   ",PRIMARY KEY (transaction_id, merchant_pub)"
+	   ",PRIMARY KEY (h_proposal_data, merchant_pub)"
            ");");
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_deposits ("
-	   " transaction_id VARCHAR NOT NULL"
+	   " h_proposal_data BTYEA NOT NULL"
 	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
 	   ",FOREIGN KEY (transaction_id, merchant_pub) REFERENCES merchant_transactions (transaction_id, merchant_pub)"
            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
@@ -196,7 +196,7 @@ postgres_initialize (void *cls)
            ",deposit_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
            ",exchange_proof BYTEA NOT NULL"
-           ",PRIMARY KEY (transaction_id, coin_pub)"
+           ",PRIMARY KEY (h_proposal_data, coin_pub)"
            ");");
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_proofs ("
@@ -212,10 +212,10 @@ postgres_initialize (void *cls)
      Hence those cannot be foreign keys into deposits/transactions! */
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_transfers ("
-           " transaction_id VARCHAR NOT NULL"
+           " h_proposal_data BYTEA NOT NULL"
            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
            ",wtid BYTEA NOT NULL CHECK (LENGTH(wtid)=32)"
-           ",PRIMARY KEY (transaction_id, coin_pub)"
+           ",PRIMARY KEY (h_proposal_data, coin_pub)"
            ");");
   PG_EXEC_INDEX (pg,
                  "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin"
@@ -228,7 +228,7 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "insert_transaction",
               "INSERT INTO merchant_transactions"
-              "(transaction_id"
+              "(h_proposal_data"
               ",exchange_uri"
 	      ",merchant_pub"
               ",h_wire"
@@ -259,7 +259,7 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "insert_transfer",
               "INSERT INTO merchant_transfers"
-              "(transaction_id"
+              "(h_proposal_data"
               ",coin_pub"
               ",wtid) VALUES "
               "($1, $2, $3)",
@@ -334,7 +334,7 @@ postgres_initialize (void *cls)
               ",deposit_fee_curr"
               ",exchange_proof"
               " FROM merchant_deposits"
-              " WHERE transaction_id=$1"
+              " WHERE h_proposal_data=$1"
               " AND merchant_pub=$2",
               2);
   PG_PREPARE (pg,
@@ -353,7 +353,7 @@ postgres_initialize (void *cls)
               " AND coin_pub=$3",
               3);
   PG_PREPARE (pg,
-              "find_transfers_by_transaction_id",
+              "find_transfers_by_hash",
               "SELECT"
               " coin_pub"
               ",wtid"
@@ -361,12 +361,12 @@ postgres_initialize (void *cls)
               ",merchant_proofs.proof"
               " FROM merchant_transfers"
               "   JOIN merchant_proofs USING (wtid)"
-              " WHERE transaction_id=$1",
+              " WHERE h_proposal_data=$1",
               1);
   PG_PREPARE (pg,
               "find_deposits_by_wtid",
               "SELECT"
-              " merchant_transfers.transaction_id"
+              " merchant_transfers.h_proposal_data"
               ",merchant_transfers.coin_pub"
               ",merchant_deposits.amount_with_fee_val"
               ",merchant_deposits.amount_with_fee_frac"
@@ -377,7 +377,7 @@ postgres_initialize (void *cls)
               ",merchant_deposits.exchange_proof"
               " FROM merchant_transfers"
               "   JOIN merchant_deposits"
-              "     ON (merchant_deposits.transaction_id = merchant_transfers.transaction_id"
+              "     ON (merchant_deposits.h_proposal_data = merchant_transfers.h_proposal_data"
               "       AND"
               "         merchant_deposits.coin_pub = merchant_transfers.coin_pub)"
               " WHERE wtid=$1",
@@ -515,7 +515,7 @@ postgres_insert_proposal_data (void *cls,
  */
 static int
 postgres_store_transaction (void *cls,
-                            const char *transaction_id,
+                            const struct GNUNET_HashCode *h_proposal_data,
 			    const struct TALER_MerchantPublicKeyP *merchant_pub,
                             const char *exchange_uri,
                             const struct GNUNET_HashCode *h_wire,
@@ -530,7 +530,7 @@ postgres_store_transaction (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_INFO, "dbtc: %s\n", total_amount->currency);
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
     GNUNET_PQ_query_param_string (exchange_uri),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (h_wire),
@@ -626,7 +626,7 @@ postgres_store_deposit (void *cls,
  */
 static int
 postgres_store_coin_to_transfer (void *cls,
-                                 const char *transaction_id,
+                                 const struct GNUNET_HashCode *h_proposal_data,
                                  const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                  const struct TALER_WireTransferIdentifierRawP *wtid)
 {
@@ -635,7 +635,7 @@ postgres_store_coin_to_transfer (void *cls,
   int ret;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_auto_from_type (wtid),
     GNUNET_PQ_query_param_end
@@ -753,12 +753,13 @@ postgres_find_transactions_by_date (void *cls,
     struct GNUNET_TIME_Absolute timestamp;
     struct GNUNET_TIME_Absolute refund_deadline;
     struct TALER_Amount total_amount;
-    char *transaction_id;
+    struct GNUNET_HashCode h_proposal_data;
+
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_string ("exchange_uri",
                                     &exchange_uri),
-      GNUNET_PQ_result_spec_string ("transaction_id",
-                                    &transaction_id),
+      GNUNET_PQ_result_spec_auto_from_type ("h_proposal_data",
+                                    &h_proposal_data),
       GNUNET_PQ_result_spec_auto_from_type ("merchant_pub",
                                             &merchant_pub),
       GNUNET_PQ_result_spec_auto_from_type ("h_wire",
@@ -784,7 +785,7 @@ postgres_find_transactions_by_date (void *cls,
     cb (cb_cls,
 	&merchant_pub,
         exchange_uri,
-        transaction_id,
+        &h_proposal_data,
         &h_wire,
         timestamp,
         refund_deadline,
@@ -809,7 +810,7 @@ postgres_find_transactions_by_date (void *cls,
  */
 static int
 postgres_find_transaction (void *cls,
-                           const char *transaction_id,
+                           const struct GNUNET_HashCode *h_proposal_data,
 			   const struct TALER_MerchantPublicKeyP *merchant_pub,
                            TALER_MERCHANTDB_TransactionCallback cb,
                            void *cb_cls)
@@ -817,7 +818,7 @@ postgres_find_transaction (void *cls,
   struct PostgresClosure *pg = cls;
   PGresult *result;
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string(transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
@@ -875,7 +876,7 @@ postgres_find_transaction (void *cls,
     cb (cb_cls,
 	merchant_pub,
         exchange_uri,
-        transaction_id,
+        h_proposal_data,
         &h_wire,
         timestamp,
         refund_deadline,
@@ -900,7 +901,7 @@ postgres_find_transaction (void *cls,
  */
 static int
 postgres_find_payments (void *cls,
-                        const char *transaction_id,
+                        const struct GNUNET_HashCode *h_proposal_data,
 		        const struct TALER_MerchantPublicKeyP *merchant_pub,
                         TALER_MERCHANTDB_CoinDepositCallback cb,
                         void *cb_cls)
@@ -910,7 +911,7 @@ postgres_find_payments (void *cls,
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
@@ -958,7 +959,7 @@ postgres_find_payments (void *cls,
       return GNUNET_SYSERR;
     }
     cb (cb_cls,
-        transaction_id,
+        h_proposal_data,
         &coin_pub,
         &amount_with_fee,
         &deposit_fee,
@@ -987,19 +988,19 @@ postgres_find_payments (void *cls,
  *         #GNUNET_SYSERR on hard errors
  */
 static int
-postgres_find_payments_by_id_and_coin (void *cls,
-                                       const char *transaction_id,
-                                       const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                       const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                                       TALER_MERCHANTDB_CoinDepositCallback cb,
-                                       void *cb_cls)
+postgres_find_payments_by_hash_and_coin (void *cls,
+                                         const struct GNUNET_HashCode *h_proposal_data,
+                                         const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                         TALER_MERCHANTDB_CoinDepositCallback cb,
+                                         void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_end
@@ -1046,7 +1047,7 @@ postgres_find_payments_by_id_and_coin (void *cls,
       return GNUNET_SYSERR;
     }
     cb (cb_cls,
-        transaction_id,
+        h_proposal_data,
         coin_pub,
         &amount_with_fee,
         &deposit_fee,
@@ -1076,21 +1077,21 @@ postgres_find_payments_by_id_and_coin (void *cls,
  *         #GNUNET_SYSERR on hard errors
  */
 static int
-postgres_find_transfers_by_id (void *cls,
-                               const char *transaction_id,
-                               TALER_MERCHANTDB_TransferCallback cb,
-                               void *cb_cls)
+postgres_find_transfers_by_hash (void *cls,
+                                 const struct GNUNET_HashCode *h_proposal_data,
+                                 TALER_MERCHANTDB_TransferCallback cb,
+                                 void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
     GNUNET_PQ_query_param_end
   };
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_transfers_by_transaction_id",
+                                    "find_transfers_by_hash",
                                     params);
   if (PGRES_TUPLES_OK != PQresultStatus (result))
   {
@@ -1133,7 +1134,7 @@ postgres_find_transfers_by_id (void *cls,
       return GNUNET_SYSERR;
     }
     cb (cb_cls,
-        transaction_id,
+        h_proposal_data,
         &coin_pub,
         &wtid,
         execution_time,
@@ -1186,15 +1187,15 @@ postgres_find_deposits_by_wtid (void *cls,
 
   for (i=0;i<PQntuples (result);i++)
   {
-    char *transaction_id;
+    struct GNUNET_HashCode h_proposal_data;
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
     json_t *exchange_proof;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
-      GNUNET_PQ_result_spec_string ("transaction_id",
-                                    &transaction_id),
+      GNUNET_PQ_result_spec_auto_from_type ("h_proposal_data",
+                                            &h_proposal_data),
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
       TALER_PQ_result_spec_amount ("amount_with_fee",
@@ -1216,7 +1217,7 @@ postgres_find_deposits_by_wtid (void *cls,
       return GNUNET_SYSERR;
     }
     cb (cb_cls,
-        transaction_id,
+        &h_proposal_data,
         &coin_pub,
         &amount_with_fee,
         &deposit_fee,
@@ -1350,9 +1351,9 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
   plugin->find_transaction = &postgres_find_transaction;
   plugin->find_transactions_by_date = &postgres_find_transactions_by_date;
-  plugin->find_payments_by_id_and_coin = &postgres_find_payments_by_id_and_coin;
+  plugin->find_payments_by_hash_and_coin = &postgres_find_payments_by_hash_and_coin;
   plugin->find_payments = &postgres_find_payments;
-  plugin->find_transfers_by_id = &postgres_find_transfers_by_id;
+  plugin->find_transfers_by_hash = &postgres_find_transfers_by_hash;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
   plugin->insert_proposal_data = &postgres_insert_proposal_data;
