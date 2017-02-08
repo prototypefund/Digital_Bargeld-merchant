@@ -294,7 +294,7 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "find_transactions_by_date",
               "SELECT"
-              " transaction_id"
+              " h_proposal_data"
 	      ",merchant_pub"
               ",exchange_uri"
               ",h_wire"
@@ -319,7 +319,7 @@ postgres_initialize (void *cls)
               ",total_amount_frac"
               ",total_amount_curr"
               " FROM merchant_transactions"
-              " WHERE transaction_id=$1"
+              " WHERE h_proposal_data=$1"
 	      " AND merchant_pub=$2",
               2);
   PG_PREPARE (pg,
@@ -348,7 +348,7 @@ postgres_initialize (void *cls)
               ",deposit_fee_curr"
               ",exchange_proof"
               " FROM merchant_deposits"
-              " WHERE transaction_id=$1"
+              " WHERE h_proposal_data=$1"
               " AND merchant_pub=$2"
               " AND coin_pub=$3",
               3);
