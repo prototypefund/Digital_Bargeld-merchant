@@ -479,9 +479,9 @@ struct Command
       struct TALER_MERCHANT_Pay *ph;
 
       /**
-       * Set to the transaction ID of the respective contract.
+       * Hashcode of the proposal data associated to this payment.
        */
-      uint64_t transaction_id;
+      struct GNUNET_HashCode h_proposal_data;
 
       /**
        * Merchant's public key
@@ -538,6 +538,9 @@ struct Command
 
       /**
        * #OC_PAY command which we expect in the result.
+       * Since we are tracking a bank transaction, we want to know
+       * which (Taler) deposit is associated with the bank
+       * transaction being tracked now.
        */
       char *expected_pay_ref;
 
@@ -1078,7 +1081,7 @@ pay_cb (void *cls,
   struct Command *cmd = &is->commands[is->ip];
   struct PaymentResponsePS mr;
   struct GNUNET_CRYPTO_EddsaSignature sig;
-  struct GNUNET_HashCode h_contract;
+  struct GNUNET_HashCode h_proposal_data;
   const char *error_name;
   unsigned int error_line;
 
@@ -1097,8 +1100,8 @@ pay_cb (void *cls,
   {
     /* Check signature */
     struct GNUNET_JSON_Specification spec[] = {
-      GNUNET_JSON_spec_fixed_auto ("merchant_sig", &sig),
-      GNUNET_JSON_spec_fixed_auto ("h_contract", &h_contract),
+      GNUNET_JSON_spec_fixed_auto ("sig", &sig),
+      GNUNET_JSON_spec_fixed_auto ("h_proposal_data", &h_proposal_data),
       GNUNET_JSON_spec_end ()
     };
     if (GNUNET_OK !=
@@ -1117,7 +1120,7 @@ pay_cb (void *cls,
     }
     mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
-    mr.h_contract = h_contract;
+    mr.h_proposal_data = h_proposal_data;
     if (GNUNET_OK !=
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
                                     &mr.purpose,
@@ -1208,18 +1211,31 @@ track_transfer_cb (void *cls,
       unsigned int i;
       int found;
 
+      /**
+       * Retrieve the deposit operation that is supposed
+       * to have been paid by the wtid used in this operation.
+       * After that, check if that operation is actually mentioned
+       * in the returned data.
+       */
       ref = find_command (is,
                           cmd->details.track_transfer.expected_pay_ref);
       GNUNET_assert (NULL != ref);
       found = GNUNET_NO;
+
+      /**
+       * Iterating over the details makes little sense now,
+       * as each payment involves exatcly one coin.
+       */
       for (i=0;i<details_length;i++)
       {
         struct TALER_Amount amount_with_fee;
         struct TALER_Amount amount_without_fee;
         struct TALER_Amount deposit_fee;
         const struct Command *cref;
+        const struct Command *proposal_ref;
         struct TALER_CoinSpendPublicKeyP coin_pub;
 
+        /* Extract */
         GNUNET_assert (GNUNET_OK ==
                        TALER_string_to_amount (ref->details.pay.amount_without_fee,
                                                &amount_without_fee));
@@ -1231,20 +1247,28 @@ track_transfer_cb (void *cls,
                                               &amount_with_fee,
                                               &amount_without_fee));
 
+        /* Find coin ('s public key) associated with the retrieved
+           deposit. Yes, one deposit - one coin. */
 	cref = find_command (is,
                              ref->details.pay.coin_ref);
+        proposal_ref = find_command (is,
+                                     ref->details.pay.contract_ref);
         GNUNET_assert (NULL != cref);
+        GNUNET_assert (NULL != proposal_ref);
 	switch (cref->oc)
 	{
 	case OC_WITHDRAW_SIGN:
-          GNUNET_CRYPTO_eddsa_key_get_public (&cref->details.reserve_withdraw.coin_priv.eddsa_priv,
-                                              &coin_pub.eddsa_pub);
+          GNUNET_CRYPTO_eddsa_key_get_public
+            (&cref->details.reserve_withdraw.coin_priv.eddsa_priv,
+             &coin_pub.eddsa_pub);
 	  break;
 	default:
 	  GNUNET_assert (0);
 	}
 
-        if ( (details[i].transaction_id == ref->details.pay.transaction_id) &&
+        if ( (0 == memcmp (&details[i].h_proposal_data,
+                           &proposal_ref->details.proposal.hash,
+                           sizeof (struct GNUNET_HashCode))) &&
              (0 == TALER_amount_cmp (&details[i].coin_value,
                                      &amount_with_fee)) &&
              (0 == TALER_amount_cmp (&details[i].coin_fee,
@@ -1477,42 +1501,44 @@ interpreter_run (void *cls)
 	      cmd->oc);
   switch (cmd->oc)
   {
-  case OC_END:
-    result = GNUNET_OK;
-    if (instance_idx + 1 == ninstances)
-    {
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    }
-    is->ip = 0;
-    instance_idx++;
-    instance = instances[instance_idx];
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Switching instance: '%s'\n",
-                instance);
-
-    is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
-                                         is);
-    return;
-
-  case OC_PROPOSAL_LOOKUP:
-  {
-    const char *transaction_id;
-
-    GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
-    ref = find_command (is, cmd->details.proposal_lookup.proposal_reference);
-    GNUNET_assert (NULL != ref);
-
-    transaction_id = json_string_value (json_object_get (ref->details.proposal.proposal_data, "transaction_id"));
-    GNUNET_assert (NULL !=
-                    (cmd->details.proposal_lookup.plo
-                     = TALER_MERCHANT_proposal_lookup (ctx,
-                                                       MERCHANT_URI,
-                                                       transaction_id,
-                                                       proposal_lookup_cb,
-                                                       is)));
+    case OC_END:
+      result = GNUNET_OK;
+      if (instance_idx + 1 == ninstances)
+      {
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+      is->ip = 0;
+      instance_idx++;
+      instance = instances[instance_idx];
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Switching instance: '%s'\n",
+                  instance);
   
-  }
+      is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
+                                           is);
+      return;
+
+    case OC_PROPOSAL_LOOKUP:
+    {
+      const char *order_id;
+  
+      GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
+      ref = find_command (is, cmd->details.proposal_lookup.proposal_reference);
+      GNUNET_assert (NULL != ref);
+  
+      order_id =
+        json_string_value (json_object_get (ref->details.proposal.proposal_data,
+                                            "order_id"));
+      GNUNET_assert (NULL !=
+                      (cmd->details.proposal_lookup.plo
+                       = TALER_MERCHANT_proposal_lookup (ctx,
+                                                         MERCHANT_URI,
+                                                         order_id,
+                                                         proposal_lookup_cb,
+                                                         is)));
+    }
+  
     return;
 
   case OC_ADMIN_ADD_INCOMING:
@@ -1719,7 +1745,7 @@ interpreter_run (void *cls)
   case OC_PAY:
     {
       struct TALER_MERCHANT_PayCoin pc;
-      uint64_t transaction_id;
+      const char *order_id;
       struct GNUNET_TIME_Absolute refund_deadline;
       struct GNUNET_TIME_Absolute pay_deadline;
       struct GNUNET_TIME_Absolute timestamp;
@@ -1731,16 +1757,19 @@ interpreter_run (void *cls)
       const char *error_name;
       unsigned int error_line;
 
-      /* get amount */
+      /* get proposal */
       ref = find_command (is,
                           cmd->details.pay.contract_ref);
       GNUNET_assert (NULL != ref);
       merchant_sig = ref->details.proposal.merchant_sig;
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Depositing I on '%s'\n",
+                  GNUNET_h2s (&ref->details.proposal.hash));
       GNUNET_assert (NULL != ref->details.proposal.proposal_data);
       {
         /* Get information that need to be replied in the deposit permission */
         struct GNUNET_JSON_Specification spec[] = {
-          GNUNET_JSON_spec_uint64 ("transaction_id", &transaction_id),
+          GNUNET_JSON_spec_string ("order_id", &order_id),
           GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
           GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
           GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
@@ -1765,23 +1794,22 @@ interpreter_run (void *cls)
           fail (is);
           return;
         }
-        cmd->details.pay.transaction_id = transaction_id;
         cmd->details.pay.merchant_pub = merchant_pub;
       }
 
-      /* initialize 'pc' (FIXME: to do in a loop later...) */
       {
+        const struct Command *coin_ref;
 	memset (&pc, 0, sizeof (pc));
-	ref = find_command (is,
-			    cmd->details.pay.coin_ref);
+	coin_ref = find_command (is,
+	                         cmd->details.pay.coin_ref);
 	GNUNET_assert (NULL != ref);
-	switch (ref->oc)
+	switch (coin_ref->oc)
 	{
 	case OC_WITHDRAW_SIGN:
-	  pc.coin_priv = ref->details.reserve_withdraw.coin_priv;
-	  pc.denom_pub = ref->details.reserve_withdraw.pk->key;
-	  pc.denom_sig = ref->details.reserve_withdraw.sig;
-          pc.denom_value = ref->details.reserve_withdraw.pk->value;
+	  pc.coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
+	  pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
+	  pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
+          pc.denom_value = coin_ref->details.reserve_withdraw.pk->value;
 	  break;
 	default:
 	  GNUNET_assert (0);
@@ -1811,12 +1839,16 @@ interpreter_run (void *cls)
 	  return;
 	}
       }
+
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Depositing II on '%s'\n",
+                  GNUNET_h2s (&ref->details.proposal.hash));
+
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI,
                                      instance,
 				     &ref->details.proposal.hash,
-				     transaction_id,
 				     &total_amount,
 				     &max_fee,
 				     &merchant_pub,
@@ -1917,17 +1949,25 @@ interpreter_run (void *cls)
                                      is);
     return;
   case OC_TRACK_TRANSACTION:
+  {
+    const struct Command *proposal_ref;
+    const char *order_id;
+
     ref = find_command (is,
                         cmd->details.track_transaction.pay_ref);
     GNUNET_assert (NULL != ref);
-    /*FIXME check/assert return code */
+    proposal_ref = find_command (is,
+                                 ref->details.pay.contract_ref);
+    order_id = json_string_value (json_object_get (proposal_ref->details.proposal.proposal_data,
+                                        "order_id"));
     cmd->details.track_transaction.tth =
       TALER_MERCHANT_track_transaction (ctx,
                                         MERCHANT_URI,
-                                        instance, /* got it NULL, right now */
-                                        ref->details.pay.transaction_id,
+                                        instance,
+                                        order_id,
                                         &track_transaction_cb,
                                         is);
+  }
     return;
   case OC_HISTORY:
 
@@ -2246,7 +2286,7 @@ run (void *cls)
       .details.proposal.order = "{\
                   \"max_fee\":\
                      {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
-                  \"transaction_id\":1,\
+                  \"order_id\":\"1\",\
                   \"timestamp\":\"\\/Date(42)\\/\",\
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
                   \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
@@ -2257,7 +2297,7 @@ run (void *cls)
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
-      .details.pay.contract_ref = "create-contract-1",
+      .details.pay.contract_ref = "create-proposal-1",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
@@ -2270,7 +2310,7 @@ run (void *cls)
       .details.proposal.order = "{\
                   \"max_fee\":\
                      {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
-                  \"transaction_id\":2,\
+                  \"order_id\":\"2\",\
                   \"timestamp\":\"\\/Date(42)\\/\",\
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
                   \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
@@ -2283,7 +2323,7 @@ run (void *cls)
     { .oc = OC_PAY,
       .label = "deposit-double-2",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
-      .details.pay.contract_ref = "create-contract-2",
+      .details.pay.contract_ref = "create-proposal-2",
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
@@ -2354,40 +2394,14 @@ run (void *cls)
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
 
-    /* Trace transaction to WTID */
-    { .oc = OC_TRACK_TRANSACTION,
-      .label = "track-transaction-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.track_transaction.pay_ref = "deposit-simple",
-      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c"
-    },
-    { .oc = OC_TRACK_TRANSACTION,
-      .label = "track-transaction-1-again",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.track_transaction.pay_ref = "deposit-simple",
-      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c"
-    },
-
     /* Pay again successfully on 2nd contract */
     { .oc = OC_PAY,
       .label = "deposit-simple-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.pay.contract_ref = "create-contract-2",
+      .details.pay.contract_ref = "create-proposal-2",
       .details.pay.coin_ref = "withdraw-coin-2",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-
-    /* Check "failure" to trace transaction to WTID before aggregator */
-    { .oc = OC_TRACK_TRANSACTION,
-      .label = "track-transaction-2-found",
-      .expected_response_code = MHD_HTTP_ACCEPTED,
-      .details.track_transaction.pay_ref = "deposit-simple-2"
-    },
-    { .oc = OC_TRACK_TRANSACTION,
-      .label = "track-transaction-2-found-again",
-      .expected_response_code = MHD_HTTP_ACCEPTED,
-      .details.track_transaction.pay_ref = "deposit-simple-2"
-    },
 
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
@@ -2404,20 +2418,6 @@ run (void *cls)
     /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
-
-    /* This time, invert the order in which we do the tracing */
-    /* Trace transaction to WTID */
-    { .oc = OC_TRACK_TRANSACTION,
-      .label = "track-transaction-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.track_transaction.pay_ref = "deposit-simple-2",
-      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2"
-    },
-    { .oc = OC_TRACK_TRANSACTION,
-      .label = "track-transaction-2-again", .expected_response_code = MHD_HTTP_OK,
-      .details.track_transaction.pay_ref = "deposit-simple-2",
-      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2"
-    },
 
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
@@ -2448,27 +2448,6 @@ run (void *cls)
       .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
       .details.history.nresult = 0
     },
-    /* Retrieve via /map/out a contract NOT stored previously. */
-    {
-      .oc = OC_PROPOSAL_LOOKUP, 
-      .label = "fetch-proposal-not-found",
-      .expected_response_code = MHD_HTTP_NOT_FOUND,
-      .details.proposal_lookup.proposal_reference = "create-proposal-3" },
-
-    /* Create another contract, NOT to be stored. */
-    { .oc = OC_PROPOSAL,
-      .label = "create-proposal-3",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.order = "{\
-                  \"max_fee\":\
-                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":10000},\
-                  \"transaction_id\":3,\
-                  \"timestamp\":\"\\/Date(42)\\/\",\
-                  \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"pay_deadline\":\"\\/Date(0)\\/\",\
-                  \"amount\":{\"currency\":\"EUR\", \"value\":1, \"fraction\":0},\
-                  \"products\":\
-                     [ {\"description\":\"bogus\", \"value\":\"{EUR:1}\"} ] }" },
 
     /* end of testcase */
     { .oc = OC_END }
@@ -2628,6 +2607,7 @@ main (int argc,
                                        "taler-merchant-httpd",
                                        "taler-merchant-httpd",
                                        "-c", "test_merchant_api.conf",
+                                       "-L", "DEBUG",
                                        NULL);
   if (NULL == merchantd)
   {

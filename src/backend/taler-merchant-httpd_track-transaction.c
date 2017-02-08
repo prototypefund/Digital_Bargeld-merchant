@@ -844,11 +844,13 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                               size_t *upload_data_size)
 {
   struct TrackTransactionContext *tctx;
-  const char *h_proposal_data_str;
+  const char *order_id;
   const char *instance;
   int ret;
   struct GNUNET_HashCode h_instance;
+  struct GNUNET_HashCode h_order_id;
   struct GNUNET_HashCode h_proposal_data;
+  struct json_t *proposal_data;
 
   if (NULL == *connection_cls)
   {
@@ -893,13 +895,13 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                 "Not sure why we are here, should be suspended\n");
     return MHD_YES; /* still work in progress */
   }
-  h_proposal_data_str = MHD_lookup_connection_value (connection,
-                                                     MHD_GET_ARGUMENT_KIND,
-                                                     "hash");
-  if (NULL == h_proposal_data_str)
+  order_id = MHD_lookup_connection_value (connection,
+                                          MHD_GET_ARGUMENT_KIND,
+                                          "order_id");
+  if (NULL == order_id)
     return TMH_RESPONSE_reply_arg_missing (connection,
                                            TALER_EC_PARAMETER_MISSING,
-					   "hash");
+					   "order_id");
   instance = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
                                           "instance");
@@ -908,9 +910,11 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   GNUNET_CRYPTO_hash (instance,
                       strlen (instance),
                       &h_instance);
-  GNUNET_CRYPTO_hash (h_proposal_data_str,
-                      strlen (h_proposal_data_str),
-                      &h_proposal_data);
+  GNUNET_CRYPTO_hash (order_id,
+                      strlen (order_id),
+                      &h_order_id);
+
+
 
   tctx->mi = GNUNET_CONTAINER_multihashmap_get (by_id_map,
                                                 &h_instance);
@@ -918,6 +922,21 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
 					 "unknown instance");
+
+  if (GNUNET_YES != db->find_proposal_data (db->cls,
+                                            &proposal_data,
+                                            &h_order_id))
+
+    return TMH_RESPONSE_reply_not_found (connection,
+					 TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
+					 "Given order_id doesn't map to any proposal");
+  TALER_JSON_hash (proposal_data,
+                   &h_proposal_data);
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Trying to track h_proposal_data '%s'\n",
+              GNUNET_h2s (&h_proposal_data));
+
   ret = db->find_transaction (db->cls,
                               &h_proposal_data,
 			      &tctx->mi->pubkey,
@@ -927,7 +946,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   {
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSACTION_TRANSACTION_UNKNOWN,
-                                         "id");
+                                         "h_proposal_data is unknown");
   }
   if ( (GNUNET_SYSERR == ret) ||
        (0 != memcmp (&tctx->h_proposal_data,
@@ -973,6 +992,5 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 				    tctx);
   return MHD_YES;
 }
-
 
 /* end of taler-merchant-httpd_track-transaction.c */

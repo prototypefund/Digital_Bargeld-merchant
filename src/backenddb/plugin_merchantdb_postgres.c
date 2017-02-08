@@ -145,7 +145,7 @@ postgres_drop_tables (void *cls)
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_deposits;");
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_transactions;");
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_proofs;");
-  PG_EXEC_INDEX (pg, "DROP TABLE merchant_contract_maps;");
+  PG_EXEC_INDEX (pg, "DROP TABLE merchant_proposal_data;");
   return GNUNET_OK;
 }
 
@@ -164,9 +164,9 @@ postgres_initialize (void *cls)
   /* Setup tables */
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_proposal_data ("
-           "h_proposal_data BYTEA NOT NULL CHECK (LENGTH(h_proposal_data)=64)"
+           "h_order_id BYTEA NOT NULL"
            ",proposal_data BYTEA NOT NULL"
-	   ",PRIMARY KEY (h_proposal_data)"
+	   ",PRIMARY KEY (h_order_id)"
            ");");
 
   PG_EXEC (pg,
@@ -278,7 +278,7 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "insert_proposal_data",
               "INSERT INTO merchant_proposal_data"
-              "(h_transaction_id"
+              "(h_order_id"
               ",proposal_data)"
               " VALUES "
               "($1, $2)",
@@ -288,7 +288,7 @@ postgres_initialize (void *cls)
               "find_proposal_data",
               "SELECT proposal_data FROM merchant_proposal_data"
               " WHERE"
-              " h_transaction_id=$1",
+              " h_order_id=$1",
               1);
 
   PG_PREPARE (pg,
@@ -538,6 +538,9 @@ postgres_store_transaction (void *cls,
     GNUNET_PQ_query_param_end
   };
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Storing transaction with h_proposal_data '%s'\n",
+              GNUNET_h2s (h_proposal_data));
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "insert_transaction",
@@ -594,6 +597,9 @@ postgres_store_deposit (void *cls,
     GNUNET_PQ_query_param_end
   };
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "storing payment for h_proposal_data '%s'\n",
+              GNUNET_h2s (h_proposal_data));
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "insert_deposit",
                                     params);
@@ -821,6 +827,10 @@ postgres_find_transaction (void *cls,
     GNUNET_PQ_query_param_end
   };
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Finding transaction for h_proposal_data '%s'\n",
+              GNUNET_h2s (h_proposal_data));
+
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_transaction",
                                     params);
@@ -832,6 +842,10 @@ postgres_find_transaction (void *cls,
   }
   if (0 == PQntuples (result))
   {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Could NOT find transaction for h_proposal_data '%s'\n",
+                GNUNET_h2s (h_proposal_data));
+
     PQclear (result);
     return GNUNET_NO;
   }
@@ -913,6 +927,9 @@ postgres_find_payments (void *cls,
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "finding payment for h_proposal_data '%s'\n",
+              GNUNET_h2s (h_proposal_data));
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_deposits",
                                     params);

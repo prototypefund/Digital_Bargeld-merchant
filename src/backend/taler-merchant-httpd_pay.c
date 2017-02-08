@@ -159,7 +159,7 @@ struct PayContext
   /**
    * Transaction ID given in @e root.
    */
-  const char *transaction_id;
+  const char *order_id;
 
   /**
    * Maximum fee the merchant is willing to pay, from @e root.
@@ -395,9 +395,13 @@ deposit_cb (void *cls,
     return;
   }
   /* store result to DB */
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Storing successful payment for h_proposal_data '%s'\n",
+              GNUNET_h2s (&pc->h_proposal_data));
+
   if (GNUNET_OK !=
       db->store_deposit (db->cls,
-			 pc->transaction_id,
+			 &pc->h_proposal_data,
 			 &pc->mi->pubkey,
 			 &dc->coin_pub,
 			 &dc->amount_with_fee,
@@ -430,9 +434,9 @@ deposit_cb (void *cls,
   resume_pay_with_response (pc,
                             MHD_HTTP_OK,
                             TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
-                                                         "merchant_sig",
+                                                         "sig",
 							 json_string_value (GNUNET_JSON_from_data_auto (&sig)),
-                                                         "hash",
+                                                         "h_proposal_data",
                                                          GNUNET_JSON_from_data (&pc->h_proposal_data,
                                                                                 sizeof (struct GNUNET_HashCode))));
 }
@@ -854,6 +858,33 @@ get_instance (struct json_t *json);
 
 
 /**
+ * Just a stub used to double-check if a transaction
+ * has been correctly inserted into db.
+ *
+ * @param cls closure
+ * @param transaction_id of the contract
+ * @param merchant's public key
+ * @param exchange_uri URI of the exchange
+ * @param h_contract hash of the contract
+ * @param h_wire hash of our wire details
+ * @param timestamp time of the confirmation
+ * @param refund refund deadline
+ * @param total_amount total amount we receive for the contract after fees
+ */
+static void
+transaction_double_check (void *cls,
+		          const struct TALER_MerchantPublicKeyP *merchant_pub,
+                          const char *exchange_uri,
+                          const struct GNUNET_HashCode *h_proposal_data,
+                          const struct GNUNET_HashCode *h_wire,
+                          struct GNUNET_TIME_Absolute timestamp,
+                          struct GNUNET_TIME_Absolute refund,
+                          const struct TALER_Amount *total_amount)
+{
+  return;
+}                
+
+/**
  * Accomplish this payment.
  *
  * @param rh context of the handler
@@ -945,14 +976,13 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     struct GNUNET_JSON_Specification spec[] = {
       TALER_JSON_spec_amount ("amount", &pc->amount),
       GNUNET_JSON_spec_json ("coins", &coins),
-      GNUNET_JSON_spec_fixed_auto ("H_contract", &pc->h_proposal_data),
+      GNUNET_JSON_spec_fixed_auto ("h_proposal_data", &pc->h_proposal_data),
       TALER_JSON_spec_amount ("max_fee", &pc->max_fee),
       GNUNET_JSON_spec_fixed_auto ("merchant_sig", &merchant_sig),
       GNUNET_JSON_spec_string ("exchange", &chosen_exchange),
       GNUNET_JSON_spec_absolute_time ("refund_deadline", &pc->refund_deadline),
       GNUNET_JSON_spec_absolute_time ("pay_deadline", &pc->pay_deadline),
       GNUNET_JSON_spec_absolute_time ("timestamp", &pc->timestamp),
-      GNUNET_JSON_spec_string ("transaction_id", &pc->transaction_id),
       GNUNET_JSON_spec_end()
     };
 
@@ -990,6 +1020,27 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
     pdps.purpose.size = htonl (sizeof (pdps));
     pdps.hash = pc->h_proposal_data;
+
+    struct GNUNET_HashCode dummy;
+
+    GNUNET_CRYPTO_hash (&merchant_sig.eddsa_sig,
+                        sizeof (merchant_sig.eddsa_sig),
+                        &dummy);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Verifying signature '%s'\n",
+                GNUNET_h2s (&dummy));
+
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "of hashed data '%s'\n",
+                GNUNET_h2s (&pc->h_proposal_data));
+
+    GNUNET_CRYPTO_hash (&pc->mi->privkey.eddsa_priv,
+                        sizeof (pc->mi->privkey.eddsa_priv),
+                        &dummy);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "with private key '%s'\n",
+                GNUNET_h2s (&dummy));
+
     if (GNUNET_OK !=
 	GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_CONTRACT,
 				    &pdps.purpose,
@@ -1159,7 +1210,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_NO == pc->transaction_exits)
   {
-    /* #4521 goes here: Check if the customer respects pay_deadline */
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Dealing with new transaction '%s'\n",
+                GNUNET_h2s (&pc->h_proposal_data));
     now = GNUNET_TIME_absolute_get ();
     if (now.abs_value_us > pc->pay_deadline.abs_value_us)
     {
@@ -1176,6 +1229,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                                              "The time to pay for this contract has expired.");
     }
 
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Storing transaction '%s'\n",
+                GNUNET_h2s (&pc->h_proposal_data));
     if (GNUNET_OK !=
         db->store_transaction (db->cls,
                                &pc->h_proposal_data,
@@ -1192,6 +1248,12 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
 						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
 						"Merchant database error");
     }
+  if (GNUNET_OK != db->find_transaction (db->cls,
+                                         &pc->h_proposal_data,
+			                 &pc->mi->pubkey,
+                                         &transaction_double_check,
+                                         NULL))
+    GNUNET_break (0);                                         
   }
 
   MHD_suspend_connection (connection);

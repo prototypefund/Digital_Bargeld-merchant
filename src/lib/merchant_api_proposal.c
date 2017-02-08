@@ -132,8 +132,8 @@ handle_proposal_finished (void *cls,
     case MHD_HTTP_OK:
     {
       struct GNUNET_JSON_Specification spec[] = {
-        GNUNET_JSON_spec_json ("proposal_data", &proposal_data),
-        GNUNET_JSON_spec_fixed_auto ("merchant_sig", &sig),
+        GNUNET_JSON_spec_json ("data", &proposal_data),
+        GNUNET_JSON_spec_fixed_auto ("sig", &sig),
         GNUNET_JSON_spec_fixed_auto ("hash", &hash),
         GNUNET_JSON_spec_end()
       };
@@ -287,7 +287,7 @@ handle_proposal_lookup_finished (void *cls,
 struct TALER_MERCHANT_ProposalLookupOperation *
 TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                                 const char *backend_uri,
-                                const char *transaction_id,
+                                const char *order_id,
                                 TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
                                 void *plo_cb_cls)
 {
@@ -300,9 +300,9 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
   plo->cb_cls = plo_cb_cls;
 
   GNUNET_asprintf (&plo->url,
-                   "%s/proposal?transaction_id=%s",
+                   "%s/proposal?order_id=%s",
                    backend_uri,
-                   transaction_id);
+                   order_id);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,

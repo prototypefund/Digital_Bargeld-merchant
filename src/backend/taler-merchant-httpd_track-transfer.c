@@ -175,7 +175,7 @@ resume_track_transfer_with_response (struct TrackTransferContext *rctx,
   rctx->response_code = response_code;
   rctx->response = response;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Resuming /track/transaction handling as exchange interaction is done (%u)\n",
+              "Resuming /track/transfer handling as exchange interaction is done (%u)\n",
               response_code);
   if (NULL != rctx->timeout_task)
   {

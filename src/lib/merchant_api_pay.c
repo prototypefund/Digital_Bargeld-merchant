@@ -279,7 +279,6 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 			   const char *merchant_uri,
 			   const char *instance,
                            const struct GNUNET_HashCode *h_proposal_data,
-                           uint64_t transaction_id,
 			   const struct TALER_Amount *amount,
 			   const struct TALER_Amount *max_fee,
                            const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -348,7 +347,6 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 				      h_proposal_data,
                                       amount,
 				      max_fee,
-				      transaction_id,
 				      merchant_sig,
 				      refund_deadline,
 				      pay_deadline,
@@ -391,10 +389,9 @@ struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const char *merchant_uri,
 			     const char *instance,
-                             const struct GNUNET_HashCode *h_contract,
+                             const struct GNUNET_HashCode *h_proposal_data,
 			     const struct TALER_Amount *amount,
 			     const struct TALER_Amount *max_fee,
-                             uint64_t transaction_id,
                              const struct TALER_MerchantSignatureP *merchant_sig,
                              struct GNUNET_TIME_Absolute refund_deadline,
                              struct GNUNET_TIME_Absolute pay_deadline,
@@ -560,14 +557,13 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
     }
   } /* end of sanity check */
 
-  pay_obj = json_pack ("{s:o," /* H_contract */
-                       " s:I, s:o," /* transaction id, timestamp */
+  pay_obj = json_pack ("{s:o," /* h_proposal_data */
+                       " s:o," /* timestamp */
                        " s:o, s:o," /* refund_deadline, pay_deadline */
                        " s:s," /* exchange */
                        " s:o, s:o," /* coins, max_fee */
                        " s:o, s:o}",/* amount, signature */
-                       "H_contract", GNUNET_JSON_from_data_auto (h_contract),
-                       "transaction_id", (json_int_t) transaction_id,
+                       "h_proposal_data", GNUNET_JSON_from_data_auto (h_proposal_data),
                        "timestamp", GNUNET_JSON_from_time_abs (timestamp),
                        "refund_deadline", GNUNET_JSON_from_time_abs (refund_deadline),
                        "pay_deadline", GNUNET_JSON_from_time_abs (pay_deadline),

@@ -148,8 +148,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
   struct TALER_Amount total;
   struct TALER_Amount max_fee;
-  const char *transaction_id;
-  struct GNUNET_HashCode h_tid;
+  const char *order_id;
+  struct GNUNET_HashCode h_oid;
   json_t *products;
   json_t *merchant;
   struct GNUNET_TIME_Absolute timestamp;
@@ -158,7 +158,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
     TALER_JSON_spec_amount ("max_fee", &max_fee),
-    GNUNET_JSON_spec_string ("transaction_id", &transaction_id),
+    GNUNET_JSON_spec_string ("order_id", &order_id),
     /* The following entries we don't actually need, except to check that
        the order is well-formed */
     GNUNET_JSON_spec_json ("products", &products),
@@ -259,17 +259,39 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   GNUNET_assert (GNUNET_OK ==
                  TALER_JSON_hash (order,
                                   &pdps.hash));
+
+  /*FIXME: do NOT keep in production, private key logged!*/
+  struct GNUNET_HashCode dummy;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Signing h_proposal_data '%s'\n",
+              GNUNET_h2s (&pdps.hash));
+
+  GNUNET_CRYPTO_hash (&mi->privkey.eddsa_priv,
+                      sizeof (mi->privkey.eddsa_priv),
+                      &dummy);
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "with private key '%s'\n",
+              GNUNET_h2s (&dummy));
+
   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                             &pdps.purpose,
                             &merchant_sig);
-  
 
-  GNUNET_CRYPTO_hash (transaction_id,
-                      strlen (transaction_id),
-                      &h_tid);
+   GNUNET_CRYPTO_hash (&merchant_sig,
+                      sizeof (merchant_sig),
+                      &dummy);
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "generating signature '%s'\n",
+              GNUNET_h2s (&dummy)); 
+
+  GNUNET_CRYPTO_hash (order_id,
+                      strlen (order_id),
+                      &h_oid);
   if (GNUNET_OK !=
       db->insert_proposal_data (db->cls,
-                                &h_tid,
+                                &h_oid,
                                 order))
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PROPOSAL_STORE_DB_ERROR,
@@ -280,7 +302,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                                       MHD_HTTP_OK,
                                       "{s:O, s:o s:o}",
                                       "data", order,
-                                      "merchant_sig", GNUNET_JSON_from_data_auto (&merchant_sig),
+                                      "sig", GNUNET_JSON_from_data_auto (&merchant_sig),
                                       "hash", GNUNET_JSON_from_data_auto (&pdps.hash));
   GNUNET_JSON_parse_free (spec);
   json_decref (root);
@@ -306,25 +328,25 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                             const char *upload_data,
                             size_t *upload_data_size)
 {
-  const char *transaction_id;
-  struct GNUNET_HashCode h_tid;
+  const char *order_id;
+  struct GNUNET_HashCode h_oid;
   int res;
   json_t *proposal_data;
 
-  transaction_id = MHD_lookup_connection_value (connection,
-                                                MHD_GET_ARGUMENT_KIND,
-                                                "transaction_id");
-  if (NULL == transaction_id)
+  order_id = MHD_lookup_connection_value (connection,
+                                          MHD_GET_ARGUMENT_KIND,
+                                          "order_id");
+  if (NULL == order_id)
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
-                                           "transaction_id");
-  GNUNET_CRYPTO_hash (transaction_id,
-                      strlen (transaction_id),
-                      &h_tid);
+                                           "order_id");
+  GNUNET_CRYPTO_hash (order_id,
+                      strlen (order_id),
+                      &h_oid);
 
   res = db->find_proposal_data (db->cls,
                                 &proposal_data,
-                                &h_tid);
+                                &h_oid);
   if (GNUNET_NO == res)
     return TMH_RESPONSE_reply_not_found (connection, 
                                          TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,

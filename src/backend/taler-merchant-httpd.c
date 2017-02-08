@@ -164,7 +164,7 @@ url_handler (void *cls,
       { "/", MHD_HTTP_METHOD_GET, "text/plain",
         "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK },
-      { "/proposal", MHD_HTTP_METHOD_PUT, "application/json",
+      { "/proposal", MHD_HTTP_METHOD_POST, "application/json",
         NULL, 0,
         &MH_handler_proposal_put, MHD_HTTP_OK },
       { "/pay", MHD_HTTP_METHOD_POST, "application/json",
@@ -192,7 +192,7 @@ url_handler (void *cls,
         "Only GET is allowed", 0,
         &MH_handler_proposal_lookup, MHD_HTTP_OK},
       { "/proposal", NULL, "text/plain",
-        "Only GET/PUT are allowed", 0,
+        "Only GET/POST are allowed", 0,
         &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
 
       {NULL, NULL, NULL, NULL, 0, 0 }
@@ -723,7 +723,7 @@ run (void *cls,
                                  NULL);
   GNUNET_assert (GNUNET_OK ==
                  GNUNET_log_setup ("taler-merchant-httpd",
-                                   "INFO",
+                                   "DEBUG",
                                    NULL));
   if (GNUNET_SYSERR ==
       TMH_EXCHANGES_init (config))

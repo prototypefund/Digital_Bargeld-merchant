@@ -476,7 +476,7 @@ main (int argc,
     GNUNET_break (0);
     return -1;
   }
-  GNUNET_log_setup (argv[0], "INFO", NULL);
+  GNUNET_log_setup (argv[0], "DEBUG", NULL);
   plugin_name++;
   (void) GNUNET_asprintf (&testname,
                           "test-merchantdb-%s",

@@ -201,7 +201,7 @@ handle_track_transaction_finished (void *cls,
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "track transaction URI not found\n");
+                "Did not find any data\n");
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
@@ -240,7 +240,7 @@ struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                                   const char *backend_uri,
                                   const char *instance,
-                                  uint64_t transaction_id,
+                                  const char *order_id,
                                   TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
                                   void *track_transaction_cb_cls)
 {
@@ -252,10 +252,13 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
   tdo->cb = track_transaction_cb;
   tdo->cb_cls = track_transaction_cb_cls;
   GNUNET_asprintf (&tdo->url,
-                   "%s/track/transaction?id=%llu&instance=%s",
+                   "%s/track/transaction?order_id=%s&instance=%s",
                    backend_uri,
-                   (unsigned long long) transaction_id,
+                   order_id,
                    instance);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Requesting URI '%s'\n",
+              tdo->url);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
