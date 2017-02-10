@@ -292,6 +292,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   if (GNUNET_OK !=
       db->insert_proposal_data (db->cls,
                                 &h_oid,
+                                &mi->pubkey,
                                 order))
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PROPOSAL_STORE_DB_ERROR,
@@ -329,9 +330,22 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                             size_t *upload_data_size)
 {
   const char *order_id;
+  const char *instance;
   struct GNUNET_HashCode h_oid;
   int res;
   json_t *proposal_data;
+  struct MerchantInstance *mi;
+
+  instance = MHD_lookup_connection_value (connection,
+                                          MHD_GET_ARGUMENT_KIND,
+                                          "instance");
+  if (NULL == instance)
+    return TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+                                           "instance");
+
+  mi = TMH_lookup_instance (instance);
+  GNUNET_assert (NULL != mi);
 
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -346,7 +360,8 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 
   res = db->find_proposal_data (db->cls,
                                 &proposal_data,
-                                &h_oid);
+                                &h_oid,
+                                &mi->pubkey);
   if (GNUNET_NO == res)
     return TMH_RESPONSE_reply_not_found (connection, 
                                          TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,

@@ -288,6 +288,7 @@ struct TALER_MERCHANT_ProposalLookupOperation *
 TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                                 const char *backend_uri,
                                 const char *order_id,
+                                const char *instance,
                                 TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
                                 void *plo_cb_cls)
 {
@@ -300,9 +301,10 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
   plo->cb_cls = plo_cb_cls;
 
   GNUNET_asprintf (&plo->url,
-                   "%s/proposal?order_id=%s",
+                   "%s/proposal?order_id=%s&instance=%s",
                    backend_uri,
-                   order_id);
+                   order_id,
+                   instance);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,
