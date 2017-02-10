@@ -2438,10 +2438,14 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
     },
-    /**
-     * NOTE: could NOT initialize timestamps by calling GNUNET_TIME_xy ()
-     * because that raised a 'Initializer element is not constant' when compiling.
-     */
+
+    { .oc = OC_TRACK_TRANSACTION,
+      .label = "track-transaction-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2",
+      .details.track_transaction.pay_ref = "deposit-simple-2"  
+    },
+
     { .oc = OC_HISTORY,
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
