@@ -882,7 +882,7 @@ transaction_double_check (void *cls,
                           const struct TALER_Amount *total_amount)
 {
   return;
-}                
+}
 
 /**
  * Accomplish this payment.
