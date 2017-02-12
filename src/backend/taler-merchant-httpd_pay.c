@@ -328,6 +328,36 @@ abort_deposit (struct PayContext *pc)
 
 
 /**
+ * Generate a response that indicates payment success.
+ *
+ * @param pc payment context
+ * @return the mhd response
+ */
+struct MHD_Response *
+sign_success_response (struct PayContext *pc)
+{
+  struct GNUNET_CRYPTO_EddsaSignature sig;
+  struct PaymentResponsePS mr;
+
+  mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
+  mr.purpose.size = htonl (sizeof (mr));
+  mr.h_proposal_data = pc->h_proposal_data;
+
+  GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
+                            &mr.purpose,
+			    &sig);
+
+  return TMH_RESPONSE_make_json_pack ("{s:O, s:s, s:o}",
+                                      "proposal_data", pc->proposal_data,
+                                      "sig",
+                                      json_string_value (GNUNET_JSON_from_data_auto (&sig)),
+                                      "h_proposal_data",
+                                      GNUNET_JSON_from_data (&pc->h_proposal_data,
+                                                             sizeof (struct GNUNET_HashCode)));
+}
+
+
+/**
  * Callback to handle a deposit permission's response.
  *
  * @param cls a `struct DepositConfirmation` (i.e. a pointer
@@ -353,8 +383,6 @@ deposit_cb (void *cls,
 {
   struct DepositConfirmation *dc = cls;
   struct PayContext *pc = dc->pc;
-  struct GNUNET_CRYPTO_EddsaSignature sig;
-  struct PaymentResponsePS mr;
 
   dc->dh = NULL;
   pc->pending--;
@@ -425,22 +453,7 @@ deposit_cb (void *cls,
     return; /* still more to do */
 
 
-  mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
-  mr.purpose.size = htonl (sizeof (mr));
-  mr.h_proposal_data = pc->h_proposal_data;
-
-  GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
-                            &mr.purpose,
-			    &sig);
-  resume_pay_with_response (pc,
-                            MHD_HTTP_OK,
-                            TMH_RESPONSE_make_json_pack ("{s:O, s:s, s:o}",
-                                                         "proposal_data", pc->proposal_data,
-                                                         "sig",
-							 json_string_value (GNUNET_JSON_from_data_auto (&sig)),
-                                                         "h_proposal_data",
-                                                         GNUNET_JSON_from_data (&pc->h_proposal_data,
-                                                                                sizeof (struct GNUNET_HashCode))));
+  resume_pay_with_response (pc, MHD_HTTP_OK, sign_success_response (pc));
 }
 
 
@@ -1151,7 +1164,7 @@ handler_pay_json (struct MHD_Connection *connection,
 					    MHD_RESPMEM_PERSISTENT);
     ret = MHD_queue_response (connection,
 			      MHD_HTTP_OK,
-			      resp);
+			      sign_success_response (pc));
     MHD_destroy_response (resp);
     return ret;
   }
