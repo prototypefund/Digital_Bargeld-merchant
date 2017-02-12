@@ -434,7 +434,7 @@ deposit_cb (void *cls,
 			    &sig);
   resume_pay_with_response (pc,
                             MHD_HTTP_OK,
-                            TMH_RESPONSE_make_json_pack ("{s:o, s:s, s:o}",
+                            TMH_RESPONSE_make_json_pack ("{s:O, s:s, s:o}",
                                                          "proposal_data", pc->proposal_data,
                                                          "sig",
 							 json_string_value (GNUNET_JSON_from_data_auto (&sig)),
