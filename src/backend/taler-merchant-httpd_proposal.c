@@ -120,30 +120,18 @@ get_instance (struct json_t *json);
 
 
 /**
- * Generate a proposal, given its order. In practical terms, it adds the
- * fields  'exchanges', 'merchant_pub', and 'H_wire' to the order gotten
- * from the frontend. Finally, it signs this data, and returns it to the
- * frontend.
+ * Transform an order into a proposal and store it in the database.
+ * Write the resulting proposal or an error message ot a MHD connection
  *
- * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param connection connection to write the result or error to
+ * @param order to process
  * @return MHD result code
  */
 int
-MH_handler_proposal_put (struct TMH_RequestHandler *rh,
-                         struct MHD_Connection *connection,
-                         void **connection_cls,
-                         const char *upload_data,
-                         size_t *upload_data_size)
+proposal_put (struct MHD_Connection *connection, json_t *order)
 {
-
-  json_t *root;
-  json_t *order;
   int res;
   struct MerchantInstance *mi;
-  struct TMH_JsonParseContext *ctx;
   struct TALER_ProposalDataPS pdps;
   struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
   struct TALER_Amount total;
@@ -157,8 +145,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute pay_deadline;
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
-    TALER_JSON_spec_amount ("max_fee", &max_fee),
     GNUNET_JSON_spec_string ("order_id", &order_id),
+    TALER_JSON_spec_amount ("max_fee", &max_fee),
     /* The following entries we don't actually need, except to check that
        the order is well-formed */
     GNUNET_JSON_spec_json ("products", &products),
@@ -169,58 +157,45 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
     GNUNET_JSON_spec_end ()
   };
 
-  if (NULL == *connection_cls)
+
+  /* Add order_id if it doesn't exist. */
+
+  order_id = json_string_value (json_object_get (order, "order_id"));
+  if (NULL == order_id)
   {
-    ctx = GNUNET_new (struct TMH_JsonParseContext);
-    ctx->hc.cc = &json_parse_cleanup;
-    *connection_cls = ctx;
-  }
-  else
-  {
-    ctx = *connection_cls;
+    char buf[256];
+    time_t timer;
+    struct tm* tm_info;
+    size_t off;
+
+    time (&timer);
+    tm_info = localtime (&timer);
+
+    off = strftime (buf, sizeof (buf), "%H:%M:%S", tm_info);
+    snprintf (buf + off, sizeof (buf) - off,
+              "%llu\n", 
+              (long long unsigned) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX));
+    json_object_set (order, "order_id", json_string (buf));
   }
 
-  res = TMH_PARSE_post_json (connection,
-                             &ctx->json_parse_context,
-                             upload_data,
-                             upload_data_size,
-                             &root);
-  if (GNUNET_SYSERR == res)
-    return MHD_NO;
-  /* the POST's body has to be further fetched */
-  if ((GNUNET_NO == res) || (NULL == root))
-    return MHD_YES;
-
-  order = json_object_get (root,
-                           "order");
-  if (NULL == order)
-  {
-    json_decref (root);
-    return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
-					   "order");
-  }
   /* extract fields we need to sign separately */
-  res = TMH_PARSE_json_data (connection,
-                             order,
-                             spec);
+  res = TMH_PARSE_json_data (connection, order, spec);
   if (GNUNET_NO == res)
   {
-    json_decref (root);
     return MHD_YES;
   }
   if (GNUNET_SYSERR == res)
   {
-    json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_NONE,
 					      "Impossible to parse the order");
   }
+    
+
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))
   {
     GNUNET_JSON_parse_free (spec);
-    json_decref (root);
     return TMH_RESPONSE_reply_arg_invalid (connection,
 					   TALER_EC_PARAMETER_MALFORMED,
 					   "order:products");
@@ -231,7 +206,6 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Not able to find the specified instance\n"); 
-    json_decref (root);
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
 					 "Unknown instance given");
@@ -260,31 +234,9 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                  TALER_JSON_hash (order,
                                   &pdps.hash));
 
-  /*FIXME: do NOT keep in production, private key logged!*/
-  struct GNUNET_HashCode dummy;
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Signing h_proposal_data '%s'\n",
-              GNUNET_h2s (&pdps.hash));
-
-  GNUNET_CRYPTO_hash (&mi->privkey.eddsa_priv,
-                      sizeof (mi->privkey.eddsa_priv),
-                      &dummy);
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "with private key '%s'\n",
-              GNUNET_h2s (&dummy));
-
   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                             &pdps.purpose,
                             &merchant_sig);
-
-   GNUNET_CRYPTO_hash (&merchant_sig,
-                      sizeof (merchant_sig),
-                      &dummy);
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "generating signature '%s'\n",
-              GNUNET_h2s (&dummy)); 
 
   GNUNET_CRYPTO_hash (order_id,
                       strlen (order_id),
@@ -296,9 +248,12 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                                 &h_oid,
                                 &mi->pubkey,
                                 order))
+  {
+    GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PROPOSAL_STORE_DB_ERROR,
                                               "db error: could not store this proposal's data into db");
+  }
   
 
   res = TMH_RESPONSE_reply_json_pack (connection,
@@ -308,6 +263,68 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                                       "sig", GNUNET_JSON_from_data_auto (&merchant_sig),
                                       "hash", GNUNET_JSON_from_data_auto (&pdps.hash));
   GNUNET_JSON_parse_free (spec);
+  return res;
+}
+
+
+/**
+ * Generate a proposal, given its order. In practical terms, it adds the
+ * fields  'exchanges', 'merchant_pub', and 'H_wire' to the order gotten
+ * from the frontend. Finally, it signs this data, and returns it to the
+ * frontend.
+ *
+ * @param connection the MHD connection to handle
+ * @param[in,out] connection_cls the connection's closure (can be updated)
+ * @param upload_data upload data
+ * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @return MHD result code
+ */
+int
+MH_handler_proposal_put (struct TMH_RequestHandler *rh,
+                         struct MHD_Connection *connection,
+                         void **connection_cls,
+                         const char *upload_data,
+                         size_t *upload_data_size)
+{
+  int res;
+  struct TMH_JsonParseContext *ctx;
+
+  if (NULL == *connection_cls)
+  {
+    ctx = GNUNET_new (struct TMH_JsonParseContext);
+    ctx->hc.cc = &json_parse_cleanup;
+    *connection_cls = ctx;
+  }
+  else
+  {
+    ctx = *connection_cls;
+  }
+
+  json_t *root;
+
+  res = TMH_PARSE_post_json (connection,
+                             &ctx->json_parse_context,
+                             upload_data,
+                             upload_data_size,
+                             &root);
+  if (GNUNET_SYSERR == res)
+    return MHD_NO;
+  /* the POST's body has to be further fetched */
+  if ((GNUNET_NO == res) || (NULL == root))
+    return MHD_YES;
+
+  json_t *order = json_object_get (root, "order");
+
+  if (NULL == order)
+  {
+    res = TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+					   "order");
+  }
+  else
+  {
+    res = proposal_put (connection, order);
+  }
   json_decref (root);
   return res;
 }
