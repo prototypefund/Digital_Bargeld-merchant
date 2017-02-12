@@ -179,7 +179,9 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
 
   if (NULL == json_string_value (json_object_get (order, "timestamp")))
   {
-    json_object_set (order, "timestamp", GNUNET_JSON_from_time_abs (GNUNET_TIME_absolute_get ()));
+    struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
+    (void) GNUNET_TIME_round_abs (&now);
+    json_object_set (order, "timestamp", GNUNET_JSON_from_time_abs (now));
   }
 
   /* extract fields we need to sign separately */
