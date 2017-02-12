@@ -172,7 +172,7 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
 
     off = strftime (buf, sizeof (buf), "%H:%M:%S", tm_info);
     snprintf (buf + off, sizeof (buf) - off,
-              "-%llX\n", 
+              "-%llX", 
               (long long unsigned) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX));
     json_object_set (order, "order_id", json_string (buf));
   }
