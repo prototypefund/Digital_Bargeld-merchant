@@ -289,6 +289,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   GNUNET_CRYPTO_hash (order_id,
                       strlen (order_id),
                       &h_oid);
+
+
   if (GNUNET_OK !=
       db->insert_proposal_data (db->cls,
                                 &h_oid,

@@ -1857,6 +1857,7 @@ interpreter_run (void *cls)
 				     pay_deadline,
 				     &h_wire,
 				     EXCHANGE_URI,
+                                     order_id,
 				     1 /* num_coins */,
 				     &pc /* coins */,
 				     &pay_cb,

@@ -288,6 +288,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
                            struct GNUNET_TIME_Absolute pay_deadline,
                            const struct GNUNET_HashCode *h_wire,
 			   const char *exchange_uri,
+                           const char *order_id,
                            unsigned int num_coins,
                            const struct TALER_MERCHANT_PayCoin *coins,
                            TALER_MERCHANT_PayCallback pay_cb,
@@ -300,6 +301,14 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
   (void) GNUNET_TIME_round_abs (&timestamp);
   (void) GNUNET_TIME_round_abs (&pay_deadline);
   (void) GNUNET_TIME_round_abs (&refund_deadline);
+
+  if (GNUNET_YES !=
+      TALER_amount_cmp_currency (amount,
+                                 max_fee))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
 
   dr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_COIN_DEPOSIT);
   dr.purpose.size = htonl (sizeof (struct TALER_DepositRequestPS));
@@ -331,6 +340,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
     }
     TALER_amount_hton (&dr.deposit_fee,
 		       &fee);
+
     GNUNET_CRYPTO_eddsa_sign (&coin->coin_priv.eddsa_priv,
 			      &dr.purpose,
 			      &p->coin_sig.eddsa_signature);
@@ -343,15 +353,8 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
   }
   return TALER_MERCHANT_pay_frontend (ctx,
 				      merchant_uri,
-                                      instance,
-				      h_proposal_data,
-                                      amount,
-				      max_fee,
-				      merchant_sig,
-				      refund_deadline,
-				      pay_deadline,
-				      timestamp,
-				      GNUNET_TIME_UNIT_ZERO_ABS,
+                                      merchant_pub,
+                                      order_id,
 				      exchange_uri,
 				      num_coins,
 				      pc,
@@ -368,19 +371,9 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  *
  * @param ctx the execution loop context
  * @param merchant_uri base URI of the merchant's backend
- * @param instance which merchant instance will receive this payment
- * @param h_contract hash of the contact of the merchant with the customer
- * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
- * @param transaction_id transaction id for the transaction between merchant and customer
- * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
- * @param deadline to pay for this contract
- * @param wire_transfer_deadline date by which the merchant would like the exchange to execute the wire transfer (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
  * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
- * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
- * @param max_fee maximum fee covered by the merchant (according to the contract)
- * @param amount total value of the contract to be paid to the merchant
  * @param pay_cb the callback to call when a reply for this request is available
  * @param pay_cb_cls closure for @a pay_cb
  * @return a handle for this request
@@ -388,15 +381,8 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const char *merchant_uri,
-			     const char *instance,
-                             const struct GNUNET_HashCode *h_proposal_data,
-			     const struct TALER_Amount *amount,
-			     const struct TALER_Amount *max_fee,
-                             const struct TALER_MerchantSignatureP *merchant_sig,
-                             struct GNUNET_TIME_Absolute refund_deadline,
-                             struct GNUNET_TIME_Absolute pay_deadline,
-                             struct GNUNET_TIME_Absolute timestamp,
-                             struct GNUNET_TIME_Absolute wire_transfer_deadline,
+                             const struct TALER_MerchantPublicKeyP *merchant_pub,
+                             const char *order_id,
 			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
@@ -411,23 +397,6 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   struct TALER_Amount total_amount;
   unsigned int i;
 
-  (void) GNUNET_TIME_round_abs (&timestamp);
-  (void) GNUNET_TIME_round_abs (&refund_deadline);
-  (void) GNUNET_TIME_round_abs (&wire_transfer_deadline);
-
-  if (GNUNET_YES !=
-      TALER_amount_cmp_currency (amount,
-                                 max_fee))
-  {
-    GNUNET_break (0);
-    return NULL;
-  }
-  if ( (0 != wire_transfer_deadline.abs_value_us) &&
-       (wire_transfer_deadline.abs_value_us < refund_deadline.abs_value_us) )
-  {
-    GNUNET_break (0);
-    return NULL;
-  }
   if (0 == num_coins)
   {
     GNUNET_break (0);
@@ -489,101 +458,16 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
                                           j_coin));
   }
 
-  { /* Sanity check that total_amount and total_fee
-       match amount/max_fee requirements */
-    struct TALER_Amount fee_left;
-
-    if (GNUNET_OK ==
-	TALER_amount_subtract (&fee_left,
-			       &total_fee,
-			       max_fee))
-    {
-      /* Wallet must cover part of the fee! */
-      struct TALER_Amount new_amount;
-
-      if (GNUNET_OK !=
-	  TALER_amount_add (&new_amount,
-			    &fee_left,
-			    amount))
-      {
-	/* integer overflow */
-	GNUNET_break (0);
-	json_decref (j_coins);
-	return NULL;
-      }
-      if (GNUNET_YES !=
-          TALER_amount_cmp_currency (&new_amount,
-                                     &total_amount))
-      {
-        GNUNET_break (0);
-	json_decref (j_coins);
-        return NULL;
-      }
-      if (1 ==
-	  TALER_amount_cmp (&new_amount,
-			    &total_amount))
-      {
-	/* new_amount > total_amount: all of the coins (total_amount)
-	   do not add up to at least the new_amount owed to the
-	   merchant, this request is bogus, abort */
-	GNUNET_break (0);
-	json_decref (j_coins);
-	return NULL;
-      }
-    }
-    else
-    {
-      /* Full fee covered by merchant, but our total
-	 must at least cover the total contract amount */
-      if (GNUNET_YES !=
-          TALER_amount_cmp_currency (amount,
-                                     &total_amount))
-      {
-        GNUNET_break (0);
-	json_decref (j_coins);
-        return NULL;
-      }
-      if (1 ==
-	  TALER_amount_cmp (amount,
-			    &total_amount))
-	{
-	  /* amount > total_amount: all of the coins (total_amount) do
-	   not add up to at least the amount owed to the merchant,
-	   this request is bogus, abort */
-	GNUNET_break (0);
-	json_decref (j_coins);
-	return NULL;
-      }
-    }
-  } /* end of sanity check */
-
-  pay_obj = json_pack ("{s:o," /* h_proposal_data */
-                       " s:o," /* timestamp */
-                       " s:o, s:o," /* refund_deadline, pay_deadline */
+  pay_obj = json_pack ("{"
                        " s:s," /* exchange */
-                       " s:o, s:o," /* coins, max_fee */
-                       " s:o, s:o}",/* amount, signature */
-                       "h_proposal_data", GNUNET_JSON_from_data_auto (h_proposal_data),
-                       "timestamp", GNUNET_JSON_from_time_abs (timestamp),
-                       "refund_deadline", GNUNET_JSON_from_time_abs (refund_deadline),
-                       "pay_deadline", GNUNET_JSON_from_time_abs (pay_deadline),
+                       " s:o," /* coins */
+                       " s:s," /* order_id */
+                       " s:o," /* merchant_pub */
+                       "}",
 		       "exchange", exchange_uri,
 		       "coins", j_coins,
-                       "max_fee", TALER_JSON_from_amount (max_fee),
-                       "amount", TALER_JSON_from_amount (amount),
-                       "merchant_sig", GNUNET_JSON_from_data_auto (merchant_sig));
-  if (NULL != instance)
-    json_object_set_new (pay_obj,
-                         "instance",
-                         json_string (instance));
-
-  if (0 != wire_transfer_deadline.abs_value_us)
-  {
-    /* Frontend did have an execution date in mind, add it */
-    json_object_set_new (pay_obj,
-			 "wire_transfer_deadline",
-			 GNUNET_JSON_from_time_abs (wire_transfer_deadline));
-  }
+                       "order_id", order_id,
+                       "merchant_pub", GNUNET_JSON_from_data_auto (merchant_pub));
 
   ph = GNUNET_new (struct TALER_MERCHANT_Pay);
   ph->ctx = ctx;

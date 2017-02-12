@@ -38,11 +38,6 @@
  */
 #define PAY_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
-/**
- * The instance which is working this request
- */
-struct MerchantInstance *mi;
-
 
 /**
  * Information we keep for an individual call to the /pay handler.
@@ -247,6 +242,12 @@ struct PayContext
    */
   struct MerchantInstance *mi;
 
+  /**
+   * Proposal data for the proposal that is being
+   * payed for in this context.
+   */
+  json_t *proposal_data;
+
 };
 
 
@@ -428,12 +429,13 @@ deposit_cb (void *cls,
   mr.purpose.size = htonl (sizeof (mr));
   mr.h_proposal_data = pc->h_proposal_data;
 
-  GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
+  GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
                             &mr.purpose,
 			    &sig);
   resume_pay_with_response (pc,
                             MHD_HTTP_OK,
-                            TMH_RESPONSE_make_json_pack ("{s:s, s:o}",
+                            TMH_RESPONSE_make_json_pack ("{s:o, s:s, s:o}",
+                                                         "proposal_data", pc->proposal_data,
                                                          "sig",
 							 json_string_value (GNUNET_JSON_from_data_auto (&sig)),
                                                          "h_proposal_data",
@@ -495,6 +497,11 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
   {
     GNUNET_free (pc->chosen_exchange);
     pc->chosen_exchange = NULL;
+  }
+  if (NULL != pc->proposal_data)
+  {
+    json_decref (pc->proposal_data);
+    pc->proposal_data = NULL;
   }
   GNUNET_free (pc);
 }
@@ -884,8 +891,362 @@ transaction_double_check (void *cls,
   return;
 }
 
+
+
 /**
- * Accomplish this payment.
+ * Try to parse the pay request into the given pay context.
+ *
+ * Schedules an error response in the connection on failure.
+ *
+ * @return #GNUNET_YES on success
+ */
+static int
+parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *pc)
+{
+  json_t *coins;
+  json_t *coin;
+  json_t *merchant;
+  unsigned int coins_index;
+  const char *chosen_exchange;
+  const char *order_id;
+  struct GNUNET_HashCode h_oid;
+  struct TALER_MerchantPublicKeyP merchant_pub;
+  int res;
+  struct GNUNET_JSON_Specification spec[] = {
+    GNUNET_JSON_spec_json ("coins", &coins),
+    GNUNET_JSON_spec_string ("exchange", &chosen_exchange),
+    GNUNET_JSON_spec_string ("order_id", &order_id),
+    GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
+    GNUNET_JSON_spec_end()
+  };
+
+  res = TMH_PARSE_json_data (connection,
+                             root,
+                             spec);
+  if (GNUNET_YES != res)
+  {
+    GNUNET_break (0);
+    return res;
+  }
+
+  GNUNET_CRYPTO_hash (order_id,
+                      strlen (order_id),
+                      &h_oid);
+
+  res = db->find_proposal_data (db->cls,
+                                &pc->proposal_data,
+                                &h_oid,
+                                &merchant_pub);
+
+
+  if (GNUNET_OK != res)
+  {
+
+    if (MHD_YES != TMH_RESPONSE_reply_not_found (connection,
+                                                 TALER_EC_PAY_DB_STORE_PAY_ERROR,
+                                                 "Proposal not found"))
+    {
+      GNUNET_break (0);
+      return GNUNET_SYSERR;
+    }
+    return GNUNET_NO;
+  }
+
+
+  if (GNUNET_OK != TALER_JSON_hash (pc->proposal_data, &pc->h_proposal_data))
+  {
+    if (MHD_YES != TMH_RESPONSE_reply_internal_error (connection,
+                                                      TALER_EC_NONE,
+                                                      "Can not hash proposal"))
+    {
+      GNUNET_break (0);
+      return GNUNET_SYSERR;
+    }
+    return GNUNET_NO;
+  }
+
+
+  merchant = json_object_get (pc->proposal_data, "merchant");
+  if (NULL == merchant)
+  {
+    // invalid contract:
+    GNUNET_break (0);
+    if (MHD_YES != TMH_RESPONSE_reply_internal_error (connection,
+                                                      TALER_EC_NONE,
+                                                      "No merchant field in contract"))
+    {
+      GNUNET_break (0);
+      return GNUNET_SYSERR;
+    }
+    return GNUNET_NO;
+  }
+  pc->mi = get_instance (merchant);
+
+  if (NULL == pc->mi)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Not able to find the specified instance\n");
+    if (MHD_NO == TMH_RESPONSE_reply_not_found (connection,
+                                                TALER_EC_PAY_INSTANCE_UNKNOWN,
+                                                "Unknown instance given"))
+    {
+      GNUNET_break (0);
+      return GNUNET_SYSERR;
+    }
+    return GNUNET_NO;
+  }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "/pay: picked instance %s with key %s\n",
+              pc->mi->id,
+              GNUNET_STRINGS_data_to_string_alloc (&pc->mi->pubkey, sizeof (pc->mi->pubkey)));
+
+  pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Parsed JSON for /pay.\n");
+
+
+
+  {
+    struct GNUNET_JSON_Specification espec[] = {
+      GNUNET_JSON_spec_absolute_time ("refund_deadline",
+                                      &pc->refund_deadline),
+      GNUNET_JSON_spec_absolute_time ("pay_deadline",
+                                      &pc->pay_deadline),
+      GNUNET_JSON_spec_absolute_time ("timestamp",
+                                      &pc->timestamp),
+      TALER_JSON_spec_amount ("max_fee",
+                              &pc->max_fee),
+      TALER_JSON_spec_amount ("amount",
+                              &pc->amount),
+      GNUNET_JSON_spec_end()
+    };
+
+    res = TMH_PARSE_json_data (connection,
+                               pc->proposal_data,
+                               espec);
+    if (GNUNET_YES != res)
+    {
+      GNUNET_JSON_parse_free (spec);
+      GNUNET_break (0);
+      return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
+    }
+
+    pc->wire_transfer_deadline = GNUNET_TIME_absolute_add (pc->timestamp, wire_transfer_delay);
+
+    if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
+    {
+      GNUNET_break (0);
+      GNUNET_JSON_parse_free (spec);
+      return TMH_RESPONSE_reply_external_error (connection,
+                                                TALER_EC_PAY_REFUND_DEADLINE_PAST_WIRE_TRANSFER_DEADLINE,
+                                                "refund deadline after wire transfer deadline");
+    }
+  }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "parsed timestamps\n");
+
+
+  pc->coins_cnt = json_array_size (coins);
+  if (0 == pc->coins_cnt)
+  {
+    GNUNET_JSON_parse_free (spec);
+    return TMH_RESPONSE_reply_arg_invalid (connection,
+                                           TALER_EC_PAY_COINS_ARRAY_EMPTY,
+                                           "coins");
+  }
+  /* note: 1 coin = 1 deposit confirmation expected */
+  pc->dc = GNUNET_new_array (pc->coins_cnt,
+                             struct DepositConfirmation);
+
+  /* This loop populates the array 'dc' in 'pc' */
+  json_array_foreach (coins, coins_index, coin)
+  {
+    struct DepositConfirmation *dc = &pc->dc[coins_index];
+    struct GNUNET_JSON_Specification spec[] = {
+      TALER_JSON_spec_denomination_public_key ("denom_pub", &dc->denom),
+      TALER_JSON_spec_amount ("f" /* FIXME */, &dc->amount_with_fee),
+      GNUNET_JSON_spec_fixed_auto ("coin_pub", &dc->coin_pub),
+      TALER_JSON_spec_denomination_signature ("ub_sig", &dc->ub_sig),
+      GNUNET_JSON_spec_fixed_auto ("coin_sig", &dc->coin_sig),
+      GNUNET_JSON_spec_end()
+    };
+
+    res = TMH_PARSE_json_data (connection,
+                               coin,
+                               spec);
+    if (GNUNET_YES != res)
+    {
+      GNUNET_JSON_parse_free (spec);
+      json_decref (root);
+      GNUNET_break (0);
+      return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
+    }
+
+    {
+      char *s;
+
+      s = TALER_amount_to_string (&dc->amount_with_fee);
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Coin #%i has f %s\n",
+                  coins_index,
+                  s);
+      GNUNET_free (s);
+   }
+
+    dc->index = coins_index;
+    dc->pc = pc;
+  }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "parsed coins\n");
+
+  pc->pending = pc->coins_cnt;
+
+  GNUNET_JSON_parse_free (spec);
+
+  return GNUNET_OK;
+}
+
+
+/**
+ * Process a payment for a proposal.
+ */
+static int
+handler_pay_json (struct MHD_Connection *connection,
+                  json_t *root,
+                  struct PayContext *pc)
+{
+  int ret;
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "about to parse '/pay' body\n");
+
+  ret = parse_pay (connection, root, pc);
+  if (GNUNET_OK != ret)
+    return ret;
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "parsed '/pay' body\n");
+
+  /* Check if this payment attempt has already succeeded */
+  if (GNUNET_SYSERR ==
+      db->find_payments (db->cls,
+		         &pc->h_proposal_data,
+                         &pc->mi->pubkey,
+		         &check_coin_paid,
+		         pc))
+  {
+    GNUNET_break (0);
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
+					      "Merchant database error");
+  }
+  if (0 == pc->pending)
+  {
+    struct MHD_Response *resp;
+    int ret;
+
+    /* Payment succeeded in the past; take short cut
+       and accept immediately */
+    resp = MHD_create_response_from_buffer (0,
+					    NULL,
+					    MHD_RESPMEM_PERSISTENT);
+    ret = MHD_queue_response (connection,
+			      MHD_HTTP_OK,
+			      resp);
+    MHD_destroy_response (resp);
+    return ret;
+  }
+  /* Check if transaction is already known, if not store it. */
+  if (GNUNET_SYSERR ==
+      db->find_transaction (db->cls,
+			    &pc->h_proposal_data,
+			    &pc->mi->pubkey,
+			    &check_transaction_exists,
+                            pc))
+  {
+    GNUNET_break (0);
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
+                                               "Merchant database error");
+  }
+  if (GNUNET_SYSERR == pc->transaction_exits)
+  {
+    GNUNET_break (0);
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              TALER_EC_PAY_DB_TRANSACTION_ID_CONFLICT,
+					      "Transaction ID reused with different transaction details");
+  }
+  if (GNUNET_NO == pc->transaction_exits)
+  {
+    struct GNUNET_TIME_Absolute now;
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Dealing with new transaction '%s'\n",
+                GNUNET_h2s (&pc->h_proposal_data));
+
+    now = GNUNET_TIME_absolute_get ();
+    if (now.abs_value_us > pc->pay_deadline.abs_value_us)
+    {
+      /* Time expired, we don't accept this payment now! */
+      const char *pd_str;
+      pd_str = GNUNET_STRINGS_absolute_time_to_string (pc->pay_deadline);
+
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Attempt to get coins for expired contract. Deadline: '%s'\n",
+		  pd_str);
+
+      return TMH_RESPONSE_reply_bad_request (connection,
+					     TALER_EC_PAY_OFFER_EXPIRED,
+                                             "The time to pay for this contract has expired.");
+    }
+
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Storing transaction '%s'\n",
+                GNUNET_h2s (&pc->h_proposal_data));
+    if (GNUNET_OK !=
+        db->store_transaction (db->cls,
+                               &pc->h_proposal_data,
+                               &pc->mi->pubkey,
+                               pc->chosen_exchange,
+                               &pc->mi->h_wire,
+                               pc->timestamp,
+                               pc->refund_deadline,
+                               &pc->amount))
+    {
+      GNUNET_break (0);
+      return TMH_RESPONSE_reply_internal_error (connection,
+						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+						"Merchant database error");
+    }
+  if (GNUNET_OK != db->find_transaction (db->cls,
+                                         &pc->h_proposal_data,
+			                 &pc->mi->pubkey,
+                                         &transaction_double_check,
+                                         NULL))
+    GNUNET_break (0);                                         
+  }
+
+  MHD_suspend_connection (connection);
+
+  /* Find the responsible exchange, this may take a while... */
+  pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,
+                                        &process_pay_with_exchange,
+                                        pc);
+
+  /* ... so we suspend connection until the last coin has been ack'd
+     or until we have encountered a hard error.  Eventually, we will
+     resume the connection and send back a response using
+     #resume_pay_with_response(). */
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Suspending /pay handling while working with the exchange\n");
+  pc->timeout_task = GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT,
+                                                   &handle_pay_timeout,
+                                                   pc);
+  return GNUNET_OK;
+}
+
+
+/**
+ * Process a payment for a proposal.
+ * Takes data from the given MHD connection.
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
@@ -906,7 +1267,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   struct PayContext *pc;
   int res;
   json_t *root;
-  struct GNUNET_TIME_Absolute now;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "In handler for /pay.\n");
@@ -946,6 +1306,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
   if (NULL != pc->chosen_exchange)
   {
+    // FIXME: explain in comment why this could happen!
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 		"Shouldn't be here. Old MHD version?\n");
     return MHD_YES;
@@ -963,316 +1324,10 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES; /* the POST's body has to be further fetched */
 
-  mi = get_instance (root);
-
-  /* Got the JSON upload, parse it */
-  {
-    json_t *coins;
-    json_t *coin;
-    unsigned int coins_index;
-    struct TALER_MerchantSignatureP merchant_sig;
-    struct TALER_ProposalDataPS pdps;
-    const char *chosen_exchange;
-    struct GNUNET_JSON_Specification spec[] = {
-      TALER_JSON_spec_amount ("amount", &pc->amount),
-      GNUNET_JSON_spec_json ("coins", &coins),
-      GNUNET_JSON_spec_fixed_auto ("h_proposal_data", &pc->h_proposal_data),
-      TALER_JSON_spec_amount ("max_fee", &pc->max_fee),
-      GNUNET_JSON_spec_fixed_auto ("merchant_sig", &merchant_sig),
-      GNUNET_JSON_spec_string ("exchange", &chosen_exchange),
-      GNUNET_JSON_spec_absolute_time ("refund_deadline", &pc->refund_deadline),
-      GNUNET_JSON_spec_absolute_time ("pay_deadline", &pc->pay_deadline),
-      GNUNET_JSON_spec_absolute_time ("timestamp", &pc->timestamp),
-      GNUNET_JSON_spec_end()
-    };
-
-    res = TMH_PARSE_json_data (connection,
-			       root,
-			       spec);
-    if (GNUNET_YES != res)
-    {
-      json_decref (root);
-      GNUNET_break (0);
-      return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
-    }
-    pc->mi = get_instance (root);
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-		"/pay: picked instance %s\n",
-		pc->mi->id);
-
-    if (NULL == pc->mi)
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		  "Not able to find the specified instance\n");
-      json_decref (root);
-      return TMH_RESPONSE_reply_not_found (connection,
-					   TALER_EC_PAY_INSTANCE_UNKNOWN,
-					   "Unknown instance given");
-    }
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		"The instance for this deposit is '%s', whose bank details are '%s'\n",
-		pc->mi->id,
-		json_dumps (pc->mi->j_wire,
-			    JSON_COMPACT));
-    pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		"Parsed JSON for /pay.\n");
-    pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
-    pdps.purpose.size = htonl (sizeof (pdps));
-    pdps.hash = pc->h_proposal_data;
-
-    struct GNUNET_HashCode dummy;
-
-    GNUNET_CRYPTO_hash (&merchant_sig.eddsa_sig,
-                        sizeof (merchant_sig.eddsa_sig),
-                        &dummy);
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Verifying signature '%s'\n",
-                GNUNET_h2s (&dummy));
-
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "of hashed data '%s'\n",
-                GNUNET_h2s (&pc->h_proposal_data));
-
-    GNUNET_CRYPTO_hash (&pc->mi->privkey.eddsa_priv,
-                        sizeof (pc->mi->privkey.eddsa_priv),
-                        &dummy);
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "with private key '%s'\n",
-                GNUNET_h2s (&dummy));
-
-    if (GNUNET_OK !=
-	GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_CONTRACT,
-				    &pdps.purpose,
-				    &merchant_sig.eddsa_sig,
-				    &pc->mi->pubkey.eddsa_pub))
-    {
-      GNUNET_break (0);
-      GNUNET_JSON_parse_free (spec);
-      json_decref (root);
-      return TMH_RESPONSE_reply_external_error (connection,
-						TALER_EC_PAY_MERCHANT_SIGNATURE_INVALID,
-						"invalid merchant signature supplied");
-    }
-
-    /* 'wire_transfer_deadline' is optional, if it is not present,
-       generate it here; it will be timestamp plus the
-       wire_transfer_delay supplied in config file */
-    if (NULL == json_object_get (root,
-				 "wire_transfer_deadline"))
-    {
-      pc->wire_transfer_deadline
-	= GNUNET_TIME_absolute_add (pc->timestamp,
-				    wire_transfer_delay);
-      if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
-      {
-	/* Refund value very large, delay wire transfer accordingly */
-	pc->wire_transfer_deadline = pc->refund_deadline;
-      }
-    }
-    else
-    {
-      struct GNUNET_JSON_Specification espec[] = {
-	GNUNET_JSON_spec_absolute_time ("wire_transfer_deadline",
-					&pc->wire_transfer_deadline),
-	GNUNET_JSON_spec_end()
-      };
-
-      res = TMH_PARSE_json_data (connection,
-				 root,
-				 espec);
-      if (GNUNET_YES != res)
-      {
-	GNUNET_JSON_parse_free (spec);
-	json_decref (root);
-	GNUNET_break (0);
-	return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
-      }
-      if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
-      {
-	GNUNET_break (0);
-	GNUNET_JSON_parse_free (spec);
-	json_decref (root);
-	return TMH_RESPONSE_reply_external_error (connection,
-						  TALER_EC_PAY_REFUND_DEADLINE_PAST_WIRE_TRANSFER_DEADLINE,
-						  "refund deadline after wire transfer deadline");
-      }
-    }
-
-
-    pc->coins_cnt = json_array_size (coins);
-    if (0 == pc->coins_cnt)
-    {
-      GNUNET_JSON_parse_free (spec);
-      json_decref (root);
-      return TMH_RESPONSE_reply_arg_invalid (connection,
-					     TALER_EC_PAY_COINS_ARRAY_EMPTY,
-					     "coins");
-    }
-    /* note: 1 coin = 1 deposit confirmation expected */
-    pc->dc = GNUNET_new_array (pc->coins_cnt,
-			       struct DepositConfirmation);
-
-    /* This loop populates the array 'dc' in 'pc' */
-    json_array_foreach (coins, coins_index, coin)
-    {
-      struct DepositConfirmation *dc = &pc->dc[coins_index];
-      struct GNUNET_JSON_Specification spec[] = {
-	TALER_JSON_spec_denomination_public_key ("denom_pub", &dc->denom),
-	TALER_JSON_spec_amount ("f" /* FIXME */, &dc->amount_with_fee),
-	GNUNET_JSON_spec_fixed_auto ("coin_pub", &dc->coin_pub),
-	TALER_JSON_spec_denomination_signature ("ub_sig", &dc->ub_sig),
-	GNUNET_JSON_spec_fixed_auto ("coin_sig", &dc->coin_sig),
-	GNUNET_JSON_spec_end()
-      };
-
-      res = TMH_PARSE_json_data (connection,
-				 coin,
-				 spec);
-      if (GNUNET_YES != res)
-      {
-	GNUNET_JSON_parse_free (spec);
-	json_decref (root);
-	GNUNET_break (0);
-	return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
-      }
-
-      {
-	char *s;
-
-	s = TALER_amount_to_string (&dc->amount_with_fee);
-	GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		    "Coin #%i has f %s\n",
-		    coins_index,
-		    s);
-	GNUNET_free (s);
-     }
-
-      dc->index = coins_index;
-      dc->pc = pc;
-    }
-    GNUNET_JSON_parse_free (spec);
-  } /* end of parsing of JSON upload */
-  pc->pending = pc->coins_cnt;
-
-  /* Check if this payment attempt has already succeeded */
-  if (GNUNET_SYSERR ==
-      db->find_payments (db->cls,
-		         &pc->h_proposal_data,
-                         &pc->mi->pubkey,
-		         &check_coin_paid,
-		         pc))
-  {
-    GNUNET_break (0);
-    json_decref (root);
-    return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
-					      "Merchant database error");
-  }
-  if (0 == pc->pending)
-  {
-    struct MHD_Response *resp;
-    int ret;
-
-    /* Payment succeeded in the past; take short cut
-       and accept immediately */
-    resp = MHD_create_response_from_buffer (0,
-					    NULL,
-					    MHD_RESPMEM_PERSISTENT);
-    ret = MHD_queue_response (connection,
-			      MHD_HTTP_OK,
-			      resp);
-    MHD_destroy_response (resp);
-    json_decref (root);
-    return ret;
-  }
-  /* Check if transaction is already known, if not store it. */
-  if (GNUNET_SYSERR ==
-      db->find_transaction (db->cls,
-			    &pc->h_proposal_data,
-			    &pc->mi->pubkey,
-			    &check_transaction_exists,
-                            pc))
-  {
-    GNUNET_break (0);
-    json_decref (root);
-    return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
-                                               "Merchant database error");
-  }
-  if (GNUNET_SYSERR == pc->transaction_exits)
-  {
-    GNUNET_break (0);
-    json_decref (root);
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              TALER_EC_PAY_DB_TRANSACTION_ID_CONFLICT,
-					      "Transaction ID reused with different transaction details");
-  }
-  if (GNUNET_NO == pc->transaction_exits)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Dealing with new transaction '%s'\n",
-                GNUNET_h2s (&pc->h_proposal_data));
-    now = GNUNET_TIME_absolute_get ();
-    if (now.abs_value_us > pc->pay_deadline.abs_value_us)
-    {
-      /* Time expired, we don't accept this payment now! */
-      const char *pd_str;
-      pd_str = GNUNET_STRINGS_absolute_time_to_string (pc->pay_deadline);
-
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "Attempt to get coins for expired contract. Deadline: '%s'\n",
-		  pd_str);
-
-      return TMH_RESPONSE_reply_bad_request (connection,
-					     TALER_EC_PAY_OFFER_EXPIRED,
-                                             "The time to pay for this contract has expired.");
-    }
-
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Storing transaction '%s'\n",
-                GNUNET_h2s (&pc->h_proposal_data));
-    if (GNUNET_OK !=
-        db->store_transaction (db->cls,
-                               &pc->h_proposal_data,
-                               &pc->mi->pubkey,
-                               pc->chosen_exchange,
-                               &pc->mi->h_wire,
-                               pc->timestamp,
-                               pc->refund_deadline,
-                               &pc->amount))
-    {
-      GNUNET_break (0);
-      json_decref (root);
-      return TMH_RESPONSE_reply_internal_error (connection,
-						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
-						"Merchant database error");
-    }
-  if (GNUNET_OK != db->find_transaction (db->cls,
-                                         &pc->h_proposal_data,
-			                 &pc->mi->pubkey,
-                                         &transaction_double_check,
-                                         NULL))
-    GNUNET_break (0);                                         
-  }
-
-  MHD_suspend_connection (connection);
-
-  /* Find the responsible exchange, this may take a while... */
-  pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,
-                                        &process_pay_with_exchange,
-                                        pc);
-
-  /* ... so we suspend connection until the last coin has been ack'd
-     or until we have encountered a hard error.  Eventually, we will
-     resume the connection and send back a response using
-     #resume_pay_with_response(). */
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Suspending /pay handling while working with the exchange\n");
-  pc->timeout_task = GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT,
-                                                   &handle_pay_timeout,
-                                                   pc);
+  res = handler_pay_json (connection, root, pc);
   json_decref (root);
+  if (GNUNET_SYSERR == res)
+    return MHD_NO;
   return MHD_YES;
 }
 
