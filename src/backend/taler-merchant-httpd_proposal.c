@@ -190,6 +190,15 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
     json_object_set (order, "refund_deadline", GNUNET_JSON_from_time_abs (zero));
   }
 
+  if (NULL == json_string_value (json_object_get (order, "pay_deadline")))
+  {
+    struct GNUNET_TIME_Absolute t;
+    /* FIXME: read the delay for pay_deadline from config */
+    t = GNUNET_TIME_absolute_add (GNUNET_TIME_absolute_get (), GNUNET_TIME_UNIT_HOURS);
+    (void) GNUNET_TIME_round_abs (&t);
+    json_object_set (order, "pay_deadline", GNUNET_JSON_from_time_abs (t));
+  }
+
   /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection, order, spec);
   if (GNUNET_NO == res)
