@@ -160,8 +160,7 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
 
   /* Add order_id if it doesn't exist. */
 
-  order_id = json_string_value (json_object_get (order, "order_id"));
-  if (NULL == order_id)
+  if (NULL == json_string_value (json_object_get (order, "order_id")))
   {
     char buf[256];
     time_t timer;
@@ -176,6 +175,11 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
               "%llu\n", 
               (long long unsigned) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX));
     json_object_set (order, "order_id", json_string (buf));
+  }
+
+  if (NULL == json_string_value (json_object_get (order, "timestamp")))
+  {
+    json_object_set (order, "timestamp", GNUNET_JSON_from_time_abs (GNUNET_TIME_absolute_get ()));
   }
 
   /* extract fields we need to sign separately */
