@@ -184,6 +184,12 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
     json_object_set (order, "timestamp", GNUNET_JSON_from_time_abs (now));
   }
 
+  if (NULL == json_string_value (json_object_get (order, "refund_deadline")))
+  {
+    struct GNUNET_TIME_Absolute zero = { 0 };
+    json_object_set (order, "refund_deadline", GNUNET_JSON_from_time_abs (zero));
+  }
+
   /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection, order, spec);
   if (GNUNET_NO == res)
