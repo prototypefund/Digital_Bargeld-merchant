@@ -2294,8 +2294,18 @@ run (void *cls)
 		  \"summary\": \"merchant-lib testcase\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }"},
+
     { .oc = OC_PAY,
       .label = "deposit-simple",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay.contract_ref = "create-proposal-1",
+      .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99" },
+
+    /* Try to replay payment reusing coin */
+    { .oc = OC_PAY,
+      .label = "replay-simple",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-1",
       .details.pay.coin_ref = "withdraw-coin-1",
@@ -2352,7 +2362,7 @@ run (void *cls)
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
 
-    /* Fetch contract-1 */
+    /* Proposal lookup */
     {
       .oc = OC_PROPOSAL_LOOKUP, 
       .label = "fetch-proposal-2",
