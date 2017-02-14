@@ -158,7 +158,8 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*insert_proposal_data) (void *cls,
-                           struct GNUNET_HashCode *h_transaction_id,
+                           const struct GNUNET_HashCode *h_transaction_id,
+                           const struct TALER_MerchantPublicKeyP *merchant_pub,
                            const json_t *proposal_data);
 
 
@@ -176,7 +177,8 @@ struct TALER_MERCHANTDB_Plugin
   int
   (*find_proposal_data) (void *cls,
                          json_t **proposal_data,
-                         struct GNUNET_HashCode *h_transaction_id);
+                         const struct GNUNET_HashCode *h_transaction_id,
+                         const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
   /**

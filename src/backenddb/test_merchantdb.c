@@ -372,6 +372,7 @@ run (void *cls)
   FAILIF (GNUNET_OK !=
           plugin->insert_proposal_data (plugin->cls,
                                         &h_transaction_id,
+                                        &merchant_pub,
                                         proposal_data));
 
   json_t *out;
@@ -379,7 +380,8 @@ run (void *cls)
   FAILIF (GNUNET_OK !=
           plugin->find_proposal_data (plugin->cls,
                                       &out, // plain data
-                                      &h_transaction_id));
+                                      &h_transaction_id,
+                                      &merchant_pub));
 
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,

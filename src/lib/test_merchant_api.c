@@ -1046,6 +1046,9 @@ proposal_cb (void *cls,
     cmd->details.proposal.proposal_data = json_incref ((json_t *) proposal_data);
     cmd->details.proposal.merchant_sig = *sig;
     cmd->details.proposal.hash = *hash;
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Hashed proposal, '%s'\n",
+                GNUNET_h2s (hash));
     break;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1357,6 +1360,8 @@ track_transaction_cb (void *cls,
       struct TALER_Amount ea;
       struct TALER_Amount coin_contribution;
 
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Successful /track/tracking\n");
       if (1 != num_transfers)
       {
         GNUNET_break (0);
@@ -1511,7 +1516,7 @@ interpreter_run (void *cls)
       is->ip = 0;
       instance_idx++;
       instance = instances[instance_idx];
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                   "Switching instance: '%s'\n",
                   instance);
   
@@ -1535,6 +1540,7 @@ interpreter_run (void *cls)
                        = TALER_MERCHANT_proposal_lookup (ctx,
                                                          MERCHANT_URI,
                                                          order_id,
+                                                         instance,
                                                          proposal_lookup_cb,
                                                          is)));
     }
@@ -1762,9 +1768,6 @@ interpreter_run (void *cls)
                           cmd->details.pay.contract_ref);
       GNUNET_assert (NULL != ref);
       merchant_sig = ref->details.proposal.merchant_sig;
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Depositing I on '%s'\n",
-                  GNUNET_h2s (&ref->details.proposal.hash));
       GNUNET_assert (NULL != ref->details.proposal.proposal_data);
       {
         /* Get information that need to be replied in the deposit permission */
@@ -1840,10 +1843,6 @@ interpreter_run (void *cls)
 	}
       }
 
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Depositing II on '%s'\n",
-                  GNUNET_h2s (&ref->details.proposal.hash));
-
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
 				     MERCHANT_URI,
@@ -1858,6 +1857,7 @@ interpreter_run (void *cls)
 				     pay_deadline,
 				     &h_wire,
 				     EXCHANGE_URI,
+                                     order_id,
 				     1 /* num_coins */,
 				     &pc /* coins */,
 				     &pay_cb,
@@ -2294,8 +2294,18 @@ run (void *cls)
 		  \"summary\": \"merchant-lib testcase\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }"},
+
     { .oc = OC_PAY,
       .label = "deposit-simple",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay.contract_ref = "create-proposal-1",
+      .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99" },
+
+    /* Try to replay payment reusing coin */
+    { .oc = OC_PAY,
+      .label = "replay-simple",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-1",
       .details.pay.coin_ref = "withdraw-coin-1",
@@ -2352,7 +2362,7 @@ run (void *cls)
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
 
-    /* Fetch contract-1 */
+    /* Proposal lookup */
     {
       .oc = OC_PROPOSAL_LOOKUP, 
       .label = "fetch-proposal-2",
@@ -2379,6 +2389,13 @@ run (void *cls)
     /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
+
+    { .oc = OC_TRACK_TRANSACTION,
+      .label = "track-transaction-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c",
+      .details.track_transaction.pay_ref = "deposit-simple"  
+    },
 
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
@@ -2432,10 +2449,14 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
     },
-    /**
-     * NOTE: could NOT initialize timestamps by calling GNUNET_TIME_xy ()
-     * because that raised a 'Initializer element is not constant' when compiling.
-     */
+
+    { .oc = OC_TRACK_TRANSACTION,
+      .label = "track-transaction-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2",
+      .details.track_transaction.pay_ref = "deposit-simple-2"  
+    },
+
     { .oc = OC_HISTORY,
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
@@ -2604,7 +2625,8 @@ main (int argc,
   merchantd = GNUNET_OS_start_process (GNUNET_NO,
                                        GNUNET_OS_INHERIT_STD_ALL,
                                        NULL, NULL, NULL,
-                                       "taler-merchant-httpd",
+                                       "valgrind",
+                                       "valgrind",
                                        "taler-merchant-httpd",
                                        "-c", "test_merchant_api.conf",
                                        "-L", "DEBUG",

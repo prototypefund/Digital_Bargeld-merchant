@@ -165,8 +165,9 @@ postgres_initialize (void *cls)
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_proposal_data ("
            "h_order_id BYTEA NOT NULL"
+           ",merchant_pub BYTEA NOT NULL"
            ",proposal_data BYTEA NOT NULL"
-	   ",PRIMARY KEY (h_order_id)"
+	   ",PRIMARY KEY (h_order_id, merchant_pub)"
            ");");
 
   PG_EXEC (pg,
@@ -279,17 +280,19 @@ postgres_initialize (void *cls)
               "insert_proposal_data",
               "INSERT INTO merchant_proposal_data"
               "(h_order_id"
+              ",merchant_pub"
               ",proposal_data)"
               " VALUES "
-              "($1, $2)",
-              2);
+              "($1, $2, $3)",
+              3);
 
   PG_PREPARE (pg,
               "find_proposal_data",
               "SELECT proposal_data FROM merchant_proposal_data"
               " WHERE"
-              " h_order_id=$1",
-              1);
+              " h_order_id=$1"
+              " AND merchant_pub=$2",
+              2);
 
   PG_PREPARE (pg,
               "find_transactions_by_date",
@@ -406,7 +409,8 @@ postgres_initialize (void *cls)
 static int
 postgres_find_proposal_data (void *cls,
                              json_t **proposal_data,
-                             struct GNUNET_HashCode *h_transaction_id)
+                             const struct GNUNET_HashCode *h_transaction_id,
+                             const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
@@ -414,6 +418,7 @@ postgres_find_proposal_data (void *cls,
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
 
@@ -461,7 +466,8 @@ postgres_find_proposal_data (void *cls,
  */
 static int
 postgres_insert_proposal_data (void *cls,
-                               struct GNUNET_HashCode *h_transaction_id,
+                               const struct GNUNET_HashCode *h_transaction_id,
+                               const struct TALER_MerchantPublicKeyP *merchant_pub,
                                const json_t *proposal_data)
 {
   struct PostgresClosure *pg = cls;
@@ -470,6 +476,7 @@ postgres_insert_proposal_data (void *cls,
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_transaction_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     TALER_PQ_query_param_json (proposal_data),
     GNUNET_PQ_query_param_end
   };
@@ -1356,6 +1363,11 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
     }
   }
   pg->conn = GNUNET_POSTGRES_connect (cfg, "merchantdb-postgres");
+  if (NULL == pg->conn)
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   plugin = GNUNET_new (struct TALER_MERCHANTDB_Plugin);
   plugin->cls = pg;
   plugin->drop_tables = &postgres_drop_tables;

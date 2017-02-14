@@ -907,17 +907,21 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                           "instance");
   if (NULL == instance)
     instance = "default";
+
   GNUNET_CRYPTO_hash (instance,
                       strlen (instance),
                       &h_instance);
+
   GNUNET_CRYPTO_hash (order_id,
                       strlen (order_id),
                       &h_order_id);
 
-
-
   tctx->mi = GNUNET_CONTAINER_multihashmap_get (by_id_map,
                                                 &h_instance);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Tracking on behalf of instance '%s'\n",
+              instance);
+
   if (NULL == tctx->mi)
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
@@ -925,7 +929,8 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 
   if (GNUNET_YES != db->find_proposal_data (db->cls,
                                             &proposal_data,
-                                            &h_order_id))
+                                            &h_order_id,
+                                            &tctx->mi->pubkey))
 
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
@@ -944,6 +949,8 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                               tctx);
   if (GNUNET_NO == ret)
   {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "h_proposal_data not found\n");
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSACTION_TRANSACTION_UNKNOWN,
                                          "h_proposal_data is unknown");
