@@ -339,8 +339,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   if (NULL == order)
   {
     res = TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
-					   "order");
+                                          TALER_EC_PARAMETER_MISSING,
+				          "order");
   }
   else
   {

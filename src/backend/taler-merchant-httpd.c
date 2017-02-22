@@ -501,8 +501,8 @@ instances_iterator_cb (void *cls,
                    mi->id);
 
   mi->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
-                                             iic->config,
-                                             instance_wiresection);
+                                              iic->config,
+                                              instance_wiresection);
   GNUNET_free (instance_wiresection);
 
   if (TALER_EC_NONE !=

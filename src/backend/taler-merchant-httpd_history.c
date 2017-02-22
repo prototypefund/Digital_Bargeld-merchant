@@ -51,8 +51,10 @@ history_cb (void *cls,
   json_t *response = cls;
   json_t *entry;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "history_cb\n");
   GNUNET_break (NULL !=
-               (entry = json_pack ("{s:o, s:s, s:s, s:o}",
+               (entry = json_pack ("{s:o, s:s, s:o, s:o}",
                                    "h_proposal_data", GNUNET_JSON_from_data_auto (h_proposal_data),
                                    "exchange", exchange_uri,
                                    "timestamp", GNUNET_JSON_from_time_abs (timestamp),
@@ -105,6 +107,11 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_bad_request (connection,
 					   TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
                                            "Timestamp overflowed");
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Querying history back to %llu\n",
+              date.abs_value_us);
+
   ret = db->find_transactions_by_date (db->cls,
                                        date,
                                        history_cb,
