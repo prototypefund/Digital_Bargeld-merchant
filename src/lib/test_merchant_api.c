@@ -753,6 +753,8 @@ history_cb (void *cls,
             const json_t *json)
 {
   struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  unsigned int nresult;
 
   if (MHD_HTTP_OK != http_status)
   {
@@ -760,6 +762,16 @@ history_cb (void *cls,
     return;
   }
   /*FIXME: put check on number of expected entries*/
+  nresult = json_array_size (json);
+  if (nresult != cmd->details.history.nresult)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected number of history entries. Got %d, expected %d\n",
+                nresult,
+                cmd->details.history.nresult);
+    fail (is);
+    return;
+  }
   next_command (is);
 }
 
