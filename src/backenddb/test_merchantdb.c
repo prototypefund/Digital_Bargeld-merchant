@@ -60,11 +60,6 @@ static int result;
 static struct TALER_MERCHANTDB_Plugin *plugin;
 
 /**
- * Hash of the (fictitious) transaction id.  Set to some random value.
- */
-static struct GNUNET_HashCode h_transaction_id;
-
-/**
  * Hash of the wire transfer address.  Set to some random value.
  */
 static struct GNUNET_HashCode h_wire;
@@ -72,7 +67,7 @@ static struct GNUNET_HashCode h_wire;
 /**
  * Transaction ID.
  */
-char *transaction_id;
+const char *order_id;
 
 /**
  * Proposal's hash
@@ -187,32 +182,18 @@ transaction_cb (void *cls,
                                 &amount_with_fee));
 }
 
-
 /**
- * Function called with information about a transaction. Checks whether the
- * returned tuple
+ * Callback for `find_proposal_data_by_date`.
  *
  * @param cls closure
- * @param transaction_id of the contract
- * @param merchant_pub merchant's public key
- * @param exchange_uri URI of the exchange
- * @param h_wire hash of our wire details
- * @param timestamp time of the confirmation
- * @param refund refund deadline
- * @param total_amount total amount we receive for the contract after fees
+ * @param order_id order id
+ * @param proposal_data proposal data
  */
-
 static void
-history_cb (void *cls,
-	    const struct TALER_MerchantPublicKeyP *merchant_pub,
-            const char *exchange_uri,
-            const struct GNUNET_HashCode *h_proposal_data,
-            const struct GNUNET_HashCode *h_wire,
-            struct GNUNET_TIME_Absolute timestamp,
-            struct GNUNET_TIME_Absolute refund,
-            const struct TALER_Amount *total_amount)
+pd_cb (void *cls,
+       const char *order_id,
+       const json_t *proposal_data)
 {
-  /*Just a stub*/
   return;
 }
 
@@ -336,10 +317,7 @@ run (void *cls)
   /* Prepare data for 'store_payment()' */
   RND_BLK (&h_wire);
   RND_BLK (&h_proposal_data);
-  transaction_id = "test_ID";
-  GNUNET_CRYPTO_hash (transaction_id,
-                      strlen (transaction_id),
-                      &h_transaction_id);
+  order_id = "test_ID";
   RND_BLK (&signkey_pub);
   RND_BLK (&merchant_pub);
   RND_BLK (&wtid);
@@ -371,8 +349,9 @@ run (void *cls)
 
   FAILIF (GNUNET_OK !=
           plugin->insert_proposal_data (plugin->cls,
-                                        &h_transaction_id,
+                                        order_id,
                                         &merchant_pub,
+                                        timestamp,
                                         proposal_data));
 
   json_t *out;
@@ -380,9 +359,15 @@ run (void *cls)
   FAILIF (GNUNET_OK !=
           plugin->find_proposal_data (plugin->cls,
                                       &out, // plain data
-                                      &h_transaction_id,
+                                      order_id,
                                       &merchant_pub));
 
+  FAILIF (1 !=
+          plugin->find_proposal_data_by_date (plugin->cls,
+                                              fake_now,
+                                              &merchant_pub,
+                                              pd_cb,
+                                              NULL));
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,
                                      &h_proposal_data,
@@ -419,13 +404,6 @@ run (void *cls)
 				    &merchant_pub,
                                     &transaction_cb,
                                     NULL));
-
-  /* FIXME: put here find_transactions_by_date () */
-  FAILIF (1 !=
-          plugin->find_transactions_by_date (plugin->cls,
-                                             fake_now,
-                                             history_cb,
-                                             NULL));
 
   FAILIF (GNUNET_OK !=
           plugin->find_payments (plugin->cls,

@@ -39,27 +39,19 @@
  */
 
 static void
-history_cb (void *cls,
-	    const struct TALER_MerchantPublicKeyP *merchant_pub,
-            const char *exchange_uri,
-            const struct GNUNET_HashCode *h_proposal_data,
-            const struct GNUNET_HashCode *h_wire,
-            struct GNUNET_TIME_Absolute timestamp,
-            struct GNUNET_TIME_Absolute refund,
-            const struct TALER_Amount *total_amount)
+pd_cb (void *cls,
+       const char *order_id,
+       const json_t *proposal_data)
 {
   json_t *response = cls;
   json_t *entry;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "history_cb\n");
+  /*FIXME: more details to be returned*/
   GNUNET_break (NULL !=
-               (entry = json_pack ("{s:o, s:s, s:o, s:o}",
-                                   "h_proposal_data", GNUNET_JSON_from_data_auto (h_proposal_data),
-                                   "exchange", exchange_uri,
-                                   "timestamp", GNUNET_JSON_from_time_abs (timestamp),
-                                   "total_amount",
-                                   TALER_JSON_from_amount (total_amount))));
+               (entry = json_pack ("{s:s, s:o}",
+                                   "order_id", order_id,
+                                   "proposal_data", proposal_data)));
+
   GNUNET_break (0 == json_array_append (response, entry));
 }
 
@@ -87,6 +79,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   json_t *response;
   unsigned int ret;
   unsigned long long seconds;
+  struct MerchantInstance *mi;
   
   response = json_array (); /*FIXME who decrefs this?*/
   str = MHD_lookup_connection_value (connection,
@@ -108,14 +101,24 @@ MH_handler_history (struct TMH_RequestHandler *rh,
 					   TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
                                            "Timestamp overflowed");
 
+  str = MHD_lookup_connection_value (connection,
+                                     MHD_GET_ARGUMENT_KIND,
+                                     "instance");
+  if (NULL == str)
+    return TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+                                           "instance");
+  mi = TMH_lookup_instance (str);
+
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Querying history back to %llu\n",
               date.abs_value_us);
 
-  ret = db->find_transactions_by_date (db->cls,
-                                       date,
-                                       history_cb,
-                                       response);
+  ret = db->find_proposal_data_by_date (db->cls,
+                                        date,
+                                        &mi->pubkey,
+                                        pd_cb,
+                                        response);
   if (GNUNET_SYSERR == ret)
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_HISTORY_DB_FETCH_ERROR,

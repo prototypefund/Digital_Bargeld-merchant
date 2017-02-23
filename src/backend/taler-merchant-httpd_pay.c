@@ -922,7 +922,6 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
   unsigned int coins_index;
   const char *chosen_exchange;
   const char *order_id;
-  struct GNUNET_HashCode h_oid;
   struct TALER_MerchantPublicKeyP merchant_pub;
   int res;
   struct GNUNET_JSON_Specification spec[] = {
@@ -942,13 +941,9 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
     return res;
   }
 
-  GNUNET_CRYPTO_hash (order_id,
-                      strlen (order_id),
-                      &h_oid);
-
   res = db->find_proposal_data (db->cls,
                                 &pc->proposal_data,
-                                &h_oid,
+                                order_id,
                                 &merchant_pub);
 
 

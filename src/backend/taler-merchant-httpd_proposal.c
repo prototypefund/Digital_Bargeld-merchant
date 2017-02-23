@@ -137,7 +137,6 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
   struct TALER_Amount total;
   struct TALER_Amount max_fee;
   const char *order_id;
-  struct GNUNET_HashCode h_oid;
   json_t *products;
   json_t *merchant;
   struct GNUNET_TIME_Absolute timestamp;
@@ -259,15 +258,13 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
                             &pdps.purpose,
                             &merchant_sig);
 
-  GNUNET_CRYPTO_hash (order_id,
-                      strlen (order_id),
-                      &h_oid);
-
+  /* fetch timestamp from order */
 
   if (GNUNET_OK !=
       db->insert_proposal_data (db->cls,
-                                &h_oid,
+                                order_id,
                                 &mi->pubkey,
+                                timestamp,
                                 order))
   {
     GNUNET_JSON_parse_free (spec);
@@ -371,7 +368,6 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 {
   const char *order_id;
   const char *instance;
-  struct GNUNET_HashCode h_oid;
   int res;
   json_t *proposal_data;
   struct MerchantInstance *mi;
@@ -394,13 +390,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
                                            "order_id");
-  GNUNET_CRYPTO_hash (order_id,
-                      strlen (order_id),
-                      &h_oid);
 
   res = db->find_proposal_data (db->cls,
                                 &proposal_data,
-                                &h_oid,
+                                order_id,
                                 &mi->pubkey);
   if (GNUNET_NO == res)
     return TMH_RESPONSE_reply_not_found (connection, 

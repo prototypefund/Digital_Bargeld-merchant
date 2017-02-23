@@ -113,7 +113,7 @@ history_raw_cb (void *cls,
     break;
   case MHD_HTTP_BAD_REQUEST:
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-		"Wrong parameter passed in URL\n");
+		"Wrong/missing URL parameter\n");
     break;
   default:
     /* unexpected response code */
@@ -144,6 +144,7 @@ history_raw_cb (void *cls,
 struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                         const char *backend_uri,
+                        const char *instance,
                         struct GNUNET_TIME_Absolute date,
                         TALER_MERCHANT_HistoryOperationCallback history_cb,
                         void *history_cb_cls)
@@ -158,9 +159,10 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
   ho->cb_cls = history_cb_cls;
   seconds = date.abs_value_us / 1000LL / 1000LL;
   GNUNET_asprintf (&ho->url,
-                   "%s/history?date=%llu",
+                   "%s/history?date=%llu&instance=%s",
                    backend_uri,
-                   seconds);
+                   seconds,
+                   instance);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,

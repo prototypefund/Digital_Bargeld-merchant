@@ -164,10 +164,11 @@ postgres_initialize (void *cls)
   /* Setup tables */
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_proposal_data ("
-           "h_order_id BYTEA NOT NULL"
+           "order_id VARCHAR NOT NULL"
            ",merchant_pub BYTEA NOT NULL"
            ",proposal_data BYTEA NOT NULL"
-	   ",PRIMARY KEY (h_order_id, merchant_pub)"
+           ",timestamp INT8 NOT NULL"
+	   ",PRIMARY KEY (order_id, merchant_pub)"
            ");");
 
   PG_EXEC (pg,
@@ -279,36 +280,34 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "insert_proposal_data",
               "INSERT INTO merchant_proposal_data"
-              "(h_order_id"
+              "(order_id"
               ",merchant_pub"
+              ",timestamp"
               ",proposal_data)"
               " VALUES "
-              "($1, $2, $3)",
-              3);
+              "($1, $2, $3, $4)",
+              4);
 
   PG_PREPARE (pg,
               "find_proposal_data",
-              "SELECT proposal_data FROM merchant_proposal_data"
+              "SELECT"
+              " proposal_data"
+              " FROM merchant_proposal_data"
               " WHERE"
-              " h_order_id=$1"
+              " order_id=$1"
               " AND merchant_pub=$2",
               2);
 
   PG_PREPARE (pg,
-              "find_transactions_by_date",
+              "find_proposal_data_by_date",
               "SELECT"
-              " h_proposal_data"
-	      ",merchant_pub"
-              ",exchange_uri"
-              ",h_wire"
-              ",timestamp"
-              ",refund_deadline"
-              ",total_amount_val"
-              ",total_amount_frac"
-              ",total_amount_curr"
-              " FROM merchant_transactions"
-              " WHERE timestamp>=$1",
-              1);
+              " proposal_data"
+              ",order_id"
+              " FROM merchant_proposal_data"
+              " WHERE"
+              " timestamp>=$1"
+              " AND merchant_pub=$2",
+              2);
 
   /* Setup prepared "SELECT" statements */
   PG_PREPARE (pg,
@@ -409,7 +408,7 @@ postgres_initialize (void *cls)
 static int
 postgres_find_proposal_data (void *cls,
                              json_t **proposal_data,
-                             const struct GNUNET_HashCode *h_transaction_id,
+                             const char *order_id,
                              const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
@@ -417,7 +416,7 @@ postgres_find_proposal_data (void *cls,
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_transaction_id),
+    GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
@@ -466,8 +465,9 @@ postgres_find_proposal_data (void *cls,
  */
 static int
 postgres_insert_proposal_data (void *cls,
-                               const struct GNUNET_HashCode *h_transaction_id,
+                               const char *order_id,
                                const struct TALER_MerchantPublicKeyP *merchant_pub,
+                               struct GNUNET_TIME_Absolute timestamp,
                                const json_t *proposal_data)
 {
   struct PostgresClosure *pg = cls;
@@ -475,8 +475,9 @@ postgres_insert_proposal_data (void *cls,
   int ret;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_transaction_id),
+    GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_absolute_time (&timestamp),
     TALER_PQ_query_param_json (proposal_data),
     GNUNET_PQ_query_param_end
   };
@@ -727,10 +728,11 @@ postgres_store_transfer_to_proof (void *cls,
  * @return numer of found tuples, #GNUNET_SYSERR upon error
  */
 static int
-postgres_find_transactions_by_date (void *cls,
-                                    struct GNUNET_TIME_Absolute date,
-                                    TALER_MERCHANTDB_TransactionCallback cb,
-                                    void *cb_cls)
+postgres_find_proposal_data_by_date (void *cls,
+                                     struct GNUNET_TIME_Absolute date,
+                                     const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                     TALER_MERCHANTDB_ProposalDataCallback cb,
+                                     void *cb_cls)
 {
 
   struct PostgresClosure *pg = cls;
@@ -740,10 +742,11 @@ postgres_find_transactions_by_date (void *cls,
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_transactions_by_date",
+                                    "find_proposal_data_by_date",
                                     params);
   if (PGRES_TUPLES_OK != PQresultStatus (result))
   {
@@ -758,29 +761,14 @@ postgres_find_transactions_by_date (void *cls,
   }
   for (i = 0; i < n; i++)
   {
-    struct TALER_MerchantPublicKeyP merchant_pub;
-    char *exchange_uri;
-    struct GNUNET_HashCode h_wire;
-    struct GNUNET_TIME_Absolute timestamp;
-    struct GNUNET_TIME_Absolute refund_deadline;
-    struct TALER_Amount total_amount;
-    struct GNUNET_HashCode h_proposal_data;
+    char *order_id;
+    json_t *proposal_data;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
-      GNUNET_PQ_result_spec_string ("exchange_uri",
-                                    &exchange_uri),
-      GNUNET_PQ_result_spec_auto_from_type ("h_proposal_data",
-                                    &h_proposal_data),
-      GNUNET_PQ_result_spec_auto_from_type ("merchant_pub",
-                                            &merchant_pub),
-      GNUNET_PQ_result_spec_auto_from_type ("h_wire",
-                                            &h_wire),
-      GNUNET_PQ_result_spec_absolute_time ("timestamp",
-                                           &timestamp),
-      GNUNET_PQ_result_spec_absolute_time ("refund_deadline",
-                                           &refund_deadline),
-      TALER_PQ_result_spec_amount ("total_amount",
-                                   &total_amount),
+      GNUNET_PQ_result_spec_string ("order_id",
+                                    &order_id),
+      TALER_PQ_result_spec_json ("proposal_data",
+                                 &proposal_data),
       GNUNET_PQ_result_spec_end
     };
 
@@ -794,13 +782,8 @@ postgres_find_transactions_by_date (void *cls,
       return GNUNET_SYSERR;
     }
     cb (cb_cls,
-	&merchant_pub,
-        exchange_uri,
-        &h_proposal_data,
-        &h_wire,
-        timestamp,
-        refund_deadline,
-        &total_amount);
+        order_id,
+        proposal_data);
     GNUNET_PQ_cleanup_result (rs);
   }
   PQclear (result);
@@ -1377,7 +1360,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
   plugin->find_transaction = &postgres_find_transaction;
-  plugin->find_transactions_by_date = &postgres_find_transactions_by_date;
   plugin->find_payments_by_hash_and_coin = &postgres_find_payments_by_hash_and_coin;
   plugin->find_payments = &postgres_find_payments;
   plugin->find_transfers_by_hash = &postgres_find_transfers_by_hash;
@@ -1385,6 +1367,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
   plugin->insert_proposal_data = &postgres_insert_proposal_data;
   plugin->find_proposal_data = &postgres_find_proposal_data;
+  plugin->find_proposal_data_by_date = &postgres_find_proposal_data_by_date;
 
   return plugin;
 }

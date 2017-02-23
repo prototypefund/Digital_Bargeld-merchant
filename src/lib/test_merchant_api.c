@@ -753,23 +753,13 @@ history_cb (void *cls,
             const json_t *json)
 {
   struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-  unsigned int nelements;
 
   if (MHD_HTTP_OK != http_status)
   {
     fail (is);
     return;
   }
-  nelements = json_array_size (json);
-  if (nelements != (cmd->details.history.nresult * (instance_idx + 1)))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Did not get as many history entries as expected\n");
-    fail (is);
-    return;
-  }
-
+  /*FIXME: put check on number of expected entries*/
   next_command (is);
 }
 
@@ -1974,6 +1964,7 @@ interpreter_run (void *cls)
     if (NULL ==
        (cmd->details.history.ho = TALER_MERCHANT_history (ctx,
 	                                                  MERCHANT_URI,
+                                                          instance,
 	                                                  cmd->details.history.date,
 							  history_cb,
 							  is)))

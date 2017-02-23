@@ -32,6 +32,18 @@ struct TALER_MERCHANTDB_Plugin;
 
 
 /**
+ * Tipically called by `find_proposal_data_by_date`.
+ *
+ * @param cls closure
+ * @param order_id order id
+ * @param proposal_data proposal data related to order id
+ */
+ typedef void
+ (*TALER_MERCHANTDB_ProposalDataCallback)(void *cls,
+                                          const char *order_id,
+                                          const json_t *proposal_data);
+
+/**
  * Function called with information about a transaction.
  *
  * @param cls closure
@@ -158,8 +170,9 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*insert_proposal_data) (void *cls,
-                           const struct GNUNET_HashCode *h_transaction_id,
+                           const char *order_id,
                            const struct TALER_MerchantPublicKeyP *merchant_pub,
+                           struct GNUNET_TIME_Absolute timestamp,
                            const json_t *proposal_data);
 
 
@@ -177,8 +190,25 @@ struct TALER_MERCHANTDB_Plugin
   int
   (*find_proposal_data) (void *cls,
                          json_t **proposal_data,
-                         const struct GNUNET_HashCode *h_transaction_id,
+                         const char *order_id,
                          const struct TALER_MerchantPublicKeyP *merchant_pub);
+
+
+  /**
+   * Return proposal data and order id for all proposals younger than
+   * date.
+   *
+   * @param cls closure
+   * @param date limit to the oldest record
+   * @param cb callback called with proposal data and order id
+   * @param cb_cls closure for cb
+   */
+  int
+  (*find_proposal_data_by_date) (void *cls,
+                                 struct GNUNET_TIME_Absolute date,
+                                 const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                 TALER_MERCHANTDB_ProposalDataCallback cb,
+                                 void *cb_cls);
 
 
   /**

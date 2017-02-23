@@ -848,7 +848,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   const char *instance;
   int ret;
   struct GNUNET_HashCode h_instance;
-  struct GNUNET_HashCode h_order_id;
   struct GNUNET_HashCode h_proposal_data;
   struct json_t *proposal_data;
 
@@ -912,10 +911,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                       strlen (instance),
                       &h_instance);
 
-  GNUNET_CRYPTO_hash (order_id,
-                      strlen (order_id),
-                      &h_order_id);
-
   tctx->mi = GNUNET_CONTAINER_multihashmap_get (by_id_map,
                                                 &h_instance);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -929,7 +924,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 
   if (GNUNET_YES != db->find_proposal_data (db->cls,
                                             &proposal_data,
-                                            &h_order_id,
+                                            order_id,
                                             &tctx->mi->pubkey))
 
     return TMH_RESPONSE_reply_not_found (connection,
