@@ -2451,13 +2451,15 @@ run (void *cls)
     { .oc = OC_HISTORY,
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
+      /*all records to be returned*/
       .details.history.date.abs_value_us = 0,
       .details.history.nresult = 2
     },
     { .oc = OC_HISTORY,
       .label = "history-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
+      /*no records to be returned, as limit is in the future*/
+      .details.history.date.abs_value_us = 43 * 1000LL * 1000LL, 
       .details.history.nresult = 0
     },
 
