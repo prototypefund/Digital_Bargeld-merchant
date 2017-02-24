@@ -46,11 +46,11 @@ pd_cb (void *cls,
   json_t *response = cls;
   json_t *entry;
 
+
   /*FIXME: more details to be returned*/
   GNUNET_break (NULL !=
-               (entry = json_pack ("{s:s, s:o}",
-                                   "order_id", order_id,
-                                   "proposal_data", proposal_data)));
+               (entry = json_pack ("{s:s}",
+                                   "order_id", order_id)));
 
   GNUNET_break (0 == json_array_append (response, entry));
 }
@@ -123,6 +123,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_HISTORY_DB_FETCH_ERROR,
 					      "db error to get history");
+
   return TMH_RESPONSE_reply_json (connection,
                                   response,
                                   MHD_HTTP_OK);
