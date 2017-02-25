@@ -45,14 +45,23 @@ pd_cb (void *cls,
 {
   json_t *response = cls;
   json_t *entry;
+  json_t *amount;
+  json_t *timestamp;
 
+  GNUNET_assert (NULL != (amount = json_object_get (proposal_data, "amount")));
+  GNUNET_assert (NULL != (timestamp = json_object_get (proposal_data, "timestamp")));
 
-  /*FIXME: more details to be returned*/
   GNUNET_break (NULL !=
-               (entry = json_pack ("{s:s}",
-                                   "order_id", order_id)));
+               (entry = json_pack ("{s:s, s:o, s:s}",
+                                   "order_id", order_id,
+                                   "amount", amount,
+                                   "timestamp", json_string_value (timestamp))));
 
-  GNUNET_break (0 == json_array_append (response, entry));
+  GNUNET_break (0 == json_array_append_new (response, entry));
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "growing history data: %s\nptr: %p\n",
+              json_dumps (response, JSON_INDENT (1)),
+              response);
 }
 
 /**
@@ -123,6 +132,10 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_HISTORY_DB_FETCH_ERROR,
 					      "db error to get history");
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "history data: %s\n",
+              json_dumps (response, JSON_INDENT (1)));
 
   return TMH_RESPONSE_reply_json (connection,
                                   response,
