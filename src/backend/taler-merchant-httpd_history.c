@@ -115,6 +115,11 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                            "instance");
   mi = TMH_lookup_instance (str);
 
+  if (NULL == mi)
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_HISTORY_INSTANCE_UNKNOWN,
+                                         "instance");
+
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Querying history back to %llu\n",
               date.abs_value_us);
