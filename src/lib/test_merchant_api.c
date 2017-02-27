@@ -761,7 +761,6 @@ history_cb (void *cls,
     fail (is);
     return;
   }
-  /*FIXME: put check on number of expected entries*/
   nresult = json_array_size (json);
   if (nresult != cmd->details.history.nresult)
   {
@@ -772,6 +771,10 @@ history_cb (void *cls,
     fail (is);
     return;
   }
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "/history data: %s\n",
+              json_dumps (json, JSON_INDENT (1)));
+
   next_command (is);
 }
 

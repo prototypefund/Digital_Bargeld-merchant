@@ -48,7 +48,7 @@ pd_cb (void *cls,
   json_t *amount;
   json_t *timestamp;
 
-  GNUNET_assert (NULL != (amount = json_object_get (proposal_data, "amount")));
+  GNUNET_assert (NULL != (amount = json_copy (json_object_get (proposal_data, "amount"))));
   GNUNET_assert (NULL != (timestamp = json_object_get (proposal_data, "timestamp")));
 
   GNUNET_break (NULL !=
@@ -58,10 +58,6 @@ pd_cb (void *cls,
                                    "timestamp", json_string_value (timestamp))));
 
   GNUNET_break (0 == json_array_append_new (response, entry));
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "growing history data: %s\nptr: %p\n",
-              json_dumps (response, JSON_INDENT (1)),
-              response);
 }
 
 /**

@@ -784,6 +784,7 @@ postgres_find_proposal_data_by_date (void *cls,
     cb (cb_cls,
         order_id,
         proposal_data);
+
     GNUNET_PQ_cleanup_result (rs);
   }
   PQclear (result);
