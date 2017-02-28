@@ -83,6 +83,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute date;
   json_t *response;
   unsigned int ret;
+  unsigned int start;
+  unsigned int delta;
   unsigned long long seconds;
   struct MerchantInstance *mi;
   
@@ -118,6 +120,33 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                          TALER_EC_HISTORY_INSTANCE_UNKNOWN,
                                          "instance");
 
+  start = 0;
+  delta = 20;
+  
+  str = MHD_lookup_connection_value (connection,
+                                     MHD_GET_ARGUMENT_KIND,
+                                     "start");
+  if (NULL != str)
+  {
+    if ((1 != sscanf (str, "%d", &start)) ||
+        start < 0)
+      return TMH_RESPONSE_reply_arg_invalid (connection,
+                                             TALER_EC_PARAMETER_MALFORMED,
+                                             "start");  
+  }
+
+  str = MHD_lookup_connection_value (connection,
+                                     MHD_GET_ARGUMENT_KIND,
+                                     "delta");
+
+  if (NULL != str)
+  {
+    if ((1 != sscanf (str, "%d", &delta)) ||
+        delta < 0)
+      return TMH_RESPONSE_reply_arg_invalid (connection,
+                                             TALER_EC_PARAMETER_MALFORMED,
+                                             "delta");  
+  }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Querying history back to %llu\n",
               date.abs_value_us);
