@@ -1980,6 +1980,8 @@ interpreter_run (void *cls)
        (cmd->details.history.ho = TALER_MERCHANT_history (ctx,
 	                                                  MERCHANT_URI,
                                                           instance,
+                                                          0,
+                                                          20,
 	                                                  cmd->details.history.date,
 							  history_cb,
 							  is)))

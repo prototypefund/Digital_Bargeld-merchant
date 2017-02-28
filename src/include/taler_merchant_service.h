@@ -552,6 +552,9 @@ typedef void
  *
  * @param ctx execution context
  * @param backend_uri base URL of the merchant backend
+ * @param instance which merchant instance is performing this call
+ * @param start return `delta` records starting from position `start`
+ * @param delta return `delta` records starting from position `start`
  * @param date only transactions younger than/equals to date will be returned
  * @param history_cb callback which will work the response gotten from the backend
  * @param history_cb_cls closure to pass to history_cb
@@ -561,6 +564,8 @@ struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                         const char *backend_uri,
                         const char *instance,
+                        unsigned int start,
+                        unsigned int delta,
                         struct GNUNET_TIME_Absolute date,
                         TALER_MERCHANT_HistoryOperationCallback history_cb,
                         void *history_cb_cls);

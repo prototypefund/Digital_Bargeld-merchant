@@ -91,29 +91,27 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                      MHD_GET_ARGUMENT_KIND,
                                      "date");
 
-  if (NULL == str)
-    return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
-                                           "date");
-
-  if (1 != sscanf (str, "%llu", &seconds))
+  seconds = 0;
+  if (NULL != str)
+  {
+    if (1 != sscanf (str, "%llu", &seconds))
     return TMH_RESPONSE_reply_arg_invalid (connection,
 					   TALER_EC_PARAMETER_MALFORMED,
                                            "date");
-  date.abs_value_us = seconds * 1000LL * 1000LL;
-  if (date.abs_value_us / 1000LL / 1000LL != seconds)
-    return TMH_RESPONSE_reply_bad_request (connection,
-					   TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
-                                           "Timestamp overflowed");
+    date.abs_value_us = seconds * 1000LL * 1000LL;
+    if (date.abs_value_us / 1000LL / 1000LL != seconds)
+      return TMH_RESPONSE_reply_bad_request (connection,
+                                             TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
+                                             "Timestamp overflowed");
+  
+  }
 
+  mi = TMH_lookup_instance ("default");
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "instance");
-  if (NULL == str)
-    return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
-                                           "instance");
-  mi = TMH_lookup_instance (str);
+  if (NULL != str)
+    mi = TMH_lookup_instance (str);
 
   if (NULL == mi)
     return TMH_RESPONSE_reply_not_found (connection,
