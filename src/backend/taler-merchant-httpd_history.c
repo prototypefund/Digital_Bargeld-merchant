@@ -26,6 +26,16 @@
 #include "taler-merchant-httpd_responses.h"
 
 /**
+ * Index to the first row to return in response to /history.
+ */
+unsigned int start;
+
+/**
+ * How many rows we are to return in response to /history.
+ */
+unsigned int delta;
+
+/**
  * Function called with information about a transaction.
  *
  * @param cls closure
@@ -83,8 +93,6 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute date;
   json_t *response;
   unsigned int ret;
-  unsigned int start;
-  unsigned int delta;
   unsigned long long seconds;
   struct MerchantInstance *mi;
   
