@@ -36,6 +36,12 @@ unsigned int start;
 unsigned int delta;
 
 /**
+ * Index to the current row being processed.
+ */
+unsigned int current = 0;
+
+
+/**
  * Function called with information about a transaction.
  *
  * @param cls closure
@@ -58,16 +64,23 @@ pd_cb (void *cls,
   json_t *amount;
   json_t *timestamp;
 
+
   GNUNET_assert (NULL != (amount = json_copy (json_object_get (proposal_data, "amount"))));
   GNUNET_assert (NULL != (timestamp = json_object_get (proposal_data, "timestamp")));
 
-  GNUNET_break (NULL !=
-               (entry = json_pack ("{s:s, s:o, s:s}",
-                                   "order_id", order_id,
-                                   "amount", amount,
-                                   "timestamp", json_string_value (timestamp))));
+  if (current >= start && current <= start + delta)
+  {
+    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:o, s:s}",
+                                              "order_id", order_id,
+                                              "amount", amount,
+                                              "timestamp", json_string_value (timestamp))));
 
-  GNUNET_break (0 == json_array_append_new (response, entry));
+    GNUNET_break (0 == json_array_append_new (response, entry));
+  
+  }
+
+  // FIXME to zero after returned.
+  current++;
 }
 
 /**
@@ -164,6 +177,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                         &mi->pubkey,
                                         pd_cb,
                                         response);
+  current = 0;
   if (GNUNET_SYSERR == ret)
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_HISTORY_DB_FETCH_ERROR,
