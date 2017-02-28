@@ -68,7 +68,7 @@ pd_cb (void *cls,
   GNUNET_assert (NULL != (amount = json_copy (json_object_get (proposal_data, "amount"))));
   GNUNET_assert (NULL != (timestamp = json_object_get (proposal_data, "timestamp")));
 
-  if (current >= start && current <= start + delta)
+  if (current >= start && current < start + delta)
   {
     GNUNET_break (NULL != (entry = json_pack ("{s:s, s:o, s:s}",
                                               "order_id", order_id,
@@ -120,14 +120,16 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     if (1 != sscanf (str, "%llu", &seconds))
     return TMH_RESPONSE_reply_arg_invalid (connection,
 					   TALER_EC_PARAMETER_MALFORMED,
-                                           "date");
-    date.abs_value_us = seconds * 1000LL * 1000LL;
-    if (date.abs_value_us / 1000LL / 1000LL != seconds)
-      return TMH_RESPONSE_reply_bad_request (connection,
-                                             TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
-                                             "Timestamp overflowed");
-  
+                                           "date");  
   }
+
+  date.abs_value_us = seconds * 1000LL * 1000LL;
+  if (date.abs_value_us / 1000LL / 1000LL != seconds)
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
+                                           "Timestamp overflowed");
+
+
 
   mi = TMH_lookup_instance ("default");
   str = MHD_lookup_connection_value (connection,
