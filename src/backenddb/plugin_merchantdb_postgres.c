@@ -307,7 +307,7 @@ postgres_initialize (void *cls)
               " WHERE"
               " timestamp>=$1"
               " AND merchant_pub=$2"
-              " ORDER BY timestamp",
+              " ORDER BY timestamp DESC",
               2);
 
   /* Setup prepared "SELECT" statements */
