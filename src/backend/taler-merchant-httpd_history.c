@@ -64,9 +64,10 @@ pd_cb (void *cls,
   json_t *amount;
   json_t *timestamp;
   json_t *instance;
+  json_t *proposal_data_copy;
 
-
-  GNUNET_assert (-1 != json_unpack (proposal_data,
+  proposal_data_copy = json_copy (proposal_data);
+  GNUNET_assert (-1 != json_unpack (proposal_data_copy,
                                     "{s:o, s:o, s:{s:o}}",
                                     "amount", &amount,
                                     "timestamp", &timestamp,
