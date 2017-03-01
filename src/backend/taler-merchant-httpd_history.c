@@ -63,17 +63,27 @@ pd_cb (void *cls,
   json_t *entry;
   json_t *amount;
   json_t *timestamp;
+  json_t *instance;
 
 
-  GNUNET_assert (NULL != (amount = json_copy (json_object_get (proposal_data, "amount"))));
-  GNUNET_assert (NULL != (timestamp = json_object_get (proposal_data, "timestamp")));
+  GNUNET_assert (-1 != json_unpack (proposal_data,
+                                    "{s:o, s:o, s:{s:o}}",
+                                    "amount", &amount,
+                                    "timestamp", &timestamp,
+                                    "merchant", "instance", &instance));
 
   if (current >= start && current < start + delta)
   {
-    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:o, s:s}",
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Adding history element. Current: %d, start: %d, delta: %d\n",
+                current,
+                start,
+                delta);
+    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:o, s:s, s:s}",
                                               "order_id", order_id,
                                               "amount", amount,
-                                              "timestamp", json_string_value (timestamp))));
+                                              "timestamp", json_string_value (timestamp),
+                                              "instance", json_string_value (instance))));
 
     GNUNET_break (0 == json_array_append_new (response, entry));
   
