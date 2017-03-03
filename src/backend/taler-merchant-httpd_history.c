@@ -64,10 +64,8 @@ pd_cb (void *cls,
   json_t *amount;
   json_t *timestamp;
   json_t *instance;
-  json_t *proposal_data_copy;
 
-  proposal_data_copy = json_copy (proposal_data);
-  GNUNET_assert (-1 != json_unpack (proposal_data_copy,
+  GNUNET_assert (-1 != json_unpack ((json_t *) proposal_data,
                                     "{s:o, s:o, s:{s:o}}",
                                     "amount", &amount,
                                     "timestamp", &timestamp,
@@ -87,7 +85,7 @@ pd_cb (void *cls,
                                               "instance", json_string_value (instance))));
 
     GNUNET_break (0 == json_array_append_new (response, entry));
-  
+
   }
 
   // FIXME to zero after returned.
@@ -119,7 +117,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   unsigned int ret;
   unsigned long long seconds;
   struct MerchantInstance *mi;
-  
+
   response = json_array (); /*FIXME who decrefs this?*/
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
@@ -131,7 +129,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     if (1 != sscanf (str, "%llu", &seconds))
     return TMH_RESPONSE_reply_arg_invalid (connection,
 					   TALER_EC_PARAMETER_MALFORMED,
-                                           "date");  
+                                           "date");
   }
 
   date.abs_value_us = seconds * 1000LL * 1000LL;
@@ -156,7 +154,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
 
   start = 0;
   delta = 20;
-  
+
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "start");
@@ -166,7 +164,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
         start < 0)
       return TMH_RESPONSE_reply_arg_invalid (connection,
                                              TALER_EC_PARAMETER_MALFORMED,
-                                             "start");  
+                                             "start");
   }
 
   str = MHD_lookup_connection_value (connection,
@@ -179,11 +177,11 @@ MH_handler_history (struct TMH_RequestHandler *rh,
         delta < 0)
       return TMH_RESPONSE_reply_arg_invalid (connection,
                                              TALER_EC_PARAMETER_MALFORMED,
-                                             "delta");  
+                                             "delta");
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Querying history back to %llu\n",
-              date.abs_value_us);
+              "Querying history back to %s\n",
+              GNUNET_STRINGS_absolute_time_to_string (date));
 
   ret = db->find_proposal_data_by_date (db->cls,
                                         date,
