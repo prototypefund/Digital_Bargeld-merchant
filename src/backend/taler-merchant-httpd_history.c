@@ -53,7 +53,6 @@ unsigned int current = 0;
  * @param refund refund deadline
  * @param total_amount total amount we receive for the contract after fees
  */
-
 static void
 pd_cb (void *cls,
        const char *order_id,
@@ -71,26 +70,28 @@ pd_cb (void *cls,
                                     "timestamp", &timestamp,
                                     "merchant", "instance", &instance));
 
-  if (current >= start && current < start + delta)
+  if ( (current >= start) &&
+       (current < start + delta) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Adding history element. Current: %d, start: %d, delta: %d\n",
                 current,
                 start,
                 delta);
-    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:o, s:s, s:s}",
+    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:O, s:s, s:s}",
                                               "order_id", order_id,
                                               "amount", amount,
                                               "timestamp", json_string_value (timestamp),
                                               "instance", json_string_value (instance))));
 
-    GNUNET_break (0 == json_array_append_new (response, entry));
-
+    GNUNET_break (0 == json_array_append_new (response,
+                                              entry));
   }
 
   // FIXME to zero after returned.
   current++;
 }
+
 
 /**
  * Manage a /history request. Query the db and returns transactions
