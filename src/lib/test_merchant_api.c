@@ -1919,6 +1919,7 @@ interpreter_run (void *cls)
                           &amount,
                           cmd->details.check_bank_transfer.account_debit,
                           cmd->details.check_bank_transfer.account_credit,
+                          EXCHANGE_URI,
                           &cmd->details.check_bank_transfer.wtid))
       {
         GNUNET_break (0);
