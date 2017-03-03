@@ -74,7 +74,7 @@ pd_cb (void *cls,
        (current < start + delta) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Adding history element. Current: %d, start: %d, delta: %d\n",
+                "Adding history element. Current: %u, start: %u, delta: %u\n",
                 current,
                 start,
                 delta);
