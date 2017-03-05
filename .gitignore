@@ -37,3 +37,4 @@ doc/*
 !doc/*.am
 !doc/*.sh
 !doc/examples/
+src/lib/test_merchant_api_home/.local/share/taler/exchange/wirefees/
