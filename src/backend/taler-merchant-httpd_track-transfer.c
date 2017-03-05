@@ -415,11 +415,13 @@ wire_transfer_cb (void *cls,
  *
  * @param cls the `struct TrackTransferContext`
  * @param eh NULL if exchange was not found to be acceptable
+ * @param wire_fee NULL (we did not specify a wire method)
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
  */
 static void
 process_track_transfer_with_exchange (void *cls,
                                       struct TALER_EXCHANGE_Handle *eh,
+                                      const struct TALER_Amount *wire_fee,
                                       int exchange_trusted)
 {
   struct TrackTransferContext *rctx = cls;
@@ -623,6 +625,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
               "Suspending /track/transfer handling while working with the exchange\n");
   MHD_suspend_connection (connection);
   rctx->fo = TMH_EXCHANGES_find_exchange (uri,
+                                          NULL,
                                           &process_track_transfer_with_exchange,
                                           rctx);
   rctx->timeout_task

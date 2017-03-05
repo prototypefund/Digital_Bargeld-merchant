@@ -679,11 +679,13 @@ trace_coins (struct TrackTransactionContext *tctx)
  *
  * @param cls the `struct TrackTransactionContext`
  * @param eh NULL if exchange was not found to be acceptable
+ * @param wire_fee NULL (we did not specify a wire method)
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
  */
 static void
 process_track_transaction_with_exchange (void *cls,
                                          struct TALER_EXCHANGE_Handle *eh,
+                                         const struct TALER_Amount *wire_fee,
                                          int exchange_trusted)
 {
   struct TrackTransactionContext *tctx = cls;
@@ -987,6 +989,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
               "Suspending /track/transaction handling while working with the exchange\n");
   MHD_suspend_connection (connection);
   tctx->fo = TMH_EXCHANGES_find_exchange (tctx->exchange_uri,
+                                          NULL,
                                           &process_track_transaction_with_exchange,
                                           tctx);
 

@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
+  (C) 2014, 2015, 2016, 2017 GNUnet e.V. and INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -163,6 +163,34 @@ struct PayContext
    * pay the difference (i.e. amount - max_fee <= actual-amount - actual-fee).
    */
   struct TALER_Amount max_fee;
+
+  /**
+   * Maximum wire fee the merchant is willing to pay, from @e root.
+   * Note that IF the total fee of the exchange is higher, that is
+   * acceptable to the merchant if the customer is willing to
+   * pay the amorized difference.  Wire fees are charged over an
+   * aggregate of several translations, hence unlike the deposit
+   * fees, they are amortized over several customer's transactions.
+   * The contract specifies under @e wire_fee_amortization how many
+   * customer's transactions he expects the wire fees to be amortized
+   * over on average.  Thus, if the wire fees are larger than
+   * @e max_wire_fee, each customer is expected to contribute
+   * $\frac{actual-wire-fee - max_wire_fee}{wire_fee_amortization}$.
+   * The customer's contribution may be further reduced by the
+   * difference between @e max_fee and the sum of the deposit fees.
+   *
+   * Default is that the merchant is unwilling to pay any wire fees.
+   */
+  struct TALER_Amount max_wire_fee;
+
+  /**
+   * Number of transactions that the wire fees are expected to be
+   * amortized over.  Never zero, defaults (conservateively) to 1.
+   * May be higher if merchants expect many small transactions to
+   * be aggregated and thus wire fees to be reasonably amortized
+   * due to aggregation.
+   */
+  uint32_t wire_fee_amortization;
 
   /**
    * Amount from @e root.  This is the amount the merchant expects
@@ -526,11 +554,13 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
  *
  * @param cls the `struct PayContext`
  * @param mh NULL if exchange was not found to be acceptable
+ * @param wire_fee current applicable fee for dealing with @a mh, NULL if not available
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
  */
 static void
 process_pay_with_exchange (void *cls,
                            struct TALER_EXCHANGE_Handle *mh,
+                           const struct TALER_Amount *wire_fee,
                            int exchange_trusted)
 {
   struct PayContext *pc = cls;
@@ -552,7 +582,6 @@ process_pay_with_exchange (void *cls,
     return;
   }
   pc->mh = mh;
-
   keys = TALER_EXCHANGE_get_keys (mh);
   if (NULL == keys)
   {
@@ -874,37 +903,10 @@ check_transaction_exists (void *cls,
   }
 }
 
+
+// FIXME: declare in proper header!
 extern struct MerchantInstance *
 get_instance (struct json_t *json);
-
-
-/**
- * Just a stub used to double-check if a transaction
- * has been correctly inserted into db.
- *
- * @param cls closure
- * @param transaction_id of the contract
- * @param merchant's public key
- * @param exchange_uri URI of the exchange
- * @param h_contract hash of the contract
- * @param h_wire hash of our wire details
- * @param timestamp time of the confirmation
- * @param refund refund deadline
- * @param total_amount total amount we receive for the contract after fees
- */
-static void
-transaction_double_check (void *cls,
-		          const struct TALER_MerchantPublicKeyP *merchant_pub,
-                          const char *exchange_uri,
-                          const struct GNUNET_HashCode *h_proposal_data,
-                          const struct GNUNET_HashCode *h_wire,
-                          struct GNUNET_TIME_Absolute timestamp,
-                          struct GNUNET_TIME_Absolute refund,
-                          const struct TALER_Amount *total_amount)
-{
-  return;
-}
-
 
 
 /**
@@ -968,7 +970,7 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_JSON_parse_free (spec);
     if (MHD_YES !=
         TMH_RESPONSE_reply_internal_error (connection,
-                                           TALER_EC_NONE,
+                                           TALER_EC_PAY_FAILED_COMPUTE_PROPOSAL_HASH,
                                            "Can not hash proposal"))
     {
       GNUNET_break (0);
@@ -984,10 +986,9 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_JSON_parse_free (spec);
     /* invalid contract */
     GNUNET_break (0);
-    // FIXME: define proper EC for this!
     if (MHD_YES !=
         TMH_RESPONSE_reply_internal_error (connection,
-                                           TALER_EC_NONE,
+                                           TALER_EC_PAY_MERCHANT_FIELD_MISSING,
                                            "No merchant field in contract"))
     {
       GNUNET_break (0);
@@ -1015,12 +1016,10 @@ parse_pay (struct MHD_Connection *connection,
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "/pay: picked instance %s with key %s\n",
               pc->mi->id,
-              GNUNET_STRINGS_data_to_string_alloc (&pc->mi->pubkey, sizeof (pc->mi->pubkey)));
+              GNUNET_STRINGS_data_to_string_alloc (&pc->mi->pubkey,
+                                                   sizeof (pc->mi->pubkey)));
 
   pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Parsed JSON for /pay.\n");
-
   {
     struct GNUNET_JSON_Specification espec[] = {
       GNUNET_JSON_spec_absolute_time ("refund_deadline",
@@ -1060,9 +1059,42 @@ parse_pay (struct MHD_Connection *connection,
     }
   }
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "parsed timestamps\n");
+  /* parse optional details */
+  {
+    struct GNUNET_JSON_Specification espec[] = {
+      TALER_JSON_spec_amount ("max_wire_fee",
+                              &pc->max_wire_fee),
+      GNUNET_JSON_spec_end()
+    };
 
+    res = TMH_PARSE_json_data (connection,
+                               pc->proposal_data,
+                               espec);
+    if (GNUNET_YES != res)
+    {
+      /* default is we cover no fee */
+      GNUNET_assert (GNUNET_OK ==
+                     TALER_amount_get_zero (pc->max_fee.currency,
+                                            &pc->max_wire_fee));
+    }
+  }
+  {
+    struct GNUNET_JSON_Specification espec[] = {
+      GNUNET_JSON_spec_uint32 ("wire_fee_amortization",
+                              &pc->wire_fee_amortization),
+      GNUNET_JSON_spec_end()
+    };
+
+    res = TMH_PARSE_json_data (connection,
+                               pc->proposal_data,
+                               espec);
+    if ( (GNUNET_YES != res) ||
+         (0 == pc->wire_fee_amortization) )
+    {
+      /* default is no amortization */
+      pc->wire_fee_amortization = 1;
+    }
+  }
 
   pc->coins_cnt = json_array_size (coins);
   if (0 == pc->coins_cnt)
@@ -1139,8 +1171,6 @@ handler_pay_json (struct MHD_Connection *connection,
                    pc);
   if (GNUNET_OK != ret)
     return ret;
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "parsed '/pay' body\n");
 
   /* Check if this payment attempt has already succeeded */
   if (GNUNET_SYSERR ==
@@ -1232,18 +1262,13 @@ handler_pay_json (struct MHD_Connection *connection,
 						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
 						"Merchant database error");
     }
-  if (GNUNET_OK != db->find_transaction (db->cls,
-                                         &pc->h_proposal_data,
-			                 &pc->mi->pubkey,
-                                         &transaction_double_check,
-                                         NULL))
-    GNUNET_break (0);
   }
 
   MHD_suspend_connection (connection);
 
   /* Find the responsible exchange, this may take a while... */
   pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,
+                                        NULL, /* FIXME: wire method! */
                                         &process_pay_with_exchange,
                                         pc);
 

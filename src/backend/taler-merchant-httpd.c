@@ -632,7 +632,7 @@ get_instance (struct json_t *json)
  * @param config configuration handle
  * @param allowed which wire format is allowed/expected?
  * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
- * (for example, if no "defaul" instance is defined)
+ * (for example, if no "default" instance is defined)
  */
 static unsigned int
 iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
@@ -716,7 +716,6 @@ run (void *cls,
   char *wireformat;
   int fh;
 
-  wireformat = NULL;
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
                                  NULL);
@@ -763,6 +762,7 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
+  wireformat = NULL;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (config,
                                              "merchant",
@@ -775,10 +775,10 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-
-  iterate_instances (config, wireformat);
-
+  iterate_instances (config,
+                     wireformat);
   GNUNET_free (wireformat);
+
   if (NULL ==
       (db = TALER_MERCHANTDB_plugin_load (config)))
   {
