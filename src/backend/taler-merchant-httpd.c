@@ -242,18 +242,23 @@ url_handler (void *cls,
 /**
  * Callback that frees all the elements in the hashmap
  *
- * @param cls closure
+ * @param cls closure, NULL
  * @param key current key
- * @param value current value
+ * @param value a `struct MerchantInstance`
  */
-int
+static int
 hashmap_free (void *cls,
               const struct GNUNET_HashCode *key,
               void *value)
 {
-  GNUNET_free (value);
+  struct MerchantInstance *mi = value;
+
+  json_decref (mi->j_wire);
+  GNUNET_free (mi->keyfile);
+  GNUNET_free (mi);
   return GNUNET_YES;
 }
+
 
 /**
  * Shutdown task (magically invoked when the application is being
@@ -286,9 +291,15 @@ do_shutdown (void *cls)
                                          &hashmap_free,
                                          NULL);
   if (NULL != by_id_map)
+  {
     GNUNET_CONTAINER_multihashmap_destroy (by_id_map);
+    by_id_map = NULL;
+  }
   if (NULL != by_kpub_map)
+  {
     GNUNET_CONTAINER_multihashmap_destroy (by_kpub_map);
+    by_kpub_map = NULL;
+  }
 }
 
 
@@ -467,6 +478,7 @@ instances_iterator_cb (void *cls,
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
                                "KEYFILE");
+    GNUNET_free (mi);
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
@@ -479,6 +491,8 @@ instances_iterator_cb (void *cls,
        (pk = GNUNET_CRYPTO_eddsa_key_create_from_file (mi->keyfile)))
   {
     GNUNET_break (0);
+    GNUNET_free (mi->keyfile);
+    GNUNET_free (mi);
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
@@ -535,7 +549,7 @@ instances_iterator_cb (void *cls,
   #endif
 
   GNUNET_CRYPTO_hash (mi->id,
-                      strlen(mi->id),
+                      strlen (mi->id),
                       &h_id);
   GNUNET_CRYPTO_hash (&mi->pubkey.eddsa_pub,
                       sizeof (struct GNUNET_CRYPTO_EddsaPublicKey),
@@ -550,18 +564,6 @@ instances_iterator_cb (void *cls,
                 "Failed to put an entry into the 'by_id' hashmap\n");
     iic->ret |= GNUNET_SYSERR;
   }
-  #ifdef EXTRADEBUG
-  else {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Added element at %p, by by-id key %s of '%s' in hashmap\n",
-                mi,
-                GNUNET_h2s (&h_id),
-                mi->id);
-    GNUNET_assert (NULL != GNUNET_CONTAINER_multihashmap_get (by_id_map,
-                                                              &h_id));
-  }
-  #endif
-
   if (GNUNET_OK !=
       GNUNET_CONTAINER_multihashmap_put (by_kpub_map,
                                          &h_pk,
@@ -633,7 +635,7 @@ get_instance (struct json_t *json)
  *
  * @param config configuration handle
  * @param allowed which wire format is allowed/expected?
- * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
+ * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  * (for example, if no "defaul" instance is defined)
  */
 static unsigned int
@@ -688,7 +690,8 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   GNUNET_free (iic);
   return GNUNET_OK;
 
-  fail: do {
+ fail:
+  do {
     GNUNET_PLUGIN_unload (lib_name,
                           iic->plugin);
     GNUNET_free (lib_name);
