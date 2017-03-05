@@ -347,10 +347,11 @@ sign_success_response (struct PayContext *pc)
                             &mr.purpose,
 			    &sig);
 
-  return TMH_RESPONSE_make_json_pack ("{s:O, s:s, s:o}",
-                                      "proposal_data", pc->proposal_data,
+  return TMH_RESPONSE_make_json_pack ("{s:O, s:o, s:o}",
+                                      "proposal_data",
+                                      pc->proposal_data,
                                       "sig",
-                                      json_string_value (GNUNET_JSON_from_data_auto (&sig)),
+                                      GNUNET_JSON_from_data_auto (&sig),
                                       "h_proposal_data",
                                       GNUNET_JSON_from_data (&pc->h_proposal_data,
                                                              sizeof (struct GNUNET_HashCode)));
@@ -451,9 +452,9 @@ deposit_cb (void *cls,
 
   if (0 != pc->pending)
     return; /* still more to do */
-
-
-  resume_pay_with_response (pc, MHD_HTTP_OK, sign_success_response (pc));
+  resume_pay_with_response (pc,
+                            MHD_HTTP_OK,
+                            sign_success_response (pc));
 }
 
 
@@ -914,7 +915,9 @@ transaction_double_check (void *cls,
  * @return #GNUNET_YES on success
  */
 static int
-parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *pc)
+parse_pay (struct MHD_Connection *connection,
+           const json_t *root,
+           struct PayContext *pc)
 {
   json_t *coins;
   json_t *coin;
@@ -940,19 +943,17 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
     GNUNET_break (0);
     return res;
   }
-
   res = db->find_proposal_data (db->cls,
                                 &pc->proposal_data,
                                 order_id,
                                 &merchant_pub);
-
-
   if (GNUNET_OK != res)
   {
-
-    if (MHD_YES != TMH_RESPONSE_reply_not_found (connection,
-                                                 TALER_EC_PAY_DB_STORE_PAY_ERROR,
-                                                 "Proposal not found"))
+    GNUNET_JSON_parse_free (spec);
+    if (MHD_YES !=
+        TMH_RESPONSE_reply_not_found (connection,
+                                      TALER_EC_PAY_DB_STORE_PAY_ERROR,
+                                      "Proposal not found"))
     {
       GNUNET_break (0);
       return GNUNET_SYSERR;
@@ -960,12 +961,15 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
     return GNUNET_NO;
   }
 
-
-  if (GNUNET_OK != TALER_JSON_hash (pc->proposal_data, &pc->h_proposal_data))
+  if (GNUNET_OK !=
+      TALER_JSON_hash (pc->proposal_data,
+                       &pc->h_proposal_data))
   {
-    if (MHD_YES != TMH_RESPONSE_reply_internal_error (connection,
-                                                      TALER_EC_NONE,
-                                                      "Can not hash proposal"))
+    GNUNET_JSON_parse_free (spec);
+    if (MHD_YES !=
+        TMH_RESPONSE_reply_internal_error (connection,
+                                           TALER_EC_NONE,
+                                           "Can not hash proposal"))
     {
       GNUNET_break (0);
       return GNUNET_SYSERR;
@@ -973,15 +977,18 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
     return GNUNET_NO;
   }
 
-
-  merchant = json_object_get (pc->proposal_data, "merchant");
+  merchant = json_object_get (pc->proposal_data,
+                              "merchant");
   if (NULL == merchant)
   {
-    // invalid contract:
+    GNUNET_JSON_parse_free (spec);
+    /* invalid contract */
     GNUNET_break (0);
-    if (MHD_YES != TMH_RESPONSE_reply_internal_error (connection,
-                                                      TALER_EC_NONE,
-                                                      "No merchant field in contract"))
+    // FIXME: define proper EC for this!
+    if (MHD_YES !=
+        TMH_RESPONSE_reply_internal_error (connection,
+                                           TALER_EC_NONE,
+                                           "No merchant field in contract"))
     {
       GNUNET_break (0);
       return GNUNET_SYSERR;
@@ -994,6 +1001,7 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Not able to find the specified instance\n");
+    GNUNET_JSON_parse_free (spec);
     if (MHD_NO == TMH_RESPONSE_reply_not_found (connection,
                                                 TALER_EC_PAY_INSTANCE_UNKNOWN,
                                                 "Unknown instance given"))
@@ -1012,8 +1020,6 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
   pc->chosen_exchange = GNUNET_strdup (chosen_exchange);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Parsed JSON for /pay.\n");
-
-
 
   {
     struct GNUNET_JSON_Specification espec[] = {
@@ -1040,7 +1046,9 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
 
-    pc->wire_transfer_deadline = GNUNET_TIME_absolute_add (pc->timestamp, wire_transfer_delay);
+    pc->wire_transfer_deadline
+      = GNUNET_TIME_absolute_add (pc->timestamp,
+                                  wire_transfer_delay);
 
     if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
     {
@@ -1052,7 +1060,8 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
     }
   }
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "parsed timestamps\n");
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "parsed timestamps\n");
 
 
   pc->coins_cnt = json_array_size (coins);
@@ -1086,7 +1095,6 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
     if (GNUNET_YES != res)
     {
       GNUNET_JSON_parse_free (spec);
-      json_decref (root);
       GNUNET_break (0);
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
@@ -1106,12 +1114,10 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
     dc->pc = pc;
   }
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "parsed coins\n");
-
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "parsed coins\n");
   pc->pending = pc->coins_cnt;
-
   GNUNET_JSON_parse_free (spec);
-
   return GNUNET_OK;
 }
 
@@ -1121,14 +1127,16 @@ parse_pay (struct MHD_Connection *connection, json_t *root, struct PayContext *p
  */
 static int
 handler_pay_json (struct MHD_Connection *connection,
-                  json_t *root,
+                  const json_t *root,
                   struct PayContext *pc)
 {
   int ret;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "about to parse '/pay' body\n");
-
-  ret = parse_pay (connection, root, pc);
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "about to parse '/pay' body\n");
+  ret = parse_pay (connection,
+                   root,
+                   pc);
   if (GNUNET_OK != ret)
     return ret;
 
@@ -1229,7 +1237,7 @@ handler_pay_json (struct MHD_Connection *connection,
 			                 &pc->mi->pubkey,
                                          &transaction_double_check,
                                          NULL))
-    GNUNET_break (0);                                         
+    GNUNET_break (0);
   }
 
   MHD_suspend_connection (connection);
@@ -1301,11 +1309,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     res = MHD_queue_response (connection,
 			      pc->response_code,
 			      pc->response);
-    if (NULL != pc->response)
-    {
-      MHD_destroy_response (pc->response);
-      pc->response = NULL;
-    }
+    MHD_destroy_response (pc->response);
+    pc->response = NULL;
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 		"Queueing response (%u) for /pay (%s).\n",
 		(unsigned int) pc->response_code,
@@ -1332,7 +1337,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES; /* the POST's body has to be further fetched */
 
-  res = handler_pay_json (connection, root, pc);
+  res = handler_pay_json (connection,
+                          root,
+                          pc);
   json_decref (root);
   if (GNUNET_SYSERR == res)
     return MHD_NO;

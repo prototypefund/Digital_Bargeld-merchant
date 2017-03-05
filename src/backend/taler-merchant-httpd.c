@@ -254,6 +254,7 @@ hashmap_free (void *cls,
   struct MerchantInstance *mi = value;
 
   json_decref (mi->j_wire);
+  GNUNET_free (mi->id);
   GNUNET_free (mi->keyfile);
   GNUNET_free (mi);
   return GNUNET_YES;
@@ -501,11 +502,6 @@ instances_iterator_cb (void *cls,
                                       &mi->pubkey.eddsa_pub);
   GNUNET_free (pk);
 
-  /**
-   * FIXME: 'token' must NOT be freed, as it is handled by the
-   * gnunet_configuration facility. OTOH mi->id does need to be freed,
-   * because it is a duplicate.
-   */
   mi->id = GNUNET_strdup (token + 1);
   if (0 == strcmp ("default", mi->id))
     iic->default_instance = GNUNET_YES;

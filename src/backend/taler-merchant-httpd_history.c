@@ -78,11 +78,11 @@ pd_cb (void *cls,
                 current,
                 start,
                 delta);
-    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:O, s:s, s:s}",
+    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:O, s:O, s:O}",
                                               "order_id", order_id,
                                               "amount", amount,
-                                              "timestamp", json_string_value (timestamp),
-                                              "instance", json_string_value (instance))));
+                                              "timestamp", timestamp,
+                                              "instance", instance)));
 
     GNUNET_break (0 == json_array_append_new (response,
                                               entry));
@@ -128,17 +128,22 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   if (NULL != str)
   {
     if (1 != sscanf (str, "%llu", &seconds))
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-					   TALER_EC_PARAMETER_MALFORMED,
-                                           "date");
+    {
+      json_decref (response);
+      return TMH_RESPONSE_reply_arg_invalid (connection,
+                                             TALER_EC_PARAMETER_MALFORMED,
+                                             "date");
+    }
   }
 
   date.abs_value_us = seconds * 1000LL * 1000LL;
   if (date.abs_value_us / 1000LL / 1000LL != seconds)
+  {
+    json_decref (response);
     return TMH_RESPONSE_reply_bad_request (connection,
                                            TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
                                            "Timestamp overflowed");
-
+  }
 
 
   mi = TMH_lookup_instance ("default");
@@ -149,10 +154,12 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     mi = TMH_lookup_instance (str);
 
   if (NULL == mi)
+  {
+    json_decref (response);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_HISTORY_INSTANCE_UNKNOWN,
                                          "instance");
-
+  }
   start = 0;
   delta = 20;
 
@@ -163,9 +170,12 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   {
     if ((1 != sscanf (str, "%d", &start)) ||
         start < 0)
+    {
+      json_decref (response);
       return TMH_RESPONSE_reply_arg_invalid (connection,
                                              TALER_EC_PARAMETER_MALFORMED,
                                              "start");
+    }
   }
 
   str = MHD_lookup_connection_value (connection,
@@ -191,17 +201,21 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                         response);
   current = 0;
   if (GNUNET_SYSERR == ret)
+  {
+    json_decref (response);
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_HISTORY_DB_FETCH_ERROR,
 					      "db error to get history");
-
+  }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "history data: %s\n",
               json_dumps (response, JSON_INDENT (1)));
 
-  return TMH_RESPONSE_reply_json (connection,
-                                  response,
-                                  MHD_HTTP_OK);
+  ret = TMH_RESPONSE_reply_json (connection,
+                                 response,
+                                 MHD_HTTP_OK);
+  json_decref (response);
+  return ret;
 }
 
 /* end of taler-merchant-httpd_history.c */

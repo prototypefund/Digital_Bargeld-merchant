@@ -127,8 +127,9 @@ get_instance (struct json_t *json);
  * @param order to process
  * @return MHD result code
  */
-int
-proposal_put (struct MHD_Connection *connection, json_t *order)
+static int
+proposal_put (struct MHD_Connection *connection,
+              json_t *order)
 {
   int res;
   struct MerchantInstance *mi;
@@ -171,7 +172,7 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
 
     off = strftime (buf, sizeof (buf), "%H:%M:%S", tm_info);
     snprintf (buf + off, sizeof (buf) - off,
-              "-%llX", 
+              "-%llX",
               (long long unsigned) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX));
     json_object_set (order, "order_id", json_string (buf));
   }
@@ -210,7 +211,7 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
 					      TALER_EC_NONE,
 					      "Impossible to parse the order");
   }
-    
+
 
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))
@@ -225,7 +226,7 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
   if (NULL == mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Not able to find the specified instance\n"); 
+                "Not able to find the specified instance\n");
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
 					 "Unknown instance given");
@@ -272,7 +273,7 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
                                               TALER_EC_PROPOSAL_STORE_DB_ERROR,
                                               "db error: could not store this proposal's data into db");
   }
-  
+
 
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
@@ -396,7 +397,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                 order_id,
                                 &mi->pubkey);
   if (GNUNET_NO == res)
-    return TMH_RESPONSE_reply_not_found (connection, 
+    return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
                                          "unknown transaction id");
 
@@ -405,10 +406,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                               TALER_EC_PROPOSAL_LOOKUP_DB_ERROR,
                                               "An error occurred while retrieving proposal data from db");
 
-  
+
   return TMH_RESPONSE_reply_json (connection,
                                   proposal_data,
-                                  MHD_HTTP_OK); 
+                                  MHD_HTTP_OK);
 
 
 }
