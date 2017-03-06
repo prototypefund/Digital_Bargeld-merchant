@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA
+  (C) 2014-2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -881,41 +881,57 @@ run (void *cls,
 
       un = GNUNET_new (struct sockaddr_un);
       un->sun_family = AF_UNIX;
-      strncpy (un->sun_path, serve_unixpath, sizeof (un->sun_path) - 1);
+      strncpy (un->sun_path,
+               serve_unixpath,
+               sizeof (un->sun_path) - 1);
 
       GNUNET_NETWORK_unix_precheck (un);
 
-      if (NULL == (nh = GNUNET_NETWORK_socket_create (AF_UNIX, SOCK_STREAM, 0)))
+      if (NULL == (nh = GNUNET_NETWORK_socket_create (AF_UNIX,
+                                                      SOCK_STREAM,
+                                                      0)))
       {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR, "create(for AF_UNIX)");
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                             "socket(AF_UNIX)");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      if (GNUNET_OK != GNUNET_NETWORK_socket_bind (nh, (void *) un, sizeof (struct sockaddr_un)))
+      if (GNUNET_OK !=
+          GNUNET_NETWORK_socket_bind (nh,
+                                      (void *) un,
+                                      sizeof (struct sockaddr_un)))
       {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR, "bind(for AF_UNIX)");
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                             "bind(AF_UNIX)");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      if (GNUNET_OK != GNUNET_NETWORK_socket_listen (nh, UNIX_BACKLOG))
+      if (GNUNET_OK !=
+          GNUNET_NETWORK_socket_listen (nh,
+                                        UNIX_BACKLOG))
       {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR, "listen(for AF_UNIX)");
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                             "listen(AF_UNIX)");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
 
       fh = GNUNET_NETWORK_get_fd (nh);
-      if (0 != chmod (serve_unixpath, unixpath_mode))
+      GNUNET_NETWORK_socket_free_memory_only_ (nh);
+      if (0 != chmod (serve_unixpath,
+                      unixpath_mode))
       {
-        fprintf (stderr, "chmod failed: %s\n", strerror (errno));
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                             "chmod");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      GNUNET_NETWORK_socket_free_memory_only_ (nh);
       port = 0;
     }
     else if (0 == strcmp (serve_type, "tcp"))
     {
+      char *bind_to;
+
       if (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_number (config,
                                                  "merchant",
@@ -928,7 +944,81 @@ run (void *cls,
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      fh = -1;
+      if (GNUNET_OK ==
+          GNUNET_CONFIGURATION_get_value_string (config,
+                                                 "merchant",
+                                                 "BIND_TO",
+                                                 &bind_to))
+      {
+        char port_str[6];
+        struct addrinfo hints;
+        struct addrinfo *res;
+        int ec;
+        struct GNUNET_NETWORK_Handle *nh;
+
+        GNUNET_snprintf (port_str,
+                         sizeof (port_str),
+                         "%u",
+                         (uint16_t) port);
+        memset (&hints, 0, sizeof (hints));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+        hints.ai_flags = AI_PASSIVE | AI_IDN;
+        if (0 !=
+            (ec = getaddrinfo (bind_to,
+                               port_str,
+                               &hints,
+                               &res)))
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Failed to resolve BIND_TO address `%s': %s\n",
+                      bind_to,
+                      gai_strerror (ec));
+          GNUNET_free (bind_to);
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+        GNUNET_free (bind_to);
+
+        if (NULL == (nh = GNUNET_NETWORK_socket_create (res->ai_family,
+                                                        res->ai_socktype,
+                                                        res->ai_protocol)))
+        {
+          GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                               "socket");
+          freeaddrinfo (res);
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+        if (GNUNET_OK !=
+            GNUNET_NETWORK_socket_bind (nh,
+                                        res->ai_addr,
+                                        res->ai_addrlen))
+        {
+          GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                               "bind");
+          freeaddrinfo (res);
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+        freeaddrinfo (res);
+        if (GNUNET_OK !=
+            GNUNET_NETWORK_socket_listen (nh,
+                                          UNIX_BACKLOG))
+        {
+          GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                               "listen");
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+        fh = GNUNET_NETWORK_get_fd (nh);
+        GNUNET_NETWORK_socket_free_memory_only_ (nh);
+      }
+      else
+      {
+        fh = -1;
+      }
     }
     else
     {
@@ -936,15 +1026,13 @@ run (void *cls,
       GNUNET_assert (0);
     }
   }
-  mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
+  mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME | MHD_USE_DUAL_STACK,
                           port,
                           NULL, NULL,
                           &url_handler, NULL,
                           MHD_OPTION_LISTEN_SOCKET, fh,
-                          MHD_OPTION_NOTIFY_COMPLETED,
-                          &handle_mhd_completion_callback, NULL,
-                          MHD_OPTION_CONNECTION_TIMEOUT,
-                          (unsigned int) 10 /* 10s */,
+                          MHD_OPTION_NOTIFY_COMPLETED, &handle_mhd_completion_callback, NULL,
+                          MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 10 /* 10s */,
                           MHD_OPTION_END);
   if (NULL == mhd)
   {
