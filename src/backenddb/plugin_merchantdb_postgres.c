@@ -1350,7 +1350,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   pg->conn = GNUNET_POSTGRES_connect (cfg, "merchantdb-postgres");
   if (NULL == pg->conn)
   {
-    GNUNET_break (0);
+    GNUNET_free (pg);
     return NULL;
   }
   plugin = GNUNET_new (struct TALER_MERCHANTDB_Plugin);
