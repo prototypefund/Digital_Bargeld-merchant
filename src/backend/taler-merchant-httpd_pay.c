@@ -914,7 +914,13 @@ get_instance (struct json_t *json);
  *
  * Schedules an error response in the connection on failure.
  *
- * @return #GNUNET_YES on success
+ *
+ * @param connection HTTP connection we are receiving payment on
+ * @param root JSON upload with payment data
+ * @param pc context we use to handle the payment
+ * @return #GNUNET_OK on success,
+ *         #GNUNET_NO on failure (response was queued with MHD)
+ *         #GNUNET_SYSERR on hard error (MHD connection must be dropped)
  */
 static int
 parse_pay (struct MHD_Connection *connection,
@@ -1162,6 +1168,12 @@ parse_pay (struct MHD_Connection *connection,
 
 /**
  * Process a payment for a proposal.
+ *
+ * @param connection HTTP connection we are receiving payment on
+ * @param root JSON upload with payment data
+ * @param pc context we use to handle the payment
+ * @return value to return to MHD (#MHD_NO to drop connection,
+ *         #MHD_YES to keep handling it)
  */
 static int
 handler_pay_json (struct MHD_Connection *connection,
@@ -1176,7 +1188,7 @@ handler_pay_json (struct MHD_Connection *connection,
                    root,
                    pc);
   if (GNUNET_OK != ret)
-    return ret;
+    return (GNUNET_NO == ret) ? MHD_YES : MHD_NO;
 
   /* Check if this payment attempt has already succeeded */
   if (GNUNET_SYSERR ==
@@ -1287,7 +1299,7 @@ handler_pay_json (struct MHD_Connection *connection,
   pc->timeout_task = GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT,
                                                    &handle_pay_timeout,
                                                    pc);
-  return GNUNET_OK;
+  return MHD_YES;
 }
 
 
