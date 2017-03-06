@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016, 2017 GNUnet e.V. and INRIA
+  (C) 2014-2017 GNUnet e.V. and INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -1060,6 +1060,8 @@ parse_pay (struct MHD_Connection *connection,
   }
 
   /* parse optional details */
+  if (NULL != json_object_get (pc->proposal_data,
+                               "max_wire_fee"))
   {
     struct GNUNET_JSON_Specification espec[] = {
       TALER_JSON_spec_amount ("max_wire_fee",
@@ -1072,12 +1074,15 @@ parse_pay (struct MHD_Connection *connection,
                                espec);
     if (GNUNET_YES != res)
     {
+      GNUNET_break_op (0); /* invalid input, use default */
       /* default is we cover no fee */
       GNUNET_assert (GNUNET_OK ==
                      TALER_amount_get_zero (pc->max_fee.currency,
                                             &pc->max_wire_fee));
     }
   }
+  if (NULL != json_object_get (pc->proposal_data,
+                               "wire_fee_amortization"))
   {
     struct GNUNET_JSON_Specification espec[] = {
       GNUNET_JSON_spec_uint32 ("wire_fee_amortization",
@@ -1091,6 +1096,7 @@ parse_pay (struct MHD_Connection *connection,
     if ( (GNUNET_YES != res) ||
          (0 == pc->wire_fee_amortization) )
     {
+      GNUNET_break_op (0); /* invalid input, use default */
       /* default is no amortization */
       pc->wire_fee_amortization = 1;
     }
