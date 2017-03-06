@@ -507,14 +507,14 @@ Which currency the Web shop deals in, i.e. ``EUR'' or ``USD'', is specified usin
 @cindex currency
 @cindex KUDOS
 @example
-[merchant]/currency
+[taler]/currency
 @end example
 
 For testing purposes, the currency MUST match ``KUDOS'' so that tests will work
 with the Taler demonstration exchange at @url{https://exchange.demo.taler.net/}:
 
 @example
-$ taler-config -s merchant -o currency -V KUDOS
+$ taler-config -s taler -o currency -V KUDOS
 @end example
 
 @item Database

@@ -315,28 +315,6 @@ resume_pay_with_response (struct PayContext *pc,
 
 
 /**
- * Convert denomination key to its base32 representation
- *
- * @param dk denomination key to convert
- * @return 0-terminated base32 encoding of @a dk, to be deallocated
- */
-static char *
-denomination_to_string_alloc (struct TALER_DenominationPublicKey *dk)
-{
-  char *buf;
-  char *buf2;
-  size_t buf_size;
-
-  buf_size = GNUNET_CRYPTO_rsa_public_key_encode (dk->rsa_public_key,
-                                                  &buf);
-  buf2 = GNUNET_STRINGS_data_to_string_alloc (buf,
-                                              buf_size);
-  GNUNET_free (buf);
-  return buf2;
-}
-
-
-/**
  * Abort all pending /deposit operations.
  *
  * @param pc pay context to abort
@@ -572,6 +550,8 @@ process_pay_with_exchange (void *cls,
   struct PayContext *pc = cls;
   struct TALER_Amount acc_fee;
   struct TALER_Amount acc_amount;
+  struct TALER_Amount wire_fee_delta;
+  struct TALER_Amount wire_fee_customer_contribution;
   const struct TALER_EXCHANGE_Keys *keys;
   unsigned int i;
 
@@ -609,8 +589,6 @@ process_pay_with_exchange (void *cls,
 							 &dc->denom);
     if (NULL == denom_details)
     {
-      char *denom_enc;
-
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
@@ -619,11 +597,6 @@ process_pay_with_exchange (void *cls,
 							     "code", TALER_EC_PAY_DENOMINATION_KEY_NOT_FOUND,
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key),
                                                              "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
-      denom_enc = denomination_to_string_alloc (&dc->denom);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "unknown denom to exchange: %s\n",
-                  denom_enc);
-      GNUNET_free (denom_enc);
       return;
     }
     if (GNUNET_OK !=
@@ -631,8 +604,6 @@ process_pay_with_exchange (void *cls,
                                denom_details,
                                exchange_trusted))
     {
-      char *denom_enc;
-
       GNUNET_break_op (0);
       resume_pay_with_response (pc,
                                 MHD_HTTP_BAD_REQUEST,
@@ -640,11 +611,6 @@ process_pay_with_exchange (void *cls,
                                                              "error", "invalid denomination",
 							     "code", (json_int_t) TALER_EC_PAY_DENOMINATION_KEY_AUDITOR_FAILURE,
                                                              "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
-      denom_enc = denomination_to_string_alloc (&dc->denom);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Client offered invalid denomination: %s\n",
-                  denom_enc);
-      GNUNET_free (denom_enc);
       return;
     }
     dc->deposit_fee = denom_details->fee_deposit;
@@ -690,6 +656,38 @@ process_pay_with_exchange (void *cls,
     }
   }
 
+  /* Now compare exchange wire fee compared to what we are willing to pay */
+  if (GNUNET_YES !=
+      TALER_amount_cmp_currency (wire_fee,
+                                 &pc->max_wire_fee))
+  {
+    GNUNET_break (0);
+    resume_pay_with_response (pc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
+                              TMH_RESPONSE_make_internal_error (TALER_EC_PAY_WIRE_FEE_CURRENCY_MISSMATCH,
+                                                                "wire_fee"));
+    return;
+  }
+
+  if (GNUNET_OK ==
+      TALER_amount_subtract (&wire_fee_delta,
+                             wire_fee,
+                             &pc->max_wire_fee))
+  {
+    /* Actual wire fee is indeed higher than our maximum, compute
+       how much the customer is expected to cover! */
+    TALER_amount_divide (&wire_fee_customer_contribution,
+                         &wire_fee_delta,
+                         pc->wire_fee_amortization);
+  }
+  else
+  {
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_amount_get_zero (wire_fee->currency,
+                                          &wire_fee_customer_contribution));
+
+  }
+
   /* Now check that the customer paid enough for the full contract */
   if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
@@ -716,6 +714,12 @@ process_pay_with_exchange (void *cls,
 								  "overflow"));
       return;
     }
+    /* add wire fee contribution to the total */
+    if (GNUNET_OK ==
+        TALER_amount_add (&total_needed,
+                          &total_needed,
+                          &wire_fee_customer_contribution))
+
     /* check if total payment sufficies */
     if (-1 == TALER_amount_cmp (&acc_amount,
                                 &total_needed))
@@ -730,7 +734,40 @@ process_pay_with_exchange (void *cls,
   }
   else
   {
-    /* fees are acceptable, we cover them all; let's check the amount */
+    struct TALER_Amount deposit_fee_savings;
+
+    /* Compute how much the customer saved by not going to the
+       limit on the deposit fees, as this amount is counted against
+       what we expect him to cover for the wire fees */
+    GNUNET_assert (GNUNET_SYSERR !=
+                   TALER_amount_subtract (&deposit_fee_savings,
+                                          &pc->max_fee,
+                                          &acc_fee));
+    /* See how much of wire fee contribution is covered by fee_savings */
+    if (-1 == TALER_amount_cmp (&deposit_fee_savings,
+                                &wire_fee_customer_contribution))
+    {
+      /* wire_fee_customer_contribution > deposit_fee_savings */
+      GNUNET_assert (GNUNET_SYSERR !=
+                     TALER_amount_subtract (&wire_fee_customer_contribution,
+                                            &wire_fee_customer_contribution,
+                                            &deposit_fee_savings));
+      /* subtract remaining wire fees from total contribution */
+      if (GNUNET_SYSERR ==
+          TALER_amount_subtract (&acc_amount,
+                                 &acc_amount,
+                                 &wire_fee_customer_contribution))
+      {
+        GNUNET_break_op (0);
+        resume_pay_with_response (pc,
+                                  MHD_HTTP_METHOD_NOT_ACCEPTABLE,
+                                  TMH_RESPONSE_make_external_error (TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES,
+                                                                    "insufficient funds (including excessive exchange fees to be covered by customer)"));
+        return;
+      }
+    }
+
+    /* fees are acceptable, merchant covers them all; let's check the amount */
     if (-1 == TALER_amount_cmp (&acc_amount,
                                 &pc->amount))
     {
@@ -745,8 +782,6 @@ process_pay_with_exchange (void *cls,
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Exchange and fee structure OK. Initiating deposit operation for coins\n");
-
-
 
   /* Initiate /deposit operation for all coins */
   for (i=0;i<pc->coins_cnt;i++)
@@ -1072,7 +1107,7 @@ parse_pay (struct MHD_Connection *connection,
   /* NOTE: In the future, iterate over all wire hashes
      available to a given instance here! (#4939) */
   if (0 != memcmp (&pc->h_wire,
-                   &mi->h_wire,
+                   &pc->mi->h_wire,
                    sizeof (struct GNUNET_HashCode)))
   {
     GNUNET_break (0);
@@ -1104,6 +1139,13 @@ parse_pay (struct MHD_Connection *connection,
                                             &pc->max_wire_fee));
     }
   }
+  else
+  {
+    /* default is we cover no fee */
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_amount_get_zero (pc->max_fee.currency,
+                                          &pc->max_wire_fee));
+  }
   if (NULL != json_object_get (pc->proposal_data,
                                "wire_fee_amortization"))
   {
@@ -1123,6 +1165,10 @@ parse_pay (struct MHD_Connection *connection,
       /* default is no amortization */
       pc->wire_fee_amortization = 1;
     }
+  }
+  else
+  {
+    pc->wire_fee_amortization = 1;
   }
 
   pc->coins_cnt = json_array_size (coins);
@@ -1287,7 +1333,7 @@ handler_pay_json (struct MHD_Connection *connection,
 
   /* Find the responsible exchange, this may take a while... */
   pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,
-                                        NULL, /* FIXME: wire method! */
+                                        pc->mi->wire_method,
                                         &process_pay_with_exchange,
                                         pc);
 
@@ -1378,7 +1424,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     GNUNET_break (0);
     return TMH_RESPONSE_reply_invalid_json (connection);
   }
-  if ((GNUNET_NO == res) || (NULL == root))
+  if ( (GNUNET_NO == res) ||
+       (NULL == root) )
     return MHD_YES; /* the POST's body has to be further fetched */
 
   res = handler_pay_json (connection,

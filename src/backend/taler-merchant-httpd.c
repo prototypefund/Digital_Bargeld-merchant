@@ -73,6 +73,17 @@ static long long unsigned port;
 struct GNUNET_TIME_Relative wire_transfer_delay;
 
 /**
+ * Default maximum wire fee to assume, unless stated differently in the proposal
+ * already.
+ */
+struct TALER_Amount default_max_wire_fee;
+
+/**
+ * Default factor for wire fee amortization.
+ */
+unsigned long long default_wire_fee_amortization;
+
+/**
  * Should a "Connection: close" header be added to each HTTP response?
  */
 int TMH_merchant_connection_close;
@@ -275,6 +286,10 @@ do_shutdown (void *cls)
     GNUNET_SCHEDULER_cancel (mhd_task);
     mhd_task = NULL;
   }
+  /* FIXME: MHD API requires us to resume all suspended
+     connections before we do this, but /pay currently
+     suspends connections without giving us a way to
+     enumerate / resume them... */
   if (NULL != mhd)
   {
     MHD_stop_daemon (mhd);
@@ -446,13 +461,15 @@ instances_iterator_cb (void *cls,
   /* used as hashmap keys */
   struct GNUNET_HashCode h_pk;
   struct GNUNET_HashCode h_id;
+  json_t *type;
   char *emsg;
 
   iic = cls;
   substr = strstr (section, "merchant-instance-");
 
-  if ((NULL == substr)
-      || (NULL != strstr (section, "merchant-instance-wireformat-")))
+  if ( (NULL == substr) ||
+       (NULL != strstr (section,
+                        "merchant-instance-wireformat-")) )
     return;
 
   if (substr != section)
@@ -509,11 +526,19 @@ instances_iterator_cb (void *cls,
   GNUNET_asprintf (&instance_wiresection,
                    "merchant-instance-wireformat-%s",
                    mi->id);
-
   mi->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
                                               iic->config,
                                               instance_wiresection);
   GNUNET_free (instance_wiresection);
+  if ( (NULL == (type = json_object_get (mi->j_wire,
+                                         "type"))) ||
+       (! json_is_string (type)) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Malformed wireformat: lacks type\n");
+    iic->ret |= GNUNET_SYSERR;
+  }
+  mi->wire_method = json_string_value (type);
 
   if (TALER_EC_NONE !=
       iic->plugin->wire_validate (iic->plugin->cls,
@@ -521,7 +546,6 @@ instances_iterator_cb (void *cls,
                                   NULL,
                                   &emsg))
   {
-
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Malformed wireformat: %s\n",
                 emsg);
@@ -762,6 +786,55 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
+
+  if (GNUNET_OK !=
+      TALER_config_get_denom (config,
+                              "merchant",
+                              "DEFAULT_MAX_WIRE_FEE",
+                              &default_max_wire_fee))
+  {
+    char *currency;
+
+    if (GNUNET_OK !=
+        GNUNET_CONFIGURATION_get_value_string (config,
+                                               "taler",
+                                               "CURRENCY",
+                                               &currency))
+    {
+      GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                                 "taler",
+                                 "CURRENCY");
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+    if (GNUNET_OK !=
+        TALER_amount_get_zero (currency,
+                               &default_max_wire_fee))
+    {
+      GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                 "taler",
+                                 "CURRENCY",
+                                 "Specified value not legal for a Taler currency");
+      GNUNET_SCHEDULER_shutdown ();
+      GNUNET_free (currency);
+      return;
+    }
+    GNUNET_free (currency);
+  }
+
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_number (config,
+                                             "merchant",
+                                             "DEFAULT_WIRE_FEE_AMORTIZATION",
+                                             &default_wire_fee_amortization))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "DEFAULT_WIRE_FEE_AMORTIZATION");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
   wireformat = NULL;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (config,

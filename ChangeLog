@@ -1,3 +1,8 @@
+Mon Mar  6 17:57:51 CET 2017
+	Add support for wire fee calculations to /pay handling (#4935),
+	and adding setting "max_wire_fee" and "wire_fee_amortization"
+	in contract from defaults. -CG
+
 Mon Mar  6 00:59:25 CET 2017
 	Implement BIND_TO option to allow binding backend to a particular
 	IP address (#4752).  Enabling use of dual-stack by default. -CG

@@ -354,6 +354,40 @@ process_wire_fees (void *cls,
 
 
 /**
+ * Obtain applicable fees for @a exchange and @a wire_method.
+ *
+ * @param exchange the exchange to query
+ * @param now current time
+ * @param wire_method the wire method we want the fees for
+ * @return NULL if we do not have fees for this method yet
+ */
+static struct TALER_EXCHANGE_WireAggregateFees *
+get_wire_fees (struct Exchange *exchange,
+               struct GNUNET_TIME_Absolute now,
+               const char *wire_method)
+{
+  for (struct FeesByWireMethod *fbw = exchange->wire_fees_head;
+       NULL != fbw;
+       fbw = fbw->next)
+    if (0 == strcasecmp (fbw->wire_method,
+                         wire_method) )
+    {
+      struct TALER_EXCHANGE_WireAggregateFees *af;
+
+      /* Advance through list up to current time */
+      while ( (NULL != (af = fbw->af)) &&
+              (now.abs_value_us >= af->end_date.abs_value_us) )
+      {
+        fbw->af = af->next;
+        GNUNET_free (af);
+      }
+      return af;
+    }
+  return NULL;
+}
+
+
+/**
  * Check if we have any remaining pending requests for the
  * given @a exchange, and if we have the required data, call
  * the callback.
@@ -378,26 +412,12 @@ process_find_operations (struct Exchange *exchange)
     fn = fo->next;
     if (NULL != fo->wire_method)
     {
-      struct FeesByWireMethod *fbw;
       struct TALER_EXCHANGE_WireAggregateFees *af;
 
       /* Find fee structure for our wire method */
-      for (fbw = exchange->wire_fees_head; NULL != fbw; fbw = fbw->next)
-        if (0 == strcasecmp (fbw->wire_method,
-                             fo->wire_method) )
-          break;
-      if (NULL == fbw)
-      {
-        need_wire = GNUNET_YES;
-        continue;
-      }
-      /* Advance through list up to current time */
-      while ( (NULL != (af = fbw->af)) &&
-              (now.abs_value_us >= af->end_date.abs_value_us) )
-      {
-        fbw->af = af->next;
-        GNUNET_free (af);
-      }
+      af = get_wire_fees (exchange,
+                          now,
+                          fo->wire_method);
       if (NULL == af)
       {
         need_wire = GNUNET_YES;
@@ -479,18 +499,40 @@ handle_wire_data (void *cls,
     return;
   }
   if (GNUNET_OK !=
-      TALER_EXCHANGE_wire_get_fees (&exchange->master_pub,
+      TALER_EXCHANGE_wire_get_fees (&TALER_EXCHANGE_get_keys (exchange->conn)->master_pub,
                                     obj,
                                     &process_wire_fees,
                                     exchange))
   {
+    /* Report hard failure to all callbacks! */
+    struct TMH_EXCHANGES_FindOperation *fo;
+
     GNUNET_break_op (0);
+    while (NULL != (fo = exchange->fo_head))
+    {
+      GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
+                                   exchange->fo_tail,
+                                   fo);
+      /* TODO: report more precise error, this ultimately generates
+         "exchange not supported" instead of "exchange violated
+         protocol"; we should ideally generate a reply with
+         a specific TALER_EC-code, boxing 'obj' within it. */
+      fo->fc (fo->fc_cls,
+              NULL,
+              NULL,
+              GNUNET_NO);
+      GNUNET_free_non_null (fo->wire_method);
+      GNUNET_free (fo);
+    }
     return;
   }
   if (GNUNET_YES ==
       process_find_operations (exchange))
   {
     /* need to run /wire again, with some delay */
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Do not have sufficient wire data. Will re-request /wire in 1 minute\n");
+
     GNUNET_assert (NULL == exchange->wire_task);
     exchange->wire_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_MINUTES,
                                                         &wire_task_cb,
@@ -574,7 +616,8 @@ keys_mgmt_cb (void *cls,
     delay = RELOAD_DELAY;
   else
     delay = GNUNET_TIME_absolute_get_remaining (expire);
-  exchange->retry_delay = GNUNET_TIME_UNIT_ZERO;
+  exchange->retry_delay
+    = GNUNET_TIME_UNIT_ZERO;
   exchange->retry_task
     = GNUNET_SCHEDULER_add_delayed (delay,
                                     &retry_exchange,
@@ -583,6 +626,8 @@ keys_mgmt_cb (void *cls,
   if (GNUNET_YES ==
       process_find_operations (exchange))
   {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Got key data, but do not have current wire data. Will request /wire now\n");
     GNUNET_assert (NULL == exchange->wire_request);
     GNUNET_assert (NULL == exchange->wire_task);
     exchange->wire_request = TALER_EXCHANGE_wire (exchange->conn,
@@ -603,18 +648,19 @@ return_result (void *cls)
   struct TMH_EXCHANGES_FindOperation *fo = cls;
   struct Exchange *exchange = fo->my_exchange;
 
-  fo->at = NULL;
-  GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
-                               exchange->fo_tail,
-                               fo);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Returning result for exchange %s, trusted=%d\n",
-              exchange->uri, exchange->trusted);
-  fo->fc (fo->fc_cls,
-          (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
-          NULL, /* FIXME: pass fees! */
-          exchange->trusted);
-  GNUNET_free (fo);
+  if ( (GNUNET_YES ==
+        process_find_operations (exchange)) &&
+       (NULL == exchange->wire_request) &&
+       (GNUNET_NO == exchange->pending) &&
+       (NULL != exchange->wire_task) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Do not have current wire data. Will re-request /wire in 1 minute\n");
+    exchange->wire_task
+      = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_MINUTES,
+                                      &wire_task_cb,
+                                      exchange);
+  }
 }
 
 
@@ -689,7 +735,11 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                                exchange->fo_tail,
                                fo);
 
-  if (GNUNET_YES != exchange->pending)
+  if ( (GNUNET_YES != exchange->pending) &&
+       ( (NULL == fo->wire_method) ||
+         (NULL != get_wire_fees (exchange,
+                                 GNUNET_TIME_absolute_get (),
+                                 fo->wire_method)) ) )
   {
     /* We are not currently waiting for a reply, immediately
        return result */
@@ -702,9 +752,22 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   if ( (NULL == exchange->conn) &&
        (GNUNET_YES == exchange->pending) )
   {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Do not have current key data. Will request /keys now\n");
     exchange->retry_task = GNUNET_SCHEDULER_add_now (&retry_exchange,
                                                      exchange);
   }
+  else if ( (GNUNET_NO == exchange->pending) &&
+            (NULL == exchange->wire_task) &&
+            (NULL == exchange->wire_request) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Do not have current wire data. Will re-request /wire now\n");
+    exchange->wire_task = GNUNET_SCHEDULER_add_now (&wire_task_cb,
+                                                    exchange);
+  }
+
+
   return fo;
 }
 
@@ -723,7 +786,7 @@ TMH_EXCHANGES_find_exchange_cancel (struct TMH_EXCHANGES_FindOperation *fo)
   {
     GNUNET_SCHEDULER_cancel (fo->at);
     fo->at = NULL;
-  }
+   }
   GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
                                exchange->fo_tail,
                                fo);
