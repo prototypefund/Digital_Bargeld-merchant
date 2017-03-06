@@ -38,7 +38,8 @@
  * Used by the iterator of the various merchant's instances given
  * in configuration
  */
-struct IterateInstancesCls {
+struct IterateInstancesCls
+{
 
   /**
    * Handle for the configuration beig parsed
@@ -75,7 +76,8 @@ struct IterateInstancesCls {
  * backend can account for several merchants, as used to do in donation
  * shops
  */
-struct MerchantInstance {
+struct MerchantInstance
+{
 
   /**
    * Instance's mnemonic identifier. This value lives as long as
@@ -88,6 +90,9 @@ struct MerchantInstance {
    * File holding the merchant's private key
    */
   char *keyfile;
+
+  /* NOTE: the *_wire-fields should eventually be moved into a DLL
+     once we implement #4939 */
 
   /**
    * Wire details for this instance

@@ -199,12 +199,12 @@ struct PayContext
   struct TALER_Amount amount;
 
   /**
-   * Timestamp from @e root.
+   * Timestamp from @e proposal_data.
    */
   struct GNUNET_TIME_Absolute timestamp;
 
   /**
-   * Refund deadline from @e root.
+   * Refund deadline from @e proposal_data.
    */
   struct GNUNET_TIME_Absolute refund_deadline;
 
@@ -214,9 +214,15 @@ struct PayContext
   struct GNUNET_TIME_Absolute pay_deadline;
 
   /**
-   * "H_contract" from @e root.
+   * "H_contract" from @e proposal_data.
    */
   struct GNUNET_HashCode h_proposal_data;
+
+  /**
+   * "H_wire" from @e proposal_data.  Used to identify the instance's
+   * wire transfer method.
+   */
+  struct GNUNET_HashCode h_wire;
 
   /**
    * Wire transfer deadline. How soon would the merchant like the
@@ -789,24 +795,21 @@ process_pay_with_exchange (void *cls,
 /**
  * Handle a timeout for the processing of the pay request.
  *
- * @param cls closure
+ * @param cls our `struct PayContext`
  */
 static void
 handle_pay_timeout (void *cls)
 {
   struct PayContext *pc = cls;
 
+  pc->timeout_task = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming /pay with error after timeout\n");
-
-  pc->timeout_task = NULL;
-
   if (NULL != pc->fo)
   {
     TMH_EXCHANGES_find_exchange_cancel (pc->fo);
     pc->fo = NULL;
   }
-
   resume_pay_with_response (pc,
                             MHD_HTTP_SERVICE_UNAVAILABLE,
                             TMH_RESPONSE_make_internal_error (TALER_EC_PAY_EXCHANGE_TIMEOUT,
@@ -977,7 +980,7 @@ parse_pay (struct MHD_Connection *connection,
     if (MHD_YES !=
         TMH_RESPONSE_reply_internal_error (connection,
                                            TALER_EC_PAY_FAILED_COMPUTE_PROPOSAL_HASH,
-                                           "Can not hash proposal"))
+                                           "Failed to hash proposal"))
     {
       GNUNET_break (0);
       return GNUNET_SYSERR;
@@ -989,9 +992,9 @@ parse_pay (struct MHD_Connection *connection,
                               "merchant");
   if (NULL == merchant)
   {
-    GNUNET_JSON_parse_free (spec);
     /* invalid contract */
     GNUNET_break (0);
+    GNUNET_JSON_parse_free (spec);
     if (MHD_YES !=
         TMH_RESPONSE_reply_internal_error (connection,
                                            TALER_EC_PAY_MERCHANT_FIELD_MISSING,
@@ -1003,11 +1006,10 @@ parse_pay (struct MHD_Connection *connection,
     return GNUNET_NO;
   }
   pc->mi = get_instance (merchant);
-
   if (NULL == pc->mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Not able to find the specified instance\n");
+                "Unable to find the specified instance\n");
     GNUNET_JSON_parse_free (spec);
     if (MHD_NO == TMH_RESPONSE_reply_not_found (connection,
                                                 TALER_EC_PAY_INSTANCE_UNKNOWN,
@@ -1038,6 +1040,8 @@ parse_pay (struct MHD_Connection *connection,
                               &pc->max_fee),
       TALER_JSON_spec_amount ("amount",
                               &pc->amount),
+      GNUNET_JSON_spec_fixed_auto ("H_wire",
+                                   &pc->h_wire),
       GNUNET_JSON_spec_end()
     };
 
@@ -1063,6 +1067,19 @@ parse_pay (struct MHD_Connection *connection,
                                                 TALER_EC_PAY_REFUND_DEADLINE_PAST_WIRE_TRANSFER_DEADLINE,
                                                 "refund deadline after wire transfer deadline");
     }
+  }
+
+  /* NOTE: In the future, iterate over all wire hashes
+     available to a given instance here! (#4939) */
+  if (0 != memcmp (&pc->h_wire,
+                   &mi->h_wire,
+                   sizeof (struct GNUNET_HashCode)))
+  {
+    GNUNET_break (0);
+    GNUNET_JSON_parse_free (spec);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_PAY_WIRE_HASH_UNKNOWN,
+                                              "Did not find matching wire details");
   }
 
   /* parse optional details */
@@ -1143,23 +1160,9 @@ parse_pay (struct MHD_Connection *connection,
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
 
-    {
-      char *s;
-
-      s = TALER_amount_to_string (&dc->amount_with_fee);
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Coin #%i has f %s\n",
-                  coins_index,
-                  s);
-      GNUNET_free (s);
-   }
-
     dc->index = coins_index;
     dc->pc = pc;
   }
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "parsed coins\n");
   pc->pending = pc->coins_cnt;
   GNUNET_JSON_parse_free (spec);
   return GNUNET_OK;
@@ -1182,8 +1185,6 @@ handler_pay_json (struct MHD_Connection *connection,
 {
   int ret;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "about to parse '/pay' body\n");
   ret = parse_pay (connection,
                    root,
                    pc);
