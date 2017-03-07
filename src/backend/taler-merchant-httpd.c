@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA
+  (C) 2014-2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -71,6 +71,17 @@ static long long unsigned port;
  * to receive the funds for a deposited payment
  */
 struct GNUNET_TIME_Relative wire_transfer_delay;
+
+/**
+ * Default maximum wire fee to assume, unless stated differently in the proposal
+ * already.
+ */
+struct TALER_Amount default_max_wire_fee;
+
+/**
+ * Default factor for wire fee amortization.
+ */
+unsigned long long default_wire_fee_amortization;
 
 /**
  * Should a "Connection: close" header be added to each HTTP response?
@@ -242,18 +253,24 @@ url_handler (void *cls,
 /**
  * Callback that frees all the elements in the hashmap
  *
- * @param cls closure
+ * @param cls closure, NULL
  * @param key current key
- * @param value current value
+ * @param value a `struct MerchantInstance`
  */
-int
+static int
 hashmap_free (void *cls,
               const struct GNUNET_HashCode *key,
               void *value)
 {
-  GNUNET_free (value);
+  struct MerchantInstance *mi = value;
+
+  json_decref (mi->j_wire);
+  GNUNET_free (mi->id);
+  GNUNET_free (mi->keyfile);
+  GNUNET_free (mi);
   return GNUNET_YES;
 }
+
 
 /**
  * Shutdown task (magically invoked when the application is being
@@ -269,6 +286,10 @@ do_shutdown (void *cls)
     GNUNET_SCHEDULER_cancel (mhd_task);
     mhd_task = NULL;
   }
+  /* FIXME: MHD API requires us to resume all suspended
+     connections before we do this, but /pay currently
+     suspends connections without giving us a way to
+     enumerate / resume them... */
   if (NULL != mhd)
   {
     MHD_stop_daemon (mhd);
@@ -286,9 +307,15 @@ do_shutdown (void *cls)
                                          &hashmap_free,
                                          NULL);
   if (NULL != by_id_map)
+  {
     GNUNET_CONTAINER_multihashmap_destroy (by_id_map);
+    by_id_map = NULL;
+  }
   if (NULL != by_kpub_map)
+  {
     GNUNET_CONTAINER_multihashmap_destroy (by_kpub_map);
+    by_kpub_map = NULL;
+  }
 }
 
 
@@ -434,13 +461,15 @@ instances_iterator_cb (void *cls,
   /* used as hashmap keys */
   struct GNUNET_HashCode h_pk;
   struct GNUNET_HashCode h_id;
+  json_t *type;
   char *emsg;
 
   iic = cls;
   substr = strstr (section, "merchant-instance-");
 
-  if ((NULL == substr)
-      || (NULL != strstr (section, "merchant-instance-wireformat-")))
+  if ( (NULL == substr) ||
+       (NULL != strstr (section,
+                        "merchant-instance-wireformat-")) )
     return;
 
   if (substr != section)
@@ -467,6 +496,7 @@ instances_iterator_cb (void *cls,
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
                                "KEYFILE");
+    GNUNET_free (mi);
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
@@ -479,6 +509,8 @@ instances_iterator_cb (void *cls,
        (pk = GNUNET_CRYPTO_eddsa_key_create_from_file (mi->keyfile)))
   {
     GNUNET_break (0);
+    GNUNET_free (mi->keyfile);
+    GNUNET_free (mi);
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
@@ -487,11 +519,6 @@ instances_iterator_cb (void *cls,
                                       &mi->pubkey.eddsa_pub);
   GNUNET_free (pk);
 
-  /**
-   * FIXME: 'token' must NOT be freed, as it is handled by the
-   * gnunet_configuration facility. OTOH mi->id does need to be freed,
-   * because it is a duplicate.
-   */
   mi->id = GNUNET_strdup (token + 1);
   if (0 == strcmp ("default", mi->id))
     iic->default_instance = GNUNET_YES;
@@ -499,11 +526,19 @@ instances_iterator_cb (void *cls,
   GNUNET_asprintf (&instance_wiresection,
                    "merchant-instance-wireformat-%s",
                    mi->id);
-
   mi->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
                                               iic->config,
                                               instance_wiresection);
   GNUNET_free (instance_wiresection);
+  if ( (NULL == (type = json_object_get (mi->j_wire,
+                                         "type"))) ||
+       (! json_is_string (type)) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Malformed wireformat: lacks type\n");
+    iic->ret |= GNUNET_SYSERR;
+  }
+  mi->wire_method = json_string_value (type);
 
   if (TALER_EC_NONE !=
       iic->plugin->wire_validate (iic->plugin->cls,
@@ -511,7 +546,6 @@ instances_iterator_cb (void *cls,
                                   NULL,
                                   &emsg))
   {
-
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Malformed wireformat: %s\n",
                 emsg);
@@ -535,7 +569,7 @@ instances_iterator_cb (void *cls,
   #endif
 
   GNUNET_CRYPTO_hash (mi->id,
-                      strlen(mi->id),
+                      strlen (mi->id),
                       &h_id);
   GNUNET_CRYPTO_hash (&mi->pubkey.eddsa_pub,
                       sizeof (struct GNUNET_CRYPTO_EddsaPublicKey),
@@ -550,18 +584,6 @@ instances_iterator_cb (void *cls,
                 "Failed to put an entry into the 'by_id' hashmap\n");
     iic->ret |= GNUNET_SYSERR;
   }
-  #ifdef EXTRADEBUG
-  else {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Added element at %p, by by-id key %s of '%s' in hashmap\n",
-                mi,
-                GNUNET_h2s (&h_id),
-                mi->id);
-    GNUNET_assert (NULL != GNUNET_CONTAINER_multihashmap_get (by_id_map,
-                                                              &h_id));
-  }
-  #endif
-
   if (GNUNET_OK !=
       GNUNET_CONTAINER_multihashmap_put (by_kpub_map,
                                          &h_pk,
@@ -633,8 +655,8 @@ get_instance (struct json_t *json)
  *
  * @param config configuration handle
  * @param allowed which wire format is allowed/expected?
- * @return GNUNET_OK if successful, GNUNET_SYSERR upon errors
- * (for example, if no "defaul" instance is defined)
+ * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
+ * (for example, if no "default" instance is defined)
  */
 static unsigned int
 iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
@@ -688,7 +710,8 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   GNUNET_free (iic);
   return GNUNET_OK;
 
-  fail: do {
+ fail:
+  do {
     GNUNET_PLUGIN_unload (lib_name,
                           iic->plugin);
     GNUNET_free (lib_name);
@@ -717,7 +740,6 @@ run (void *cls,
   char *wireformat;
   int fh;
 
-  wireformat = NULL;
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
                                  NULL);
@@ -764,6 +786,56 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
+
+  if (GNUNET_OK !=
+      TALER_config_get_denom (config,
+                              "merchant",
+                              "DEFAULT_MAX_WIRE_FEE",
+                              &default_max_wire_fee))
+  {
+    char *currency;
+
+    if (GNUNET_OK !=
+        GNUNET_CONFIGURATION_get_value_string (config,
+                                               "taler",
+                                               "CURRENCY",
+                                               &currency))
+    {
+      GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                                 "taler",
+                                 "CURRENCY");
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+    if (GNUNET_OK !=
+        TALER_amount_get_zero (currency,
+                               &default_max_wire_fee))
+    {
+      GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                 "taler",
+                                 "CURRENCY",
+                                 "Specified value not legal for a Taler currency");
+      GNUNET_SCHEDULER_shutdown ();
+      GNUNET_free (currency);
+      return;
+    }
+    GNUNET_free (currency);
+  }
+
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_number (config,
+                                             "merchant",
+                                             "DEFAULT_WIRE_FEE_AMORTIZATION",
+                                             &default_wire_fee_amortization))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "DEFAULT_WIRE_FEE_AMORTIZATION");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  wireformat = NULL;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (config,
                                              "merchant",
@@ -776,10 +848,10 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-
-  iterate_instances (config, wireformat);
-
+  iterate_instances (config,
+                     wireformat);
   GNUNET_free (wireformat);
+
   if (NULL ==
       (db = TALER_MERCHANTDB_plugin_load (config)))
   {
@@ -882,41 +954,57 @@ run (void *cls,
 
       un = GNUNET_new (struct sockaddr_un);
       un->sun_family = AF_UNIX;
-      strncpy (un->sun_path, serve_unixpath, sizeof (un->sun_path) - 1);
+      strncpy (un->sun_path,
+               serve_unixpath,
+               sizeof (un->sun_path) - 1);
 
       GNUNET_NETWORK_unix_precheck (un);
 
-      if (NULL == (nh = GNUNET_NETWORK_socket_create (AF_UNIX, SOCK_STREAM, 0)))
+      if (NULL == (nh = GNUNET_NETWORK_socket_create (AF_UNIX,
+                                                      SOCK_STREAM,
+                                                      0)))
       {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR, "create(for AF_UNIX)");
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                             "socket(AF_UNIX)");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      if (GNUNET_OK != GNUNET_NETWORK_socket_bind (nh, (void *) un, sizeof (struct sockaddr_un)))
+      if (GNUNET_OK !=
+          GNUNET_NETWORK_socket_bind (nh,
+                                      (void *) un,
+                                      sizeof (struct sockaddr_un)))
       {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR, "bind(for AF_UNIX)");
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                             "bind(AF_UNIX)");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      if (GNUNET_OK != GNUNET_NETWORK_socket_listen (nh, UNIX_BACKLOG))
+      if (GNUNET_OK !=
+          GNUNET_NETWORK_socket_listen (nh,
+                                        UNIX_BACKLOG))
       {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR, "listen(for AF_UNIX)");
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                             "listen(AF_UNIX)");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
 
       fh = GNUNET_NETWORK_get_fd (nh);
-      if (0 != chmod (serve_unixpath, unixpath_mode))
+      GNUNET_NETWORK_socket_free_memory_only_ (nh);
+      if (0 != chmod (serve_unixpath,
+                      unixpath_mode))
       {
-        fprintf (stderr, "chmod failed: %s\n", strerror (errno));
+        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                             "chmod");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      GNUNET_NETWORK_socket_free_memory_only_ (nh);
       port = 0;
     }
     else if (0 == strcmp (serve_type, "tcp"))
     {
+      char *bind_to;
+
       if (GNUNET_SYSERR ==
           GNUNET_CONFIGURATION_get_value_number (config,
                                                  "merchant",
@@ -929,7 +1017,81 @@ run (void *cls,
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      fh = -1;
+      if (GNUNET_OK ==
+          GNUNET_CONFIGURATION_get_value_string (config,
+                                                 "merchant",
+                                                 "BIND_TO",
+                                                 &bind_to))
+      {
+        char port_str[6];
+        struct addrinfo hints;
+        struct addrinfo *res;
+        int ec;
+        struct GNUNET_NETWORK_Handle *nh;
+
+        GNUNET_snprintf (port_str,
+                         sizeof (port_str),
+                         "%u",
+                         (uint16_t) port);
+        memset (&hints, 0, sizeof (hints));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+        hints.ai_flags = AI_PASSIVE | AI_IDN;
+        if (0 !=
+            (ec = getaddrinfo (bind_to,
+                               port_str,
+                               &hints,
+                               &res)))
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Failed to resolve BIND_TO address `%s': %s\n",
+                      bind_to,
+                      gai_strerror (ec));
+          GNUNET_free (bind_to);
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+        GNUNET_free (bind_to);
+
+        if (NULL == (nh = GNUNET_NETWORK_socket_create (res->ai_family,
+                                                        res->ai_socktype,
+                                                        res->ai_protocol)))
+        {
+          GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                               "socket");
+          freeaddrinfo (res);
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+        if (GNUNET_OK !=
+            GNUNET_NETWORK_socket_bind (nh,
+                                        res->ai_addr,
+                                        res->ai_addrlen))
+        {
+          GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                               "bind");
+          freeaddrinfo (res);
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+        freeaddrinfo (res);
+        if (GNUNET_OK !=
+            GNUNET_NETWORK_socket_listen (nh,
+                                          UNIX_BACKLOG))
+        {
+          GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                               "listen");
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+        fh = GNUNET_NETWORK_get_fd (nh);
+        GNUNET_NETWORK_socket_free_memory_only_ (nh);
+      }
+      else
+      {
+        fh = -1;
+      }
     }
     else
     {
@@ -937,15 +1099,13 @@ run (void *cls,
       GNUNET_assert (0);
     }
   }
-  mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME,
+  mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME | MHD_USE_DUAL_STACK,
                           port,
                           NULL, NULL,
                           &url_handler, NULL,
                           MHD_OPTION_LISTEN_SOCKET, fh,
-                          MHD_OPTION_NOTIFY_COMPLETED,
-                          &handle_mhd_completion_callback, NULL,
-                          MHD_OPTION_CONNECTION_TIMEOUT,
-                          (unsigned int) 10 /* 10s */,
+                          MHD_OPTION_NOTIFY_COMPLETED, &handle_mhd_completion_callback, NULL,
+                          MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 10 /* 10s */,
                           MHD_OPTION_END);
   if (NULL == mhd)
   {

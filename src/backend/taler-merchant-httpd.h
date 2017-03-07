@@ -38,7 +38,8 @@
  * Used by the iterator of the various merchant's instances given
  * in configuration
  */
-struct IterateInstancesCls {
+struct IterateInstancesCls
+{
 
   /**
    * Handle for the configuration beig parsed
@@ -75,7 +76,8 @@ struct IterateInstancesCls {
  * backend can account for several merchants, as used to do in donation
  * shops
  */
-struct MerchantInstance {
+struct MerchantInstance
+{
 
   /**
    * Instance's mnemonic identifier. This value lives as long as
@@ -88,6 +90,14 @@ struct MerchantInstance {
    * File holding the merchant's private key
    */
   char *keyfile;
+
+  /* NOTE: the *_wire-fields should eventually be moved into a DLL
+     once we implement #4939 */
+
+  /**
+   * Which wire method is @e j_wire using?
+   */
+  const char *wire_method;
 
   /**
    * Wire details for this instance
@@ -213,6 +223,17 @@ struct TM_HandlerContext
  * Our wire format details in JSON format (with salt).
  */
 extern json_t *j_wire;
+
+/**
+ * Default maximum wire fee to assume, unless stated differently in the proposal
+ * already.
+ */
+extern struct TALER_Amount default_max_wire_fee;
+
+/**
+ * Default factor for wire fee amortization.
+ */
+extern unsigned long long default_wire_fee_amortization;
 
 /**
  * Hash of our wire format details as given in #j_wire.

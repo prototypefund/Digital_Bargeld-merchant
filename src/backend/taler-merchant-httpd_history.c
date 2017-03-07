@@ -53,7 +53,6 @@ unsigned int current = 0;
  * @param refund refund deadline
  * @param total_amount total amount we receive for the contract after fees
  */
-
 static void
 pd_cb (void *cls,
        const char *order_id,
@@ -63,25 +62,36 @@ pd_cb (void *cls,
   json_t *entry;
   json_t *amount;
   json_t *timestamp;
+  json_t *instance;
 
+  GNUNET_assert (-1 != json_unpack ((json_t *) proposal_data,
+                                    "{s:o, s:o, s:{s:o}}",
+                                    "amount", &amount,
+                                    "timestamp", &timestamp,
+                                    "merchant", "instance", &instance));
 
-  GNUNET_assert (NULL != (amount = json_copy (json_object_get (proposal_data, "amount"))));
-  GNUNET_assert (NULL != (timestamp = json_object_get (proposal_data, "timestamp")));
-
-  if (current >= start && current < start + delta)
+  if ( (current >= start) &&
+       (current < start + delta) )
   {
-    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:o, s:s}",
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Adding history element. Current: %u, start: %u, delta: %u\n",
+                current,
+                start,
+                delta);
+    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:O, s:O, s:O}",
                                               "order_id", order_id,
                                               "amount", amount,
-                                              "timestamp", json_string_value (timestamp))));
+                                              "timestamp", timestamp,
+                                              "instance", instance)));
 
-    GNUNET_break (0 == json_array_append_new (response, entry));
-  
+    GNUNET_break (0 == json_array_append_new (response,
+                                              entry));
   }
 
   // FIXME to zero after returned.
   current++;
 }
+
 
 /**
  * Manage a /history request. Query the db and returns transactions
@@ -108,7 +118,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   unsigned int ret;
   unsigned long long seconds;
   struct MerchantInstance *mi;
-  
+
   response = json_array (); /*FIXME who decrefs this?*/
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
@@ -118,17 +128,22 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   if (NULL != str)
   {
     if (1 != sscanf (str, "%llu", &seconds))
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-					   TALER_EC_PARAMETER_MALFORMED,
-                                           "date");  
+    {
+      json_decref (response);
+      return TMH_RESPONSE_reply_arg_invalid (connection,
+                                             TALER_EC_PARAMETER_MALFORMED,
+                                             "date");
+    }
   }
 
   date.abs_value_us = seconds * 1000LL * 1000LL;
   if (date.abs_value_us / 1000LL / 1000LL != seconds)
+  {
+    json_decref (response);
     return TMH_RESPONSE_reply_bad_request (connection,
                                            TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
                                            "Timestamp overflowed");
-
+  }
 
 
   mi = TMH_lookup_instance ("default");
@@ -139,13 +154,15 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     mi = TMH_lookup_instance (str);
 
   if (NULL == mi)
+  {
+    json_decref (response);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_HISTORY_INSTANCE_UNKNOWN,
                                          "instance");
-
+  }
   start = 0;
   delta = 20;
-  
+
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "start");
@@ -153,9 +170,12 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   {
     if ((1 != sscanf (str, "%d", &start)) ||
         start < 0)
+    {
+      json_decref (response);
       return TMH_RESPONSE_reply_arg_invalid (connection,
                                              TALER_EC_PARAMETER_MALFORMED,
-                                             "start");  
+                                             "start");
+    }
   }
 
   str = MHD_lookup_connection_value (connection,
@@ -168,11 +188,11 @@ MH_handler_history (struct TMH_RequestHandler *rh,
         delta < 0)
       return TMH_RESPONSE_reply_arg_invalid (connection,
                                              TALER_EC_PARAMETER_MALFORMED,
-                                             "delta");  
+                                             "delta");
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Querying history back to %llu\n",
-              date.abs_value_us);
+              "Querying history back to %s\n",
+              GNUNET_STRINGS_absolute_time_to_string (date));
 
   ret = db->find_proposal_data_by_date (db->cls,
                                         date,
@@ -181,17 +201,21 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                         response);
   current = 0;
   if (GNUNET_SYSERR == ret)
+  {
+    json_decref (response);
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_HISTORY_DB_FETCH_ERROR,
 					      "db error to get history");
-
+  }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "history data: %s\n",
               json_dumps (response, JSON_INDENT (1)));
 
-  return TMH_RESPONSE_reply_json (connection,
-                                  response,
-                                  MHD_HTTP_OK);
+  ret = TMH_RESPONSE_reply_json (connection,
+                                 response,
+                                 MHD_HTTP_OK);
+  json_decref (response);
+  return ret;
 }
 
 /* end of taler-merchant-httpd_history.c */

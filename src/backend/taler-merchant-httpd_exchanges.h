@@ -60,11 +60,13 @@ TMH_EXCHANGES_done (void);
  *
  * @param cls closure
  * @param eh handle to the exchange context
+ * @param wire_fee current applicable wire fee for dealing with @a eh, NULL if not available
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
  */
 typedef void
 (*TMH_EXCHANGES_FindContinuation)(void *cls,
                                   struct TALER_EXCHANGE_Handle *eh,
+                                  const struct TALER_Amount *wire_fee,
                                   int exchange_trusted);
 
 
@@ -80,11 +82,13 @@ struct TMH_EXCHANGES_FindOperation;
  * NULL for the exchange.
  *
  * @param chosen_exchange URI of the exchange we would like to talk to
+ * @param wire_method the wire method we will use with @a chosen_exchange, NULL for none
  * @param fc function to call with the handles for the exchange
  * @param fc_cls closure for @a fc
  */
 struct TMH_EXCHANGES_FindOperation *
 TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
+                             const char *wire_method,
                              TMH_EXCHANGES_FindContinuation fc,
                              void *fc_cls);
 

@@ -127,8 +127,9 @@ get_instance (struct json_t *json);
  * @param order to process
  * @return MHD result code
  */
-int
-proposal_put (struct MHD_Connection *connection, json_t *order)
+static int
+proposal_put (struct MHD_Connection *connection,
+              json_t *order)
 {
   int res;
   struct MerchantInstance *mi;
@@ -169,33 +170,65 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
     time (&timer);
     tm_info = localtime (&timer);
 
-    off = strftime (buf, sizeof (buf), "%H:%M:%S", tm_info);
+    off = strftime (buf,
+                    sizeof (buf),
+                    "%H:%M:%S",
+                    tm_info);
     snprintf (buf + off, sizeof (buf) - off,
-              "-%llX", 
-              (long long unsigned) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK, UINT64_MAX));
-    json_object_set (order, "order_id", json_string (buf));
+              "-%llX",
+              (long long unsigned) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK,
+                                                             UINT64_MAX));
+    json_object_set (order,
+                     "order_id",
+                     json_string (buf));
   }
 
-  if (NULL == json_string_value (json_object_get (order, "timestamp")))
+  if (NULL == json_object_get (order,
+                               "timestamp"))
   {
     struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
+
     (void) GNUNET_TIME_round_abs (&now);
-    json_object_set (order, "timestamp", GNUNET_JSON_from_time_abs (now));
+    json_object_set (order,
+                     "timestamp",
+                     GNUNET_JSON_from_time_abs (now));
   }
 
-  if (NULL == json_string_value (json_object_get (order, "refund_deadline")))
+  if (NULL == json_object_get (order,
+                               "refund_deadline"))
   {
     struct GNUNET_TIME_Absolute zero = { 0 };
-    json_object_set (order, "refund_deadline", GNUNET_JSON_from_time_abs (zero));
+
+    json_object_set (order,
+                     "refund_deadline",
+                     GNUNET_JSON_from_time_abs (zero));
   }
 
-  if (NULL == json_string_value (json_object_get (order, "pay_deadline")))
+  if (NULL == json_object_get (order,
+                               "pay_deadline"))
   {
     struct GNUNET_TIME_Absolute t;
+
     /* FIXME: read the delay for pay_deadline from config */
-    t = GNUNET_TIME_absolute_add (GNUNET_TIME_absolute_get (), GNUNET_TIME_UNIT_HOURS);
+    t = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_HOURS);
     (void) GNUNET_TIME_round_abs (&t);
     json_object_set (order, "pay_deadline", GNUNET_JSON_from_time_abs (t));
+  }
+
+  if (NULL == json_object_get (order,
+                               "max_wire_fee"))
+  {
+    json_object_set (order,
+                     "max_wire_fee",
+                     TALER_JSON_from_amount (&default_max_wire_fee));
+  }
+
+  if (NULL == json_object_get (order,
+                               "wire_fee_amortization"))
+  {
+    json_object_set (order,
+                     "wire_fee_amortization",
+                     json_integer ((json_int_t) default_wire_fee_amortization));
   }
 
   /* extract fields we need to sign separately */
@@ -210,7 +243,7 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
 					      TALER_EC_NONE,
 					      "Impossible to parse the order");
   }
-    
+
 
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))
@@ -225,7 +258,7 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
   if (NULL == mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Not able to find the specified instance\n"); 
+                "Not able to find the specified instance\n");
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
 					 "Unknown instance given");
@@ -272,7 +305,7 @@ proposal_put (struct MHD_Connection *connection, json_t *order)
                                               TALER_EC_PROPOSAL_STORE_DB_ERROR,
                                               "db error: could not store this proposal's data into db");
   }
-  
+
 
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
@@ -347,6 +380,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   return res;
 }
 
+
 /**
  * Manage a GET /proposal request. Query the db and returns the
  * proposal's data related to the transaction id given as the URL's
@@ -396,7 +430,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                 order_id,
                                 &mi->pubkey);
   if (GNUNET_NO == res)
-    return TMH_RESPONSE_reply_not_found (connection, 
+    return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
                                          "unknown transaction id");
 
@@ -405,10 +439,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                               TALER_EC_PROPOSAL_LOOKUP_DB_ERROR,
                                               "An error occurred while retrieving proposal data from db");
 
-  
+
   return TMH_RESPONSE_reply_json (connection,
                                   proposal_data,
-                                  MHD_HTTP_OK); 
+                                  MHD_HTTP_OK);
 
 
 }

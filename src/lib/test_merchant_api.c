@@ -565,6 +565,11 @@ struct Command
       char *expected_transfer_ref;
 
       /**
+       * Wire fee we expect to pay for this transaction.
+       */
+      const char *wire_fee;
+
+      /**
        * Handle to a /track/transaction operation
        */
       struct TALER_MERCHANT_TrackTransactionHandle *tth;
@@ -1315,7 +1320,7 @@ proposal_lookup_cb (void *cls,
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
-  
+
   cmd->details.proposal_lookup.plo = NULL;
 
   if (cmd->expected_response_code != http_status)
@@ -1363,6 +1368,7 @@ track_transaction_cb (void *cls,
     {
       const struct Command *ref;
       struct TALER_Amount ea;
+      struct TALER_Amount wire_fee;
       struct TALER_Amount coin_contribution;
 
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -1401,9 +1407,16 @@ track_transaction_cb (void *cls,
                      TALER_string_to_amount (ref->details.check_bank_transfer.amount,
                                              &ea));
       GNUNET_assert (GNUNET_OK ==
+                     TALER_string_to_amount (cmd->details.track_transaction.wire_fee,
+                                             &wire_fee));
+      GNUNET_assert (GNUNET_OK ==
                      TALER_amount_subtract (&coin_contribution,
                                             &transfers[0].coins[0].amount_with_fee,
                                             &transfers[0].coins[0].deposit_fee));
+      GNUNET_assert (GNUNET_OK ==
+                     TALER_amount_subtract (&coin_contribution,
+                                            &coin_contribution,
+                                            &wire_fee));
       if (0 !=
           TALER_amount_cmp (&ea,
                             &coin_contribution))
@@ -1524,7 +1537,7 @@ interpreter_run (void *cls)
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                   "Switching instance: '%s'\n",
                   instance);
-  
+
       is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
                                            is);
       return;
@@ -1532,11 +1545,11 @@ interpreter_run (void *cls)
     case OC_PROPOSAL_LOOKUP:
     {
       const char *order_id;
-  
+
       GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
       ref = find_command (is, cmd->details.proposal_lookup.proposal_reference);
       GNUNET_assert (NULL != ref);
-  
+
       order_id =
         json_string_value (json_object_get (ref->details.proposal.proposal_data,
                                             "order_id"));
@@ -1549,7 +1562,7 @@ interpreter_run (void *cls)
                                                          proposal_lookup_cb,
                                                          is)));
     }
-  
+
     return;
 
   case OC_ADMIN_ADD_INCOMING:
@@ -1919,6 +1932,7 @@ interpreter_run (void *cls)
                           &amount,
                           cmd->details.check_bank_transfer.account_debit,
                           cmd->details.check_bank_transfer.account_credit,
+                          EXCHANGE_URI,
                           &cmd->details.check_bank_transfer.wtid))
       {
         GNUNET_break (0);
@@ -2372,7 +2386,7 @@ run (void *cls)
 
     /* Proposal lookup */
     {
-      .oc = OC_PROPOSAL_LOOKUP, 
+      .oc = OC_PROPOSAL_LOOKUP,
       .label = "fetch-proposal-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.proposal_lookup.proposal_reference = "create-proposal-2" },
@@ -2388,8 +2402,8 @@ run (void *cls)
 
     /* Obtain WTID of the transfer */
     { .oc = OC_CHECK_BANK_TRANSFER,
-      .label = "check_bank_transfer-499c",
-      .details.check_bank_transfer.amount = "EUR:4.99",
+      .label = "check_bank_transfer-498c",
+      .details.check_bank_transfer.amount = "EUR:4.98",
       .details.check_bank_transfer.account_debit = 2, /* exchange-outgoing */
       .details.check_bank_transfer.account_credit = 62 /* merchant */
     },
@@ -2401,21 +2415,22 @@ run (void *cls)
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c",
-      .details.track_transaction.pay_ref = "deposit-simple"  
+      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-498c",
+      .details.track_transaction.pay_ref = "deposit-simple",
+      .details.track_transaction.wire_fee = "EUR:0.01",
     },
 
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c",
+      .details.track_transfer.check_bank_ref = "check_bank_transfer-498c",
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-1-again",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c",
+      .details.track_transfer.check_bank_ref = "check_bank_transfer-498c",
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
 
@@ -2434,8 +2449,8 @@ run (void *cls)
 
     /* Obtain WTID of the transfer */
     { .oc = OC_CHECK_BANK_TRANSFER,
-      .label = "check_bank_transfer-499c-2",
-      .details.check_bank_transfer.amount = "EUR:4.99",
+      .label = "check_bank_transfer-498c-2",
+      .details.check_bank_transfer.amount = "EUR:4.98",
       .details.check_bank_transfer.account_debit = 2, /* exchange-outgoing */
       .details.check_bank_transfer.account_credit = 62 /* merchant */
     },
@@ -2448,21 +2463,22 @@ run (void *cls)
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
+      .details.track_transfer.check_bank_ref = "check_bank_transfer-498c-2",
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
     },
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-2-again",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transfer.check_bank_ref = "check_bank_transfer-499c-2",
+      .details.track_transfer.check_bank_ref = "check_bank_transfer-498c-2",
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
     },
 
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-499c-2",
-      .details.track_transaction.pay_ref = "deposit-simple-2"  
+      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-498c-2",
+      .details.track_transaction.wire_fee = "EUR:0.01",
+      .details.track_transaction.pay_ref = "deposit-simple-2"
     },
 
     { .oc = OC_HISTORY,
@@ -2476,7 +2492,7 @@ run (void *cls)
       .label = "history-2",
       .expected_response_code = MHD_HTTP_OK,
       /*no records to be returned, as limit is in the future*/
-      .details.history.date.abs_value_us = 43 * 1000LL * 1000LL, 
+      .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
       .details.history.nresult = 0
     },
 
@@ -2635,8 +2651,7 @@ main (int argc,
   merchantd = GNUNET_OS_start_process (GNUNET_NO,
                                        GNUNET_OS_INHERIT_STD_ALL,
                                        NULL, NULL, NULL,
-                                       "valgrind",
-                                       "valgrind",
+                                       "taler-merchant-httpd",
                                        "taler-merchant-httpd",
                                        "-c", "test_merchant_api.conf",
                                        "-L", "DEBUG",

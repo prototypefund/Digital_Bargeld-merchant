@@ -340,6 +340,7 @@ trace_coins (struct TrackTransactionContext *tctx);
  *             not provide any (set only if @a http_status is #MHD_HTTP_OK)
  * @param total_amount total amount of the wire transfer, or NULL if the exchange could
  *             not provide any @a wtid (set only if @a http_status is #MHD_HTTP_OK)
+ * @param wire_fee wire fee that was charged by the exchange
  * @param details_length length of the @a details array
  * @param details array with details about the combined transactions
  */
@@ -352,16 +353,17 @@ wire_deposits_cb (void *cls,
                   const struct GNUNET_HashCode *h_wire,
                   struct GNUNET_TIME_Absolute execution_time,
                   const struct TALER_Amount *total_amount,
+                  const struct TALER_Amount *wire_fee,
                   unsigned int details_length,
                   const struct TALER_TrackTransferDetails *details)
-    {
-      struct TrackTransactionContext *tctx = cls;
-      struct TrackCoinContext *tcc;
-      unsigned int i;
+{
+  struct TrackTransactionContext *tctx = cls;
+  struct TrackCoinContext *tcc;
+  unsigned int i;
 
-      tctx->wdh = NULL;
-      if (MHD_HTTP_OK != http_status)
-      {
+  tctx->wdh = NULL;
+  if (MHD_HTTP_OK != http_status)
+  {
     resume_track_transaction_with_response
       (tctx,
        MHD_HTTP_FAILED_DEPENDENCY,
@@ -509,7 +511,7 @@ wtid_cb (void *cls,
   /* WARNING: if two transactions got aggregated under the same
      WTID, then this branch is always taken (when attempting to
      track the second transaction). */
-  if (GNUNET_OK == 
+  if (GNUNET_OK ==
       db->find_proof_by_wtid (db->cls,
                               tctx->exchange_uri,
                               wtid,
@@ -677,11 +679,13 @@ trace_coins (struct TrackTransactionContext *tctx)
  *
  * @param cls the `struct TrackTransactionContext`
  * @param eh NULL if exchange was not found to be acceptable
+ * @param wire_fee NULL (we did not specify a wire method)
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
  */
 static void
 process_track_transaction_with_exchange (void *cls,
                                          struct TALER_EXCHANGE_Handle *eh,
+                                         const struct TALER_Amount *wire_fee,
                                          int exchange_trusted)
 {
   struct TrackTransactionContext *tctx = cls;
@@ -985,6 +989,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
               "Suspending /track/transaction handling while working with the exchange\n");
   MHD_suspend_connection (connection);
   tctx->fo = TMH_EXCHANGES_find_exchange (tctx->exchange_uri,
+                                          NULL,
                                           &process_track_transaction_with_exchange,
                                           tctx);
 

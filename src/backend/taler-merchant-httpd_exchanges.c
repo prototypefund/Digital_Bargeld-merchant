@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA
+  (C) 2014-2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -84,10 +84,44 @@ struct TMH_EXCHANGES_FindOperation
   struct Exchange *my_exchange;
 
   /**
+   * Wire method we care about for fees.
+   */
+  char *wire_method;
+
+  /**
    * Task scheduled to asynchronously return the result to
    * the find continuation.
    */
   struct GNUNET_SCHEDULER_Task *at;
+
+};
+
+
+/**
+ * Information about wire transfer fees of an exchange, by wire method.
+ */
+struct FeesByWireMethod
+{
+
+  /**
+   * Kept in a DLL.
+   */
+  struct FeesByWireMethod *next;
+
+  /**
+   * Kept in a DLL.
+   */
+  struct FeesByWireMethod *prev;
+
+  /**
+   * Wire method these fees are for.
+   */
+  char *wire_method;
+
+  /**
+   * Applicable fees, NULL if unknown/error.
+   */
+  struct TALER_EXCHANGE_WireAggregateFees *af;
 
 };
 
@@ -127,6 +161,26 @@ struct Exchange
    * A connection to this exchange
    */
   struct TALER_EXCHANGE_Handle *conn;
+
+  /**
+   * Active /wire request to the exchange, or NULL.
+   */
+  struct TALER_EXCHANGE_WireHandle *wire_request;
+
+  /**
+   * Task to re-run /wire after some delay.
+   */
+  struct GNUNET_SCHEDULER_Task *wire_task;
+
+  /**
+   * Head of wire fees from /wire request.
+   */
+  struct FeesByWireMethod *wire_fees_head;
+
+  /**
+   * Tail of wire fees from /wire request.
+   */
+  struct FeesByWireMethod *wire_fees_tail;
 
   /**
    * Master public key, guaranteed to be set ONLY for
@@ -239,6 +293,279 @@ retry_exchange (void *cls)
 
 
 /**
+ * Function called with information about the wire fees
+ * for each wire method.  Stores the wire fees with the
+ * exchange for laster use.
+ *
+ * @param cls closure
+ * @param wire_method name of the wire method (i.e. "sepa")
+ * @param fees fee structure for this method
+ */
+static void
+process_wire_fees (void *cls,
+                   const char *wire_method,
+                   const struct TALER_EXCHANGE_WireAggregateFees *fees)
+{
+  struct Exchange *exchange = cls;
+  struct FeesByWireMethod *f;
+  struct TALER_EXCHANGE_WireAggregateFees *endp;
+  struct TALER_EXCHANGE_WireAggregateFees *af;
+
+  for (f = exchange->wire_fees_head; NULL != f; f = f->next)
+    if (0 == strcasecmp (wire_method,
+                         f->wire_method))
+      break;
+  if (NULL == f)
+  {
+    f = GNUNET_new (struct FeesByWireMethod);
+    f->wire_method = GNUNET_strdup (wire_method);
+    GNUNET_CONTAINER_DLL_insert (exchange->wire_fees_head,
+                                 exchange->wire_fees_tail,
+                                 f);
+  }
+  endp = f->af;
+  while ( (NULL != endp) &&
+          (NULL != endp->next) )
+    endp = endp->next;
+  while ( (NULL != endp) &&
+          (fees->start_date.abs_value_us < endp->end_date.abs_value_us) )
+    fees = fees->next;
+  if ( (NULL != endp) &&
+       (fees->start_date.abs_value_us != endp->end_date.abs_value_us) )
+  {
+    /* Hole in the fee structure, not allowed! */
+    GNUNET_break_op (0);
+    return;
+  }
+  while (NULL != fees)
+  {
+    af = GNUNET_new (struct TALER_EXCHANGE_WireAggregateFees);
+    *af = *fees;
+    af->next = NULL;
+    if (NULL == endp)
+      f->af = af;
+    else
+      endp->next = af;
+    endp = af;
+    // FIXME: also preserve `fees` in backend DB (under wire method + exchange master pub!)
+    fees = fees->next;
+  }
+}
+
+
+/**
+ * Obtain applicable fees for @a exchange and @a wire_method.
+ *
+ * @param exchange the exchange to query
+ * @param now current time
+ * @param wire_method the wire method we want the fees for
+ * @return NULL if we do not have fees for this method yet
+ */
+static struct TALER_EXCHANGE_WireAggregateFees *
+get_wire_fees (struct Exchange *exchange,
+               struct GNUNET_TIME_Absolute now,
+               const char *wire_method)
+{
+  for (struct FeesByWireMethod *fbw = exchange->wire_fees_head;
+       NULL != fbw;
+       fbw = fbw->next)
+    if (0 == strcasecmp (fbw->wire_method,
+                         wire_method) )
+    {
+      struct TALER_EXCHANGE_WireAggregateFees *af;
+
+      /* Advance through list up to current time */
+      while ( (NULL != (af = fbw->af)) &&
+              (now.abs_value_us >= af->end_date.abs_value_us) )
+      {
+        fbw->af = af->next;
+        GNUNET_free (af);
+      }
+      return af;
+    }
+  return NULL;
+}
+
+
+/**
+ * Check if we have any remaining pending requests for the
+ * given @a exchange, and if we have the required data, call
+ * the callback.
+ *
+ * @param exchange the exchange to check for pending find operations
+ * @return #GNUNET_YES if we need /wire data from @a exchange
+ */
+static int
+process_find_operations (struct Exchange *exchange)
+{
+  struct TMH_EXCHANGES_FindOperation *fo;
+  struct TMH_EXCHANGES_FindOperation *fn;
+  struct GNUNET_TIME_Absolute now;
+  int need_wire;
+
+  now = GNUNET_TIME_absolute_get ();
+  need_wire = GNUNET_NO;
+  for (fo = exchange->fo_head; NULL != fo; fo = fn)
+  {
+    const struct TALER_Amount *wire_fee;
+
+    fn = fo->next;
+    if (NULL != fo->wire_method)
+    {
+      struct TALER_EXCHANGE_WireAggregateFees *af;
+
+      /* Find fee structure for our wire method */
+      af = get_wire_fees (exchange,
+                          now,
+                          fo->wire_method);
+      if (NULL == af)
+      {
+        need_wire = GNUNET_YES;
+        continue;
+      }
+      if (af->start_date.abs_value_us > now.abs_value_us)
+      {
+        /* Disagreement on the current time */
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Exchange's earliest fee is %s adhead of our time. Clock skew issue?\n",
+                    GNUNET_STRINGS_relative_time_to_string (GNUNET_TIME_absolute_get_remaining (af->start_date),
+                                                            GNUNET_YES));
+        continue;
+      }
+      /* found fee, great! */
+      wire_fee = &af->wire_fee;
+    }
+    else
+    {
+      /* no wire transfer method given, so we yield no fee */
+      wire_fee = NULL;
+    }
+    GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
+                                 exchange->fo_tail,
+                                 fo);
+    fo->fc (fo->fc_cls,
+            exchange->conn,
+            wire_fee,
+            exchange->trusted);
+    GNUNET_free_non_null (fo->wire_method);
+    GNUNET_free (fo);
+  }
+  return need_wire;
+}
+
+
+/**
+ * Check if we have any remaining pending requests for the
+ * given @a exchange, and if we have the required data, call
+ * the callback.  If requests without /wire data remain,
+ * retry the /wire request after some delay.
+ *
+ * @param cls a `struct Exchange` to check
+ */
+static void
+wire_task_cb (void *cls);
+
+
+/**
+ * Callbacks of this type are used to serve the result of submitting a
+ * wire format inquiry request to a exchange.
+ *
+ * If the request fails to generate a valid response from the
+ * exchange, @a http_status will also be zero.
+ *
+ * @param cls closure, a `struct Exchange`
+ * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful request;
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param obj the received JSON reply, if successful this should be the wire
+ *            format details as provided by /wire, or NULL if the
+ *            reply was not in JSON format.
+ */
+static void
+handle_wire_data (void *cls,
+                  unsigned int http_status,
+                  enum TALER_ErrorCode ec,
+                  const json_t *obj)
+{
+  struct Exchange *exchange = cls;
+
+  exchange->wire_request = NULL;
+  if (MHD_HTTP_OK != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Failed to obtain /wire details from `%s': %d\n",
+                exchange->uri,
+                ec);
+    return;
+  }
+  if (GNUNET_OK !=
+      TALER_EXCHANGE_wire_get_fees (&TALER_EXCHANGE_get_keys (exchange->conn)->master_pub,
+                                    obj,
+                                    &process_wire_fees,
+                                    exchange))
+  {
+    /* Report hard failure to all callbacks! */
+    struct TMH_EXCHANGES_FindOperation *fo;
+
+    GNUNET_break_op (0);
+    while (NULL != (fo = exchange->fo_head))
+    {
+      GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
+                                   exchange->fo_tail,
+                                   fo);
+      /* TODO: report more precise error, this ultimately generates
+         "exchange not supported" instead of "exchange violated
+         protocol"; we should ideally generate a reply with
+         a specific TALER_EC-code, boxing 'obj' within it. */
+      fo->fc (fo->fc_cls,
+              NULL,
+              NULL,
+              GNUNET_NO);
+      GNUNET_free_non_null (fo->wire_method);
+      GNUNET_free (fo);
+    }
+    return;
+  }
+  if (GNUNET_YES ==
+      process_find_operations (exchange))
+  {
+    /* need to run /wire again, with some delay */
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Do not have sufficient wire data. Will re-request /wire in 1 minute\n");
+
+    GNUNET_assert (NULL == exchange->wire_task);
+    exchange->wire_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_MINUTES,
+                                                        &wire_task_cb,
+                                                        exchange);
+  }
+}
+
+
+/**
+ * Check if we have any remaining pending requests for the
+ * given @a exchange, and if we have the required data, call
+ * the callback.  If requests without /wire data remain,
+ * retry the /wire request after some delay.
+ *
+ * @param cls a `struct Exchange` to check
+ */
+static void
+wire_task_cb (void *cls)
+{
+  struct Exchange *exchange = cls;
+
+  exchange->wire_task = NULL;
+  if (GNUNET_YES !=
+      process_find_operations (exchange))
+    return; /* no more need */
+  GNUNET_assert (NULL == exchange->wire_request);
+  exchange->wire_request = TALER_EXCHANGE_wire (exchange->conn,
+                                                &handle_wire_data,
+                                                exchange);
+}
+
+
+/**
  * Function called with information about who is auditing
  * a particular exchange and what key the exchange is using.
  *
@@ -257,13 +584,22 @@ keys_mgmt_cb (void *cls,
               const struct TALER_EXCHANGE_Keys *keys)
 {
   struct Exchange *exchange = cls;
-  struct TMH_EXCHANGES_FindOperation *fo;
   struct GNUNET_TIME_Absolute expire;
   struct GNUNET_TIME_Relative delay;
 
   if (NULL == keys)
   {
     exchange->pending = GNUNET_YES;
+    if (NULL != exchange->wire_request)
+    {
+      TALER_EXCHANGE_wire_cancel (exchange->wire_request);
+      exchange->wire_request = NULL;
+    }
+    if (NULL != exchange->wire_task)
+    {
+      GNUNET_SCHEDULER_cancel (exchange->wire_task);
+      exchange->wire_task = NULL;
+    }
     exchange->retry_delay = RETRY_BACKOFF (exchange->retry_delay);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Failed to fetch /keys from `%s', retrying in %s\n",
@@ -280,21 +616,23 @@ keys_mgmt_cb (void *cls,
     delay = RELOAD_DELAY;
   else
     delay = GNUNET_TIME_absolute_get_remaining (expire);
-  exchange->retry_delay = GNUNET_TIME_UNIT_ZERO;
+  exchange->retry_delay
+    = GNUNET_TIME_UNIT_ZERO;
   exchange->retry_task
     = GNUNET_SCHEDULER_add_delayed (delay,
                                     &retry_exchange,
                                     exchange);
   exchange->pending = GNUNET_NO;
-  while (NULL != (fo = exchange->fo_head))
+  if (GNUNET_YES ==
+      process_find_operations (exchange))
   {
-    GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
-                                 exchange->fo_tail,
-                                 fo);
-    fo->fc (fo->fc_cls,
-            exchange->conn,
-            exchange->trusted);
-    GNUNET_free (fo);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Got key data, but do not have current wire data. Will request /wire now\n");
+    GNUNET_assert (NULL == exchange->wire_request);
+    GNUNET_assert (NULL == exchange->wire_task);
+    exchange->wire_request = TALER_EXCHANGE_wire (exchange->conn,
+                                                  &handle_wire_data,
+                                                  exchange);
   }
 }
 
@@ -310,17 +648,19 @@ return_result (void *cls)
   struct TMH_EXCHANGES_FindOperation *fo = cls;
   struct Exchange *exchange = fo->my_exchange;
 
-  fo->at = NULL;
-  GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
-                               exchange->fo_tail,
-                               fo);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Returning result for exchange %s, trusted=%d\n",
-              exchange->uri, exchange->trusted);
-  fo->fc (fo->fc_cls,
-          (GNUNET_SYSERR == exchange->pending) ? NULL : exchange->conn,
-          exchange->trusted);
-  GNUNET_free (fo);
+  if ( (GNUNET_YES ==
+        process_find_operations (exchange)) &&
+       (NULL == exchange->wire_request) &&
+       (GNUNET_NO == exchange->pending) &&
+       (NULL != exchange->wire_task) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Do not have current wire data. Will re-request /wire in 1 minute\n");
+    exchange->wire_task
+      = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_MINUTES,
+                                      &wire_task_cb,
+                                      exchange);
+  }
 }
 
 
@@ -330,12 +670,14 @@ return_result (void *cls)
  * NULL for the exchange.
  *
  * @param chosen_exchange URI of the exchange we would like to talk to
+ * @param wire_method the wire method we will use with @a chosen_exchange, NULL for none
  * @param fc function to call with the handles for the exchange
  * @param fc_cls closure for @a fc
  * @return NULL on error
  */
 struct TMH_EXCHANGES_FindOperation *
 TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
+                             const char *wire_method,
 			     TMH_EXCHANGES_FindContinuation fc,
 			     void *fc_cls)
 {
@@ -387,11 +729,17 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   fo->fc = fc;
   fo->fc_cls = fc_cls;
   fo->my_exchange = exchange;
+  if (NULL != wire_method)
+    fo->wire_method = GNUNET_strdup (wire_method);
   GNUNET_CONTAINER_DLL_insert (exchange->fo_head,
                                exchange->fo_tail,
                                fo);
 
-  if (GNUNET_YES != exchange->pending)
+  if ( (GNUNET_YES != exchange->pending) &&
+       ( (NULL == fo->wire_method) ||
+         (NULL != get_wire_fees (exchange,
+                                 GNUNET_TIME_absolute_get (),
+                                 fo->wire_method)) ) )
   {
     /* We are not currently waiting for a reply, immediately
        return result */
@@ -404,9 +752,22 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   if ( (NULL == exchange->conn) &&
        (GNUNET_YES == exchange->pending) )
   {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Do not have current key data. Will request /keys now\n");
     exchange->retry_task = GNUNET_SCHEDULER_add_now (&retry_exchange,
                                                      exchange);
   }
+  else if ( (GNUNET_NO == exchange->pending) &&
+            (NULL == exchange->wire_task) &&
+            (NULL == exchange->wire_request) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Do not have current wire data. Will re-request /wire now\n");
+    exchange->wire_task = GNUNET_SCHEDULER_add_now (&wire_task_cb,
+                                                    exchange);
+  }
+
+
   return fo;
 }
 
@@ -425,10 +786,11 @@ TMH_EXCHANGES_find_exchange_cancel (struct TMH_EXCHANGES_FindOperation *fo)
   {
     GNUNET_SCHEDULER_cancel (fo->at);
     fo->at = NULL;
-  }
+   }
   GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
                                exchange->fo_tail,
                                fo);
+  GNUNET_free_non_null (fo->wire_method);
   GNUNET_free (fo);
 }
 
@@ -443,7 +805,7 @@ TMH_EXCHANGES_find_exchange_cancel (struct TMH_EXCHANGES_FindOperation *fo)
  */
 static void
 accept_exchanges (void *cls,
-                 const char *section)
+                  const char *section)
 {
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   char *uri;
@@ -561,10 +923,26 @@ TMH_EXCHANGES_done ()
     GNUNET_CONTAINER_DLL_remove (exchange_head,
                                  exchange_tail,
                                  exchange);
+    if (NULL != exchange->wire_request)
+    {
+      TALER_EXCHANGE_wire_cancel (exchange->wire_request);
+      exchange->wire_request = NULL;
+    }
+    if (NULL != exchange->wire_task)
+    {
+      GNUNET_SCHEDULER_cancel (exchange->wire_task);
+      exchange->wire_task = NULL;
+    }
     if (NULL != exchange->conn)
+    {
       TALER_EXCHANGE_disconnect (exchange->conn);
+      exchange->conn = NULL;
+    }
     if (NULL != exchange->retry_task)
+    {
       GNUNET_SCHEDULER_cancel (exchange->retry_task);
+      exchange->retry_task = NULL;
+    }
     GNUNET_free (exchange->uri);
     GNUNET_free (exchange);
   }
