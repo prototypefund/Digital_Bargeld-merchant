@@ -518,16 +518,6 @@ wtid_cb (void *cls,
                               &proof_cb,
                               &pcc))
   {
-    /**
-     * Conflict semantics: when the *first* call to /track/transaction
-     * at the exchange returns, the merchant issues a call to /track/transfer
-     * (at the exchange) and when that second call returns, it updates
-     * the information for all other coins using that returned information.
-     * Thus since this function is only called as callback to /track/transaction
-     * at the exchange, then if we already know this WTID, then some coin was not
-     * accounted in what /track/transfer returned (otherwise we wouldn't have
-     * tried to track it).
-     */
     GNUNET_break_op (0);
     resume_track_transaction_with_response
       (tcc->tctx,
