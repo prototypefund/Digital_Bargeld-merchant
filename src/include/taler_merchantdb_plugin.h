@@ -175,15 +175,13 @@ struct TALER_MERCHANTDB_Plugin
                            struct GNUNET_TIME_Absolute timestamp,
                            const json_t *proposal_data);
 
-
-
   /**
-   * Retrieve proposal data given its transaction id's hashcode
+   * Retrieve proposal data given its order ID.
    *
    * @param cls closure
-   * @param h_transaction_id hashcode of the transaction id mentioned in this
-   * proposal data
-   * @param proposal_data where to store the retrieved proposal data
+   * @param proposal_data where to store the result
+   * @param order_id order_id used to lookup.
+   * @param merchant_pub instance's public key.
    * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
    * found, #GNUNET_SYSERR upon error
    */
@@ -192,6 +190,23 @@ struct TALER_MERCHANTDB_Plugin
                          json_t **proposal_data,
                          const char *order_id,
                          const struct TALER_MerchantPublicKeyP *merchant_pub);
+
+
+  /**
+   * Retrieve proposal data given its hashcode
+   *
+   * @param cls closure
+   * @param proposal_data where to store the result
+   * @param h_proposal_data hashcode used to lookup.
+   * @param merchant_pub instance's public key.
+   * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
+   * found, #GNUNET_SYSERR upon error
+   */
+  int
+  (*find_proposal_data_from_hash) (void *cls,
+                                   json_t **proposal_data,
+                                   const struct GNUNET_HashCode *h_proposal_data,
+                                   const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
   /**

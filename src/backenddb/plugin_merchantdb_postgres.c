@@ -24,6 +24,7 @@
 #include <gnunet/gnunet_postgres_lib.h>
 #include <taler/taler_util.h>
 #include <taler/taler_pq_lib.h>
+#include <taler/taler_json_lib.h>
 #include "taler_merchantdb_plugin.h"
 
 
@@ -167,6 +168,7 @@ postgres_initialize (void *cls)
            "order_id VARCHAR NOT NULL"
            ",merchant_pub BYTEA NOT NULL"
            ",proposal_data BYTEA NOT NULL"
+           ",h_proposal_data BYTEA NOT NULL"
            ",timestamp INT8 NOT NULL"
 	   ",PRIMARY KEY (order_id, merchant_pub)"
            ");");
@@ -283,10 +285,21 @@ postgres_initialize (void *cls)
               "(order_id"
               ",merchant_pub"
               ",timestamp"
-              ",proposal_data)"
+              ",proposal_data"
+              ",h_proposal_data)"
               " VALUES "
-              "($1, $2, $3, $4)",
+              "($1, $2, $3, $4, $5)",
               4);
+
+  PG_PREPARE (pg,
+              "find_proposal_data_from_hash",
+              "SELECT"
+              " proposal_data"
+              " FROM merchant_proposal_data"
+              " WHERE"
+              " h_proposal_data=$1"
+              " AND merchant_pub=$2",
+              2);
 
   PG_PREPARE (pg,
               "find_proposal_data",
@@ -407,6 +420,65 @@ postgres_initialize (void *cls)
  * found, #GNUNET_SYSERR upon error
  */
 static int
+postgres_find_proposal_data_from_hash (void *cls,
+                                       json_t **proposal_data,
+                                       const struct GNUNET_HashCode *h_proposal_data,
+                                       const struct TALER_MerchantPublicKeyP *merchant_pub)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int i;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_proposal_data_from_hash",
+                                    params);
+  i = PQntuples (result);
+  if (1 < i)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Mupltiple proposal data hash the same hashcode!\n");
+    return GNUNET_SYSERR;
+  }
+
+  if (0 == i)
+    return GNUNET_NO;
+
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_json ("proposal_data",
+                               proposal_data),
+    GNUNET_PQ_result_spec_end
+  };
+  if (GNUNET_OK !=
+      GNUNET_PQ_extract_result (result,
+                                rs,
+                                0))
+  {
+    GNUNET_break (0);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+
+  return GNUNET_OK;
+}
+
+
+/**
+ * Retrieve proposal data given its transaction id's hashcode
+ *
+ * @param cls closure
+ * @param h_transaction_id hashcode of the transaction id mentioned in this
+ * proposal data
+ * @param proposal_data where to store the retrieved proposal data
+ * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
+ * found, #GNUNET_SYSERR upon error
+ */
+static int
 postgres_find_proposal_data (void *cls,
                              json_t **proposal_data,
                              const char *order_id,
@@ -474,12 +546,18 @@ postgres_insert_proposal_data (void *cls,
   struct PostgresClosure *pg = cls;
   PGresult *result;
   int ret;
+  struct GNUNET_HashCode h_proposal_data;
+
+  if (GNUNET_OK != TALER_JSON_hash (proposal_data,
+                                    &h_proposal_data))
+    return GNUNET_SYSERR;
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_absolute_time (&timestamp),
     TALER_PQ_query_param_json (proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (&h_proposal_data),
     GNUNET_PQ_query_param_end
   };
 
@@ -1370,6 +1448,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->insert_proposal_data = &postgres_insert_proposal_data;
   plugin->find_proposal_data = &postgres_find_proposal_data;
   plugin->find_proposal_data_by_date = &postgres_find_proposal_data_by_date;
+  plugin->find_proposal_data_from_hash = &postgres_find_proposal_data_from_hash;
 
   return plugin;
 }

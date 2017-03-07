@@ -75,6 +75,11 @@ const char *order_id;
 struct GNUNET_HashCode h_proposal_data;
 
 /**
+ * Proposal's hash.
+ */
+struct GNUNET_HashCode h_proposal_data2;
+
+/**
  * Time of the transaction.
  */
 static struct GNUNET_TIME_Absolute timestamp;
@@ -347,6 +352,9 @@ run (void *cls)
   contract = json_object ();
   proposal_data = json_object ();
 
+  TALER_JSON_hash (proposal_data,
+                   &h_proposal_data2);
+
   FAILIF (GNUNET_OK !=
           plugin->insert_proposal_data (plugin->cls,
                                         order_id,
@@ -362,6 +370,11 @@ run (void *cls)
                                       order_id,
                                       &merchant_pub));
 
+  FAILIF (GNUNET_OK !=
+          plugin->find_proposal_data_from_hash (plugin->cls,
+                                                &out, // plain data
+                                                &h_proposal_data2,
+                                                &merchant_pub));
   FAILIF (1 !=
           plugin->find_proposal_data_by_date (plugin->cls,
                                               fake_now,

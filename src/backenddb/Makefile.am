@@ -36,6 +36,7 @@ libtaler_plugin_merchantdb_postgres_la_LDFLAGS = \
   -lgnunetpq \
   -ltalerpq \
   -ltalerutil \
+  -ltalerjson \
   -lpq \
   -lgnunetpostgres \
   -lgnunetutil $(XLIB)
@@ -53,6 +54,7 @@ test_merchantdb_postgres_SOURCES = \
 test_merchantdb_postgres_LDFLAGS = \
   -lgnunetutil \
   -ltalerutil \
+  -ltalerjson \
   -ljansson
 
 test_merchantdb_postgres_LDADD = \
