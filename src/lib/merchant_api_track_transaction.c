@@ -94,73 +94,11 @@ static int
 parse_track_transaction_ok (struct TALER_MERCHANT_TrackTransactionHandle *tdo,
                             const json_t *json)
 {
-  unsigned int num_transfers = json_array_size (json);
-  struct TALER_MERCHANT_TransactionWireTransfer transfers[num_transfers];
-  unsigned int i;
-
-  if (0 == num_transfers)
-  {
-    /* zero transfers is not a valid reply */
-    GNUNET_break_op (0);
-    return GNUNET_SYSERR;
-  }
-  for (i=0;i<num_transfers;i++)
-  {
-    struct TALER_MERCHANT_TransactionWireTransfer *transfer = &transfers[i];
-    json_t *coins;
-    unsigned int j;
-    struct GNUNET_JSON_Specification spec[] = {
-      GNUNET_JSON_spec_fixed_auto ("wtid",
-                                   &transfer->wtid),
-      GNUNET_JSON_spec_absolute_time ("execution_time",
-                                      &transfer->execution_time),
-      GNUNET_JSON_spec_json ("coins",
-                             &coins),
-      GNUNET_JSON_spec_end()
-    };
-
-    if (GNUNET_OK !=
-        GNUNET_JSON_parse (json_array_get (json, i),
-                           spec,
-                           NULL, NULL))
-    {
-      GNUNET_break_op (0);
-      return GNUNET_SYSERR;
-    }
-    transfer->num_coins = json_array_size (coins);
-    transfer->coins = GNUNET_new_array (transfer->num_coins,
-                                        struct TALER_MERCHANT_CoinWireTransfer);
-    for (j=0;j<transfer->num_coins;j++)
-    {
-      struct TALER_MERCHANT_CoinWireTransfer *coin = &transfer->coins[j];
-      struct GNUNET_JSON_Specification coin_spec[] = {
-        GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin->coin_pub),
-        TALER_JSON_spec_amount ("amount_with_fee", &coin->amount_with_fee),
-        TALER_JSON_spec_amount ("deposit_fee", &coin->deposit_fee),
-        GNUNET_JSON_spec_end()
-      };
-      if (GNUNET_OK !=
-          GNUNET_JSON_parse (json_array_get (coins, j),
-                             coin_spec,
-                             NULL, NULL))
-      {
-        GNUNET_break_op (0);
-        GNUNET_JSON_parse_free (spec);
-        free_transfers (i,
-                        transfers);
-        return GNUNET_SYSERR;
-      }
-    }
-    GNUNET_JSON_parse_free (spec);
-  }
   tdo->cb (tdo->cb_cls,
            MHD_HTTP_OK,
 	   TALER_EC_NONE,
-           json,
-           num_transfers,
-           transfers);
-  free_transfers (num_transfers,
-                  transfers);
+           json);
+
   return GNUNET_OK;
 }
 
@@ -219,9 +157,7 @@ handle_track_transaction_finished (void *cls,
   tdo->cb (tdo->cb_cls,
            response_code,
 	   TALER_JSON_get_error_code (json),
-           json,
-           0,
-           NULL);
+           json);
 }
 
 

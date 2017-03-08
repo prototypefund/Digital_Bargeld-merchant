@@ -1343,9 +1343,7 @@ static void
 track_transaction_cb (void *cls,
                       unsigned int http_status,
 		      enum TALER_ErrorCode ec,
-                      const json_t *json,
-                      unsigned int num_transfers,
-                      const struct TALER_MERCHANT_TransactionWireTransfer *transfers)
+                      const json_t *json)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -1361,76 +1359,8 @@ track_transaction_cb (void *cls,
     fail (is);
     return;
   }
-  /* Test result vs. expecations... */
-  switch (http_status)
-  {
-  case MHD_HTTP_OK:
-    {
-      const struct Command *ref;
-      struct TALER_Amount ea;
-      struct TALER_Amount wire_fee;
-      struct TALER_Amount coin_contribution;
-
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Successful /track/tracking\n");
-      if (1 != num_transfers)
-      {
-        GNUNET_break (0);
-        json_dumpf (json, stderr, 0);
-        fail (is);
-        return;
-      }
-      ref = find_command (is,
-                          cmd->details.track_transaction.expected_transfer_ref);
-      GNUNET_assert (NULL != ref);
-      if (0 != memcmp (&ref->details.check_bank_transfer.wtid,
-                       &transfers[0].wtid,
-                       sizeof (struct TALER_WireTransferIdentifierRawP)))
-      {
-        GNUNET_break (0);
-        json_dumpf (json, stderr, 0);
-        fail (is);
-        return;
-      }
-      /* NOTE: this assumes that the wire transfer corresponds to a
-         single coin involved in a pay/deposit.  Thus, this invariant
-         may not always hold in the future depending on how the
-         testcases evolve. */
-      if (1 != transfers[0].num_coins)
-      {
-        GNUNET_break (0);
-        json_dumpf (json, stderr, 0);
-        fail (is);
-        return;
-      }
-      GNUNET_assert (GNUNET_OK ==
-                     TALER_string_to_amount (ref->details.check_bank_transfer.amount,
-                                             &ea));
-      GNUNET_assert (GNUNET_OK ==
-                     TALER_string_to_amount (cmd->details.track_transaction.wire_fee,
-                                             &wire_fee));
-      GNUNET_assert (GNUNET_OK ==
-                     TALER_amount_subtract (&coin_contribution,
-                                            &transfers[0].coins[0].amount_with_fee,
-                                            &transfers[0].coins[0].deposit_fee));
-      GNUNET_assert (GNUNET_OK ==
-                     TALER_amount_subtract (&coin_contribution,
-                                            &coin_contribution,
-                                            &wire_fee));
-      if (0 !=
-          TALER_amount_cmp (&ea,
-                            &coin_contribution))
-      {
-        GNUNET_break (0);
-        json_dumpf (json, stderr, 0);
-        fail (is);
-        return;
-      }
-      break;
-    }
-  default:
-    break;
-  }
+  if (MHD_HTTP_OK != http_status)
+    fail (is);
   next_command (is);
 }
 

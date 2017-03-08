@@ -493,9 +493,7 @@ typedef void
 (*TALER_MERCHANT_TrackTransactionCallback) (void *cls,
                                             unsigned int http_status,
 					    enum TALER_ErrorCode ec,
-                                            const json_t *json,
-                                            unsigned int num_transfers,
-                                            const struct TALER_MERCHANT_TransactionWireTransfer *transfers);
+                                            const json_t *json);
 
 
 /**

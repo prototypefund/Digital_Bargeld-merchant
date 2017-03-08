@@ -411,33 +411,31 @@ TMH_RESPONSE_make_track_transaction_ok (unsigned int num_transfers,
   struct MHD_Response *ret;
   unsigned int i;
   json_t *j_transfers;
+  struct TALER_Amount sum;
 
   j_transfers = json_array ();
   for (i=0;i<num_transfers;i++)
   {
     const struct TALER_MERCHANT_TransactionWireTransfer *transfer = &transfers[i];
-    json_t *j_coins;
     unsigned int j;
 
-    j_coins = json_array ();
-    for (j=0;j<transfer->num_coins;j++)
+    sum = transfer->coins[0].amount_with_fee;
+    for (j=1;j<transfer->num_coins;j++)
     {
       const struct TALER_MERCHANT_CoinWireTransfer *coin = &transfer->coins[j];
 
-      GNUNET_assert (0 ==
-                     json_array_append_new (j_coins,
-                                            json_pack ("{s:o, s:o, s:o}",
-                                                       "coin_pub", GNUNET_JSON_from_data_auto (&coin->coin_pub),
-                                                       "amount_with_fee", TALER_JSON_from_amount (&coin->amount_with_fee),
-                                                       "deposit_fee", TALER_JSON_from_amount (&coin->deposit_fee))));
+      GNUNET_assert (GNUNET_SYSERR != TALER_amount_add (&sum,
+                                                        &sum,
+                                                        &coin->amount_with_fee));
     }
+
     GNUNET_assert (0 ==
                    json_array_append_new (j_transfers,
                                           json_pack ("{s:s, s:o, s:o, s:o}",
                                                      "exchange", exchange_uri,
                                                      "wtid", GNUNET_JSON_from_data_auto (&transfer->wtid),
                                                      "execution_time", GNUNET_JSON_from_time_abs (transfer->execution_time),
-                                                     "coins", j_coins)));
+                                                     "amount", TALER_JSON_from_amount (&sum))));
   }
   ret = TMH_RESPONSE_make_json (j_transfers);
   json_decref (j_transfers);
