@@ -2,12 +2,12 @@
 AM_CPPFLAGS = -I$(top_srcdir)/src/include
 
 bin_PROGRAMS = \
-  merchant-create-payments
+  taler-merchant-generate-payments
 
-merchant_create_payments_SOURCES = \
-  create_payments.c
+taler_merchant_generate_payments_SOURCES = \
+  generate_payments.c
 
-merchant_create_payments_LDADD = \
+taler_merchant_generate_payments_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   -ltalermerchant \
   $(LIBGCRYPT_LIBS) \
