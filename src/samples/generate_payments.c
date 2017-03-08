@@ -28,11 +28,6 @@
 
 
 /**
- * Handle to database.
- */
-struct TALER_MERCHANTDB_Plugin *db;
-
-/**
  * Configuration handle.
  */
 struct GNUNET_CONFIGURATION_Handle *cfg;
@@ -48,10 +43,7 @@ main ()
   struct GNUNET_SIGNAL_Context *shc_chld;
 
 
-  /*** Very beginning ***/
   /* 1 Launch exchange */
-  /* 2 Launch merchant */
-  /* 3 What about the bank? */
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
@@ -61,13 +53,63 @@ main ()
   cfg = GNUNET_CONFIGURATION_create ();
   GNUNET_assert (GNUNET_OK ==
                  GNUNET_CONFIGURATION_load (cfg,
-                                            "merchant_create_payments.conf"));
+                                            "merchant_generate_payments.conf"));
 
-  db = TALER_MERCHANTDB_plugin_load (cfg);
-  if (NULL == db)
+
+  proc = GNUNET_OS_start_process (GNUNET_NO,
+                                  GNUNET_OS_INHERIT_STD_ALL,
+                                  NULL, NULL, NULL,
+                                  "taler-exchange-keyup",
+                                  "taler-exchange-keyup",
+                                  "-c", "merchant_generate_payments.conf",
+                                  NULL);
+  if (NULL == proc)
   {
-    GNUNET_CONFIGURATION_destroy (cfg);
+    fprintf (stderr,
+             "Failed to run taler-exchange-keyup. Check your PATH.\n");
     return 77;
   }
+
+
+  GNUNET_OS_process_wait (proc);
+  GNUNET_OS_process_destroy (proc);
+
+  proc = GNUNET_OS_start_process (GNUNET_NO,
+                                  GNUNET_OS_INHERIT_STD_ALL,
+                                  NULL, NULL, NULL,
+                                  "taler-exchange-dbinit",
+                                  "taler-exchange-dbinit",
+                                  "-c", "merchant_generate_payments.conf",
+                                  "-r",
+                                  NULL);
+  if (NULL == proc)
+  {
+    fprintf (stderr,
+             "Failed to run taler-exchange-dbinit. Check your PATH.\n");
+    return 77;
+  }
+  GNUNET_OS_process_wait (proc);
+  GNUNET_OS_process_destroy (proc);
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "About to launch the exchange.\n");
+
+  exchanged = GNUNET_OS_start_process (GNUNET_NO,
+                                       GNUNET_OS_INHERIT_STD_ALL,
+                                       NULL, NULL, NULL,
+                                       "taler-exchange-httpd",
+                                       "taler-exchange-httpd",
+                                       "-c", "merchant_generate_payments.conf",
+                                       NULL);
+  if (NULL == exchanged)
+  {
+    fprintf (stderr,
+             "Failed to run taler-exchange-httpd. Check your PATH.\n");
+    return 77;
+  }
+
+  /*Remove this!*/
+  GNUNET_OS_process_wait (exchanged);
+  GNUNET_OS_process_destroy (exchanged);
 
 }
