@@ -1,0 +1,3 @@
+Here is the logic that creates dummy payments into the
+merchant's DB, mainly used for debugging applications that
+need some real data from the merchant backend. 
