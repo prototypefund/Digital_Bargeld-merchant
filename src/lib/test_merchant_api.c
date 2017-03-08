@@ -1361,6 +1361,9 @@ track_transaction_cb (void *cls,
   }
   if (MHD_HTTP_OK != http_status)
     fail (is);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "/track/order response: %s\n",
+              json_dumps (json, JSON_INDENT (1)));
   next_command (is);
 }
 
