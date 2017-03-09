@@ -26,6 +26,9 @@
 #include <gnunet/gnunet_curl_lib.h>
 #include <microhttpd.h>
 
+#define EXCHANGE_URI "http://localhost:8081/"
+
+#define MERCHANT_URI "http://localhost:8082"
 
 /**
  * Configuration handle.
@@ -108,8 +111,71 @@ main ()
     return 77;
   }
 
-  /*Remove this!*/
-  GNUNET_OS_process_wait (exchanged);
-  GNUNET_OS_process_destroy (exchanged);
+  fprintf (stderr,
+           "Waiting for taler-exchange-httpd to be ready\n");
+  cnt = 0;
+  do
+    {
+      fprintf (stderr, ".");
+      sleep (1);
+      cnt++;
+      if (cnt > 60)
+      {
+        fprintf (stderr,
+                 "\nFailed to start taler-exchange-httpd\n");
+        GNUNET_OS_process_kill (exchanged,
+                                SIGKILL);
+        GNUNET_OS_process_wait (exchanged);
+        GNUNET_OS_process_destroy (exchanged);
+        return 77;
+      }
+    }
+  while (0 != system ("wget -q -t 1 -T 1 " EXCHANGE_URI "keys -o /dev/null -O /dev/null"));
+  fprintf (stderr, "\n");
+
+  merchantd = GNUNET_OS_start_process (GNUNET_NO,
+                                       GNUNET_OS_INHERIT_STD_ALL,
+                                       NULL, NULL, NULL,
+                                       "taler-merchant-httpd",
+                                       "taler-merchant-httpd",
+                                       "-c", "merchant_generate_payments.conf",
+                                       "-L", "DEBUG",
+                                       NULL);
+  if (NULL == merchantd)
+  {
+    fprintf (stderr,
+             "Failed to run taler-merchant-httpd. Check your PATH.\n");
+    GNUNET_OS_process_kill (exchanged,
+                            SIGKILL);
+    GNUNET_OS_process_wait (exchanged);
+    GNUNET_OS_process_destroy (exchanged);
+    return 77;
+  }
+  /* give child time to start and bind against the socket */
+  fprintf (stderr,
+           "Waiting for taler-merchant-httpd to be ready\n");
+  cnt = 0;
+  do
+    {
+      fprintf (stderr, ".");
+      sleep (1);
+      cnt++;
+      if (cnt > 60)
+      {
+        fprintf (stderr,
+                 "\nFailed to start taler-merchant-httpd\n");
+        GNUNET_OS_process_kill (merchantd,
+                                SIGKILL);
+        GNUNET_OS_process_wait (merchantd);
+        GNUNET_OS_process_destroy (merchantd);
+        GNUNET_OS_process_kill (exchanged,
+                                SIGKILL);
+        GNUNET_OS_process_wait (exchanged);
+        GNUNET_OS_process_destroy (exchanged);
+        return 77;
+      }
+    }
+  while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URI " -o /dev/null -O /dev/null"));
+  fprintf (stderr, "\n");
 
 }
