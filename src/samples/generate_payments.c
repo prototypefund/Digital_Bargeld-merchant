@@ -28,11 +28,13 @@
 
 #define EXCHANGE_URI "http://localhost:8081/"
 
-#define MERCHANT_URI "http://localhost:8082"
-
 #define BANK_URI "http://localhost:8083/"
 
 #define ORDER_MAX_SIZE 1000
+
+const char *exchange_uri;
+
+const char *backend_uri;
 
 /**
  * Task run on timeout.
@@ -834,7 +836,7 @@ interpreter_run (void *cls)
 
       cmd->details.pay.ph
 	= TALER_MERCHANT_pay_wallet (ctx,
-				     MERCHANT_URI,
+				     backend_uri,
                                      "default",
 				     &ref->details.proposal.hash,
 				     &total_amount,
@@ -882,7 +884,7 @@ interpreter_run (void *cls)
         }
         cmd->details.proposal.po
           = TALER_MERCHANT_order_put (ctx,
-                                      MERCHANT_URI,
+                                      backend_uri,
                                       order,
                                       &proposal_cb,
                                       is);
@@ -1457,6 +1459,7 @@ main ()
   struct GNUNET_OS_Process *merchantd;
   unsigned int cnt;
   struct GNUNET_SIGNAL_Context *shc_chld;
+  char *wget_cmd;
 
 
   unsetenv ("XDG_DATA_HOME");
@@ -1566,6 +1569,10 @@ main ()
   fprintf (stderr,
            "Waiting for taler-merchant-httpd to be ready\n");
   cnt = 0;
+
+  GNUNET_asprintf (&wget_cmd,
+                   "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null",
+                   backend_uri);
   do
     {
       fprintf (stderr, ".");
@@ -1586,9 +1593,10 @@ main ()
         return 77;
       }
     }
-  while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URI " -o /dev/null -O /dev/null"));
-  fprintf (stderr, "\n");
+  while (0 != system (wget_cmd));
 
+  GNUNET_free (wget_cmd);
+  fprintf (stderr, "\n");
 
   result = GNUNET_SYSERR;
   sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO, GNUNET_NO, GNUNET_NO);
