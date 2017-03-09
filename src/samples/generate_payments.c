@@ -222,6 +222,102 @@ do_timeout (void *cls)
 }
 
 /**
+ * The generator failed, return with an error code.
+ *
+ * @param is interpreter state to clean up
+ */
+static void
+fail (struct InterpreterState *is)
+{
+  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+              "Interpreter failed at step %s (#%u)\n",
+              is->commands[is->ip].label,
+              is->ip);
+  result = GNUNET_SYSERR;
+  GNUNET_SCHEDULER_shutdown ();
+}
+
+/**
+ * Run the main interpreter loop that performs exchange operations.
+ *
+ * @param cls contains the `struct InterpreterState`
+ */
+static void
+interpreter_run (void *cls);
+
+/**
+ * Run the next command with the interpreter.
+ *
+ * @param is current interpeter state.
+ */
+static void
+next_command (struct InterpreterState *is)
+{
+  is->ip++;
+  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
+                                       is);
+}
+
+/**
+ * Function called upon completion of our /admin/add/incoming request.
+ *
+ * @param cls closure with the interpreter state
+ * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param full_response full response from the exchange (for logging, in case of errors)
+ */
+static void
+add_incoming_cb (void *cls,
+                 unsigned int http_status,
+		 enum TALER_ErrorCode ec,
+                 const json_t *full_response)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  cmd->details.admin_add_incoming.aih = NULL;
+  if (MHD_HTTP_OK != http_status)
+  {
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
+  next_command (is);
+}
+
+/**
+ * Find a command by label.
+ *
+ * @param is interpreter state to search
+ * @param label label to look for
+ * @return NULL if command was not found
+ */
+static const struct Command *
+find_command (const struct InterpreterState *is,
+              const char *label)
+{
+  unsigned int i;
+  const struct Command *cmd;
+
+  if (NULL == label)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Attempt to lookup command for empty label\n");
+    return NULL;
+  }
+  for (i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
+    if ( (NULL != cmd->label) &&
+         (0 == strcmp (cmd->label,
+                       label)) )
+      return cmd;
+  GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+              "Command not found: %s\n",
+              label);
+  return NULL;
+}
+
+/**
  * Run the main interpreter loop that performs exchange operations.
  *
  * @param cls contains the `struct InterpreterState`
@@ -229,7 +325,201 @@ do_timeout (void *cls)
 static void
 interpreter_run (void *cls)
 {
-  return;
+  const struct GNUNET_SCHEDULER_TaskContext *tc;
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  const struct Command *ref;
+  struct TALER_ReservePublicKeyP reserve_pub;
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+  struct TALER_Amount amount;
+  struct GNUNET_TIME_Absolute execution_date;
+  json_t *sender_details;
+  json_t *transfer_details;
+
+  is->task = NULL;
+  tc = GNUNET_SCHEDULER_get_task_context ();
+  if (0 != (tc->reason & GNUNET_SCHEDULER_REASON_SHUTDOWN))
+  {
+    fprintf (stderr,
+             "Test aborted by shutdown request\n");
+    fail (is);
+    return;
+  }
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+	      "Interpreter runs command %u/%s(%u)\n",
+	      is->ip,
+	      cmd->label,
+	      cmd->oc);
+
+  switch (cmd->oc)
+  {
+    case OC_END:
+      result = GNUNET_OK;
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+
+    case OC_ADMIN_ADD_INCOMING:
+      if (NULL !=
+          cmd->details.admin_add_incoming.reserve_reference)
+      {
+        ref = find_command (is,
+                            cmd->details.admin_add_incoming.reserve_reference);
+        GNUNET_assert (NULL != ref);
+        GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
+        cmd->details.admin_add_incoming.reserve_priv
+          = ref->details.admin_add_incoming.reserve_priv;
+      }
+      else
+      {
+        struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
+  
+        priv = GNUNET_CRYPTO_eddsa_key_create ();
+        cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
+        GNUNET_free (priv);
+      }
+      GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
+                                          &reserve_pub.eddsa_pub);
+      if (GNUNET_OK !=
+          TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
+                                  &amount))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse amount `%s' at %u\n",
+                    cmd->details.admin_add_incoming.amount,
+                    is->ip);
+        fail (is);
+        return;
+      }
+  
+      execution_date = GNUNET_TIME_absolute_get ();
+      GNUNET_TIME_round_abs (&execution_date);
+      sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
+                                   JSON_REJECT_DUPLICATES,
+                                   NULL);
+      if (NULL == sender_details)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse sender details `%s' at %u\n",
+                    cmd->details.admin_add_incoming.sender_details,
+                    is->ip);
+        fail (is);
+        return;
+      }
+      transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
+                                     JSON_REJECT_DUPLICATES,
+                                     NULL);
+  
+      if (NULL == transfer_details)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse transfer details `%s' at %u\n",
+                    cmd->details.admin_add_incoming.transfer_details,
+                    is->ip);
+        fail (is);
+        return;
+      }
+  
+      cmd->details.admin_add_incoming.aih
+        = TALER_EXCHANGE_admin_add_incoming (exchange,
+                                             "http://localhost:18080/",
+                                             &reserve_pub,
+                                             &amount,
+                                             execution_date,
+                                             sender_details,
+                                             transfer_details,
+                                             &add_incoming_cb,
+                                             is);
+      json_decref (sender_details);
+      json_decref (transfer_details);
+      if (NULL == cmd->details.admin_add_incoming.aih)
+      {
+        GNUNET_break (0);
+        fail (is);
+        return;
+      }
+      return;
+      if (NULL !=
+          cmd->details.admin_add_incoming.reserve_reference)
+      {
+        ref = find_command (is,
+                            cmd->details.admin_add_incoming.reserve_reference);
+        GNUNET_assert (NULL != ref);
+        GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
+        cmd->details.admin_add_incoming.reserve_priv
+          = ref->details.admin_add_incoming.reserve_priv;
+      }
+      else
+      {
+        struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
+  
+        priv = GNUNET_CRYPTO_eddsa_key_create ();
+        cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
+        GNUNET_free (priv);
+      }
+      GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
+                                          &reserve_pub.eddsa_pub);
+      if (GNUNET_OK !=
+          TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
+                                  &amount))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse amount `%s' at %u\n",
+                    cmd->details.admin_add_incoming.amount,
+                    is->ip);
+        fail (is);
+        return;
+      }
+  
+      execution_date = GNUNET_TIME_absolute_get ();
+      GNUNET_TIME_round_abs (&execution_date);
+      sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
+                                   JSON_REJECT_DUPLICATES,
+                                   NULL);
+      if (NULL == sender_details)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse sender details `%s' at %u\n",
+                    cmd->details.admin_add_incoming.sender_details,
+                    is->ip);
+        fail (is);
+        return;
+      }
+      transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
+                                     JSON_REJECT_DUPLICATES,
+                                     NULL);
+  
+      if (NULL == transfer_details)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse transfer details `%s' at %u\n",
+                    cmd->details.admin_add_incoming.transfer_details,
+                    is->ip);
+        fail (is);
+        return;
+      }
+  
+      cmd->details.admin_add_incoming.aih
+        = TALER_EXCHANGE_admin_add_incoming (exchange,
+                                             "http://localhost:18080/",
+                                             &reserve_pub,
+                                             &amount,
+                                             execution_date,
+                                             sender_details,
+                                             transfer_details,
+                                             &add_incoming_cb,
+                                             is);
+      json_decref (sender_details);
+      json_decref (transfer_details);
+      if (NULL == cmd->details.admin_add_incoming.aih)
+      {
+        GNUNET_break (0);
+        fail (is);
+        return;
+      }
+
+      return;
+
+  }
 }
 
 /**
@@ -373,7 +663,8 @@ run (void *cls)
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = "EUR:5.01" },
-    { .oc = OC_END }
+    { .oc = OC_END,
+      .label = "end-of-commands"}
   };
 
   is = GNUNET_new (struct InterpreterState);
