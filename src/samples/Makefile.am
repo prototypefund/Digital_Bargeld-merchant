@@ -9,7 +9,7 @@ taler_merchant_generate_payments_SOURCES = \
 
 taler_merchant_generate_payments_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
-  -ltalermerchant \
+  $(top_srcdir)/src/lib/libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
   -ltalerfakebank \
   -ltalerexchange \
