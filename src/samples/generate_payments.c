@@ -32,6 +32,8 @@
 
 #define BANK_URI "http://localhost:8083/"
 
+#define ORDER_MAX_SIZE 1000
+
 /**
  * Task run on timeout.
  */
@@ -165,6 +167,54 @@ struct Command
   {
 
     /**
+     * Information for a #OC_WITHDRAW_SIGN command.
+     */
+    struct
+    {
+
+      /**
+       * Which reserve should we withdraw from?
+       */
+      const char *reserve_reference;
+
+      /**
+       * String describing the denomination value we should withdraw.
+       * A corresponding denomination key must exist in the exchange's
+       * offerings.  Can be NULL if @e pk is set instead.
+       */
+      const char *amount;
+
+      /**
+       * If @e amount is NULL, this specifies the denomination key to
+       * use.  Otherwise, this will be set (by the interpreter) to the
+       * denomination PK matching @e amount.
+       */
+      const struct TALER_EXCHANGE_DenomPublicKey *pk;
+
+      /**
+       * Set (by the interpreter) to the exchange's signature over the
+       * coin's public key.
+       */
+      struct TALER_DenominationSignature sig;
+
+      /**
+       * Set (by the interpreter) to the coin's private key.
+       */
+      struct TALER_CoinSpendPrivateKeyP coin_priv;
+
+      /**
+       * Blinding key used for the operation.
+       */
+      struct TALER_DenominationBlindingKeyP blinding_key;
+
+      /**
+       * Withdraw handle (while operation is running).
+       */
+      struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
+
+    } reserve_withdraw;
+
+    /**
      * Information for a #OC_ADMIN_ADD_INCOMING command.
      */
     struct
@@ -204,6 +254,43 @@ struct Command
       struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
 
     } admin_add_incoming;
+
+    /**
+     * Information for an #OC_PROPOSAL command.
+     */
+    struct
+    {
+
+      /**
+       * The order.
+       * It's dynamically generated because we need different transaction_id
+       * for different merchant instances.
+       */
+      char order[ORDER_MAX_SIZE];
+
+      /**
+       * Handle to the active PUT /proposal operation, or NULL.
+       */
+      struct TALER_MERCHANT_ProposalOperation *po;
+
+      /**
+       * Full contract in JSON, set by the /contract operation.
+       * FIXME: verify in the code that this bit is actually proposal
+       * data and not the whole proposal.
+       */
+      json_t *proposal_data;
+
+      /**
+       * Proposal's signature.
+       */
+      struct TALER_MerchantSignatureP merchant_sig;
+
+      /**
+       * Proposal data's hashcode.
+       */
+      struct GNUNET_HashCode hash;
+
+    } proposal;
 
   } details;
 
@@ -256,6 +343,56 @@ next_command (struct InterpreterState *is)
   is->ip++;
   is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
                                        is);
+}
+
+/**
+ * Callback that works PUT /proposal's output.
+ *
+ * @param cls closure
+ * @param http_status HTTP response code, 200 indicates success;
+ *                    0 if the backend's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code
+ * @param obj the full received JSON reply, or
+ *            error details if the request failed
+ * @param proposal_data the order + additional information provided by the
+ * backend, NULL on error.
+ * @param sig merchant's signature over the contract, NULL on error
+ * @param h_contract hash of the contract, NULL on error
+ */
+static void
+proposal_cb (void *cls,
+             unsigned int http_status,
+	     enum TALER_ErrorCode ec,
+             const json_t *obj,
+             const json_t *proposal_data,
+             const struct TALER_MerchantSignatureP *sig,
+             const struct GNUNET_HashCode *hash)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  cmd->details.proposal.po = NULL;
+  switch (http_status)
+  {
+  case MHD_HTTP_OK:
+    cmd->details.proposal.proposal_data = json_incref ((json_t *) proposal_data);
+    cmd->details.proposal.merchant_sig = *sig;
+    cmd->details.proposal.hash = *hash;
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Hashed proposal, '%s'\n",
+                GNUNET_h2s (hash));
+    break;
+  default:
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "unexpected status code from /proposal: %u. Step %u\n",
+                http_status,
+                is->ip);
+    json_dumpf (obj, stderr, 0);
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
+  next_command (is);
 }
 
 /**
@@ -318,6 +455,114 @@ find_command (const struct InterpreterState *is,
 }
 
 /**
+ * Function called upon completion of our /reserve/withdraw request.
+ *
+ * @param cls closure with the interpreter state
+ * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code
+ * @param sig signature over the coin, NULL on error
+ * @param full_response full response from the exchange (for logging, in case of errors)
+ */
+static void
+reserve_withdraw_cb (void *cls,
+                     unsigned int http_status,
+		     enum TALER_ErrorCode ec,
+                     const struct TALER_DenominationSignature *sig,
+                     const json_t *full_response)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  cmd->details.reserve_withdraw.wsh = NULL;
+  if (cmd->expected_response_code != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u to command %s\n",
+                http_status,
+                cmd->label);
+    json_dumpf (full_response, stderr, 0);
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
+  switch (http_status)
+  {
+  case MHD_HTTP_OK:
+    if (NULL == sig)
+    {
+      GNUNET_break (0);
+      fail (is);
+      return;
+    }
+    cmd->details.reserve_withdraw.sig.rsa_signature
+      = GNUNET_CRYPTO_rsa_signature_dup (sig->rsa_signature);
+    break;
+  case MHD_HTTP_PAYMENT_REQUIRED:
+    /* nothing to check */
+    break;
+  default:
+    /* Unsupported status code (by test harness) */
+    GNUNET_break (0);
+    break;
+  }
+  next_command (is);
+}
+
+/**
+ * Find denomination key matching the given amount.
+ *
+ * @param keys array of keys to search
+ * @param amount coin value to look for
+ * @return NULL if no matching key was found
+ */
+static const struct TALER_EXCHANGE_DenomPublicKey *
+find_pk (const struct TALER_EXCHANGE_Keys *keys,
+         const struct TALER_Amount *amount)
+{
+  unsigned int i;
+  struct GNUNET_TIME_Absolute now;
+  struct TALER_EXCHANGE_DenomPublicKey *pk;
+  char *str;
+
+  now = GNUNET_TIME_absolute_get ();
+  for (i=0;i<keys->num_denom_keys;i++)
+  {
+    pk = &keys->denom_keys[i];
+    if ( (0 == TALER_amount_cmp (amount,
+                                 &pk->value)) &&
+         (now.abs_value_us >= pk->valid_from.abs_value_us) &&
+         (now.abs_value_us < pk->withdraw_valid_until.abs_value_us) )
+      return pk;
+  }
+  /* do 2nd pass to check if expiration times are to blame for failure */
+  str = TALER_amount_to_string (amount);
+  for (i=0;i<keys->num_denom_keys;i++)
+  {
+    pk = &keys->denom_keys[i];
+    if ( (0 == TALER_amount_cmp (amount,
+                                 &pk->value)) &&
+         ( (now.abs_value_us < pk->valid_from.abs_value_us) ||
+           (now.abs_value_us > pk->withdraw_valid_until.abs_value_us) ) )
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Have denomination key for `%s', but with wrong expiration range %llu vs [%llu,%llu)\n",
+                  str,
+                  (unsigned long long) now.abs_value_us,
+                  (unsigned long long) pk->valid_from.abs_value_us,
+                  (unsigned long long) pk->withdraw_valid_until.abs_value_us);
+      GNUNET_free (str);
+      return NULL;
+    }
+  }
+  GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+              "No denomination key for amount %s found\n",
+              str);
+  GNUNET_free (str);
+  return NULL;
+}
+
+/**
  * Run the main interpreter loop that performs exchange operations.
  *
  * @param cls contains the `struct InterpreterState`
@@ -357,6 +602,41 @@ interpreter_run (void *cls)
       result = GNUNET_OK;
       GNUNET_SCHEDULER_shutdown ();
       return;
+
+    case OC_PROPOSAL:
+      {
+        json_t *order;
+        json_error_t error;
+  
+        order = json_loads (cmd->details.proposal.order,
+                            JSON_REJECT_DUPLICATES,
+                            &error);
+        if (NULL == order)
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Failed to parse the order `%s' at command #%u: %s at %u\n",
+                      cmd->details.proposal.order,
+                      is->ip,
+                      error.text,
+                      (unsigned int) error.column);
+          fail (is);
+          return;
+        }
+        cmd->details.proposal.po
+          = TALER_MERCHANT_order_put (ctx,
+                                      MERCHANT_URI,
+                                      order,
+                                      &proposal_cb,
+                                      is);
+        json_decref (order);
+        if (NULL == cmd->details.proposal.po)
+        {
+          GNUNET_break (0);
+          fail (is);
+          return;
+        }
+        return;
+      }
 
     case OC_ADMIN_ADD_INCOMING:
       if (NULL !=
@@ -519,6 +799,74 @@ interpreter_run (void *cls)
 
       return;
 
+    case OC_WITHDRAW_SIGN:
+      GNUNET_assert (NULL !=
+                     cmd->details.reserve_withdraw.reserve_reference);
+      ref = find_command (is,
+                          cmd->details.reserve_withdraw.reserve_reference);
+      GNUNET_assert (NULL != ref);
+      GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
+      if (NULL != cmd->details.reserve_withdraw.amount)
+      {
+        if (GNUNET_OK !=
+            TALER_string_to_amount (cmd->details.reserve_withdraw.amount,
+                                    &amount))
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Failed to parse amount `%s' at %u\n",
+                      cmd->details.reserve_withdraw.amount,
+                      is->ip);
+          fail (is);
+          return;
+        }
+        cmd->details.reserve_withdraw.pk = find_pk (is->keys,
+                                                    &amount);
+      }
+      if (NULL == cmd->details.reserve_withdraw.pk)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to determine denomination key at %u\n",
+                    is->ip);
+        fail (is);
+        return;
+      }
+  
+      /* create coin's private key */
+      {
+        struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
+  
+        priv = GNUNET_CRYPTO_eddsa_key_create ();
+        cmd->details.reserve_withdraw.coin_priv.eddsa_priv = *priv;
+        GNUNET_free (priv);
+      }
+      GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.reserve_withdraw.coin_priv.eddsa_priv,
+                                          &coin_pub.eddsa_pub);
+      GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                                  &cmd->details.reserve_withdraw.blinding_key,
+                                  sizeof (cmd->details.reserve_withdraw.blinding_key));
+  
+      cmd->details.reserve_withdraw.wsh
+        = TALER_EXCHANGE_reserve_withdraw (exchange,
+                                           cmd->details.reserve_withdraw.pk,
+                                           &ref->details.admin_add_incoming.reserve_priv,
+                                           &cmd->details.reserve_withdraw.coin_priv,
+                                           &cmd->details.reserve_withdraw.blinding_key,
+                                           &reserve_withdraw_cb,
+                                           is);
+      if (NULL == cmd->details.reserve_withdraw.wsh)
+      {
+        GNUNET_break (0);
+        fail (is);
+        return;
+      }
+      return;
+
+    default:
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Unknown command, OC: %d, label: %s.\n",
+                  cmd->oc,
+                  cmd->label);
+      fail (is);
   }
 }
 
@@ -599,6 +947,41 @@ do_shutdown (void *cls)
     case OC_END:
       GNUNET_assert (0);
       break;
+
+    case OC_PROPOSAL:
+      if (NULL != cmd->details.proposal.po)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
+        cmd->details.proposal.po = NULL;
+      }
+      if (NULL != cmd->details.proposal.proposal_data)
+      {
+        json_decref (cmd->details.proposal.proposal_data);
+        cmd->details.proposal.proposal_data = NULL;
+      }
+      break;
+
+    case OC_WITHDRAW_SIGN:
+      if (NULL != cmd->details.reserve_withdraw.wsh)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_EXCHANGE_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
+        cmd->details.reserve_withdraw.wsh = NULL;
+      }
+      if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
+      {
+        GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
+        cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
+      }
+      break;
+
     case OC_ADMIN_ADD_INCOMING:
       if (NULL != cmd->details.admin_add_incoming.aih)
       {
@@ -663,6 +1046,30 @@ run (void *cls)
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = "EUR:5.01" },
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference = "create-reserve-1",
+      .details.reserve_withdraw.amount = "EUR:5" },
+
+    /* Create proposal */
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.proposal.order = "{\
+                  \"max_fee\":\
+                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
+                  \"order_id\":\"1\",\
+                  \"timestamp\":\"\\/Date(42)\\/\",\
+                  \"refund_deadline\":\"\\/Date(0)\\/\",\
+                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
+                  \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
+                  \"merchant\":{\"instance\":\"default\"},\
+		  \"summary\": \"merchant-lib testcase\",\
+                  \"products\":\
+                     [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }"},
+
     { .oc = OC_END,
       .label = "end-of-commands"}
   };
