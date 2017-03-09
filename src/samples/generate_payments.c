@@ -292,6 +292,63 @@ struct Command
 
     } proposal;
 
+    /**
+     * Information for a #OC_PAY command.
+     * FIXME: support tests where we pay with multiple coins at once.
+     */
+    struct
+    {
+
+      /**
+       * Reference to the contract.
+       */
+      const char *contract_ref;
+
+      /**
+       * Reference to a reserve_withdraw operation for a coin to
+       * be used for the /deposit operation.
+       */
+      const char *coin_ref;
+
+      /**
+       * If this @e coin_ref refers to an operation that generated
+       * an array of coins, this value determines which coin to use.
+       */
+      unsigned int coin_idx;
+
+      /**
+       * Amount to pay (from the coin, including fee).
+       */
+      const char *amount_with_fee;
+
+      /**
+       * Amount to pay (from the coin, excluding fee).  The sum of the
+       * deltas between all @e amount_with_fee and the @e
+       * amount_without_fee must be less than max_fee, and the sum of
+       * the @e amount_with_fee must be larger than the @e
+       * total_amount.
+       */
+      const char *amount_without_fee;
+
+      /**
+       * Deposit handle while operation is running.
+       */
+      struct TALER_MERCHANT_Pay *ph;
+
+      /**
+       * Hashcode of the proposal data associated to this payment.
+       */
+      struct GNUNET_HashCode h_proposal_data;
+
+      /**
+       * Merchant's public key
+       */
+      struct TALER_MerchantPublicKeyP merchant_pub;
+
+    } pay;
+
+
+
   } details;
 
 };
@@ -392,6 +449,83 @@ proposal_cb (void *cls,
     fail (is);
     return;
   }
+  next_command (is);
+}
+
+/**
+ * Function called with the result of a /pay operation.
+ *
+ * @param cls closure with the interpreter state
+ * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code
+ * @param obj the received JSON reply, should be kept as proof (and, in case of errors,
+ *            be forwarded to the customer)
+ */
+static void
+pay_cb (void *cls,
+        unsigned int http_status,
+	enum TALER_ErrorCode ec,
+        const json_t *obj)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  struct PaymentResponsePS mr;
+  struct GNUNET_CRYPTO_EddsaSignature sig;
+  struct GNUNET_HashCode h_proposal_data;
+  const char *error_name;
+  unsigned int error_line;
+
+  cmd->details.pay.ph = NULL;
+  if (cmd->expected_response_code != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u to command %s\n",
+                http_status,
+                cmd->label);
+    json_dumpf (obj, stderr, 0);
+    fail (is);
+    return;
+  }
+  if (MHD_HTTP_OK == http_status)
+  {
+    /* Check signature */
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_fixed_auto ("sig", &sig),
+      GNUNET_JSON_spec_fixed_auto ("h_proposal_data", &h_proposal_data),
+      GNUNET_JSON_spec_end ()
+    };
+    if (GNUNET_OK !=
+        GNUNET_JSON_parse (obj,
+                           spec,
+                           &error_name,
+                           &error_line))
+    {
+      GNUNET_break_op (0);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Parser failed on %s:%u\n",
+                  error_name,
+                  error_line);
+      fail (is);
+      return;
+    }
+    mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
+    mr.purpose.size = htonl (sizeof (mr));
+    mr.h_proposal_data = h_proposal_data;
+    if (GNUNET_OK !=
+        GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
+                                    &mr.purpose,
+  		                    &sig,
+  				    &cmd->details.pay.merchant_pub.eddsa_pub))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Merchant signature given in response to /pay invalid\n");
+      fail (is);
+      return;
+    }
+
+  }
+
   next_command (is);
 }
 
@@ -602,6 +736,130 @@ interpreter_run (void *cls)
       result = GNUNET_OK;
       GNUNET_SCHEDULER_shutdown ();
       return;
+
+  case OC_PAY:
+    {
+      struct TALER_MERCHANT_PayCoin pc;
+      const char *order_id;
+      struct GNUNET_TIME_Absolute refund_deadline;
+      struct GNUNET_TIME_Absolute pay_deadline;
+      struct GNUNET_TIME_Absolute timestamp;
+      struct GNUNET_HashCode h_wire;
+      struct TALER_MerchantPublicKeyP merchant_pub;
+      struct TALER_MerchantSignatureP merchant_sig;
+      struct TALER_Amount total_amount;
+      struct TALER_Amount max_fee;
+      const char *error_name;
+      unsigned int error_line;
+
+      /* get proposal */
+      ref = find_command (is,
+                          cmd->details.pay.contract_ref);
+      GNUNET_assert (NULL != ref);
+      merchant_sig = ref->details.proposal.merchant_sig;
+      GNUNET_assert (NULL != ref->details.proposal.proposal_data);
+      {
+        /* Get information that need to be replied in the deposit permission */
+        struct GNUNET_JSON_Specification spec[] = {
+          GNUNET_JSON_spec_string ("order_id", &order_id),
+          GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
+          GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
+          GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
+          GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
+          GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
+          TALER_JSON_spec_amount ("amount", &total_amount),
+          TALER_JSON_spec_amount ("max_fee", &max_fee),
+          GNUNET_JSON_spec_end()
+        };
+
+        if (GNUNET_OK !=
+            GNUNET_JSON_parse (ref->details.proposal.proposal_data,
+                               spec,
+                               &error_name,
+                               &error_line))
+        {
+          GNUNET_break_op (0);
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Parser failed on %s:%u\n",
+                      error_name,
+                      error_line);
+          fail (is);
+          return;
+        }
+        cmd->details.pay.merchant_pub = merchant_pub;
+      }
+
+      {
+        const struct Command *coin_ref;
+	memset (&pc, 0, sizeof (pc));
+	coin_ref = find_command (is,
+	                         cmd->details.pay.coin_ref);
+	GNUNET_assert (NULL != ref);
+	switch (coin_ref->oc)
+	{
+	case OC_WITHDRAW_SIGN:
+	  pc.coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
+	  pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
+	  pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
+          pc.denom_value = coin_ref->details.reserve_withdraw.pk->value;
+	  break;
+	default:
+	  GNUNET_assert (0);
+	}
+
+	if (GNUNET_OK !=
+	    TALER_string_to_amount (cmd->details.pay.amount_without_fee,
+				    &pc.amount_without_fee))
+	{
+	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		      "Failed to parse amount `%s' at %u\n",
+		      cmd->details.pay.amount_without_fee,
+		      is->ip);
+	  fail (is);
+	  return;
+	}
+
+	if (GNUNET_OK !=
+	    TALER_string_to_amount (cmd->details.pay.amount_with_fee,
+				    &pc.amount_with_fee))
+	{
+	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		      "Failed to parse amount `%s' at %u\n",
+		      cmd->details.pay.amount_with_fee,
+		      is->ip);
+	  fail (is);
+	  return;
+	}
+      }
+
+      cmd->details.pay.ph
+	= TALER_MERCHANT_pay_wallet (ctx,
+				     MERCHANT_URI,
+                                     "default",
+				     &ref->details.proposal.hash,
+				     &total_amount,
+				     &max_fee,
+				     &merchant_pub,
+                                     &merchant_sig,
+				     timestamp,
+				     refund_deadline,
+				     pay_deadline,
+				     &h_wire,
+				     EXCHANGE_URI,
+                                     order_id,
+				     1 /* num_coins */,
+				     &pc /* coins */,
+				     &pay_cb,
+				     is);
+    }
+    if (NULL == cmd->details.pay.ph)
+    {
+      GNUNET_break (0);
+      fail (is);
+      return;
+    }
+    return;
+
 
     case OC_PROPOSAL:
       {
@@ -948,6 +1206,18 @@ do_shutdown (void *cls)
       GNUNET_assert (0);
       break;
 
+    case OC_PAY:
+      if (NULL != cmd->details.pay.ph)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_pay_cancel (cmd->details.pay.ph);
+        cmd->details.pay.ph = NULL;
+      }
+      break;
+
     case OC_PROPOSAL:
       if (NULL != cmd->details.proposal.po)
       {
@@ -1069,6 +1339,14 @@ run (void *cls)
 		  \"summary\": \"merchant-lib testcase\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }"},
+
+    { .oc = OC_PAY,
+      .label = "deposit-simple",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay.contract_ref = "create-proposal-1",
+      .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99" },
 
     { .oc = OC_END,
       .label = "end-of-commands"}
