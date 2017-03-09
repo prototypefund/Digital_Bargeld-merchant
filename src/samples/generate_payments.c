@@ -1475,9 +1475,29 @@ main (int argc,
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
+
   GNUNET_log_setup ("merchant-create-payments",
                     "DEBUG",
                     NULL);
+
+  if (GNUNET_GETOPT_run ("merchant-payments-generator",
+                         options, argc, argv) < 0)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Invalid command line options."); 
+    return 77;
+  }
+
+  if (NULL == exchange_uri ||
+      NULL == merchant_uri ||
+      NULL == bank_uri)
+  {
+  
+  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+              "Please provide all arguments!\n"); 
+  return 77;
+  }
+
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "About to launch the exchange.\n");
 
@@ -1575,20 +1595,6 @@ main (int argc,
   GNUNET_assert (NULL != sigpipe);
   shc_chld = GNUNET_SIGNAL_handler_install (GNUNET_SIGCHLD,
                                             &sighandler_child_death);
-  if (GNUNET_GETOPT_run ("merchant-payments-generator",
-                         options, argc, argv) < 0)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Invalid command line options."); 
-    return 77;
-  }
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Options: exchange_uri '%s', merchant_uri '%s' bank_uri '%s'.",
-              exchange_uri,
-              merchant_uri,
-              bank_uri);
-
   GNUNET_SCHEDULER_run (&run, NULL);
 
   GNUNET_SIGNAL_handler_uninstall (shc_chld);
