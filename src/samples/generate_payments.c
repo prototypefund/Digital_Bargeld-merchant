@@ -35,6 +35,145 @@
  */
 struct GNUNET_CONFIGURATION_Handle *cfg;
 
+/**
+ * Result of the testcases, #GNUNET_OK on success.
+ */
+static int result;
+
+/**
+ * Pipe used to communicate child death via signal.
+ */
+static struct GNUNET_DISK_PipeHandle *sigpipe;
+
+/**
+ * State of the interpreter loop.
+ */
+struct InterpreterState
+{
+  /**
+   * Keys from the exchange.
+   */
+  const struct TALER_EXCHANGE_Keys *keys;
+
+  /**
+   * Commands the interpreter will run.
+   */
+  struct Command *commands;
+
+  /**
+   * Interpreter task (if one is scheduled).
+   */
+  struct GNUNET_SCHEDULER_Task *task;
+
+  /**
+   * Instruction pointer.  Tells #interpreter_run() which
+   * instruction to run next.
+   */
+  unsigned int ip;
+
+};
+
+/**
+ * Opcodes for the interpreter.
+ */
+enum OpCode
+{
+  /**
+   * Termination code, stops the interpreter loop (with success).
+   */
+  OC_END = 0,
+
+  /**
+   * Issue a GET /proposal to the backend.
+   */
+  OC_PROPOSAL_LOOKUP,
+
+  /**
+   * Add funds to a reserve by (faking) incoming wire transfer.
+   */
+  OC_ADMIN_ADD_INCOMING,
+
+  /**
+   * Check status of a reserve.
+   */
+  OC_WITHDRAW_STATUS,
+
+  /**
+   * Withdraw a coin from a reserve.
+   */
+  OC_WITHDRAW_SIGN,
+
+  /**
+   * Issue a PUT /proposal to the backend.
+   */
+  OC_PROPOSAL,
+
+  /**
+   * Pay with coins.
+   */
+  OC_PAY
+
+};
+
+
+/**
+ * Details for a exchange operation to execute.
+ */
+struct Command
+{
+  /**
+   * Opcode of the command.
+   */
+  enum OpCode oc;
+
+  /**
+   * Label for the command, can be NULL.
+   */
+  const char *label;
+
+  /**
+   * Which response code do we expect for this command?
+   */
+  unsigned int expected_response_code;
+
+  /**
+   * Details about the command.
+   */
+  union
+  {
+
+  };
+
+};
+
+
+/**
+ * Signal handler called for SIGCHLD.  Triggers the
+ * respective handler by writing to the trigger pipe.
+ */
+static void
+sighandler_child_death ()
+{
+  static char c;
+  int old_errno = errno;	/* back-up errno */
+
+  GNUNET_break (1 ==
+		GNUNET_DISK_file_write (GNUNET_DISK_pipe_handle
+					(sigpipe, GNUNET_DISK_PIPE_END_WRITE),
+					&c, sizeof (c)));
+  errno = old_errno;		/* restore errno */
+}
+
+/**
+ * Main function that will be run by the scheduler.
+ *
+ * @param cls closure
+ */
+static void
+run (void *cls)
+{
+  while(1);
+}
 
 int
 main ()
@@ -45,8 +184,6 @@ main ()
   unsigned int cnt;
   struct GNUNET_SIGNAL_Context *shc_chld;
 
-
-  /* 1 Launch exchange */
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
@@ -178,4 +315,25 @@ main ()
   while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URI " -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
 
+
+  result = GNUNET_SYSERR;
+  sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO, GNUNET_NO, GNUNET_NO);
+  GNUNET_assert (NULL != sigpipe);
+  shc_chld = GNUNET_SIGNAL_handler_install (GNUNET_SIGCHLD,
+                                            &sighandler_child_death);
+  GNUNET_SCHEDULER_run (&run, NULL);
+  GNUNET_SIGNAL_handler_uninstall (shc_chld);
+  shc_chld = NULL;
+  GNUNET_DISK_pipe_close (sigpipe);
+  GNUNET_OS_process_kill (merchantd,
+                          SIGTERM);
+  GNUNET_OS_process_wait (merchantd);
+  GNUNET_OS_process_destroy (merchantd);
+  GNUNET_OS_process_kill (exchanged,
+                          SIGTERM);
+  GNUNET_OS_process_wait (exchanged);
+  GNUNET_OS_process_destroy (exchanged);
+  if (77 == result)
+    return 77;
+  return (GNUNET_OK == result) ? 0 : 1;
 }
