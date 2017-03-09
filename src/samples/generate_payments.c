@@ -955,9 +955,13 @@ interpreter_run (void *cls)
         return;
       }
   
+      json_object_set (sender_details,
+                       "bank_uri",
+                       json_string (bank_uri));
+
       cmd->details.admin_add_incoming.aih
         = TALER_EXCHANGE_admin_add_incoming (exchange,
-                                             "http://localhost:18080/",
+                                             exchange_uri,
                                              &reserve_pub,
                                              &amount,
                                              execution_date,
@@ -973,89 +977,6 @@ interpreter_run (void *cls)
         fail (is);
         return;
       }
-      return;
-      if (NULL !=
-          cmd->details.admin_add_incoming.reserve_reference)
-      {
-        ref = find_command (is,
-                            cmd->details.admin_add_incoming.reserve_reference);
-        GNUNET_assert (NULL != ref);
-        GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
-        cmd->details.admin_add_incoming.reserve_priv
-          = ref->details.admin_add_incoming.reserve_priv;
-      }
-      else
-      {
-        struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-  
-        priv = GNUNET_CRYPTO_eddsa_key_create ();
-        cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
-        GNUNET_free (priv);
-      }
-      GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
-                                          &reserve_pub.eddsa_pub);
-      if (GNUNET_OK !=
-          TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
-                                  &amount))
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse amount `%s' at %u\n",
-                    cmd->details.admin_add_incoming.amount,
-                    is->ip);
-        fail (is);
-        return;
-      }
-  
-      execution_date = GNUNET_TIME_absolute_get ();
-      GNUNET_TIME_round_abs (&execution_date);
-      sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
-                                   JSON_REJECT_DUPLICATES,
-                                   NULL);
-      if (NULL == sender_details)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse sender details `%s' at %u\n",
-                    cmd->details.admin_add_incoming.sender_details,
-                    is->ip);
-        fail (is);
-        return;
-      }
-
-      json_object_set (sender_details, "bank_uri", json_string (bank_uri));
-
-      transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
-                                     JSON_REJECT_DUPLICATES,
-                                     NULL);
-  
-      if (NULL == transfer_details)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse transfer details `%s' at %u\n",
-                    cmd->details.admin_add_incoming.transfer_details,
-                    is->ip);
-        fail (is);
-        return;
-      }
-  
-      cmd->details.admin_add_incoming.aih
-        = TALER_EXCHANGE_admin_add_incoming (exchange,
-                                             "http://localhost:18080/",
-                                             &reserve_pub,
-                                             &amount,
-                                             execution_date,
-                                             sender_details,
-                                             transfer_details,
-                                             &add_incoming_cb,
-                                             is);
-      json_decref (sender_details);
-      json_decref (transfer_details);
-      if (NULL == cmd->details.admin_add_incoming.aih)
-      {
-        GNUNET_break (0);
-        fail (is);
-        return;
-      }
-
       return;
 
     case OC_WITHDRAW_SIGN:
@@ -1467,7 +1388,7 @@ main (int argc,
     { 'm', "merchant-uri", "MERCHANT_URI",
       "Indicates the merchant backend's URI.", GNUNET_YES,
       &GNUNET_GETOPT_set_string, &merchant_uri},
-    { 'b', "merchant-uri", "MERCHANT_URI",
+    { 'b', "bank-uri", "BANK_URI",
       "Indicates the bank's URI.", GNUNET_YES,
       &GNUNET_GETOPT_set_string, &bank_uri},
     GNUNET_GETOPT_OPTION_END
@@ -1586,7 +1507,7 @@ main (int argc,
         return 77;
       }
     }
-  while (wget_cmd);
+  while (0 != system (wget_cmd));
   fprintf (stderr, "\n");
   GNUNET_free (wget_cmd);
 
