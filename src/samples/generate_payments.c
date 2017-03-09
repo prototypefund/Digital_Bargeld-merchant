@@ -330,7 +330,31 @@ do_shutdown (void *cls)
       break;
     }
 
+  if (NULL != is->task)
+  {
+    GNUNET_SCHEDULER_cancel (is->task);
+    is->task = NULL;
+  }
+  GNUNET_free (is);
+  if (NULL != exchange)
+  {
+    TALER_EXCHANGE_disconnect (exchange);
+    exchange = NULL;
+  }
+  if (NULL != ctx)
+  {
+    GNUNET_CURL_fini (ctx);
+    ctx = NULL;
+  }
+  if (NULL != rc)
+  {
+    GNUNET_CURL_gnunet_rc_destroy (rc);
+    rc = NULL;
+  }
+
+  GNUNET_CONFIGURATION_destroy (cfg);
 }
+
 /**
  * Main function that will be run by the scheduler.
  *
