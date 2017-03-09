@@ -30,6 +30,28 @@
 
 #define MERCHANT_URI "http://localhost:8082"
 
+#define BANK_URI "http://localhost:8083/"
+
+/**
+ * Task run on timeout.
+ */
+static struct GNUNET_SCHEDULER_Task *timeout_task;
+
+/**
+ * Handle to access the exchange.
+ */
+static struct TALER_EXCHANGE_Handle *exchange;
+
+/**
+ * Main execution context for the main loop of the exchange.
+ */
+static struct GNUNET_CURL_Context *ctx;
+
+/**
+ * Context for running the #ctx's event loop.
+ */
+static struct GNUNET_CURL_RescheduleContext *rc;
+
 /**
  * Configuration handle.
  */
@@ -142,10 +164,108 @@ struct Command
   union
   {
 
-  };
+    /**
+     * Information for a #OC_ADMIN_ADD_INCOMING command.
+     */
+    struct
+    {
+
+      /**
+       * Label to another admin_add_incoming command if we
+       * should deposit into an existing reserve, NULL if
+       * a fresh reserve should be created.
+       */
+      const char *reserve_reference;
+
+      /**
+       * String describing the amount to add to the reserve.
+       */
+      const char *amount;
+
+      /**
+       * Sender's bank account details (JSON).
+       */
+      const char *sender_details;
+
+      /**
+       * Transfer details (JSON)
+       */
+       const char *transfer_details;
+
+      /**
+       * Set (by the interpreter) to the reserve's private key
+       * we used to fill the reserve.
+       */
+      struct TALER_ReservePrivateKeyP reserve_priv;
+
+      /**
+       * Set to the API's handle during the operation.
+       */
+      struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
+
+    } admin_add_incoming;
+
+  } details;
 
 };
 
+/**
+ * Function run when the test times out.
+ *
+ * @param cls NULL
+ */
+static void
+do_timeout (void *cls)
+{
+  timeout_task = NULL;
+  GNUNET_SCHEDULER_shutdown ();
+}
+
+/**
+ * Run the main interpreter loop that performs exchange operations.
+ *
+ * @param cls contains the `struct InterpreterState`
+ */
+static void
+interpreter_run (void *cls)
+{
+  return;
+}
+
+/**
+ * Functions of this type are called to provide the retrieved signing and
+ * denomination keys of the exchange.  No TALER_EXCHANGE_*() functions should
+ * be called in this callback.
+ *
+ * @param cls closure
+ * @param keys information about keys of the exchange
+ */
+static void
+cert_cb (void *cls,
+         const struct TALER_EXCHANGE_Keys *keys)
+{
+  struct InterpreterState *is = cls;
+
+  /* check that keys is OK */
+#define ERR(cond) do { if(!(cond)) break; GNUNET_break (0); GNUNET_SCHEDULER_shutdown(); return; } while (0)
+  ERR (NULL == keys);
+  ERR (0 == keys->num_sign_keys);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Read %u signing keys\n",
+              keys->num_sign_keys);
+  ERR (0 == keys->num_denom_keys);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Read %u denomination keys\n",
+              keys->num_denom_keys);
+#undef ERR
+
+  /* run actual tests via interpreter-loop */
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+	      "Certificate callback invoked, starting interpreter\n");
+  is->keys = keys;
+  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
+                                       is);
+}
 
 /**
  * Signal handler called for SIGCHLD.  Triggers the
@@ -165,6 +285,53 @@ sighandler_child_death ()
 }
 
 /**
+ * Function run when the test terminates (good or bad).
+ * Cleans up our state.
+ *
+ * @param cls the interpreter state.
+ */
+static void
+do_shutdown (void *cls)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd;
+  unsigned int i;
+
+  if (NULL != timeout_task)
+  {
+    GNUNET_SCHEDULER_cancel (timeout_task);
+    timeout_task = NULL;
+  }
+
+  for (i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
+    switch (cmd->oc)
+    {
+    case OC_END:
+      GNUNET_assert (0);
+      break;
+    case OC_ADMIN_ADD_INCOMING:
+      if (NULL != cmd->details.admin_add_incoming.aih)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
+        cmd->details.admin_add_incoming.aih = NULL;
+      }
+      break;
+
+    default:
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Shutdown: unknown instruction %d at %u (%s)\n",
+                  cmd->oc,
+                  i,
+                  cmd->label);
+      break;
+    }
+
+}
+/**
  * Main function that will be run by the scheduler.
  *
  * @param cls closure
@@ -172,7 +339,38 @@ sighandler_child_death ()
 static void
 run (void *cls)
 {
-  while(1);
+  struct InterpreterState *is;
+  static struct Command commands[] =
+  {
+    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
+      .details.admin_add_incoming.amount = "EUR:5.01" },
+    { .oc = OC_END }
+  };
+
+  is = GNUNET_new (struct InterpreterState);
+  is->commands = commands;
+
+  ctx = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
+                          &rc);
+  GNUNET_assert (NULL != ctx);
+  rc = GNUNET_CURL_gnunet_rc_create (ctx);
+  exchange = TALER_EXCHANGE_connect (ctx,
+                                     EXCHANGE_URI,
+                                     &cert_cb, is,
+                                     TALER_EXCHANGE_OPTION_END);
+  GNUNET_assert (NULL != exchange);
+  timeout_task
+    = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply
+                                    (GNUNET_TIME_UNIT_SECONDS, 150),
+                                    &do_timeout, NULL);
+  GNUNET_SCHEDULER_add_shutdown (&do_shutdown, is);
+
+
 }
 
 int
