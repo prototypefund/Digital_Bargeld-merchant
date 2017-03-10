@@ -245,7 +245,17 @@ transform_response (const json_t *result)
   }
 
   GNUNET_CONTAINER_multihashmap_destroy (map);
-  /*TODO fill up response */
+
+  /**
+   * Missing actions:
+   *
+   * 1) Take the sums in the map and convert them into
+   *    appropriate JSON.
+   * 2) Translate h_proposal_data into order_id and place
+   *    it somewhere in the response.
+   */
+
+
   goto cleanup;
 
   cleanup:
