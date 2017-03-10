@@ -158,6 +158,26 @@ free_transfer_track_context (struct TrackTransferContext *rctx)
 }
 
 /**
+ * Callback that frees all the elements in the hashmap
+ *
+ * @param cls closure, NULL
+ * @param key current key
+ * @param value a `struct MerchantInstance`
+ * @return GNUNET_YES if the iteration should continue,
+ * GNUNET_NO otherwise.
+ */
+static int
+hashmap_free (void *cls,
+              const struct GNUNET_HashCode *key,
+              void *value)
+{
+  struct TALER_Amount *amount = value;
+  GNUNET_free (amount);
+  /*NOTE: how to find out when iteration should stop?*/
+  return GNUNET_YES;
+}
+
+/**
  * Transform /track/transfer result as gotten from the exchange
  * and transforms it in a format liked by the backoffice Web interface.
  *
@@ -167,10 +187,74 @@ free_transfer_track_context (struct TrackTransferContext *rctx)
 json_t *
 transform_response (const json_t *result)
 {
-  json_t *response;
+  json_t *response = NULL;
+  json_t *value;
+  json_t *deposits;
+  size_t index;
+  const char *key;
+  struct GNUNET_HashCode h_key;
+  struct GNUNET_CONTAINER_MultiHashMap *map;
+  struct TALER_Amount iter_amount;
+  struct TALER_Amount *current_amount;
 
-  response = json_object ();
-  return response;
+  /* TODO/FIXME Free the values in hashmap! */
+
+  struct GNUNET_JSON_Specification spec[] = {
+    TALER_JSON_spec_amount ("amount_with_fee", &iter_amount),
+    GNUNET_JSON_spec_string ("h_proposal_data", &key),
+    GNUNET_JSON_spec_end ()
+  };
+  
+  map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
+
+  json_array_foreach (deposits, index, value)
+  {
+
+    if (GNUNET_OK != GNUNET_JSON_parse (value,
+                                        spec,
+                                        NULL,
+                                        NULL))
+    {
+      GNUNET_break_op (0); 
+      return NULL;
+    }
+
+    GNUNET_CRYPTO_hash (key,
+                        strlen (key),
+                        &h_key);
+
+    if (NULL != (current_amount = GNUNET_CONTAINER_multihashmap_get (map, (const struct GNUNET_HashCode *) &h_key)))
+    {
+      if (GNUNET_SYSERR == TALER_amount_add (current_amount,
+                                             current_amount,
+                                             &iter_amount))
+        goto cleanup;
+    
+    }
+    else
+    {
+      current_amount = GNUNET_malloc (sizeof (struct TALER_Amount));
+      memcpy (current_amount, &iter_amount, sizeof (struct TALER_Amount));
+      if (GNUNET_SYSERR == GNUNET_CONTAINER_multihashmap_put (map,
+                                                              (const struct GNUNET_HashCode *) &h_key,
+                                                              current_amount,
+                                                              GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
+        goto cleanup;
+    }
+       
+  }
+
+  GNUNET_CONTAINER_multihashmap_destroy (map);
+  /*TODO fill up response */
+  goto cleanup;
+
+  cleanup:
+    GNUNET_CONTAINER_multihashmap_iterate (map,
+                                           &hashmap_free,
+                                           NULL);  
+    GNUNET_JSON_parse_free (spec);
+    GNUNET_CONTAINER_multihashmap_destroy (map);
+    return response;
 }
 
 /**
