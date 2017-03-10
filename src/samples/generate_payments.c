@@ -53,11 +53,6 @@ static struct GNUNET_CURL_Context *ctx;
 static struct GNUNET_CURL_RescheduleContext *rc;
 
 /**
- * Configuration handle.
- */
-struct GNUNET_CONFIGURATION_Handle *cfg;
-
-/**
  * Result of the testcases, #GNUNET_OK on success.
  */
 static int result;
@@ -735,128 +730,128 @@ interpreter_run (void *cls)
       GNUNET_SCHEDULER_shutdown ();
       return;
 
-  case OC_PAY:
-    {
-      struct TALER_MERCHANT_PayCoin pc;
-      const char *order_id;
-      struct GNUNET_TIME_Absolute refund_deadline;
-      struct GNUNET_TIME_Absolute pay_deadline;
-      struct GNUNET_TIME_Absolute timestamp;
-      struct GNUNET_HashCode h_wire;
-      struct TALER_MerchantPublicKeyP merchant_pub;
-      struct TALER_MerchantSignatureP merchant_sig;
-      struct TALER_Amount total_amount;
-      struct TALER_Amount max_fee;
-      const char *error_name;
-      unsigned int error_line;
-
-      /* get proposal */
-      ref = find_command (is,
-                          cmd->details.pay.contract_ref);
-      GNUNET_assert (NULL != ref);
-      merchant_sig = ref->details.proposal.merchant_sig;
-      GNUNET_assert (NULL != ref->details.proposal.proposal_data);
+    case OC_PAY:
       {
-        /* Get information that need to be replied in the deposit permission */
-        struct GNUNET_JSON_Specification spec[] = {
-          GNUNET_JSON_spec_string ("order_id", &order_id),
-          GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
-          GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
-          GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
-          GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
-          GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
-          TALER_JSON_spec_amount ("amount", &total_amount),
-          TALER_JSON_spec_amount ("max_fee", &max_fee),
-          GNUNET_JSON_spec_end()
-        };
-
-        if (GNUNET_OK !=
-            GNUNET_JSON_parse (ref->details.proposal.proposal_data,
-                               spec,
-                               &error_name,
-                               &error_line))
+        struct TALER_MERCHANT_PayCoin pc;
+        const char *order_id;
+        struct GNUNET_TIME_Absolute refund_deadline;
+        struct GNUNET_TIME_Absolute pay_deadline;
+        struct GNUNET_TIME_Absolute timestamp;
+        struct GNUNET_HashCode h_wire;
+        struct TALER_MerchantPublicKeyP merchant_pub;
+        struct TALER_MerchantSignatureP merchant_sig;
+        struct TALER_Amount total_amount;
+        struct TALER_Amount max_fee;
+        const char *error_name;
+        unsigned int error_line;
+  
+        /* get proposal */
+        ref = find_command (is,
+                            cmd->details.pay.contract_ref);
+        GNUNET_assert (NULL != ref);
+        merchant_sig = ref->details.proposal.merchant_sig;
+        GNUNET_assert (NULL != ref->details.proposal.proposal_data);
         {
-          GNUNET_break_op (0);
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Parser failed on %s:%u\n",
-                      error_name,
-                      error_line);
-          fail (is);
-          return;
+          /* Get information that need to be replied in the deposit permission */
+          struct GNUNET_JSON_Specification spec[] = {
+            GNUNET_JSON_spec_string ("order_id", &order_id),
+            GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
+            GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
+            GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
+            GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
+            GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
+            TALER_JSON_spec_amount ("amount", &total_amount),
+            TALER_JSON_spec_amount ("max_fee", &max_fee),
+            GNUNET_JSON_spec_end()
+          };
+  
+          if (GNUNET_OK !=
+              GNUNET_JSON_parse (ref->details.proposal.proposal_data,
+                                 spec,
+                                 &error_name,
+                                 &error_line))
+          {
+            GNUNET_break_op (0);
+            GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                        "Parser failed on %s:%u\n",
+                        error_name,
+                        error_line);
+            fail (is);
+            return;
+          }
+          cmd->details.pay.merchant_pub = merchant_pub;
         }
-        cmd->details.pay.merchant_pub = merchant_pub;
+  
+        {
+          const struct Command *coin_ref;
+  	memset (&pc, 0, sizeof (pc));
+  	coin_ref = find_command (is,
+  	                         cmd->details.pay.coin_ref);
+  	GNUNET_assert (NULL != ref);
+  	switch (coin_ref->oc)
+  	{
+  	case OC_WITHDRAW_SIGN:
+  	  pc.coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
+  	  pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
+  	  pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
+            pc.denom_value = coin_ref->details.reserve_withdraw.pk->value;
+  	  break;
+  	default:
+  	  GNUNET_assert (0);
+  	}
+  
+  	if (GNUNET_OK !=
+  	    TALER_string_to_amount (cmd->details.pay.amount_without_fee,
+  				    &pc.amount_without_fee))
+  	{
+  	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+  		      "Failed to parse amount `%s' at %u\n",
+  		      cmd->details.pay.amount_without_fee,
+  		      is->ip);
+  	  fail (is);
+  	  return;
+  	}
+  
+  	if (GNUNET_OK !=
+  	    TALER_string_to_amount (cmd->details.pay.amount_with_fee,
+  				    &pc.amount_with_fee))
+  	{
+  	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+  		      "Failed to parse amount `%s' at %u\n",
+  		      cmd->details.pay.amount_with_fee,
+  		      is->ip);
+  	  fail (is);
+  	  return;
+  	}
+        }
+  
+        cmd->details.pay.ph
+  	= TALER_MERCHANT_pay_wallet (ctx,
+  				     merchant_uri,
+                                       "default",
+  				     &ref->details.proposal.hash,
+  				     &total_amount,
+  				     &max_fee,
+  				     &merchant_pub,
+                                       &merchant_sig,
+  				     timestamp,
+  				     refund_deadline,
+  				     pay_deadline,
+  				     &h_wire,
+  				     exchange_uri,
+                                       order_id,
+  				     1 /* num_coins */,
+  				     &pc /* coins */,
+  				     &pay_cb,
+  				     is);
       }
-
+      if (NULL == cmd->details.pay.ph)
       {
-        const struct Command *coin_ref;
-	memset (&pc, 0, sizeof (pc));
-	coin_ref = find_command (is,
-	                         cmd->details.pay.coin_ref);
-	GNUNET_assert (NULL != ref);
-	switch (coin_ref->oc)
-	{
-	case OC_WITHDRAW_SIGN:
-	  pc.coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
-	  pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
-	  pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
-          pc.denom_value = coin_ref->details.reserve_withdraw.pk->value;
-	  break;
-	default:
-	  GNUNET_assert (0);
-	}
-
-	if (GNUNET_OK !=
-	    TALER_string_to_amount (cmd->details.pay.amount_without_fee,
-				    &pc.amount_without_fee))
-	{
-	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		      "Failed to parse amount `%s' at %u\n",
-		      cmd->details.pay.amount_without_fee,
-		      is->ip);
-	  fail (is);
-	  return;
-	}
-
-	if (GNUNET_OK !=
-	    TALER_string_to_amount (cmd->details.pay.amount_with_fee,
-				    &pc.amount_with_fee))
-	{
-	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		      "Failed to parse amount `%s' at %u\n",
-		      cmd->details.pay.amount_with_fee,
-		      is->ip);
-	  fail (is);
-	  return;
-	}
+        GNUNET_break (0);
+        fail (is);
+        return;
       }
-
-      cmd->details.pay.ph
-	= TALER_MERCHANT_pay_wallet (ctx,
-				     merchant_uri,
-                                     "default",
-				     &ref->details.proposal.hash,
-				     &total_amount,
-				     &max_fee,
-				     &merchant_pub,
-                                     &merchant_sig,
-				     timestamp,
-				     refund_deadline,
-				     pay_deadline,
-				     &h_wire,
-				     exchange_uri,
-                                     order_id,
-				     1 /* num_coins */,
-				     &pc /* coins */,
-				     &pay_cb,
-				     is);
-    }
-    if (NULL == cmd->details.pay.ph)
-    {
-      GNUNET_break (0);
-      fail (is);
       return;
-    }
-    return;
 
 
     case OC_PROPOSAL:
@@ -1124,75 +1119,75 @@ do_shutdown (void *cls)
   for (i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
     switch (cmd->oc)
     {
-    case OC_END:
-      GNUNET_assert (0);
-      break;
-
-    case OC_PAY:
-      if (NULL != cmd->details.pay.ph)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
+      case OC_END:
+        GNUNET_assert (0);
+        break;
+  
+      case OC_PAY:
+        if (NULL != cmd->details.pay.ph)
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                      "Command %u (%s) did not complete\n",
+                      i,
+                      cmd->label);
+          TALER_MERCHANT_pay_cancel (cmd->details.pay.ph);
+          cmd->details.pay.ph = NULL;
+        }
+        break;
+  
+      case OC_PROPOSAL:
+        if (NULL != cmd->details.proposal.po)
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                      "Command %u (%s) did not complete\n",
+                      i,
+                      cmd->label);
+          TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
+          cmd->details.proposal.po = NULL;
+        }
+        if (NULL != cmd->details.proposal.proposal_data)
+        {
+          json_decref (cmd->details.proposal.proposal_data);
+          cmd->details.proposal.proposal_data = NULL;
+        }
+        break;
+  
+      case OC_WITHDRAW_SIGN:
+        if (NULL != cmd->details.reserve_withdraw.wsh)
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                      "Command %u (%s) did not complete\n",
+                      i,
+                      cmd->label);
+          TALER_EXCHANGE_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
+          cmd->details.reserve_withdraw.wsh = NULL;
+        }
+        if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
+        {
+          GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
+          cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
+        }
+        break;
+  
+      case OC_ADMIN_ADD_INCOMING:
+        if (NULL != cmd->details.admin_add_incoming.aih)
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                      "Command %u (%s) did not complete\n",
+                      i,
+                      cmd->label);
+          TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
+          cmd->details.admin_add_incoming.aih = NULL;
+        }
+        break;
+  
+      default:
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Shutdown: unknown instruction %d at %u (%s)\n",
+                    cmd->oc,
                     i,
                     cmd->label);
-        TALER_MERCHANT_pay_cancel (cmd->details.pay.ph);
-        cmd->details.pay.ph = NULL;
-      }
-      break;
-
-    case OC_PROPOSAL:
-      if (NULL != cmd->details.proposal.po)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
-        cmd->details.proposal.po = NULL;
-      }
-      if (NULL != cmd->details.proposal.proposal_data)
-      {
-        json_decref (cmd->details.proposal.proposal_data);
-        cmd->details.proposal.proposal_data = NULL;
-      }
-      break;
-
-    case OC_WITHDRAW_SIGN:
-      if (NULL != cmd->details.reserve_withdraw.wsh)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_EXCHANGE_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
-        cmd->details.reserve_withdraw.wsh = NULL;
-      }
-      if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
-      {
-        GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
-        cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
-      }
-      break;
-
-    case OC_ADMIN_ADD_INCOMING:
-      if (NULL != cmd->details.admin_add_incoming.aih)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
-        cmd->details.admin_add_incoming.aih = NULL;
-      }
-      break;
-
-    default:
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Shutdown: unknown instruction %d at %u (%s)\n",
-                  cmd->oc,
-                  i,
-                  cmd->label);
-      break;
+        break;
     }
 
   if (NULL != is->task)
@@ -1216,8 +1211,6 @@ do_shutdown (void *cls)
     GNUNET_CURL_gnunet_rc_destroy (rc);
     rc = NULL;
   }
-
-  GNUNET_CONFIGURATION_destroy (cfg);
 }
 
 /**
