@@ -157,6 +157,21 @@ free_transfer_track_context (struct TrackTransferContext *rctx)
   GNUNET_free (rctx);
 }
 
+/**
+ * Transform /track/transfer result as gotten from the exchange
+ * and transforms it in a format liked by the backoffice Web interface.
+ *
+ * @param result response from exchange's /track/transfer
+ * @result pointer to new JSON, or NULL upon errors.
+ */
+json_t *
+transform_response (const json_t *result)
+{
+  json_t *response;
+
+  response = json_object ();
+  return response;
+}
 
 /**
  * Resume the given /track/transfer operation and send the given response.
@@ -287,6 +302,7 @@ wire_transfer_cb (void *cls,
   struct TrackTransferContext *rctx = cls;
   unsigned int i;
   int ret;
+  json_t *jresponse;
 
   rctx->wdh = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
@@ -403,10 +419,21 @@ wire_transfer_cb (void *cls,
     }
   }
   rctx->original_response = NULL;
-  resume_track_transfer_with_response
-    (rctx,
-     MHD_HTTP_OK,
-     TMH_RESPONSE_make_json (json));
+  /* FIXME, implement response transformator. Handle error as well. */
+  if (NULL == (jresponse = transform_response (json)))
+  {
+    resume_track_transfer_with_response
+      (rctx,
+       MHD_HTTP_INTERNAL_SERVER_ERROR,
+       TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
+                                         "Fail to elaborate the response."));
+    return;
+  }
+
+  resume_track_transfer_with_response (rctx,
+                                       MHD_HTTP_OK,
+                                       TMH_RESPONSE_make_json (jresponse));
+  json_decref (jresponse);
 }
 
 
