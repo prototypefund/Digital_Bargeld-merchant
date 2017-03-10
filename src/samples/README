@@ -1,3 +1,16 @@
 Here is the logic that creates dummy payments into the
 merchant's DB, mainly used for debugging applications that
 need some real data from the merchant backend. 
+
+The tool taler-merchant-generate-payments needs three values:
+
+1 exchange URL
+2 merchant backend URL
+3 bank URL
+4 currency
+
+The tool reads these values from #define'd macros, so you should
+change them and recompile the code in order to make them fit your
+needs.
+
+We wish to get this tool reading those values via a config file!
