@@ -376,11 +376,9 @@ struct TALER_MERCHANT_TrackTransferDetails {
   struct TALER_Amount deposit_fee;
 
   /**
-   * Proposal data's hashcode associated whit this
-   * payment.  NOTE, this value is temporary, as the
-   * order ID is supposed to be returned here.
+   * Order ID associated whit this payment.
    */
-  struct GNUNET_HashCode h_proposal_data;
+  char *order_id;
 
 };
 

@@ -118,7 +118,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
       struct TALER_MERCHANT_TrackTransferDetails *detail = &details[i];
       json_t *deposit = json_array_get (deposits, i);
       struct GNUNET_JSON_Specification spec_detail[] = {
-        GNUNET_JSON_spec_fixed_auto ("h_proposal_data", &detail->h_proposal_data),
+        GNUNET_JSON_spec_string ("order_id", &detail->order_id),
         TALER_JSON_spec_amount ("deposit_value", &detail->deposit_value),
         TALER_JSON_spec_amount ("deposit_fee", &detail->deposit_fee),
         GNUNET_JSON_spec_end()

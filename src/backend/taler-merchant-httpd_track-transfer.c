@@ -143,6 +143,11 @@ struct Entry {
   };
 
 /**
+ * Modified response to return to the frontend.
+ */
+static json_t *deposits_response;
+
+/**
  * Free the @a rctx.
  *
  * @param rctx data to free
@@ -209,20 +214,27 @@ build_deposits_response (void *cls,
                          const struct GNUNET_HashCode *key,
                          void *value)
 {
-  json_t *response = cls;
+  struct TrackTransferContext *rctx = cls;
   json_t *element;
-  /*FIXME make Entry global*/
   struct Entry *entry = value;
+  json_t *proposal_data;
+  json_t *order_id;
 
   /*FIXME put error check*/
-  element = json_pack ("{s:o, s:o, s:o}",
-                       "h_proposal_data",
-                       GNUNET_JSON_from_data_auto (key),
+  GNUNET_assert (GNUNET_OK == db->find_proposal_data_from_hash (db->cls,
+                                                                &proposal_data,
+                                                                key,
+                                                                &rctx->mi->pubkey));
+
+  order_id = json_object_get (proposal_data, "order_id");
+  /*FIXME put error check*/
+  element = json_pack ("{s:s, s:o, s:o}",
+                       "order_id", json_string_value (order_id),
                        "deposit_value", TALER_JSON_from_amount (&entry->deposit_value),
                        "deposit_fee", TALER_JSON_from_amount (&entry->deposit_fee));
 
   /*FIXME put error check*/
-  json_array_append_new (response, element);
+  json_array_append_new (deposits_response, element);
 
   return GNUNET_YES;
 }
@@ -235,12 +247,11 @@ build_deposits_response (void *cls,
  * @result pointer to new JSON, or NULL upon errors.
  */
 json_t *
-transform_response (const json_t *result)
+transform_response (const json_t *result, struct TrackTransferContext *rctx)
 {
   json_t *deposits;
   json_t *value;
   json_t *result_mod = NULL;
-  json_t *deposits_response;
   size_t index;
   const char *key;
   struct GNUNET_HashCode h_key;
@@ -263,7 +274,7 @@ transform_response (const json_t *result)
   deposits = json_object_get (result, "deposits");
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Inspecting deposits: '%s'\n",
+              "Transforming deposits: '%s'\n",
               json_dumps (deposits, JSON_INDENT (1)));
 
   json_array_foreach (deposits, index, value)
@@ -313,7 +324,7 @@ transform_response (const json_t *result)
   
   GNUNET_CONTAINER_multihashmap_iterate (map,
                                          build_deposits_response,
-                                         deposits_response);
+                                         rctx);
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Fresh built deposits array: '%s'.\n",
@@ -589,7 +600,7 @@ wire_transfer_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "About to call tracks transformator.\n");
 
-  if (NULL == (jresponse = transform_response (json)))
+  if (NULL == (jresponse = transform_response (json, rctx)))
   {
     resume_track_transfer_with_response
       (rctx,
@@ -683,7 +694,7 @@ proof_cb (void *cls,
   struct TrackTransferContext *rctx = cls;
   json_t *transformed_response;
 
-  if (NULL == (transformed_response = transform_response (proof)))
+  if (NULL == (transformed_response = transform_response (proof, rctx)))
   {
     rctx->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
     rctx->response = TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
