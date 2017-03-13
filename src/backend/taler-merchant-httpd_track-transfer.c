@@ -125,6 +125,26 @@ struct TrackTransferContext
   int check_transfer_result;
 };
 
+/**
+ * Represents an entry in the table used to sum up
+ * individual deposits for each h_proposal_data.
+ */
+struct Entry {
+  /**
+   * Sum accumulator for deposited value.
+   */
+  struct TALER_Amount deposit_value;
+
+  /**
+   * Sum accumulator for deposit fee.
+   */
+  struct TALER_Amount deposit_fee;
+
+  /**
+   * Transaction ID.
+   */
+  uint64_t transaction_id;
+  };
 
 /**
  * Free the @a rctx.
@@ -177,6 +197,41 @@ hashmap_free (void *cls,
   return GNUNET_YES;
 }
 
+
+/**
+ * Builds JSON response containing the summed-up amounts
+ * from individual deposits.
+ *
+ * @param cls closure
+ * @param key map's current key
+ * @param map's current value
+ * @return GNUNET_YES if iteration is to be continued,
+ * GNUNET_NO otherwise.
+ */
+int
+build_response (void *cls,
+                const struct GNUNET_HashCode *key,
+                void *value)
+{
+  json_t *response = cls;
+  json_t *element;
+  /*FIXME make Entry global*/
+  struct Entry *entry = value;
+
+  /*FIXME put error check*/
+  element = json_pack ("{s:s, s:o, s:o, s:I}",
+                       "h_proposal_data",
+                       GNUNET_JSON_from_data (key, sizeof (struct GNUNET_HashCode)),
+                       "total_amount", TALER_JSON_from_amount (&entry->deposit_value),
+                       "total_fee", TALER_JSON_from_amount (&entry->deposit_fee),
+                       "transaction_id", entry->transaction_id);
+
+  /*FIXME put error check*/
+  json_array_append_new (response, element);
+
+  return GNUNET_YES;
+}
+
 /**
  * Transform /track/transfer result as gotten from the exchange
  * and transforms it in a format liked by the backoffice Web interface.
@@ -194,14 +249,18 @@ transform_response (const json_t *result)
   const char *key;
   struct GNUNET_HashCode h_key;
   struct GNUNET_CONTAINER_MultiHashMap *map;
-  struct TALER_Amount iter_amount;
-  struct TALER_Amount *current_amount;
+  struct TALER_Amount iter_value;
+  struct TALER_Amount iter_fee;
+  uint64_t transaction_id;
+  struct Entry *current_entry;
 
   /* TODO/FIXME Free the values in hashmap! */
 
   struct GNUNET_JSON_Specification spec[] = {
-    TALER_JSON_spec_amount ("amount_with_fee", &iter_amount),
+    TALER_JSON_spec_amount ("deposit_value", &iter_value),
+    TALER_JSON_spec_amount ("deposit_fee", &iter_fee),
     GNUNET_JSON_spec_string ("h_proposal_data", &key),
+    GNUNET_JSON_spec_uint64 ("transaction_id", &transaction_id),
     GNUNET_JSON_spec_end ()
   };
   
@@ -219,42 +278,53 @@ transform_response (const json_t *result)
       return NULL;
     }
 
-    GNUNET_CRYPTO_hash (key,
-                        strlen (key),
-                        &h_key);
+    GNUNET_CRYPTO_hash_from_string (key, &h_key);
 
-    if (NULL != (current_amount = GNUNET_CONTAINER_multihashmap_get (map, (const struct GNUNET_HashCode *) &h_key)))
+    if (NULL != (current_entry = GNUNET_CONTAINER_multihashmap_get (map, (const struct GNUNET_HashCode *) &h_key)))
     {
-      if (GNUNET_SYSERR == TALER_amount_add (current_amount,
-                                             current_amount,
-                                             &iter_amount))
+      /*The map already knows this h_proposal_data*/
+      if ((GNUNET_SYSERR == TALER_amount_add (&current_entry->deposit_value,
+                                             &current_entry->deposit_value,
+                                             &iter_value)) ||
+          (GNUNET_SYSERR == TALER_amount_add (&current_entry->deposit_fee,
+                                              &current_entry->deposit_fee,
+                                              &iter_fee)))
+                                             
         goto cleanup;
     
     }
     else
     {
-      current_amount = GNUNET_malloc (sizeof (struct TALER_Amount));
-      memcpy (current_amount, &iter_amount, sizeof (struct TALER_Amount));
+      /*First time in the map for this h_proposal_data*/
+      current_entry = GNUNET_malloc (sizeof (struct Entry));
+      memcpy (&current_entry->deposit_value, &iter_value, sizeof (struct TALER_Amount));
+      memcpy (&current_entry->deposit_fee, &iter_fee, sizeof (struct TALER_Amount));
+      current_entry->transaction_id = transaction_id;
+
       if (GNUNET_SYSERR == GNUNET_CONTAINER_multihashmap_put (map,
                                                               (const struct GNUNET_HashCode *) &h_key,
-                                                              current_amount,
+                                                              current_entry,
                                                               GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
         goto cleanup;
     }
        
   }
 
-  GNUNET_CONTAINER_multihashmap_destroy (map);
+  response = json_array ();
+  
+  GNUNET_CONTAINER_multihashmap_iterate (map,
+                                         build_response,
+                                         response);
 
   /**
    * Missing actions:
    *
    * 1) Take the sums in the map and convert them into
-   *    appropriate JSON.
+   *    appropriate JSON (x).
    * 2) Translate h_proposal_data into order_id and place
    *    it somewhere in the response.
+   * 3) Return result (x).
    */
-
 
   goto cleanup;
 
