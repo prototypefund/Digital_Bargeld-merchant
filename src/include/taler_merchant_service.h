@@ -359,6 +359,32 @@ TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *ph);
 struct TALER_MERCHANT_TrackTransferHandle;
 
 /**
+ * Information about the _total_ amount that was paid back
+ * by the exchange for a given h_proposal_data, by _one_ wire
+ * transfer.
+ */
+struct TALER_MERCHANT_TrackTransferDetails {
+  
+  /**
+   * Total amount paid back by the exchange.
+   */
+  struct TALER_Amount deposit_value;
+
+  /**
+   * Total amount of deposit fees.
+   */
+  struct TALER_Amount deposit_fee;
+
+  /**
+   * Proposal data's hashcode associated whit this
+   * payment.  NOTE, this value is temporary, as the
+   * order ID is supposed to be returned here.
+   */
+  struct GNUNET_HashCode h_proposal_data;
+
+};
+
+/**
  * Callbacks of this type are used to work the result of submitting a /track/transfer request to a merchant
  *
  * @param cls closure
@@ -382,7 +408,7 @@ typedef void
                                          const struct GNUNET_HashCode *h_wire,
                                          const struct TALER_Amount *total_amount,
                                          unsigned int details_length,
-                                         const struct TALER_TrackTransferDetails *details);
+                                         const struct TALER_MERCHANT_TrackTransferDetails *details);
 
 /**
  * Request backend to return deposits associated with a given wtid.

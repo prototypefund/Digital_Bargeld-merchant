@@ -85,7 +85,7 @@ static int
 check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh,
                                   const json_t *json)
 {
-  json_t *details_j;
+  json_t *deposits;
   struct GNUNET_HashCode h_wire;
   struct TALER_Amount total_amount;
   struct TALER_MerchantPublicKeyP merchant_pub;
@@ -95,7 +95,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
     TALER_JSON_spec_amount ("total", &total_amount),
     GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
     GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
-    GNUNET_JSON_spec_json ("deposits", &details_j),
+    GNUNET_JSON_spec_json ("deposits", &deposits),
     GNUNET_JSON_spec_fixed_auto ("exchange_pub", &exchange_pub),
     GNUNET_JSON_spec_end()
   };
@@ -108,25 +108,28 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
   }
-  num_details = json_array_size (details_j);
+  num_details = json_array_size (deposits);
   {
-    struct TALER_TrackTransferDetails details[num_details];
+    struct TALER_MERCHANT_TrackTransferDetails details[num_details];
     unsigned int i;
 
     for (i=0;i<num_details;i++)
     {
-      struct TALER_TrackTransferDetails *detail = &details[i];
-      struct json_t *detail_j = json_array_get (details_j, i);
+      struct TALER_MERCHANT_TrackTransferDetails *detail = &details[i];
+      json_t *deposit = json_array_get (deposits, i);
       struct GNUNET_JSON_Specification spec_detail[] = {
         GNUNET_JSON_spec_fixed_auto ("h_proposal_data", &detail->h_proposal_data),
-        GNUNET_JSON_spec_fixed_auto ("coin_pub", &detail->coin_pub),
-        TALER_JSON_spec_amount ("deposit_value", &detail->coin_value),
-        TALER_JSON_spec_amount ("deposit_fee", &detail->coin_fee),
+        TALER_JSON_spec_amount ("deposit_value", &detail->deposit_value),
+        TALER_JSON_spec_amount ("deposit_fee", &detail->deposit_fee),
         GNUNET_JSON_spec_end()
       };
 
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Extracting fields from: '%s'.\n",
+                  json_dumps (deposit, JSON_INDENT (1)));
+
       if (GNUNET_OK !=
-          GNUNET_JSON_parse (detail_j,
+          GNUNET_JSON_parse (deposit,
                              spec_detail,
                              NULL, NULL))
       {

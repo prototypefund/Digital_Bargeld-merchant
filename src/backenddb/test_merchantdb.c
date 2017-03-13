@@ -21,6 +21,7 @@
 
 #include "platform.h"
 #include <taler/taler_util.h>
+#include <taler/taler_json_lib.h>
 #include "taler_merchantdb_lib.h"
 #include <jansson.h>
 

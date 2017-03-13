@@ -1200,7 +1200,7 @@ track_transfer_cb (void *cls,
                    const struct GNUNET_HashCode *h_wire,
                    const struct TALER_Amount *total_amount,
                    unsigned int details_length,
-                   const struct TALER_TrackTransferDetails *details)
+                   const struct TALER_MERCHANT_TrackTransferDetails *details)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -1218,90 +1218,12 @@ track_transfer_cb (void *cls,
   }
   switch (http_status)
   {
-  case MHD_HTTP_OK:
-    {
-      const struct Command *ref;
-      unsigned int i;
-      int found;
-
-      /**
-       * Retrieve the deposit operation that is supposed
-       * to have been paid by the wtid used in this operation.
-       * After that, check if that operation is actually mentioned
-       * in the returned data.
-       */
-      ref = find_command (is,
-                          cmd->details.track_transfer.expected_pay_ref);
-      GNUNET_assert (NULL != ref);
-      found = GNUNET_NO;
-
-      /**
-       * Iterating over the details makes little sense now,
-       * as each payment involves exatcly one coin.
-       */
-      for (i=0;i<details_length;i++)
-      {
-        struct TALER_Amount amount_with_fee;
-        struct TALER_Amount amount_without_fee;
-        struct TALER_Amount deposit_fee;
-        const struct Command *cref;
-        const struct Command *proposal_ref;
-        struct TALER_CoinSpendPublicKeyP coin_pub;
-
-        /* Extract */
-        GNUNET_assert (GNUNET_OK ==
-                       TALER_string_to_amount (ref->details.pay.amount_without_fee,
-                                               &amount_without_fee));
-        GNUNET_assert (GNUNET_OK ==
-                       TALER_string_to_amount (ref->details.pay.amount_with_fee,
-                                               &amount_with_fee));
-        GNUNET_assert (GNUNET_OK ==
-                       TALER_amount_subtract (&deposit_fee,
-                                              &amount_with_fee,
-                                              &amount_without_fee));
-
-        /* Find coin ('s public key) associated with the retrieved
-           deposit. Yes, one deposit - one coin. */
-	cref = find_command (is,
-                             ref->details.pay.coin_ref);
-        proposal_ref = find_command (is,
-                                     ref->details.pay.contract_ref);
-        GNUNET_assert (NULL != cref);
-        GNUNET_assert (NULL != proposal_ref);
-	switch (cref->oc)
-	{
-	case OC_WITHDRAW_SIGN:
-          GNUNET_CRYPTO_eddsa_key_get_public
-            (&cref->details.reserve_withdraw.coin_priv.eddsa_priv,
-             &coin_pub.eddsa_pub);
-	  break;
-	default:
-	  GNUNET_assert (0);
-	}
-
-        if ( (0 == memcmp (&details[i].h_proposal_data,
-                           &proposal_ref->details.proposal.hash,
-                           sizeof (struct GNUNET_HashCode))) &&
-             (0 == TALER_amount_cmp (&details[i].coin_value,
-                                     &amount_with_fee)) &&
-             (0 == TALER_amount_cmp (&details[i].coin_fee,
-                                     &deposit_fee)) &&
-             (0 == memcmp (&details[i].coin_pub,
-                           &coin_pub,
-                           sizeof (struct TALER_CoinSpendPublicKeyP))) )
-          found = GNUNET_YES;
-      }
-      if (GNUNET_NO == found)
-      {
-        GNUNET_break (0);
-        json_dumpf (json, stderr, 0);
-        fail (is);
-        return;
-      }
+    case MHD_HTTP_OK:
       break;
-    }
-  default:
-    break;
+
+    default:
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Unhandled HTTP status.\n");
   }
   next_command (is);
 }

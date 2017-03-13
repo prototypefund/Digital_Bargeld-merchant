@@ -140,10 +140,6 @@ struct Entry {
    */
   struct TALER_Amount deposit_fee;
 
-  /**
-   * Transaction ID.
-   */
-  uint64_t transaction_id;
   };
 
 /**
@@ -219,12 +215,11 @@ build_deposits_response (void *cls,
   struct Entry *entry = value;
 
   /*FIXME put error check*/
-  element = json_pack ("{s:s, s:o, s:o, s:I}",
+  element = json_pack ("{s:o, s:o, s:o}",
                        "h_proposal_data",
-                       GNUNET_JSON_from_data (key, sizeof (struct GNUNET_HashCode)),
-                       "total_amount", TALER_JSON_from_amount (&entry->deposit_value),
-                       "total_fee", TALER_JSON_from_amount (&entry->deposit_fee),
-                       "transaction_id", entry->transaction_id);
+                       GNUNET_JSON_from_data_auto (key),
+                       "deposit_value", TALER_JSON_from_amount (&entry->deposit_value),
+                       "deposit_fee", TALER_JSON_from_amount (&entry->deposit_fee));
 
   /*FIXME put error check*/
   json_array_append_new (response, element);
@@ -252,7 +247,6 @@ transform_response (const json_t *result)
   struct GNUNET_CONTAINER_MultiHashMap *map;
   struct TALER_Amount iter_value;
   struct TALER_Amount iter_fee;
-  uint64_t transaction_id;
   struct Entry *current_entry;
 
   /* TODO/FIXME Free the values in hashmap! */
@@ -261,12 +255,15 @@ transform_response (const json_t *result)
     TALER_JSON_spec_amount ("deposit_value", &iter_value),
     TALER_JSON_spec_amount ("deposit_fee", &iter_fee),
     GNUNET_JSON_spec_string ("h_proposal_data", &key),
-    GNUNET_JSON_spec_uint64 ("transaction_id", &transaction_id),
     GNUNET_JSON_spec_end ()
   };
   
   map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
   deposits = json_object_get (result, "deposits");
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Inspecting deposits: '%s'\n",
+              json_dumps (deposits, JSON_INDENT (1)));
 
   json_array_foreach (deposits, index, value)
   {
@@ -301,7 +298,6 @@ transform_response (const json_t *result)
       current_entry = GNUNET_malloc (sizeof (struct Entry));
       memcpy (&current_entry->deposit_value, &iter_value, sizeof (struct TALER_Amount));
       memcpy (&current_entry->deposit_fee, &iter_fee, sizeof (struct TALER_Amount));
-      current_entry->transaction_id = transaction_id;
 
       if (GNUNET_SYSERR == GNUNET_CONTAINER_multihashmap_put (map,
                                                               (const struct GNUNET_HashCode *) &h_key,
@@ -317,6 +313,11 @@ transform_response (const json_t *result)
   GNUNET_CONTAINER_multihashmap_iterate (map,
                                          build_deposits_response,
                                          deposits_response);
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Fresh built deposits array: '%s'.\n",
+              json_dumps (deposits_response, JSON_INDENT (1)));
+
   result_mod = json_copy ((struct json_t *) result);
   json_object_del (result_mod, "deposits");
   json_object_set (result_mod, "deposits", deposits_response);
