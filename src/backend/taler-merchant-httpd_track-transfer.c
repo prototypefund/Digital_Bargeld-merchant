@@ -209,9 +209,9 @@ hashmap_free (void *cls,
  * GNUNET_NO otherwise.
  */
 int
-build_response (void *cls,
-                const struct GNUNET_HashCode *key,
-                void *value)
+build_deposits_response (void *cls,
+                         const struct GNUNET_HashCode *key,
+                         void *value)
 {
   json_t *response = cls;
   json_t *element;
@@ -242,9 +242,10 @@ build_response (void *cls,
 json_t *
 transform_response (const json_t *result)
 {
-  json_t *response = NULL;
-  json_t *value;
   json_t *deposits;
+  json_t *value;
+  json_t *result_mod = NULL;
+  json_t *deposits_response;
   size_t index;
   const char *key;
   struct GNUNET_HashCode h_key;
@@ -265,6 +266,7 @@ transform_response (const json_t *result)
   };
   
   map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
+  deposits = json_object_get (result, "deposits");
 
   json_array_foreach (deposits, index, value)
   {
@@ -310,11 +312,14 @@ transform_response (const json_t *result)
        
   }
 
-  response = json_array ();
+  deposits_response = json_array ();
   
   GNUNET_CONTAINER_multihashmap_iterate (map,
-                                         build_response,
-                                         response);
+                                         build_deposits_response,
+                                         deposits_response);
+  result_mod = json_copy ((struct json_t *) result);
+  json_object_del (result_mod, "deposits");
+  json_object_set (result_mod, "deposits", deposits_response);
 
   /**
    * Missing actions:
@@ -334,7 +339,7 @@ transform_response (const json_t *result)
                                            NULL);  
     GNUNET_JSON_parse_free (spec);
     GNUNET_CONTAINER_multihashmap_destroy (map);
-    return response;
+    return result_mod;
 }
 
 /**
