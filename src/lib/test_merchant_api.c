@@ -1205,6 +1205,10 @@ track_transfer_cb (void *cls,
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Tracked transfers: '%s'.\n",
+              json_dumps (json, JSON_INDENT (1)));
+
   cmd->details.track_transfer.tdo = NULL;
   if (cmd->expected_response_code != http_status)
   {

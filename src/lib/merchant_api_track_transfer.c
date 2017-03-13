@@ -95,7 +95,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
     TALER_JSON_spec_amount ("total", &total_amount),
     GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
     GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
-    GNUNET_JSON_spec_json ("deposits", &deposits),
+    GNUNET_JSON_spec_json ("deposits_sums", &deposits),
     GNUNET_JSON_spec_fixed_auto ("exchange_pub", &exchange_pub),
     GNUNET_JSON_spec_end()
   };

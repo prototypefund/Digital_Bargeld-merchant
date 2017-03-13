@@ -249,7 +249,8 @@ transform_response (const json_t *result)
   struct TALER_Amount iter_fee;
   struct Entry *current_entry;
 
-  /* TODO/FIXME Free the values in hashmap! */
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Transforming /track/transfer response.\n");
 
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("deposit_value", &iter_value),
@@ -320,18 +321,10 @@ transform_response (const json_t *result)
 
   result_mod = json_copy ((struct json_t *) result);
   json_object_del (result_mod, "deposits");
-  json_object_set (result_mod, "deposits", deposits_response);
-
-  /**
-   * Missing actions:
-   *
-   * 1) Take the sums in the map and convert them into
-   *    appropriate JSON (x).
-   * 2) Translate h_proposal_data into order_id and place
-   *    it somewhere in the response.
-   * 3) Return result (x).
-   */
-
+  json_object_set (result_mod, "deposits_sums", deposits_response);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Returning: '%s'.\n",
+              json_dumps (result_mod, JSON_INDENT (1)));
   goto cleanup;
 
   cleanup:
@@ -340,6 +333,9 @@ transform_response (const json_t *result)
                                            NULL);  
     GNUNET_JSON_parse_free (spec);
     GNUNET_CONTAINER_multihashmap_destroy (map);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Returning: '%s'.\n",
+                json_dumps (result_mod, JSON_INDENT (1)));
     return result_mod;
 }
 
@@ -589,7 +585,10 @@ wire_transfer_cb (void *cls,
     }
   }
   rctx->original_response = NULL;
-  /* FIXME, implement response transformator. Handle error as well. */
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "About to call tracks transformator.\n");
+
   if (NULL == (jresponse = transform_response (json)))
   {
     resume_track_transfer_with_response
@@ -682,9 +681,18 @@ proof_cb (void *cls,
           const json_t *proof)
 {
   struct TrackTransferContext *rctx = cls;
+  json_t *transformed_response;
+
+  if (NULL == (transformed_response = transform_response (proof)))
+  {
+    rctx->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+    rctx->response = TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
+                                                       "Fail to elaborate response.");
+    return;
+  }
 
   rctx->response_code = MHD_HTTP_OK;
-  rctx->response = TMH_RESPONSE_make_json (proof);
+  rctx->response = TMH_RESPONSE_make_json (transformed_response);
 }
 
 
