@@ -220,20 +220,28 @@ build_deposits_response (void *cls,
   json_t *proposal_data;
   json_t *order_id;
 
-  /*FIXME put error check*/
-  GNUNET_assert (GNUNET_OK == db->find_proposal_data_from_hash (db->cls,
-                                                                &proposal_data,
-                                                                key,
-                                                                &rctx->mi->pubkey));
+  if (GNUNET_OK != db->find_proposal_data_from_hash (db->cls,
+                                                     &proposal_data,
+                                                     key,
+                                                     &rctx->mi->pubkey))
+  {
+    GNUNET_break_op (0);
+    return GNUNET_NO;
+  }
 
   order_id = json_object_get (proposal_data, "order_id");
-  /*FIXME put error check*/
+
   element = json_pack ("{s:s, s:o, s:o}",
                        "order_id", json_string_value (order_id),
                        "deposit_value", TALER_JSON_from_amount (&entry->deposit_value),
                        "deposit_fee", TALER_JSON_from_amount (&entry->deposit_fee));
 
-  /*FIXME put error check*/
+  if (NULL == order_id || NULL == element)
+  {
+    GNUNET_break_op (0);
+    return GNUNET_NO;
+  }
+
   json_array_append_new (deposits_response, element);
 
   return GNUNET_YES;
@@ -262,7 +270,6 @@ transform_response (const json_t *result, struct TrackTransferContext *rctx)
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Transforming /track/transfer response.\n");
-
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("deposit_value", &iter_value),
     TALER_JSON_spec_amount ("deposit_fee", &iter_fee),
@@ -273,13 +280,8 @@ transform_response (const json_t *result, struct TrackTransferContext *rctx)
   map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
   deposits = json_object_get (result, "deposits");
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Transforming deposits: '%s'\n",
-              json_dumps (deposits, JSON_INDENT (1)));
-
   json_array_foreach (deposits, index, value)
   {
-
     if (GNUNET_OK != GNUNET_JSON_parse (value,
                                         spec,
                                         NULL,
@@ -300,9 +302,7 @@ transform_response (const json_t *result, struct TrackTransferContext *rctx)
           (GNUNET_SYSERR == TALER_amount_add (&current_entry->deposit_fee,
                                               &current_entry->deposit_fee,
                                               &iter_fee)))
-                                             
         goto cleanup;
-    
     }
     else
     {
@@ -317,25 +317,19 @@ transform_response (const json_t *result, struct TrackTransferContext *rctx)
                                                               GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
         goto cleanup;
     }
-       
   }
-
   deposits_response = json_array ();
   
-  GNUNET_CONTAINER_multihashmap_iterate (map,
-                                         build_deposits_response,
-                                         rctx);
+  if (GNUNET_SYSERR == GNUNET_CONTAINER_multihashmap_iterate (map,
+                                                              build_deposits_response,
+                                                              rctx))
+    goto cleanup;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Fresh built deposits array: '%s'.\n",
-              json_dumps (deposits_response, JSON_INDENT (1)));
 
   result_mod = json_copy ((struct json_t *) result);
   json_object_del (result_mod, "deposits");
   json_object_set (result_mod, "deposits_sums", deposits_response);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Returning: '%s'.\n",
-              json_dumps (result_mod, JSON_INDENT (1)));
+
   goto cleanup;
 
   cleanup:
@@ -344,9 +338,6 @@ transform_response (const json_t *result, struct TrackTransferContext *rctx)
                                            NULL);  
     GNUNET_JSON_parse_free (spec);
     GNUNET_CONTAINER_multihashmap_destroy (map);
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Returning: '%s'.\n",
-                json_dumps (result_mod, JSON_INDENT (1)));
     return result_mod;
 }
 
