@@ -378,7 +378,7 @@ struct TALER_MERCHANT_TrackTransferDetails {
   /**
    * Order ID associated whit this payment.
    */
-  char *order_id;
+  const char *order_id;
 
 };
 

@@ -64,24 +64,6 @@ struct TALER_MERCHANT_TrackTransactionHandle
   struct GNUNET_CURL_Context *ctx;
 };
 
-
-/**
- * Free data in @a transfers.
- *
- * @param num_transfers length of the @a transfers array
- * @param transfers information about wire transfers to free
- */
-static void
-free_transfers (unsigned int num_transfers,
-                struct TALER_MERCHANT_TransactionWireTransfer *transfers)
-{
-  unsigned int i;
-
-  for (i=0;i<num_transfers;i++)
-    GNUNET_free (transfers[i].coins);
-}
-
-
 /**
  * Handle #MHD_HTTP_OK response to /track/transaction.
  * Parse @a json and if successful call the callback in @a tdo.
