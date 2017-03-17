@@ -87,10 +87,13 @@ int
 main (int argc,
       char *const *argv)
 {
-  const struct GNUNET_GETOPT_CommandLineOption options[] = {
-    {'r', "reset", NULL,
-     "reset database (DANGEROUS: all existing data is lost!)", 0,
-     &GNUNET_GETOPT_set_one, &reset_db},
+  struct GNUNET_GETOPT_CommandLineOption options[] = {
+
+    GNUNET_GETOPT_OPTION_SET_ONE ('r',
+                                  "reset",
+                                  "reset database (DANGEROUS: all existing data is lost!)",
+                                  &reset_db),
+
     GNUNET_GETOPT_OPTION_END
   };
 

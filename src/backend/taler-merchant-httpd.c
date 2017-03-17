@@ -1128,10 +1128,13 @@ run (void *cls,
 int
 main (int argc, char *const *argv)
 {
-  static const struct GNUNET_GETOPT_CommandLineOption options[] = {
-    { 'C', "connection-close", NULL,
-      "force HTTP connections to be closed after each request", 0,
-      &GNUNET_GETOPT_set_one, &TMH_merchant_connection_close},
+  struct GNUNET_GETOPT_CommandLineOption options[] = {
+
+    GNUNET_GETOPT_OPTION_SET_ONE ('C',
+                                  "connection-close",
+                                  "force HTTP connections to be closed after each request",
+                                  &TMH_merchant_connection_close),
+
     GNUNET_GETOPT_OPTION_END
   };
 
