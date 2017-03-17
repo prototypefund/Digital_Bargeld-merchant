@@ -193,11 +193,13 @@ transaction_cb (void *cls,
  *
  * @param cls closure
  * @param order_id order id
+ * @param row_id row id in db
  * @param proposal_data proposal data
  */
 static void
 pd_cb (void *cls,
        const char *order_id,
+       unsigned int row_id,
        const json_t *proposal_data)
 {
   return;
@@ -377,11 +379,22 @@ run (void *cls)
                                                 &h_proposal_data2,
                                                 &merchant_pub));
   FAILIF (1 !=
+          plugin->find_proposal_data_by_date_and_range (plugin->cls,
+                                                        fake_now,
+                                                        &merchant_pub,
+                                                        0,
+                                                        5,
+                                                        pd_cb,
+                                                        NULL));
+
+  FAILIF (1 !=
           plugin->find_proposal_data_by_date (plugin->cls,
                                               fake_now,
                                               &merchant_pub,
+                                              5,
                                               pd_cb,
                                               NULL));
+
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,
                                      &h_proposal_data,

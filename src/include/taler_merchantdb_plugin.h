@@ -36,11 +36,13 @@ struct TALER_MERCHANTDB_Plugin;
  *
  * @param cls closure
  * @param order_id order id
+ * @param row_id serial numer of the transaction in the table,
  * @param proposal_data proposal data related to order id
  */
  typedef void
  (*TALER_MERCHANTDB_ProposalDataCallback)(void *cls,
                                           const char *order_id,
+                                          unsigned int row_id,
                                           const json_t *proposal_data);
 
 /**
@@ -209,19 +211,51 @@ struct TALER_MERCHANTDB_Plugin
                                    const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
+
   /**
-   * Return proposal data and order id for all proposals younger than
-   * date.
+   * Return proposals whose timestamp are older than `date`.
+   * Among those proposals, only those ones being between the
+   * start-th and (start-nrows)-th record are returned.  The rows
+   * are sorted having the youngest first.
    *
-   * @param cls closure
-   * @param date limit to the oldest record
-   * @param cb callback called with proposal data and order id
-   * @param cb_cls closure for cb
+   * @param cls our plugin handle.
+   * @param date only results older than this date are returned.
+   * @param merchant_pub instance's public key; only rows related to this
+   * instance are returned.
+   * @param start only rows with serial id less than start are returned.
+   * @param nrows only nrows rows are returned.
+   * @param cb function to call with transaction data, can be NULL.
+   * @param cb_cls closure for @a cb
+   * @return numer of found tuples, #GNUNET_SYSERR upon error
+   */
+  int
+  (*find_proposal_data_by_date_and_range) (void *cls,
+                                           struct GNUNET_TIME_Absolute date,
+                                           const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                           unsigned int start,
+                                           unsigned int nrows,
+                                           TALER_MERCHANTDB_ProposalDataCallback cb,
+                                           void *cb_cls);
+
+  /**
+   * Return proposals whose timestamp are older than `date`.
+   * The rows are sorted having the youngest first.*
+   *
+   * @param cls our plugin handle.
+   * @param date only results older than this date are returned.
+   * @param merchant_pub instance's public key; only rows related to this
+   * instance are returned.
+   * @param start the first start-1 rows are not returned.
+   * @param nrows only nrows rows are returned.
+   * @param cb function to call with transaction data, can be NULL.
+   * @param cb_cls closure for @a cb
+   * @return numer of found tuples, #GNUNET_SYSERR upon error
    */
   int
   (*find_proposal_data_by_date) (void *cls,
                                  struct GNUNET_TIME_Absolute date,
                                  const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                 unsigned int nrows,
                                  TALER_MERCHANTDB_ProposalDataCallback cb,
                                  void *cb_cls);
 

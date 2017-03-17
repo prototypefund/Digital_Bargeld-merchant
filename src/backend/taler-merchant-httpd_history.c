@@ -28,34 +28,31 @@
 /**
  * Index to the first row to return in response to /history.
  */
-unsigned int start;
+static int start = -1;
 
 /**
  * How many rows we are to return in response to /history.
  */
-unsigned int delta;
+static unsigned int delta;
 
 /**
  * Index to the current row being processed.
  */
-unsigned int current = 0;
+static unsigned int current = 0;
 
 
 /**
  * Function called with information about a transaction.
  *
  * @param cls closure
- * @param merchant_pub merchant's public key
- * @param exchange_uri URI of the exchange
- * @param transaction_id proposal's transaction id
- * @param h_wire hash of our wire details
- * @param timestamp time of the confirmation
- * @param refund refund deadline
- * @param total_amount total amount we receive for the contract after fees
+ * @param order_id transaction's order ID.
+ * @param row_id serial numer of the transaction in the table,
+ * used as index by the frontend to skip previous results.
  */
 static void
 pd_cb (void *cls,
        const char *order_id,
+       unsigned int row_id,
        const json_t *proposal_data)
 {
   json_t *response = cls;
@@ -65,10 +62,11 @@ pd_cb (void *cls,
   json_t *instance;
 
   GNUNET_assert (-1 != json_unpack ((json_t *) proposal_data,
-                                    "{s:o, s:o, s:{s:o}}",
+                                    "{s:o, s:o, s:{s:o}, s:I}",
                                     "amount", &amount,
                                     "timestamp", &timestamp,
-                                    "merchant", "instance", &instance));
+                                    "merchant", "instance", &instance,
+                                    "row_id", (json_int_t) row_id));
 
   if ( (current >= start) &&
        (current < start + delta) )
@@ -88,7 +86,6 @@ pd_cb (void *cls,
                                               entry));
   }
 
-  // FIXME to zero after returned.
   current++;
 }
 
@@ -160,7 +157,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                          TALER_EC_HISTORY_INSTANCE_UNKNOWN,
                                          "instance");
   }
-  start = 0;
+
   delta = 20;
 
   str = MHD_lookup_connection_value (connection,
@@ -194,11 +191,25 @@ MH_handler_history (struct TMH_RequestHandler *rh,
               "Querying history back to %s\n",
               GNUNET_STRINGS_absolute_time_to_string (date));
 
-  ret = db->find_proposal_data_by_date (db->cls,
-                                        date,
-                                        &mi->pubkey,
-                                        pd_cb,
-                                        response);
+  if (0 > start)
+    ret = db->find_proposal_data_by_date (db->cls,
+                                          date,
+                                          &mi->pubkey,
+                                          delta,
+                                          pd_cb,
+                                          response);
+  else
+    ret = db->find_proposal_data_by_date_and_range (db->cls,
+                                                    date,
+                                                    &mi->pubkey,
+                                                    start,
+                                                    delta,
+                                                    pd_cb,
+                                                    response);
+    
+
+
+
   current = 0;
   if (GNUNET_SYSERR == ret)
   {

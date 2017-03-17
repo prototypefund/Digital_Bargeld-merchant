@@ -170,6 +170,7 @@ postgres_initialize (void *cls)
            ",proposal_data BYTEA NOT NULL"
            ",h_proposal_data BYTEA NOT NULL"
            ",timestamp INT8 NOT NULL"
+           ",row_id SERIAL"
 	   ",PRIMARY KEY (order_id, merchant_pub)"
            ");");
 
@@ -316,12 +317,29 @@ postgres_initialize (void *cls)
               "SELECT"
               " proposal_data"
               ",order_id"
+              ",row_id"
               " FROM merchant_proposal_data"
               " WHERE"
-              " timestamp>=$1"
+              " timestamp<$1"
               " AND merchant_pub=$2"
-              " ORDER BY timestamp DESC",
-              2);
+              " ORDER BY timestamp DESC, row_id DESC"
+              " FETCH FIRST $3 ROWS ONLY",
+              3);
+
+  PG_PREPARE (pg,
+              "find_proposal_data_by_date_and_range",
+              "SELECT"
+              " proposal_data"
+              ",order_id"
+              ",row_id"
+              " FROM merchant_proposal_data"
+              " WHERE"
+              " timestamp<$1"
+              " AND merchant_pub=$2"
+              " AND row_id<$3"
+              " ORDER BY timestamp DESC, row_id DESC"
+              " FETCH FIRST $4 ROWS ONLY",
+              4);
 
   /* Setup prepared "SELECT" statements */
   PG_PREPARE (pg,
@@ -798,18 +816,112 @@ postgres_store_transfer_to_proof (void *cls,
 }
 
 /**
- * Return transactions younger than the given date
+ * Return proposals whose timestamp are older than `date`.
+ * Among those proposals, only those ones being between the
+ * start-th and (start-nrows)-th record are returned.  The rows
+ * are sorted having the youngest first.
  *
- * @param cls our plugin handle
- * @param date limit to transactions' age
- * @param cb function to call with transaction data, can be NULL
+ * @param cls our plugin handle.
+ * @param date only results older than this date are returned.
+ * @param merchant_pub instance's public key; only rows related to this
+ * instance are returned.
+ * @param start only rows with serial id less than start are returned.
+ * @param nrows only nrows rows are returned.
+ * @param cb function to call with transaction data, can be NULL.
  * @param cb_cls closure for @a cb
+ * @return numer of found tuples, #GNUNET_SYSERR upon error
+ */
+static int
+postgres_find_proposal_data_by_date_and_range (void *cls,
+                                               struct GNUNET_TIME_Absolute date,
+                                               const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                               unsigned int start,
+                                               unsigned int nrows,
+                                               TALER_MERCHANTDB_ProposalDataCallback cb,
+                                               void *cb_cls)
+{
+
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int n;
+  unsigned int i;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_absolute_time (&date),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_uint32 (&start),
+    GNUNET_PQ_query_param_uint32 (&nrows),
+    GNUNET_PQ_query_param_end
+  };
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_proposal_data_by_date_and_range",
+                                    params);
+      if (PGRES_TUPLES_OK != PQresultStatus (result))
+      {
+        BREAK_DB_ERR (result);
+        PQclear (result);
+        return GNUNET_SYSERR;
+      }
+      if (0 == (n = PQntuples (result)) || NULL == cb)
+      {
+        PQclear (result);
+        return n;
+      }
+      for (i = 0; i < n; i++)
+      {
+        char *order_id;
+        json_t *proposal_data;
+        unsigned int row_id;
+
+        struct GNUNET_PQ_ResultSpec rs[] = {
+          GNUNET_PQ_result_spec_string ("order_id",
+                                        &order_id),
+          TALER_PQ_result_spec_json ("proposal_data",
+                                     &proposal_data),
+          GNUNET_PQ_result_spec_uint32 ("row_id",
+                                        &row_id),
+          GNUNET_PQ_result_spec_end
+        };
+
+        if (GNUNET_OK !=
+            GNUNET_PQ_extract_result (result,
+                                      rs,
+                                      i))
+        {
+          GNUNET_break (0);
+          PQclear (result);
+          return GNUNET_SYSERR;
+        }
+        cb (cb_cls,
+            order_id,
+            row_id,
+            proposal_data);
+
+        GNUNET_PQ_cleanup_result (rs);
+      }
+      PQclear (result);
+      return n;
+    }
+
+
+    /**
+     * Return proposals whose timestamp are older than `date`.
+     * The rows are sorted having the youngest first.
+     *
+     * @param cls our plugin handle.
+     * @param date only results older than this date are returned.
+     * @param merchant_pub instance's public key; only rows related to this
+     * instance are returned.
+     * @param nrows at most nrows rows are returned.
+     * @param cb function to call with transaction data, can be NULL.
+     * @param cb_cls closure for @a cb
  * @return numer of found tuples, #GNUNET_SYSERR upon error
  */
 static int
 postgres_find_proposal_data_by_date (void *cls,
                                      struct GNUNET_TIME_Absolute date,
                                      const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                     unsigned int nrows,
                                      TALER_MERCHANTDB_ProposalDataCallback cb,
                                      void *cb_cls)
 {
@@ -822,6 +934,7 @@ postgres_find_proposal_data_by_date (void *cls,
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_uint32 (&nrows),
     GNUNET_PQ_query_param_end
   };
   result = GNUNET_PQ_exec_prepared (pg->conn,
@@ -842,12 +955,15 @@ postgres_find_proposal_data_by_date (void *cls,
   {
     char *order_id;
     json_t *proposal_data;
+    unsigned int row_id;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_string ("order_id",
                                     &order_id),
       TALER_PQ_result_spec_json ("proposal_data",
                                  &proposal_data),
+      GNUNET_PQ_result_spec_uint32 ("row_id",
+                                    &row_id),
       GNUNET_PQ_result_spec_end
     };
 
@@ -862,6 +978,7 @@ postgres_find_proposal_data_by_date (void *cls,
     }
     cb (cb_cls,
         order_id,
+        row_id,
         proposal_data);
 
     GNUNET_PQ_cleanup_result (rs);
@@ -1448,6 +1565,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->insert_proposal_data = &postgres_insert_proposal_data;
   plugin->find_proposal_data = &postgres_find_proposal_data;
   plugin->find_proposal_data_by_date = &postgres_find_proposal_data_by_date;
+  plugin->find_proposal_data_by_date_and_range = &postgres_find_proposal_data_by_date_and_range;
   plugin->find_proposal_data_from_hash = &postgres_find_proposal_data_from_hash;
 
   return plugin;
