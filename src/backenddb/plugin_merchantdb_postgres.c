@@ -323,7 +323,7 @@ postgres_initialize (void *cls)
               " timestamp<$1"
               " AND merchant_pub=$2"
               " ORDER BY timestamp DESC, row_id DESC"
-              " FETCH FIRST $3 ROWS ONLY",
+              " LIMIT $3",
               3);
 
   PG_PREPARE (pg,
@@ -338,7 +338,7 @@ postgres_initialize (void *cls)
               " AND merchant_pub=$2"
               " AND row_id<$3"
               " ORDER BY timestamp DESC, row_id DESC"
-              " FETCH FIRST $4 ROWS ONLY",
+              " LIMIT $4",
               4);
 
   /* Setup prepared "SELECT" statements */
