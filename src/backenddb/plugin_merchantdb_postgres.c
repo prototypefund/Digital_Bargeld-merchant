@@ -856,52 +856,52 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_proposal_data_by_date_and_range",
                                     params);
-      if (PGRES_TUPLES_OK != PQresultStatus (result))
-      {
-        BREAK_DB_ERR (result);
-        PQclear (result);
-        return GNUNET_SYSERR;
-      }
-      if (0 == (n = PQntuples (result)) || NULL == cb)
-      {
-        PQclear (result);
-        return n;
-      }
-      for (i = 0; i < n; i++)
-      {
-        char *order_id;
-        json_t *proposal_data;
-        unsigned int row_id;
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  if (0 == (n = PQntuples (result)) || NULL == cb)
+  {
+    PQclear (result);
+    return n;
+  }
+  for (i = 0; i < n; i++)
+  {
+    char *order_id;
+    json_t *proposal_data;
+    unsigned int row_id;
 
-        struct GNUNET_PQ_ResultSpec rs[] = {
-          GNUNET_PQ_result_spec_string ("order_id",
-                                        &order_id),
-          TALER_PQ_result_spec_json ("proposal_data",
-                                     &proposal_data),
-          GNUNET_PQ_result_spec_uint32 ("row_id",
-                                        &row_id),
-          GNUNET_PQ_result_spec_end
-        };
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_string ("order_id",
+                                    &order_id),
+      TALER_PQ_result_spec_json ("proposal_data",
+                                 &proposal_data),
+      GNUNET_PQ_result_spec_uint32 ("row_id",
+                                    &row_id),
+      GNUNET_PQ_result_spec_end
+    };
 
-        if (GNUNET_OK !=
-            GNUNET_PQ_extract_result (result,
-                                      rs,
-                                      i))
-        {
-          GNUNET_break (0);
-          PQclear (result);
-          return GNUNET_SYSERR;
-        }
-        cb (cb_cls,
-            order_id,
-            row_id,
-            proposal_data);
-
-        GNUNET_PQ_cleanup_result (rs);
-      }
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
       PQclear (result);
-      return n;
+      return GNUNET_SYSERR;
     }
+    cb (cb_cls,
+        order_id,
+        row_id,
+        proposal_data);
+
+    GNUNET_PQ_cleanup_result (rs);
+  }
+  PQclear (result);
+  return n;
+}
 
 
     /**
