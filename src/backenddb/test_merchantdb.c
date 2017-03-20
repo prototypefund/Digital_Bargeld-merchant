@@ -332,7 +332,7 @@ run (void *cls)
   timestamp = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&timestamp);
   delta = GNUNET_TIME_UNIT_MINUTES;
-  fake_now = GNUNET_TIME_absolute_subtract (timestamp, delta);
+  fake_now = GNUNET_TIME_absolute_add (timestamp, delta);
   refund_deadline = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&refund_deadline);
   GNUNET_assert (GNUNET_OK ==
@@ -382,8 +382,8 @@ run (void *cls)
           plugin->find_proposal_data_by_date_and_range (plugin->cls,
                                                         fake_now,
                                                         &merchant_pub,
-                                                        0,
-                                                        5,
+                                                        2,
+                                                        1,
                                                         pd_cb,
                                                         NULL));
 
@@ -391,7 +391,7 @@ run (void *cls)
           plugin->find_proposal_data_by_date (plugin->cls,
                                               fake_now,
                                               &merchant_pub,
-                                              5,
+                                              1,
                                               pd_cb,
                                               NULL));
 

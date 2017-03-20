@@ -865,6 +865,8 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
   if ( (0 == (n = PQntuples (result))) ||
        (NULL == cb) )
   {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "No records found.\n");
     PQclear (result);
     return n;
   }
@@ -927,6 +929,7 @@ postgres_find_proposal_data_by_date (void *cls,
                                      void *cb_cls)
 {
 
+  uint64_t r64 = nrows;
   struct PostgresClosure *pg = cls;
   PGresult *result;
   unsigned int n;
@@ -935,7 +938,7 @@ postgres_find_proposal_data_by_date (void *cls,
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_uint32 (&nrows),
+    GNUNET_PQ_query_param_uint64 (&r64),
     GNUNET_PQ_query_param_end
   };
   result = GNUNET_PQ_exec_prepared (pg->conn,
