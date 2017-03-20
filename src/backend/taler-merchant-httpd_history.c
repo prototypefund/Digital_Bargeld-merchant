@@ -36,12 +36,6 @@ static int start = -1;
 static unsigned int delta;
 
 /**
- * Index to the current row being processed.
- */
-static unsigned int current = 0;
-
-
-/**
  * Function called with information about a transaction.
  *
  * @param cls closure
@@ -60,33 +54,23 @@ pd_cb (void *cls,
   json_t *amount;
   json_t *timestamp;
   json_t *instance;
+  uint64_t r64 = (uint64_t) row_id;
 
   GNUNET_assert (-1 != json_unpack ((json_t *) proposal_data,
-                                    "{s:o, s:o, s:{s:o}, s:I}",
+                                    "{s:o, s:o, s:{s:o}}",
                                     "amount", &amount,
                                     "timestamp", &timestamp,
-                                    "merchant", "instance", &instance,
-                                    "row_id", (json_int_t) row_id));
+                                    "merchant", "instance", &instance));
 
-  if ( (current >= start) &&
-       (current < start + delta) )
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Adding history element. Current: %u, start: %u, delta: %u\n",
-                current,
-                start,
-                delta);
-    GNUNET_break (NULL != (entry = json_pack ("{s:s, s:O, s:O, s:O}",
-                                              "order_id", order_id,
-                                              "amount", amount,
-                                              "timestamp", timestamp,
-                                              "instance", instance)));
+  GNUNET_break (NULL != (entry = json_pack ("{s:I, s:s, s:O, s:O, s:O}",
+                                            "row_id", r64,
+                                            "order_id", order_id,
+                                            "amount", amount,
+                                            "timestamp", timestamp,
+                                            "instance", instance)));
 
-    GNUNET_break (0 == json_array_append_new (response,
-                                              entry));
-  }
-
-  current++;
+  GNUNET_break (0 == json_array_append_new (response,
+                                            entry));
 }
 
 
@@ -206,11 +190,6 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                                     delta,
                                                     pd_cb,
                                                     response);
-    
-
-
-
-  current = 0;
   if (GNUNET_SYSERR == ret)
   {
     json_decref (response);

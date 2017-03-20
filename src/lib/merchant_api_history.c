@@ -137,7 +137,8 @@ history_raw_cb (void *cls,
  * @param ctx execution context
  * @param backend_uri base URL of the merchant backend
  * @param instance which merchant instance is performing this call
- * @param start return `delta` records starting from position `start`
+ * @param start return `delta` records starting from position `start`.
+ * If given as zero, then no initial skip of `start` records is done.
  * @param delta return `delta` records starting from position `start`
  * @param date only transactions younger than/equals to date will be returned
  * @param history_cb callback which will work the response gotten from the backend
@@ -163,6 +164,7 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
   ho->cb = history_cb;
   ho->cb_cls = history_cb_cls;
   seconds = date.abs_value_us / 1000LL / 1000LL;
+
   GNUNET_asprintf (&ho->url,
                    "%s/history?date=%llu&instance=%s&start=%d&delta=%d",
                    backend_uri,
@@ -170,6 +172,7 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                    instance,
                    start,
                    delta);
+
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,

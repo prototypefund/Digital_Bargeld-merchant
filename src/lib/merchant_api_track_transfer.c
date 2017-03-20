@@ -124,10 +124,6 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
         GNUNET_JSON_spec_end()
       };
 
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Extracting fields from: '%s'.\n",
-                  json_dumps (deposit, JSON_INDENT (1)));
-
       if (GNUNET_OK !=
           GNUNET_JSON_parse (deposit,
                              spec_detail,

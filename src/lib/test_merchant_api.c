@@ -1287,9 +1287,6 @@ track_transaction_cb (void *cls,
   }
   if (MHD_HTTP_OK != http_status)
     fail (is);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "/track/order response: %s\n",
-              json_dumps (json, JSON_INDENT (1)));
   next_command (is);
 }
 
@@ -1853,7 +1850,7 @@ interpreter_run (void *cls)
        (cmd->details.history.ho = TALER_MERCHANT_history (ctx,
 	                                                  MERCHANT_URI,
                                                           instance,
-                                                          0,
+                                                          20,
                                                           20,
 	                                                  cmd->details.history.date,
 							  history_cb,
@@ -2344,14 +2341,14 @@ run (void *cls)
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
       /*all records to be returned*/
-      .details.history.date.abs_value_us = 0,
+      .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
       .details.history.nresult = 2
     },
     { .oc = OC_HISTORY,
       .label = "history-2",
       .expected_response_code = MHD_HTTP_OK,
-      /*no records to be returned, as limit is in the future*/
-      .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
+      /*no records returned, time limit too ancient*/
+      .details.history.date.abs_value_us = 0,
       .details.history.nresult = 0
     },
 
