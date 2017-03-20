@@ -170,7 +170,7 @@ postgres_initialize (void *cls)
            ",proposal_data BYTEA NOT NULL"
            ",h_proposal_data BYTEA NOT NULL"
            ",timestamp INT8 NOT NULL"
-           ",row_id SERIAL"
+           ",row_id BIGSERIAL"
 	   ",PRIMARY KEY (order_id, merchant_pub)"
            ");");
 
@@ -840,19 +840,19 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
                                                TALER_MERCHANTDB_ProposalDataCallback cb,
                                                void *cb_cls)
 {
-
+  uint64_t s64 = start;
+  uint64_t r64 = nrows;
   struct PostgresClosure *pg = cls;
   PGresult *result;
   unsigned int n;
-  unsigned int i;
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_uint32 (&start),
-    GNUNET_PQ_query_param_uint32 (&nrows),
+    GNUNET_PQ_query_param_uint64 (&s64),
+    GNUNET_PQ_query_param_uint64 (&r64),
     GNUNET_PQ_query_param_end
   };
+
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_proposal_data_by_date_and_range",
                                     params);
@@ -862,12 +862,13 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
     PQclear (result);
     return GNUNET_SYSERR;
   }
-  if (0 == (n = PQntuples (result)) || NULL == cb)
+  if ( (0 == (n = PQntuples (result))) ||
+       (NULL == cb) )
   {
     PQclear (result);
     return n;
   }
-  for (i = 0; i < n; i++)
+  for (unsigned int i = 0; i < n; i++)
   {
     char *order_id;
     json_t *proposal_data;
