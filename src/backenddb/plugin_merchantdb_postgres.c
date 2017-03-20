@@ -826,6 +826,12 @@ postgres_store_transfer_to_proof (void *cls,
  * @param merchant_pub instance's public key; only rows related to this
  * instance are returned.
  * @param start only rows with serial id less than start are returned.
+ * In other words, you lower `start` to get older records. The tipical
+ * usage is to firstly call `find_proposal_data_by_date`, so that you get
+ * the `nrows` youngest records. The oldest of those records will tell you
+ * from which timestamp and `start` you can query the DB in order to get
+ * furtherly older records, and so on. Alternatively, you can use always
+ * the same timestamp and just go behind in history by tuning `start`.
  * @param nrows only nrows rows are returned.
  * @param cb function to call with transaction data, can be NULL.
  * @param cb_cls closure for @a cb

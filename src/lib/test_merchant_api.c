@@ -596,6 +596,17 @@ struct Command
        */
       struct TALER_MERCHANT_HistoryOperation *ho;
 
+      /**
+       * The backend will return records with row_id
+       * less than this value.
+       */
+      unsigned int start;
+
+      /**
+       * The backend will return at most `nrows` records.
+       */
+      unsigned int nrows;
+
     } history;
 
 
@@ -1850,8 +1861,8 @@ interpreter_run (void *cls)
        (cmd->details.history.ho = TALER_MERCHANT_history (ctx,
 	                                                  MERCHANT_URI,
                                                           instance,
-                                                          20,
-                                                          20,
+                                                          cmd->details.history.start,
+                                                          cmd->details.history.nrows,
 	                                                  cmd->details.history.date,
 							  history_cb,
 							  is)))
@@ -2342,14 +2353,18 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       /*all records to be returned*/
       .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
-      .details.history.nresult = 2
+      .details.history.nresult = 2,
+      .details.history.start = 10,
+      .details.history.nrows = 10
     },
     { .oc = OC_HISTORY,
       .label = "history-2",
       .expected_response_code = MHD_HTTP_OK,
       /*no records returned, time limit too ancient*/
       .details.history.date.abs_value_us = 0,
-      .details.history.nresult = 0
+      .details.history.nresult = 0,
+      .details.history.start = 10,
+      .details.history.nrows = 10
     },
 
     /* end of testcase */
