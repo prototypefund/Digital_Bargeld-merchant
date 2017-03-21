@@ -32,6 +32,32 @@
 #define INSTANCE "FSF"
 #define CURRENCY "EUR"
 
+/**
+ * Exchange URI to withdraw from and deposit to.
+ */
+static char *exchange_uri;
+
+/**
+ * Merchant backend to get proposals from and pay.
+ */
+static char *merchant_uri;
+
+/**
+ * Customer's bank URI, communicated at withdrawal time
+ * to the exchange; must be the same as the exchange's bank.
+ */
+static char *bank_uri;
+
+/**
+ * Which merchant instance we use.
+ */
+static char *instance;
+
+/**
+ * Currency used to generate payments.
+ */
+static char *currency;
+
 #define ORDER_MAX_SIZE 1000
 
 /**
@@ -1370,6 +1396,76 @@ main (int argc,
   struct GNUNET_OS_Process *merchantd;
   unsigned int cnt;
   struct GNUNET_SIGNAL_Context *shc_chld;
+  char *config_file;
+  struct GNUNET_CONFIGURATION_Handle *cfg;
+
+  struct GNUNET_GETOPT_CommandLineOption options[] = {
+
+    GNUNET_GETOPT_OPTION_MANDATORY (GNUNET_GETOPT_OPTION_FILENAME ('c',
+                                                                   "config",
+                                                                   NULL,
+                                                                   "Configuration file",
+                                                                   &config_file)), 
+    GNUNET_GETOPT_OPTION_END
+  };
+
+  GNUNET_assert (GNUNET_SYSERR != GNUNET_GETOPT_run (argv[0],
+                                                     options,
+                                                     argc,
+                                                     argv));
+
+  cfg = GNUNET_CONFIGURATION_create ();
+  GNUNET_assert (GNUNET_OK == GNUNET_CONFIGURATION_parse (cfg, config_file));
+
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg, 
+                                                              "payments-generator",
+                                                              "exchange",
+                                                              &exchange_uri))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "'exchange' config value invalid.\n");
+    return 77;  
+  }
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                              "payments-generator",
+                                                              "merchant",
+                                                              &merchant_uri))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "'merchant' config value invalid.\n");
+    return 77; 
+  }
+
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                              "payments-generator",
+                                                              "bank",
+                                                              &bank_uri))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "'bank' config value invalid.\n");
+    return 77;  
+  }
+
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                              "payments-generator",
+                                                              "instance",
+                                                              &instance))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "'instance' config value invalid.\n");
+    return 77;  
+  }
+
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                              "payments-generator",
+                                                              "currency",
+                                                              &currency))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "'currency' config value invalid.\n");
+    return 77;  
+  }
+
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
