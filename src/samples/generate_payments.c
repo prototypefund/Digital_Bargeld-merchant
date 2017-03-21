@@ -26,10 +26,6 @@
 #include <gnunet/gnunet_curl_lib.h>
 #include <microhttpd.h>
 
-#define EXCHANGE_URI "http://localexchange/"
-#define MERCHANT_URI "http://localshop/"
-#define BANK_URI "http://localbank/"
-#define INSTANCE "FSF"
 #define CURRENCY "EUR"
 
 /**
@@ -59,6 +55,16 @@ static char *instance;
 static char *currency;
 
 #define ORDER_MAX_SIZE 1000
+
+/**
+ * Configuration file
+ */
+static char *config_file;
+
+/**
+ * Configuration handle
+ */
+static struct GNUNET_CONFIGURATION_Handle *cfg;
 
 /**
  * Task run on timeout.
@@ -811,7 +817,7 @@ interpreter_run (void *cls)
         }
   
         {
-          const struct Command *coin_ref;
+        const struct Command *coin_ref;
   	memset (&pc, 0, sizeof (pc));
   	coin_ref = find_command (is,
   	                         cmd->details.pay.coin_ref);
@@ -855,8 +861,8 @@ interpreter_run (void *cls)
   
         cmd->details.pay.ph
   	= TALER_MERCHANT_pay_wallet (ctx,
-  				     MERCHANT_URI,
-                                     INSTANCE,
+  				     merchant_uri,
+                                     instance,
   				     &ref->details.proposal.hash,
   				     &total_amount,
   				     &max_fee,
@@ -866,7 +872,7 @@ interpreter_run (void *cls)
   				     refund_deadline,
   				     pay_deadline,
   				     &h_wire,
-  				     EXCHANGE_URI,
+  				     exchange_uri,
                                      order_id,
   				     1 /* num_coins */,
   				     &pc /* coins */,
@@ -885,6 +891,7 @@ interpreter_run (void *cls)
     case OC_PROPOSAL:
       {
         json_t *order;
+        json_t *merchant_obj;
         json_error_t error;
   
         order = json_loads (cmd->details.proposal.order,
@@ -902,9 +909,17 @@ interpreter_run (void *cls)
           return;
         }
         
+        GNUNET_assert (NULL != (merchant_obj = json_pack ("{s:{s:s}}",
+                                                          "merchant",
+                                                          "instance",
+                                                          instance)));
+
+
+        GNUNET_assert (-1 != json_object_update (order, merchant_obj));
+
         cmd->details.proposal.po
           = TALER_MERCHANT_order_put (ctx,
-                                      MERCHANT_URI,
+                                      merchant_uri,
                                       order,
                                       &proposal_cb,
                                       is);
@@ -965,6 +980,8 @@ interpreter_run (void *cls)
         fail (is);
         return;
       }
+      json_object_set (sender_details, "bank_uri", bank_uri);
+
       transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
                                      JSON_REJECT_DUPLICATES,
                                      NULL);
@@ -980,7 +997,7 @@ interpreter_run (void *cls)
       }
       cmd->details.admin_add_incoming.aih
         = TALER_EXCHANGE_admin_add_incoming (exchange,
-                                             EXCHANGE_URI,
+                                             exchange_uri,
                                              &reserve_pub,
                                              &amount,
                                              execution_date,
@@ -1252,21 +1269,21 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"bank_uri\":\"" BANK_URI "\", \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = CURRENCY ":5.01" },
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"bank_uri\":\"" BANK_URI "\", \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = CURRENCY ":5.01" },
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-3",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"bank_uri\":\"" BANK_URI "\", \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = CURRENCY ":5.01" },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
@@ -1300,7 +1317,6 @@ run (void *cls)
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
                   \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
                   \"amount\":{\"currency\":\"" CURRENCY "\", \"value\":5, \"fraction\":0},\
-                  \"merchant\":{\"instance\":\"" INSTANCE "\"},\
 		  \"summary\": \"merchant-lib testcase\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{" CURRENCY ":5}\"} ] }"},
@@ -1317,7 +1333,6 @@ run (void *cls)
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
                   \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
                   \"amount\":{\"currency\":\"" CURRENCY "\", \"value\":5, \"fraction\":0},\
-                  \"merchant\":{\"instance\":\"" INSTANCE "\"},\
 		  \"summary\": \"merchant-lib testcase\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{" CURRENCY ":5}\"} ] }"},
@@ -1334,7 +1349,6 @@ run (void *cls)
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
                   \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
                   \"amount\":{\"currency\":\"" CURRENCY "\", \"value\":5, \"fraction\":0},\
-                  \"merchant\":{\"instance\":\"" INSTANCE "\"},\
 		  \"summary\": \"merchant-lib testcase\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{" CURRENCY ":5}\"} ] }"},
@@ -1375,7 +1389,7 @@ run (void *cls)
   GNUNET_assert (NULL != ctx);
   rc = GNUNET_CURL_gnunet_rc_create (ctx);
   exchange = TALER_EXCHANGE_connect (ctx,
-                                     EXCHANGE_URI,
+                                     exchange_uri,
                                      &cert_cb, is,
                                      TALER_EXCHANGE_OPTION_END);
   GNUNET_assert (NULL != exchange);
@@ -1392,27 +1406,31 @@ int
 main (int argc,
       char *argv[])
 {
+
   struct GNUNET_OS_Process *exchanged;
   struct GNUNET_OS_Process *merchantd;
   unsigned int cnt;
   struct GNUNET_SIGNAL_Context *shc_chld;
-  char *config_file;
-  struct GNUNET_CONFIGURATION_Handle *cfg;
+  char *wget_cmd;
+
+  GNUNET_log_setup ("merchant-create-payments",
+                    "DEBUG",
+                    NULL);
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
-
-    GNUNET_GETOPT_OPTION_MANDATORY (GNUNET_GETOPT_OPTION_FILENAME ('c',
-                                                                   "config",
-                                                                   NULL,
-                                                                   "Configuration file",
-                                                                   &config_file)), 
+    GNUNET_GETOPT_OPTION_CFG_FILE (&config_file),
     GNUNET_GETOPT_OPTION_END
   };
 
-  GNUNET_assert (GNUNET_SYSERR != GNUNET_GETOPT_run (argv[0],
-                                                     options,
-                                                     argc,
-                                                     argv));
+  if (GNUNET_SYSERR == GNUNET_GETOPT_run (argv[0],
+                                          options,
+                                          argc,
+                                          argv))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to parse CLI arguments.\n");
+    return 77;
+  }
 
   cfg = GNUNET_CONFIGURATION_create ();
   GNUNET_assert (GNUNET_OK == GNUNET_CONFIGURATION_parse (cfg, config_file));
@@ -1466,13 +1484,8 @@ main (int argc,
     return 77;  
   }
 
-
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
-
-  GNUNET_log_setup ("merchant-create-payments",
-                    "DEBUG",
-                    NULL);
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "About to launch the exchange.\n");
@@ -1493,6 +1506,9 @@ main (int argc,
   fprintf (stderr,
            "Waiting for taler-exchange-httpd to be ready\n");
   cnt = 0;
+
+  GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null", exchange_uri);
+
   do
     {
       fprintf (stderr, ".");
@@ -1509,7 +1525,9 @@ main (int argc,
         return 77;
       }
     }
-  while (0 != system ("wget -q -t 1 -T 1 " EXCHANGE_URI "keys -o /dev/null -O /dev/null"));
+  while (0 != system (wget_cmd));
+  GNUNET_free (wget_cmd);
+  
   fprintf (stderr, "\n");
 
   merchantd = GNUNET_OS_start_process (GNUNET_NO,
@@ -1533,6 +1551,8 @@ main (int argc,
   fprintf (stderr,
            "Waiting for taler-merchant-httpd to be ready\n");
   cnt = 0;
+  GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null", merchant_uri);
+
   do
     {
       fprintf (stderr, ".");
@@ -1553,8 +1573,9 @@ main (int argc,
         return 77;
       }
     }
-  while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URI " -o /dev/null -O /dev/null"));
+  while (0 != system (wget_cmd));
   fprintf (stderr, "\n");
+  GNUNET_free (wget_cmd);
 
   result = GNUNET_SYSERR;
   sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO, GNUNET_NO, GNUNET_NO);
