@@ -1,6 +1,0 @@
-{
-  "type": "test",
-  "account_number": 3,
-  "bank_uri": "http://localhost:8083/",
-  "name": "The exchange"
-}
