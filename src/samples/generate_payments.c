@@ -1255,6 +1255,28 @@ do_shutdown (void *cls)
 }
 
 /**
+ * Take currency and the part after ":" in the
+ * "CURRENCY:XX.YY" format, and return a string
+ * in the format "CURRENCY:XX.YY".
+ *
+ * @param currency currency
+ * @param rpart float numbers after the ":", in string form
+ * @return pointer to allocated and concatenated "CURRENCY:XX.YY"
+ * formatted string.
+ *
+ * FIXME: deallocate this string from within the interpreter
+ * commands who use it.
+ */
+char *
+amount_concat (char *currency, char *rpart)
+{
+  char *ret;
+  GNUNET_asprintf (&ret, "%s:%s",
+                   currency, rpart);
+  return ret;
+}
+
+/**
  * Main function that will be run by the scheduler.
  *
  * @param cls closure
@@ -1285,25 +1307,25 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
-      .details.admin_add_incoming.amount = CURRENCY ":5.01" },
+      .details.admin_add_incoming.amount = amount_concat (currency, "5.01") },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_withdraw.reserve_reference = "create-reserve-1",
-      .details.reserve_withdraw.amount = CURRENCY ":5" },
+      .details.reserve_withdraw.amount = amount_concat (currency, "5") },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
-      .details.reserve_withdraw.amount = CURRENCY ":5" },
+      .details.reserve_withdraw.amount = amount_concat (currency, "5") },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-3",
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_withdraw.reserve_reference = "create-reserve-3",
-      .details.reserve_withdraw.amount = CURRENCY ":5" },
+      .details.reserve_withdraw.amount = amount_concat (currency, "5") },
 
     /* Create proposal */
     { .oc = OC_PROPOSAL,
