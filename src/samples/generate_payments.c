@@ -770,11 +770,6 @@ interpreter_run (void *cls)
 
       j++;
 
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "j=%d, times=%d\n",
-                  j,
-                  times);
-
       if (j < times)
       {
         is->ip = 0;
@@ -1329,6 +1324,7 @@ make_order (char *currency,
   struct TALER_Amount tmp_amount;
   json_t *tmp_total;
   json_t *tmp_maxfee;
+  unsigned long long id;
 
   GNUNET_asprintf (&tmp_str,
                    "%s:%s",
@@ -1346,9 +1342,12 @@ make_order (char *currency,
   TALER_string_to_amount (tmp_str, &tmp_amount);
   tmp_maxfee = TALER_JSON_from_amount (&tmp_amount);
 
+  GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                              &id,
+                              sizeof (id));
   GNUNET_asprintf (&ret, "{\
                   \"max_fee\":%s,\
-                  \"order_id\":\"1\",\
+                  \"order_id\":\"%s\",\
                   \"timestamp\":\"\\/Date(42)\\/\",\
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
                   \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
@@ -1357,6 +1356,7 @@ make_order (char *currency,
                   \"products\":\
                      [ {\"description\":\"ice cream\"} ] }",
                   json_dumps (tmp_maxfee, JSON_COMPACT),
+                  TALER_b2s (&id, sizeof (id)),
                   json_dumps (tmp_total, JSON_COMPACT));
 
   GNUNET_free (tmp_str);
