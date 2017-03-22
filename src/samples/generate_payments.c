@@ -26,7 +26,15 @@
 #include <gnunet/gnunet_curl_lib.h>
 #include <microhttpd.h>
 
-#define CURRENCY "EUR"
+/**
+ * How many times the command list should be rerun.
+ */
+static unsigned int times = 1;
+
+/**
+ * Current iteration of commands
+ */
+static unsigned int j = 0;
 
 /**
  * Exchange URI to withdraw from and deposit to.
@@ -726,7 +734,7 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
  *
  * @param cls contains the `struct InterpreterState`
  */
-void
+static void
 interpreter_run (void *cls)
 {
   const struct GNUNET_SCHEDULER_TaskContext *tc;
@@ -759,8 +767,28 @@ interpreter_run (void *cls)
   switch (cmd->oc)
   {
     case OC_END:
+
+      j++;
+
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "j=%d, times=%d\n",
+                  j,
+                  times);
+
+      if (j < times)
+      {
+        is->ip = 0;
+        
+        GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                    "Rewinding the interpreter.\n");
+    
+        GNUNET_SCHEDULER_add_now (&interpreter_run,
+                                  is);
+        return;
+      }
       result = GNUNET_OK;
       GNUNET_SCHEDULER_shutdown ();
+
       return;
 
     case OC_PAY:
@@ -1150,6 +1178,7 @@ do_shutdown (void *cls)
   struct InterpreterState *is = cls;
   struct Command *cmd;
   unsigned int i;
+  
 
   if (NULL != timeout_task)
   {
@@ -1483,6 +1512,11 @@ main (int argc,
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
     GNUNET_GETOPT_OPTION_CFG_FILE (&config_file),
+    GNUNET_GETOPT_OPTION_SET_UINT ('n',
+                                   "times",
+                                   "TIMES",
+                                   "How many times the commands should be run.",
+                                   &times),
     GNUNET_GETOPT_OPTION_END
   };
 
