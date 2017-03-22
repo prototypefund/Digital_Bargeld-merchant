@@ -54,8 +54,6 @@ static char *instance;
  */
 static char *currency;
 
-#define ORDER_MAX_SIZE 1000
-
 /**
  * Configuration file
  */
@@ -207,9 +205,11 @@ struct Command
       /**
        * String describing the denomination value we should withdraw.
        * A corresponding denomination key must exist in the exchange's
-       * offerings.  Can be NULL if @e pk is set instead.
+       * offerings. Can be NULL if @e pk is set instead.
+       * The interpreter must free this value after it doesn't need it
+       * anymore.
        */
-      const char *amount;
+      char *amount;
 
       /**
        * If @e amount is NULL, this specifies the denomination key to
@@ -290,10 +290,8 @@ struct Command
 
       /**
        * The order.
-       * It's dynamically generated because we need different transaction_id
-       * for different merchant instances.
        */
-      char order[ORDER_MAX_SIZE];
+      char *order;
 
       /**
        * Handle to the active PUT /proposal operation, or NULL.
@@ -728,7 +726,7 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
  *
  * @param cls contains the `struct InterpreterState`
  */
-static void
+void
 interpreter_run (void *cls)
 {
   const struct GNUNET_SCHEDULER_TaskContext *tc;
@@ -742,6 +740,12 @@ interpreter_run (void *cls)
   json_t *sender_details;
   json_t *transfer_details;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+	      "Interpreter runs command %u/%s(%u)\n",
+	      is->ip,
+	      cmd->label,
+	      cmd->oc);
+
   is->task = NULL;
   tc = GNUNET_SCHEDULER_get_task_context ();
   if (0 != (tc->reason & GNUNET_SCHEDULER_REASON_SHUTDOWN))
@@ -751,11 +755,6 @@ interpreter_run (void *cls)
     fail (is);
     return;
   }
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-	      "Interpreter runs command %u/%s(%u)\n",
-	      is->ip,
-	      cmd->label,
-	      cmd->oc);
 
   switch (cmd->oc)
   {
@@ -980,7 +979,7 @@ interpreter_run (void *cls)
         fail (is);
         return;
       }
-      json_object_set (sender_details, "bank_uri", bank_uri);
+      json_object_set (sender_details, "bank_uri", json_string (bank_uri));
 
       transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
                                      JSON_REJECT_DUPLICATES,
@@ -1117,6 +1116,7 @@ cert_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Certificate callback invoked, starting interpreter\n");
   is->keys = keys;
+
   is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
                                        is);
 }
@@ -1191,6 +1191,8 @@ do_shutdown (void *cls)
           json_decref (cmd->details.proposal.proposal_data);
           cmd->details.proposal.proposal_data = NULL;
         }
+
+        GNUNET_free_non_null (cmd->details.proposal.order);
         break;
   
       case OC_WITHDRAW_SIGN:
@@ -1208,6 +1210,7 @@ do_shutdown (void *cls)
           GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
           cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
         }
+        GNUNET_free_non_null (cmd->details.reserve_withdraw.amount);
         break;
   
       case OC_ADMIN_ADD_INCOMING:
@@ -1264,17 +1267,76 @@ do_shutdown (void *cls)
  * @return pointer to allocated and concatenated "CURRENCY:XX.YY"
  * formatted string.
  *
- * FIXME: deallocate this string from within the interpreter
- * commands who use it.
  */
 char *
-amount_concat (char *currency, char *rpart)
+concat_amount (char *currency, char *rpart)
 {
-  char *ret;
-  GNUNET_asprintf (&ret, "%s:%s",
+  char *str;
+
+  GNUNET_asprintf (&str, "%s:%s",
                    currency, rpart);
+  return str;
+}
+
+
+/**
+ * Allocates and return a string representing a order.
+ * In this process, this function gives the order those
+ * prices specified by the user. Please NOTE that any amount
+ * must be given in the form "XX.YY".
+ *
+ * @param currency string representing the currency
+ * the system works in
+ * @param max_fee merchant's allowed max_fee
+ * @param amount total amount for this order
+ */
+char *
+make_order (char *currency,
+            char *max_fee,
+            char *amount)
+{
+  char *tmp_str;
+  char *ret;
+  struct TALER_Amount tmp_amount;
+  json_t *tmp_total;
+  json_t *tmp_maxfee;
+
+  GNUNET_asprintf (&tmp_str,
+                   "%s:%s",
+                   currency,
+                   max_fee);
+
+  TALER_string_to_amount (tmp_str, &tmp_amount);
+  tmp_total = TALER_JSON_from_amount (&tmp_amount);
+
+  sprintf (tmp_str,
+           "%s:%s",
+           currency,
+           amount);
+
+  TALER_string_to_amount (tmp_str, &tmp_amount);
+  tmp_maxfee = TALER_JSON_from_amount (&tmp_amount);
+
+  GNUNET_asprintf (&ret, "{\
+                  \"max_fee\":%s,\
+                  \"order_id\":\"1\",\
+                  \"timestamp\":\"\\/Date(42)\\/\",\
+                  \"refund_deadline\":\"\\/Date(0)\\/\",\
+                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
+                  \"amount\":%s,\
+		  \"summary\": \"merchant-lib testcase\",\
+                  \"products\":\
+                     [ {\"description\":\"ice cream\"} ] }",
+                  json_dumps (tmp_maxfee, JSON_COMPACT),
+                  json_dumps (tmp_total, JSON_COMPACT));
+
+  GNUNET_free (tmp_str);
+  json_decref (tmp_maxfee);
+  json_decref (tmp_total);
+
   return ret;
 }
+
 
 /**
  * Main function that will be run by the scheduler.
@@ -1284,8 +1346,12 @@ amount_concat (char *currency, char *rpart)
 static void
 run (void *cls)
 {
+  int ncmds;
   struct InterpreterState *is;
-  static struct Command commands[] =
+
+  /* must always be updated with the # of cmds the interpreter has*/
+  ncmds = 13;
+  struct Command commands[] =
   {
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
@@ -1293,118 +1359,94 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
-      .details.admin_add_incoming.amount = CURRENCY ":5.01" },
+      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
+
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
-      .details.admin_add_incoming.amount = CURRENCY ":5.01" },
+      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-3",
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
-      .details.admin_add_incoming.amount = amount_concat (currency, "5.01") },
+      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
+
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_withdraw.reserve_reference = "create-reserve-1",
-      .details.reserve_withdraw.amount = amount_concat (currency, "5") },
+      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
+
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
-      .details.reserve_withdraw.amount = amount_concat (currency, "5") },
+      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
+
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-3",
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_withdraw.reserve_reference = "create-reserve-3",
-      .details.reserve_withdraw.amount = amount_concat (currency, "5") },
+      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
 
     /* Create proposal */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.order = "{\
-                  \"max_fee\":\
-                     {\"currency\":\"" CURRENCY "\", \"value\":0, \"fraction\":50000000},\
-                  \"order_id\":\"1\",\
-                  \"timestamp\":\"\\/Date(42)\\/\",\
-                  \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
-                  \"amount\":{\"currency\":\"" CURRENCY "\", \"value\":5, \"fraction\":0},\
-		  \"summary\": \"merchant-lib testcase\",\
-                  \"products\":\
-                     [ {\"description\":\"ice cream\", \"value\":\"{" CURRENCY ":5}\"} ] }"},
+      .details.proposal.order = make_order (currency, "0.5", "5.0") },
 
     /* Create proposal */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.order = "{\
-                  \"max_fee\":\
-                     {\"currency\":\"" CURRENCY "\", \"value\":0, \"fraction\":50000000},\
-                  \"order_id\":\"2\",\
-                  \"timestamp\":\"\\/Date(42)\\/\",\
-                  \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
-                  \"amount\":{\"currency\":\"" CURRENCY "\", \"value\":5, \"fraction\":0},\
-		  \"summary\": \"merchant-lib testcase\",\
-                  \"products\":\
-                     [ {\"description\":\"ice cream\", \"value\":\"{" CURRENCY ":5}\"} ] }"},
+      .details.proposal.order = make_order (currency, "0.5", "5.0") },
 
     /* Create proposal */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-3",
       .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.order = "{\
-                  \"max_fee\":\
-                     {\"currency\":\"" CURRENCY "\", \"value\":0, \"fraction\":50000000},\
-                  \"order_id\":\"3\",\
-                  \"timestamp\":\"\\/Date(42)\\/\",\
-                  \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
-                  \"amount\":{\"currency\":\"" CURRENCY "\", \"value\":5, \"fraction\":0},\
-		  \"summary\": \"merchant-lib testcase\",\
-                  \"products\":\
-                     [ {\"description\":\"ice cream\", \"value\":\"{" CURRENCY ":5}\"} ] }"},
+      .details.proposal.order = make_order (currency, "0.5", "5.0") },
 
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-1",
       .details.pay.coin_ref = "withdraw-coin-1",
-      .details.pay.amount_with_fee = CURRENCY ":5",
-      .details.pay.amount_without_fee = CURRENCY ":4.99" },
+      .details.pay.amount_with_fee = concat_amount (currency, "5"),
+      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
 
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-2",
       .details.pay.coin_ref = "withdraw-coin-2",
-      .details.pay.amount_with_fee = CURRENCY ":5",
-      .details.pay.amount_without_fee = CURRENCY ":4.99" },
+      .details.pay.amount_with_fee = concat_amount (currency, "5"),
+      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
 
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-3",
       .details.pay.coin_ref = "withdraw-coin-3",
-      .details.pay.amount_with_fee = CURRENCY ":5",
-      .details.pay.amount_without_fee = CURRENCY ":4.99" },
+      .details.pay.amount_with_fee = concat_amount (currency, "5"),
+      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
 
     { .oc = OC_END,
       .label = "end-of-commands"}
   };
 
+
   is = GNUNET_new (struct InterpreterState);
-  is->commands = commands;
+  is->commands = GNUNET_malloc (sizeof (struct Command) * ncmds);
+  memcpy (is->commands, commands, sizeof (struct Command) * ncmds);
 
   ctx = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
                           &rc);
