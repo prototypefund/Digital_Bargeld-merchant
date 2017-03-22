@@ -1,16 +1,43 @@
-Here is the logic that creates dummy payments into the
-merchant's DB, mainly used for debugging applications that
-need some real data from the merchant backend. 
 
-The tool taler-merchant-generate-payments needs three values:
+=== INTRODUCTION ===
 
-1 exchange URL
-2 merchant backend URL
-3 bank URL
-4 currency
+The tool contained in this directory is used to populate the
+merchant's and exchange's database with fake payments.
+It is mainly used for debugging applications that need some
+payments to be in place.
 
-The tool reads these values from #define'd macros, so you should
-change them and recompile the code in order to make them fit your
-needs.
+It is mandatory to give it a config file that contains information
+about the setup to target. Note that the merchant and the exchange
+tun by this command will use their own config files, so just few values
+are required for it to run.
 
-We wish to get this tool reading those values via a config file!
+
+=== COFIGURATION ===
+
+Any config file must look like the following one.
+
+[payments-generator]
+
+# where on this machine the exchange listens
+exchange = http://localexchange/
+
+# where on this machine the merchant listens
+merchant = http://localshop/
+
+# bank's URI of the customer who withdraws coins.
+# Must be known by the exchange.
+bank = http://localbank/
+
+# must match an instance known by the merchant
+instance = FSF
+
+# must match the currency used by merchant and exchange
+currency = EUR
+
+
+=== INVOCATION ===
+
+taler-merchant-generate-payments -c config/file.conf [-n ITERATIONS]
+
+The -n option instructs the tools about how many iteration of all
+the (internal) commands we want to execute.
