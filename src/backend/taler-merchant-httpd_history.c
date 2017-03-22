@@ -105,7 +105,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                      MHD_GET_ARGUMENT_KIND,
                                      "date");
 
-  seconds = 0;
+  date = GNUNET_TIME_absolute_get ();
+
   if (NULL != str)
   {
     if (1 != sscanf (str, "%llu", &seconds))
@@ -115,9 +116,9 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                              TALER_EC_PARAMETER_MALFORMED,
                                              "date");
     }
-  }
 
   date.abs_value_us = seconds * 1000LL * 1000LL;
+
   if (date.abs_value_us / 1000LL / 1000LL != seconds)
   {
     json_decref (response);
@@ -126,6 +127,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                            "Timestamp overflowed");
   }
 
+
+  }
 
   mi = TMH_lookup_instance ("default");
   str = MHD_lookup_connection_value (connection,
