@@ -55,6 +55,10 @@ pd_cb (void *cls,
   json_t *timestamp;
   json_t *instance;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "/history's row_id: %llu\n",
+              row_id);
+
   GNUNET_assert (-1 != json_unpack ((json_t *) proposal_data,
                                     "{s:o, s:o, s:{s:o}}",
                                     "amount", &amount,
@@ -199,10 +203,6 @@ MH_handler_history (struct TMH_RequestHandler *rh,
 					      TALER_EC_HISTORY_DB_FETCH_ERROR,
 					      "db error to get history");
   }
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "history data: %s\n",
-              json_dumps (response, JSON_INDENT (1)));
-
   ret = TMH_RESPONSE_reply_json (connection,
                                  response,
                                  MHD_HTTP_OK);
