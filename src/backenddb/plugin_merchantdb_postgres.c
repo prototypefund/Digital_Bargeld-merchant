@@ -880,14 +880,14 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
   {
     char *order_id;
     json_t *proposal_data;
-    unsigned int row_id;
+    uint64_t row_id;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_string ("order_id",
                                     &order_id),
       TALER_PQ_result_spec_json ("proposal_data",
                                  &proposal_data),
-      GNUNET_PQ_result_spec_uint32 ("row_id",
+      GNUNET_PQ_result_spec_uint64 ("row_id",
                                     &row_id),
       GNUNET_PQ_result_spec_end
     };

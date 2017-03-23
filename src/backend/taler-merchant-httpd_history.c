@@ -46,7 +46,7 @@ static unsigned int delta;
 static void
 pd_cb (void *cls,
        const char *order_id,
-       unsigned int row_id,
+       uint64_t row_id,
        const json_t *proposal_data)
 {
   json_t *response = cls;
@@ -54,7 +54,6 @@ pd_cb (void *cls,
   json_t *amount;
   json_t *timestamp;
   json_t *instance;
-  uint64_t r64 = (uint64_t) row_id;
 
   GNUNET_assert (-1 != json_unpack ((json_t *) proposal_data,
                                     "{s:o, s:o, s:{s:o}}",
@@ -63,7 +62,7 @@ pd_cb (void *cls,
                                     "merchant", "instance", &instance));
 
   GNUNET_break (NULL != (entry = json_pack ("{s:I, s:s, s:O, s:O, s:O}",
-                                            "row_id", r64,
+                                            "row_id", row_id,
                                             "order_id", order_id,
                                             "amount", amount,
                                             "timestamp", timestamp,

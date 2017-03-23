@@ -199,7 +199,7 @@ transaction_cb (void *cls,
 static void
 pd_cb (void *cls,
        const char *order_id,
-       unsigned int row_id,
+       uint64_t row_id,
        const json_t *proposal_data)
 {
   return;

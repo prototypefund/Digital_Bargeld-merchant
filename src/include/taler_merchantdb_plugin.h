@@ -42,7 +42,7 @@ struct TALER_MERCHANTDB_Plugin;
  typedef void
  (*TALER_MERCHANTDB_ProposalDataCallback)(void *cls,
                                           const char *order_id,
-                                          unsigned int row_id,
+                                          uint64_t row_id,
                                           const json_t *proposal_data);
 
 /**
