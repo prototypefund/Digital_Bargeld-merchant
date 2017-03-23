@@ -297,9 +297,16 @@ struct Command
     {
 
       /**
-       * The order.
+       * Max deposit fee accepted by the merchant.
+       * Given in the form "CURRENCY:X.Y".
        */
-      char *order;
+      char *max_fee;
+
+      /**
+       * Proposal overall price.
+       * Given in the form "CURRENCY:X.Y".
+       */
+      char *amount;
 
       /**
        * Handle to the active PUT /proposal operation, or NULL.
@@ -730,6 +737,47 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
 }
 
 /**
+ * Allocates and return a string representing a order.
+ * In this process, this function gives the order those
+ * prices specified by the user. Please NOTE that any amount
+ * must be given in the form "XX.YY".
+ *
+ * @param max_fee merchant's allowed max_fee
+ * @param amount total amount for this order
+ */
+json_t *
+make_order (char *maxfee,
+            char *total)
+{
+  struct TALER_Amount tmp_amount;
+  json_t *total_j;
+  json_t *maxfee_j;
+  json_t *ret;
+  unsigned long long id;
+
+  TALER_string_to_amount (maxfee, &tmp_amount);
+  maxfee_j = TALER_JSON_from_amount (&tmp_amount);
+  TALER_string_to_amount (total, &tmp_amount);
+  total_j = TALER_JSON_from_amount (&tmp_amount);
+
+  GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                              &id,
+                              sizeof (id));
+  ret = json_pack ("{s:O, s:s, s:s, s:s, s:s, s:O, s:s, s:[{s:s}]}",
+                   "max_fee", maxfee_j,
+                   "order_id", TALER_b2s (&id, sizeof (id)),
+                   "timestamp", "/Date(42)/",
+                   "refund_deadline", "/Date(0)/",
+                   "pay_deadline", "/Date(9999999999)/",
+                   "amount", total_j,
+                   "summary", "payments generator..",
+                   "products", "description", "ice cream");
+
+   GNUNET_assert (NULL != ret);
+   return ret;
+}
+
+/**
  * Run the main interpreter loop that performs exchange operations.
  *
  * @param cls contains the `struct InterpreterState`
@@ -914,19 +962,16 @@ interpreter_run (void *cls)
       {
         json_t *order;
         json_t *merchant_obj;
-        json_error_t error;
   
-        order = json_loads (cmd->details.proposal.order,
-                            JSON_REJECT_DUPLICATES,
-                            &error);
+        order = make_order (cmd->details.proposal.max_fee,
+                            cmd->details.proposal.amount);
+        
+        
         if (NULL == order)
         {
           GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Failed to parse the order `%s' at command #%u: %s at %u\n",
-                      cmd->details.proposal.order,
-                      is->ip,
-                      error.text,
-                      (unsigned int) error.column);
+                      "Failed to create the order at command #%u\n",
+                      is->ip);
           fail (is);
           return;
         }
@@ -1215,8 +1260,6 @@ do_shutdown (void *cls)
           json_decref (cmd->details.proposal.proposal_data);
           cmd->details.proposal.proposal_data = NULL;
         }
-
-        GNUNET_free_non_null (cmd->details.proposal.order);
         break;
   
       case OC_WITHDRAW_SIGN:
@@ -1304,70 +1347,6 @@ concat_amount (char *currency, char *rpart)
 
 
 /**
- * Allocates and return a string representing a order.
- * In this process, this function gives the order those
- * prices specified by the user. Please NOTE that any amount
- * must be given in the form "XX.YY".
- *
- * @param currency string representing the currency
- * the system works in
- * @param max_fee merchant's allowed max_fee
- * @param amount total amount for this order
- */
-char *
-make_order (char *currency,
-            char *max_fee,
-            char *amount)
-{
-  char *tmp_str;
-  char *ret;
-  struct TALER_Amount tmp_amount;
-  json_t *tmp_total;
-  json_t *tmp_maxfee;
-  unsigned long long id;
-
-  GNUNET_asprintf (&tmp_str,
-                   "%s:%s",
-                   currency,
-                   max_fee);
-
-  TALER_string_to_amount (tmp_str, &tmp_amount);
-  tmp_total = TALER_JSON_from_amount (&tmp_amount);
-
-  sprintf (tmp_str,
-           "%s:%s",
-           currency,
-           amount);
-
-  TALER_string_to_amount (tmp_str, &tmp_amount);
-  tmp_maxfee = TALER_JSON_from_amount (&tmp_amount);
-
-  GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
-                              &id,
-                              sizeof (id));
-  GNUNET_asprintf (&ret, "{\
-                  \"max_fee\":%s,\
-                  \"order_id\":\"%s\",\
-                  \"timestamp\":\"\\/Date(42)\\/\",\
-                  \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
-                  \"amount\":%s,\
-		  \"summary\": \"merchant-lib testcase\",\
-                  \"products\":\
-                     [ {\"description\":\"ice cream\"} ] }",
-                  json_dumps (tmp_maxfee, JSON_COMPACT),
-                  TALER_b2s (&id, sizeof (id)),
-                  json_dumps (tmp_total, JSON_COMPACT));
-
-  GNUNET_free (tmp_str);
-  json_decref (tmp_maxfee);
-  json_decref (tmp_total);
-
-  return ret;
-}
-
-
-/**
  * Main function that will be run by the scheduler.
  *
  * @param cls closure
@@ -1430,19 +1409,22 @@ run (void *cls)
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.order = make_order (currency, "0.5", "5.0") },
+      .details.proposal.max_fee = concat_amount (currency, "0.5"),
+      .details.proposal.amount = concat_amount (currency, "0.5") },
 
     /* Create proposal */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.order = make_order (currency, "0.5", "5.0") },
+      .details.proposal.max_fee = concat_amount (currency, "0.5"),
+      .details.proposal.amount = concat_amount (currency, "0.5") },
 
     /* Create proposal */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-3",
       .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.order = make_order (currency, "0.5", "5.0") },
+      .details.proposal.max_fee = concat_amount (currency, "0.5"),
+      .details.proposal.amount = concat_amount (currency, "5.0") },
 
     { .oc = OC_PAY,
       .label = "deposit-simple",
