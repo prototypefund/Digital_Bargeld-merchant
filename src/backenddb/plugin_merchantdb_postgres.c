@@ -322,7 +322,7 @@ postgres_initialize (void *cls)
               " WHERE"
               " timestamp<$1"
               " AND merchant_pub=$2"
-              " ORDER BY timestamp DESC, row_id DESC"
+              " ORDER BY row_id DESC, timestamp DESC"
               " LIMIT $3",
               3);
 
@@ -337,7 +337,7 @@ postgres_initialize (void *cls)
               " timestamp<$1"
               " AND merchant_pub=$2"
               " AND row_id<$3"
-              " ORDER BY timestamp DESC, row_id DESC"
+              " ORDER BY row_id DESC, timestamp DESC"
               " LIMIT $4",
               4);
 

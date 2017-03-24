@@ -156,7 +156,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   if (NULL != str)
   {
     if ((1 != sscanf (str, "%d", &start)) ||
-        start < 0)
+        0 > start)
     {
       json_decref (response);
       return TMH_RESPONSE_reply_arg_invalid (connection,
@@ -178,8 +178,10 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                              "delta");
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Querying history back to %s\n",
-              GNUNET_STRINGS_absolute_time_to_string (date));
+              "Querying history back to %s, start: %d, delta: %d\n",
+              GNUNET_STRINGS_absolute_time_to_string (date),
+              start,
+              delta);
 
   if (0 > start)
     ret = db->find_proposal_data_by_date (db->cls,
