@@ -25,15 +25,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_responses.h"
 
-/**
- * Index to the first row to return in response to /history.
- */
-static int start = -1;
-
-/**
- * How many rows we are to return in response to /history.
- */
-static unsigned int delta;
 
 /**
  * Function called with information about a transaction.
@@ -102,6 +93,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   unsigned int ret;
   unsigned long long seconds;
   struct MerchantInstance *mi;
+  int start = -1;
+  unsigned int delta;
 
   response = json_array (); /*FIXME who decrefs this?*/
   str = MHD_lookup_connection_value (connection,
