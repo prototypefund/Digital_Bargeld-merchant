@@ -1493,8 +1493,8 @@ main (int argc,
                     NULL);
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
-    GNUNET_GETOPT_OPTION_CFG_FILE (&config_file),
-    GNUNET_GETOPT_OPTION_SET_UINT ('n',
+    GNUNET_GETOPT_option_cfgfile (&config_file),
+    GNUNET_GETOPT_option_uint ('n',
                                    "times",
                                    "TIMES",
                                    "How many times the commands should be run.",

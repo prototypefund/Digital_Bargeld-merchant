@@ -1130,7 +1130,7 @@ main (int argc, char *const *argv)
 {
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 
-    GNUNET_GETOPT_OPTION_SET_ONE ('C',
+    GNUNET_GETOPT_option_flag ('C',
                                   "connection-close",
                                   "force HTTP connections to be closed after each request",
                                   &TMH_merchant_connection_close),

@@ -89,7 +89,7 @@ main (int argc,
 {
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 
-    GNUNET_GETOPT_OPTION_SET_ONE ('r',
+    GNUNET_GETOPT_option_flag ('r',
                                   "reset",
                                   "reset database (DANGEROUS: all existing data is lost!)",
                                   &reset_db),
