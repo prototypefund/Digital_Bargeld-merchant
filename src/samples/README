@@ -18,7 +18,9 @@ Any config file must look like the following one.
 
 [payments-generator]
 
-# where on this machine the exchange listens
+# where on this machine the exchange listens; note that
+# this exchange must be among the ones accepted by the
+# merchant
 exchange = http://localexchange/
 
 # where on this machine the merchant listens
