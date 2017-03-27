@@ -937,7 +937,7 @@ interpreter_run (void *cls)
   				     &total_amount,
   				     &max_fee,
   				     &merchant_pub,
-                                       &merchant_sig,
+                                     &merchant_sig,
   				     timestamp,
   				     refund_deadline,
   				     pay_deadline,
