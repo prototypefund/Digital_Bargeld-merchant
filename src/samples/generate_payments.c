@@ -37,6 +37,13 @@ static unsigned int times = 1;
 static unsigned int j = 0;
 
 /**
+ * Indicates whether we use an external exchange.
+ * By default, the generator tries to execute a local
+ * exchange.
+ */
+static int remote_exchange = 0;
+
+/**
  * Exchange URI to withdraw from and deposit to.
  */
 static char *exchange_uri;
@@ -1482,7 +1489,7 @@ main (int argc,
       char *argv[])
 {
 
-  struct GNUNET_OS_Process *exchanged;
+  struct GNUNET_OS_Process *exchanged = NULL;
   struct GNUNET_OS_Process *merchantd;
   unsigned int cnt;
   struct GNUNET_SIGNAL_Context *shc_chld;
@@ -1494,11 +1501,17 @@ main (int argc,
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
     GNUNET_GETOPT_option_cfgfile (&config_file),
+
     GNUNET_GETOPT_option_uint ('n',
-                                   "times",
-                                   "TIMES",
-                                   "How many times the commands should be run.",
-                                   &times),
+                               "times",
+                               "TIMES",
+                               "How many times the commands should be run.",
+                               &times),
+
+    GNUNET_GETOPT_option_flag ('r',
+                               "remote-exchange",
+                               "Do not execute any local exchange",
+                               &remote_exchange),
     GNUNET_GETOPT_OPTION_END
   };
 
@@ -1567,48 +1580,48 @@ main (int argc,
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "About to launch the exchange.\n");
-
-  exchanged = GNUNET_OS_start_process (GNUNET_NO,
-                                       GNUNET_OS_INHERIT_STD_ALL,
-                                       NULL, NULL, NULL,
-                                       "taler-exchange-httpd",
-                                       "taler-exchange-httpd",
-                                       NULL);
-  if (NULL == exchanged)
+  if (!remote_exchange)
   {
-    fprintf (stderr,
-             "Failed to run taler-exchange-httpd. Check your PATH.\n");
-    return 77;
-  }
-
-  fprintf (stderr,
-           "Waiting for taler-exchange-httpd to be ready\n");
-  cnt = 0;
-
-  GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null", exchange_uri);
-
-  do
+    exchanged = GNUNET_OS_start_process (GNUNET_NO,
+                                         GNUNET_OS_INHERIT_STD_ALL,
+                                         NULL, NULL, NULL,
+                                         "taler-exchange-httpd",
+                                         "taler-exchange-httpd",
+                                         NULL);
+    if (NULL == exchanged)
     {
-      fprintf (stderr, ".");
-      sleep (1);
-      cnt++;
-      if (cnt > 60)
-      {
-        fprintf (stderr,
-                 "\nFailed to start taler-exchange-httpd\n");
-        GNUNET_OS_process_kill (exchanged,
-                                SIGKILL);
-        GNUNET_OS_process_wait (exchanged);
-        GNUNET_OS_process_destroy (exchanged);
-        return 77;
-      }
+      fprintf (stderr,
+               "Failed to run taler-exchange-httpd. Check your PATH.\n");
+      return 77;
     }
-  while (0 != system (wget_cmd));
-  GNUNET_free (wget_cmd);
   
-  fprintf (stderr, "\n");
+    fprintf (stderr,
+             "Waiting for taler-exchange-httpd to be ready\n");
+    cnt = 0;
+  
+    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null", exchange_uri);
+  
+    do
+      {
+        fprintf (stderr, ".");
+        sleep (1);
+        cnt++;
+        if (cnt > 60)
+        {
+          fprintf (stderr,
+                   "\nFailed to start taler-exchange-httpd\n");
+          GNUNET_OS_process_kill (exchanged,
+                                  SIGKILL);
+          GNUNET_OS_process_wait (exchanged);
+          GNUNET_OS_process_destroy (exchanged);
+          return 77;
+        }
+      }
+    while (0 != system (wget_cmd));
+    GNUNET_free (wget_cmd);
+    
+    fprintf (stderr, "\n");
+  }
 
   merchantd = GNUNET_OS_start_process (GNUNET_NO,
                                        GNUNET_OS_INHERIT_STD_ALL,
