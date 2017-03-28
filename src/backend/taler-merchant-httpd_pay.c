@@ -269,7 +269,7 @@ struct PayContext
    * #GNUNET_SYSERR if the transaction ID is used for a different
    * transaction in our database.
    */
-  int transaction_exits;
+  int transaction_exists;
 
   /**
    * Instance of the payment's instance (in JSON format)
@@ -883,14 +883,23 @@ check_coin_paid (void *cls,
   for (i=0;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
-
+    /* Get matching coin from results*/
     if ( (0 != memcmp (coin_pub,
                        &dc->coin_pub,
                        sizeof (struct TALER_CoinSpendPublicKeyP))) ||
          (0 != TALER_amount_cmp (amount_with_fee,
                                  &dc->amount_with_fee)) )
       continue;
+
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Coin (%s) already found in our DB.\n",
+                TALER_b2s (coin_pub, sizeof (*coin_pub)));
+
     dc->found_in_db = GNUNET_YES;
+    /**
+     * What happens if a (mad) wallet sends new coins on a
+     * contract that it already paid for?
+     */
     pc->pending--;
   }
 }
@@ -898,7 +907,7 @@ check_coin_paid (void *cls,
 
 /**
  * Check if the existing transaction matches our transaction.
- * Update `transaction_exits` accordingly.
+ * Update `transaction_exists` accordingly.
  *
  * @param cls closure with the `struct PayContext`
  * @param transaction_id of the contract
@@ -932,12 +941,12 @@ check_transaction_exists (void *cls,
        (0 == TALER_amount_cmp (total_amount,
 			       &pc->amount) ) )
   {
-    pc->transaction_exits = GNUNET_YES;
+    pc->transaction_exists = GNUNET_YES;
   }
   else
   {
     GNUNET_break_op (0);
-    pc->transaction_exits = GNUNET_SYSERR;
+    pc->transaction_exists = GNUNET_SYSERR;
   }
 }
 
@@ -949,7 +958,6 @@ get_instance (struct json_t *json);
 
 /**
  * Try to parse the pay request into the given pay context.
- *
  * Schedules an error response in the connection on failure.
  *
  *
@@ -1254,6 +1262,9 @@ handler_pay_json (struct MHD_Connection *connection,
   {
     struct MHD_Response *resp;
     int ret;
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Payment succeeded in the past; take short cut"
+                " and accept immediately.\n");
 
     /* Payment succeeded in the past; take short cut
        and accept immediately */
@@ -1279,14 +1290,14 @@ handler_pay_json (struct MHD_Connection *connection,
 					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
                                                "Merchant database error");
   }
-  if (GNUNET_SYSERR == pc->transaction_exits)
+  if (GNUNET_SYSERR == pc->transaction_exists)
   {
     GNUNET_break (0);
     return TMH_RESPONSE_reply_external_error (connection,
                                               TALER_EC_PAY_DB_TRANSACTION_ID_CONFLICT,
 					      "Transaction ID reused with different transaction details");
   }
-  if (GNUNET_NO == pc->transaction_exits)
+  if (GNUNET_NO == pc->transaction_exists)
   {
     struct GNUNET_TIME_Absolute now;
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,

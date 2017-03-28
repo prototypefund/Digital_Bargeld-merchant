@@ -1098,7 +1098,8 @@ postgres_find_transaction (void *cls,
 
 
 /**
- * Lookup information about coin payments by transaction ID (and @a merchant_pub)
+ * Lookup information about coin payments by proposal data hash
+ * (and @a merchant_pub)
  *
  * @param cls closure
  * @param transaction_id key for the search
