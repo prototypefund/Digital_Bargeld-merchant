@@ -1,0 +1,14 @@
+
+=== INTRODUCTION ===
+
+This directory contain a Web server that listens for
+requests addressed to the exchange, relays them to the
+exchange, and returns a modified response to the caller.
+
+The modifications are made to test error management in the
+merchant, and are driven by a HTTP header that instructs the
+proxy about the modifications to be made.
+
+=== INVOCATION ===
+
+FIXME
