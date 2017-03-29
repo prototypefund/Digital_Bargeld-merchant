@@ -212,7 +212,7 @@ postgres_initialize (void *cls)
            ",proof BYTEA NOT NULL"
            ",PRIMARY KEY (wtid, exchange_uri)"
            ");");
-  /* Note that transaction_id + coin_pub may actually be unknown to
+  /* Note that h_proposal_data + coin_pub may actually be unknown to
      us, e.g. someone else deposits something for us at the exchange.
      Hence those cannot be foreign keys into deposits/transactions! */
   PG_EXEC (pg,
@@ -224,7 +224,7 @@ postgres_initialize (void *cls)
            ");");
   PG_EXEC_INDEX (pg,
                  "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin"
-                 " ON merchant_transfers (transaction_id, coin_pub)");
+                 " ON merchant_transfers (h_proposal_data, coin_pub)");
   PG_EXEC_INDEX (pg,
                  "CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid"
                  " ON merchant_transfers (wtid)");
@@ -372,7 +372,7 @@ postgres_initialize (void *cls)
               " AND merchant_pub=$2",
               2);
   PG_PREPARE (pg,
-              "find_deposits_by_tid_and_coin",
+              "find_deposits_by_hash_and_coin",
               "SELECT"
               " amount_with_fee_val"
               ",amount_with_fee_frac"
@@ -428,12 +428,12 @@ postgres_initialize (void *cls)
 }
 
 /**
- * Retrieve proposal data given its transaction id's hashcode
+ * Retrieve proposal data given its proposal data's hashcode
  *
  * @param cls closure
- * @param h_transaction_id hashcode of the transaction id mentioned in this
- * proposal data
  * @param proposal_data where to store the retrieved proposal data
+ * @param h_proposal_data proposal data's hashcode that will be used to
+ * perform the lookup
  * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
  * found, #GNUNET_SYSERR upon error
  */
@@ -487,12 +487,11 @@ postgres_find_proposal_data_from_hash (void *cls,
 
 
 /**
- * Retrieve proposal data given its transaction id's hashcode
+ * Retrieve proposal data given its order id.
  *
  * @param cls closure
- * @param h_transaction_id hashcode of the transaction id mentioned in this
- * proposal data
  * @param proposal_data where to store the retrieved proposal data
+ * @param order id order id used to perform the lookup
  * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
  * found, #GNUNET_SYSERR upon error
  */
@@ -546,11 +545,10 @@ postgres_find_proposal_data (void *cls,
 
 
 /**
- * Insert proposal data and its transaction id's hashcode into db
+ * Insert proposal data and its hashcode into db
  *
  * @param cls closure
- * @param h_transaction_id hashcode of the transaction id mentioned in this
- * proposal data
+ * @param order_id identificator of the proposal being stored
  * @param proposal_data proposal data to store
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
  */
@@ -609,7 +607,8 @@ postgres_insert_proposal_data (void *cls,
  * Insert transaction data into the database.
  *
  * @param cls closure
- * @param transaction_id of the proposal
+ * @param h_proposal_data hashcode of the proposal data associated with the
+ * transaction being stored
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
  * @param h_wire hash of our wire details
@@ -668,7 +667,7 @@ postgres_store_transaction (void *cls,
  * Insert payment confirmation from the exchange into the database.
  *
  * @param cls closure
- * @param transaction_id of the contract
+ * @param order_id identificator of the proposal associated with this revenue
  * @param merchant_pub merchant's public key
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
@@ -723,11 +722,11 @@ postgres_store_deposit (void *cls,
 
 
 /**
- * Insert mapping of @a coin_pub and @a transaction_id to
+ * Insert mapping of @a coin_pub and @a h_proposal_data to
  * corresponding @a wtid.
  *
  * @param cls closure
- * @param transaction_id ID of the contract
+ * @param h_proposal_data hashcode of the proposal data paid by @a coin_pub
  * @param coin_pub public key of the coin
  * @param wtid identifier of the wire transfer in which the exchange
  *             send us the money for the coin deposit
@@ -913,17 +912,17 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
 }
 
 
-    /**
-     * Return proposals whose timestamp are older than `date`.
-     * The rows are sorted having the youngest first.
-     *
-     * @param cls our plugin handle.
-     * @param date only results older than this date are returned.
-     * @param merchant_pub instance's public key; only rows related to this
-     * instance are returned.
-     * @param nrows at most nrows rows are returned.
-     * @param cb function to call with transaction data, can be NULL.
-     * @param cb_cls closure for @a cb
+/**
+ * Return proposals whose timestamp are older than `date`.
+ * The rows are sorted having the youngest first.
+ *
+ * @param cls our plugin handle.
+ * @param date only results older than this date are returned.
+ * @param merchant_pub instance's public key; only rows related to this
+ * instance are returned.
+ * @param nrows at most nrows rows are returned.
+ * @param cb function to call with transaction data, can be NULL.
+ * @param cb_cls closure for @a cb
  * @return numer of found tuples, #GNUNET_SYSERR upon error
  */
 static int
@@ -1001,9 +1000,8 @@ postgres_find_proposal_data_by_date (void *cls,
  * Find information about a transaction.
  *
  * @param cls our plugin handle
- * @param transaction_id the transaction id to search
- * @param merchant_pub merchant's public key. It's AND'd with transaction_id
- * in order to find the result.
+ * @param h_proposal_data value used to perform the lookup
+ * @param merchant_pub merchant's public key
  * @param cb function to call with transaction data
  * @param cb_cls closure for @a cb
  * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
@@ -1102,7 +1100,7 @@ postgres_find_transaction (void *cls,
  * (and @a merchant_pub)
  *
  * @param cls closure
- * @param transaction_id key for the search
+ * @param h_proposal_data key for the search
  * @param merchant_pub merchant's public key
  * @param cb function to call with payment data
  * @param cb_cls closure for @a cb
@@ -1188,13 +1186,12 @@ postgres_find_payments (void *cls,
 
 
 /**
- * Lookup information about coin payments by transaction ID.
+ * Retrieve information about a deposited coin.
  *
  * @param cls closure
- * @param transaction_id key for the search
- * @param merchant_pub merchant's public key. It's AND'd with @a transaction_id
- *        in order to find the result.
- * @param coin_pub public key to use for the search
+ * @param h_proposal_data hashcode of the proposal data paid by @a coin_pub
+ * @param merchant_pub merchant's public key.
+ * @param coin_pub coin's public key used for the search
  * @param cb function to call with payment data
  * @param cb_cls closure for @a cb
  * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
@@ -1220,7 +1217,7 @@ postgres_find_payments_by_hash_and_coin (void *cls,
   };
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_deposits_by_tid_and_coin",
+                                    "find_deposits_by_hash_and_coin",
                                     params);
   if (PGRES_TUPLES_OK != PQresultStatus (result))
   {
@@ -1276,14 +1273,14 @@ postgres_find_payments_by_hash_and_coin (void *cls,
 
 
 /**
- * Lookup information about a transfer by @a transaction_id.  Note
+ * Lookup information about a transfer by @a h_proposal_data.  Note
  * that in theory there could be multiple wire transfers for a
- * single @a transaction_id, as the transaction may have involved
+ * single @a h_proposal_data, as the transaction may have involved
  * multiple coins and the coins may be spread over different wire
  * transfers.
  *
  * @param cls closure
- * @param transaction_id key for the search
+ * @param h_proposal_data key for the search
  * @param cb function to call with transfer data
  * @param cb_cls closure for @a cb
  * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,

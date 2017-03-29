@@ -51,7 +51,7 @@ struct TALER_MERCHANTDB_Plugin;
  * @param cls closure
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
- * @param transaction_id proposal's transaction id
+ * @param h_proposal_data proposal data's hashcode
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -72,7 +72,7 @@ typedef void
  * Function called with information about a coin that was deposited.
  *
  * @param cls closure
- * @param transaction_id of the contract
+ * @param h_proposal_data proposal data's hashcode
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
@@ -91,13 +91,13 @@ typedef void
 /**
  * Information about the wire transfer corresponding to
  * a deposit operation.  Note that it is in theory possible
- * that we have a @a transaction_id and @a coin_pub in the
+ * that we have a @a h_proposal_data and @a coin_pub in the
  * result that do not match a deposit that we know about,
  * for example because someone else deposited funds into
  * our account.
  *
  * @param cls closure
- * @param transaction_id ID of the contract
+ * @param h_proposal_data hashcode of the proposal data
  * @param coin_pub public key of the coin
  * @param wtid identifier of the wire transfer in which the exchange
  *             send us the money for the coin deposit
@@ -162,11 +162,13 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Insert proposal data and its transaction id's hashcode into db
+   * Insert proposal data into db; the routine will internally hash and
+   * insert the proposal data's hashcode into the same row.
    *
    * @param cls closure
-   * @param h_transaction_id hashcode of the transaction id mentioned in this
-   * proposal data
+   * @param order_id alphanumeric string that uniquely identifies the proposal
+   * @param merchant_pub merchant's public key
+   * @param timestamp timestamp of this proposal data
    * @param proposal_data proposal data to store
    * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
    */
@@ -245,7 +247,6 @@ struct TALER_MERCHANTDB_Plugin
    * @param date only results older than this date are returned.
    * @param merchant_pub instance's public key; only rows related to this
    * instance are returned.
-   * @param start the first start-1 rows are not returned.
    * @param nrows only nrows rows are returned.
    * @param cb function to call with transaction data, can be NULL.
    * @param cb_cls closure for @a cb
@@ -264,10 +265,9 @@ struct TALER_MERCHANTDB_Plugin
    * Insert transaction data into the database.
    *
    * @param cls closure
-   * @param transaction_id of the contract
+   * @param h_proposal_data proposal data's hashcode
    * @param merchant_pub merchant's public key
    * @param exchange_uri URI of the exchange
-   * @param h_contract hash of the contract
    * @param h_wire hash of our wire details
    * @param timestamp time of the confirmation
    * @param refund refund deadline
@@ -289,7 +289,7 @@ struct TALER_MERCHANTDB_Plugin
    * Insert payment confirmation from the exchange into the database.
    *
    * @param cls closure
-   * @param transaction_id of the contract
+   * @param h_proposal_data proposal data's hashcode
    * @param merchant_pub merchant's public key
    * @param coin_pub public key of the coin
    * @param amount_with_fee amount the exchange will deposit for this coin
@@ -310,11 +310,11 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Insert mapping of @a coin_pub and @a transaction_id to
+   * Insert mapping of @a coin_pub and @a h_proposal_data to
    * corresponding @a wtid.
    *
    * @param cls closure
-   * @param transaction_id ID of the contract
+   * @param h_proposal_data proposal data's hashcode
    * @param coin_pub public key of the coin
    * @param wtid identifier of the wire transfer in which the exchange
    *             send us the money for the coin deposit
@@ -367,9 +367,8 @@ struct TALER_MERCHANTDB_Plugin
    * Find information about a transaction.
    *
    * @param cls our plugin handle
-   * @param transaction_id the transaction id to search
-   * @param merchant_pub merchant's public key. It's AND'd with @a transaction_id
-   * in order to find the result.
+   * @param h_proposal_data proposal data's hashcode
+   * @param merchant_pub merchant's public key.
    * @param cb function to call with transaction data
    * @param cb_cls closure for @a cb
    * @return number of found tuples, #GNUNET_SYSERR upon error
@@ -383,15 +382,15 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Lookup information about coin payments by transaction ID.
+   * Lookup information about coin payments by proposal data's hashcode.
    *
    * @param cls closure
-   * @param transaction_id key for the search
-   * @param merchant_pub merchant's public key. It's AND'd with @a transaction_id
+   * @param h_proposal_data proposal data's hashcode
+   * @param merchant_pub merchant's public key. It's AND'd with @a h_proposal_data
    *        in order to find the result.
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
@@ -402,16 +401,16 @@ struct TALER_MERCHANTDB_Plugin
                     void *cb_cls);
 
   /**
-   * Lookup information about coin payments by transaction ID and coin.
+   * Lookup information about coin payments by h_proposal_data and coin.
    *
    * @param cls closure
-   * @param transaction_id key for the search
-   * @param merchant_pub merchant's public key. It's AND'd with @a transaction_id
+   * @param h_proposal_data proposal data's hashcode
+   * @param merchant_pub merchant's public key. It's AND'd with @a h_proposal_data
    *        in order to find the result.
    * @param coin_pub public key to use for the search
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
@@ -424,17 +423,17 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Lookup information about a transfer by @a transaction_id.  Note
+   * Lookup information about a transfer by @a h_proposal_data.  Note
    * that in theory there could be multiple wire transfers for a
-   * single @a transaction_id, as the transaction may have involved
+   * single @a h_proposal_data, as the transaction may have involved
    * multiple coins and the coins may be spread over different wire
    * transfers.
    *
    * @param cls closure
-   * @param transaction_id key for the search
+   * @param h_proposal_data proposal data's hashcode
    * @param cb function to call with transfer data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
@@ -451,7 +450,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param wtid wire transfer identifier to find matching transactions for
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
@@ -469,7 +468,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param wtid wire transfer identifier for the search
    * @param cb function to call with proof data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
