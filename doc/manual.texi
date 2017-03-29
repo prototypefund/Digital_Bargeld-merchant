@@ -773,6 +773,8 @@ merchant = http://localbackend/
 bank = https://bank.test.taler.net/
 
 # The merchant instance in charge of serving the payment.
+# Make sure this instance has a bank account at the same bank
+# indicated by the 'bank' option above.
 instance = default
 
 # The currency used during the test. Must match the one used
