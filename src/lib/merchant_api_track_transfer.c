@@ -213,7 +213,7 @@ handle_track_transfer_finished (void *cls,
  * @param backend_uri base URI of the backend
  * @param instance which merchant instance is going to be tracked
  * @param wtid base32 string indicating a wtid
- * @param exchange base URL of the exchange in charge of returning the wanted information
+ * @param exchange_uri base URL of the exchange in charge of returning the wanted information
  * @param track_transfer_cb the callback to call when a reply for this request is available
  * @param track_transfer_cb_cls closure for @a contract_cb
  * @return a handle for this request
@@ -263,7 +263,7 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
  * Cancel a /track/transfer request.  This function cannot be used
  * on a request handle if a response is already served for it.
  *
- * @param co the transfer's tracking handle
+ * @param tdo handle to the tracking operation being cancelled
  */
 void
 TALER_MERCHANT_track_transfer_cancel (struct TALER_MERCHANT_TrackTransferHandle *tdo)

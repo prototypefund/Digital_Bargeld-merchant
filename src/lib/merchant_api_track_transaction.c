@@ -149,7 +149,7 @@ handle_track_transaction_finished (void *cls,
  * @param ctx execution context
  * @param backend_uri base URI of the backend
  * @param instance which merchant instance is going to be tracked
- * @param transaction_id which transaction should we trace
+ * @param order_id order id pointing to the transaction being tracked
  * @param track_transaction_cb the callback to call when a reply for this request is available
  * @param track_transaction_cb_cls closure for @a track_transaction_cb
  * @return a handle for this request
@@ -195,7 +195,7 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
  * Cancel a /track/transaction request.  This function cannot be used
  * on a request handle if a response is already served for it.
  *
- * @param co the transaction's tracking handle
+ * @param tdo handle to the tracking operation being cancelled
  */
 void
 TALER_MERCHANT_track_transaction_cancel (struct TALER_MERCHANT_TrackTransactionHandle *tdo)
