@@ -55,6 +55,7 @@ Texts.  A copy of the license is included in the section entitled
 * Introduction::            Whom this manual is addressed to
 * Installation::            Installing the Merchant backend
 * Configuration::           How to set up the Merchant backend
+* Testing::                 How to test the installed Merchant backend
 * Advanced topics::         Detailed solutions to specific issues
 
 
@@ -740,13 +741,65 @@ reachable.  Production systems should be configured to bind
 to a UNIX domain socket or properly restrict access to the
 port.
 
+@node Testing
+@chapter Testing
 
-@c Add section describing how to test the backend.
-@c For this, we should write some tools that make it
-@c EASY to test the backend without going through the
-@c full manual frontend setup!
-@c NOTE: include explaining wallet installation to sysadmin
+The tool @code{taler-merchant-generate-payments} can be used to test
+the merchant backend installation.  It implements all the payment's steps
+in a programmatically way, relying on the backend you give it as input.
+Note that this tool gets installed along all the merchant backend's binaries.
 
+This tool gets configured by a config file, that must have the following
+layout:
+
+@example
+[payments-generator]
+
+# The exchange used during the test: make sure the merchant backend
+# being tested accpets this exchange.
+# If the sysadmin wants, she can also install a local exchange
+# and test against it.
+exchange = https://exchange.test.taler.net/
+
+# This value must indicate some URL where the backend
+# to be tested is listening; it doesn't have to be the
+# "official" one, though.
+merchant = http://localbackend/
+
+# This value is used when the tool tries to withdraw coins,
+# and must match the bank used by the exchange. If the test is
+# done against the exchange at https://exchange.test.taler.net/,
+# then this value can be "https://bank.test.taler.net/".
+bank = https://bank.test.taler.net/
+
+# The merchant instance in charge of serving the payment.
+instance = default
+
+# The currency used during the test. Must match the one used
+# by merchant backend and exchange.
+currency = EUR
+@end example
+
+Run the test in the following way:
+
+@example
+$ taler-merchant-payments-generator -c config -r
+@end example
+
+the argument @code{config} given to @code{-c} points to the configuration
+file and is mandatory; @code{-r} tells the tool to use a remote exchange.
+In case you want to test against a local exchange, remove the @code{-r} option.
+
+If the command terminates with no errors, then the merchant backend is correctly
+installed.
+
+After this operation is done, the merchant database will have some dummy
+data in it, so it may be convenient to clean all the tables; to this purpose,
+issue the following command:
+
+@example
+$ taler-merchant-dbinit -r
+@end example
 
 @node Advanced topics
 @chapter Advanced topics
