@@ -785,7 +785,7 @@ currency = EUR
 Run the test in the following way:
 
 @example
-$ taler-merchant-payments-generator -c config -r
+$ taler-merchant-generate-payments -c config -r
 @end example
 
 the argument @code{config} given to @code{-c} points to the configuration
