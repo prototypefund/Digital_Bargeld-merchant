@@ -1684,10 +1684,13 @@ main (int argc,
                           SIGTERM);
   GNUNET_OS_process_wait (merchantd);
   GNUNET_OS_process_destroy (merchantd);
-  GNUNET_OS_process_kill (exchanged,
-                          SIGTERM);
-  GNUNET_OS_process_wait (exchanged);
-  GNUNET_OS_process_destroy (exchanged);
+  if (!remote_exchange)
+  {
+    GNUNET_OS_process_kill (exchanged,
+                            SIGTERM);
+    GNUNET_OS_process_wait (exchanged);
+    GNUNET_OS_process_destroy (exchanged);
+  }
   if (77 == result)
     return 77;
   return (GNUNET_OK == result) ? 0 : 1;
