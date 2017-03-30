@@ -779,18 +779,19 @@ instance = default
 
 # The currency used during the test. Must match the one used
 # by merchant backend and exchange.
-currency = EUR
+currency = PUDOS
 @end example
 
 Run the test in the following way:
 
 @example
-$ taler-merchant-generate-payments -c config -r
+$ taler-merchant-generate-payments [-c config] [-r]
 @end example
 
 the argument @code{config} given to @code{-c} points to the configuration
-file and is mandatory; @code{-r} tells the tool to use a remote exchange.
-In case you want to test against a local exchange, remove the @code{-r} option.
+file and is optional -- @code{~/.config/taler.conf} will be checked by default.
+By default, the tool tries to fork a process running the exchange, unless the
+@code{-r} option is given.
 
 If the command terminates with no errors, then the merchant backend is correctly
 installed.
