@@ -384,6 +384,7 @@ run (void *cls)
                                                         &merchant_pub,
                                                         2,
                                                         1,
+                                                        GNUNET_NO,
                                                         pd_cb,
                                                         NULL));
 

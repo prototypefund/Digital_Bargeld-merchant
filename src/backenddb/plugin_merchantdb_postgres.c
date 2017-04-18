@@ -832,6 +832,9 @@ postgres_store_transfer_to_proof (void *cls,
  * furtherly older records, and so on. Alternatively, you can use always
  * the same timestamp and just go behind in history by tuning `start`.
  * @param nrows only nrows rows are returned.
+ * @param future if set to GNUNET_YES, retrieves rows younger than `date`.
+ * This is tipically used to show live updates on the merchant's backoffice
+ * Web interface.
  * @param cb function to call with transaction data, can be NULL.
  * @param cb_cls closure for @a cb
  * @return numer of found tuples, #GNUNET_SYSERR upon error
@@ -842,6 +845,7 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
                                                const struct TALER_MerchantPublicKeyP *merchant_pub,
                                                unsigned int start,
                                                unsigned int nrows,
+                                               unsigned int future,
                                                TALER_MERCHANTDB_ProposalDataCallback cb,
                                                void *cb_cls)
 {

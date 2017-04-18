@@ -189,6 +189,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                                     &mi->pubkey,
                                                     start,
                                                     delta,
+                                                    GNUNET_NO,
                                                     pd_cb,
                                                     response);
   if (GNUNET_SYSERR == ret)
