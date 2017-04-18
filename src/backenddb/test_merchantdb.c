@@ -404,7 +404,9 @@ run (void *cls)
                                         timestamp,
                                         proposal_data));
 
-  FAILIF (1 !=
+  fake_now = GNUNET_TIME_absolute_subtract (timestamp, delta);
+
+  FAILIF (2 !=
           plugin->find_proposal_data_by_date_and_range (plugin->cls,
                                                         fake_now,
                                                         &merchant_pub,
@@ -414,7 +416,7 @@ run (void *cls)
                                                         pd_cb,
                                                         NULL));
 
-  FAILIF (1 !=
+  FAILIF (0 !=
           plugin->find_proposal_data_by_date (plugin->cls,
                                               fake_now,
                                               &merchant_pub,

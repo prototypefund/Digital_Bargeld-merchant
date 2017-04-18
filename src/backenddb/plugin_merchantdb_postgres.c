@@ -18,6 +18,7 @@
  * @brief database helper functions for postgres used by the merchant
  * @author Sree Harsha Totakura <sreeharsha@totakura.in>
  * @author Christian Grothoff
+ * @author Marcello Stanisci
  */
 #include "platform.h"
 #include <gnunet/gnunet_util_lib.h>
