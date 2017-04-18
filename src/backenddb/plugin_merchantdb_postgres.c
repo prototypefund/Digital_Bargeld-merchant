@@ -341,6 +341,21 @@ postgres_initialize (void *cls)
               " LIMIT $4",
               4);
 
+  PG_PREPARE (pg,
+              "find_proposal_data_by_date_and_range_future",
+              "SELECT"
+              " proposal_data"
+              ",order_id"
+              ",row_id"
+              " FROM merchant_proposal_data"
+              " WHERE"
+              " timestamp>$1"
+              " AND merchant_pub=$2"
+              " AND row_id>$3"
+              " ORDER BY row_id DESC, timestamp DESC"
+              " LIMIT $4",
+              4);
+
   /* Setup prepared "SELECT" statements */
   PG_PREPARE (pg,
               "find_transaction",
@@ -862,9 +877,14 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
     GNUNET_PQ_query_param_end
   };
 
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_proposal_data_by_date_and_range",
-                                    params);
+  if (GNUNET_YES == future)
+    result = GNUNET_PQ_exec_prepared (pg->conn,
+                                      "find_proposal_data_by_date_and_range_future",
+                                      params);
+  else
+    result = GNUNET_PQ_exec_prepared (pg->conn,
+                                      "find_proposal_data_by_date_and_range",
+                                      params);
   if (PGRES_TUPLES_OK != PQresultStatus (result))
   {
     BREAK_DB_ERR (result);

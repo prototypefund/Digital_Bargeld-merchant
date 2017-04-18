@@ -71,6 +71,12 @@ static struct GNUNET_HashCode h_wire;
 const char *order_id;
 
 /**
+ * Transaction ID used to test the db query
+ * `find_proposal_data_by_date_and_range_future`
+ */
+const char *order_id_future;
+
+/**
  * Proposal's hash
  */
 struct GNUNET_HashCode h_proposal_data;
@@ -326,10 +332,11 @@ run (void *cls)
   RND_BLK (&h_wire);
   RND_BLK (&h_proposal_data);
   order_id = "test_ID";
+  order_id_future = "test_ID_future";
   RND_BLK (&signkey_pub);
   RND_BLK (&merchant_pub);
   RND_BLK (&wtid);
-  timestamp = GNUNET_TIME_absolute_get();
+  timestamp = GNUNET_TIME_absolute_get ();
   GNUNET_TIME_round_abs (&timestamp);
   delta = GNUNET_TIME_UNIT_MINUTES;
   fake_now = GNUNET_TIME_absolute_add (timestamp, delta);
@@ -385,6 +392,25 @@ run (void *cls)
                                                         2,
                                                         1,
                                                         GNUNET_NO,
+                                                        pd_cb,
+                                                        NULL));
+  timestamp = GNUNET_TIME_absolute_get ();
+  GNUNET_TIME_round_abs (&timestamp);
+
+  FAILIF (GNUNET_OK !=
+          plugin->insert_proposal_data (plugin->cls,
+                                        order_id_future,
+                                        &merchant_pub,
+                                        timestamp,
+                                        proposal_data));
+
+  FAILIF (1 !=
+          plugin->find_proposal_data_by_date_and_range (plugin->cls,
+                                                        fake_now,
+                                                        &merchant_pub,
+                                                        0,
+                                                        5,
+                                                        GNUNET_YES,
                                                         pd_cb,
                                                         NULL));
 
