@@ -364,6 +364,7 @@ wire_deposits_cb (void *cls,
   tctx->wdh = NULL;
   if (MHD_HTTP_OK != http_status)
   {
+    GNUNET_break_op (0);
     resume_track_transaction_with_response
       (tctx,
        MHD_HTTP_FAILED_DEPENDENCY,

@@ -1526,6 +1526,9 @@ main (int argc,
   }
 
   cfg = GNUNET_CONFIGURATION_create ();
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Config file: '%s'.\n",
+              config_file);
   GNUNET_assert (GNUNET_OK == GNUNET_CONFIGURATION_parse (cfg, config_file));
 
   if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg, 
