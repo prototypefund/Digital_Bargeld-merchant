@@ -70,16 +70,6 @@ static char *instance;
 static char *currency;
 
 /**
- * Configuration file
- */
-static char *config_file;
-
-/**
- * Configuration handle
- */
-static struct GNUNET_CONFIGURATION_Handle *cfg;
-
-/**
  * Task run on timeout.
  */
 static struct GNUNET_SCHEDULER_Task *timeout_task;
@@ -1357,12 +1347,80 @@ concat_amount (char *currency, char *rpart)
  * Main function that will be run by the scheduler.
  *
  * @param cls closure
+ * @param args remaining command-line arguments
+ * @param cfgfile name of the configuration file used (for saving, can be
+ *        NULL!)
+ * @param config configuration
  */
 static void
-run (void *cls)
+run (void *cls,
+     char *const *args,
+     const char *cfgfile,
+     const struct GNUNET_CONFIGURATION_Handle *config)
 {
   int ncmds;
   struct InterpreterState *is;
+
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config, 
+                                                              "payments-generator",
+                                                              "exchange",
+                                                              &exchange_uri))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "payments-generator",
+                               "exchange");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
+                                                              "payments-generator",
+                                                              "merchant",
+                                                              &merchant_uri))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "payments-generator",
+                               "merchant");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
+                                                              "payments-generator",
+                                                              "bank",
+                                                              &bank_uri))
+  {
+
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "payments-generator",
+                               "bank");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
+                                                              "payments-generator",
+                                                              "instance",
+                                                              &instance))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "payments-generator",
+                               "instance");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
+                                                              "payments-generator",
+                                                              "currency",
+                                                              &currency))
+  {
+
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "payments-generator",
+                               "currency");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
 
   /* must always be updated with the # of cmds the interpreter has*/
   ncmds = 13;
@@ -1500,8 +1558,6 @@ main (int argc,
                     NULL);
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
-    GNUNET_GETOPT_option_cfgfile (&config_file),
-
     GNUNET_GETOPT_option_uint ('n',
                                "times",
                                "TIMES",
@@ -1514,71 +1570,6 @@ main (int argc,
                                &remote_exchange),
     GNUNET_GETOPT_OPTION_END
   };
-
-  if (GNUNET_SYSERR == GNUNET_GETOPT_run (argv[0],
-                                          options,
-                                          argc,
-                                          argv))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to parse CLI arguments.\n");
-    return 77;
-  }
-
-  cfg = GNUNET_CONFIGURATION_create ();
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Config file: '%s'.\n",
-              config_file);
-  GNUNET_assert (GNUNET_OK == GNUNET_CONFIGURATION_parse (cfg, config_file));
-
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg, 
-                                                              "payments-generator",
-                                                              "exchange",
-                                                              &exchange_uri))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "'exchange' config value invalid.\n");
-    return 77;  
-  }
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                              "payments-generator",
-                                                              "merchant",
-                                                              &merchant_uri))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "'merchant' config value invalid.\n");
-    return 77; 
-  }
-
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                              "payments-generator",
-                                                              "bank",
-                                                              &bank_uri))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "'bank' config value invalid.\n");
-    return 77;  
-  }
-
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                              "payments-generator",
-                                                              "instance",
-                                                              &instance))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "'instance' config value invalid.\n");
-    return 77;  
-  }
-
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                              "payments-generator",
-                                                              "currency",
-                                                              &currency))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "'currency' config value invalid.\n");
-    return 77;  
-  }
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
@@ -1678,7 +1669,13 @@ main (int argc,
   GNUNET_assert (NULL != sigpipe);
   shc_chld = GNUNET_SIGNAL_handler_install (GNUNET_SIGCHLD,
                                             &sighandler_child_death);
-  GNUNET_SCHEDULER_run (&run, NULL);
+  if (GNUNET_OK !=
+      GNUNET_PROGRAM_run (argc, argv,
+                          "taler-merchant-generate-payments",
+                          "Populates DB with fake payments",
+                          options, &run, NULL))
+    return 77;
+
 
   GNUNET_SIGNAL_handler_uninstall (shc_chld);
   shc_chld = NULL;
