@@ -27,6 +27,16 @@
 #include <microhttpd.h>
 
 /**
+ * The exchange process launched by the generator
+ */
+static struct GNUNET_OS_Process *exchanged;
+
+/**
+ * The merchant process launched by the generator
+ */
+static struct GNUNET_OS_Process *merchantd;
+
+/**
  * How many times the command list should be rerun.
  */
 static unsigned int times = 1;
@@ -1360,6 +1370,8 @@ run (void *cls,
 {
   int ncmds;
   struct InterpreterState *is;
+  unsigned int cnt;
+  char *wget_cmd;
 
   if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config, 
                                                               "payments-generator",
@@ -1421,6 +1433,102 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
+
+  if (!remote_exchange)
+  {
+    exchanged = GNUNET_OS_start_process (GNUNET_NO,
+                                         GNUNET_OS_INHERIT_STD_ALL,
+                                         NULL, NULL, NULL,
+                                         "taler-exchange-httpd",
+                                         "taler-exchange-httpd",
+                                         NULL);
+    if (NULL == exchanged)
+    {
+      fprintf (stderr,
+               "Failed to run taler-exchange-httpd. Check your PATH.\n");
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+  
+    fprintf (stderr,
+             "Waiting for taler-exchange-httpd to be ready\n");
+    cnt = 0;
+  
+    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null", exchange_uri);
+  
+    do
+      {
+        fprintf (stderr, ".");
+        sleep (1);
+        cnt++;
+        if (cnt > 60)
+        {
+          fprintf (stderr,
+                   "\nFailed to start taler-exchange-httpd\n");
+          GNUNET_OS_process_kill (exchanged,
+                                  SIGKILL);
+          GNUNET_OS_process_wait (exchanged);
+          GNUNET_OS_process_destroy (exchanged);
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+      }
+    while (0 != system (wget_cmd));
+    GNUNET_free (wget_cmd);
+    
+    fprintf (stderr, "\n");
+  }
+
+  merchantd = GNUNET_OS_start_process (GNUNET_NO,
+                                       GNUNET_OS_INHERIT_STD_ALL,
+                                       NULL, NULL, NULL,
+                                       "taler-merchant-httpd",
+                                       "taler-merchant-httpd",
+                                       "-L", "DEBUG",
+                                       NULL);
+  if (NULL == merchantd)
+  {
+    fprintf (stderr,
+             "Failed to run taler-merchant-httpd. Check your PATH.\n");
+    GNUNET_OS_process_kill (exchanged,
+                            SIGKILL);
+    GNUNET_OS_process_wait (exchanged);
+    GNUNET_OS_process_destroy (exchanged);
+    
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  /* give child time to start and bind against the socket */
+  fprintf (stderr,
+           "Waiting for taler-merchant-httpd to be ready\n");
+  cnt = 0;
+  GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null", merchant_uri);
+
+  do
+    {
+      fprintf (stderr, ".");
+      sleep (1);
+      cnt++;
+      if (cnt > 60)
+      {
+        fprintf (stderr,
+                 "\nFailed to start taler-merchant-httpd\n");
+        GNUNET_OS_process_kill (merchantd,
+                                SIGKILL);
+        GNUNET_OS_process_wait (merchantd);
+        GNUNET_OS_process_destroy (merchantd);
+        GNUNET_OS_process_kill (exchanged,
+                                SIGKILL);
+        GNUNET_OS_process_wait (exchanged);
+        GNUNET_OS_process_destroy (exchanged);
+
+        GNUNET_SCHEDULER_shutdown ();
+        return;
+      }
+    }
+  while (0 != system (wget_cmd));
+  fprintf (stderr, "\n");
+  GNUNET_free (wget_cmd);
 
   /* must always be updated with the # of cmds the interpreter has*/
   ncmds = 13;
@@ -1546,12 +1654,7 @@ int
 main (int argc,
       char *argv[])
 {
-
-  struct GNUNET_OS_Process *exchanged = NULL;
-  struct GNUNET_OS_Process *merchantd;
-  unsigned int cnt;
   struct GNUNET_SIGNAL_Context *shc_chld;
-  char *wget_cmd;
 
   GNUNET_log_setup ("merchant-create-payments",
                     "DEBUG",
@@ -1573,96 +1676,6 @@ main (int argc,
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
-
-  if (!remote_exchange)
-  {
-    exchanged = GNUNET_OS_start_process (GNUNET_NO,
-                                         GNUNET_OS_INHERIT_STD_ALL,
-                                         NULL, NULL, NULL,
-                                         "taler-exchange-httpd",
-                                         "taler-exchange-httpd",
-                                         NULL);
-    if (NULL == exchanged)
-    {
-      fprintf (stderr,
-               "Failed to run taler-exchange-httpd. Check your PATH.\n");
-      return 77;
-    }
-  
-    fprintf (stderr,
-             "Waiting for taler-exchange-httpd to be ready\n");
-    cnt = 0;
-  
-    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null", exchange_uri);
-  
-    do
-      {
-        fprintf (stderr, ".");
-        sleep (1);
-        cnt++;
-        if (cnt > 60)
-        {
-          fprintf (stderr,
-                   "\nFailed to start taler-exchange-httpd\n");
-          GNUNET_OS_process_kill (exchanged,
-                                  SIGKILL);
-          GNUNET_OS_process_wait (exchanged);
-          GNUNET_OS_process_destroy (exchanged);
-          return 77;
-        }
-      }
-    while (0 != system (wget_cmd));
-    GNUNET_free (wget_cmd);
-    
-    fprintf (stderr, "\n");
-  }
-
-  merchantd = GNUNET_OS_start_process (GNUNET_NO,
-                                       GNUNET_OS_INHERIT_STD_ALL,
-                                       NULL, NULL, NULL,
-                                       "taler-merchant-httpd",
-                                       "taler-merchant-httpd",
-                                       "-L", "DEBUG",
-                                       NULL);
-  if (NULL == merchantd)
-  {
-    fprintf (stderr,
-             "Failed to run taler-merchant-httpd. Check your PATH.\n");
-    GNUNET_OS_process_kill (exchanged,
-                            SIGKILL);
-    GNUNET_OS_process_wait (exchanged);
-    GNUNET_OS_process_destroy (exchanged);
-    return 77;
-  }
-  /* give child time to start and bind against the socket */
-  fprintf (stderr,
-           "Waiting for taler-merchant-httpd to be ready\n");
-  cnt = 0;
-  GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null", merchant_uri);
-
-  do
-    {
-      fprintf (stderr, ".");
-      sleep (1);
-      cnt++;
-      if (cnt > 60)
-      {
-        fprintf (stderr,
-                 "\nFailed to start taler-merchant-httpd\n");
-        GNUNET_OS_process_kill (merchantd,
-                                SIGKILL);
-        GNUNET_OS_process_wait (merchantd);
-        GNUNET_OS_process_destroy (merchantd);
-        GNUNET_OS_process_kill (exchanged,
-                                SIGKILL);
-        GNUNET_OS_process_wait (exchanged);
-        GNUNET_OS_process_destroy (exchanged);
-        return 77;
-      }
-    }
-  while (0 != system (wget_cmd));
-  fprintf (stderr, "\n");
-  GNUNET_free (wget_cmd);
 
   result = GNUNET_SYSERR;
   sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO, GNUNET_NO, GNUNET_NO);
