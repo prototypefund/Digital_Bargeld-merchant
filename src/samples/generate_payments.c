@@ -598,6 +598,9 @@ add_incoming_cb (void *cls,
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_break (0);
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "%s",
+                json_dumps (full_response, JSON_INDENT (2)));
     fail (is);
     return;
   }
@@ -1693,11 +1696,14 @@ main (int argc,
   GNUNET_SIGNAL_handler_uninstall (shc_chld);
   shc_chld = NULL;
   GNUNET_DISK_pipe_close (sigpipe);
-  GNUNET_OS_process_kill (merchantd,
-                          SIGTERM);
-  GNUNET_OS_process_wait (merchantd);
-  GNUNET_OS_process_destroy (merchantd);
-  if (!remote_exchange)
+  if (NULL != merchantd)
+  {
+    GNUNET_OS_process_kill (merchantd,
+                            SIGTERM);
+    GNUNET_OS_process_wait (merchantd);
+    GNUNET_OS_process_destroy (merchantd);
+  }
+  if (!remote_exchange && NULL != exchanged)
   {
     GNUNET_OS_process_kill (exchanged,
                             SIGTERM);
