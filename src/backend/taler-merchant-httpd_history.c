@@ -141,6 +141,34 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                          "instance");
   }
 
+  /* Here goes the cherry-picking logic */
+  
+  str = MHD_lookup_connection_value (connection,
+                                     MHD_GET_ARGUMENT_KIND,
+                                     "order_id");
+
+  if (NULL != str)
+  {
+
+    ret = db->find_proposal_data_history (db->cls,
+                                          str,
+                                          &mi->pubkey,
+                                          pd_cb,
+                                          response);
+    if (GNUNET_SYSERR == ret)
+    {
+      json_decref (response);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_HISTORY_DB_FETCH_ERROR,
+					        "db error to get history");
+    }
+    ret = TMH_RESPONSE_reply_json (connection,
+                                   response,
+                                   MHD_HTTP_OK);
+    json_decref (response);
+    return ret;
+  }
+
   delta = 20;
 
   str = MHD_lookup_connection_value (connection,

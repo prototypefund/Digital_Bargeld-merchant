@@ -243,6 +243,26 @@ struct TALER_MERCHANTDB_Plugin
                                            void *cb_cls);
 
   /**
+   * Lookup for a proposal, respecting the signature used by the
+   * /history's db methods.
+   *
+   * @param cls db plugin handle
+   * @param order_id order id used to search for the proposal data
+   * @param merchant_pub public key of the merchant using this method
+   * @param cb the callback
+   * @param cb_cls closure to pass to the callback
+   * @return GNUNET_YES, GNUNET_NO, GNUNET_SYSERR according to the
+   * query being successful, unsuccessful, or generated errors.
+   */
+  int
+  (*find_proposal_data_history) (void *cls,
+                                 const char *order_id,
+                                 const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                 TALER_MERCHANTDB_ProposalDataCallback cb,
+                                 void *cb_cls);
+
+
+  /**
    * Return proposals whose timestamp are older than `date`.
    * The rows are sorted having the youngest first.*
    *

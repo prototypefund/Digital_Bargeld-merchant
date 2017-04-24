@@ -376,13 +376,20 @@ run (void *cls)
 
   FAILIF (GNUNET_OK !=
           plugin->find_proposal_data (plugin->cls,
-                                      &out, // plain data
+                                      &out,
                                       order_id,
                                       &merchant_pub));
 
   FAILIF (GNUNET_OK !=
+          plugin->find_proposal_data_history (plugin->cls,
+                                              order_id,
+                                              &merchant_pub,
+                                              pd_cb,
+                                              NULL));
+
+  FAILIF (GNUNET_OK !=
           plugin->find_proposal_data_from_hash (plugin->cls,
-                                                &out, // plain data
+                                                &out,
                                                 &h_proposal_data2,
                                                 &merchant_pub));
   FAILIF (1 !=

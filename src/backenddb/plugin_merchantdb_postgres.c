@@ -831,6 +831,76 @@ postgres_store_transfer_to_proof (void *cls,
 }
 
 /**
+ * Lookup for a proposal, respecting the signature used by the
+ * /history's db methods.
+ *
+ * @param cls db plugin handle
+ * @param order_id order id used to search for the proposal data
+ * @param merchant_pub public key of the merchant using this method
+ * @param cb the callback
+ * @param cb_cls closure to pass to the callback
+ * @return GNUNET_YES, GNUNET_NO, GNUNET_SYSERR according to the
+ * query being successful, unsuccessful, or generated errors.
+ */
+static int
+postgres_find_proposal_data_history (void *cls,
+                                     const char *order_id,
+                                     const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                     TALER_MERCHANTDB_ProposalDataCallback cb,
+                                     void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int i;
+  json_t *proposal_data;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (order_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_proposal_data",
+                                    params);
+  i = PQntuples (result);
+  if (1 < i)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Mupltiple proposal data share the same hashcode.\n");
+    return GNUNET_SYSERR;
+  }
+
+  if (0 == i)
+    return GNUNET_NO;
+
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_json ("proposal_data",
+                               &proposal_data),
+    GNUNET_PQ_result_spec_end
+  };
+  if (GNUNET_OK !=
+      GNUNET_PQ_extract_result (result,
+                                rs,
+                                0))
+  {
+    GNUNET_break (0);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+
+  cb (cb_cls,
+      order_id,
+      0,
+      proposal_data);
+
+  PQclear (result);
+  return GNUNET_OK;
+
+}                                     
+
+
+/**
  * Return proposals whose timestamp are older than `date`.
  * Among those proposals, only those ones being between the
  * start-th and (start-nrows)-th record are returned.  The rows
@@ -1597,6 +1667,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
   plugin->insert_proposal_data = &postgres_insert_proposal_data;
   plugin->find_proposal_data = &postgres_find_proposal_data;
+  plugin->find_proposal_data_history = &postgres_find_proposal_data_history;
   plugin->find_proposal_data_by_date = &postgres_find_proposal_data_by_date;
   plugin->find_proposal_data_by_date_and_range = &postgres_find_proposal_data_by_date_and_range;
   plugin->find_proposal_data_from_hash = &postgres_find_proposal_data_from_hash;
