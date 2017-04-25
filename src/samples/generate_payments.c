@@ -48,10 +48,16 @@ static unsigned int j = 0;
 
 /**
  * Indicates whether we use an external exchange.
- * By default, the generator tries to execute a local
- * exchange.
+ * By default, the generator forks a local exchange.
  */
 static int remote_exchange = 0;
+
+/**
+ * Indicates whether we use an external merchant.
+ * By default, the generator tries to fork a local
+ * merchant.
+ */
+static int remote_merchant = 0;
 
 /**
  * Exchange URI to withdraw from and deposit to.
@@ -1482,57 +1488,60 @@ run (void *cls,
     fprintf (stderr, "\n");
   }
 
-  merchantd = GNUNET_OS_start_process (GNUNET_NO,
-                                       GNUNET_OS_INHERIT_STD_ALL,
-                                       NULL, NULL, NULL,
-                                       "taler-merchant-httpd",
-                                       "taler-merchant-httpd",
-                                       "-L", "DEBUG",
-                                       NULL);
-  if (NULL == merchantd)
+
+  if (!remote_merchant)
   {
-    fprintf (stderr,
-             "Failed to run taler-merchant-httpd. Check your PATH.\n");
-    GNUNET_OS_process_kill (exchanged,
-                            SIGKILL);
-    GNUNET_OS_process_wait (exchanged);
-    GNUNET_OS_process_destroy (exchanged);
-    
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-  /* give child time to start and bind against the socket */
-  fprintf (stderr,
-           "Waiting for taler-merchant-httpd to be ready\n");
-  cnt = 0;
-  GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null", merchant_uri);
-
-  do
+    merchantd = GNUNET_OS_start_process (GNUNET_NO,
+                                         GNUNET_OS_INHERIT_STD_ALL,
+                                         NULL, NULL, NULL,
+                                         "taler-merchant-httpd",
+                                         "taler-merchant-httpd",
+                                         "-L", "DEBUG",
+                                         NULL);
+    if (NULL == merchantd)
     {
-      fprintf (stderr, ".");
-      sleep (1);
-      cnt++;
-      if (cnt > 60)
-      {
-        fprintf (stderr,
-                 "\nFailed to start taler-merchant-httpd\n");
-        GNUNET_OS_process_kill (merchantd,
-                                SIGKILL);
-        GNUNET_OS_process_wait (merchantd);
-        GNUNET_OS_process_destroy (merchantd);
-        GNUNET_OS_process_kill (exchanged,
-                                SIGKILL);
-        GNUNET_OS_process_wait (exchanged);
-        GNUNET_OS_process_destroy (exchanged);
-
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
+      fprintf (stderr,
+               "Failed to run taler-merchant-httpd. Check your PATH.\n");
+      GNUNET_OS_process_kill (exchanged,
+                              SIGKILL);
+      GNUNET_OS_process_wait (exchanged);
+      GNUNET_OS_process_destroy (exchanged);
+      
+      GNUNET_SCHEDULER_shutdown ();
+      return;
     }
-  while (0 != system (wget_cmd));
-  fprintf (stderr, "\n");
-  GNUNET_free (wget_cmd);
-
+    /* give child time to start and bind against the socket */
+    fprintf (stderr,
+             "Waiting for taler-merchant-httpd to be ready\n");
+    cnt = 0;
+    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null", merchant_uri);
+  
+    do
+      {
+        fprintf (stderr, ".");
+        sleep (1);
+        cnt++;
+        if (cnt > 60)
+        {
+          fprintf (stderr,
+                   "\nFailed to start taler-merchant-httpd\n");
+          GNUNET_OS_process_kill (merchantd,
+                                  SIGKILL);
+          GNUNET_OS_process_wait (merchantd);
+          GNUNET_OS_process_destroy (merchantd);
+          GNUNET_OS_process_kill (exchanged,
+                                  SIGKILL);
+          GNUNET_OS_process_wait (exchanged);
+          GNUNET_OS_process_destroy (exchanged);
+  
+          GNUNET_SCHEDULER_shutdown ();
+          return;
+        }
+      }
+    while (0 != system (wget_cmd));
+    fprintf (stderr, "\n");
+    GNUNET_free (wget_cmd);
+  }
   /* must always be updated with the # of cmds the interpreter has*/
   ncmds = 13;
   struct Command commands[] =
@@ -1669,11 +1678,14 @@ main (int argc,
                                "TIMES",
                                "How many times the commands should be run.",
                                &times),
-
     GNUNET_GETOPT_option_flag ('r',
                                "remote-exchange",
-                               "Do not execute any local exchange",
+                               "Do not fork any exchange",
                                &remote_exchange),
+    GNUNET_GETOPT_option_flag ('m',
+                               "remote-merchant",
+                               "Do not fork any merchant",
+                               &remote_merchant),
     GNUNET_GETOPT_OPTION_END
   };
 
@@ -1696,7 +1708,7 @@ main (int argc,
   GNUNET_SIGNAL_handler_uninstall (shc_chld);
   shc_chld = NULL;
   GNUNET_DISK_pipe_close (sigpipe);
-  if (NULL != merchantd)
+  if (!remote_merchant && NULL != merchantd)
   {
     GNUNET_OS_process_kill (merchantd,
                             SIGTERM);
