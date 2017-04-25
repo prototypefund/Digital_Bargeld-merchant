@@ -785,13 +785,16 @@ currency = PUDOS
 Run the test in the following way:
 
 @example
-$ taler-merchant-generate-payments [-c config] [-r]
+$ taler-merchant-generate-payments [-c config] [-e EURI] [-m MURI]
 @end example
 
 the argument @code{config} given to @code{-c} points to the configuration
 file and is optional -- @code{~/.config/taler.conf} will be checked by default.
-By default, the tool tries to fork a process running the exchange, unless the
-@code{-r} option is given.
+By default, the tool forks two processes: one for the merchant backend, and one
+for the exchange.
+The option @code{-e} (@code{-m}) avoids any exchange (merchant backend) fork,
+and just runs the generator against the exchange (merchant backend) running
+at @code{EURI} (@code{MURI}).
 
 If the command terminates with no errors, then the merchant backend is correctly
 installed.
