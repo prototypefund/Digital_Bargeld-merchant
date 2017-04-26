@@ -277,6 +277,9 @@ proposal_put (struct MHD_Connection *connection,
                        "H_wire",
 		       GNUNET_JSON_from_data_auto (&mi->h_wire));
   json_object_set_new (order,
+                       "wire_method",
+		       json_string (mi->wire_method));
+  json_object_set_new (order,
                        "merchant_pub",
 		       GNUNET_JSON_from_data_auto (&mi->pubkey));
 
