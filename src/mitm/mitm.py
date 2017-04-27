@@ -31,14 +31,17 @@ import json
 from random import randint
 from datetime import datetime
 
-# FIXME make this as a standalone executable, and accept
-# the exchange url as a cli option.
+# FIXME make this as a standalone executable, like taler-merchant-mitm.
+# accept the exchange url as a cli option.
 
 app = Flask(__name__)
 app.secret_key = base64.b64encode(os.urandom(64)).decode('utf-8')
 logger = logging.getLogger(__name__)
 exchange_url = os.environ.get("TALER_EXCHANGE_URL")
 assert(None != exchange_url)
+
+# The functions taking 'resp' as parameter are responsible for
+# modifying the data to return.
 
 def track_transaction(resp):
     return resp
@@ -55,8 +58,10 @@ def all(path):
     url[0] = xurl[0]
     url[1] = xurl[1]
     url = urlunparse(url)
-    print("Querying " + url)
-    r = requests.post(urljoin(url, path), json=body)
+    if "POST" == request.method:
+        r = requests.post(urljoin(url, path), json=body)
+    else:
+        r = requests.get(urljoin(url, path), json=body)
     resp = dict()
     if "application/json" == r.headers["Content-Type"]:
         resp = r.json()
