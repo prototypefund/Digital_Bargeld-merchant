@@ -31,8 +31,10 @@ import json
 from random import randint
 from datetime import datetime
 
-# FIXME make this as a standalone executable, like taler-merchant-mitm.
-# accept the exchange url as a cli option.
+# FIXME
+
+# 1) make this as a standalone executable, like taler-merchant-mitm.
+# 2) accept the exchange url as a cli option.
 
 app = Flask(__name__)
 app.secret_key = base64.b64encode(os.urandom(64)).decode('utf-8')
