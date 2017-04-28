@@ -9,5 +9,5 @@ install-data:
 
 .PHONY: install
 install: install-data
-	pip3 install . --install-option="--prefix=@prefix@"
+	pip3 install . --install-option="--prefix=@prefix@" --upgrade --no-deps
 	install -m 544 -Dt @prefix@/bin taler-merchant-mitm
