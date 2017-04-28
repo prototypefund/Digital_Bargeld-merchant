@@ -7,6 +7,7 @@ error generator.
 
 import argparse
 import sys
+import os
 
 parser = argparse.ArgumentParser()
 
@@ -32,3 +33,12 @@ args = parser.parse_args()
 if getattr(args, 'exchange_url', None) is None:
     parser.print_help()
     sys.exit(1)
+
+uwsgi_logfmt = "%(ltime) %(proto) %(method) %(uri) %(proto) => %(status)"
+
+os.execlp("uwsgi", "uwsgi",
+            "--master",
+            "--die-on-term",
+            "--log-format", uwsgi_logfmt,
+            "--http", ":%d" % args.port,
+            "--wsgi-file", "@prefix@/share/taler/merchant-mitm.wsgi")
