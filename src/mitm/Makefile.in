@@ -1,0 +1,15 @@
+INSTALL = install -m 644 -Dt
+
+.PHONY: all
+all:
+	true
+
+
+.PHONY: install-data
+install-data:
+	$(INSTALL) @prefix@/share/taler/ merchant-mitm.wsgi
+
+.PHONY: install
+install: install-data
+	$(INSTALL) @prefix@/bin/ taler-merchant-mitm
+	pip3 install . --install-option="--prefix=@prefix@"
