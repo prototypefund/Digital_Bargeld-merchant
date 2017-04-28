@@ -1,3 +1,3 @@
 # This Makefile is in the public domain
 AM_CPPFLAGS = -I$(top_srcdir)/src/include
-SUBDIRS = include backenddb backend lib merchant-tools samples
+SUBDIRS = include backenddb backend lib merchant-tools samples mitm
