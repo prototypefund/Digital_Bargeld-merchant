@@ -11,4 +11,15 @@ proxy about the modifications to be made.
 
 === INVOCATION ===
 
-FIXME
+After a successful 'make install', a command called 'taler-merchant-mitm'
+is placed under <prefix>/bin - make sure PATH points at it.
+
+To run the mitm, give the following commands:
+
+$ taler-merchant-mitm --exchange URL [--port PORT]
+
+The '--exchange' option is mandatory, telling the mitm where to
+forward the requests addressed to the exchange.
+
+The second option just sets the port number where the mitm
+listens, defaulting to 5000.
