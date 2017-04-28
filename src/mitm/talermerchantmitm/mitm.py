@@ -31,11 +31,6 @@ import json
 from random import randint
 from datetime import datetime
 
-# FIXME
-
-# 1) make this as a standalone executable, like taler-merchant-mitm.
-# 2) accept the exchange url as a cli option.
-
 app = Flask(__name__)
 app.secret_key = base64.b64encode(os.urandom(64)).decode('utf-8')
 logger = logging.getLogger(__name__)
@@ -73,4 +68,5 @@ def all(path):
     }
     func = dispatcher.get(request.headers.get("X-Taler-Mitm"),
                           lambda x: x)
+
     return jsonify(func(resp)), r.status_code

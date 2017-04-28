@@ -586,7 +586,6 @@ keys_mgmt_cb (void *cls,
   struct Exchange *exchange = cls;
   struct GNUNET_TIME_Absolute expire;
   struct GNUNET_TIME_Relative delay;
-
   if (NULL == keys)
   {
     exchange->pending = GNUNET_YES;
