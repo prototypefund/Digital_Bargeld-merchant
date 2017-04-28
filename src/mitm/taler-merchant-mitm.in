@@ -36,6 +36,7 @@ if getattr(args, 'exchange_url', None) is None:
 
 uwsgi_logfmt = "%(ltime) %(proto) %(method) %(uri) %(proto) => %(status)"
 
+os.environ["TALER_EXCHANGE_URL"] = args.exchange_url
 os.execlp("uwsgi", "uwsgi",
             "--master",
             "--die-on-term",

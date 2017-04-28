@@ -8,5 +8,4 @@ setup(name='talermerchantmitm',
       license='GPL',
       packages=find_packages(),
       install_requires=["Flask>=0.10"],
-      scripts=['taler-merchant-mitm'],
       zip_safe=False)
