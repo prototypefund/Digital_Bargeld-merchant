@@ -38,9 +38,6 @@ logger = logging.getLogger(__name__)
 exchange_url = os.environ.get("TALER_EXCHANGE_URL")
 assert(None != exchange_url)
 
-# The functions taking 'resp' as parameter are responsible for
-# modifying the data to return.
-
 def track_transaction(resp):
     return resp.text
 
