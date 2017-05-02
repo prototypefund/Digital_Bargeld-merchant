@@ -47,12 +47,6 @@ def track_transaction(resp):
 def track_transfer(resp):
     return resp
 
-def fallback(resp):
-    if "application/json" == resp.headers["Content-Type"]:
-        return make_response(jsonify(resp.json()))
-    else:
-        return make_response(resp.text)
-
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>', methods=["GET", "POST"])
 def all(path):
@@ -71,8 +65,9 @@ def all(path):
         "track_transfer": track_transfer
     }
     func = dispatcher.get(request.headers.get("X-Taler-Mitm"),
-                          fallback)
+                          lambda x: make_response(x.text))
     response = func(r)
     for key, value in r.headers.items():
-        response.headers[key] = value
+        if key not in ("Server", "Content-Length"):
+            response.headers[key] = value
     return response, r.status_code
