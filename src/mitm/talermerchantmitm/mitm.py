@@ -42,10 +42,10 @@ assert(None != exchange_url)
 # modifying the data to return.
 
 def track_transaction(resp):
-    return resp
+    return resp.text
 
 def track_transfer(resp):
-    return resp
+    return resp.text
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>', methods=["GET", "POST"])
@@ -65,8 +65,8 @@ def all(path):
         "track_transfer": track_transfer
     }
     func = dispatcher.get(request.headers.get("X-Taler-Mitm"),
-                          lambda x: make_response(x.text))
-    response = func(r)
+                          lambda x: x.text)
+    response = make_response(func(r))
     for key, value in r.headers.items():
         if key not in ("Server", "Content-Length"):
             response.headers[key] = value
