@@ -450,7 +450,7 @@ postgres_initialize (void *cls)
  * @param proposal_data where to store the retrieved proposal data
  * @param h_proposal_data proposal data's hashcode that will be used to
  * perform the lookup
- * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
+ * @return #GNUNET_OK on success, #GNUNET_NO if no proposal is
  * found, #GNUNET_SYSERR upon error
  */
 static int
@@ -508,7 +508,7 @@ postgres_find_proposal_data_from_hash (void *cls,
  * @param cls closure
  * @param proposal_data where to store the retrieved proposal data
  * @param order id order id used to perform the lookup
- * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
+ * @return #GNUNET_OK on success, #GNUNET_NO if no proposal is
  * found, #GNUNET_SYSERR upon error
  */
 static int
@@ -600,7 +600,7 @@ postgres_insert_proposal_data (void *cls,
   /**
    * We don't treat a unique_violation (code '23505') error as
    * an actual error, since there is no problem if a frontend tries
-   * to store twice the same contract.  That is especially needed
+   * to store twice the same proposal.  That is especially needed
    * when DB-less frontends perform replayed payments.
    */
   if (PGRES_COMMAND_OK != PQresultStatus (result)

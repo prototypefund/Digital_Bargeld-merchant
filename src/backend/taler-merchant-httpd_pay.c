@@ -209,12 +209,12 @@ struct PayContext
   struct GNUNET_TIME_Absolute refund_deadline;
 
   /**
-   * Deadline for the customer to pay for this contract.
+   * Deadline for the customer to pay for this proposal.
    */
   struct GNUNET_TIME_Absolute pay_deadline;
 
   /**
-   * "H_contract" from @e proposal_data.
+   * Hashed proposal.
    */
   struct GNUNET_HashCode h_proposal_data;
 
@@ -856,7 +856,7 @@ handle_pay_timeout (void *cls)
  * Function called with information about a coin that was deposited.
  *
  * @param cls closure
- * @param transaction_id of the contract
+ * @param h_proposal_data hashed proposal data
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
@@ -910,9 +910,9 @@ check_coin_paid (void *cls,
  * Update `transaction_exists` accordingly.
  *
  * @param cls closure with the `struct PayContext`
- * @param transaction_id of the contract
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
+ * @param h_proposal_data hashed proposal data
  * @param h_xwire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -1041,7 +1041,7 @@ parse_pay (struct MHD_Connection *connection,
     if (MHD_YES !=
         TMH_RESPONSE_reply_internal_error (connection,
                                            TALER_EC_PAY_MERCHANT_FIELD_MISSING,
-                                           "No merchant field in contract"))
+                                           "No merchant field in proposal"))
     {
       GNUNET_break (0);
       return GNUNET_SYSERR;
