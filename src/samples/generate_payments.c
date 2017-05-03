@@ -65,6 +65,11 @@ static int remote_merchant = 0;
 static char *exchange_uri;
 
 /**
+ * Base URL of exchange's admin interface.
+ */
+static char *exchange_uri_admin;
+
+/**
  * Merchant backend to get proposals from and pay.
  */
 static char *merchant_uri;
@@ -1080,7 +1085,7 @@ interpreter_run (void *cls)
       }
       cmd->details.admin_add_incoming.aih
         = TALER_EXCHANGE_admin_add_incoming (exchange,
-                                             exchange_uri,
+                                             exchange_uri_admin,
                                              &reserve_pub,
                                              &amount,
                                              execution_date,
@@ -1393,6 +1398,18 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config, 
+                                                              "payments-generator",
+                                                              "exchange_admin",
+                                                              &exchange_uri_admin))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "payments-generator",
+                               "exchange_admin");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
   if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
                                                               "payments-generator",
                                                               "merchant",
