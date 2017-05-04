@@ -11,3 +11,9 @@ install-data:
 install: install-data
 	pip3 install . --install-option="--prefix=@prefix@" --upgrade --no-deps
 	install -m 544 -Dt @prefix@/bin taler-merchant-mitm
+
+# need a way to make 'make check' happy in this subdir.
+# This component is still too young to be tested.
+.PHONY: check
+check:
+	true
