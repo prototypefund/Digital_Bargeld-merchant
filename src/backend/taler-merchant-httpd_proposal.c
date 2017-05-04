@@ -183,8 +183,7 @@ proposal_put (struct MHD_Connection *connection,
                      json_string (buf));
   }
 
-  if (NULL == json_object_get (order,
-                               "timestamp"))
+  if (NULL == json_object_get (order, "timestamp"))
   {
     struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
 

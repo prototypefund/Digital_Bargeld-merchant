@@ -795,6 +795,7 @@ process_pay_with_exchange (void *cls,
                 "Timing for this payment, wire_deadline: %llu, refund_deadline: %llu\n",
                 (unsigned long long) pc->wire_transfer_deadline.abs_value_us,
                 (unsigned long long) pc->refund_deadline.abs_value_us);
+
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
