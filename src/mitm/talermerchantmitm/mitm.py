@@ -17,7 +17,6 @@
 
 from flask import (request,
                    Flask,
-                   jsonify,
                    make_response)
 import requests
 from urllib.parse import (urljoin,
@@ -44,6 +43,14 @@ def track_transaction(resp):
 def track_transfer(resp):
     return resp.text
 
+def keys(resp):
+    try:
+        keys = resp.json()
+        # Put here data perturbation logic
+        return json.dumps(keys)
+    except Exception:
+        return resp.text
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>', methods=["GET", "POST"])
 def all(path):
@@ -59,7 +66,8 @@ def all(path):
         r = requests.get(urljoin(url, path), json=body)
     dispatcher = {
         "track_transaction": track_transaction,
-        "track_transfer": track_transfer
+        "track_transfer": track_transfer,
+        "keys": keys
     }
     func = dispatcher.get(request.headers.get("X-Taler-Mitm"),
                           lambda x: x.text)
