@@ -796,6 +796,44 @@ The option @code{-e} (@code{-m}) avoids any exchange (merchant backend) fork,
 and just runs the generator against the exchange (merchant backend) running
 at @code{EURI} (@code{MURI}).
 
+Please NOTE that the generator contains @emph{hardcoded} values, as for deposit
+fees of the coins it uses.  In order to work against the used exchange, those values
+MUST match the ones used by the exchange.
+
+The following example shows how the generator "sets" a deposit fee of EUR:0.01
+for the 5 EURO coin.
+
+@example
+// from <merchant_repository>/src/sample/generate_payments.c
+@{ .oc = OC_PAY,
+  .label = "deposit-simple",
+  .expected_response_code = MHD_HTTP_OK,
+  .details.pay.contract_ref = "create-proposal-1",
+  .details.pay.coin_ref = "withdraw-coin-1",
+  .details.pay.amount_with_fee = concat_amount (currency, "5"),
+  .details.pay.amount_without_fee = concat_amount (currency, "4.99") @},
+@end example
+
+The logic calculates the deposit fee according to the subtraction:
+@code{amount_with_fee - amount_without_fee}.
+
+The following example shows a 5 EURO coin configuration - needed by the
+used exchange - which is compatible with the hardcoded example above.
+
+@example
+[coin_eur_5]
+value = EUR:5
+duration_overlap = 5 minutes
+duration_withdraw = 7 days
+duration_spend = 2 years
+duration_legal = 3 years
+fee_withdraw = EUR:0.00
+fee_deposit = EUR:0.01 # important bit
+fee_refresh = EUR:0.00
+fee_refund = EUR:0.00
+rsa_keysize = 1024
+@end example
+
 If the command terminates with no errors, then the merchant backend is correctly
 installed.
 
