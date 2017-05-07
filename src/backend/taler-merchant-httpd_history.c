@@ -48,7 +48,7 @@ pd_cb (void *cls,
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "/history's row_id: %llu\n",
-              row_id);
+              (unsigned long long) row_id);
 
   GNUNET_assert (-1 != json_unpack ((json_t *) proposal_data,
                                     "{s:o, s:o, s:{s:o}}",
@@ -142,7 +142,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   }
 
   /* Here goes the cherry-picking logic */
-  
+
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "order_id");
