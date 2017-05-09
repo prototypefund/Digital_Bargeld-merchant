@@ -137,7 +137,7 @@ handle_proposal_finished (void *cls,
         GNUNET_JSON_spec_fixed_auto ("hash", &hash),
         GNUNET_JSON_spec_end()
       };
-  
+
       if (GNUNET_OK !=
           GNUNET_JSON_parse (json,
                              spec,
@@ -200,7 +200,7 @@ handle_proposal_finished (void *cls,
  * @param proposal_cb the callback to call when a reply for this request is
  * available
  * @param proposal_cb_cls closure for @a proposal_cb
- * @return a handle for this request
+ * @return a handle for this request, NULL on error
  */
 struct TALER_MERCHANT_ProposalOperation *
 TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
@@ -225,10 +225,15 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
   eh = curl_easy_init ();
-  GNUNET_assert (NULL != (po->json_enc =
-                          json_dumps (req,
-                                      JSON_COMPACT)));
+  po->json_enc = json_dumps (req,
+                             JSON_COMPACT);
   json_decref (req);
+  if (NULL == po->json_enc)
+  {
+    GNUNET_break (0);
+    GNUNET_free (po);
+    return NULL;
+  }
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
@@ -310,7 +315,7 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                                     CURLOPT_URL,
                                     plo->url))
   {
-    GNUNET_break (0);  
+    GNUNET_break (0);
     return NULL;
   }
 

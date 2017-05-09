@@ -50,7 +50,7 @@ struct TALER_MERCHANT_ProposalLookupOperation;
  * @param cls closure
  * @param http_status HTTP response code, 200 indicates success;
  *                    0 if the backend's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code 
+ * @param ec taler-specific error code
  * @param obj raw JSON reply, or error details if the request failed
  * @param proposal_data completed contract, NULL on error
  * @param sig merchant's signature over the contract, NULL on error
@@ -88,7 +88,7 @@ typedef void
  * backend
  * @param proposal_cb the callback to call when a reply for this request is available
  * @param proposal_cb_cls closure for @a proposal_cb
- * @return a handle for this request
+ * @return a handle for this request, NULL on error
  */
 struct TALER_MERCHANT_ProposalOperation *
 TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
@@ -162,7 +162,7 @@ struct TALER_MERCHANT_Pay;
  *                    can indicate success, depending on whether the interaction
  *                    was with a merchant frontend or backend;
  *                    0 if the merchant's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code 
+ * @param ec taler-specific error code
  * @param obj the received JSON reply, with error details if the request failed
  */
 typedef void
@@ -364,7 +364,7 @@ struct TALER_MERCHANT_TrackTransferHandle;
  * transfer.
  */
 struct TALER_MERCHANT_TrackTransferDetails {
-  
+
   /**
    * Total amount paid back by the exchange.
    */
@@ -387,7 +387,7 @@ struct TALER_MERCHANT_TrackTransferDetails {
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
- * @param ec taler-specific error code 
+ * @param ec taler-specific error code
  * @param sign_key exchange key used to sign @a json, or NULL
  * @param json original json reply (may include signatures, those have then been
  *        validated already)
@@ -508,7 +508,7 @@ struct TALER_MERCHANT_TransactionWireTransfer
  *
  * @param cls closure
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
- * @param ec taler-specific error code 
+ * @param ec taler-specific error code
  * @param json original json reply from the backend
  * @param num_transfers number of wire transfers the exchange used for the transaction
  * @param transfers details about each transfer and which coins are aggregated in it
@@ -560,7 +560,7 @@ struct TALER_MERCHANT_HistoryOperation;
  *
  * @param cls closure
  * @param http_status HTTP status returned by the merchant backend
- * @param ec taler-specific error code 
+ * @param ec taler-specific error code
  * @param json actual body containing history
  */
 typedef void
