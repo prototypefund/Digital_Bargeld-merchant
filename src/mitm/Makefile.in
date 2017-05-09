@@ -17,3 +17,5 @@ install: install-data
 .PHONY: check
 check:
 	true
+clean:
+	true
