@@ -282,7 +282,7 @@ src/backenddb/Makefile
 src/backend/Makefile
 src/samples/Makefile
 src/lib/Makefile
-src/mitm/taler-merchant-mitm
-src/mitm/merchant-mitm.wsgi
-src/mitm/Makefile])
+src/merchant-tools/mitm/taler-merchant-mitm
+src/merchant-tools/mitm/merchant-mitm.wsgi
+src/merchant-tools/mitm/Makefile])
 AC_OUTPUT

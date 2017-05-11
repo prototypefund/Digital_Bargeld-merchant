@@ -1,4 +1,6 @@
 
+** Taler Merchant Payments Generator **
+
 === INTRODUCTION ===
 
 The tool contained in this directory is used to populate the
@@ -43,3 +45,7 @@ taler-merchant-generate-payments -c config/file.conf [-n ITERATIONS]
 
 The -n option instructs the tools about how many iteration of all
 the (internal) commands we want to execute.
+
+** Taler Merchant Dbinit **
+
+TBD
