@@ -842,10 +842,10 @@ interpreter_run (void *cls)
       if (j < times)
       {
         is->ip = 0;
-        
+
         GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                     "Rewinding the interpreter.\n");
-    
+
         GNUNET_SCHEDULER_add_now (&interpreter_run,
                                   is);
         return;
@@ -869,7 +869,7 @@ interpreter_run (void *cls)
         struct TALER_Amount max_fee;
         const char *error_name;
         unsigned int error_line;
-  
+
         /* get proposal */
         ref = find_command (is,
                             cmd->details.pay.contract_ref);
@@ -889,7 +889,7 @@ interpreter_run (void *cls)
             TALER_JSON_spec_amount ("max_fee", &max_fee),
             GNUNET_JSON_spec_end()
           };
-  
+
           if (GNUNET_OK !=
               GNUNET_JSON_parse (ref->details.proposal.proposal_data,
                                  spec,
@@ -906,7 +906,7 @@ interpreter_run (void *cls)
           }
           cmd->details.pay.merchant_pub = merchant_pub;
         }
-  
+
         {
         const struct Command *coin_ref;
   	memset (&pc, 0, sizeof (pc));
@@ -924,7 +924,7 @@ interpreter_run (void *cls)
   	default:
   	  GNUNET_assert (0);
   	}
-  
+
   	if (GNUNET_OK !=
   	    TALER_string_to_amount (cmd->details.pay.amount_without_fee,
   				    &pc.amount_without_fee))
@@ -936,7 +936,7 @@ interpreter_run (void *cls)
   	  fail (is);
   	  return;
   	}
-  
+
   	if (GNUNET_OK !=
   	    TALER_string_to_amount (cmd->details.pay.amount_with_fee,
   				    &pc.amount_with_fee))
@@ -949,7 +949,7 @@ interpreter_run (void *cls)
   	  return;
   	}
         }
-  
+
         cmd->details.pay.ph
   	= TALER_MERCHANT_pay_wallet (ctx,
   				     merchant_uri,
@@ -983,11 +983,11 @@ interpreter_run (void *cls)
       {
         json_t *order;
         json_t *merchant_obj;
-  
+
         order = make_order (cmd->details.proposal.max_fee,
                             cmd->details.proposal.amount);
-        
-        
+
+
         if (NULL == order)
         {
           GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -996,7 +996,7 @@ interpreter_run (void *cls)
           fail (is);
           return;
         }
-        
+
         GNUNET_assert (NULL != (merchant_obj = json_pack ("{s:{s:s}}",
                                                           "merchant",
                                                           "instance",
@@ -1035,7 +1035,7 @@ interpreter_run (void *cls)
       else
       {
         struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-  
+
         priv = GNUNET_CRYPTO_eddsa_key_create ();
         cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
         GNUNET_free (priv);
@@ -1053,7 +1053,7 @@ interpreter_run (void *cls)
         fail (is);
         return;
       }
-  
+
       execution_date = GNUNET_TIME_absolute_get ();
       GNUNET_TIME_round_abs (&execution_date);
       sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
@@ -1073,7 +1073,7 @@ interpreter_run (void *cls)
       transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
                                      JSON_REJECT_DUPLICATES,
                                      NULL);
-  
+
       if (NULL == transfer_details)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1134,11 +1134,11 @@ interpreter_run (void *cls)
         fail (is);
         return;
       }
-  
+
       /* create coin's private key */
       {
         struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-  
+
         priv = GNUNET_CRYPTO_eddsa_key_create ();
         cmd->details.reserve_withdraw.coin_priv.eddsa_priv = *priv;
         GNUNET_free (priv);
@@ -1148,7 +1148,7 @@ interpreter_run (void *cls)
       GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
                                   &cmd->details.reserve_withdraw.blinding_key,
                                   sizeof (cmd->details.reserve_withdraw.blinding_key));
-  
+
       cmd->details.reserve_withdraw.wsh
         = TALER_EXCHANGE_reserve_withdraw (exchange,
                                            cmd->details.reserve_withdraw.pk,
@@ -1239,7 +1239,7 @@ do_shutdown (void *cls)
   struct InterpreterState *is = cls;
   struct Command *cmd;
   unsigned int i;
-  
+
 
   if (NULL != timeout_task)
   {
@@ -1253,7 +1253,7 @@ do_shutdown (void *cls)
       case OC_END:
         GNUNET_assert (0);
         break;
-  
+
       case OC_PAY:
         if (NULL != cmd->details.pay.ph)
         {
@@ -1265,7 +1265,7 @@ do_shutdown (void *cls)
           cmd->details.pay.ph = NULL;
         }
         break;
-  
+
       case OC_PROPOSAL:
         if (NULL != cmd->details.proposal.po)
         {
@@ -1282,7 +1282,7 @@ do_shutdown (void *cls)
           cmd->details.proposal.proposal_data = NULL;
         }
         break;
-  
+
       case OC_WITHDRAW_SIGN:
         if (NULL != cmd->details.reserve_withdraw.wsh)
         {
@@ -1300,7 +1300,7 @@ do_shutdown (void *cls)
         }
         GNUNET_free_non_null (cmd->details.reserve_withdraw.amount);
         break;
-  
+
       case OC_ADMIN_ADD_INCOMING:
         if (NULL != cmd->details.admin_add_incoming.aih)
         {
@@ -1312,7 +1312,7 @@ do_shutdown (void *cls)
           cmd->details.admin_add_incoming.aih = NULL;
         }
         break;
-  
+
       default:
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                     "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -1382,12 +1382,11 @@ run (void *cls,
      const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
-  int ncmds;
   struct InterpreterState *is;
   unsigned int cnt;
   char *wget_cmd;
 
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config, 
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
                                                               "payments-generator",
                                                               "exchange",
                                                               &exchange_uri))
@@ -1398,7 +1397,7 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config, 
+  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
                                                               "payments-generator",
                                                               "exchange_admin",
                                                               &exchange_uri_admin))
@@ -1475,13 +1474,13 @@ run (void *cls,
       GNUNET_SCHEDULER_shutdown ();
       return;
     }
-  
+
     fprintf (stderr,
              "Waiting for taler-exchange-httpd to be ready\n");
     cnt = 0;
-  
+
     GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null", exchange_uri);
-  
+
     do
       {
         fprintf (stderr, ".");
@@ -1501,7 +1500,7 @@ run (void *cls,
       }
     while (0 != system (wget_cmd));
     GNUNET_free (wget_cmd);
-    
+
     fprintf (stderr, "\n");
   }
 
@@ -1523,7 +1522,7 @@ run (void *cls,
                               SIGKILL);
       GNUNET_OS_process_wait (exchanged);
       GNUNET_OS_process_destroy (exchanged);
-      
+
       GNUNET_SCHEDULER_shutdown ();
       return;
     }
@@ -1532,7 +1531,7 @@ run (void *cls,
              "Waiting for taler-merchant-httpd to be ready\n");
     cnt = 0;
     GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null", merchant_uri);
-  
+
     do
       {
         fprintf (stderr, ".");
@@ -1550,7 +1549,7 @@ run (void *cls,
                                   SIGKILL);
           GNUNET_OS_process_wait (exchanged);
           GNUNET_OS_process_destroy (exchanged);
-  
+
           GNUNET_SCHEDULER_shutdown ();
           return;
         }
@@ -1559,8 +1558,7 @@ run (void *cls,
     fprintf (stderr, "\n");
     GNUNET_free (wget_cmd);
   }
-  /* must always be updated with the # of cmds the interpreter has*/
-  ncmds = 13;
+
   struct Command commands[] =
   {
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
@@ -1629,7 +1627,7 @@ run (void *cls,
       .details.proposal.amount = concat_amount (currency, "5.0") },
 
     { .oc = OC_PAY,
-      .label = "deposit-simple",
+      .label = "deposit-simple-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-1",
       .details.pay.coin_ref = "withdraw-coin-1",
@@ -1637,7 +1635,7 @@ run (void *cls,
       .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
 
     { .oc = OC_PAY,
-      .label = "deposit-simple",
+      .label = "deposit-simple-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-2",
       .details.pay.coin_ref = "withdraw-coin-2",
@@ -1645,7 +1643,7 @@ run (void *cls,
       .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
 
     { .oc = OC_PAY,
-      .label = "deposit-simple",
+      .label = "deposit-simple-3",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-3",
       .details.pay.coin_ref = "withdraw-coin-3",
@@ -1658,8 +1656,10 @@ run (void *cls,
 
 
   is = GNUNET_new (struct InterpreterState);
-  is->commands = GNUNET_malloc (sizeof (struct Command) * ncmds);
-  memcpy (is->commands, commands, sizeof (struct Command) * ncmds);
+  is->commands = GNUNET_malloc (sizeof (commands));
+  memcpy (is->commands,
+          commands,
+          sizeof (commands));
 
   ctx = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
                           &rc);
@@ -1667,17 +1667,18 @@ run (void *cls,
   rc = GNUNET_CURL_gnunet_rc_create (ctx);
   exchange = TALER_EXCHANGE_connect (ctx,
                                      exchange_uri,
-                                     &cert_cb, is,
+                                     &cert_cb,
+                                     is,
                                      TALER_EXCHANGE_OPTION_END);
   GNUNET_assert (NULL != exchange);
   timeout_task
     = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply
                                     (GNUNET_TIME_UNIT_SECONDS, 150),
                                     &do_timeout, NULL);
-  GNUNET_SCHEDULER_add_shutdown (&do_shutdown, is);
-
-
+  GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
+                                 is);
 }
+
 
 int
 main (int argc,
