@@ -1686,7 +1686,7 @@ main (int argc,
 {
   struct GNUNET_SIGNAL_Context *shc_chld;
 
-  GNUNET_log_setup ("merchant-create-payments",
+  GNUNET_log_setup ("taler-merchant-create-payments",
                     "DEBUG",
                     NULL);
 
