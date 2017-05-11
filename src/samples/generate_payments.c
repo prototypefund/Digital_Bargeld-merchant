@@ -1238,8 +1238,6 @@ do_shutdown (void *cls)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd;
-  unsigned int i;
-
 
   if (NULL != timeout_task)
   {
@@ -1247,7 +1245,7 @@ do_shutdown (void *cls)
     timeout_task = NULL;
   }
 
-  for (i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
+  for (unsigned int i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
     switch (cmd->oc)
     {
       case OC_END:
@@ -1685,11 +1683,6 @@ main (int argc,
       char *argv[])
 {
   struct GNUNET_SIGNAL_Context *shc_chld;
-
-  GNUNET_log_setup ("taler-merchant-create-payments",
-                    "DEBUG",
-                    NULL);
-
   struct GNUNET_GETOPT_CommandLineOption options[] = {
     GNUNET_GETOPT_option_uint ('n',
                                "times",
@@ -1709,9 +1702,12 @@ main (int argc,
 
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
-
+  GNUNET_log_setup ("taler-merchant-generate-payments",
+                    "DEBUG",
+                    NULL);
   result = GNUNET_SYSERR;
-  sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO, GNUNET_NO, GNUNET_NO);
+  sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO,
+                              GNUNET_NO, GNUNET_NO);
   GNUNET_assert (NULL != sigpipe);
   shc_chld = GNUNET_SIGNAL_handler_install (GNUNET_SIGCHLD,
                                             &sighandler_child_death);
@@ -1719,7 +1715,8 @@ main (int argc,
       GNUNET_PROGRAM_run (argc, argv,
                           "taler-merchant-generate-payments",
                           "Populates DB with fake payments",
-                          options, &run, NULL))
+                          options,
+                          &run, NULL))
     return 77;
 
 
