@@ -195,7 +195,7 @@ parse_auditors (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Loaded key data of auditor `%s' (%s)\n",
               auditor.name,
-              TALER_B2S (&auditors[j].public_key);
+              TALER_B2S (&auditor.public_key));
   GNUNET_free (pks);
   GNUNET_array_append (auditors,
                        nauditors,
