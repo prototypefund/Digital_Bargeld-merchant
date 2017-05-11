@@ -105,16 +105,16 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
                        &auditors[j].public_key,
                        sizeof (struct TALER_AuditorPublicKeyP)))
       {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+        GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                     "Found supported auditor `%s' (%s)\n",
                     auditors[j].name,
                     TALER_B2S (&auditors[j].public_key));
 
       }
+      for (unsigned int k=0;j<ai->num_denom_keys;k++)
+        if (ai->denom_keys[k] == dk)
+          return GNUNET_OK;
     }
-    for (unsigned int j=0;j<ai->num_denom_keys;j++)
-      if (ai->denom_keys[j] == dk)
-        return GNUNET_OK;
   }
   GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
               "Denomination key %s offered by client not audited by any accepted auditor\n",
@@ -193,8 +193,9 @@ parse_auditors (void *cls,
     return;
   }
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Loaded key data of auditor `%s'\n",
-              auditor.name);
+              "Loaded key data of auditor `%s' (%s)\n",
+              auditor.name,
+              TALER_B2S (&auditors[j].public_key);
   GNUNET_free (pks);
   GNUNET_array_append (auditors,
                        nauditors,
