@@ -553,7 +553,6 @@ process_pay_with_exchange (void *cls,
   struct TALER_Amount wire_fee_delta;
   struct TALER_Amount wire_fee_customer_contribution;
   const struct TALER_EXCHANGE_Keys *keys;
-  unsigned int i;
 
   pc->fo = NULL;
   if (NULL == mh)
@@ -580,7 +579,7 @@ process_pay_with_exchange (void *cls,
   }
 
   /* Total up the fees and the value of the deposited coins! */
-  for (i=0;i<pc->coins_cnt;i++)
+  for (unsigned int i=0;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
     const struct TALER_EXCHANGE_DenomPublicKey *denom_details;
@@ -784,7 +783,7 @@ process_pay_with_exchange (void *cls,
               "Exchange and fee structure OK. Initiating deposit operation for coins\n");
 
   /* Initiate /deposit operation for all coins */
-  for (i=0;i<pc->coins_cnt;i++)
+  for (unsigned int i=0;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
 

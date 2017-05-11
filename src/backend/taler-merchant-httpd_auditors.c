@@ -79,8 +79,6 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
 {
   const struct TALER_EXCHANGE_Keys *keys;
   const struct TALER_EXCHANGE_AuditorInformation *ai;
-  unsigned int i;
-  unsigned int j;
 
   if (0 == GNUNET_TIME_absolute_get_remaining (dk->expire_deposit).rel_value_us)
   {
@@ -98,15 +96,28 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
-  for (i=0;i<keys->num_auditors;i++)
+  for (unsigned int i=0;i<keys->num_auditors;i++)
   {
     ai = &keys->auditors[i];
-    for (j=0;j<ai->num_denom_keys;j++)
+    for (unsigned int j=0;j<nauditors;j++)
+    {
+      if (0 == memcmp (&ai->auditor_pub,
+                       &auditors[j].public_key,
+                       sizeof (struct TALER_AuditorPublicKeyP)))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Found supported auditor `%s' (%s)\n",
+                    auditors[j].name,
+                    TALER_B2S (&auditors[j].public_key));
+
+      }
+    }
+    for (unsigned int j=0;j<ai->num_denom_keys;j++)
       if (ai->denom_keys[j] == dk)
         return GNUNET_OK;
   }
   GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-              "Denomination key %s offered by client not audited by accepted auditor\n",
+              "Denomination key %s offered by client not audited by any accepted auditor\n",
               GNUNET_h2s (&dk->h_key));
   return GNUNET_NO;
 }
@@ -181,6 +192,9 @@ parse_auditors (void *cls,
     GNUNET_free (pks);
     return;
   }
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Loaded key data of auditor `%s'\n",
+              auditor.name);
   GNUNET_free (pks);
   GNUNET_array_append (auditors,
                        nauditors,
@@ -198,15 +212,13 @@ parse_auditors (void *cls,
 int
 TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
-  unsigned int cnt;
-
   GNUNET_CONFIGURATION_iterate_sections (cfg,
                                          &parse_auditors,
                                          (void *) cfg);
 
   /* Generate preferred exchange(s) array. */
   j_auditors = json_array ();
-  for (cnt = 0; cnt < nauditors; cnt++)
+  for (unsigned int cnt = 0; cnt < nauditors; cnt++)
     GNUNET_assert (0 ==
                    json_array_append_new (j_auditors,
                                           json_pack ("{s:s, s:o, s:s}",
@@ -223,11 +235,9 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 void
 TMH_AUDITORS_done ()
 {
-  unsigned int i;
-
   json_decref (j_auditors);
   j_auditors = NULL;
-  for (i=0;i<nauditors;i++)
+  for (unsigned int i=0;i<nauditors;i++)
   {
     GNUNET_free (auditors[i].name);
     GNUNET_free (auditors[i].uri);
