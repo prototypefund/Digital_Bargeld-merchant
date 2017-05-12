@@ -335,6 +335,12 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
     }
     TALER_amount_hton (&dr.deposit_fee,
 		       &fee);
+    {
+      TALER_LOG_DEBUG ("... amount_with_fee was %s\n",
+                       TALER_amount2s (&coin->amount_with_fee));
+      TALER_LOG_DEBUG ("... fee was %s\n",
+                       TALER_amount2s (&fee));
+    }
 
     GNUNET_CRYPTO_eddsa_sign (&coin->coin_priv.eddsa_priv,
 			      &dr.purpose,

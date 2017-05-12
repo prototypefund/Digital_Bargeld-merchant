@@ -1109,7 +1109,8 @@ run (void *cls,
                           MHD_OPTION_END);
   if (NULL == mhd)
   {
-    GNUNET_break (0);
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to launch HTTP service, exiting.\n");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
