@@ -448,6 +448,11 @@ process_find_operations (struct Exchange *exchange)
             wire_fee,
             exchange->trusted);
     GNUNET_free_non_null (fo->wire_method);
+    if (NULL != fo->at)
+    {
+      GNUNET_SCHEDULER_cancel (fo->at);
+      fo->at = NULL;
+    }
     GNUNET_free (fo);
   }
   return need_wire;
@@ -522,6 +527,11 @@ handle_wire_data (void *cls,
               NULL,
               GNUNET_NO);
       GNUNET_free_non_null (fo->wire_method);
+      if (NULL != fo->at)
+      {
+        GNUNET_SCHEDULER_cancel (fo->at);
+        fo->at = NULL;
+      }
       GNUNET_free (fo);
     }
     return;
@@ -647,6 +657,7 @@ return_result (void *cls)
   struct TMH_EXCHANGES_FindOperation *fo = cls;
   struct Exchange *exchange = fo->my_exchange;
 
+  fo->at = NULL;
   if ( (GNUNET_YES ==
         process_find_operations (exchange)) &&
        (NULL == exchange->wire_request) &&
@@ -742,6 +753,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   {
     /* We are not currently waiting for a reply, immediately
        return result */
+    GNUNET_assert (NULL == fo->at);
     fo->at = GNUNET_SCHEDULER_add_now (&return_result,
                                        fo);
     return fo;
