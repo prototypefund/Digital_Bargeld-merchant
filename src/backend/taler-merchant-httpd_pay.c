@@ -119,6 +119,16 @@ struct PayContext
   struct TM_HandlerContext hc;
 
   /**
+   * Stored in a DLL.
+   */
+  struct PayContext *next;
+
+  /**
+   * Stored in a DLL.
+   */
+  struct PayContext *prev;
+
+  /**
    * Array with @e coins_cnt coins we are despositing.
    */
   struct DepositConfirmation *dc;
@@ -127,6 +137,29 @@ struct PayContext
    * MHD connection to return to
    */
   struct MHD_Connection *connection;
+
+  /**
+   * Instance of the payment's instance (in JSON format)
+   */
+  struct MerchantInstance *mi;
+
+  /**
+   * Proposal data for the proposal that is being
+   * payed for in this context.
+   */
+  json_t *proposal_data;
+
+  /**
+   * Task called when the (suspended) processing for
+   * the /pay request times out.
+   * Happens when we don't get a response from the exchange.
+   */
+  struct GNUNET_SCHEDULER_Task *timeout_task;
+
+  /**
+   * Response to return, NULL if we don't have one yet.
+   */
+  struct MHD_Response *response;
 
   /**
    * Handle to the exchange that we are doing the payment with.
@@ -157,6 +190,17 @@ struct PayContext
   const char *order_id;
 
   /**
+   * Hashed proposal.
+   */
+  struct GNUNET_HashCode h_proposal_data;
+
+  /**
+   * "H_wire" from @e proposal_data.  Used to identify the instance's
+   * wire transfer method.
+   */
+  struct GNUNET_HashCode h_wire;
+
+  /**
    * Maximum fee the merchant is willing to pay, from @e root.
    * Note that IF the total fee of the exchange is higher, that is
    * acceptable to the merchant if the customer is willing to
@@ -184,19 +228,17 @@ struct PayContext
   struct TALER_Amount max_wire_fee;
 
   /**
-   * Number of transactions that the wire fees are expected to be
-   * amortized over.  Never zero, defaults (conservateively) to 1.
-   * May be higher if merchants expect many small transactions to
-   * be aggregated and thus wire fees to be reasonably amortized
-   * due to aggregation.
-   */
-  uint32_t wire_fee_amortization;
-
-  /**
    * Amount from @e root.  This is the amount the merchant expects
    * to make, minus @e max_fee.
    */
   struct TALER_Amount amount;
+
+  /**
+   * Wire transfer deadline. How soon would the merchant like the
+   * wire transfer to be executed? (Can be given by the frontend
+   * or be determined by our configuration via #wire_transfer_delay.)
+   */
+  struct GNUNET_TIME_Absolute wire_transfer_deadline;
 
   /**
    * Timestamp from @e proposal_data.
@@ -214,27 +256,13 @@ struct PayContext
   struct GNUNET_TIME_Absolute pay_deadline;
 
   /**
-   * Hashed proposal.
+   * Number of transactions that the wire fees are expected to be
+   * amortized over.  Never zero, defaults (conservateively) to 1.
+   * May be higher if merchants expect many small transactions to
+   * be aggregated and thus wire fees to be reasonably amortized
+   * due to aggregation.
    */
-  struct GNUNET_HashCode h_proposal_data;
-
-  /**
-   * "H_wire" from @e proposal_data.  Used to identify the instance's
-   * wire transfer method.
-   */
-  struct GNUNET_HashCode h_wire;
-
-  /**
-   * Wire transfer deadline. How soon would the merchant like the
-   * wire transfer to be executed? (Can be given by the frontend
-   * or be determined by our configuration via #wire_transfer_delay.)
-   */
-  struct GNUNET_TIME_Absolute wire_transfer_deadline;
-
-  /**
-   * Response to return, NULL if we don't have one yet.
-   */
-  struct MHD_Response *response;
+  uint32_t wire_fee_amortization;
 
   /**
    * Number of coins this payment is made of.  Length
@@ -257,13 +285,6 @@ struct PayContext
   unsigned int response_code;
 
   /**
-   * Task called when the (suspended) processing for
-   * the /pay request times out.
-   * Happens when we don't get a response from the exchange.
-   */
-  struct GNUNET_SCHEDULER_Task *timeout_task;
-
-  /**
    * #GNUNET_NO if the transaction is not in our database,
    * #GNUNET_YES if the transaction is known to our database,
    * #GNUNET_SYSERR if the transaction ID is used for a different
@@ -272,17 +293,42 @@ struct PayContext
   int transaction_exists;
 
   /**
-   * Instance of the payment's instance (in JSON format)
+   * #GNUNET_NO if the @e connection was not suspended,
+   * #GNUNET_YES if the @e connection was suspended,
+   * #GNUNET_SYSERR if @e connection was resumed to as
+   * part of #MH_force_pc_resume during shutdown.
    */
-  struct MerchantInstance *mi;
-
-  /**
-   * Proposal data for the proposal that is being
-   * payed for in this context.
-   */
-  json_t *proposal_data;
-
+  int suspended;
 };
+
+
+/**
+ * Head of active pay context DLL.
+ */
+static struct PayContext *pc_head;
+
+/**
+ * Tail of active pay context DLL.
+ */
+static struct PayContext *pc_tail;
+
+
+/**
+ * Force all pay contexts to be resumed as we are about
+ * to shut down MHD.
+ */
+void
+MH_force_pc_resume ()
+{
+  for (struct PayContext *pc = pc_head; NULL != pc; pc = pc->next)
+  {
+    if (GNUNET_YES == pc->suspended)
+    {
+      pc->suspended = GNUNET_SYSERR;
+      MHD_resume_connection (pc->connection);
+    }
+  }
+}
 
 
 /**
@@ -309,6 +355,8 @@ resume_pay_with_response (struct PayContext *pc,
     GNUNET_SCHEDULER_cancel (pc->timeout_task);
     pc->timeout_task = NULL;
   }
+  GNUNET_assert (GNUNET_YES == pc->suspended);
+  pc->suspended = GNUNET_NO;
   MHD_resume_connection (pc->connection);
   TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
@@ -479,16 +527,14 @@ static void
 pay_context_cleanup (struct TM_HandlerContext *hc)
 {
   struct PayContext *pc = (struct PayContext *) hc;
-  unsigned int i;
 
   if (NULL != pc->timeout_task)
   {
     GNUNET_SCHEDULER_cancel (pc->timeout_task);
     pc->timeout_task = NULL;
   }
-
   TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
-  for (i=0;i<pc->coins_cnt;i++)
+  for (unsigned int i=0;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
 
@@ -529,6 +575,9 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
     json_decref (pc->proposal_data);
     pc->proposal_data = NULL;
   }
+  GNUNET_CONTAINER_DLL_remove (pc_head,
+                               pc_tail,
+                               pc);
   GNUNET_free (pc);
 }
 
@@ -1262,12 +1311,11 @@ handler_pay_json (struct MHD_Connection *connection,
   {
     struct MHD_Response *resp;
     int ret;
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Payment succeeded in the past; take short cut"
-                " and accept immediately.\n");
 
     /* Payment succeeded in the past; take short cut
        and accept immediately */
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Payment succeeded in the past; taking short cut");
     resp = MHD_create_response_from_buffer (0,
 					    NULL,
 					    MHD_RESPMEM_PERSISTENT);
@@ -1300,6 +1348,7 @@ handler_pay_json (struct MHD_Connection *connection,
   if (GNUNET_NO == pc->transaction_exists)
   {
     struct GNUNET_TIME_Absolute now;
+
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Dealing with new transaction '%s'\n",
                 GNUNET_h2s (&pc->h_proposal_data));
@@ -1309,12 +1358,11 @@ handler_pay_json (struct MHD_Connection *connection,
     {
       /* Time expired, we don't accept this payment now! */
       const char *pd_str;
-      pd_str = GNUNET_STRINGS_absolute_time_to_string (pc->pay_deadline);
 
+      pd_str = GNUNET_STRINGS_absolute_time_to_string (pc->pay_deadline);
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Attempt to get coins for expired contract. Deadline: '%s'\n",
 		  pd_str);
-
       return TMH_RESPONSE_reply_bad_request (connection,
 					     TALER_EC_PAY_OFFER_EXPIRED,
                                              "The time to pay for this contract has expired.");
@@ -1341,6 +1389,7 @@ handler_pay_json (struct MHD_Connection *connection,
   }
 
   MHD_suspend_connection (connection);
+  pc->suspended = GNUNET_YES;
 
   /* Find the responsible exchange, this may take a while... */
   pc->fo = TMH_EXCHANGES_find_exchange (pc->chosen_exchange,
@@ -1390,6 +1439,9 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if (NULL == *connection_cls)
   {
     pc = GNUNET_new (struct PayContext);
+    GNUNET_CONTAINER_DLL_insert (pc_head,
+                                 pc_tail,
+                                 pc);
     pc->hc.cc = &pay_context_cleanup;
     pc->connection = connection;
     *connection_cls = pc;

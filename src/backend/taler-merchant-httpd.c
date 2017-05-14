@@ -286,10 +286,7 @@ do_shutdown (void *cls)
     GNUNET_SCHEDULER_cancel (mhd_task);
     mhd_task = NULL;
   }
-  /* FIXME: MHD API requires us to resume all suspended
-     connections before we do this, but /pay currently
-     suspends connections without giving us a way to
-     enumerate / resume them... */
+  MH_force_pc_resume ();
   if (NULL != mhd)
   {
     MHD_stop_daemon (mhd);

@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015 GNUnet e.V.
+  (C) 2014-2017 GNUnet e.V.
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -22,6 +22,15 @@
 #define TALER_EXCHANGE_HTTPD_PAY_H
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
+
+
+/**
+ * Force all pay contexts to be resumed as we are about
+ * to shut down MHD.
+ */
+void
+MH_force_pc_resume (void);
+
 
 /**
  * Manage a payment
