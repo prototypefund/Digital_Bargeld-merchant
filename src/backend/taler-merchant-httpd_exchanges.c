@@ -596,6 +596,7 @@ keys_mgmt_cb (void *cls,
   struct Exchange *exchange = cls;
   struct GNUNET_TIME_Absolute expire;
   struct GNUNET_TIME_Relative delay;
+
   if (NULL == keys)
   {
     exchange->pending = GNUNET_YES;
@@ -777,8 +778,6 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
     exchange->wire_task = GNUNET_SCHEDULER_add_now (&wire_task_cb,
                                                     exchange);
   }
-
-
   return fo;
 }
 
