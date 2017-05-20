@@ -759,7 +759,7 @@ layout:
 # being tested accpets this exchange.
 # If the sysadmin wants, she can also install a local exchange
 # and test against it.
-exchange = https://exchange.test.taler.net/
+exchange = https://exchange.demo.taler.net/
 
 # This value must indicate some URL where the backend
 # to be tested is listening; it doesn't have to be the
@@ -768,9 +768,9 @@ merchant = http://localbackend/
 
 # This value is used when the tool tries to withdraw coins,
 # and must match the bank used by the exchange. If the test is
-# done against the exchange at https://exchange.test.taler.net/,
-# then this value can be "https://bank.test.taler.net/".
-bank = https://bank.test.taler.net/
+# done against the exchange at https://exchange.demo.taler.net/,
+# then this value can be "https://bank.demo.taler.net/".
+bank = https://bank.demo.taler.net/
 
 # The merchant instance in charge of serving the payment.
 # Make sure this instance has a bank account at the same bank
@@ -779,7 +779,7 @@ instance = default
 
 # The currency used during the test. Must match the one used
 # by merchant backend and exchange.
-currency = PUDOS
+currency = KUDOS
 @end example
 
 Run the test in the following way:
