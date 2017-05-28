@@ -127,7 +127,7 @@ struct TrackTransferContext
 
 /**
  * Represents an entry in the table used to sum up
- * individual deposits for each h_proposal_data.
+ * individual deposits for each h_contract_terms.
  */
 struct Entry {
   /**
@@ -217,11 +217,11 @@ build_deposits_response (void *cls,
   struct TrackTransferContext *rctx = cls;
   json_t *element;
   struct Entry *entry = value;
-  json_t *proposal_data;
+  json_t *contract_terms;
   json_t *order_id;
 
-  if (GNUNET_OK != db->find_proposal_data_from_hash (db->cls,
-                                                     &proposal_data,
+  if (GNUNET_OK != db->find_contract_terms_from_hash (db->cls,
+                                                     &contract_terms,
                                                      key,
                                                      &rctx->mi->pubkey))
   {
@@ -229,7 +229,7 @@ build_deposits_response (void *cls,
     return GNUNET_NO;
   }
 
-  order_id = json_object_get (proposal_data, "order_id");
+  order_id = json_object_get (contract_terms, "order_id");
 
   element = json_pack ("{s:s, s:o, s:o}",
                        "order_id", json_string_value (order_id),
@@ -273,7 +273,7 @@ transform_response (const json_t *result, struct TrackTransferContext *rctx)
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("deposit_value", &iter_value),
     TALER_JSON_spec_amount ("deposit_fee", &iter_fee),
-    GNUNET_JSON_spec_string ("h_proposal_data", &key),
+    GNUNET_JSON_spec_string ("h_contract_terms", &key),
     GNUNET_JSON_spec_end ()
   };
   
@@ -295,7 +295,7 @@ transform_response (const json_t *result, struct TrackTransferContext *rctx)
 
     if (NULL != (current_entry = GNUNET_CONTAINER_multihashmap_get (map, (const struct GNUNET_HashCode *) &h_key)))
     {
-      /*The map already knows this h_proposal_data*/
+      /*The map already knows this h_contract_terms*/
       if ((GNUNET_SYSERR == TALER_amount_add (&current_entry->deposit_value,
                                              &current_entry->deposit_value,
                                              &iter_value)) ||
@@ -306,7 +306,7 @@ transform_response (const json_t *result, struct TrackTransferContext *rctx)
     }
     else
     {
-      /*First time in the map for this h_proposal_data*/
+      /*First time in the map for this h_contract_terms*/
       current_entry = GNUNET_malloc (sizeof (struct Entry));
       memcpy (&current_entry->deposit_value, &iter_value, sizeof (struct TALER_Amount));
       memcpy (&current_entry->deposit_fee, &iter_fee, sizeof (struct TALER_Amount));
@@ -398,7 +398,7 @@ track_transfer_cleanup (struct TM_HandlerContext *hc)
  */
 static void
 check_transfer (void *cls,
-                const struct GNUNET_HashCode *h_proposal_data,
+                const struct GNUNET_HashCode *h_contract_terms,
                 const struct TALER_CoinSpendPublicKeyP *coin_pub,
                 const struct TALER_Amount *amount_with_fee,
                 const struct TALER_Amount *deposit_fee,
@@ -427,7 +427,7 @@ check_transfer (void *cls,
                                      "conflict_offset", (json_int_t) rctx->current_offset,
                                      "exchange_transfer_proof", rctx->original_response,
                                      "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
-                                     "h_proposal_data", GNUNET_JSON_from_data_auto (&ttd->h_proposal_data),
+                                     "h_contract_terms", GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
                                      "amount_with_fee", TALER_JSON_from_amount (amount_with_fee),
                                      "deposit_fee", TALER_JSON_from_amount (deposit_fee));
     return;
@@ -514,7 +514,7 @@ wire_transfer_cb (void *cls,
     rctx->current_detail = &details[i];
     rctx->check_transfer_result = GNUNET_NO;
     ret = db->find_payments_by_hash_and_coin (db->cls,
-                                              &details[i].h_proposal_data,
+                                              &details[i].h_contract_terms,
                                               &rctx->mi->pubkey,
                                               &details[i].coin_pub,
                                               &check_transfer,
@@ -570,7 +570,7 @@ wire_transfer_cb (void *cls,
     /* Response is consistent with the /deposit we made, remember
        it for future reference */
     ret = db->store_coin_to_transfer (db->cls,
-                                      &details[i].h_proposal_data,
+                                      &details[i].h_contract_terms,
                                       &details[i].coin_pub,
                                       &rctx->wtid);
     if (GNUNET_OK != ret)

@@ -72,19 +72,19 @@ const char *order_id;
 
 /**
  * Transaction ID used to test the db query
- * `find_proposal_data_by_date_and_range_future`
+ * `find_contract_terms_by_date_and_range_future`
  */
 const char *order_id_future;
 
 /**
  * Proposal's hash
  */
-struct GNUNET_HashCode h_proposal_data;
+struct GNUNET_HashCode h_contract_terms;
 
 /**
  * Proposal's hash.
  */
-struct GNUNET_HashCode h_proposal_data2;
+struct GNUNET_HashCode h_contract_terms2;
 
 /**
  * Time of the transaction.
@@ -150,7 +150,7 @@ static json_t *contract;
 /**
  * Mock proposal data, not need to be well-formed
  */
-static json_t *proposal_data;
+static json_t *contract_terms;
 
 
 
@@ -170,7 +170,7 @@ static void
 transaction_cb (void *cls,
 		const struct TALER_MerchantPublicKeyP *amerchant_pub,
                 const char *aexchange_uri,
-                const struct GNUNET_HashCode *ah_proposal_data,
+                const struct GNUNET_HashCode *ah_contract_terms,
                 const struct GNUNET_HashCode *ah_wire,
                 struct GNUNET_TIME_Absolute atimestamp,
                 struct GNUNET_TIME_Absolute arefund_deadline,
@@ -180,8 +180,8 @@ transaction_cb (void *cls,
   CHECK (0 == memcmp (amerchant_pub,
                       &merchant_pub,
 		      sizeof (struct TALER_MerchantPublicKeyP)));
-  CHECK (0 == memcmp (ah_proposal_data,
-                      &h_proposal_data,
+  CHECK (0 == memcmp (ah_contract_terms,
+                      &h_contract_terms,
                       sizeof (struct GNUNET_HashCode)));
   CHECK (0 == strcmp (aexchange_uri,
                       EXCHANGE_URI));
@@ -195,18 +195,18 @@ transaction_cb (void *cls,
 }
 
 /**
- * Callback for `find_proposal_data_by_date`.
+ * Callback for `find_contract_terms_by_date`.
  *
  * @param cls closure
  * @param order_id order id
  * @param row_id row id in db
- * @param proposal_data proposal data
+ * @param contract_terms proposal data
  */
 static void
 pd_cb (void *cls,
        const char *order_id,
        uint64_t row_id,
-       const json_t *proposal_data)
+       const json_t *contract_terms)
 {
   return;
 }
@@ -223,14 +223,14 @@ pd_cb (void *cls,
  */
 static void
 deposit_cb (void *cls,
-            const struct GNUNET_HashCode *ah_proposal_data,
+            const struct GNUNET_HashCode *ah_contract_terms,
             const struct TALER_CoinSpendPublicKeyP *acoin_pub,
             const struct TALER_Amount *aamount_with_fee,
             const struct TALER_Amount *adeposit_fee,
             const json_t *aexchange_proof)
 {
-  CHECK ((0 == memcmp (ah_proposal_data,
-                       &h_proposal_data,
+  CHECK ((0 == memcmp (ah_contract_terms,
+                       &h_contract_terms,
                        sizeof (struct GNUNET_HashCode))));
   CHECK (0 == memcmp (acoin_pub,
                       &coin_pub,
@@ -263,14 +263,14 @@ deposit_cb (void *cls,
  */
 static void
 transfer_cb (void *cls,
-             const struct GNUNET_HashCode *ah_proposal_data,
+             const struct GNUNET_HashCode *ah_contract_terms,
              const struct TALER_CoinSpendPublicKeyP *acoin_pub,
              const struct TALER_WireTransferIdentifierRawP *awtid,
              struct GNUNET_TIME_Absolute execution_time,
              const json_t *exchange_proof)
 {
-  CHECK (0 == memcmp (ah_proposal_data,
-                      &h_proposal_data,
+  CHECK (0 == memcmp (ah_contract_terms,
+                      &h_contract_terms,
                       sizeof (struct GNUNET_HashCode)));
 
   CHECK (0 == memcmp (acoin_pub,
@@ -330,7 +330,7 @@ run (void *cls)
 
   /* Prepare data for 'store_payment()' */
   RND_BLK (&h_wire);
-  RND_BLK (&h_proposal_data);
+  RND_BLK (&h_contract_terms);
   order_id = "test_ID";
   order_id_future = "test_ID_future";
   RND_BLK (&signkey_pub);
@@ -360,40 +360,40 @@ run (void *cls)
                                       "test",
                                       json_string ("backenddb test B")));
   contract = json_object ();
-  proposal_data = json_object ();
+  contract_terms = json_object ();
 
-  TALER_JSON_hash (proposal_data,
-                   &h_proposal_data2);
+  TALER_JSON_hash (contract_terms,
+                   &h_contract_terms2);
 
   FAILIF (GNUNET_OK !=
-          plugin->insert_proposal_data (plugin->cls,
+          plugin->insert_contract_terms (plugin->cls,
                                         order_id,
                                         &merchant_pub,
                                         timestamp,
-                                        proposal_data));
+                                        contract_terms));
 
   json_t *out;
 
   FAILIF (GNUNET_OK !=
-          plugin->find_proposal_data (plugin->cls,
+          plugin->find_contract_terms (plugin->cls,
                                       &out,
                                       order_id,
                                       &merchant_pub));
 
   FAILIF (GNUNET_OK !=
-          plugin->find_proposal_data_history (plugin->cls,
+          plugin->find_contract_terms_history (plugin->cls,
                                               order_id,
                                               &merchant_pub,
                                               pd_cb,
                                               NULL));
 
   FAILIF (GNUNET_OK !=
-          plugin->find_proposal_data_from_hash (plugin->cls,
+          plugin->find_contract_terms_from_hash (plugin->cls,
                                                 &out,
-                                                &h_proposal_data2,
+                                                &h_contract_terms2,
                                                 &merchant_pub));
   FAILIF (1 !=
-          plugin->find_proposal_data_by_date_and_range (plugin->cls,
+          plugin->find_contract_terms_by_date_and_range (plugin->cls,
                                                         fake_now,
                                                         &merchant_pub,
                                                         2,
@@ -405,16 +405,16 @@ run (void *cls)
   GNUNET_TIME_round_abs (&timestamp);
 
   FAILIF (GNUNET_OK !=
-          plugin->insert_proposal_data (plugin->cls,
+          plugin->insert_contract_terms (plugin->cls,
                                         order_id_future,
                                         &merchant_pub,
                                         timestamp,
-                                        proposal_data));
+                                        contract_terms));
 
   fake_now = GNUNET_TIME_absolute_subtract (timestamp, delta);
 
   FAILIF (2 !=
-          plugin->find_proposal_data_by_date_and_range (plugin->cls,
+          plugin->find_contract_terms_by_date_and_range (plugin->cls,
                                                         fake_now,
                                                         &merchant_pub,
                                                         0,
@@ -424,7 +424,7 @@ run (void *cls)
                                                         NULL));
 
   FAILIF (0 !=
-          plugin->find_proposal_data_by_date (plugin->cls,
+          plugin->find_contract_terms_by_date (plugin->cls,
                                               fake_now,
                                               &merchant_pub,
                                               1,
@@ -433,7 +433,7 @@ run (void *cls)
 
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,
-                                     &h_proposal_data,
+                                     &h_contract_terms,
 				     &merchant_pub,
                                      EXCHANGE_URI,
                                      &h_wire,
@@ -442,7 +442,7 @@ run (void *cls)
                                      &amount_with_fee));
   FAILIF (GNUNET_OK !=
           plugin->store_deposit (plugin->cls,
-                                 &h_proposal_data,
+                                 &h_contract_terms,
 				 &merchant_pub,
                                  &coin_pub,
                                  &amount_with_fee,
@@ -451,7 +451,7 @@ run (void *cls)
                                  deposit_proof));
   FAILIF (GNUNET_OK !=
           plugin->store_coin_to_transfer (plugin->cls,
-                                          &h_proposal_data,
+                                          &h_contract_terms,
                                           &coin_pub,
                                           &wtid));
   FAILIF (GNUNET_OK !=
@@ -463,20 +463,20 @@ run (void *cls)
                                            transfer_proof));
   FAILIF (GNUNET_OK !=
           plugin->find_transaction (plugin->cls,
-                                    &h_proposal_data,
+                                    &h_contract_terms,
 				    &merchant_pub,
                                     &transaction_cb,
                                     NULL));
 
   FAILIF (GNUNET_OK !=
           plugin->find_payments (plugin->cls,
-                                 &h_proposal_data,
+                                 &h_contract_terms,
                                  &merchant_pub,
                                  &deposit_cb,
                                  NULL));
   FAILIF (GNUNET_OK !=
           plugin->find_transfers_by_hash (plugin->cls,
-                                        &h_proposal_data,
+                                        &h_contract_terms,
                                         &transfer_cb,
                                         NULL));
   FAILIF (GNUNET_OK !=

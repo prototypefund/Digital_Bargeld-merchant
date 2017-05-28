@@ -32,18 +32,18 @@ struct TALER_MERCHANTDB_Plugin;
 
 
 /**
- * Tipically called by `find_proposal_data_by_date`.
+ * Tipically called by `find_contract_terms_by_date`.
  *
  * @param cls closure
  * @param order_id order id
  * @param row_id serial numer of the transaction in the table,
- * @param proposal_data proposal data related to order id
+ * @param contract_terms proposal data related to order id
  */
  typedef void
  (*TALER_MERCHANTDB_ProposalDataCallback)(void *cls,
                                           const char *order_id,
                                           uint64_t row_id,
-                                          const json_t *proposal_data);
+                                          const json_t *contract_terms);
 
 /**
  * Function called with information about a transaction.
@@ -51,7 +51,7 @@ struct TALER_MERCHANTDB_Plugin;
  * @param cls closure
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
- * @param h_proposal_data proposal data's hashcode
+ * @param h_contract_terms proposal data's hashcode
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -61,7 +61,7 @@ typedef void
 (*TALER_MERCHANTDB_TransactionCallback)(void *cls,
 					const struct TALER_MerchantPublicKeyP *merchant_pub,
                                         const char *exchange_uri,
-                                        const struct GNUNET_HashCode *h_proposal_data,
+                                        const struct GNUNET_HashCode *h_contract_terms,
                                         const struct GNUNET_HashCode *h_wire,
                                         struct GNUNET_TIME_Absolute timestamp,
                                         struct GNUNET_TIME_Absolute refund,
@@ -72,7 +72,7 @@ typedef void
  * Function called with information about a coin that was deposited.
  *
  * @param cls closure
- * @param h_proposal_data proposal data's hashcode
+ * @param h_contract_terms proposal data's hashcode
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
@@ -81,7 +81,7 @@ typedef void
  */
 typedef void
 (*TALER_MERCHANTDB_CoinDepositCallback)(void *cls,
-                                        const struct GNUNET_HashCode *h_proposal_data,
+                                        const struct GNUNET_HashCode *h_contract_terms,
                                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                         const struct TALER_Amount *amount_with_fee,
                                         const struct TALER_Amount *deposit_fee,
@@ -91,13 +91,13 @@ typedef void
 /**
  * Information about the wire transfer corresponding to
  * a deposit operation.  Note that it is in theory possible
- * that we have a @a h_proposal_data and @a coin_pub in the
+ * that we have a @a h_contract_terms and @a coin_pub in the
  * result that do not match a deposit that we know about,
  * for example because someone else deposited funds into
  * our account.
  *
  * @param cls closure
- * @param h_proposal_data hashcode of the proposal data
+ * @param h_contract_terms hashcode of the proposal data
  * @param coin_pub public key of the coin
  * @param wtid identifier of the wire transfer in which the exchange
  *             send us the money for the coin deposit
@@ -107,7 +107,7 @@ typedef void
  */
 typedef void
 (*TALER_MERCHANTDB_TransferCallback)(void *cls,
-                                     const struct GNUNET_HashCode *h_proposal_data,
+                                     const struct GNUNET_HashCode *h_contract_terms,
                                      const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                      const struct TALER_WireTransferIdentifierRawP *wtid,
                                      struct GNUNET_TIME_Absolute execution_time,
@@ -169,29 +169,29 @@ struct TALER_MERCHANTDB_Plugin
    * @param order_id alphanumeric string that uniquely identifies the proposal
    * @param merchant_pub merchant's public key
    * @param timestamp timestamp of this proposal data
-   * @param proposal_data proposal data to store
+   * @param contract_terms proposal data to store
    * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
    */
   int
-  (*insert_proposal_data) (void *cls,
+  (*insert_contract_terms) (void *cls,
                            const char *order_id,
                            const struct TALER_MerchantPublicKeyP *merchant_pub,
                            struct GNUNET_TIME_Absolute timestamp,
-                           const json_t *proposal_data);
+                           const json_t *contract_terms);
 
   /**
    * Retrieve proposal data given its order ID.
    *
    * @param cls closure
-   * @param proposal_data where to store the result
+   * @param contract_terms where to store the result
    * @param order_id order_id used to lookup.
    * @param merchant_pub instance's public key.
    * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
    * found, #GNUNET_SYSERR upon error
    */
   int
-  (*find_proposal_data) (void *cls,
-                         json_t **proposal_data,
+  (*find_contract_terms) (void *cls,
+                         json_t **contract_terms,
                          const char *order_id,
                          const struct TALER_MerchantPublicKeyP *merchant_pub);
 
@@ -200,16 +200,16 @@ struct TALER_MERCHANTDB_Plugin
    * Retrieve proposal data given its hashcode
    *
    * @param cls closure
-   * @param proposal_data where to store the result
-   * @param h_proposal_data hashcode used to lookup.
+   * @param contract_terms where to store the result
+   * @param h_contract_terms hashcode used to lookup.
    * @param merchant_pub instance's public key.
    * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
    * found, #GNUNET_SYSERR upon error
    */
   int
-  (*find_proposal_data_from_hash) (void *cls,
-                                   json_t **proposal_data,
-                                   const struct GNUNET_HashCode *h_proposal_data,
+  (*find_contract_terms_from_hash) (void *cls,
+                                   json_t **contract_terms,
+                                   const struct GNUNET_HashCode *h_contract_terms,
                                    const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
@@ -233,7 +233,7 @@ struct TALER_MERCHANTDB_Plugin
    * @return numer of found tuples, #GNUNET_SYSERR upon error
    */
   int
-  (*find_proposal_data_by_date_and_range) (void *cls,
+  (*find_contract_terms_by_date_and_range) (void *cls,
                                            struct GNUNET_TIME_Absolute date,
                                            const struct TALER_MerchantPublicKeyP *merchant_pub,
                                            unsigned int start,
@@ -255,7 +255,7 @@ struct TALER_MERCHANTDB_Plugin
    * query being successful, unsuccessful, or generated errors.
    */
   int
-  (*find_proposal_data_history) (void *cls,
+  (*find_contract_terms_history) (void *cls,
                                  const char *order_id,
                                  const struct TALER_MerchantPublicKeyP *merchant_pub,
                                  TALER_MERCHANTDB_ProposalDataCallback cb,
@@ -276,7 +276,7 @@ struct TALER_MERCHANTDB_Plugin
    * @return numer of found tuples, #GNUNET_SYSERR upon error
    */
   int
-  (*find_proposal_data_by_date) (void *cls,
+  (*find_contract_terms_by_date) (void *cls,
                                  struct GNUNET_TIME_Absolute date,
                                  const struct TALER_MerchantPublicKeyP *merchant_pub,
                                  unsigned int nrows,
@@ -288,7 +288,7 @@ struct TALER_MERCHANTDB_Plugin
    * Insert transaction data into the database.
    *
    * @param cls closure
-   * @param h_proposal_data proposal data's hashcode
+   * @param h_contract_terms proposal data's hashcode
    * @param merchant_pub merchant's public key
    * @param exchange_uri URI of the exchange
    * @param h_wire hash of our wire details
@@ -299,7 +299,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*store_transaction) (void *cls,
-                        const struct GNUNET_HashCode *h_proposal_data,
+                        const struct GNUNET_HashCode *h_contract_terms,
 			const struct TALER_MerchantPublicKeyP *merchant_pub,
                         const char *exchange_uri,
                         const struct GNUNET_HashCode *h_wire,
@@ -312,7 +312,7 @@ struct TALER_MERCHANTDB_Plugin
    * Insert payment confirmation from the exchange into the database.
    *
    * @param cls closure
-   * @param h_proposal_data proposal data's hashcode
+   * @param h_contract_terms proposal data's hashcode
    * @param merchant_pub merchant's public key
    * @param coin_pub public key of the coin
    * @param amount_with_fee amount the exchange will deposit for this coin
@@ -323,7 +323,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*store_deposit) (void *cls,
-                    const struct GNUNET_HashCode *h_proposal_data,
+                    const struct GNUNET_HashCode *h_contract_terms,
                     const struct TALER_MerchantPublicKeyP *merchant_pub,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
                     const struct TALER_Amount *amount_with_fee,
@@ -333,11 +333,11 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Insert mapping of @a coin_pub and @a h_proposal_data to
+   * Insert mapping of @a coin_pub and @a h_contract_terms to
    * corresponding @a wtid.
    *
    * @param cls closure
-   * @param h_proposal_data proposal data's hashcode
+   * @param h_contract_terms proposal data's hashcode
    * @param coin_pub public key of the coin
    * @param wtid identifier of the wire transfer in which the exchange
    *             send us the money for the coin deposit
@@ -345,7 +345,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*store_coin_to_transfer) (void *cls,
-                             const struct GNUNET_HashCode *h_proposal_data,
+                             const struct GNUNET_HashCode *h_contract_terms,
                              const struct TALER_CoinSpendPublicKeyP *coin_pub,
                              const struct TALER_WireTransferIdentifierRawP *wtid);
 
@@ -390,7 +390,7 @@ struct TALER_MERCHANTDB_Plugin
    * Find information about a transaction.
    *
    * @param cls our plugin handle
-   * @param h_proposal_data proposal data's hashcode
+   * @param h_contract_terms proposal data's hashcode
    * @param merchant_pub merchant's public key.
    * @param cb function to call with transaction data
    * @param cb_cls closure for @a cb
@@ -398,7 +398,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*find_transaction) (void *cls,
-                       const struct GNUNET_HashCode *h_proposal_data,
+                       const struct GNUNET_HashCode *h_contract_terms,
 		       const struct TALER_MerchantPublicKeyP *merchant_pub,
                        TALER_MERCHANTDB_TransactionCallback cb,
                        void *cb_cls);
@@ -408,37 +408,37 @@ struct TALER_MERCHANTDB_Plugin
    * Lookup information about coin payments by proposal data's hashcode.
    *
    * @param cls closure
-   * @param h_proposal_data proposal data's hashcode
-   * @param merchant_pub merchant's public key. It's AND'd with @a h_proposal_data
+   * @param h_contract_terms proposal data's hashcode
+   * @param merchant_pub merchant's public key. It's AND'd with @a h_contract_terms
    *        in order to find the result.
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
   (*find_payments) (void *cls,
-                    const struct GNUNET_HashCode *h_proposal_data,
+                    const struct GNUNET_HashCode *h_contract_terms,
                     const struct TALER_MerchantPublicKeyP *merchant_pub,
                     TALER_MERCHANTDB_CoinDepositCallback cb,
                     void *cb_cls);
 
   /**
-   * Lookup information about coin payments by h_proposal_data and coin.
+   * Lookup information about coin payments by h_contract_terms and coin.
    *
    * @param cls closure
-   * @param h_proposal_data proposal data's hashcode
-   * @param merchant_pub merchant's public key. It's AND'd with @a h_proposal_data
+   * @param h_contract_terms proposal data's hashcode
+   * @param merchant_pub merchant's public key. It's AND'd with @a h_contract_terms
    *        in order to find the result.
    * @param coin_pub public key to use for the search
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
   (*find_payments_by_hash_and_coin) (void *cls,
-                                     const struct GNUNET_HashCode *h_proposal_data,
+                                     const struct GNUNET_HashCode *h_contract_terms,
                                      const struct TALER_MerchantPublicKeyP *merchant_pub,
                                      const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                      TALER_MERCHANTDB_CoinDepositCallback cb,
@@ -446,22 +446,22 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Lookup information about a transfer by @a h_proposal_data.  Note
+   * Lookup information about a transfer by @a h_contract_terms.  Note
    * that in theory there could be multiple wire transfers for a
-   * single @a h_proposal_data, as the transaction may have involved
+   * single @a h_contract_terms, as the transaction may have involved
    * multiple coins and the coins may be spread over different wire
    * transfers.
    *
    * @param cls closure
-   * @param h_proposal_data proposal data's hashcode
+   * @param h_contract_terms proposal data's hashcode
    * @param cb function to call with transfer data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
   (*find_transfers_by_hash) (void *cls,
-                             const struct GNUNET_HashCode *h_proposal_data,
+                             const struct GNUNET_HashCode *h_contract_terms,
                              TALER_MERCHANTDB_TransferCallback cb,
                              void *cb_cls);
 
@@ -473,7 +473,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param wtid wire transfer identifier to find matching transactions for
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int
@@ -491,7 +491,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param wtid wire transfer identifier for the search
    * @param cb function to call with proof data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_proposal_data is unknown,
+   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
    *         #GNUNET_SYSERR on hard errors
    */
   int

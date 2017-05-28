@@ -147,7 +147,7 @@ postgres_drop_tables (void *cls)
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_deposits;");
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_transactions;");
   PG_EXEC_INDEX (pg, "DROP TABLE merchant_proofs;");
-  PG_EXEC_INDEX (pg, "DROP TABLE merchant_proposal_data;");
+  PG_EXEC_INDEX (pg, "DROP TABLE merchant_contract_terms;");
   return GNUNET_OK;
 }
 
@@ -165,11 +165,11 @@ postgres_initialize (void *cls)
 
   /* Setup tables */
   PG_EXEC (pg,
-           "CREATE TABLE IF NOT EXISTS merchant_proposal_data ("
+           "CREATE TABLE IF NOT EXISTS merchant_contract_terms ("
            "order_id VARCHAR NOT NULL"
            ",merchant_pub BYTEA NOT NULL"
-           ",proposal_data BYTEA NOT NULL"
-           ",h_proposal_data BYTEA NOT NULL"
+           ",contract_terms BYTEA NOT NULL"
+           ",h_contract_terms BYTEA NOT NULL"
            ",timestamp INT8 NOT NULL"
            ",row_id BIGSERIAL"
 	   ",PRIMARY KEY (order_id, merchant_pub)"
@@ -177,7 +177,7 @@ postgres_initialize (void *cls)
 
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_transactions ("
-           " h_proposal_data BYTEA NOT NULL"
+           " h_contract_terms BYTEA NOT NULL"
            ",exchange_uri VARCHAR NOT NULL"
 	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
            ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
@@ -186,13 +186,13 @@ postgres_initialize (void *cls)
            ",total_amount_val INT8 NOT NULL"
            ",total_amount_frac INT4 NOT NULL"
            ",total_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
-	   ",PRIMARY KEY (h_proposal_data, merchant_pub)"
+	   ",PRIMARY KEY (h_contract_terms, merchant_pub)"
            ");");
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_deposits ("
-	   " h_proposal_data BYTEA NOT NULL"
+	   " h_contract_terms BYTEA NOT NULL"
 	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-	   ",FOREIGN KEY (h_proposal_data, merchant_pub) REFERENCES merchant_transactions (h_proposal_data, merchant_pub)"
+	   ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_transactions (h_contract_terms, merchant_pub)"
            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
            ",amount_with_fee_val INT8 NOT NULL"
            ",amount_with_fee_frac INT4 NOT NULL"
@@ -202,7 +202,7 @@ postgres_initialize (void *cls)
            ",deposit_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
            ",exchange_proof BYTEA NOT NULL"
-           ",PRIMARY KEY (h_proposal_data, coin_pub)"
+           ",PRIMARY KEY (h_contract_terms, coin_pub)"
            ");");
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_proofs ("
@@ -213,19 +213,19 @@ postgres_initialize (void *cls)
            ",proof BYTEA NOT NULL"
            ",PRIMARY KEY (wtid, exchange_uri)"
            ");");
-  /* Note that h_proposal_data + coin_pub may actually be unknown to
+  /* Note that h_contract_terms + coin_pub may actually be unknown to
      us, e.g. someone else deposits something for us at the exchange.
      Hence those cannot be foreign keys into deposits/transactions! */
   PG_EXEC (pg,
            "CREATE TABLE IF NOT EXISTS merchant_transfers ("
-           " h_proposal_data BYTEA NOT NULL"
+           " h_contract_terms BYTEA NOT NULL"
            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
            ",wtid BYTEA NOT NULL CHECK (LENGTH(wtid)=32)"
-           ",PRIMARY KEY (h_proposal_data, coin_pub)"
+           ",PRIMARY KEY (h_contract_terms, coin_pub)"
            ");");
   PG_EXEC_INDEX (pg,
                  "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin"
-                 " ON merchant_transfers (h_proposal_data, coin_pub)");
+                 " ON merchant_transfers (h_contract_terms, coin_pub)");
   PG_EXEC_INDEX (pg,
                  "CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid"
                  " ON merchant_transfers (wtid)");
@@ -234,7 +234,7 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "insert_transaction",
               "INSERT INTO merchant_transactions"
-              "(h_proposal_data"
+              "(h_contract_terms"
               ",exchange_uri"
 	      ",merchant_pub"
               ",h_wire"
@@ -249,7 +249,7 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "insert_deposit",
               "INSERT INTO merchant_deposits"
-              "(h_proposal_data"
+              "(h_contract_terms"
 	      ",merchant_pub"
               ",coin_pub"
               ",amount_with_fee_val"
@@ -265,7 +265,7 @@ postgres_initialize (void *cls)
   PG_PREPARE (pg,
               "insert_transfer",
               "INSERT INTO merchant_transfers"
-              "(h_proposal_data"
+              "(h_contract_terms"
               ",coin_pub"
               ",wtid) VALUES "
               "($1, $2, $3)",
@@ -282,44 +282,44 @@ postgres_initialize (void *cls)
               5);
 
   PG_PREPARE (pg,
-              "insert_proposal_data",
-              "INSERT INTO merchant_proposal_data"
+              "insert_contract_terms",
+              "INSERT INTO merchant_contract_terms"
               "(order_id"
               ",merchant_pub"
               ",timestamp"
-              ",proposal_data"
-              ",h_proposal_data)"
+              ",contract_terms"
+              ",h_contract_terms)"
               " VALUES "
               "($1, $2, $3, $4, $5)",
               4);
 
   PG_PREPARE (pg,
-              "find_proposal_data_from_hash",
+              "find_contract_terms_from_hash",
               "SELECT"
-              " proposal_data"
-              " FROM merchant_proposal_data"
+              " contract_terms"
+              " FROM merchant_contract_terms"
               " WHERE"
-              " h_proposal_data=$1"
+              " h_contract_terms=$1"
               " AND merchant_pub=$2",
               2);
 
   PG_PREPARE (pg,
-              "find_proposal_data",
+              "find_contract_terms",
               "SELECT"
-              " proposal_data"
-              " FROM merchant_proposal_data"
+              " contract_terms"
+              " FROM merchant_contract_terms"
               " WHERE"
               " order_id=$1"
               " AND merchant_pub=$2",
               2);
 
   PG_PREPARE (pg,
-              "find_proposal_data_by_date",
+              "find_contract_terms_by_date",
               "SELECT"
-              " proposal_data"
+              " contract_terms"
               ",order_id"
               ",row_id"
-              " FROM merchant_proposal_data"
+              " FROM merchant_contract_terms"
               " WHERE"
               " timestamp<$1"
               " AND merchant_pub=$2"
@@ -328,12 +328,12 @@ postgres_initialize (void *cls)
               3);
 
   PG_PREPARE (pg,
-              "find_proposal_data_by_date_and_range",
+              "find_contract_terms_by_date_and_range",
               "SELECT"
-              " proposal_data"
+              " contract_terms"
               ",order_id"
               ",row_id"
-              " FROM merchant_proposal_data"
+              " FROM merchant_contract_terms"
               " WHERE"
               " timestamp<$1"
               " AND merchant_pub=$2"
@@ -343,12 +343,12 @@ postgres_initialize (void *cls)
               4);
 
   PG_PREPARE (pg,
-              "find_proposal_data_by_date_and_range_future",
+              "find_contract_terms_by_date_and_range_future",
               "SELECT"
-              " proposal_data"
+              " contract_terms"
               ",order_id"
               ",row_id"
-              " FROM merchant_proposal_data"
+              " FROM merchant_contract_terms"
               " WHERE"
               " timestamp>$1"
               " AND merchant_pub=$2"
@@ -369,7 +369,7 @@ postgres_initialize (void *cls)
               ",total_amount_frac"
               ",total_amount_curr"
               " FROM merchant_transactions"
-              " WHERE h_proposal_data=$1"
+              " WHERE h_contract_terms=$1"
 	      " AND merchant_pub=$2",
               2);
   PG_PREPARE (pg,
@@ -384,7 +384,7 @@ postgres_initialize (void *cls)
               ",deposit_fee_curr"
               ",exchange_proof"
               " FROM merchant_deposits"
-              " WHERE h_proposal_data=$1"
+              " WHERE h_contract_terms=$1"
               " AND merchant_pub=$2",
               2);
   PG_PREPARE (pg,
@@ -398,7 +398,7 @@ postgres_initialize (void *cls)
               ",deposit_fee_curr"
               ",exchange_proof"
               " FROM merchant_deposits"
-              " WHERE h_proposal_data=$1"
+              " WHERE h_contract_terms=$1"
               " AND merchant_pub=$2"
               " AND coin_pub=$3",
               3);
@@ -411,12 +411,12 @@ postgres_initialize (void *cls)
               ",merchant_proofs.proof"
               " FROM merchant_transfers"
               "   JOIN merchant_proofs USING (wtid)"
-              " WHERE h_proposal_data=$1",
+              " WHERE h_contract_terms=$1",
               1);
   PG_PREPARE (pg,
               "find_deposits_by_wtid",
               "SELECT"
-              " merchant_transfers.h_proposal_data"
+              " merchant_transfers.h_contract_terms"
               ",merchant_transfers.coin_pub"
               ",merchant_deposits.amount_with_fee_val"
               ",merchant_deposits.amount_with_fee_frac"
@@ -427,7 +427,7 @@ postgres_initialize (void *cls)
               ",merchant_deposits.exchange_proof"
               " FROM merchant_transfers"
               "   JOIN merchant_deposits"
-              "     ON (merchant_deposits.h_proposal_data = merchant_transfers.h_proposal_data"
+              "     ON (merchant_deposits.h_contract_terms = merchant_transfers.h_contract_terms"
               "       AND"
               "         merchant_deposits.coin_pub = merchant_transfers.coin_pub)"
               " WHERE wtid=$1",
@@ -447,16 +447,16 @@ postgres_initialize (void *cls)
  * Retrieve proposal data given its proposal data's hashcode
  *
  * @param cls closure
- * @param proposal_data where to store the retrieved proposal data
- * @param h_proposal_data proposal data's hashcode that will be used to
+ * @param contract_terms where to store the retrieved proposal data
+ * @param h_contract_terms proposal data's hashcode that will be used to
  * perform the lookup
  * @return #GNUNET_OK on success, #GNUNET_NO if no proposal is
  * found, #GNUNET_SYSERR upon error
  */
 static int
-postgres_find_proposal_data_from_hash (void *cls,
-                                       json_t **proposal_data,
-                                       const struct GNUNET_HashCode *h_proposal_data,
+postgres_find_contract_terms_from_hash (void *cls,
+                                       json_t **contract_terms,
+                                       const struct GNUNET_HashCode *h_contract_terms,
                                        const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
@@ -464,13 +464,13 @@ postgres_find_proposal_data_from_hash (void *cls,
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_proposal_data_from_hash",
+                                    "find_contract_terms_from_hash",
                                     params);
   i = PQntuples (result);
   if (1 < i)
@@ -484,8 +484,8 @@ postgres_find_proposal_data_from_hash (void *cls,
     return GNUNET_NO;
 
   struct GNUNET_PQ_ResultSpec rs[] = {
-    TALER_PQ_result_spec_json ("proposal_data",
-                               proposal_data),
+    TALER_PQ_result_spec_json ("contract_terms",
+                               contract_terms),
     GNUNET_PQ_result_spec_end
   };
   if (GNUNET_OK !=
@@ -506,14 +506,14 @@ postgres_find_proposal_data_from_hash (void *cls,
  * Retrieve proposal data given its order id.
  *
  * @param cls closure
- * @param proposal_data where to store the retrieved proposal data
+ * @param contract_terms where to store the retrieved proposal data
  * @param order id order id used to perform the lookup
  * @return #GNUNET_OK on success, #GNUNET_NO if no proposal is
  * found, #GNUNET_SYSERR upon error
  */
 static int
-postgres_find_proposal_data (void *cls,
-                             json_t **proposal_data,
+postgres_find_contract_terms (void *cls,
+                             json_t **contract_terms,
                              const char *order_id,
                              const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
@@ -528,7 +528,7 @@ postgres_find_proposal_data (void *cls,
   };
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_proposal_data",
+                                    "find_contract_terms",
                                     params);
   i = PQntuples (result);
   if (1 < i)
@@ -542,8 +542,8 @@ postgres_find_proposal_data (void *cls,
     return GNUNET_NO;
 
   struct GNUNET_PQ_ResultSpec rs[] = {
-    TALER_PQ_result_spec_json ("proposal_data",
-                               proposal_data),
+    TALER_PQ_result_spec_json ("contract_terms",
+                               contract_terms),
     GNUNET_PQ_result_spec_end
   };
   if (GNUNET_OK !=
@@ -565,36 +565,36 @@ postgres_find_proposal_data (void *cls,
  *
  * @param cls closure
  * @param order_id identificator of the proposal being stored
- * @param proposal_data proposal data to store
+ * @param contract_terms proposal data to store
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
  */
 static int
-postgres_insert_proposal_data (void *cls,
+postgres_insert_contract_terms (void *cls,
                                const char *order_id,
                                const struct TALER_MerchantPublicKeyP *merchant_pub,
                                struct GNUNET_TIME_Absolute timestamp,
-                               const json_t *proposal_data)
+                               const json_t *contract_terms)
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
   int ret;
-  struct GNUNET_HashCode h_proposal_data;
+  struct GNUNET_HashCode h_contract_terms;
 
-  if (GNUNET_OK != TALER_JSON_hash (proposal_data,
-                                    &h_proposal_data))
+  if (GNUNET_OK != TALER_JSON_hash (contract_terms,
+                                    &h_contract_terms))
     return GNUNET_SYSERR;
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_absolute_time (&timestamp),
-    TALER_PQ_query_param_json (proposal_data),
-    GNUNET_PQ_query_param_auto_from_type (&h_proposal_data),
+    TALER_PQ_query_param_json (contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (&h_contract_terms),
     GNUNET_PQ_query_param_end
   };
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "insert_proposal_data",
+                                    "insert_contract_terms",
                                     params);
 
   /**
@@ -623,7 +623,7 @@ postgres_insert_proposal_data (void *cls,
  * Insert transaction data into the database.
  *
  * @param cls closure
- * @param h_proposal_data hashcode of the proposal data associated with the
+ * @param h_contract_terms hashcode of the proposal data associated with the
  * transaction being stored
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
@@ -635,7 +635,7 @@ postgres_insert_proposal_data (void *cls,
  */
 static int
 postgres_store_transaction (void *cls,
-                            const struct GNUNET_HashCode *h_proposal_data,
+                            const struct GNUNET_HashCode *h_contract_terms,
 			    const struct TALER_MerchantPublicKeyP *merchant_pub,
                             const char *exchange_uri,
                             const struct GNUNET_HashCode *h_wire,
@@ -648,7 +648,7 @@ postgres_store_transaction (void *cls,
   int ret;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_string (exchange_uri),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (h_wire),
@@ -659,8 +659,8 @@ postgres_store_transaction (void *cls,
   };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Storing transaction with h_proposal_data '%s'\n",
-              GNUNET_h2s (h_proposal_data));
+              "Storing transaction with h_contract_terms '%s'\n",
+              GNUNET_h2s (h_contract_terms));
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "insert_transaction",
@@ -694,7 +694,7 @@ postgres_store_transaction (void *cls,
  */
 static int
 postgres_store_deposit (void *cls,
-                        const struct GNUNET_HashCode *h_proposal_data,
+                        const struct GNUNET_HashCode *h_contract_terms,
                         const struct TALER_MerchantPublicKeyP *merchant_pub,
                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
                         const struct TALER_Amount *amount_with_fee,
@@ -707,7 +707,7 @@ postgres_store_deposit (void *cls,
   int ret;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     TALER_PQ_query_param_amount (amount_with_fee),
@@ -718,8 +718,8 @@ postgres_store_deposit (void *cls,
   };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "storing payment for h_proposal_data '%s'\n",
-              GNUNET_h2s (h_proposal_data));
+              "storing payment for h_contract_terms '%s'\n",
+              GNUNET_h2s (h_contract_terms));
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "insert_deposit",
                                     params);
@@ -738,11 +738,11 @@ postgres_store_deposit (void *cls,
 
 
 /**
- * Insert mapping of @a coin_pub and @a h_proposal_data to
+ * Insert mapping of @a coin_pub and @a h_contract_terms to
  * corresponding @a wtid.
  *
  * @param cls closure
- * @param h_proposal_data hashcode of the proposal data paid by @a coin_pub
+ * @param h_contract_terms hashcode of the proposal data paid by @a coin_pub
  * @param coin_pub public key of the coin
  * @param wtid identifier of the wire transfer in which the exchange
  *             send us the money for the coin deposit
@@ -750,7 +750,7 @@ postgres_store_deposit (void *cls,
  */
 static int
 postgres_store_coin_to_transfer (void *cls,
-                                 const struct GNUNET_HashCode *h_proposal_data,
+                                 const struct GNUNET_HashCode *h_contract_terms,
                                  const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                  const struct TALER_WireTransferIdentifierRawP *wtid)
 {
@@ -759,7 +759,7 @@ postgres_store_coin_to_transfer (void *cls,
   int ret;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_auto_from_type (wtid),
     GNUNET_PQ_query_param_end
@@ -843,7 +843,7 @@ postgres_store_transfer_to_proof (void *cls,
  * query being successful, unsuccessful, or generated errors.
  */
 static int
-postgres_find_proposal_data_history (void *cls,
+postgres_find_contract_terms_history (void *cls,
                                      const char *order_id,
                                      const struct TALER_MerchantPublicKeyP *merchant_pub,
                                      TALER_MERCHANTDB_ProposalDataCallback cb,
@@ -852,7 +852,7 @@ postgres_find_proposal_data_history (void *cls,
   struct PostgresClosure *pg = cls;
   PGresult *result;
   unsigned int i;
-  json_t *proposal_data;
+  json_t *contract_terms;
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
@@ -861,7 +861,7 @@ postgres_find_proposal_data_history (void *cls,
   };
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_proposal_data",
+                                    "find_contract_terms",
                                     params);
   i = PQntuples (result);
   if (1 < i)
@@ -875,8 +875,8 @@ postgres_find_proposal_data_history (void *cls,
     return GNUNET_NO;
 
   struct GNUNET_PQ_ResultSpec rs[] = {
-    TALER_PQ_result_spec_json ("proposal_data",
-                               &proposal_data),
+    TALER_PQ_result_spec_json ("contract_terms",
+                               &contract_terms),
     GNUNET_PQ_result_spec_end
   };
   if (GNUNET_OK !=
@@ -892,7 +892,7 @@ postgres_find_proposal_data_history (void *cls,
   cb (cb_cls,
       order_id,
       0,
-      proposal_data);
+      contract_terms);
 
   PQclear (result);
   return GNUNET_OK;
@@ -912,7 +912,7 @@ postgres_find_proposal_data_history (void *cls,
  * instance are returned.
  * @param start only rows with serial id less than start are returned.
  * In other words, you lower `start` to get older records. The tipical
- * usage is to firstly call `find_proposal_data_by_date`, so that you get
+ * usage is to firstly call `find_contract_terms_by_date`, so that you get
  * the `nrows` youngest records. The oldest of those records will tell you
  * from which timestamp and `start` you can query the DB in order to get
  * furtherly older records, and so on. Alternatively, you can use always
@@ -926,7 +926,7 @@ postgres_find_proposal_data_history (void *cls,
  * @return numer of found tuples, #GNUNET_SYSERR upon error
  */
 static int
-postgres_find_proposal_data_by_date_and_range (void *cls,
+postgres_find_contract_terms_by_date_and_range (void *cls,
                                                struct GNUNET_TIME_Absolute date,
                                                const struct TALER_MerchantPublicKeyP *merchant_pub,
                                                unsigned int start,
@@ -950,11 +950,11 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
 
   if (GNUNET_YES == future)
     result = GNUNET_PQ_exec_prepared (pg->conn,
-                                      "find_proposal_data_by_date_and_range_future",
+                                      "find_contract_terms_by_date_and_range_future",
                                       params);
   else
     result = GNUNET_PQ_exec_prepared (pg->conn,
-                                      "find_proposal_data_by_date_and_range",
+                                      "find_contract_terms_by_date_and_range",
                                       params);
   if (PGRES_TUPLES_OK != PQresultStatus (result))
   {
@@ -973,14 +973,14 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
   for (unsigned int i = 0; i < n; i++)
   {
     char *order_id;
-    json_t *proposal_data;
+    json_t *contract_terms;
     uint64_t row_id;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_string ("order_id",
                                     &order_id),
-      TALER_PQ_result_spec_json ("proposal_data",
-                                 &proposal_data),
+      TALER_PQ_result_spec_json ("contract_terms",
+                                 &contract_terms),
       GNUNET_PQ_result_spec_uint64 ("row_id",
                                     &row_id),
       GNUNET_PQ_result_spec_end
@@ -998,7 +998,7 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
     cb (cb_cls,
         order_id,
         row_id,
-        proposal_data);
+        contract_terms);
 
     GNUNET_PQ_cleanup_result (rs);
   }
@@ -1021,7 +1021,7 @@ postgres_find_proposal_data_by_date_and_range (void *cls,
  * @return numer of found tuples, #GNUNET_SYSERR upon error
  */
 static int
-postgres_find_proposal_data_by_date (void *cls,
+postgres_find_contract_terms_by_date (void *cls,
                                      struct GNUNET_TIME_Absolute date,
                                      const struct TALER_MerchantPublicKeyP *merchant_pub,
                                      unsigned int nrows,
@@ -1042,7 +1042,7 @@ postgres_find_proposal_data_by_date (void *cls,
     GNUNET_PQ_query_param_end
   };
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_proposal_data_by_date",
+                                    "find_contract_terms_by_date",
                                     params);
   if (PGRES_TUPLES_OK != PQresultStatus (result))
   {
@@ -1058,14 +1058,14 @@ postgres_find_proposal_data_by_date (void *cls,
   for (i = 0; i < n; i++)
   {
     char *order_id;
-    json_t *proposal_data;
+    json_t *contract_terms;
     uint64_t row_id;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_string ("order_id",
                                     &order_id),
-      TALER_PQ_result_spec_json ("proposal_data",
-                                 &proposal_data),
+      TALER_PQ_result_spec_json ("contract_terms",
+                                 &contract_terms),
       GNUNET_PQ_result_spec_uint64 ("row_id",
                                     &row_id),
       GNUNET_PQ_result_spec_end
@@ -1083,7 +1083,7 @@ postgres_find_proposal_data_by_date (void *cls,
     cb (cb_cls,
         order_id,
         row_id,
-        proposal_data);
+        contract_terms);
 
     GNUNET_PQ_cleanup_result (rs);
   }
@@ -1095,7 +1095,7 @@ postgres_find_proposal_data_by_date (void *cls,
  * Find information about a transaction.
  *
  * @param cls our plugin handle
- * @param h_proposal_data value used to perform the lookup
+ * @param h_contract_terms value used to perform the lookup
  * @param merchant_pub merchant's public key
  * @param cb function to call with transaction data
  * @param cb_cls closure for @a cb
@@ -1104,7 +1104,7 @@ postgres_find_proposal_data_by_date (void *cls,
  */
 static int
 postgres_find_transaction (void *cls,
-                           const struct GNUNET_HashCode *h_proposal_data,
+                           const struct GNUNET_HashCode *h_contract_terms,
 			   const struct TALER_MerchantPublicKeyP *merchant_pub,
                            TALER_MERCHANTDB_TransactionCallback cb,
                            void *cb_cls)
@@ -1112,14 +1112,14 @@ postgres_find_transaction (void *cls,
   struct PostgresClosure *pg = cls;
   PGresult *result;
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Finding transaction for h_proposal_data '%s'\n",
-              GNUNET_h2s (h_proposal_data));
+              "Finding transaction for h_contract_terms '%s'\n",
+              GNUNET_h2s (h_contract_terms));
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_transaction",
@@ -1133,8 +1133,8 @@ postgres_find_transaction (void *cls,
   if (0 == PQntuples (result))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Could NOT find transaction for h_proposal_data '%s'\n",
-                GNUNET_h2s (h_proposal_data));
+                "Could NOT find transaction for h_contract_terms '%s'\n",
+                GNUNET_h2s (h_contract_terms));
 
     PQclear (result);
     return GNUNET_NO;
@@ -1178,7 +1178,7 @@ postgres_find_transaction (void *cls,
     cb (cb_cls,
 	merchant_pub,
         exchange_uri,
-        h_proposal_data,
+        h_contract_terms,
         &h_wire,
         timestamp,
         refund_deadline,
@@ -1195,7 +1195,7 @@ postgres_find_transaction (void *cls,
  * (and @a merchant_pub)
  *
  * @param cls closure
- * @param h_proposal_data key for the search
+ * @param h_contract_terms key for the search
  * @param merchant_pub merchant's public key
  * @param cb function to call with payment data
  * @param cb_cls closure for @a cb
@@ -1204,7 +1204,7 @@ postgres_find_transaction (void *cls,
  */
 static int
 postgres_find_payments (void *cls,
-                        const struct GNUNET_HashCode *h_proposal_data,
+                        const struct GNUNET_HashCode *h_contract_terms,
 		        const struct TALER_MerchantPublicKeyP *merchant_pub,
                         TALER_MERCHANTDB_CoinDepositCallback cb,
                         void *cb_cls)
@@ -1214,13 +1214,13 @@ postgres_find_payments (void *cls,
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "finding payment for h_proposal_data '%s'\n",
-              GNUNET_h2s (h_proposal_data));
+              "finding payment for h_contract_terms '%s'\n",
+              GNUNET_h2s (h_contract_terms));
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_deposits",
                                     params);
@@ -1265,7 +1265,7 @@ postgres_find_payments (void *cls,
       return GNUNET_SYSERR;
     }
     cb (cb_cls,
-        h_proposal_data,
+        h_contract_terms,
         &coin_pub,
         &amount_with_fee,
         &deposit_fee,
@@ -1284,7 +1284,7 @@ postgres_find_payments (void *cls,
  * Retrieve information about a deposited coin.
  *
  * @param cls closure
- * @param h_proposal_data hashcode of the proposal data paid by @a coin_pub
+ * @param h_contract_terms hashcode of the proposal data paid by @a coin_pub
  * @param merchant_pub merchant's public key.
  * @param coin_pub coin's public key used for the search
  * @param cb function to call with payment data
@@ -1294,7 +1294,7 @@ postgres_find_payments (void *cls,
  */
 static int
 postgres_find_payments_by_hash_and_coin (void *cls,
-                                         const struct GNUNET_HashCode *h_proposal_data,
+                                         const struct GNUNET_HashCode *h_contract_terms,
                                          const struct TALER_MerchantPublicKeyP *merchant_pub,
                                          const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                          TALER_MERCHANTDB_CoinDepositCallback cb,
@@ -1305,7 +1305,7 @@ postgres_find_payments_by_hash_and_coin (void *cls,
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_end
@@ -1352,7 +1352,7 @@ postgres_find_payments_by_hash_and_coin (void *cls,
       return GNUNET_SYSERR;
     }
     cb (cb_cls,
-        h_proposal_data,
+        h_contract_terms,
         coin_pub,
         &amount_with_fee,
         &deposit_fee,
@@ -1368,14 +1368,14 @@ postgres_find_payments_by_hash_and_coin (void *cls,
 
 
 /**
- * Lookup information about a transfer by @a h_proposal_data.  Note
+ * Lookup information about a transfer by @a h_contract_terms.  Note
  * that in theory there could be multiple wire transfers for a
- * single @a h_proposal_data, as the transaction may have involved
+ * single @a h_contract_terms, as the transaction may have involved
  * multiple coins and the coins may be spread over different wire
  * transfers.
  *
  * @param cls closure
- * @param h_proposal_data key for the search
+ * @param h_contract_terms key for the search
  * @param cb function to call with transfer data
  * @param cb_cls closure for @a cb
  * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
@@ -1383,7 +1383,7 @@ postgres_find_payments_by_hash_and_coin (void *cls,
  */
 static int
 postgres_find_transfers_by_hash (void *cls,
-                                 const struct GNUNET_HashCode *h_proposal_data,
+                                 const struct GNUNET_HashCode *h_contract_terms,
                                  TALER_MERCHANTDB_TransferCallback cb,
                                  void *cb_cls)
 {
@@ -1392,7 +1392,7 @@ postgres_find_transfers_by_hash (void *cls,
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_proposal_data),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_end
   };
   result = GNUNET_PQ_exec_prepared (pg->conn,
@@ -1439,7 +1439,7 @@ postgres_find_transfers_by_hash (void *cls,
       return GNUNET_SYSERR;
     }
     cb (cb_cls,
-        h_proposal_data,
+        h_contract_terms,
         &coin_pub,
         &wtid,
         execution_time,
@@ -1492,15 +1492,15 @@ postgres_find_deposits_by_wtid (void *cls,
 
   for (i=0;i<PQntuples (result);i++)
   {
-    struct GNUNET_HashCode h_proposal_data;
+    struct GNUNET_HashCode h_contract_terms;
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
     json_t *exchange_proof;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
-      GNUNET_PQ_result_spec_auto_from_type ("h_proposal_data",
-                                            &h_proposal_data),
+      GNUNET_PQ_result_spec_auto_from_type ("h_contract_terms",
+                                            &h_contract_terms),
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
       TALER_PQ_result_spec_amount ("amount_with_fee",
@@ -1522,7 +1522,7 @@ postgres_find_deposits_by_wtid (void *cls,
       return GNUNET_SYSERR;
     }
     cb (cb_cls,
-        &h_proposal_data,
+        &h_contract_terms,
         &coin_pub,
         &amount_with_fee,
         &deposit_fee,
@@ -1665,12 +1665,12 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_transfers_by_hash = &postgres_find_transfers_by_hash;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
-  plugin->insert_proposal_data = &postgres_insert_proposal_data;
-  plugin->find_proposal_data = &postgres_find_proposal_data;
-  plugin->find_proposal_data_history = &postgres_find_proposal_data_history;
-  plugin->find_proposal_data_by_date = &postgres_find_proposal_data_by_date;
-  plugin->find_proposal_data_by_date_and_range = &postgres_find_proposal_data_by_date_and_range;
-  plugin->find_proposal_data_from_hash = &postgres_find_proposal_data_from_hash;
+  plugin->insert_contract_terms = &postgres_insert_contract_terms;
+  plugin->find_contract_terms = &postgres_find_contract_terms;
+  plugin->find_contract_terms_history = &postgres_find_contract_terms_history;
+  plugin->find_contract_terms_by_date = &postgres_find_contract_terms_by_date;
+  plugin->find_contract_terms_by_date_and_range = &postgres_find_contract_terms_by_date_and_range;
+  plugin->find_contract_terms_from_hash = &postgres_find_contract_terms_from_hash;
 
   return plugin;
 }

@@ -336,7 +336,7 @@ struct Command
        * FIXME: verify in the code that this bit is actually proposal
        * data and not the whole proposal.
        */
-      json_t *proposal_data;
+      json_t *contract_terms;
 
       /**
        * Proposal's signature.
@@ -396,7 +396,7 @@ struct Command
       /**
        * Hashcode of the proposal data associated to this payment.
        */
-      struct GNUNET_HashCode h_proposal_data;
+      struct GNUNET_HashCode h_contract_terms;
 
       /**
        * Merchant's public key
@@ -469,7 +469,7 @@ next_command (struct InterpreterState *is)
  * @param ec taler-specific error code
  * @param obj the full received JSON reply, or
  *            error details if the request failed
- * @param proposal_data the order + additional information provided by the
+ * @param contract_terms the order + additional information provided by the
  * backend, NULL on error.
  * @param sig merchant's signature over the contract, NULL on error
  * @param h_contract hash of the contract, NULL on error
@@ -479,7 +479,7 @@ proposal_cb (void *cls,
              unsigned int http_status,
 	     enum TALER_ErrorCode ec,
              const json_t *obj,
-             const json_t *proposal_data,
+             const json_t *contract_terms,
              const struct TALER_MerchantSignatureP *sig,
              const struct GNUNET_HashCode *hash)
 {
@@ -490,7 +490,7 @@ proposal_cb (void *cls,
   switch (http_status)
   {
   case MHD_HTTP_OK:
-    cmd->details.proposal.proposal_data = json_incref ((json_t *) proposal_data);
+    cmd->details.proposal.contract_terms = json_incref ((json_t *) contract_terms);
     cmd->details.proposal.merchant_sig = *sig;
     cmd->details.proposal.hash = *hash;
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -530,7 +530,7 @@ pay_cb (void *cls,
   struct Command *cmd = &is->commands[is->ip];
   struct PaymentResponsePS mr;
   struct GNUNET_CRYPTO_EddsaSignature sig;
-  struct GNUNET_HashCode h_proposal_data;
+  struct GNUNET_HashCode h_contract_terms;
   const char *error_name;
   unsigned int error_line;
 
@@ -550,7 +550,7 @@ pay_cb (void *cls,
     /* Check signature */
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_fixed_auto ("sig", &sig),
-      GNUNET_JSON_spec_fixed_auto ("h_proposal_data", &h_proposal_data),
+      GNUNET_JSON_spec_fixed_auto ("h_contract_terms", &h_contract_terms),
       GNUNET_JSON_spec_end ()
     };
     if (GNUNET_OK !=
@@ -569,7 +569,7 @@ pay_cb (void *cls,
     }
     mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
-    mr.h_proposal_data = h_proposal_data;
+    mr.h_contract_terms = h_contract_terms;
     if (GNUNET_OK !=
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
                                     &mr.purpose,
@@ -875,7 +875,7 @@ interpreter_run (void *cls)
                             cmd->details.pay.contract_ref);
         GNUNET_assert (NULL != ref);
         merchant_sig = ref->details.proposal.merchant_sig;
-        GNUNET_assert (NULL != ref->details.proposal.proposal_data);
+        GNUNET_assert (NULL != ref->details.proposal.contract_terms);
         {
           /* Get information that need to be replied in the deposit permission */
           struct GNUNET_JSON_Specification spec[] = {
@@ -891,7 +891,7 @@ interpreter_run (void *cls)
           };
 
           if (GNUNET_OK !=
-              GNUNET_JSON_parse (ref->details.proposal.proposal_data,
+              GNUNET_JSON_parse (ref->details.proposal.contract_terms,
                                  spec,
                                  &error_name,
                                  &error_line))
@@ -1274,10 +1274,10 @@ do_shutdown (void *cls)
           TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
           cmd->details.proposal.po = NULL;
         }
-        if (NULL != cmd->details.proposal.proposal_data)
+        if (NULL != cmd->details.proposal.contract_terms)
         {
-          json_decref (cmd->details.proposal.proposal_data);
-          cmd->details.proposal.proposal_data = NULL;
+          json_decref (cmd->details.proposal.contract_terms);
+          cmd->details.proposal.contract_terms = NULL;
         }
         break;
 

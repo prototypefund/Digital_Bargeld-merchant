@@ -147,7 +147,7 @@ struct PayContext
    * Proposal data for the proposal that is being
    * payed for in this context.
    */
-  json_t *proposal_data;
+  json_t *contract_terms;
 
   /**
    * Task called when the (suspended) processing for
@@ -192,10 +192,10 @@ struct PayContext
   /**
    * Hashed proposal.
    */
-  struct GNUNET_HashCode h_proposal_data;
+  struct GNUNET_HashCode h_contract_terms;
 
   /**
-   * "H_wire" from @e proposal_data.  Used to identify the instance's
+   * "H_wire" from @e contract_terms.  Used to identify the instance's
    * wire transfer method.
    */
   struct GNUNET_HashCode h_wire;
@@ -241,12 +241,12 @@ struct PayContext
   struct GNUNET_TIME_Absolute wire_transfer_deadline;
 
   /**
-   * Timestamp from @e proposal_data.
+   * Timestamp from @e contract_terms.
    */
   struct GNUNET_TIME_Absolute timestamp;
 
   /**
-   * Refund deadline from @e proposal_data.
+   * Refund deadline from @e contract_terms.
    */
   struct GNUNET_TIME_Absolute refund_deadline;
 
@@ -401,19 +401,19 @@ sign_success_response (struct PayContext *pc)
 
   mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
   mr.purpose.size = htonl (sizeof (mr));
-  mr.h_proposal_data = pc->h_proposal_data;
+  mr.h_contract_terms = pc->h_contract_terms;
 
   GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
                             &mr.purpose,
 			    &sig);
 
   return TMH_RESPONSE_make_json_pack ("{s:O, s:o, s:o}",
-                                      "proposal_data",
-                                      pc->proposal_data,
+                                      "contract_terms",
+                                      pc->contract_terms,
                                       "sig",
                                       GNUNET_JSON_from_data_auto (&sig),
-                                      "h_proposal_data",
-                                      GNUNET_JSON_from_data (&pc->h_proposal_data,
+                                      "h_contract_terms",
+                                      GNUNET_JSON_from_data (&pc->h_contract_terms,
                                                              sizeof (struct GNUNET_HashCode)));
 }
 
@@ -486,12 +486,12 @@ deposit_cb (void *cls,
   }
   /* store result to DB */
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Storing successful payment for h_proposal_data '%s'\n",
-              GNUNET_h2s (&pc->h_proposal_data));
+              "Storing successful payment for h_contract_terms '%s'\n",
+              GNUNET_h2s (&pc->h_contract_terms));
 
   if (GNUNET_OK !=
       db->store_deposit (db->cls,
-			 &pc->h_proposal_data,
+			 &pc->h_contract_terms,
 			 &pc->mi->pubkey,
 			 &dc->coin_pub,
 			 &dc->amount_with_fee,
@@ -570,10 +570,10 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
     GNUNET_free (pc->chosen_exchange);
     pc->chosen_exchange = NULL;
   }
-  if (NULL != pc->proposal_data)
+  if (NULL != pc->contract_terms)
   {
-    json_decref (pc->proposal_data);
-    pc->proposal_data = NULL;
+    json_decref (pc->contract_terms);
+    pc->contract_terms = NULL;
   }
   GNUNET_CONTAINER_DLL_remove (pc_head,
                                pc_tail,
@@ -848,7 +848,7 @@ process_pay_with_exchange (void *cls,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
                                      pc->mi->j_wire,
-                                     &pc->h_proposal_data,
+                                     &pc->h_contract_terms,
                                      &dc->coin_pub,
                                      &dc->ub_sig,
                                      &dc->denom,
@@ -905,7 +905,7 @@ handle_pay_timeout (void *cls)
  * Function called with information about a coin that was deposited.
  *
  * @param cls closure
- * @param h_proposal_data hashed proposal data
+ * @param h_contract_terms hashed proposal data
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
@@ -913,7 +913,7 @@ handle_pay_timeout (void *cls)
  */
 static void
 check_coin_paid (void *cls,
-                 const struct GNUNET_HashCode *h_proposal_data,
+                 const struct GNUNET_HashCode *h_contract_terms,
                  const struct TALER_CoinSpendPublicKeyP *coin_pub,
                  const struct TALER_Amount *amount_with_fee,
                  const struct TALER_Amount *deposit_fee,
@@ -922,8 +922,8 @@ check_coin_paid (void *cls,
   struct PayContext *pc = cls;
   unsigned int i;
 
-  if (0 != memcmp (&pc->h_proposal_data,
-                   h_proposal_data,
+  if (0 != memcmp (&pc->h_contract_terms,
+                   h_contract_terms,
                    sizeof (struct GNUNET_HashCode)))
   {
     GNUNET_break (0);
@@ -961,7 +961,7 @@ check_coin_paid (void *cls,
  * @param cls closure with the `struct PayContext`
  * @param merchant_pub merchant's public key
  * @param exchange_uri URI of the exchange
- * @param h_proposal_data hashed proposal data
+ * @param h_contract_terms hashed proposal data
  * @param h_xwire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -971,7 +971,7 @@ static void
 check_transaction_exists (void *cls,
 			  const struct TALER_MerchantPublicKeyP *merchant_pub,
 			  const char *exchange_uri,
-			  const struct GNUNET_HashCode *h_proposal_data,
+			  const struct GNUNET_HashCode *h_contract_terms,
 			  const struct GNUNET_HashCode *h_xwire,
 			  struct GNUNET_TIME_Absolute timestamp,
 			  struct GNUNET_TIME_Absolute refund,
@@ -979,8 +979,8 @@ check_transaction_exists (void *cls,
 {
   struct PayContext *pc = cls;
 
-  if ( (0 == memcmp (h_proposal_data,
-		     &pc->h_proposal_data,
+  if ( (0 == memcmp (h_contract_terms,
+		     &pc->h_contract_terms,
                      sizeof (struct GNUNET_HashCode))) &&
        (0 == memcmp (h_xwire,
 		     &pc->mi->h_wire,
@@ -1046,8 +1046,8 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_break (0);
     return res;
   }
-  res = db->find_proposal_data (db->cls,
-                                &pc->proposal_data,
+  res = db->find_contract_terms (db->cls,
+                                &pc->contract_terms,
                                 order_id,
                                 &merchant_pub);
   if (GNUNET_OK != res)
@@ -1065,8 +1065,8 @@ parse_pay (struct MHD_Connection *connection,
   }
 
   if (GNUNET_OK !=
-      TALER_JSON_hash (pc->proposal_data,
-                       &pc->h_proposal_data))
+      TALER_JSON_hash (pc->contract_terms,
+                       &pc->h_contract_terms))
   {
     GNUNET_JSON_parse_free (spec);
     if (MHD_YES !=
@@ -1080,7 +1080,7 @@ parse_pay (struct MHD_Connection *connection,
     return GNUNET_NO;
   }
 
-  merchant = json_object_get (pc->proposal_data,
+  merchant = json_object_get (pc->contract_terms,
                               "merchant");
   if (NULL == merchant)
   {
@@ -1138,7 +1138,7 @@ parse_pay (struct MHD_Connection *connection,
     };
 
     res = TMH_PARSE_json_data (connection,
-                               pc->proposal_data,
+                               pc->contract_terms,
                                espec);
     if (GNUNET_YES != res)
     {
@@ -1175,7 +1175,7 @@ parse_pay (struct MHD_Connection *connection,
   }
 
   /* parse optional details */
-  if (NULL != json_object_get (pc->proposal_data,
+  if (NULL != json_object_get (pc->contract_terms,
                                "max_wire_fee"))
   {
     struct GNUNET_JSON_Specification espec[] = {
@@ -1185,7 +1185,7 @@ parse_pay (struct MHD_Connection *connection,
     };
 
     res = TMH_PARSE_json_data (connection,
-                               pc->proposal_data,
+                               pc->contract_terms,
                                espec);
     if (GNUNET_YES != res)
     {
@@ -1203,7 +1203,7 @@ parse_pay (struct MHD_Connection *connection,
                    TALER_amount_get_zero (pc->max_fee.currency,
                                           &pc->max_wire_fee));
   }
-  if (NULL != json_object_get (pc->proposal_data,
+  if (NULL != json_object_get (pc->contract_terms,
                                "wire_fee_amortization"))
   {
     struct GNUNET_JSON_Specification espec[] = {
@@ -1213,7 +1213,7 @@ parse_pay (struct MHD_Connection *connection,
     };
 
     res = TMH_PARSE_json_data (connection,
-                               pc->proposal_data,
+                               pc->contract_terms,
                                espec);
     if ( (GNUNET_YES != res) ||
          (0 == pc->wire_fee_amortization) )
@@ -1297,7 +1297,7 @@ handler_pay_json (struct MHD_Connection *connection,
   /* Check if this payment attempt has already succeeded */
   if (GNUNET_SYSERR ==
       db->find_payments (db->cls,
-		         &pc->h_proposal_data,
+		         &pc->h_contract_terms,
                          &pc->mi->pubkey,
 		         &check_coin_paid,
 		         pc))
@@ -1328,7 +1328,7 @@ handler_pay_json (struct MHD_Connection *connection,
   /* Check if transaction is already known, if not store it. */
   if (GNUNET_SYSERR ==
       db->find_transaction (db->cls,
-			    &pc->h_proposal_data,
+			    &pc->h_contract_terms,
 			    &pc->mi->pubkey,
 			    &check_transaction_exists,
                             pc))
@@ -1351,7 +1351,7 @@ handler_pay_json (struct MHD_Connection *connection,
 
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Dealing with new transaction '%s'\n",
-                GNUNET_h2s (&pc->h_proposal_data));
+                GNUNET_h2s (&pc->h_contract_terms));
 
     now = GNUNET_TIME_absolute_get ();
     if (now.abs_value_us > pc->pay_deadline.abs_value_us)
@@ -1370,10 +1370,10 @@ handler_pay_json (struct MHD_Connection *connection,
 
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Storing transaction '%s'\n",
-                GNUNET_h2s (&pc->h_proposal_data));
+                GNUNET_h2s (&pc->h_contract_terms));
     if (GNUNET_OK !=
         db->store_transaction (db->cls,
-                               &pc->h_proposal_data,
+                               &pc->h_contract_terms,
                                &pc->mi->pubkey,
                                pc->chosen_exchange,
                                &pc->mi->h_wire,

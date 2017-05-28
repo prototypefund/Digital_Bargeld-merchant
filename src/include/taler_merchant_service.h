@@ -52,7 +52,7 @@ struct TALER_MERCHANT_ProposalLookupOperation;
  *                    0 if the backend's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code
  * @param obj raw JSON reply, or error details if the request failed
- * @param proposal_data completed contract, NULL on error
+ * @param contract_terms completed contract, NULL on error
  * @param sig merchant's signature over the contract, NULL on error
  * @param hash proposal data's hashcode, NULL on error
  */
@@ -61,7 +61,7 @@ typedef void
                                     unsigned int http_status,
 				    enum TALER_ErrorCode ec,
                                     const json_t *obj,
-                                    const json_t *proposal_data,
+                                    const json_t *contract_terms,
                                     const struct TALER_MerchantSignatureP *sig,
                                     const struct GNUNET_HashCode *hash);
 
@@ -360,7 +360,7 @@ struct TALER_MERCHANT_TrackTransferHandle;
 
 /**
  * Information about the _total_ amount that was paid back
- * by the exchange for a given h_proposal_data, by _one_ wire
+ * by the exchange for a given h_contract_terms, by _one_ wire
  * transfer.
  */
 struct TALER_MERCHANT_TrackTransferDetails {

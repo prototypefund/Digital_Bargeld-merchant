@@ -252,7 +252,7 @@ handle_pay_finished (void *cls,
  * @param ctx the execution loop context
  * @param merchant_uri base URI of the merchant's backend
  * @param instance which merchant instance will receive this payment
- * @param h_proposal_data hashcode of the proposal being paid
+ * @param h_contract_terms hashcode of the proposal being paid
  * @param amount total value of the contract to be paid to the merchant
  * @param max_fee maximum fee covered by the merchant (according to the contract)
  * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
@@ -273,7 +273,7 @@ struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 			   const char *merchant_uri,
 			   const char *instance,
-                           const struct GNUNET_HashCode *h_proposal_data,
+                           const struct GNUNET_HashCode *h_contract_terms,
 			   const struct TALER_Amount *amount,
 			   const struct TALER_Amount *max_fee,
                            const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -307,7 +307,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 
   dr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_COIN_DEPOSIT);
   dr.purpose.size = htonl (sizeof (struct TALER_DepositRequestPS));
-  dr.h_proposal_data = *h_proposal_data;
+  dr.h_contract_terms = *h_contract_terms;
   dr.h_wire = *h_wire;
   dr.timestamp = GNUNET_TIME_absolute_hton (timestamp);
   dr.refund_deadline = GNUNET_TIME_absolute_hton (refund_deadline);
