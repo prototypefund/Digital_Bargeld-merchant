@@ -173,10 +173,10 @@ account information is encapsulated within the Taler backend.
 
 @node Installation
 @menu
+* Installing Taler using Docker:: Installing Taler using Docker
 * generic-instructions:: Generic installation guidelines
 * Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
 @c * Installing Taler with GNU Guix:: Installing Taler with GNU Guix
-* Installing Taler using Docker:: Installing Taler using Docker
 @c * Installing Taler on Arch Linux:: Installing Taler on Arch Linux
 @c * Installing Taler on Windows:: Installing Taler on Windows
 @c * Installing Taler on OS X:: Installing Taler on OS X
