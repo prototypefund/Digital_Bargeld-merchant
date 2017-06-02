@@ -521,6 +521,11 @@ postgres_find_contract_terms (void *cls,
   PGresult *result;
   unsigned int i;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "finding contract term, order_id: '%s', merchant_pub: '%s'.\n",
+              order_id,
+              TALER_B2S (merchant_pub));
+
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -583,6 +588,12 @@ postgres_insert_contract_terms (void *cls,
   if (GNUNET_OK != TALER_JSON_hash (contract_terms,
                                     &h_contract_terms))
     return GNUNET_SYSERR;
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "inserting contract_terms: order_id: %s, merchant_pub: %s, h_contract_terms: %s.\n",
+              order_id,
+              TALER_B2S (merchant_pub),
+              GNUNET_h2s (&h_contract_terms));
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
@@ -659,8 +670,9 @@ postgres_store_transaction (void *cls,
   };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Storing transaction with h_contract_terms '%s'\n",
-              GNUNET_h2s (h_contract_terms));
+              "Storing transaction with h_contract_terms '%s', merchant_pub '%s'.\n",
+              GNUNET_h2s (h_contract_terms),
+              TALER_B2S (merchant_pub));
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "insert_transaction",
@@ -1118,8 +1130,9 @@ postgres_find_transaction (void *cls,
   };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Finding transaction for h_contract_terms '%s'\n",
-              GNUNET_h2s (h_contract_terms));
+              "Finding transaction for h_contract_terms '%s', merchant_pub: '%s'.\n",
+              GNUNET_h2s (h_contract_terms),
+              TALER_B2S (merchant_pub));
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_transaction",
