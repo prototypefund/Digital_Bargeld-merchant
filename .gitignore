@@ -39,3 +39,6 @@ doc/*
 !doc/*.sh
 !doc/examples/
 src/lib/test_merchant_api_home/.local/share/taler/exchange/wirefees/
+src/merchant-tools/taler-merchant-generate-payments
+src/merchant-tools/mitm/taler-merchant-mitm
+src/merchant-tools/mitm/merchant-mitm.wsgi
