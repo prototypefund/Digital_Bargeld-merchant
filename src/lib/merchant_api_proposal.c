@@ -115,14 +115,14 @@ handle_proposal_finished (void *cls,
                           const json_t *json)
 {
   struct TALER_MERCHANT_ProposalOperation *po = cls;
-  json_t *proposal_data;
+  json_t *contract_terms;
   const struct TALER_MerchantSignatureP *sigp;
   const struct GNUNET_HashCode *hashp;
   struct TALER_MerchantSignatureP sig;
   struct GNUNET_HashCode hash;
 
   po->job = NULL;
-  proposal_data = NULL;
+  contract_terms = NULL;
   sigp = NULL;
   hashp = NULL;
   switch (response_code)
@@ -132,7 +132,7 @@ handle_proposal_finished (void *cls,
     case MHD_HTTP_OK:
     {
       struct GNUNET_JSON_Specification spec[] = {
-        GNUNET_JSON_spec_json ("data", &proposal_data),
+        GNUNET_JSON_spec_json ("data", &contract_terms),
         GNUNET_JSON_spec_fixed_auto ("sig", &sig),
         GNUNET_JSON_spec_fixed_auto ("hash", &hash),
         GNUNET_JSON_spec_end()
@@ -182,11 +182,11 @@ handle_proposal_finished (void *cls,
           response_code,
 	  TALER_JSON_get_error_code (json),
           json,
-          proposal_data,
+          contract_terms,
           sigp,
           hashp);
-  if (NULL != proposal_data)
-    json_decref (proposal_data);
+  if (NULL != contract_terms)
+    json_decref (contract_terms);
 }
 
 

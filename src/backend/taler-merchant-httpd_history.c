@@ -38,7 +38,7 @@ static void
 pd_cb (void *cls,
        const char *order_id,
        uint64_t row_id,
-       const json_t *proposal_data)
+       const json_t *contract_terms)
 {
   json_t *response = cls;
   json_t *entry;
@@ -50,7 +50,7 @@ pd_cb (void *cls,
               "/history's row_id: %llu\n",
               (unsigned long long) row_id);
 
-  GNUNET_assert (-1 != json_unpack ((json_t *) proposal_data,
+  GNUNET_assert (-1 != json_unpack ((json_t *) contract_terms,
                                     "{s:o, s:o, s:{s:o}}",
                                     "amount", &amount,
                                     "timestamp", &timestamp,
@@ -150,7 +150,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   if (NULL != str)
   {
 
-    ret = db->find_proposal_data_history (db->cls,
+    ret = db->find_contract_terms_history (db->cls,
                                           str,
                                           &mi->pubkey,
                                           pd_cb,
@@ -205,14 +205,14 @@ MH_handler_history (struct TMH_RequestHandler *rh,
               delta);
 
   if (0 > start)
-    ret = db->find_proposal_data_by_date (db->cls,
+    ret = db->find_contract_terms_by_date (db->cls,
                                           date,
                                           &mi->pubkey,
                                           delta,
                                           pd_cb,
                                           response);
   else
-    ret = db->find_proposal_data_by_date_and_range (db->cls,
+    ret = db->find_contract_terms_by_date_and_range (db->cls,
                                                     date,
                                                     &mi->pubkey,
                                                     start,

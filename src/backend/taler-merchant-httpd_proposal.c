@@ -296,7 +296,7 @@ proposal_put (struct MHD_Connection *connection,
   /* fetch timestamp from order */
 
   if (GNUNET_OK !=
-      db->insert_proposal_data (db->cls,
+      db->insert_contract_terms (db->cls,
                                 order_id,
                                 &mi->pubkey,
                                 timestamp,
@@ -405,7 +405,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   const char *order_id;
   const char *instance;
   int res;
-  json_t *proposal_data;
+  json_t *contract_terms;
   struct MerchantInstance *mi;
 
   instance = MHD_lookup_connection_value (connection,
@@ -427,8 +427,8 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 					   TALER_EC_PARAMETER_MISSING,
                                            "order_id");
 
-  res = db->find_proposal_data (db->cls,
-                                &proposal_data,
+  res = db->find_contract_terms (db->cls,
+                                &contract_terms,
                                 order_id,
                                 &mi->pubkey);
   if (GNUNET_NO == res)
@@ -443,7 +443,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 
 
   return TMH_RESPONSE_reply_json (connection,
-                                  proposal_data,
+                                  contract_terms,
                                   MHD_HTTP_OK);
 
 
