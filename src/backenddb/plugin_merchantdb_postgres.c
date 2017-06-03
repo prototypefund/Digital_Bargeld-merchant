@@ -22,7 +22,7 @@
  */
 #include "platform.h"
 #include <gnunet/gnunet_util_lib.h>
-#include <gnunet/gnunet_postgres_lib.h>
+#include <gnunet/gnunet_pq_lib.h>
 #include <taler/taler_util.h>
 #include <taler/taler_pq_lib.h>
 #include <taler/taler_json_lib.h>

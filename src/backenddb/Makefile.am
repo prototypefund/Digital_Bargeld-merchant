@@ -38,7 +38,6 @@ libtaler_plugin_merchantdb_postgres_la_LDFLAGS = \
   -ltalerutil \
   -ltalerjson \
   -lpq \
-  -lgnunetpostgres \
   -lgnunetutil $(XLIB)
 
 if HAVE_POSTGRESQL
