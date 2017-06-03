@@ -66,60 +66,6 @@ struct PostgresClosure
 
 
 /**
- * Macro to run @a s SQL statement using #GNUNET_POSTGRES_exec()
- * and return with #GNUNET_SYSERR if the operation fails.
- *
- * @param pg context for running the statement
- * @param s SQL statement to run
- */
-#define PG_EXEC(pg,s) do {                                            \
-    if (GNUNET_OK != GNUNET_POSTGRES_exec (pg->conn, s))              \
-    {                                                                 \
-      GNUNET_break (0);                                               \
-      return GNUNET_SYSERR;                                           \
-    }                                                                 \
-  } while (0)
-
-
-/**
- * Macro to run @a s SQL statement using #GNUNET_POSTGRES_exec().
- * Ignore errors, they happen.
- *
- * @param pg context for running the statement
- * @param s SQL statement to run
- */
-#define PG_EXEC_INDEX(pg,s) do {                                        \
-    PGresult *result = PQexec (pg->conn, s);                            \
-    PQclear (result);                                                   \
-  } while (0)
-
-
-/**
- * Prepare an SQL statement and log errors on failure.
- *
- * @param pg context for running the preparation
- * @param n name of the prepared statement
- * @param s SQL statement to run
- * @param c number of arguments @a s expects
- */
-#define PG_PREPARE(pg,n,s,c) do {                                       \
-    ExecStatusType status;                                              \
-    PGresult *res = PQprepare (pg->conn, n, s, c, NULL);                \
-    if ( (NULL == res) ||                                               \
-         (PGRES_COMMAND_OK != (status = PQresultStatus (res))) )        \
-    {                                                                   \
-      if (NULL != res)                                                  \
-      {                                                                 \
-        PQSQL_strerror (GNUNET_ERROR_TYPE_ERROR, "PQprepare", res);     \
-        PQclear (res);                                                  \
-      }                                                                 \
-      return GNUNET_SYSERR;                                             \
-    }                                                                   \
-    PQclear (res);                                                      \
-  } while (0)
-
-
-/**
  * Log a really unexpected PQ error.
  *
  * @param result PQ result object of the PQ operation that failed
@@ -142,13 +88,17 @@ static int
 postgres_drop_tables (void *cls)
 {
   struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_ExecuteStatement es[] = {
+    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_transfers;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_deposits;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_transactions;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_proofs;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_proposal_data;"),
+    GNUNET_PQ_EXECUTE_STATEMENT_END
+  };
 
-  PG_EXEC_INDEX (pg, "DROP TABLE merchant_transfers;");
-  PG_EXEC_INDEX (pg, "DROP TABLE merchant_deposits;");
-  PG_EXEC_INDEX (pg, "DROP TABLE merchant_transactions;");
-  PG_EXEC_INDEX (pg, "DROP TABLE merchant_proofs;");
-  PG_EXEC_INDEX (pg, "DROP TABLE merchant_proposal_data;");
-  return GNUNET_OK;
+  return GNUNET_PQ_exec_statements (pg->conn,
+                                    es);
 }
 
 
@@ -162,286 +112,273 @@ static int
 postgres_initialize (void *cls)
 {
   struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_ExecuteStatement es[] = {
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proposal_data ("
+                            "order_id VARCHAR NOT NULL"
+                            ",merchant_pub BYTEA NOT NULL"
+                            ",proposal_data BYTEA NOT NULL"
+                            ",h_proposal_data BYTEA NOT NULL"
+                            ",timestamp INT8 NOT NULL"
+                            ",row_id BIGSERIAL"
+                            ",PRIMARY KEY (order_id, merchant_pub)"
+                            ");"),
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transactions ("
+                            " h_proposal_data BYTEA NOT NULL"
+                            ",exchange_uri VARCHAR NOT NULL"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+                            ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
+                            ",timestamp INT8 NOT NULL"
+                            ",refund_deadline INT8 NOT NULL"
+                            ",total_amount_val INT8 NOT NULL"
+                            ",total_amount_frac INT4 NOT NULL"
+                            ",total_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",PRIMARY KEY (h_proposal_data, merchant_pub)"
+                            ");"),
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_deposits ("
+                            " h_proposal_data BYTEA NOT NULL"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+                            ",FOREIGN KEY (h_proposal_data, merchant_pub) REFERENCES merchant_transactions (h_proposal_data, merchant_pub)"
+                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                            ",amount_with_fee_val INT8 NOT NULL"
+                            ",amount_with_fee_frac INT4 NOT NULL"
+                            ",amount_with_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",deposit_fee_val INT8 NOT NULL"
+                            ",deposit_fee_frac INT4 NOT NULL"
+                            ",deposit_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
+                            ",exchange_proof BYTEA NOT NULL"
+                            ",PRIMARY KEY (h_proposal_data, coin_pub)"
+                            ");"),
+  GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
+                          " exchange_uri VARCHAR NOT NULL"
+                          ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
+                          ",execution_time INT8 NOT NULL"
+                          ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
+                          ",proof BYTEA NOT NULL"
+                          ",PRIMARY KEY (wtid, exchange_uri)"
+                          ");"),
+    /* Note that h_proposal_data + coin_pub may actually be unknown to
+       us, e.g. someone else deposits something for us at the exchange.
+       Hence those cannot be foreign keys into deposits/transactions! */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transfers ("
+                            " h_proposal_data BYTEA NOT NULL"
+                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                            ",wtid BYTEA NOT NULL CHECK (LENGTH(wtid)=32)"
+                            ",PRIMARY KEY (h_proposal_data, coin_pub)"
+                            ");"),
+    GNUNET_PQ_make_try_execute ("CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin"
+                                " ON merchant_transfers (h_proposal_data, coin_pub)"),
+    GNUNET_PQ_make_try_execute ("CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid"
+                                " ON merchant_transfers (wtid)"),
+    GNUNET_PQ_EXECUTE_STATEMENT_END
+  };
+  struct GNUNET_PQ_PreparedStatement ps[] = {
+    GNUNET_PQ_make_prepare ("insert_transaction",
+                            "INSERT INTO merchant_transactions"
+                            "(h_proposal_data"
+                            ",exchange_uri"
+                            ",merchant_pub"
+                            ",h_wire"
+                            ",timestamp"
+                            ",refund_deadline"
+                            ",total_amount_val"
+                            ",total_amount_frac"
+                            ",total_amount_curr"
+                            ") VALUES "
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                            9),
+    GNUNET_PQ_make_prepare ("insert_deposit",
+                            "INSERT INTO merchant_deposits"
+                            "(h_proposal_data"
+                            ",merchant_pub"
+                            ",coin_pub"
+                            ",amount_with_fee_val"
+                            ",amount_with_fee_frac"
+                            ",amount_with_fee_curr"
+                            ",deposit_fee_val"
+                            ",deposit_fee_frac"
+                            ",deposit_fee_curr"
+                            ",signkey_pub"
+                            ",exchange_proof) VALUES "
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+                            11),
+    GNUNET_PQ_make_prepare ("insert_transfer",
+                            "INSERT INTO merchant_transfers"
+                            "(h_proposal_data"
+                            ",coin_pub"
+                            ",wtid) VALUES "
+                            "($1, $2, $3)",
+                            3),
+    GNUNET_PQ_make_prepare ("insert_proof",
+                            "INSERT INTO merchant_proofs"
+                            "(exchange_uri"
+                            ",wtid"
+                            ",execution_time"
+                            ",signkey_pub"
+                            ",proof) VALUES "
+                            "($1, $2, $3, $4, $5)",
+                            5),
+    GNUNET_PQ_make_prepare ("insert_proposal_data",
+                            "INSERT INTO merchant_proposal_data"
+                            "(order_id"
+                            ",merchant_pub"
+                            ",timestamp"
+                            ",proposal_data"
+                            ",h_proposal_data)"
+                            " VALUES "
+                            "($1, $2, $3, $4, $5)",
+                            4),
+  GNUNET_PQ_make_prepare ("find_proposal_data_from_hash",
+                          "SELECT"
+                          " proposal_data"
+                          " FROM merchant_proposal_data"
+                          " WHERE"
+                          " h_proposal_data=$1"
+                          " AND merchant_pub=$2",
+                          2),
+    GNUNET_PQ_make_prepare ("find_proposal_data",
+                            "SELECT"
+                            " proposal_data"
+                            " FROM merchant_proposal_data"
+                            " WHERE"
+                            " order_id=$1"
+                            " AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_proposal_data_by_date",
+                            "SELECT"
+                            " proposal_data"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_proposal_data"
+                            " WHERE"
+                            " timestamp<$1"
+                            " AND merchant_pub=$2"
+                            " ORDER BY row_id DESC, timestamp DESC"
+                            " LIMIT $3",
+                            3),
+    GNUNET_PQ_make_prepare ("find_proposal_data_by_date_and_range",
+                            "SELECT"
+                            " proposal_data"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_proposal_data"
+                            " WHERE"
+                            " timestamp<$1"
+                            " AND merchant_pub=$2"
+                            " AND row_id<$3"
+                            " ORDER BY row_id DESC, timestamp DESC"
+                            " LIMIT $4",
+                            4),
+    GNUNET_PQ_make_prepare ("find_proposal_data_by_date_and_range_future",
+                            "SELECT"
+                            " proposal_data"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_proposal_data"
+                            " WHERE"
+                            " timestamp>$1"
+                            " AND merchant_pub=$2"
+                            " AND row_id>$3"
+                            " ORDER BY row_id DESC, timestamp DESC"
+                            " LIMIT $4",
+                            4),
+    GNUNET_PQ_make_prepare ("find_transaction",
+                            "SELECT"
+                            " exchange_uri"
+                            ",h_wire"
+                            ",timestamp"
+                            ",refund_deadline"
+                            ",total_amount_val"
+                            ",total_amount_frac"
+                            ",total_amount_curr"
+                            " FROM merchant_transactions"
+                            " WHERE h_proposal_data=$1"
+                            " AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_deposits",
+                            "SELECT"
+                            " coin_pub"
+                            ",amount_with_fee_val"
+                            ",amount_with_fee_frac"
+                            ",amount_with_fee_curr"
+                            ",deposit_fee_val"
+                            ",deposit_fee_frac"
+                            ",deposit_fee_curr"
+                            ",exchange_proof"
+                            " FROM merchant_deposits"
+                            " WHERE h_proposal_data=$1"
+                            " AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_deposits_by_hash_and_coin",
+                            "SELECT"
+                            " amount_with_fee_val"
+                            ",amount_with_fee_frac"
+                            ",amount_with_fee_curr"
+                            ",deposit_fee_val"
+                            ",deposit_fee_frac"
+                            ",deposit_fee_curr"
+                            ",exchange_proof"
+                            " FROM merchant_deposits"
+                            " WHERE h_proposal_data=$1"
+                            " AND merchant_pub=$2"
+                            " AND coin_pub=$3",
+                            3),
+    GNUNET_PQ_make_prepare ("find_transfers_by_hash",
+                            "SELECT"
+                            " coin_pub"
+                            ",wtid"
+                            ",merchant_proofs.execution_time"
+                            ",merchant_proofs.proof"
+                            " FROM merchant_transfers"
+                            "   JOIN merchant_proofs USING (wtid)"
+                            " WHERE h_proposal_data=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("find_deposits_by_wtid",
+                            "SELECT"
+                            " merchant_transfers.h_proposal_data"
+                            ",merchant_transfers.coin_pub"
+                            ",merchant_deposits.amount_with_fee_val"
+                            ",merchant_deposits.amount_with_fee_frac"
+                            ",merchant_deposits.amount_with_fee_curr"
+                            ",merchant_deposits.deposit_fee_val"
+                            ",merchant_deposits.deposit_fee_frac"
+                            ",merchant_deposits.deposit_fee_curr"
+                            ",merchant_deposits.exchange_proof"
+                            " FROM merchant_transfers"
+                            "   JOIN merchant_deposits"
+                            "     ON (merchant_deposits.h_proposal_data = merchant_transfers.h_proposal_data"
+                            "       AND"
+                            "         merchant_deposits.coin_pub = merchant_transfers.coin_pub)"
+                            " WHERE wtid=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("find_proof_by_wtid",
+                            "SELECT"
+                            " proof"
+                            " FROM merchant_proofs"
+                            " WHERE wtid=$1"
+                            "  AND exchange_uri=$2",
+                            2),
+    GNUNET_PQ_PREPARED_STATEMENT_END
+  };
 
-  /* Setup tables */
-  PG_EXEC (pg,
-           "CREATE TABLE IF NOT EXISTS merchant_proposal_data ("
-           "order_id VARCHAR NOT NULL"
-           ",merchant_pub BYTEA NOT NULL"
-           ",proposal_data BYTEA NOT NULL"
-           ",h_proposal_data BYTEA NOT NULL"
-           ",timestamp INT8 NOT NULL"
-           ",row_id BIGSERIAL"
-	   ",PRIMARY KEY (order_id, merchant_pub)"
-           ");");
+  if (GNUNET_OK !=
+      GNUNET_PQ_exec_statements (pg->conn,
+                                 es))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
 
-  PG_EXEC (pg,
-           "CREATE TABLE IF NOT EXISTS merchant_transactions ("
-           " h_proposal_data BYTEA NOT NULL"
-           ",exchange_uri VARCHAR NOT NULL"
-	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-           ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
-           ",timestamp INT8 NOT NULL"
-           ",refund_deadline INT8 NOT NULL"
-           ",total_amount_val INT8 NOT NULL"
-           ",total_amount_frac INT4 NOT NULL"
-           ",total_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
-	   ",PRIMARY KEY (h_proposal_data, merchant_pub)"
-           ");");
-  PG_EXEC (pg,
-           "CREATE TABLE IF NOT EXISTS merchant_deposits ("
-	   " h_proposal_data BYTEA NOT NULL"
-	   ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-	   ",FOREIGN KEY (h_proposal_data, merchant_pub) REFERENCES merchant_transactions (h_proposal_data, merchant_pub)"
-           ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-           ",amount_with_fee_val INT8 NOT NULL"
-           ",amount_with_fee_frac INT4 NOT NULL"
-           ",amount_with_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
-           ",deposit_fee_val INT8 NOT NULL"
-           ",deposit_fee_frac INT4 NOT NULL"
-           ",deposit_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
-           ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
-           ",exchange_proof BYTEA NOT NULL"
-           ",PRIMARY KEY (h_proposal_data, coin_pub)"
-           ");");
-  PG_EXEC (pg,
-           "CREATE TABLE IF NOT EXISTS merchant_proofs ("
-           " exchange_uri VARCHAR NOT NULL"
-           ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
-           ",execution_time INT8 NOT NULL"
-           ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
-           ",proof BYTEA NOT NULL"
-           ",PRIMARY KEY (wtid, exchange_uri)"
-           ");");
-  /* Note that h_proposal_data + coin_pub may actually be unknown to
-     us, e.g. someone else deposits something for us at the exchange.
-     Hence those cannot be foreign keys into deposits/transactions! */
-  PG_EXEC (pg,
-           "CREATE TABLE IF NOT EXISTS merchant_transfers ("
-           " h_proposal_data BYTEA NOT NULL"
-           ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-           ",wtid BYTEA NOT NULL CHECK (LENGTH(wtid)=32)"
-           ",PRIMARY KEY (h_proposal_data, coin_pub)"
-           ");");
-  PG_EXEC_INDEX (pg,
-                 "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin"
-                 " ON merchant_transfers (h_proposal_data, coin_pub)");
-  PG_EXEC_INDEX (pg,
-                 "CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid"
-                 " ON merchant_transfers (wtid)");
-
-  /* Setup prepared "INSERT" statements */
-  PG_PREPARE (pg,
-              "insert_transaction",
-              "INSERT INTO merchant_transactions"
-              "(h_proposal_data"
-              ",exchange_uri"
-	      ",merchant_pub"
-              ",h_wire"
-              ",timestamp"
-              ",refund_deadline"
-              ",total_amount_val"
-              ",total_amount_frac"
-              ",total_amount_curr"
-              ") VALUES "
-              "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-              9);
-  PG_PREPARE (pg,
-              "insert_deposit",
-              "INSERT INTO merchant_deposits"
-              "(h_proposal_data"
-	      ",merchant_pub"
-              ",coin_pub"
-              ",amount_with_fee_val"
-              ",amount_with_fee_frac"
-              ",amount_with_fee_curr"
-              ",deposit_fee_val"
-              ",deposit_fee_frac"
-              ",deposit_fee_curr"
-              ",signkey_pub"
-              ",exchange_proof) VALUES "
-              "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
-              11);
-  PG_PREPARE (pg,
-              "insert_transfer",
-              "INSERT INTO merchant_transfers"
-              "(h_proposal_data"
-              ",coin_pub"
-              ",wtid) VALUES "
-              "($1, $2, $3)",
-              3);
-  PG_PREPARE (pg,
-              "insert_proof",
-              "INSERT INTO merchant_proofs"
-              "(exchange_uri"
-              ",wtid"
-              ",execution_time"
-              ",signkey_pub"
-              ",proof) VALUES "
-              "($1, $2, $3, $4, $5)",
-              5);
-
-  PG_PREPARE (pg,
-              "insert_proposal_data",
-              "INSERT INTO merchant_proposal_data"
-              "(order_id"
-              ",merchant_pub"
-              ",timestamp"
-              ",proposal_data"
-              ",h_proposal_data)"
-              " VALUES "
-              "($1, $2, $3, $4, $5)",
-              4);
-
-  PG_PREPARE (pg,
-              "find_proposal_data_from_hash",
-              "SELECT"
-              " proposal_data"
-              " FROM merchant_proposal_data"
-              " WHERE"
-              " h_proposal_data=$1"
-              " AND merchant_pub=$2",
-              2);
-
-  PG_PREPARE (pg,
-              "find_proposal_data",
-              "SELECT"
-              " proposal_data"
-              " FROM merchant_proposal_data"
-              " WHERE"
-              " order_id=$1"
-              " AND merchant_pub=$2",
-              2);
-
-  PG_PREPARE (pg,
-              "find_proposal_data_by_date",
-              "SELECT"
-              " proposal_data"
-              ",order_id"
-              ",row_id"
-              " FROM merchant_proposal_data"
-              " WHERE"
-              " timestamp<$1"
-              " AND merchant_pub=$2"
-              " ORDER BY row_id DESC, timestamp DESC"
-              " LIMIT $3",
-              3);
-
-  PG_PREPARE (pg,
-              "find_proposal_data_by_date_and_range",
-              "SELECT"
-              " proposal_data"
-              ",order_id"
-              ",row_id"
-              " FROM merchant_proposal_data"
-              " WHERE"
-              " timestamp<$1"
-              " AND merchant_pub=$2"
-              " AND row_id<$3"
-              " ORDER BY row_id DESC, timestamp DESC"
-              " LIMIT $4",
-              4);
-
-  PG_PREPARE (pg,
-              "find_proposal_data_by_date_and_range_future",
-              "SELECT"
-              " proposal_data"
-              ",order_id"
-              ",row_id"
-              " FROM merchant_proposal_data"
-              " WHERE"
-              " timestamp>$1"
-              " AND merchant_pub=$2"
-              " AND row_id>$3"
-              " ORDER BY row_id DESC, timestamp DESC"
-              " LIMIT $4",
-              4);
-
-  /* Setup prepared "SELECT" statements */
-  PG_PREPARE (pg,
-              "find_transaction",
-              "SELECT"
-              " exchange_uri"
-              ",h_wire"
-              ",timestamp"
-              ",refund_deadline"
-              ",total_amount_val"
-              ",total_amount_frac"
-              ",total_amount_curr"
-              " FROM merchant_transactions"
-              " WHERE h_proposal_data=$1"
-	      " AND merchant_pub=$2",
-              2);
-  PG_PREPARE (pg,
-              "find_deposits",
-              "SELECT"
-              " coin_pub"
-              ",amount_with_fee_val"
-              ",amount_with_fee_frac"
-              ",amount_with_fee_curr"
-              ",deposit_fee_val"
-              ",deposit_fee_frac"
-              ",deposit_fee_curr"
-              ",exchange_proof"
-              " FROM merchant_deposits"
-              " WHERE h_proposal_data=$1"
-              " AND merchant_pub=$2",
-              2);
-  PG_PREPARE (pg,
-              "find_deposits_by_hash_and_coin",
-              "SELECT"
-              " amount_with_fee_val"
-              ",amount_with_fee_frac"
-              ",amount_with_fee_curr"
-              ",deposit_fee_val"
-              ",deposit_fee_frac"
-              ",deposit_fee_curr"
-              ",exchange_proof"
-              " FROM merchant_deposits"
-              " WHERE h_proposal_data=$1"
-              " AND merchant_pub=$2"
-              " AND coin_pub=$3",
-              3);
-  PG_PREPARE (pg,
-              "find_transfers_by_hash",
-              "SELECT"
-              " coin_pub"
-              ",wtid"
-              ",merchant_proofs.execution_time"
-              ",merchant_proofs.proof"
-              " FROM merchant_transfers"
-              "   JOIN merchant_proofs USING (wtid)"
-              " WHERE h_proposal_data=$1",
-              1);
-  PG_PREPARE (pg,
-              "find_deposits_by_wtid",
-              "SELECT"
-              " merchant_transfers.h_proposal_data"
-              ",merchant_transfers.coin_pub"
-              ",merchant_deposits.amount_with_fee_val"
-              ",merchant_deposits.amount_with_fee_frac"
-              ",merchant_deposits.amount_with_fee_curr"
-              ",merchant_deposits.deposit_fee_val"
-              ",merchant_deposits.deposit_fee_frac"
-              ",merchant_deposits.deposit_fee_curr"
-              ",merchant_deposits.exchange_proof"
-              " FROM merchant_transfers"
-              "   JOIN merchant_deposits"
-              "     ON (merchant_deposits.h_proposal_data = merchant_transfers.h_proposal_data"
-              "       AND"
-              "         merchant_deposits.coin_pub = merchant_transfers.coin_pub)"
-              " WHERE wtid=$1",
-              1);
-  PG_PREPARE (pg,
-              "find_proof_by_wtid",
-              "SELECT"
-              " proof"
-              " FROM merchant_proofs"
-              " WHERE wtid=$1"
-              "  AND exchange_uri=$2",
-              2);
+  if (GNUNET_OK !=
+      GNUNET_PQ_prepare_statements (pg->conn,
+                                    ps))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
   return GNUNET_OK;
 }
+
 
 /**
  * Retrieve proposal data given its proposal data's hashcode
@@ -897,7 +834,7 @@ postgres_find_proposal_data_history (void *cls,
   PQclear (result);
   return GNUNET_OK;
 
-}                                     
+}
 
 
 /**
@@ -1645,7 +1582,8 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
       return NULL;
     }
   }
-  pg->conn = GNUNET_POSTGRES_connect (cfg, "merchantdb-postgres");
+  pg->conn = GNUNET_PQ_connect_with_cfg (cfg,
+                                         "merchantdb-postgres");
   if (NULL == pg->conn)
   {
     GNUNET_free (pg);
