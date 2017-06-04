@@ -772,6 +772,7 @@ history_cb (void *cls,
   struct Command *cmd = &is->commands[is->ip];
   unsigned int nresult;
 
+  cmd->details.history.ho = NULL;
   if (MHD_HTTP_OK != http_status)
   {
     fail (is);
@@ -793,6 +794,7 @@ history_cb (void *cls,
 
   next_command (is);
 }
+
 
 /**
  * Check if the given historic event @a h corresponds to the given
@@ -1019,6 +1021,7 @@ reserve_withdraw_cb (void *cls,
       fail (is);
       return;
     }
+    GNUNET_assert (NULL == cmd->details.reserve_withdraw.sig.rsa_signature);
     cmd->details.reserve_withdraw.sig.rsa_signature
       = GNUNET_CRYPTO_rsa_signature_dup (sig->rsa_signature);
     break;
@@ -1156,9 +1159,7 @@ pay_cb (void *cls,
       fail (is);
       return;
     }
-
   }
-
   next_command (is);
 }
 
@@ -1235,7 +1236,6 @@ track_transfer_cb (void *cls,
   {
     case MHD_HTTP_OK:
       break;
-
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Unhandled HTTP status.\n");
@@ -1357,6 +1357,153 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
 
 
 /**
+ * Reset the interpreter's state.
+ *
+ * @param is interpreter to reset
+ */
+static void
+cleanup_state (struct InterpreterState *is)
+{
+  struct Command *cmd;
+
+  for (unsigned int i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
+  {
+    switch (cmd->oc)
+    {
+    case OC_END:
+      GNUNET_assert (0);
+      break;
+    case OC_PROPOSAL_LOOKUP:
+      if (NULL != cmd->details.proposal_lookup.plo)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_proposal_lookup_cancel (cmd->details.proposal_lookup.plo);
+      }
+      break;
+    case OC_ADMIN_ADD_INCOMING:
+      if (NULL != cmd->details.admin_add_incoming.aih)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
+        cmd->details.admin_add_incoming.aih = NULL;
+      }
+      break;
+    case OC_WITHDRAW_STATUS:
+      if (NULL != cmd->details.reserve_status.wsh)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_EXCHANGE_reserve_status_cancel (cmd->details.reserve_status.wsh);
+        cmd->details.reserve_status.wsh = NULL;
+      }
+      break;
+    case OC_WITHDRAW_SIGN:
+      if (NULL != cmd->details.reserve_withdraw.wsh)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_EXCHANGE_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
+        cmd->details.reserve_withdraw.wsh = NULL;
+      }
+      if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
+      {
+        GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
+        cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
+      }
+      break;
+    case OC_PROPOSAL:
+      if (NULL != cmd->details.proposal.po)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
+        cmd->details.proposal.po = NULL;
+      }
+      if (NULL != cmd->details.proposal.contract_terms)
+      {
+        json_decref (cmd->details.proposal.contract_terms);
+        cmd->details.proposal.contract_terms = NULL;
+      }
+      break;
+    case OC_PAY:
+      if (NULL != cmd->details.pay.ph)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_pay_cancel (cmd->details.pay.ph);
+        cmd->details.pay.ph = NULL;
+      }
+      break;
+    case OC_RUN_AGGREGATOR:
+      if (NULL != cmd->details.run_aggregator.aggregator_proc)
+      {
+        GNUNET_break (0 ==
+                      GNUNET_OS_process_kill (cmd->details.run_aggregator.aggregator_proc,
+                                              SIGKILL));
+        GNUNET_OS_process_wait (cmd->details.run_aggregator.aggregator_proc);
+        GNUNET_OS_process_destroy (cmd->details.run_aggregator.aggregator_proc);
+        cmd->details.run_aggregator.aggregator_proc = NULL;
+      }
+      if (NULL != cmd->details.run_aggregator.child_death_task)
+      {
+        GNUNET_SCHEDULER_cancel (cmd->details.run_aggregator.child_death_task);
+        cmd->details.run_aggregator.child_death_task = NULL;
+      }
+      break;
+    case OC_CHECK_BANK_TRANSFER:
+      break;
+    case OC_CHECK_BANK_TRANSFERS_EMPTY:
+      break;
+    case OC_TRACK_TRANSFER:
+      if (NULL != cmd->details.track_transfer.tdo)
+      {
+        TALER_MERCHANT_track_transfer_cancel (cmd->details.track_transfer.tdo);
+        cmd->details.track_transfer.tdo = NULL;
+      }
+      break;
+    case OC_TRACK_TRANSACTION:
+      if (NULL != cmd->details.track_transaction.tth)
+      {
+        TALER_MERCHANT_track_transaction_cancel (cmd->details.track_transaction.tth);
+        cmd->details.track_transaction.tth = NULL;
+      }
+      break;
+    case OC_HISTORY:
+
+      if (NULL != cmd->details.history.ho)
+      {
+        TALER_MERCHANT_history_cancel (cmd->details.history.ho);
+        cmd->details.history.ho = NULL;
+      }
+      break;
+
+    default:
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Shutdown: unknown instruction %d at %u (%s)\n",
+                  cmd->oc,
+                  i,
+                  cmd->label);
+      break;
+    }
+  }
+}
+
+
+/**
  * Run the main interpreter loop that performs exchange operations.
  *
  * @param cls contains the `struct InterpreterState`
@@ -1398,13 +1545,13 @@ interpreter_run (void *cls)
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
+      cleanup_state (is);
       is->ip = 0;
       instance_idx++;
       instance = instances[instance_idx];
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                   "Switching instance: `%s'\n",
                   instance);
-
       is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
                                            is);
       return;
@@ -1865,7 +2012,7 @@ interpreter_run (void *cls)
                                                           cmd->details.history.start,
                                                           cmd->details.history.nrows,
 	                                                  cmd->details.history.date,
-							  history_cb,
+							  &history_cb,
 							  is)))
     {
       fail (is);
@@ -1908,8 +2055,6 @@ static void
 do_shutdown (void *cls)
 {
   struct InterpreterState *is = cls;
-  struct Command *cmd;
-  unsigned int i;
 
   if (NULL != timeout_task)
   {
@@ -1918,141 +2063,7 @@ do_shutdown (void *cls)
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Shutdown executing\n");
-  for (i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
-  {
-    switch (cmd->oc)
-    {
-    case OC_END:
-      GNUNET_assert (0);
-      break;
-    case OC_PROPOSAL_LOOKUP:
-      if (NULL != cmd->details.proposal_lookup.plo)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_MERCHANT_proposal_lookup_cancel (cmd->details.proposal_lookup.plo);
-      }
-        break;
-
-    case OC_ADMIN_ADD_INCOMING:
-      if (NULL != cmd->details.admin_add_incoming.aih)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
-        cmd->details.admin_add_incoming.aih = NULL;
-      }
-      break;
-    case OC_WITHDRAW_STATUS:
-      if (NULL != cmd->details.reserve_status.wsh)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_EXCHANGE_reserve_status_cancel (cmd->details.reserve_status.wsh);
-        cmd->details.reserve_status.wsh = NULL;
-      }
-      break;
-    case OC_WITHDRAW_SIGN:
-      if (NULL != cmd->details.reserve_withdraw.wsh)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_EXCHANGE_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
-        cmd->details.reserve_withdraw.wsh = NULL;
-      }
-      if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
-      {
-        GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
-        cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
-      }
-      break;
-    case OC_PROPOSAL:
-      if (NULL != cmd->details.proposal.po)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
-        cmd->details.proposal.po = NULL;
-      }
-      if (NULL != cmd->details.proposal.contract_terms)
-      {
-        json_decref (cmd->details.proposal.contract_terms);
-        cmd->details.proposal.contract_terms = NULL;
-      }
-      break;
-    case OC_PAY:
-      if (NULL != cmd->details.pay.ph)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_MERCHANT_pay_cancel (cmd->details.pay.ph);
-        cmd->details.pay.ph = NULL;
-      }
-      break;
-    case OC_RUN_AGGREGATOR:
-      if (NULL != cmd->details.run_aggregator.aggregator_proc)
-      {
-        GNUNET_break (0 ==
-                      GNUNET_OS_process_kill (cmd->details.run_aggregator.aggregator_proc,
-                                              SIGKILL));
-        GNUNET_OS_process_wait (cmd->details.run_aggregator.aggregator_proc);
-        GNUNET_OS_process_destroy (cmd->details.run_aggregator.aggregator_proc);
-        cmd->details.run_aggregator.aggregator_proc = NULL;
-      }
-      if (NULL != cmd->details.run_aggregator.child_death_task)
-      {
-        GNUNET_SCHEDULER_cancel (cmd->details.run_aggregator.child_death_task);
-        cmd->details.run_aggregator.child_death_task = NULL;
-      }
-      break;
-    case OC_CHECK_BANK_TRANSFER:
-      break;
-    case OC_CHECK_BANK_TRANSFERS_EMPTY:
-      break;
-    case OC_TRACK_TRANSFER:
-      if (NULL != cmd->details.track_transfer.tdo)
-      {
-        TALER_MERCHANT_track_transfer_cancel (cmd->details.track_transfer.tdo);
-        cmd->details.track_transfer.tdo = NULL;
-      }
-      break;
-    case OC_TRACK_TRANSACTION:
-      if (NULL != cmd->details.track_transaction.tth)
-      {
-        TALER_MERCHANT_track_transaction_cancel (cmd->details.track_transaction.tth);
-        cmd->details.track_transaction.tth = NULL;
-      }
-      break;
-    case OC_HISTORY:
-
-      if (NULL != cmd->details.history.ho)
-      {
-        TALER_MERCHANT_history_cancel (cmd->details.history.ho);
-        cmd->details.history.ho = NULL;
-      }
-      break;
-
-    default:
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Shutdown: unknown instruction %d at %u (%s)\n",
-                  cmd->oc,
-                  i,
-                  cmd->label);
-      break;
-    }
-  }
+  cleanup_state (is);
   if (NULL != is->task)
   {
     GNUNET_SCHEDULER_cancel (is->task);
