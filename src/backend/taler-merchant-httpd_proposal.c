@@ -160,7 +160,8 @@ proposal_put (struct MHD_Connection *connection,
 
   /* Add order_id if it doesn't exist. */
 
-  if (NULL == json_string_value (json_object_get (order, "order_id")))
+  if (NULL == json_string_value (json_object_get (order,
+                                                  "order_id")))
   {
     char buf[256];
     time_t timer;
@@ -183,7 +184,8 @@ proposal_put (struct MHD_Connection *connection,
                          json_string (buf));
   }
 
-  if (NULL == json_object_get (order, "timestamp"))
+  if (NULL == json_object_get (order,
+                               "timestamp"))
   {
     struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
 
@@ -233,7 +235,9 @@ proposal_put (struct MHD_Connection *connection,
   }
 
   /* extract fields we need to sign separately */
-  res = TMH_PARSE_json_data (connection, order, spec);
+  res = TMH_PARSE_json_data (connection,
+                             order,
+                             spec);
   if (GNUNET_NO == res)
   {
     return MHD_YES;
@@ -244,7 +248,6 @@ proposal_put (struct MHD_Connection *connection,
 					      TALER_EC_NONE,
 					      "Impossible to parse the order");
   }
-
 
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))
@@ -260,6 +263,7 @@ proposal_put (struct MHD_Connection *connection,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Not able to find the specified instance\n");
+    GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
 					 "Unknown instance given");
@@ -343,6 +347,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
 {
   int res;
   struct TMH_JsonParseContext *ctx;
+  json_t *root;
+  json_t *order;
 
   if (NULL == *connection_cls)
   {
@@ -355,8 +361,6 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
     ctx = *connection_cls;
   }
 
-  json_t *root;
-
   res = TMH_PARSE_post_json (connection,
                              &ctx->json_parse_context,
                              upload_data,
@@ -368,8 +372,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
-  json_t *order = json_object_get (root, "order");
-
+  order = json_object_get (root,
+                           "order");
   if (NULL == order)
   {
     res = TMH_RESPONSE_reply_arg_missing (connection,
@@ -378,7 +382,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   }
   else
   {
-    res = proposal_put (connection, order);
+    res = proposal_put (connection,
+                        order);
   }
   json_decref (root);
   return res;

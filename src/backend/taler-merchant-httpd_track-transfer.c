@@ -108,6 +108,11 @@ struct TrackTransferContext
   const json_t *original_response;
 
   /**
+   * Modified response to return to the frontend.
+   */
+  json_t *deposits_response;
+
+  /**
    * Which transaction detail are we currently looking at?
    */
   unsigned int current_offset;
@@ -130,6 +135,7 @@ struct TrackTransferContext
  * individual deposits for each h_contract_terms.
  */
 struct Entry {
+
   /**
    * Sum accumulator for deposited value.
    */
@@ -140,12 +146,8 @@ struct Entry {
    */
   struct TALER_Amount deposit_fee;
 
-  };
+};
 
-/**
- * Modified response to return to the frontend.
- */
-static json_t *deposits_response;
 
 /**
  * Free the @a rctx.
@@ -184,8 +186,8 @@ free_transfer_track_context (struct TrackTransferContext *rctx)
  * @param cls closure, NULL
  * @param key current key
  * @param value a `struct MerchantInstance`
- * @return GNUNET_YES if the iteration should continue,
- * GNUNET_NO otherwise.
+ * @return #GNUNET_YES if the iteration should continue,
+ *         #GNUNET_NO otherwise.
  */
 static int
 hashmap_free (void *cls,
@@ -206,10 +208,10 @@ hashmap_free (void *cls,
  * @param cls closure
  * @param key map's current key
  * @param map's current value
- * @return GNUNET_YES if iteration is to be continued,
- * GNUNET_NO otherwise.
+ * @return #GNUNET_YES if iteration is to be continued,
+ *         #GNUNET_NO otherwise.
  */
-int
+static int
 build_deposits_response (void *cls,
                          const struct GNUNET_HashCode *key,
                          void *value)
@@ -220,31 +222,35 @@ build_deposits_response (void *cls,
   json_t *contract_terms;
   json_t *order_id;
 
-  if (GNUNET_OK != db->find_contract_terms_from_hash (db->cls,
-                                                     &contract_terms,
-                                                     key,
-                                                     &rctx->mi->pubkey))
+  if (GNUNET_OK !=
+      db->find_contract_terms_from_hash (db->cls,
+                                         &contract_terms,
+                                         key,
+                                         &rctx->mi->pubkey))
   {
     GNUNET_break_op (0);
     return GNUNET_NO;
   }
 
-  order_id = json_object_get (contract_terms, "order_id");
+  order_id = json_object_get (contract_terms,
+                              "order_id");
   if (NULL == order_id)
   {
     GNUNET_break_op (0);
+    json_decref (contract_terms);
     return GNUNET_NO;
   }
-  element = json_pack ("{s:s, s:o, s:o}",
-                       "order_id", json_string_value (order_id),
+  element = json_pack ("{s:O, s:o, s:o}",
+                       "order_id", order_id,
                        "deposit_value", TALER_JSON_from_amount (&entry->deposit_value),
                        "deposit_fee", TALER_JSON_from_amount (&entry->deposit_fee));
+  json_decref (contract_terms);
   if (NULL == element)
   {
     GNUNET_break_op (0);
     return GNUNET_NO;
   }
-  json_array_append_new (deposits_response,
+  json_array_append_new (rctx->deposits_response,
                          element);
   return GNUNET_YES;
 }
@@ -302,12 +308,14 @@ transform_response (const json_t *result,
                                                                     &h_key)))
     {
       /* The map already knows this h_contract_terms*/
-      if ((GNUNET_SYSERR == TALER_amount_add (&current_entry->deposit_value,
-                                             &current_entry->deposit_value,
-                                             &iter_value)) ||
-          (GNUNET_SYSERR == TALER_amount_add (&current_entry->deposit_fee,
-                                              &current_entry->deposit_fee,
-                                              &iter_fee)))
+      if ( (GNUNET_SYSERR ==
+            TALER_amount_add (&current_entry->deposit_value,
+                              &current_entry->deposit_value,
+                              &iter_value)) ||
+           (GNUNET_SYSERR ==
+            TALER_amount_add (&current_entry->deposit_fee,
+                              &current_entry->deposit_fee,
+                              &iter_fee)) )
       {
         GNUNET_JSON_parse_free (spec);
         goto cleanup;
@@ -332,11 +340,12 @@ transform_response (const json_t *result,
     }
     GNUNET_JSON_parse_free (spec);
   }
-  deposits_response = json_array ();
+  rctx->deposits_response = json_array ();
 
-  if (GNUNET_SYSERR == GNUNET_CONTAINER_multihashmap_iterate (map,
-                                                              build_deposits_response,
-                                                              rctx))
+  if (GNUNET_SYSERR ==
+      GNUNET_CONTAINER_multihashmap_iterate (map,
+                                             &build_deposits_response,
+                                             rctx))
     goto cleanup;
 
   result_mod = json_copy ((struct json_t *) result);
@@ -344,7 +353,8 @@ transform_response (const json_t *result,
                    "deposits");
   json_object_set_new (result_mod,
                        "deposits_sums",
-                       deposits_response);
+                       rctx->deposits_response);
+  rctx->deposits_response = NULL;
  cleanup:
   GNUNET_CONTAINER_multihashmap_iterate (map,
                                          &hashmap_free,

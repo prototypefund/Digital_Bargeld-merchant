@@ -1243,6 +1243,7 @@ track_transfer_cb (void *cls,
   next_command (is);
 }
 
+
 /**
  * Callback for GET /proposal issued at backend. Just check
  * whether response code is as expected.
@@ -1259,12 +1260,11 @@ proposal_lookup_cb (void *cls,
   struct Command *cmd = &is->commands[is->ip];
 
   cmd->details.proposal_lookup.plo = NULL;
-
   if (cmd->expected_response_code != http_status)
     fail (is);
-
   next_command (is);
 }
+
 
 /**
  * Function called with detailed wire transfer data.
@@ -1402,7 +1402,7 @@ interpreter_run (void *cls)
       instance_idx++;
       instance = instances[instance_idx];
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "Switching instance: '%s'\n",
+                  "Switching instance: `%s'\n",
                   instance);
 
       is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
@@ -1598,14 +1598,15 @@ interpreter_run (void *cls)
                           &error);
       if (NULL != instance)
       {
-
         json_t *merchant;
 
         merchant = json_object ();
         json_object_set_new (merchant,
                              "instance",
                              json_string (instance));
-        json_object_set (order, "merchant", merchant);
+        json_object_set_new (order,
+                             "merchant",
+                             merchant);
       }
       if (NULL == order)
       {
@@ -2058,6 +2059,8 @@ do_shutdown (void *cls)
     is->task = NULL;
   }
   GNUNET_free (is);
+  for (unsigned int i=0;i<ninstances;i++)
+    GNUNET_free (instances[i]);
   GNUNET_free_non_null (instances);
   if (NULL != exchange)
   {
@@ -2429,16 +2432,23 @@ main (int argc,
   GNUNET_assert (GNUNET_OK ==
                  GNUNET_CONFIGURATION_load (cfg,
                                             "test_merchant_api.conf"));
-  GNUNET_break (GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                       "merchant",
-                                                       "INSTANCES",
-                                                       &_instances));
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                        "merchant",
+                                                        "INSTANCES",
+                                                        &_instances));
+  fprintf (stderr,
+           "Found instances `%s'\n",
+           _instances);
   GNUNET_break (NULL != (token = strtok (_instances, " ")));
-  GNUNET_array_append (instances, ninstances, token);
-
+  GNUNET_array_append (instances,
+                       ninstances,
+                       GNUNET_strdup (token));
   while (NULL != (token = strtok (NULL, " ")))
-    GNUNET_array_append(instances, ninstances, token);
-
+    GNUNET_array_append (instances,
+                         ninstances,
+                         GNUNET_strdup (token));
+  GNUNET_free (_instances);
   instance = instances[instance_idx];
   db = TALER_MERCHANTDB_plugin_load (cfg);
   if (NULL == db)

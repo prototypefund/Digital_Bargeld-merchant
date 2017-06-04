@@ -127,9 +127,9 @@ handle_proposal_finished (void *cls,
   hashp = NULL;
   switch (response_code)
   {
-    case 0:
-      break;
-    case MHD_HTTP_OK:
+  case 0:
+    break;
+  case MHD_HTTP_OK:
     {
       struct GNUNET_JSON_Specification spec[] = {
         GNUNET_JSON_spec_json ("data", &contract_terms),
@@ -150,33 +150,33 @@ handle_proposal_finished (void *cls,
       hashp = &hash;
       sigp = &sig;
     }
-      break;
-    case MHD_HTTP_BAD_REQUEST:
+    break;
+  case MHD_HTTP_BAD_REQUEST:
       /* This should never happen, either us or the merchant is buggy
          (or API version conflict); just pass JSON reply to the application */
-      break;
-    case MHD_HTTP_FORBIDDEN:
-      break;
-    case MHD_HTTP_UNAUTHORIZED:
-      /* Nothing really to verify, merchant says one of the signatures is
-         invalid; as we checked them, this should never happen, we
-         should pass the JSON reply to the application */
-      break;
-    case MHD_HTTP_NOT_FOUND:
-      /* Nothing really to verify, this should never
-         happen, we should pass the JSON reply to the application */
-      break;
-    case MHD_HTTP_INTERNAL_SERVER_ERROR:
-      /* Server had an internal issue; we should retry, but this API
-         leaves this to the application */
-      break;
-    default:
-      /* unexpected response code */
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Unexpected response code %u\n",
-                  (unsigned int) response_code);
-      GNUNET_break (0);
-      response_code = 0;
+    break;
+  case MHD_HTTP_FORBIDDEN:
+    break;
+  case MHD_HTTP_UNAUTHORIZED:
+    /* Nothing really to verify, merchant says one of the signatures is
+       invalid; as we checked them, this should never happen, we
+       should pass the JSON reply to the application */
+    break;
+  case MHD_HTTP_NOT_FOUND:
+    /* Nothing really to verify, this should never
+       happen, we should pass the JSON reply to the application */
+    break;
+  case MHD_HTTP_INTERNAL_SERVER_ERROR:
+    /* Server had an internal issue; we should retry, but this API
+       leaves this to the application */
+    break;
+  default:
+    /* unexpected response code */
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u\n",
+                (unsigned int) response_code);
+    GNUNET_break (0);
+    response_code = 0;
   }
   po->cb (po->cb_cls,
           response_code,
@@ -187,6 +187,7 @@ handle_proposal_finished (void *cls,
           hashp);
   if (NULL != contract_terms)
     json_decref (contract_terms);
+  TALER_MERCHANT_proposal_cancel (po);
 }
 
 
@@ -255,6 +256,7 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
   return po;
 }
 
+
 /**
  * Function called when we're done processing the GET /proposal request.
  *
@@ -276,7 +278,9 @@ handle_proposal_lookup_finished (void *cls,
   plo->cb (plo->cb_cls,
            response_code,
            json);
+  TALER_MERCHANT_proposal_lookup_cancel (plo);
 }
+
 
 /**
  * Calls the GET /proposal API at the backend.  That is,
@@ -329,8 +333,8 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
     return NULL;
   }
   return plo;
-
 }
+
 
 /**
  * Cancel a PUT /proposal request.  This function cannot be used
@@ -350,6 +354,7 @@ TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po)
   GNUNET_free (po->json_enc);
   GNUNET_free (po);
 }
+
 
 /**
  * Cancel a GET /proposal request.
