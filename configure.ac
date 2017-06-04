@@ -17,6 +17,25 @@ AC_CONFIG_MACRO_DIR([m4])
 
 LT_INIT
 
+DX_INIT_DOXYGEN([taler-merchant],,,
+DX_PS_FEATURE(OFF),
+DX_PDF_FEATURE(OFF),
+DX_RTF_FEATURE(OFF),
+DX_CHI_FEATURE(OFF),
+DX_XML_FEATURE(OFF))
+
+AC_MSG_CHECKING([whether to compile documentation ONLY])
+AC_ARG_ENABLE([only-doc],
+  [AS_HELP_STRING([--enable-only-doc], [only compile Taler documentation])],
+  [doc_only=${enableval}],
+  [doc_only=no])
+AC_MSG_RESULT($doc_only)
+AM_CONDITIONAL([DOC_ONLY], [test "$doc_only" = "yes"])
+
+if test "$doc_only" != yes
+then
+
+
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_CC_C99
@@ -271,6 +290,22 @@ AC_CHECK_FUNCS([strdup])
 #
 AC_CHECK_PROG([tsc],[tsc],[yes],[no])
 AM_CONDITIONAL([HAVE_TSC], [test "x$tsc" = xyes])
+
+
+else
+
+# logic if doc_only is set, make sure conditionals are still defined
+AM_CONDITIONAL([HAVE_GNUNETPQ], [false])
+AM_CONDITIONAL([HAVE_POSTGRESQL], [false])
+AM_CONDITIONAL([HAVE_TALERFAKEBANK], [false])
+AM_CONDITIONAL([HAVE_LIBCURL], [false])
+AM_CONDITIONAL([HAVE_LIBGNURL], [false])
+AM_CONDITIONAL([HAVE_TSC], [false])
+AM_CONDITIONAL([USE_COVERAGE], [false])
+
+
+# end of 'doc_only'
+fi
 
 
 AC_CONFIG_FILES([Makefile

@@ -1,12 +1,25 @@
 # This Makefile is in the public domain
 
-SUBDIRS = src
+if DOC_ONLY
+  SUBDIRS = . doc
+else
+  SUBDIRS = . src
 if WITH_DOC
   SUBDIRS += doc
 endif
+endif
+
+@DX_RULES@
 
 ACLOCAL_AMFLAGS = -I m4
-EXTRA_DIST = AUTHORS COPYING.GPL COPYING.AGPL COPYING.LGPL
+EXTRA_DIST = \
+ AUTHORS \
+ COPYING.GPL \
+ COPYING.AGPL \
+ COPYING.LGPL \
+ contrib/gnunet.tag \
+ contrib/microhttpd.tag \
+ Doxyfile
 
 app:
 	mkdir -p $(PACKAGE)-frontend-$(VERSION)-app
