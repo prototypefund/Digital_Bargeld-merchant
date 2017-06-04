@@ -178,9 +178,9 @@ proposal_put (struct MHD_Connection *connection,
               "-%llX",
               (long long unsigned) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK,
                                                              UINT64_MAX));
-    json_object_set (order,
-                     "order_id",
-                     json_string (buf));
+    json_object_set_new (order,
+                         "order_id",
+                         json_string (buf));
   }
 
   if (NULL == json_object_get (order, "timestamp"))
@@ -188,9 +188,9 @@ proposal_put (struct MHD_Connection *connection,
     struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
 
     (void) GNUNET_TIME_round_abs (&now);
-    json_object_set (order,
-                     "timestamp",
-                     GNUNET_JSON_from_time_abs (now));
+    json_object_set_new (order,
+                         "timestamp",
+                         GNUNET_JSON_from_time_abs (now));
   }
 
   if (NULL == json_object_get (order,
@@ -198,9 +198,9 @@ proposal_put (struct MHD_Connection *connection,
   {
     struct GNUNET_TIME_Absolute zero = { 0 };
 
-    json_object_set (order,
-                     "refund_deadline",
-                     GNUNET_JSON_from_time_abs (zero));
+    json_object_set_new (order,
+                         "refund_deadline",
+                         GNUNET_JSON_from_time_abs (zero));
   }
 
   if (NULL == json_object_get (order,
@@ -211,23 +211,25 @@ proposal_put (struct MHD_Connection *connection,
     /* FIXME: read the delay for pay_deadline from config */
     t = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_HOURS);
     (void) GNUNET_TIME_round_abs (&t);
-    json_object_set (order, "pay_deadline", GNUNET_JSON_from_time_abs (t));
+    json_object_set_new (order,
+                         "pay_deadline",
+                         GNUNET_JSON_from_time_abs (t));
   }
 
   if (NULL == json_object_get (order,
                                "max_wire_fee"))
   {
-    json_object_set (order,
-                     "max_wire_fee",
-                     TALER_JSON_from_amount (&default_max_wire_fee));
+    json_object_set_new (order,
+                         "max_wire_fee",
+                         TALER_JSON_from_amount (&default_max_wire_fee));
   }
 
   if (NULL == json_object_get (order,
                                "wire_fee_amortization"))
   {
-    json_object_set (order,
-                     "wire_fee_amortization",
-                     json_integer ((json_int_t) default_wire_fee_amortization));
+    json_object_set_new (order,
+                         "wire_fee_amortization",
+                         json_integer ((json_int_t) default_wire_fee_amortization));
   }
 
   /* extract fields we need to sign separately */

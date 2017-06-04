@@ -215,8 +215,8 @@ build_deposits_response (void *cls,
                          void *value)
 {
   struct TrackTransferContext *rctx = cls;
-  json_t *element;
   struct Entry *entry = value;
+  json_t *element;
   json_t *contract_terms;
   json_t *order_id;
 
@@ -230,22 +230,25 @@ build_deposits_response (void *cls,
   }
 
   order_id = json_object_get (contract_terms, "order_id");
-
-  element = json_pack ("{s:s, s:o, s:o}",
-                       "order_id", json_string_value (order_id),
-                       "deposit_value", TALER_JSON_from_amount (&entry->deposit_value),
-                       "deposit_fee", TALER_JSON_from_amount (&entry->deposit_fee));
-
-  if (NULL == order_id || NULL == element)
+  if (NULL == order_id)
   {
     GNUNET_break_op (0);
     return GNUNET_NO;
   }
-
-  json_array_append_new (deposits_response, element);
-
+  element = json_pack ("{s:s, s:o, s:o}",
+                       "order_id", json_string_value (order_id),
+                       "deposit_value", TALER_JSON_from_amount (&entry->deposit_value),
+                       "deposit_fee", TALER_JSON_from_amount (&entry->deposit_fee));
+  if (NULL == element)
+  {
+    GNUNET_break_op (0);
+    return GNUNET_NO;
+  }
+  json_array_append_new (deposits_response,
+                         element);
   return GNUNET_YES;
 }
+
 
 /**
  * Transform /track/transfer result as gotten from the exchange
@@ -254,8 +257,9 @@ build_deposits_response (void *cls,
  * @param result response from exchange's /track/transfer
  * @result pointer to new JSON, or NULL upon errors.
  */
-json_t *
-transform_response (const json_t *result, struct TrackTransferContext *rctx)
+static json_t *
+transform_response (const json_t *result,
+                    struct TrackTransferContext *rctx)
 {
   json_t *deposits;
   json_t *value;
@@ -267,79 +271,88 @@ transform_response (const json_t *result, struct TrackTransferContext *rctx)
   struct TALER_Amount iter_value;
   struct TALER_Amount iter_fee;
   struct Entry *current_entry;
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Transforming /track/transfer response.\n");
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("deposit_value", &iter_value),
     TALER_JSON_spec_amount ("deposit_fee", &iter_fee),
     GNUNET_JSON_spec_string ("h_contract_terms", &key),
     GNUNET_JSON_spec_end ()
   };
-  
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Transforming /track/transfer response.\n");
   map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
-  deposits = json_object_get (result, "deposits");
+  deposits = json_object_get (result,
+                              "deposits");
 
   json_array_foreach (deposits, index, value)
   {
-    if (GNUNET_OK != GNUNET_JSON_parse (value,
-                                        spec,
-                                        NULL,
-                                        NULL))
+    if (GNUNET_OK !=
+        GNUNET_JSON_parse (value,
+                           spec,
+                           NULL,
+                           NULL))
     {
-      GNUNET_break_op (0); 
+      GNUNET_break_op (0);
       return NULL;
     }
+    GNUNET_CRYPTO_hash_from_string (key,
+                                    &h_key);
 
-    GNUNET_CRYPTO_hash_from_string (key, &h_key);
-
-    if (NULL != (current_entry = GNUNET_CONTAINER_multihashmap_get (map, (const struct GNUNET_HashCode *) &h_key)))
+    if (NULL != (current_entry = GNUNET_CONTAINER_multihashmap_get (map,
+                                                                    &h_key)))
     {
-      /*The map already knows this h_contract_terms*/
+      /* The map already knows this h_contract_terms*/
       if ((GNUNET_SYSERR == TALER_amount_add (&current_entry->deposit_value,
                                              &current_entry->deposit_value,
                                              &iter_value)) ||
           (GNUNET_SYSERR == TALER_amount_add (&current_entry->deposit_fee,
                                               &current_entry->deposit_fee,
                                               &iter_fee)))
+      {
+        GNUNET_JSON_parse_free (spec);
         goto cleanup;
+      }
     }
     else
     {
-      /*First time in the map for this h_contract_terms*/
-      current_entry = GNUNET_malloc (sizeof (struct Entry));
-      memcpy (&current_entry->deposit_value, &iter_value, sizeof (struct TALER_Amount));
-      memcpy (&current_entry->deposit_fee, &iter_fee, sizeof (struct TALER_Amount));
+      /* First time in the map for this h_contract_terms*/
+      current_entry = GNUNET_new (struct Entry);
+      current_entry->deposit_value = iter_value;
+      current_entry->deposit_fee = iter_fee;
 
-      if (GNUNET_SYSERR == GNUNET_CONTAINER_multihashmap_put (map,
-                                                              (const struct GNUNET_HashCode *) &h_key,
-                                                              current_entry,
-                                                              GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
+      if (GNUNET_SYSERR ==
+          GNUNET_CONTAINER_multihashmap_put (map,
+                                             &h_key,
+                                             current_entry,
+                                             GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY))
+      {
+        GNUNET_JSON_parse_free (spec);
         goto cleanup;
+      }
     }
+    GNUNET_JSON_parse_free (spec);
   }
   deposits_response = json_array ();
-  
+
   if (GNUNET_SYSERR == GNUNET_CONTAINER_multihashmap_iterate (map,
                                                               build_deposits_response,
                                                               rctx))
     goto cleanup;
 
-
   result_mod = json_copy ((struct json_t *) result);
-  json_object_del (result_mod, "deposits");
-  json_object_set (result_mod, "deposits_sums", deposits_response);
-
-  goto cleanup;
-
-  cleanup:
-    GNUNET_CONTAINER_multihashmap_iterate (map,
-                                           &hashmap_free,
-                                           NULL);  
-    GNUNET_JSON_parse_free (spec);
-    GNUNET_CONTAINER_multihashmap_destroy (map);
-    return result_mod;
+  json_object_del (result_mod,
+                   "deposits");
+  json_object_set_new (result_mod,
+                       "deposits_sums",
+                       deposits_response);
+ cleanup:
+  GNUNET_CONTAINER_multihashmap_iterate (map,
+                                         &hashmap_free,
+                                         NULL);
+  GNUNET_CONTAINER_multihashmap_destroy (map);
+  return result_mod;
 }
+
 
 /**
  * Resume the given /track/transfer operation and send the given response.
@@ -685,7 +698,8 @@ proof_cb (void *cls,
   struct TrackTransferContext *rctx = cls;
   json_t *transformed_response;
 
-  if (NULL == (transformed_response = transform_response (proof, rctx)))
+  if (NULL == (transformed_response = transform_response (proof,
+                                                          rctx)))
   {
     rctx->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
     rctx->response = TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,

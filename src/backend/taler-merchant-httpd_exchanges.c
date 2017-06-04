@@ -930,9 +930,19 @@ TMH_EXCHANGES_done ()
 
   while (NULL != (exchange = exchange_head))
   {
+    struct FeesByWireMethod *f;
+
     GNUNET_CONTAINER_DLL_remove (exchange_head,
                                  exchange_tail,
                                  exchange);
+    while (NULL != (f = exchange->wire_fees_head))
+    {
+      GNUNET_CONTAINER_DLL_remove (exchange->wire_fees_head,
+                                   exchange->wire_fees_tail,
+                                   f);
+      GNUNET_free (f->wire_method);
+      GNUNET_free (f);
+    }
     if (NULL != exchange->wire_request)
     {
       TALER_EXCHANGE_wire_cancel (exchange->wire_request);

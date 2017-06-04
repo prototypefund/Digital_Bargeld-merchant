@@ -917,16 +917,17 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
 					 "unknown instance");
 
-  if (GNUNET_YES != db->find_contract_terms (db->cls,
-                                            &contract_terms,
-                                            order_id,
-                                            &tctx->mi->pubkey))
-
+  if (GNUNET_YES !=
+      db->find_contract_terms (db->cls,
+                               &contract_terms,
+                               order_id,
+                               &tctx->mi->pubkey))
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
 					 "Given order_id doesn't map to any proposal");
   TALER_JSON_hash (contract_terms,
                    &h_contract_terms);
+  json_decref (contract_terms);
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Trying to track h_contract_terms '%s'\n",

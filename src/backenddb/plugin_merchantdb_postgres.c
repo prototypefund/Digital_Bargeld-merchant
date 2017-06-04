@@ -1503,12 +1503,12 @@ postgres_find_proof_by_wtid (void *cls,
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (wtid),
     GNUNET_PQ_query_param_string (exchange_uri),
     GNUNET_PQ_query_param_end
   };
+
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_proof_by_wtid",
                                     params);
@@ -1532,7 +1532,6 @@ postgres_find_proof_by_wtid (void *cls,
 
   {
     json_t *proof;
-
     struct GNUNET_PQ_ResultSpec rs[] = {
       TALER_PQ_result_spec_json ("proof",
                                  &proof),
