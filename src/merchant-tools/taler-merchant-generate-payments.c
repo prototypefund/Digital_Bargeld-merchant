@@ -283,7 +283,7 @@ struct Command
       /**
        * String describing the amount to add to the reserve.
        */
-      const char *amount;
+      char *amount;
 
       /**
        * Sender's bank account details (JSON).
@@ -377,7 +377,7 @@ struct Command
       /**
        * Amount to pay (from the coin, including fee).
        */
-      const char *amount_with_fee;
+      char *amount_with_fee;
 
       /**
        * Amount to pay (from the coin, excluding fee).  The sum of the
@@ -386,7 +386,7 @@ struct Command
        * the @e amount_with_fee must be larger than the @e
        * total_amount.
        */
-      const char *amount_without_fee;
+      char *amount_without_fee;
 
       /**
        * Deposit handle while operation is running.
@@ -405,11 +405,10 @@ struct Command
 
     } pay;
 
-
-
   } details;
 
 };
+
 
 /**
  * Function run when the test times out.
@@ -422,6 +421,7 @@ do_timeout (void *cls)
   timeout_task = NULL;
   GNUNET_SCHEDULER_shutdown ();
 }
+
 
 /**
  * The generator failed, return with an error code.
@@ -439,6 +439,7 @@ fail (struct InterpreterState *is)
   GNUNET_SCHEDULER_shutdown ();
 }
 
+
 /**
  * Run the main interpreter loop that performs exchange operations.
  *
@@ -446,6 +447,7 @@ fail (struct InterpreterState *is)
  */
 static void
 interpreter_run (void *cls);
+
 
 /**
  * Run the next command with the interpreter.
@@ -459,6 +461,7 @@ next_command (struct InterpreterState *is)
   is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
                                        is);
 }
+
 
 /**
  * Callback that works PUT /proposal's output.
@@ -509,6 +512,7 @@ proposal_cb (void *cls,
   }
   next_command (is);
 }
+
 
 /**
  * Function called with the result of a /pay operation.
@@ -583,9 +587,9 @@ pay_cb (void *cls,
     }
 
   }
-
   next_command (is);
 }
+
 
 /**
  * Function called upon completion of our /admin/add/incoming request.
@@ -618,6 +622,7 @@ add_incoming_cb (void *cls,
   next_command (is);
 }
 
+
 /**
  * Find a command by label.
  *
@@ -629,7 +634,6 @@ static const struct Command *
 find_command (const struct InterpreterState *is,
               const char *label)
 {
-  unsigned int i;
   const struct Command *cmd;
 
   if (NULL == label)
@@ -638,7 +642,7 @@ find_command (const struct InterpreterState *is,
                 "Attempt to lookup command for empty label\n");
     return NULL;
   }
-  for (i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
+  for (unsigned int i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
     if ( (NULL != cmd->label) &&
          (0 == strcmp (cmd->label,
                        label)) )
@@ -648,6 +652,7 @@ find_command (const struct InterpreterState *is,
               label);
   return NULL;
 }
+
 
 /**
  * Function called upon completion of our /reserve/withdraw request.
@@ -704,6 +709,7 @@ reserve_withdraw_cb (void *cls,
   next_command (is);
 }
 
+
 /**
  * Find denomination key matching the given amount.
  *
@@ -715,13 +721,12 @@ static const struct TALER_EXCHANGE_DenomPublicKey *
 find_pk (const struct TALER_EXCHANGE_Keys *keys,
          const struct TALER_Amount *amount)
 {
-  unsigned int i;
   struct GNUNET_TIME_Absolute now;
   struct TALER_EXCHANGE_DenomPublicKey *pk;
   char *str;
 
   now = GNUNET_TIME_absolute_get ();
-  for (i=0;i<keys->num_denom_keys;i++)
+  for (unsigned int i=0;i<keys->num_denom_keys;i++)
   {
     pk = &keys->denom_keys[i];
     if ( (0 == TALER_amount_cmp (amount,
@@ -732,7 +737,7 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
   }
   /* do 2nd pass to check if expiration times are to blame for failure */
   str = TALER_amount_to_string (amount);
-  for (i=0;i<keys->num_denom_keys;i++)
+  for (unsigned int i=0;i<keys->num_denom_keys;i++)
   {
     pk = &keys->denom_keys[i];
     if ( (0 == TALER_amount_cmp (amount,
@@ -757,6 +762,7 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
   return NULL;
 }
 
+
 /**
  * Allocates and return a string representing a order.
  * In this process, this function gives the order those
@@ -766,7 +772,7 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
  * @param max_fee merchant's allowed max_fee
  * @param amount total amount for this order
  */
-json_t *
+static json_t *
 make_order (char *maxfee,
             char *total)
 {
@@ -784,7 +790,7 @@ make_order (char *maxfee,
   GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
                               &id,
                               sizeof (id));
-  ret = json_pack ("{s:O, s:s, s:s, s:s, s:s, s:O, s:s, s:[{s:s}]}",
+  ret = json_pack ("{s:o, s:s, s:s, s:s, s:s, s:o, s:s, s:[{s:s}]}",
                    "max_fee", maxfee_j,
                    "order_id", TALER_b2s (&id, sizeof (id)),
                    "timestamp", "/Date(42)/",
@@ -794,9 +800,136 @@ make_order (char *maxfee,
                    "summary", "payments generator..",
                    "products", "description", "ice cream");
 
-   GNUNET_assert (NULL != ret);
-   return ret;
+  GNUNET_assert (NULL != ret);
+  return ret;
 }
+
+
+/**
+ * Free amount stringsin interpreter state.
+ *
+ * @param is state to reset
+ */
+static void
+free_interpreter_amounts (struct InterpreterState *is)
+{
+  struct Command *cmd;
+
+  for (unsigned int i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
+    switch (cmd->oc)
+    {
+    case OC_END:
+      GNUNET_assert (0);
+      break;
+    case OC_PAY:
+      GNUNET_free (cmd->details.pay.amount_with_fee);
+      GNUNET_free (cmd->details.pay.amount_without_fee);
+      break;
+    case OC_PROPOSAL:
+      GNUNET_free (cmd->details.proposal.max_fee);
+      GNUNET_free (cmd->details.proposal.amount);
+      break;
+    case OC_WITHDRAW_SIGN:
+      GNUNET_free (cmd->details.reserve_withdraw.amount);
+      break;
+    case OC_ADMIN_ADD_INCOMING:
+      GNUNET_free (cmd->details.admin_add_incoming.amount);
+      break;
+    default:
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Shutdown: unknown instruction %d at %u (%s)\n",
+                  cmd->oc,
+                  i,
+                  cmd->label);
+      break;
+    }
+}
+
+
+/**
+ * Reset the interpreter state.
+ *
+ * @param is state to reset
+ */
+static void
+reset_interpreter (struct InterpreterState *is)
+{
+  struct Command *cmd;
+
+  for (unsigned int i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
+    switch (cmd->oc)
+    {
+    case OC_END:
+      GNUNET_assert (0);
+      break;
+
+    case OC_PAY:
+      if (NULL != cmd->details.pay.ph)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_pay_cancel (cmd->details.pay.ph);
+        cmd->details.pay.ph = NULL;
+      }
+      break;
+
+    case OC_PROPOSAL:
+      if (NULL != cmd->details.proposal.po)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
+        cmd->details.proposal.po = NULL;
+      }
+      if (NULL != cmd->details.proposal.contract_terms)
+      {
+        json_decref (cmd->details.proposal.contract_terms);
+        cmd->details.proposal.contract_terms = NULL;
+      }
+      break;
+
+    case OC_WITHDRAW_SIGN:
+      if (NULL != cmd->details.reserve_withdraw.wsh)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_EXCHANGE_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
+        cmd->details.reserve_withdraw.wsh = NULL;
+      }
+      if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
+      {
+        GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
+        cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
+      }
+      break;
+
+    case OC_ADMIN_ADD_INCOMING:
+      if (NULL != cmd->details.admin_add_incoming.aih)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
+        cmd->details.admin_add_incoming.aih = NULL;
+      }
+      break;
+    default:
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Shutdown: unknown instruction %d at %u (%s)\n",
+                  cmd->oc,
+                  i,
+                  cmd->label);
+      break;
+    }
+}
+
 
 /**
  * Run the main interpreter loop that performs exchange operations.
@@ -841,8 +974,8 @@ interpreter_run (void *cls)
 
       if (j < times)
       {
+        reset_interpreter (is);
         is->ip = 0;
-
         GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                     "Rewinding the interpreter.\n");
 
@@ -908,67 +1041,66 @@ interpreter_run (void *cls)
         }
 
         {
-        const struct Command *coin_ref;
-  	memset (&pc, 0, sizeof (pc));
-  	coin_ref = find_command (is,
-  	                         cmd->details.pay.coin_ref);
-  	GNUNET_assert (NULL != ref);
-  	switch (coin_ref->oc)
-  	{
-  	case OC_WITHDRAW_SIGN:
-  	  pc.coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
-  	  pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
-  	  pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
+          const struct Command *coin_ref;
+          memset (&pc, 0, sizeof (pc));
+          coin_ref = find_command (is,
+                                   cmd->details.pay.coin_ref);
+          GNUNET_assert (NULL != ref);
+          switch (coin_ref->oc)
+          {
+          case OC_WITHDRAW_SIGN:
+            pc.coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
+            pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
+            pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
             pc.denom_value = coin_ref->details.reserve_withdraw.pk->value;
-  	  break;
-  	default:
-  	  GNUNET_assert (0);
-  	}
+            break;
+          default:
+            GNUNET_assert (0);
+          }
 
-  	if (GNUNET_OK !=
-  	    TALER_string_to_amount (cmd->details.pay.amount_without_fee,
-  				    &pc.amount_without_fee))
-  	{
-  	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-  		      "Failed to parse amount `%s' at %u\n",
-  		      cmd->details.pay.amount_without_fee,
-  		      is->ip);
-  	  fail (is);
-  	  return;
-  	}
+          if (GNUNET_OK !=
+              TALER_string_to_amount (cmd->details.pay.amount_without_fee,
+                                      &pc.amount_without_fee))
+          {
+            GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                        "Failed to parse amount `%s' at %u\n",
+                        cmd->details.pay.amount_without_fee,
+                        is->ip);
+            fail (is);
+            return;
+          }
 
-  	if (GNUNET_OK !=
-  	    TALER_string_to_amount (cmd->details.pay.amount_with_fee,
-  				    &pc.amount_with_fee))
-  	{
-  	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-  		      "Failed to parse amount `%s' at %u\n",
-  		      cmd->details.pay.amount_with_fee,
-  		      is->ip);
-  	  fail (is);
-  	  return;
-  	}
+          if (GNUNET_OK !=
+              TALER_string_to_amount (cmd->details.pay.amount_with_fee,
+                                      &pc.amount_with_fee))
+          {
+            GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                        "Failed to parse amount `%s' at %u\n",
+                        cmd->details.pay.amount_with_fee,
+                        is->ip);
+            fail (is);
+            return;
+          }
         }
-
         cmd->details.pay.ph
-  	= TALER_MERCHANT_pay_wallet (ctx,
-  				     merchant_uri,
-                                     instance,
-  				     &ref->details.proposal.hash,
-  				     &total_amount,
-  				     &max_fee,
-  				     &merchant_pub,
-                                     &merchant_sig,
-  				     timestamp,
-  				     refund_deadline,
-  				     pay_deadline,
-  				     &h_wire,
-  				     exchange_uri,
-                                     order_id,
-  				     1 /* num_coins */,
-  				     &pc /* coins */,
-  				     &pay_cb,
-  				     is);
+          = TALER_MERCHANT_pay_wallet (ctx,
+                                       merchant_uri,
+                                       instance,
+                                       &ref->details.proposal.hash,
+                                       &total_amount,
+                                       &max_fee,
+                                       &merchant_pub,
+                                       &merchant_sig,
+                                       timestamp,
+                                       refund_deadline,
+                                       pay_deadline,
+                                       &h_wire,
+                                       exchange_uri,
+                                       order_id,
+                                       1 /* num_coins */,
+                                       &pc /* coins */,
+                                       &pay_cb,
+                                       is);
       }
       if (NULL == cmd->details.pay.ph)
       {
@@ -977,8 +1109,6 @@ interpreter_run (void *cls)
         return;
       }
       return;
-
-
     case OC_PROPOSAL:
       {
         json_t *order;
@@ -1003,8 +1133,9 @@ interpreter_run (void *cls)
                                                           instance)));
 
 
-        GNUNET_assert (-1 != json_object_update (order, merchant_obj));
-
+        GNUNET_assert (-1 != json_object_update (order,
+                                                 merchant_obj));
+        json_decref (merchant_obj);
         cmd->details.proposal.po
           = TALER_MERCHANT_order_put (ctx,
                                       merchant_uri,
@@ -1068,7 +1199,9 @@ interpreter_run (void *cls)
         fail (is);
         return;
       }
-      json_object_set (sender_details, "bank_uri", json_string (bank_uri));
+      json_object_set_new (sender_details,
+                           "bank_uri",
+                           json_string (bank_uri));
 
       transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
                                      JSON_REJECT_DUPLICATES,
@@ -1174,6 +1307,7 @@ interpreter_run (void *cls)
   }
 }
 
+
 /**
  * Functions of this type are called to provide the retrieved signing and
  * denomination keys of the exchange.  No TALER_EXCHANGE_*() functions should
@@ -1227,6 +1361,7 @@ sighandler_child_death ()
   errno = old_errno;		/* restore errno */
 }
 
+
 /**
  * Function run when the test terminates (good or bad).
  * Cleans up our state.
@@ -1237,7 +1372,6 @@ static void
 do_shutdown (void *cls)
 {
   struct InterpreterState *is = cls;
-  struct Command *cmd;
 
   if (NULL != timeout_task)
   {
@@ -1245,86 +1379,14 @@ do_shutdown (void *cls)
     timeout_task = NULL;
   }
 
-  for (unsigned int i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
-    switch (cmd->oc)
-    {
-      case OC_END:
-        GNUNET_assert (0);
-        break;
-
-      case OC_PAY:
-        if (NULL != cmd->details.pay.ph)
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                      "Command %u (%s) did not complete\n",
-                      i,
-                      cmd->label);
-          TALER_MERCHANT_pay_cancel (cmd->details.pay.ph);
-          cmd->details.pay.ph = NULL;
-        }
-        break;
-
-      case OC_PROPOSAL:
-        if (NULL != cmd->details.proposal.po)
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                      "Command %u (%s) did not complete\n",
-                      i,
-                      cmd->label);
-          TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
-          cmd->details.proposal.po = NULL;
-        }
-        if (NULL != cmd->details.proposal.contract_terms)
-        {
-          json_decref (cmd->details.proposal.contract_terms);
-          cmd->details.proposal.contract_terms = NULL;
-        }
-        break;
-
-      case OC_WITHDRAW_SIGN:
-        if (NULL != cmd->details.reserve_withdraw.wsh)
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                      "Command %u (%s) did not complete\n",
-                      i,
-                      cmd->label);
-          TALER_EXCHANGE_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
-          cmd->details.reserve_withdraw.wsh = NULL;
-        }
-        if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
-        {
-          GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
-          cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
-        }
-        GNUNET_free_non_null (cmd->details.reserve_withdraw.amount);
-        break;
-
-      case OC_ADMIN_ADD_INCOMING:
-        if (NULL != cmd->details.admin_add_incoming.aih)
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                      "Command %u (%s) did not complete\n",
-                      i,
-                      cmd->label);
-          TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
-          cmd->details.admin_add_incoming.aih = NULL;
-        }
-        break;
-
-      default:
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Shutdown: unknown instruction %d at %u (%s)\n",
-                    cmd->oc,
-                    i,
-                    cmd->label);
-        break;
-    }
-
+  reset_interpreter (is);
   if (NULL != is->task)
   {
     GNUNET_SCHEDULER_cancel (is->task);
     is->task = NULL;
   }
+  free_interpreter_amounts (is);
+  GNUNET_free (is->commands);
   GNUNET_free (is);
   if (NULL != exchange)
   {
@@ -1343,6 +1405,7 @@ do_shutdown (void *cls)
   }
 }
 
+
 /**
  * Take currency and the part after ":" in the
  * "CURRENCY:XX.YY" format, and return a string
@@ -1352,9 +1415,8 @@ do_shutdown (void *cls)
  * @param rpart float numbers after the ":", in string form
  * @return pointer to allocated and concatenated "CURRENCY:XX.YY"
  * formatted string.
- *
  */
-char *
+static char *
 concat_amount (char *currency, char *rpart)
 {
   char *str;
@@ -1362,6 +1424,128 @@ concat_amount (char *currency, char *rpart)
   GNUNET_asprintf (&str, "%s:%s",
                    currency, rpart);
   return str;
+}
+
+
+/**
+ * Actually runs the test.
+ */
+static void
+run_test ()
+{
+  struct InterpreterState *is;
+  struct Command commands[] =
+  {
+    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
+      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
+
+    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
+      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
+    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-3",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
+      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
+
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference = "create-reserve-1",
+      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
+
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference = "create-reserve-2",
+      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
+
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-3",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference = "create-reserve-3",
+      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
+
+    /* Create proposal */
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.proposal.max_fee = concat_amount (currency, "0.5"),
+      .details.proposal.amount = concat_amount (currency, "0.5") },
+
+    /* Create proposal */
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.proposal.max_fee = concat_amount (currency, "0.5"),
+      .details.proposal.amount = concat_amount (currency, "0.5") },
+
+    /* Create proposal */
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-3",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.proposal.max_fee = concat_amount (currency, "0.5"),
+      .details.proposal.amount = concat_amount (currency, "5.0") },
+
+    { .oc = OC_PAY,
+      .label = "deposit-simple-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay.contract_ref = "create-proposal-1",
+      .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.amount_with_fee = concat_amount (currency, "5"),
+      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
+
+    { .oc = OC_PAY,
+      .label = "deposit-simple-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay.contract_ref = "create-proposal-2",
+      .details.pay.coin_ref = "withdraw-coin-2",
+      .details.pay.amount_with_fee = concat_amount (currency, "5"),
+      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
+
+    { .oc = OC_PAY,
+      .label = "deposit-simple-3",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay.contract_ref = "create-proposal-3",
+      .details.pay.coin_ref = "withdraw-coin-3",
+      .details.pay.amount_with_fee = concat_amount (currency, "5"),
+      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
+
+    { .oc = OC_END,
+      .label = "end-of-commands"}
+  };
+
+  is = GNUNET_new (struct InterpreterState);
+  is->commands = GNUNET_malloc (sizeof (commands));
+  memcpy (is->commands,
+          commands,
+          sizeof (commands));
+  ctx = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
+                          &rc);
+  GNUNET_assert (NULL != ctx);
+  rc = GNUNET_CURL_gnunet_rc_create (ctx);
+  exchange = TALER_EXCHANGE_connect (ctx,
+                                     exchange_uri,
+                                     &cert_cb,
+                                     is,
+                                     TALER_EXCHANGE_OPTION_END);
+  GNUNET_assert (NULL != exchange);
+  GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
+                                 is);
 }
 
 
@@ -1380,7 +1564,6 @@ run (void *cls,
      const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
-  struct InterpreterState *is;
   unsigned int cnt;
   char *wget_cmd;
 
@@ -1502,8 +1685,7 @@ run (void *cls,
     fprintf (stderr, "\n");
   }
 
-
-  if (!remote_merchant)
+  if (! remote_merchant)
   {
     merchantd = GNUNET_OS_start_process (GNUNET_NO,
                                          GNUNET_OS_INHERIT_STD_ALL,
@@ -1556,125 +1738,11 @@ run (void *cls,
     fprintf (stderr, "\n");
     GNUNET_free (wget_cmd);
   }
-
-  struct Command commands[] =
-  {
-    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
-    { .oc = OC_ADMIN_ADD_INCOMING,
-      .label = "create-reserve-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
-      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
-      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
-
-    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
-    { .oc = OC_ADMIN_ADD_INCOMING,
-      .label = "create-reserve-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
-      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
-      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
-    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
-    { .oc = OC_ADMIN_ADD_INCOMING,
-      .label = "create-reserve-3",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
-      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
-      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
-
-    /* Withdraw a 5 EUR coin, at fee of 1 ct */
-    { .oc = OC_WITHDRAW_SIGN,
-      .label = "withdraw-coin-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_withdraw.reserve_reference = "create-reserve-1",
-      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
-
-    /* Withdraw a 5 EUR coin, at fee of 1 ct */
-    { .oc = OC_WITHDRAW_SIGN,
-      .label = "withdraw-coin-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_withdraw.reserve_reference = "create-reserve-2",
-      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
-
-    /* Withdraw a 5 EUR coin, at fee of 1 ct */
-    { .oc = OC_WITHDRAW_SIGN,
-      .label = "withdraw-coin-3",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_withdraw.reserve_reference = "create-reserve-3",
-      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
-
-    /* Create proposal */
-    { .oc = OC_PROPOSAL,
-      .label = "create-proposal-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.max_fee = concat_amount (currency, "0.5"),
-      .details.proposal.amount = concat_amount (currency, "0.5") },
-
-    /* Create proposal */
-    { .oc = OC_PROPOSAL,
-      .label = "create-proposal-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.max_fee = concat_amount (currency, "0.5"),
-      .details.proposal.amount = concat_amount (currency, "0.5") },
-
-    /* Create proposal */
-    { .oc = OC_PROPOSAL,
-      .label = "create-proposal-3",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.max_fee = concat_amount (currency, "0.5"),
-      .details.proposal.amount = concat_amount (currency, "5.0") },
-
-    { .oc = OC_PAY,
-      .label = "deposit-simple-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.pay.contract_ref = "create-proposal-1",
-      .details.pay.coin_ref = "withdraw-coin-1",
-      .details.pay.amount_with_fee = concat_amount (currency, "5"),
-      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
-
-    { .oc = OC_PAY,
-      .label = "deposit-simple-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.pay.contract_ref = "create-proposal-2",
-      .details.pay.coin_ref = "withdraw-coin-2",
-      .details.pay.amount_with_fee = concat_amount (currency, "5"),
-      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
-
-    { .oc = OC_PAY,
-      .label = "deposit-simple-3",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.pay.contract_ref = "create-proposal-3",
-      .details.pay.coin_ref = "withdraw-coin-3",
-      .details.pay.amount_with_fee = concat_amount (currency, "5"),
-      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
-
-    { .oc = OC_END,
-      .label = "end-of-commands"}
-  };
-
-
-  is = GNUNET_new (struct InterpreterState);
-  is->commands = GNUNET_malloc (sizeof (commands));
-  memcpy (is->commands,
-          commands,
-          sizeof (commands));
-
-  ctx = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
-                          &rc);
-  GNUNET_assert (NULL != ctx);
-  rc = GNUNET_CURL_gnunet_rc_create (ctx);
-  exchange = TALER_EXCHANGE_connect (ctx,
-                                     exchange_uri,
-                                     &cert_cb,
-                                     is,
-                                     TALER_EXCHANGE_OPTION_END);
-  GNUNET_assert (NULL != exchange);
   timeout_task
     = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply
                                     (GNUNET_TIME_UNIT_SECONDS, 150),
                                     &do_timeout, NULL);
-  GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
-                                 is);
+  run_test ();
 }
 
 
