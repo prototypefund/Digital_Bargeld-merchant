@@ -45,20 +45,6 @@ CFLAGS="-Wall $CFLAGS"
 # Checks for header files.
 AC_CHECK_HEADERS([stdint.h stdlib.h string.h unistd.h])
 
-# Check for compiling documentation
-with_doc = yes
-AC_MSG_CHECKING([for compiling documentation])
-AC_ARG_WITH(doc,
-            [AS_HELP_STRING([--with-doc], [Compile documentation])],
-            [AC_MSG_RESULT([given])],
-            [AC_MSG_RESULT(not given)
-	    with_doc = no])
-
-AS_CASE([$with_doc],
-        [yes], AC_CHECK_PROG([texicomp], [texi2pdf], [yes]))
-AS_IF([test "x$with_doc" = "xyes" -a "x$texicomp" != "xyes"], AC_MSG_ERROR([A texinfo compiler is needed. Install texi2pdf.]))
-AM_CONDITIONAL([WITH_DOC], [test "x$with_doc" = "xyes"])
-
 # Check for GNUnet's libgnunetutil.
 libgnunetutil=0
 AC_MSG_CHECKING([for libgnunetutil])
@@ -296,7 +282,6 @@ else
 
 # logic if doc_only is set, make sure conditionals are still defined
 AM_CONDITIONAL([HAVE_GNUNETPQ], [false])
-AM_CONDITIONAL([WITH_DOC], [true])
 AM_CONDITIONAL([HAVE_POSTGRESQL], [false])
 AM_CONDITIONAL([HAVE_TALERFAKEBANK], [false])
 AM_CONDITIONAL([HAVE_LIBCURL], [false])

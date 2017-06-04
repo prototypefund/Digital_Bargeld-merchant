@@ -3,10 +3,7 @@
 if DOC_ONLY
   SUBDIRS = . doc
 else
-  SUBDIRS = . src
-if WITH_DOC
-  SUBDIRS += doc
-endif
+  SUBDIRS = . src doc
 endif
 
 @DX_RULES@
