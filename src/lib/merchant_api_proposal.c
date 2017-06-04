@@ -271,6 +271,7 @@ handle_proposal_lookup_finished (void *cls,
 {
   struct TALER_MERCHANT_ProposalLookupOperation *plo = cls;
 
+  plo->job = NULL;
   /**
    * As no data is supposed to be extracted from this
    * call, we just invoke the provided callback.

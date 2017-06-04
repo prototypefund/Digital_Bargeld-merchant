@@ -435,25 +435,23 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                            "order_id");
 
   res = db->find_contract_terms (db->cls,
-                                &contract_terms,
-                                order_id,
-                                &mi->pubkey);
+                                 &contract_terms,
+                                 order_id,
+                                 &mi->pubkey);
   if (GNUNET_NO == res)
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
                                          "unknown transaction id");
-
   if (GNUNET_SYSERR == res)
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PROPOSAL_LOOKUP_DB_ERROR,
                                               "An error occurred while retrieving proposal data from db");
 
-
-  return TMH_RESPONSE_reply_json (connection,
-                                  contract_terms,
-                                  MHD_HTTP_OK);
-
-
+  res = TMH_RESPONSE_reply_json (connection,
+                                 contract_terms,
+                                 MHD_HTTP_OK);
+  json_decref (contract_terms);
+  return res;
 }
 
 
