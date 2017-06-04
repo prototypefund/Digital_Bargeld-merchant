@@ -1316,12 +1316,10 @@ handler_pay_json (struct MHD_Connection *connection,
        and accept immediately */
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Payment succeeded in the past; taking short cut");
-    resp = MHD_create_response_from_buffer (0,
-					    NULL,
-					    MHD_RESPMEM_PERSISTENT);
+    resp = sign_success_response (pc);
     ret = MHD_queue_response (connection,
 			      MHD_HTTP_OK,
-			      sign_success_response (pc));
+			      resp);
     MHD_destroy_response (resp);
     return ret;
   }

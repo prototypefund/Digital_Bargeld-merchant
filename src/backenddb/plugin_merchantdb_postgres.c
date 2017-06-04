@@ -397,44 +397,35 @@ postgres_find_contract_terms_from_hash (void *cls,
                                        const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int i;
-
+  enum GNUNET_PQ_QueryStatus res;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
-
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_contract_terms_from_hash",
-                                    params);
-  i = PQntuples (result);
-  if (1 < i)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Mupltiple proposal data hash the same hashcode!\n");
-    return GNUNET_SYSERR;
-  }
-
-  if (0 == i)
-    return GNUNET_NO;
-
   struct GNUNET_PQ_ResultSpec rs[] = {
     TALER_PQ_result_spec_json ("contract_terms",
                                contract_terms),
     GNUNET_PQ_result_spec_end
   };
-  if (GNUNET_OK !=
-      GNUNET_PQ_extract_result (result,
-                                rs,
-                                0))
+
+  res = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                  "find_contract_terms_from_hash",
+                                                  params,
+                                                  rs);
+  if (res < 0)
   {
     GNUNET_break (0);
-    PQclear (result);
     return GNUNET_SYSERR;
   }
-
+  if (1 < res)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Mupltiple proposal data hash the same hashcode!\n");
+    return GNUNET_SYSERR;
+  }
+  if (0 == res)
+    return GNUNET_NO;
   return GNUNET_OK;
 }
 
@@ -443,61 +434,52 @@ postgres_find_contract_terms_from_hash (void *cls,
  * Retrieve proposal data given its order id.
  *
  * @param cls closure
- * @param contract_terms where to store the retrieved proposal data
+ * @param[out] contract_terms where to store the retrieved proposal data
  * @param order id order id used to perform the lookup
  * @return #GNUNET_OK on success, #GNUNET_NO if no proposal is
  * found, #GNUNET_SYSERR upon error
  */
 static int
 postgres_find_contract_terms (void *cls,
-                             json_t **contract_terms,
-                             const char *order_id,
-                             const struct TALER_MerchantPublicKeyP *merchant_pub)
+                              json_t **contract_terms,
+                              const char *order_id,
+                              const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int i;
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "finding contract term, order_id: '%s', merchant_pub: '%s'.\n",
-              order_id,
-              TALER_B2S (merchant_pub));
-
+  enum GNUNET_PQ_QueryStatus res;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
-
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_contract_terms",
-                                    params);
-  i = PQntuples (result);
-  if (1 < i)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Mupltiple proposal data share the same hashcode.\n");
-    return GNUNET_SYSERR;
-  }
-
-  if (0 == i)
-    return GNUNET_NO;
-
   struct GNUNET_PQ_ResultSpec rs[] = {
     TALER_PQ_result_spec_json ("contract_terms",
                                contract_terms),
     GNUNET_PQ_result_spec_end
   };
-  if (GNUNET_OK !=
-      GNUNET_PQ_extract_result (result,
-                                rs,
-                                0))
+
+  *contract_terms = NULL;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Finding contract term, order_id: '%s', merchant_pub: '%s'.\n",
+              order_id,
+              TALER_B2S (merchant_pub));
+  res = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                  "find_contract_terms",
+                                                  params,
+                                                  rs);
+  if (res < 0)
   {
     GNUNET_break (0);
-    PQclear (result);
     return GNUNET_SYSERR;
   }
-
+  if (res > 1)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Mupltiple proposal data share the same hashcode.\n");
+    return GNUNET_SYSERR;
+  }
+  if (0 == res)
+    return GNUNET_NO;
   return GNUNET_OK;
 }
 

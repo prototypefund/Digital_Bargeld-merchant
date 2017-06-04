@@ -173,7 +173,10 @@ handle_track_transfer_finished (void *cls,
     if (GNUNET_OK ==
         check_track_transfer_response_ok (tdo,
                                           json))
+    {
+      TALER_MERCHANT_track_transfer_cancel (tdo);
       return;
+    }
     GNUNET_break_op (0);
     response_code = 0;
     break;
@@ -203,6 +206,7 @@ handle_track_transfer_finished (void *cls,
            NULL,
            0,
            NULL);
+  TALER_MERCHANT_track_transfer_cancel (tdo);
 }
 
 

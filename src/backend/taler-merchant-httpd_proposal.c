@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA
+  (C) 2014, 2015, 2016, 2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -14,7 +14,7 @@
   TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_propose.c
+ * @file backend/taler-merchant-httpd_proposal.c
  * @brief HTTP serving layer mainly intended to communicate with the frontend
  * @author Marcello Stanisci
  */
@@ -455,4 +455,4 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 }
 
 
-/* end of taler-merchant-httpd_contract.c */
+/* end of taler-merchant-httpd_proposal.c */

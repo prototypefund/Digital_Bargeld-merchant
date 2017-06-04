@@ -109,7 +109,10 @@ handle_track_transaction_finished (void *cls,
     if (GNUNET_OK ==
         parse_track_transaction_ok (tdo,
                                     json))
+    {
+      TALER_MERCHANT_track_transaction_cancel (tdo);
       return;
+    }
     response_code = 0;
     break;
   case MHD_HTTP_ACCEPTED:
@@ -140,6 +143,7 @@ handle_track_transaction_finished (void *cls,
            response_code,
 	   TALER_JSON_get_error_code (json),
            json);
+  TALER_MERCHANT_track_transaction_cancel (tdo);
 }
 
 

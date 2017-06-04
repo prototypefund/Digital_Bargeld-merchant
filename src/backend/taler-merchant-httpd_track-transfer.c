@@ -719,6 +719,7 @@ proof_cb (void *cls,
 
   rctx->response_code = MHD_HTTP_OK;
   rctx->response = TMH_RESPONSE_make_json (transformed_response);
+  json_decref (transformed_response);
 }
 
 

@@ -95,7 +95,6 @@ history_raw_cb (void *cls,
   struct TALER_MERCHANT_HistoryOperation *ho = cls;
 
   ho->job = NULL;
-
   switch (response_code)
   {
   case 0:
@@ -105,8 +104,8 @@ history_raw_cb (void *cls,
             MHD_HTTP_OK,
 	    TALER_EC_NONE,
             json);
+    TALER_MERCHANT_history_cancel (ho);
     return;
-    break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
 		"/history URI not found\n");
@@ -128,6 +127,7 @@ history_raw_cb (void *cls,
           response_code,
 	  TALER_JSON_get_error_code (json),
           json);
+  TALER_MERCHANT_history_cancel (ho);
 }
 
 
@@ -178,9 +178,9 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                                     CURLOPT_URL,
                                     ho->url))
   {
-    GNUNET_break (0);  
+    GNUNET_break (0);
     return NULL;
-  }    
+  }
 
   if (NULL == (ho->job = GNUNET_CURL_job_add (ctx,
                                               eh,
@@ -192,7 +192,7 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
     return NULL;
   }
   return ho;
-}                        
+}
 
 
 /* end of merchant_api_contract.c */

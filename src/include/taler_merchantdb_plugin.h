@@ -183,7 +183,7 @@ struct TALER_MERCHANTDB_Plugin
    * Retrieve proposal data given its order ID.
    *
    * @param cls closure
-   * @param contract_terms where to store the result
+   * @param[out] contract_terms where to store the result
    * @param order_id order_id used to lookup.
    * @param merchant_pub instance's public key.
    * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
