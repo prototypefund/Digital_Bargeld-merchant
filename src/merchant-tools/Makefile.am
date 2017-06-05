@@ -31,4 +31,3 @@ taler_merchant_generate_payments_LDADD = \
   -lgnunetutil \
   -ljansson
 
-SUBDIRS = mitm
