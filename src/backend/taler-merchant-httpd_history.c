@@ -93,7 +93,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   unsigned int ret;
   unsigned long long seconds;
   struct MerchantInstance *mi;
-  unsigned int start = UINT_MAX;
+  int start = -1;
   unsigned int delta;
 
   response = json_array ();
@@ -171,7 +171,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                      "start");
   if (NULL != str)
   {
-    if (1 != sscanf (str, "%u", &start))
+    if ( (1 != sscanf (str, "%d", &start)) ||
+         (0 > start) )
     {
       json_decref (response);
       return TMH_RESPONSE_reply_arg_invalid (connection,
@@ -208,7 +209,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     ret = db->find_contract_terms_by_date_and_range (db->cls,
                                                      date,
                                                      &mi->pubkey,
-                                                     start,
+                                                     (unsigned int) start,
                                                      delta,
                                                      GNUNET_NO,
                                                      &pd_cb,
