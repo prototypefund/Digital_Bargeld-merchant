@@ -226,8 +226,8 @@ struct TALER_MERCHANTDB_Plugin
    * instance are returned.
    * @param start only rows with serial id less than start are returned.
    * @param nrows only nrows rows are returned.
-   * @param future if set to GNUNET_YES, retrieves rows younger than `date`.
-   * This is tipically used to show live updates on the merchant's backoffice
+   * @param future if set to #GNUNET_YES, retrieves rows younger than `date`.
+   * This is typically used to show live updates on the merchant's backoffice
    * @param cb function to call with transaction data, can be NULL.
    * @param cb_cls closure for @a cb
    * @return numer of found tuples, #GNUNET_SYSERR upon error
@@ -250,8 +250,8 @@ struct TALER_MERCHANTDB_Plugin
    * @param order_id order id used to search for the proposal data
    * @param merchant_pub public key of the merchant using this method
    * @param cb the callback
-   * @param cb_cls closure to pass to the callback
-   * @return GNUNET_YES, GNUNET_NO, GNUNET_SYSERR according to the
+   * @param cb_cls closure to pass to @a cb
+   * @return #GNUNET_YES, #GNUNET_NO, #GNUNET_SYSERR according to the
    * query being successful, unsuccessful, or generated errors.
    */
   int

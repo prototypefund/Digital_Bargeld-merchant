@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA
+  (C) 2014, 2015, 2016, 2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -93,14 +93,13 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   unsigned int ret;
   unsigned long long seconds;
   struct MerchantInstance *mi;
-  int start = -1;
+  unsigned int start = UINT_MAX;
   unsigned int delta;
 
-  response = json_array (); /*FIXME who decrefs this?*/
+  response = json_array ();
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "date");
-
   date = GNUNET_TIME_absolute_get ();
 
   if (NULL != str)
@@ -113,25 +112,21 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                              "date");
     }
 
-  date.abs_value_us = seconds * 1000LL * 1000LL;
+    date.abs_value_us = seconds * 1000LL * 1000LL;
 
-  if (date.abs_value_us / 1000LL / 1000LL != seconds)
-  {
-    json_decref (response);
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
-                                           "Timestamp overflowed");
+    if (date.abs_value_us / 1000LL / 1000LL != seconds)
+    {
+      json_decref (response);
+      return TMH_RESPONSE_reply_bad_request (connection,
+                                             TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
+                                             "Timestamp overflowed");
+    }
   }
 
-
-  }
-
-  mi = TMH_lookup_instance ("default");
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "instance");
-  if (NULL != str)
-    mi = TMH_lookup_instance (str);
+  mi = TMH_lookup_instance (NULL != str ? str : "default");
 
   if (NULL == mi)
   {
@@ -151,10 +146,10 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   {
 
     ret = db->find_contract_terms_history (db->cls,
-                                          str,
-                                          &mi->pubkey,
-                                          pd_cb,
-                                          response);
+                                           str,
+                                           &mi->pubkey,
+                                           &pd_cb,
+                                           response);
     if (GNUNET_SYSERR == ret)
     {
       json_decref (response);
@@ -176,8 +171,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                      "start");
   if (NULL != str)
   {
-    if ((1 != sscanf (str, "%d", &start)) ||
-        0 > start)
+    if (1 != sscanf (str, "%u", &start))
     {
       json_decref (response);
       return TMH_RESPONSE_reply_arg_invalid (connection,
@@ -192,34 +186,33 @@ MH_handler_history (struct TMH_RequestHandler *rh,
 
   if (NULL != str)
   {
-    if ((1 != sscanf (str, "%d", &delta)) ||
-        delta < 0)
+    if (1 != sscanf (str, "%u", &delta))
       return TMH_RESPONSE_reply_arg_invalid (connection,
                                              TALER_EC_PARAMETER_MALFORMED,
                                              "delta");
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Querying history back to %s, start: %d, delta: %d\n",
+              "Querying history back to %s, start: %u, delta: %u\n",
               GNUNET_STRINGS_absolute_time_to_string (date),
               start,
               delta);
 
   if (0 > start)
     ret = db->find_contract_terms_by_date (db->cls,
-                                          date,
-                                          &mi->pubkey,
-                                          delta,
-                                          pd_cb,
-                                          response);
+                                           date,
+                                           &mi->pubkey,
+                                           delta,
+                                           &pd_cb,
+                                           response);
   else
     ret = db->find_contract_terms_by_date_and_range (db->cls,
-                                                    date,
-                                                    &mi->pubkey,
-                                                    start,
-                                                    delta,
-                                                    GNUNET_NO,
-                                                    pd_cb,
-                                                    response);
+                                                     date,
+                                                     &mi->pubkey,
+                                                     start,
+                                                     delta,
+                                                     GNUNET_NO,
+                                                     &pd_cb,
+                                                     response);
   if (GNUNET_SYSERR == ret)
   {
     json_decref (response);

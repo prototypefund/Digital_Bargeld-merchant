@@ -61,6 +61,7 @@ struct TALER_MERCHANT_HistoryOperation
   struct GNUNET_CURL_Context *ctx;
 };
 
+
 /**
  * Cancel a pending /history request
  *

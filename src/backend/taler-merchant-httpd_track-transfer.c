@@ -250,8 +250,9 @@ build_deposits_response (void *cls,
     GNUNET_break_op (0);
     return GNUNET_NO;
   }
-  json_array_append_new (rctx->deposits_response,
-                         element);
+  GNUNET_break (0 ==
+                json_array_append_new (rctx->deposits_response,
+                                       element));
   return GNUNET_YES;
 }
 

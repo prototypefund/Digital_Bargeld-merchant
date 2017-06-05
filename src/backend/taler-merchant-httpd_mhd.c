@@ -108,12 +108,20 @@ TMH_MHD_handler_agpl_redirect (struct TMH_RequestHandler *rh,
     (void) MHD_add_response_header (response,
                                     MHD_HTTP_HEADER_CONTENT_TYPE,
                                     rh->mime_type);
-  MHD_add_response_header (response,
-                           MHD_HTTP_HEADER_LOCATION,
-                           "http://www.git.taler.net/?p=exchange.git");
-  ret = MHD_queue_response (connection,
-                            rh->response_code,
-                            response);
+  if (MHD_NO ==
+      MHD_add_response_header (response,
+                               MHD_HTTP_HEADER_LOCATION,
+                               "http://www.git.taler.net/?p=exchange.git"))
+  {
+    GNUNET_break (0);
+    ret = MHD_NO;
+  }
+  else
+  {
+    ret = MHD_queue_response (connection,
+                              rh->response_code,
+                              response);
+  }
   MHD_destroy_response (response);
   return ret;
 }
