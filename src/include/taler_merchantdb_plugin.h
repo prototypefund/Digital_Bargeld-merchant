@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016 INRIA
+  Copyright (C) 2014-2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -125,6 +125,14 @@ typedef void
                                   const json_t *proof);
 
 
+typedef void
+(*TALER_MERCHANTDB_RefundCallback)(void *cls,
+                                   const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                   uint64_t rtransaction_id,
+                                   const struct TALER_Amount *refund_amount,
+                                   const struct TALER_Amount *refund_fee);
+
+
 /**
  * Handle to interact with the database.
  */
@@ -200,7 +208,7 @@ struct TALER_MERCHANTDB_Plugin
    * Retrieve proposal data given its hashcode
    *
    * @param cls closure
-   * @param contract_terms where to store the result
+   * @param[out] contract_terms where to store the result
    * @param h_contract_terms hashcode used to lookup.
    * @param merchant_pub instance's public key.
    * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
@@ -328,6 +336,7 @@ struct TALER_MERCHANTDB_Plugin
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
                     const struct TALER_Amount *amount_with_fee,
                     const struct TALER_Amount *deposit_fee,
+                    // const struct TALER_Amount *refund_fee, // FIXME: modify logic!
                     const struct TALER_ExchangePublicKeyP *signkey_pub,
                     const json_t *exchange_proof);
 
@@ -500,6 +509,45 @@ struct TALER_MERCHANTDB_Plugin
                          const struct TALER_WireTransferIdentifierRawP *wtid,
                          TALER_MERCHANTDB_ProofCallback cb,
                          void *cb_cls);
+
+
+  /**
+   * Function called when some backoffice staff decides to award or
+   * increase the refund on an existing contract.
+   *
+   * @param cls closure
+   * @param h_contract_terms
+   * @param refund maximum refund to return to the customer for this contract
+   * @param reason 0-terminated UTF-8 string giving the reason why the customer
+   *               got a refund (free form, business-specific)
+   * @return #GNUNET_OK if the refund is accepted
+   *         #GNUNET_NO if the refund is at or below the previous refund amount
+   *         #GNUNET_SYSERR on database error, i.e. contract unknown, DB on fire,
+   *               (FIXME: distinguish hard/soft? who does retries?)
+   */
+  int
+  (*increase_refund_for_contract)(void *cls,
+                                  const struct GNUNET_HashCode *h_contract_terms,
+                                  const struct TALER_Amount *refund,
+                                  const char *reason);
+
+
+  /**
+   * Obtain refunds associated with a contract.
+   *
+   * @param rc function to call for each coin on which there is a refund
+   * @param rc_cls closure for @a rc
+   * @return #GNUNET_OK if we called @a rc on all coins
+   *         #GNUNET_NO if there are no refunds for @a h_contract_terms
+   *         #GNUNET_SYSERR if there were errors talking to the DB
+   */
+  int
+  (*get_refunds_from_contract_terms_hash)(void *cls,
+                                          const struct GNUNET_HashCode *h_contract_terms,
+                                          TALER_MERCHANTDB_RefundCallback rc,
+                                          void *rc_cls);
+
+
 };
 
 
