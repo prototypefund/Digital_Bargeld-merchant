@@ -24,7 +24,7 @@ libtalermerchantdb_la_LIBADD = \
 
 libtalermerchantdb_la_LDFLAGS = \
   $(POSTGRESQL_LDFLAGS) \
-  -version-info 0:0:0 \
+  -version-info 1:0:0 \
   -no-undefined
 
 libtaler_plugin_merchantdb_postgres_la_SOURCES = \

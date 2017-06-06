@@ -11,3 +11,9 @@ arch.jpg: arch.dot
 
 info_TEXINFOS = manual.texi
 manual_TEXINFOS = version.texi
+
+EXTRA_DIST = \
+  arch.dot \
+  lgpl.texi \
+  agpl.texi \
+  fdl-1.3.texi

@@ -13,6 +13,7 @@ bin_PROGRAMS = \
   taler-merchant-httpd
 
 taler_merchant_httpd_SOURCES = \
+  taler-merchant-httpd_map.h \
   taler-merchant-httpd.c taler-merchant-httpd.h \
   taler-merchant-httpd_parsing.c taler-merchant-httpd_parsing.h \
   taler-merchant-httpd_responses.c taler-merchant-httpd_responses.h \

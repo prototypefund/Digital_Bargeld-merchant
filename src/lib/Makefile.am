@@ -10,7 +10,7 @@ lib_LTLIBRARIES = \
   libtalermerchant.la
 
 libtalermerchant_la_LDFLAGS = \
-  -version-info 0:0:0 \
+  -version-info 1:0:0 \
   -no-undefined
 
 libtalermerchant_la_SOURCES = \
