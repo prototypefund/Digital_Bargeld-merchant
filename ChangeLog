@@ -1,3 +1,12 @@
+Tue Jun  6 14:30:43 CEST 2017
+        Abstracting the response gotten from the exchange's tracking
+        API and relying it to the frontend.
+        A payment generator has been implemented so that the db can
+        easily be populated for testing purposes.
+        /history API now has the way to query from a starting base date
+        ahead into the future.
+        Memory leaks fixes.
+
 Mon Mar  6 17:57:51 CET 2017
 	Add support for wire fee calculations to /pay handling (#4935),
 	and adding setting "max_wire_fee" and "wire_fee_amortization"
