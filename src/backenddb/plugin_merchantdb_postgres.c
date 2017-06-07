@@ -1598,6 +1598,7 @@ get_refunds_from_contract_terms_hash (void *cls,
     uint64_t rtransaction_id;
     struct TALER_Amount refund_amount;
     struct TALER_Amount refund_fee;
+    char *reason;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
@@ -1608,6 +1609,8 @@ get_refunds_from_contract_terms_hash (void *cls,
                                    &refund_amount),
       TALER_PQ_result_spec_amount ("refund_fee",
                                    &refund_fee),
+      GNUNET_PQ_result_spec_string ("reason",
+                                    &reason),
       GNUNET_PQ_result_spec_end
     };
 
@@ -1623,6 +1626,7 @@ get_refunds_from_contract_terms_hash (void *cls,
     rc (rc_cls,
         &coin_pub,
         rtransaction_id,
+        reason,
         &refund_amount,
         &refund_fee);
 
