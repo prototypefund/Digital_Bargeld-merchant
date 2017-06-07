@@ -347,7 +347,7 @@ struct TALER_MERCHANTDB_Plugin
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
                     const struct TALER_Amount *amount_with_fee,
                     const struct TALER_Amount *deposit_fee,
-                    // const struct TALER_Amount *refund_fee, // FIXME: modify logic!
+                    const struct TALER_Amount *refund_fee,
                     const struct TALER_ExchangePublicKeyP *signkey_pub,
                     const json_t *exchange_proof);
 

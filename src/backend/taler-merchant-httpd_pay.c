@@ -78,6 +78,11 @@ struct DepositConfirmation
   struct TALER_Amount deposit_fee;
 
   /**
+   * Fee charged by the exchange for the refund operation of this coin.
+   */
+  struct TALER_Amount refund_fee;
+
+  /**
    * Public key of the coin.
    */
   struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -496,6 +501,7 @@ deposit_cb (void *cls,
 			 &dc->coin_pub,
 			 &dc->amount_with_fee,
 			 &dc->deposit_fee,
+			 &dc->refund_fee,
                          sign_key,
 			 proof))
   {
@@ -662,6 +668,7 @@ process_pay_with_exchange (void *cls,
       return;
     }
     dc->deposit_fee = denom_details->fee_deposit;
+    dc->refund_fee = denom_details->fee_refund;
     if (0 == i)
     {
       acc_fee = denom_details->fee_deposit;

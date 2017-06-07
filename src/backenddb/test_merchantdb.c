@@ -112,6 +112,11 @@ static struct TALER_Amount amount_with_fee;
 static struct TALER_Amount deposit_fee;
 
 /**
+ * Refund fee for the coin.
+ */
+static struct TALER_Amount refund_fee;
+
+/**
  * Public key of the coin.  Set to some random value.
  */
 static struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -348,6 +353,9 @@ run (void *cls)
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":0.000010",
                                          &deposit_fee));
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":0.000010",
+                                         &refund_fee));
   RND_BLK (&coin_pub);
   deposit_proof = json_object ();
   GNUNET_assert (0 ==
@@ -447,6 +455,7 @@ run (void *cls)
                                  &coin_pub,
                                  &amount_with_fee,
                                  &deposit_fee,
+                                 &refund_fee,
                                  &signkey_pub,
                                  deposit_proof));
   FAILIF (GNUNET_OK !=

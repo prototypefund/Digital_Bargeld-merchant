@@ -212,10 +212,13 @@ postgres_initialize (void *cls)
                             ",deposit_fee_val"
                             ",deposit_fee_frac"
                             ",deposit_fee_curr"
+                            ",refund_fee_val"
+                            ",refund_fee_frac"
+                            ",refund_fee_curr"
                             ",signkey_pub"
                             ",exchange_proof) VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
-                            11),
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+                            14),
     GNUNET_PQ_make_prepare ("insert_transfer",
                             "INSERT INTO merchant_transfers"
                             "(h_contract_terms"
@@ -633,6 +636,7 @@ postgres_store_transaction (void *cls,
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
+ * @param refund_fee fee the exchange will charge for refunding this coin
  * @param signkey_pub public key used by the exchange for @a exchange_proof
  * @param exchange_proof proof from exchange that coin was accepted
  * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
@@ -644,6 +648,7 @@ postgres_store_deposit (void *cls,
                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
                         const struct TALER_Amount *amount_with_fee,
                         const struct TALER_Amount *deposit_fee,
+                        const struct TALER_Amount *refund_fee,
                         const struct TALER_ExchangePublicKeyP *signkey_pub,
                         const json_t *exchange_proof)
 {
@@ -656,6 +661,7 @@ postgres_store_deposit (void *cls,
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     TALER_PQ_query_param_amount (amount_with_fee),
     TALER_PQ_query_param_amount (deposit_fee),
+    TALER_PQ_query_param_amount (refund_fee),
     GNUNET_PQ_query_param_auto_from_type (signkey_pub),
     TALER_PQ_query_param_json (exchange_proof),
     GNUNET_PQ_query_param_end
