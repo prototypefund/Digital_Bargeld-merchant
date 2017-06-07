@@ -1,4 +1,4 @@
-@set UPDATED 5 June 2017
+@set UPDATED 7 June 2017
 @set UPDATED-MONTH June 2017
 @set EDITION 0.3.0
 @set VERSION 0.3.0

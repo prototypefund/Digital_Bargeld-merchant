@@ -145,10 +145,23 @@ postgres_initialize (void *cls)
                             ",deposit_fee_val INT8 NOT NULL"
                             ",deposit_fee_frac INT4 NOT NULL"
                             ",deposit_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",refund_fee_val INT8 NOT NULL"
+                            ",refund_fee_frac INT8 NOT NULL"
+                            ",refund_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
                             ",exchange_proof BYTEA NOT NULL"
                             ",PRIMARY KEY (h_contract_terms, coin_pub)"
                             ");"),
+
+  GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
+                          " rtransaction_id SERIAL"
+                          ",h_contract_terms BYTEA NOT NULL"
+                          ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                          ",refund_amount_val INT8 NOT NULL"
+                          ",refund_amount_frac INT8 NOT NULL"
+                          ",refund_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                          ");"),
+
   GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
                           " exchange_uri VARCHAR NOT NULL"
                           ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
@@ -1537,6 +1550,87 @@ postgres_find_proof_by_wtid (void *cls,
   PQclear (result);
   return GNUNET_OK;
 }
+
+/**
+ * Obtain refunds associated with a contract.
+ *
+ * @param rc function to call for each coin on which there is a refund
+ * @param rc_cls closure for @a rc
+ * @return #GNUNET_OK if we called @a rc on all coins
+ *         #GNUNET_NO if there are no refunds for @a h_contract_terms
+ *         #GNUNET_SYSERR if there were errors talking to the DB
+ */
+int
+get_refunds_from_contract_terms_hash (void *cls,
+                                      const struct GNUNET_HashCode *h_contract_terms,
+                                      TALER_MERCHANTDB_RefundCallback rc,
+                                      void *rc_cls)
+{
+
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int i;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "FIXME",
+                                    params);
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  if (0 == PQntuples (result))
+  {
+    PQclear (result);
+    return GNUNET_NO;
+  }
+
+  for (i=0;i<PQntuples (result);i++)
+  {
+    struct TALER_CoinSpendPublicKeyP coin_pub;
+    uint64_t rtransaction_id;
+    struct TALER_Amount refund_amount;
+    struct TALER_Amount refund_fee;
+
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
+                                            &coin_pub),
+      GNUNET_PQ_result_spec_uint64 ("rtransaction_id",
+                                    &rtransaction_id),
+      TALER_PQ_result_spec_amount ("refund_amount",
+                                   &refund_amount),
+      TALER_PQ_result_spec_amount ("refund_fee",
+                                   &refund_fee),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+    rc (rc_cls,
+        &coin_pub,
+        rtransaction_id,
+        &refund_amount,
+        &refund_fee);
+
+    GNUNET_PQ_cleanup_result (rs);
+  }
+  PQclear (result);
+  return GNUNET_OK;
+}
+
 
 
 /**
