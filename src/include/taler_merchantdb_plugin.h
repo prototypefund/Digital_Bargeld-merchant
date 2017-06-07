@@ -125,10 +125,21 @@ typedef void
                                   const json_t *proof);
 
 
+/**
+ * Function called with information about a refund.
+ *
+ * @param cls closure
+ * @param coin_pub public coin from which the refund comes from
+ * @param rtransaction_id identificator of the refund
+ * @param reason human-readable explaination of the refund
+ * @param refund_amount refund amount which is being taken from coin_pub
+ * @param refund_fee cost of this refund operation
+ */
 typedef void
 (*TALER_MERCHANTDB_RefundCallback)(void *cls,
                                    const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                    uint64_t rtransaction_id,
+                                   const char *reason,
                                    const struct TALER_Amount *refund_amount,
                                    const struct TALER_Amount *refund_fee);
 

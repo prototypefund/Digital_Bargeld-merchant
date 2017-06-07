@@ -157,6 +157,7 @@ postgres_initialize (void *cls)
                           " rtransaction_id SERIAL"
                           ",h_contract_terms BYTEA NOT NULL"
                           ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                          ",reason VARCHAR NOT NULL"
                           ",refund_amount_val INT8 NOT NULL"
                           ",refund_amount_frac INT8 NOT NULL"
                           ",refund_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
