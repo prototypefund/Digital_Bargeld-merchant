@@ -1570,6 +1570,29 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
   return GNUNET_OK;
 }
 
+/**
+ * Function called when some backoffice staff decides to award or
+ * increase the refund on an existing contract.
+ *
+ * @param cls closure
+ * @param h_contract_terms
+ * @param refund maximum refund to return to the customer for this contract
+ * @param reason 0-terminated UTF-8 string giving the reason why the customer
+ *               got a refund (free form, business-specific)
+ * @return #GNUNET_OK if the refund is accepted
+ *         #GNUNET_NO if the refund is at or below the previous refund amount
+ *         #GNUNET_SYSERR on database error, i.e. contract unknown, DB on fire,
+ *               (FIXME: distinguish hard/soft? who does retries?)
+ */
+int
+postgres_increase_refund_for_contract (void *cls,
+                                       const struct GNUNET_HashCode *h_contract_terms,
+                                       const struct TALER_Amount *refund,
+                                       const char *reason)
+{
+  /*FIXME, put logic*/
+  return GNUNET_SYSERR;
+}
 
 /**
  * Lookup proof information about a wire transfer.
@@ -1709,6 +1732,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_contract_terms_by_date_and_range = &postgres_find_contract_terms_by_date_and_range;
   plugin->find_contract_terms_from_hash = &postgres_find_contract_terms_from_hash;
   plugin->get_refunds_from_contract_terms_hash = &postgres_get_refunds_from_contract_terms_hash;
+  plugin->increase_refund_for_contract = postgres_increase_refund_for_contract;
 
   return plugin;
 }
