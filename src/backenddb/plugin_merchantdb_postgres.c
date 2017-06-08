@@ -323,6 +323,9 @@ postgres_initialize (void *cls)
                             ",deposit_fee_val"
                             ",deposit_fee_frac"
                             ",deposit_fee_curr"
+                            ",refund_fee_val"
+                            ",refund_fee_frac"
+                            ",refund_fee_curr"
                             ",exchange_proof"
                             " FROM merchant_deposits"
                             " WHERE h_contract_terms=$1"
@@ -362,6 +365,9 @@ postgres_initialize (void *cls)
                             ",merchant_deposits.deposit_fee_val"
                             ",merchant_deposits.deposit_fee_frac"
                             ",merchant_deposits.deposit_fee_curr"
+                            ",merchant_deposits.refund_fee_val"
+                            ",merchant_deposits.refund_fee_frac"
+                            ",merchant_deposits.refund_fee_curr"
                             ",merchant_deposits.exchange_proof"
                             " FROM merchant_transfers"
                             "   JOIN merchant_deposits"
@@ -1194,6 +1200,7 @@ postgres_find_payments (void *cls,
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
+    struct TALER_Amount refund_fee;
     json_t *exchange_proof;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
@@ -1203,6 +1210,8 @@ postgres_find_payments (void *cls,
                                    &amount_with_fee),
       TALER_PQ_result_spec_amount ("deposit_fee",
                                    &deposit_fee),
+      TALER_PQ_result_spec_amount ("refund_fee",
+                                   &refund_fee),
       TALER_PQ_result_spec_json ("exchange_proof",
                                  &exchange_proof),
       GNUNET_PQ_result_spec_end
@@ -1222,6 +1231,7 @@ postgres_find_payments (void *cls,
         &coin_pub,
         &amount_with_fee,
         &deposit_fee,
+        &refund_fee,
         exchange_proof);
     GNUNET_PQ_cleanup_result (rs);
   }
@@ -1283,6 +1293,7 @@ postgres_find_payments_by_hash_and_coin (void *cls,
   {
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
+    struct TALER_Amount refund_fee;
     json_t *exchange_proof;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
@@ -1290,6 +1301,8 @@ postgres_find_payments_by_hash_and_coin (void *cls,
                                    &amount_with_fee),
       TALER_PQ_result_spec_amount ("deposit_fee",
                                    &deposit_fee),
+      TALER_PQ_result_spec_amount ("refund_fee",
+                                   &refund_fee),
       TALER_PQ_result_spec_json ("exchange_proof",
                                  &exchange_proof),
       GNUNET_PQ_result_spec_end
@@ -1309,6 +1322,7 @@ postgres_find_payments_by_hash_and_coin (void *cls,
         coin_pub,
         &amount_with_fee,
         &deposit_fee,
+        &refund_fee,
         exchange_proof);
     GNUNET_PQ_cleanup_result (rs);
   }
@@ -1449,6 +1463,7 @@ postgres_find_deposits_by_wtid (void *cls,
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
+    struct TALER_Amount refund_fee;
     json_t *exchange_proof;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
@@ -1460,6 +1475,8 @@ postgres_find_deposits_by_wtid (void *cls,
                                    &amount_with_fee),
       TALER_PQ_result_spec_amount ("deposit_fee",
                                    &deposit_fee),
+      TALER_PQ_result_spec_amount ("refund_fee",
+                                   &refund_fee),
       TALER_PQ_result_spec_json ("exchange_proof",
                                  &exchange_proof),
       GNUNET_PQ_result_spec_end
@@ -1479,6 +1496,7 @@ postgres_find_deposits_by_wtid (void *cls,
         &coin_pub,
         &amount_with_fee,
         &deposit_fee,
+        &refund_fee,
         exchange_proof);
     GNUNET_PQ_cleanup_result (rs);
   }
@@ -1590,7 +1608,12 @@ postgres_increase_refund_for_contract (void *cls,
                                        const struct TALER_Amount *refund,
                                        const char *reason)
 {
-  /*FIXME, put logic*/
+  /*FIXME, logic incomplete*/
+
+  /* 1 Get coins for a given contract
+     2 "Spread" the refund amount among those coins
+     3 Store the solution into table merchant_refund */
+
   return GNUNET_SYSERR;
 }
 

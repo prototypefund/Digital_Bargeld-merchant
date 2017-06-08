@@ -249,8 +249,9 @@ pd_cb (void *cls,
  * @param cls closure
  * @param transaction_id of the contract
  * @param coin_pub public key of the coin
- * @param amount_with_fee amount the exchange will deposit for this coin
- * @param deposit_fee fee the exchange will charge for this coin
+ * @param aamount_with_fee amount the exchange will deposit for this coin
+ * @param adeposit_fee fee the exchange will charge for this coin
+ * @param adeposit_fee fee the exchange will charge for refunding this coin
  * @param exchange_proof proof from exchange that coin was accepted
  */
 static void
@@ -259,6 +260,7 @@ deposit_cb (void *cls,
             const struct TALER_CoinSpendPublicKeyP *acoin_pub,
             const struct TALER_Amount *aamount_with_fee,
             const struct TALER_Amount *adeposit_fee,
+            const struct TALER_Amount *arefund_fee,
             const json_t *aexchange_proof)
 {
   CHECK ((0 == memcmp (ah_contract_terms,
@@ -534,7 +536,7 @@ run (void *cls)
                                                         &h_contract_terms,
                                                         &refund_cb,
                                                         NULL));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_SYSERR !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
                                                 &refund_amount,
