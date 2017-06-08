@@ -536,7 +536,7 @@ run (void *cls)
                                                         &h_contract_terms,
                                                         &refund_cb,
                                                         NULL));
-  FAILIF (GNUNET_SYSERR !=
+  FAILIF (GNUNET_OK !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
                                                 &refund_amount,

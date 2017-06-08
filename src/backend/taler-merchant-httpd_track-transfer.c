@@ -418,6 +418,7 @@ track_transfer_cleanup (struct TM_HandlerContext *hc)
  * @param coin_pub public key of the coin
  * @param amount_with_fee amount the exchange will transfer for this coin
  * @param deposit_fee fee the exchange will charge for this coin
+ * @param refund_fee fee the exchange will charge for refunding this coin
  * @param exchange_proof proof from exchange that coin was accepted
  */
 static void
@@ -426,6 +427,7 @@ check_transfer (void *cls,
                 const struct TALER_CoinSpendPublicKeyP *coin_pub,
                 const struct TALER_Amount *amount_with_fee,
                 const struct TALER_Amount *deposit_fee,
+                const struct TALER_Amount *refund_fee,
                 const json_t *exchange_proof)
 {
   struct TrackTransferContext *rctx = cls;

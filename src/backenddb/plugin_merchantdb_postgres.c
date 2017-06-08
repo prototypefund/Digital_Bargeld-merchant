@@ -1632,7 +1632,27 @@ postgres_increase_refund_for_contract (void *cls,
      2 "Spread" the refund amount among those coins
      3 Store the solution into table merchant_refund */
 
-  return GNUNET_SYSERR;
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  unsigned int i;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "get_refund_information",
+                                    params);
+
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+
+  return GNUNET_OK;
 }
 
 /**
