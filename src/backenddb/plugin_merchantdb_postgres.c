@@ -1626,11 +1626,6 @@ postgres_increase_refund_for_contract (void *cls,
                                        const struct TALER_Amount *refund,
                                        const char *reason)
 {
-  /*FIXME, logic incomplete*/
-
-  /* 1 Get coins for a given contract
-     2 "Spread" the refund amount among those coins
-     3 Store the solution into table merchant_refund */
 
   struct PostgresClosure *pg = cls;
   PGresult *result;
@@ -1650,6 +1645,41 @@ postgres_increase_refund_for_contract (void *cls,
     BREAK_DB_ERR (result);
     PQclear (result);
     return GNUNET_SYSERR;
+  }
+
+  /*FIXME, logic incomplete*/
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "increase DB routine\n");
+  for (i=0;i<PQntuples (result);i++)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "increase DB routine loop (%d)\n",
+                i);
+    struct TALER_CoinSpendPublicKeyP coin_pub;
+    struct TALER_Amount amount_with_fee;
+    struct TALER_Amount refund_amount_awarded;
+
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_auto_from_type ("merchant_deposits.coin_pub",
+                                            &coin_pub),
+      TALER_PQ_result_spec_amount ("merchant_deposits.amount_with_fee",
+                                   &amount_with_fee),
+      TALER_PQ_result_spec_amount ("merchant_refunds.refund_amount",
+                                   &refund_amount_awarded),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+
   }
 
   return GNUNET_OK;
