@@ -185,6 +185,16 @@ postgres_initialize (void *cls)
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
   struct GNUNET_PQ_PreparedStatement ps[] = {
+    GNUNET_PQ_make_prepare ("get_refund_information",
+                            "SELECT"
+                            " merchant_deposits.coin_pub"
+                            ",merchant_deposits.amount_with_fee"
+                            ",merchant_refunds.refund_amount"
+                            " FROM merchant_deposits"
+                            "   LEFT OUTER JOIN merchant_refunds USING coin_pub"
+                            " WHERE merchant_deposits.coin_pub=$1"
+                            " GROUP BY merchant_deposits.coin_pub",
+                            1),
     GNUNET_PQ_make_prepare ("insert_transaction",
                             "INSERT INTO merchant_transactions"
                             "(h_contract_terms"
