@@ -196,8 +196,9 @@ postgres_initialize (void *cls)
                             ",merchant_refunds.refund_amount_curr"
                             " FROM merchant_deposits"
                             "   LEFT OUTER JOIN merchant_refunds USING (coin_pub)"
-                            " WHERE merchant_deposits.coin_pub=$1",
-                            /*FIXME, need a GROUP BY coin_pub here*/
+                            " WHERE merchant_deposits.coin_pub=$1"
+                            /*FIXME, GROUP BY better than ORDER BY*/
+                            " ORDER BY merchant_deposits.coin_pub",
                             1),
     GNUNET_PQ_make_prepare ("insert_transaction",
                             "INSERT INTO merchant_transactions"
