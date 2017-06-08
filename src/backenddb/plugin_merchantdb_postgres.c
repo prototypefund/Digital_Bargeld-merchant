@@ -122,6 +122,15 @@ postgres_initialize (void *cls)
                             ",row_id BIGSERIAL"
                             ",PRIMARY KEY (order_id, merchant_pub)"
                             ");"),
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
+                            " rtransaction_id SERIAL"
+                            ",h_contract_terms BYTEA NOT NULL"
+                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                            ",reason VARCHAR NOT NULL"
+                            ",refund_amount_val INT8 NOT NULL"
+                            ",refund_amount_frac INT8 NOT NULL"
+                            ",refund_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transactions ("
                             " h_contract_terms BYTEA NOT NULL"
                             ",exchange_uri VARCHAR NOT NULL"
@@ -146,23 +155,12 @@ postgres_initialize (void *cls)
                             ",deposit_fee_frac INT4 NOT NULL"
                             ",deposit_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",refund_fee_val INT8 NOT NULL"
-                            ",refund_fee_frac INT8 NOT NULL"
+                            ",refund_fee_frac INT4 NOT NULL"
                             ",refund_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
                             ",exchange_proof BYTEA NOT NULL"
                             ",PRIMARY KEY (h_contract_terms, coin_pub)"
                             ");"),
-
-  GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
-                          " rtransaction_id SERIAL"
-                          ",h_contract_terms BYTEA NOT NULL"
-                          ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-                          ",reason VARCHAR NOT NULL"
-                          ",refund_amount_val INT8 NOT NULL"
-                          ",refund_amount_frac INT8 NOT NULL"
-                          ",refund_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
-                          ");"),
-
   GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
                           " exchange_uri VARCHAR NOT NULL"
                           ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
@@ -1484,80 +1482,6 @@ postgres_find_deposits_by_wtid (void *cls,
   return GNUNET_OK;
 }
 
-
-/**
- * Lookup proof information about a wire transfer.
- *
- * @param cls closure
- * @param exchange_uri from which exchange are we looking for proof
- * @param wtid wire transfer identifier for the search
- * @param cb function to call with proof data
- * @param cb_cls closure for @a cb
- * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
- *         #GNUNET_SYSERR on hard errors
- */
-static int
-postgres_find_proof_by_wtid (void *cls,
-                             const char *exchange_uri,
-                             const struct TALER_WireTransferIdentifierRawP *wtid,
-                             TALER_MERCHANTDB_ProofCallback cb,
-                             void *cb_cls)
-{
-  struct PostgresClosure *pg = cls;
-  PGresult *result;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (wtid),
-    GNUNET_PQ_query_param_string (exchange_uri),
-    GNUNET_PQ_query_param_end
-  };
-
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_proof_by_wtid",
-                                    params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
-  {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if (0 == PQntuples (result))
-  {
-    PQclear (result);
-    return GNUNET_NO;
-  }
-  if (1 != PQntuples (result))
-  {
-    GNUNET_break (0);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-
-  {
-    json_t *proof;
-    struct GNUNET_PQ_ResultSpec rs[] = {
-      TALER_PQ_result_spec_json ("proof",
-                                 &proof),
-      GNUNET_PQ_result_spec_end
-    };
-
-    if (GNUNET_OK !=
-        GNUNET_PQ_extract_result (result,
-                                  rs,
-                                  0))
-    {
-      GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
-    }
-    cb (cb_cls,
-        proof);
-    GNUNET_PQ_cleanup_result (rs);
-  }
-
-  PQclear (result);
-  return GNUNET_OK;
-}
-
 /**
  * Obtain refunds associated with a contract.
  *
@@ -1642,6 +1566,79 @@ get_refunds_from_contract_terms_hash (void *cls,
   return GNUNET_OK;
 }
 
+
+/**
+ * Lookup proof information about a wire transfer.
+ *
+ * @param cls closure
+ * @param exchange_uri from which exchange are we looking for proof
+ * @param wtid wire transfer identifier for the search
+ * @param cb function to call with proof data
+ * @param cb_cls closure for @a cb
+ * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
+ *         #GNUNET_SYSERR on hard errors
+ */
+static int
+postgres_find_proof_by_wtid (void *cls,
+                             const char *exchange_uri,
+                             const struct TALER_WireTransferIdentifierRawP *wtid,
+                             TALER_MERCHANTDB_ProofCallback cb,
+                             void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (wtid),
+    GNUNET_PQ_query_param_string (exchange_uri),
+    GNUNET_PQ_query_param_end
+  };
+
+  result = GNUNET_PQ_exec_prepared (pg->conn,
+                                    "find_proof_by_wtid",
+                                    params);
+  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  {
+    BREAK_DB_ERR (result);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  if (0 == PQntuples (result))
+  {
+    PQclear (result);
+    return GNUNET_NO;
+  }
+  if (1 != PQntuples (result))
+  {
+    GNUNET_break (0);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+
+  {
+    json_t *proof;
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      TALER_PQ_result_spec_json ("proof",
+                                 &proof),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  0))
+    {
+      GNUNET_break (0);
+      PQclear (result);
+      return GNUNET_SYSERR;
+    }
+    cb (cb_cls,
+        proof);
+    GNUNET_PQ_cleanup_result (rs);
+  }
+
+  PQclear (result);
+  return GNUNET_OK;
+}
 
 
 /**
