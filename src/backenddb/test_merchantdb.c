@@ -200,6 +200,28 @@ transaction_cb (void *cls,
 }
 
 /**
+ * Function called with information about a refund.
+ *
+ * @param cls closure
+ * @param coin_pub public coin from which the refund comes from
+ * @param rtransaction_id identificator of the refund
+ * @param reason human-readable explaination of the refund
+ * @param refund_amount refund amount which is being taken from coin_pub
+ * @param refund_fee cost of this refund operation
+ */
+void
+refund_cb(void *cls,
+          const struct TALER_CoinSpendPublicKeyP *coin_pub,
+          uint64_t rtransaction_id,
+          const char *reason,
+          const struct TALER_Amount *refund_amount,
+          const struct TALER_Amount *refund_fee)
+{
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "refund_cb\n");
+  /* FIXME, more logic here? */
+}
+
+/**
  * Callback for `find_contract_terms_by_date`.
  *
  * @param cls closure
@@ -485,9 +507,9 @@ run (void *cls)
                                  NULL));
   FAILIF (GNUNET_OK !=
           plugin->find_transfers_by_hash (plugin->cls,
-                                        &h_contract_terms,
-                                        &transfer_cb,
-                                        NULL));
+                                          &h_contract_terms,
+                                          &transfer_cb,
+                                          NULL));
   FAILIF (GNUNET_OK !=
           plugin->find_deposits_by_wtid (plugin->cls,
                                          &wtid,
@@ -499,6 +521,11 @@ run (void *cls)
                                       &wtid,
                                       &proof_cb,
                                       NULL));
+  FAILIF (GNUNET_NO !=
+          plugin->get_refunds_from_contract_terms_hash (plugin->cls,
+                                                        &h_contract_terms,
+                                                        &refund_cb,
+                                                        NULL));
   if (-1 == result)
     result = 0;
 

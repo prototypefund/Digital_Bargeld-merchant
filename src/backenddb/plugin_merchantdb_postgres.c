@@ -123,7 +123,7 @@ postgres_initialize (void *cls)
                             ",PRIMARY KEY (order_id, merchant_pub)"
                             ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
-                            " rtransaction_id SERIAL"
+                            " rtransaction_id INT8 NOT NULL"
                             ",h_contract_terms BYTEA NOT NULL"
                             ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
                             ",reason VARCHAR NOT NULL"
@@ -271,6 +271,10 @@ postgres_initialize (void *cls)
                             " ORDER BY row_id DESC, timestamp DESC"
                             " LIMIT $3",
                             3),
+    GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
+                            "SELECT * FROM merchant_refunds"
+                            " WHERE h_contract_terms=$1",
+                            1),
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range",
                             "SELECT"
                             " contract_terms"
@@ -1492,10 +1496,10 @@ postgres_find_deposits_by_wtid (void *cls,
  *         #GNUNET_SYSERR if there were errors talking to the DB
  */
 int
-get_refunds_from_contract_terms_hash (void *cls,
-                                      const struct GNUNET_HashCode *h_contract_terms,
-                                      TALER_MERCHANTDB_RefundCallback rc,
-                                      void *rc_cls)
+postgres_get_refunds_from_contract_terms_hash (void *cls,
+                                               const struct GNUNET_HashCode *h_contract_terms,
+                                               TALER_MERCHANTDB_RefundCallback rc,
+                                               void *rc_cls)
 {
 
   struct PostgresClosure *pg = cls;
@@ -1508,7 +1512,7 @@ get_refunds_from_contract_terms_hash (void *cls,
   };
 
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "FIXME",
+                                    "find_refunds_from_contract_terms_hash",
                                     params);
   if (PGRES_TUPLES_OK != PQresultStatus (result))
   {
@@ -1704,6 +1708,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_contract_terms_by_date = &postgres_find_contract_terms_by_date;
   plugin->find_contract_terms_by_date_and_range = &postgres_find_contract_terms_by_date_and_range;
   plugin->find_contract_terms_from_hash = &postgres_find_contract_terms_from_hash;
+  plugin->get_refunds_from_contract_terms_hash = &postgres_get_refunds_from_contract_terms_hash;
 
   return plugin;
 }
