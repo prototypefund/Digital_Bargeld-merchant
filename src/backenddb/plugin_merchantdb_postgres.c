@@ -45,6 +45,7 @@ struct PostgresClosure
 
 /**
  * Error code returned by Postgres for deadlock.
+ * FIXME: no threads, really needed?
  */
 #define PQ_DIAG_SQLSTATE_DEADLOCK "40P01"
 
@@ -209,7 +210,7 @@ evaluate_pq_result (struct PostgresClosure *pg,
       return GNUNET_SYSERR;
     }
     if ( (0 == strcmp (sqlstate,
-                       PQ_DIAG_SQLSTATE_DEADLOCK)) ||
+                       PQ_DIAG_SQLSTATE_DEADLOCK)) || /*FIXME: no threads, really needed?*/
          (0 == strcmp (sqlstate,
                        PQ_DIAG_SQLSTATE_SERIALIZATION_FAILURE)) )
     {
@@ -412,6 +413,16 @@ postgres_initialize (void *cls)
                             " h_contract_terms=$1"
                             " AND merchant_pub=$2",
                             2),
+
+    /*NOTE: minimal version, to be expanded on a needed basis*/
+    GNUNET_PQ_make_prepare ("find_refunds",
+                            "SELECT"
+                            " refund_amount_val" 
+                            ",refund_amount_frac"
+                            ",refund_amount_curr"
+                            " FROM merchant_refunds"
+                            " WHERE coin_pub=$1",
+                            1),
     GNUNET_PQ_make_prepare ("find_contract_terms",
                             "SELECT"
                             " contract_terms"
@@ -1785,7 +1796,13 @@ postgres_increase_refund_for_contract (void *cls,
     GNUNET_PQ_query_param_end
   };
 
-  /*FIXME: begin transaction*/
+  if (GNUNET_OK !=
+      postgres_start (cls))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "find_deposits",
                                     params);
@@ -1806,12 +1823,11 @@ postgres_increase_refund_for_contract (void *cls,
     return GNUNET_SYSERR;
   }
 
-  /*FIXME, logic incomplete!!*/
-
   for (i=0;i<PQntuples (result);i++)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
+    struct TALER_Amount refunded_amount;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
@@ -1830,13 +1846,74 @@ postgres_increase_refund_for_contract (void *cls,
       PQclear (result);
       return GNUNET_SYSERR;
     }
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Found: coin_pub '%s' amount_with_fee '%s'.\n",
-                TALER_B2S (&coin_pub),
-                TALER_amount_to_string (&amount_with_fee));
+    struct GNUNET_PQ_QueryParam params[] = {
+      GNUNET_PQ_query_param_auto_from_type (&coin_pub),
+      GNUNET_PQ_query_param_end
+    };
+
+    result = GNUNET_PQ_exec_prepared (pg->conn,
+                                      "find_refunds",
+                                      params);
+
+    if (PGRES_TUPLES_OK != PQresultStatus (result))
+    {
+      BREAK_DB_ERR (result);
+      goto rollback;
+    }
+    TALER_amount_get_zero (amount_with_fee.currency,
+                           &refunded_amount);
+    if (0 < PQntuples (result))
+    {
+      for (i=0; PQntuples (result); i++)
+      {
+        /*Sum up refund*/
+        struct TALER_Amount acc;
+        struct GNUNET_PQ_ResultSpec rs[] = {
+          TALER_PQ_result_spec_amount ("refund_amount",
+                                       &acc),
+          GNUNET_PQ_result_spec_end
+        };
+
+        if (GNUNET_OK !=
+            GNUNET_PQ_extract_result (result,
+                                      rs,
+                                      i))
+          goto rollback;
+
+        if (GNUNET_SYSERR == TALER_amount_add (&refunded_amount,
+                                               &refunded_amount,
+                                               &acc))
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Could not add amounts\n");
+          goto rollback;
+        }
+      }
+    }
+
+    /**
+     * Here we know how much the coin is worth, and how much it has
+     * been refunded out of it, so the actual logic can take place.
+     */
+  }
+
+  if (GNUNET_OK != postgres_commit (cls))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Failed to commit transaction increasing refund\n");
+    return GNUNET_SYSERR;
   }
 
   return GNUNET_OK;
+
+  rollback:
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed transaction, doing rollback\n");
+    PQclear (result);
+    postgres_rollback (pg);
+    return GNUNET_SYSERR;
+
+  /*FIXME, logic incomplete!!*/
 }
 
 /**
