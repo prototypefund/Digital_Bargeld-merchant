@@ -1895,6 +1895,12 @@ postgres_increase_refund_for_contract (void *cls,
      * Here we know how much the coin is worth, and how much it has
      * been refunded out of it, so the actual logic can take place.
      */
+
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Refund situation for coin '%s',  deposited: %s, refunded: %s\n",
+                TALER_B2S (&coin_pub),
+                TALER_amount_to_string (&amount_with_fee),
+                TALER_amount_to_string (&refunded_amount));
   }
 
   if (GNUNET_OK != postgres_commit (cls))
