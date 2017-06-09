@@ -1892,6 +1892,7 @@ postgres_increase_refund_for_contract (void *cls,
     }
 
     /**
+     * FIXME:
      * Here we know how much the coin is worth, and how much it has
      * been refunded out of it, so the actual logic can take place.
      */
@@ -1918,8 +1919,6 @@ postgres_increase_refund_for_contract (void *cls,
     PQclear (result);
     postgres_rollback (pg);
     return GNUNET_SYSERR;
-
-  /*FIXME, logic incomplete!!*/
 }
 
 /**
