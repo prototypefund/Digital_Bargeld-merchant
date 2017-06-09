@@ -1902,6 +1902,8 @@ postgres_increase_refund_for_contract (void *cls,
                 TALER_B2S (&coin_pub),
                 TALER_amount_to_string (&amount_with_fee),
                 TALER_amount_to_string (&refunded_amount));
+    /*NOTE: this makes testcase fail. To keep around until logic has been written*/
+    return GNUNET_SYSERR;
   }
 
   if (GNUNET_OK != postgres_commit (cls))
