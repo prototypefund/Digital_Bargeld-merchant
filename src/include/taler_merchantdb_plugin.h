@@ -530,6 +530,7 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls closure
    * @param h_contract_terms
+   * @param merchant_pub merchant's instance public key
    * @param refund maximum refund to return to the customer for this contract
    * @param reason 0-terminated UTF-8 string giving the reason why the customer
    *               got a refund (free form, business-specific)
@@ -541,6 +542,7 @@ struct TALER_MERCHANTDB_Plugin
   int
   (*increase_refund_for_contract)(void *cls,
                                   const struct GNUNET_HashCode *h_contract_terms,
+                                  const struct TALER_MerchantPublicKeyP *merchant_pub,
                                   const struct TALER_Amount *refund,
                                   const char *reason);
 

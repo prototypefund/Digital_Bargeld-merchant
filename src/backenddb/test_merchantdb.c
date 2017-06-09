@@ -539,6 +539,7 @@ run (void *cls)
   FAILIF (GNUNET_OK !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
+                                                &merchant_pub,
                                                 &refund_amount,
                                                 "refund testing"));
   if (-1 == result)

@@ -44,6 +44,16 @@ struct PostgresClosure
 };
 
 /**
+ * Error code returned by Postgres for deadlock.
+ */
+#define PQ_DIAG_SQLSTATE_DEADLOCK "40P01"
+
+/**
+ * Error code returned by Postgres on serialization failure.
+ */
+#define PQ_DIAG_SQLSTATE_SERIALIZATION_FAILURE "40001"
+
+/**
  * Extract error code.
  *
  * @param res postgres result object with error details
@@ -51,6 +61,21 @@ struct PostgresClosure
 #define EXTRACT_DB_ERROR(res)                                         \
   PQresultErrorField(res, PG_DIAG_SQLSTATE)
 
+/**
+ * Log a query error.
+ *
+ * @param result PQ result object of the query that failed
+ * @param conn SQL connection that was used
+ */
+#define QUERY_ERR(result,conn)                         \
+  GNUNET_log (GNUNET_ERROR_TYPE_WARNING,             \
+              "Query failed at %s:%u: %s/%s/%s/%s/%s\n", \
+              __FILE__, __LINE__, \
+              PQresultErrorField (result, PG_DIAG_MESSAGE_PRIMARY), \
+              PQresultErrorField (result, PG_DIAG_MESSAGE_DETAIL), \
+              PQresultErrorMessage (result), \
+              PQresStatus (PQresultStatus (result)), \
+              PQerrorMessage (conn));
 
 /**
  * Log error from PostGres.
@@ -99,6 +124,142 @@ postgres_drop_tables (void *cls)
 
   return GNUNET_PQ_exec_statements (pg->conn,
                                     es);
+}
+
+/**
+ * Start a transaction.
+ *
+ * @param cls the `struct PostgresClosure` with the plugin-specific state
+ * @return #GNUNET_OK on success
+ */
+static int
+postgres_start (void *cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  ExecStatusType ex;
+
+  result = PQexec (pg->conn,
+                   "START TRANSACTION ISOLATION LEVEL SERIALIZABLE");
+  if (PGRES_COMMAND_OK !=
+      (ex = PQresultStatus (result)))
+  {
+    TALER_LOG_ERROR ("Failed to start transaction (%s): %s\n",
+                     PQresStatus (ex),
+                     PQerrorMessage (pg->conn));
+    GNUNET_break (0);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  PQclear (result);
+  return GNUNET_OK;
+
+  /**
+   * NOTE: this function equals 99% the one from the exchange codebase.
+   * The difference is that here we don't use the session->state field (
+   * see original code: exchange/src/exchangedb/plugin_exchangedb_postgres.c).
+   * Good/bad?
+   */
+}
+
+/**
+ * Roll back the current transaction of a database connection.
+ *
+ * @param cls the `struct PostgresClosure` with the plugin-specific state
+ * @return #GNUNET_OK on success
+ */
+static void
+postgres_rollback (void *cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+
+  result = PQexec (pg->conn,
+                   "ROLLBACK");
+  GNUNET_break (PGRES_COMMAND_OK ==
+                PQresultStatus (result));
+  PQclear (result);
+}
+
+/**
+ * Check the @a result's error code to see what happened.
+ * Also logs errors.
+ *
+ * @param pg `struct PostgresClosure`
+ * @param result result to check
+ * @return #GNUNET_OK if the request/transaction succeeded
+ *         #GNUNET_NO if it failed but could succeed if retried
+ *         #GNUNET_SYSERR on hard errors
+ */
+static int
+evaluate_pq_result (struct PostgresClosure *pg,
+                    PGresult *result)
+{
+  if (PGRES_COMMAND_OK !=
+      PQresultStatus (result))
+  {
+    const char *sqlstate;
+
+    sqlstate = PQresultErrorField (result,
+                                   PG_DIAG_SQLSTATE);
+    if (NULL == sqlstate)
+    {
+      /* very unexpected... */
+      GNUNET_break (0);
+      return GNUNET_SYSERR;
+    }
+    if ( (0 == strcmp (sqlstate,
+                       PQ_DIAG_SQLSTATE_DEADLOCK)) ||
+         (0 == strcmp (sqlstate,
+                       PQ_DIAG_SQLSTATE_SERIALIZATION_FAILURE)) )
+    {
+      /* These two can be retried and have a fair chance of working
+         the next time */
+      QUERY_ERR (result, pg->conn);
+      return GNUNET_NO;
+    }
+    BREAK_DB_ERR(result);
+    return GNUNET_SYSERR;
+  }
+  return GNUNET_OK;
+
+  /**
+   * NOTE: this function equals 99% the one from the exchange codebase.
+   * The difference is that here we don't use the session->state field (
+   * see original code: exchange/src/exchangedb/plugin_exchangedb_postgres.c).
+   * Good/bad?
+   */
+}
+
+/**
+ * Commit the current transaction of a database connection.
+ *
+ * @param cls the `struct PostgresClosure` with the plugin-specific state
+ * @return #GNUNET_SYSERR on hard error,
+ *         #GNUNET_NO if commit failed but retry may work,
+ *         #GNUNET_OK on success
+ */
+static int
+postgres_commit (void *cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  int ret;
+
+  result = PQexec (pg->conn,
+                   "COMMIT");
+  ret = evaluate_pq_result (pg,
+                            result);
+  GNUNET_break (GNUNET_SYSERR != ret);
+  PQclear (result);
+  return ret;
+
+  /**
+   * NOTE: this function equals 99% the one from the exchange codebase.
+   * The difference is that here we don't use the session->state field (
+   * see original code: exchange/src/exchangedb/plugin_exchangedb_postgres.c).
+   * Good/bad?
+   */
 }
 
 
@@ -185,21 +346,6 @@ postgres_initialize (void *cls)
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
   struct GNUNET_PQ_PreparedStatement ps[] = {
-    GNUNET_PQ_make_prepare ("get_refund_information",
-                            "SELECT"
-                            " merchant_deposits.coin_pub"
-                            ",merchant_deposits.amount_with_fee_val"
-                            ",merchant_deposits.amount_with_fee_frac"
-                            ",merchant_deposits.amount_with_fee_curr"
-                            ",merchant_refunds.refund_amount_val"
-                            ",merchant_refunds.refund_amount_frac"
-                            ",merchant_refunds.refund_amount_curr"
-                            " FROM merchant_deposits"
-                            "   LEFT OUTER JOIN merchant_refunds USING (coin_pub)"
-                            " WHERE merchant_deposits.coin_pub=$1"
-                            /*FIXME, GROUP BY better than ORDER BY?*/
-                            " ORDER BY merchant_deposits.coin_pub",
-                            1),
     GNUNET_PQ_make_prepare ("insert_transaction",
                             "INSERT INTO merchant_transactions"
                             "(h_contract_terms"
@@ -1612,6 +1758,7 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
  *
  * @param cls closure
  * @param h_contract_terms
+ * @param merchant_pub merchant's instance public key
  * @param refund maximum refund to return to the customer for this contract
  * @param reason 0-terminated UTF-8 string giving the reason why the customer
  *               got a refund (free form, business-specific)
@@ -1623,6 +1770,7 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
 int
 postgres_increase_refund_for_contract (void *cls,
                                        const struct GNUNET_HashCode *h_contract_terms,
+                                       const struct TALER_MerchantPublicKeyP *merchant_pub,
                                        const struct TALER_Amount *refund,
                                        const char *reason)
 {
@@ -1633,11 +1781,13 @@ postgres_increase_refund_for_contract (void *cls,
 
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
 
+  /*FIXME: begin transaction*/
   result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "get_refund_information",
+                                    "find_deposits",
                                     params);
 
   if (PGRES_TUPLES_OK != PQresultStatus (result))
@@ -1647,26 +1797,27 @@ postgres_increase_refund_for_contract (void *cls,
     return GNUNET_SYSERR;
   }
 
-  /*FIXME, logic incomplete*/
+  if (0 == PQntuples (result))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unknown contract: %s (merchant_pub: %s), no refund possible\n",
+                GNUNET_h2s (h_contract_terms),
+                TALER_B2S (merchant_pub));
+    return GNUNET_SYSERR;
+  }
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "increase DB routine\n");
+  /*FIXME, logic incomplete!!*/
+
   for (i=0;i<PQntuples (result);i++)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "increase DB routine loop (%d)\n",
-                i);
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
-    struct TALER_Amount refund_amount_awarded;
 
     struct GNUNET_PQ_ResultSpec rs[] = {
-      GNUNET_PQ_result_spec_auto_from_type ("merchant_deposits.coin_pub",
+      GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
-      TALER_PQ_result_spec_amount ("merchant_deposits.amount_with_fee",
+      TALER_PQ_result_spec_amount ("amount_with_fee",
                                    &amount_with_fee),
-      TALER_PQ_result_spec_amount ("merchant_refunds.refund_amount",
-                                   &refund_amount_awarded),
       GNUNET_PQ_result_spec_end
     };
 
@@ -1679,7 +1830,10 @@ postgres_increase_refund_for_contract (void *cls,
       PQclear (result);
       return GNUNET_SYSERR;
     }
-
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Found: coin_pub '%s' amount_with_fee '%s'.\n",
+                TALER_B2S (&coin_pub),
+                TALER_amount_to_string (&amount_with_fee));
   }
 
   return GNUNET_OK;
