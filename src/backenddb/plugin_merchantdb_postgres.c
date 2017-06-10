@@ -195,7 +195,7 @@ static int
 postgres_commit (void *cls)
 {
   struct PostgresClosure *pg = cls;
-  enum GNUNET_PQ_QueryStatus ret;
+  enum GNUNET_DB_QueryStatus ret;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_end
   };
@@ -205,9 +205,9 @@ postgres_commit (void *cls)
                                             params);
   switch (ret)
   {
-  case GNUNET_PQ_STATUS_HARD_ERROR:
+  case GNUNET_DB_STATUS_HARD_ERROR:
     return GNUNET_SYSERR;
-  case GNUNET_PQ_STATUS_SOFT_ERROR:
+  case GNUNET_DB_STATUS_SOFT_ERROR:
     return GNUNET_NO;
   default:
     return GNUNET_OK;
@@ -551,7 +551,7 @@ postgres_find_contract_terms_from_hash (void *cls,
                                        const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
-  enum GNUNET_PQ_QueryStatus res;
+  enum GNUNET_DB_QueryStatus res;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -600,7 +600,7 @@ postgres_find_contract_terms (void *cls,
                               const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
-  enum GNUNET_PQ_QueryStatus res;
+  enum GNUNET_DB_QueryStatus res;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -1804,7 +1804,7 @@ process_deposits_cb (void *cls,
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
     struct FindRefundContext ictx;
-    enum GNUNET_PQ_QueryStatus ires;
+    enum GNUNET_DB_QueryStatus ires;
     struct GNUNET_PQ_QueryParam params[] = {
       GNUNET_PQ_query_param_auto_from_type (&coin_pub),
       GNUNET_PQ_query_param_end
@@ -1836,9 +1836,9 @@ process_deposits_cb (void *cls,
                                                  &process_refund_cb,
                                                  &ictx);
     if ( (GNUNET_OK != ictx.err) ||
-         (GNUNET_PQ_STATUS_HARD_ERROR == ires) )
+         (GNUNET_DB_STATUS_HARD_ERROR == ires) )
       goto rollback;
-    if (GNUNET_PQ_STATUS_SOFT_ERROR == ires)
+    if (GNUNET_DB_STATUS_SOFT_ERROR == ires)
       goto rollback; // FIXME: #5010: actually rollback + retry!
 
     /**
@@ -1892,7 +1892,7 @@ postgres_increase_refund_for_contract (void *cls,
 {
   struct PostgresClosure *pg = cls;
   struct InsertRefundContext ctx;
-  enum GNUNET_PQ_QueryStatus ret;
+  enum GNUNET_DB_QueryStatus ret;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -1915,15 +1915,15 @@ postgres_increase_refund_for_contract (void *cls,
                                               &ctx);
   switch (ret)
   {
-  case GNUNET_PQ_STATUS_SUCCESS_NO_RESULTS:
+  case GNUNET_DB_STATUS_SUCCESS_NO_RESULTS:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown contract: %s (merchant_pub: %s), no refund possible\n",
                 GNUNET_h2s (h_contract_terms),
                 TALER_B2S (merchant_pub));
     return GNUNET_SYSERR;
-  case GNUNET_PQ_STATUS_SOFT_ERROR:
+  case GNUNET_DB_STATUS_SOFT_ERROR:
     return GNUNET_SYSERR; /* UGH, BUG #5010! */
-  case GNUNET_PQ_STATUS_HARD_ERROR:
+  case GNUNET_DB_STATUS_HARD_ERROR:
     return GNUNET_SYSERR;
   default:
     /* got one or more deposits */
