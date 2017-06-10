@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA
+  (C) 2014, 2015, 2016, 2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -182,55 +182,6 @@ postgres_rollback (void *cls)
   PQclear (result);
 }
 
-/**
- * Check the @a result's error code to see what happened.
- * Also logs errors.
- *
- * @param pg `struct PostgresClosure`
- * @param result result to check
- * @return #GNUNET_OK if the request/transaction succeeded
- *         #GNUNET_NO if it failed but could succeed if retried
- *         #GNUNET_SYSERR on hard errors
- */
-static int
-evaluate_pq_result (struct PostgresClosure *pg,
-                    PGresult *result)
-{
-  if (PGRES_COMMAND_OK !=
-      PQresultStatus (result))
-  {
-    const char *sqlstate;
-
-    sqlstate = PQresultErrorField (result,
-                                   PG_DIAG_SQLSTATE);
-    if (NULL == sqlstate)
-    {
-      /* very unexpected... */
-      GNUNET_break (0);
-      return GNUNET_SYSERR;
-    }
-    if ( (0 == strcmp (sqlstate,
-                       PQ_DIAG_SQLSTATE_DEADLOCK)) || /*FIXME: no threads, really needed?*/
-         (0 == strcmp (sqlstate,
-                       PQ_DIAG_SQLSTATE_SERIALIZATION_FAILURE)) )
-    {
-      /* These two can be retried and have a fair chance of working
-         the next time */
-      QUERY_ERR (result, pg->conn);
-      return GNUNET_NO;
-    }
-    BREAK_DB_ERR(result);
-    return GNUNET_SYSERR;
-  }
-  return GNUNET_OK;
-
-  /**
-   * NOTE: this function equals 99% the one from the exchange codebase.
-   * The difference is that here we don't use the session->state field (
-   * see original code: exchange/src/exchangedb/plugin_exchangedb_postgres.c).
-   * Good/bad?
-   */
-}
 
 /**
  * Commit the current transaction of a database connection.
@@ -244,23 +195,23 @@ static int
 postgres_commit (void *cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  int ret;
+  enum GNUNET_PQ_QueryStatus ret;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_end
+  };
 
-  result = PQexec (pg->conn,
-                   "COMMIT");
-  ret = evaluate_pq_result (pg,
-                            result);
-  GNUNET_break (GNUNET_SYSERR != ret);
-  PQclear (result);
-  return ret;
-
-  /**
-   * NOTE: this function equals 99% the one from the exchange codebase.
-   * The difference is that here we don't use the session->state field (
-   * see original code: exchange/src/exchangedb/plugin_exchangedb_postgres.c).
-   * Good/bad?
-   */
+  ret = GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                            "end_transaction",
+                                            params);
+  switch (ret)
+  {
+  case GNUNET_PQ_STATUS_HARD_ERROR:
+    return GNUNET_SYSERR;
+  case GNUNET_PQ_STATUS_SOFT_ERROR:
+    return GNUNET_NO;
+  default:
+    return GNUNET_OK;
+  }
 }
 
 
@@ -323,7 +274,7 @@ postgres_initialize (void *cls)
                             ",exchange_proof BYTEA NOT NULL"
                             ",PRIMARY KEY (h_contract_terms, coin_pub)"
                             ");"),
-  GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
                           " exchange_uri VARCHAR NOT NULL"
                           ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
                           ",execution_time INT8 NOT NULL"
@@ -413,11 +364,14 @@ postgres_initialize (void *cls)
                             " h_contract_terms=$1"
                             " AND merchant_pub=$2",
                             2),
+    GNUNET_PQ_make_prepare ("end_transaction",
+                            "COMMIT",
+                            0),
 
     /*NOTE: minimal version, to be expanded on a needed basis*/
     GNUNET_PQ_make_prepare ("find_refunds",
                             "SELECT"
-                            " refund_amount_val" 
+                            " refund_amount_val"
                             ",refund_amount_frac"
                             ",refund_amount_curr"
                             " FROM merchant_refunds"
@@ -1763,6 +1717,157 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
   return GNUNET_OK;
 }
 
+
+/**
+ * Closure for #process_refund_cb.
+ */
+struct FindRefundContext
+{
+  struct TALER_Amount refunded_amount;
+
+  int err;
+};
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results.
+ *
+ * @param cls closure, our `struct FindRefundContext`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+process_refund_cb (void *cls,
+                   PGresult *result,
+                   unsigned int num_results)
+{
+  struct FindRefundContext *ictx = cls;
+
+  for (unsigned int i=0; i<num_results; i++)
+  {
+    /*Sum up refund*/
+    struct TALER_Amount acc;
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      TALER_PQ_result_spec_amount ("refund_amount",
+                                   &acc),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+      ictx->err = GNUNET_SYSERR;
+
+    if (GNUNET_SYSERR ==
+        TALER_amount_add (&ictx->refunded_amount,
+                          &ictx->refunded_amount,
+                          &acc))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Could not add amounts\n");
+      ictx->err = GNUNET_SYSERR;
+    }
+  }
+}
+
+
+/**
+ * Closure for #process_deposits_cb.
+ */
+struct InsertRefundContext
+{
+  struct PostgresClosure *pg;
+
+  int err;
+};
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results.
+ *
+ * @param cls closure, our `struct InsertRefundContext`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+process_deposits_cb (void *cls,
+                     PGresult *result,
+                     unsigned int num_results)
+{
+  struct InsertRefundContext *ctx = cls;
+
+  for (unsigned int i=0;i<num_results;i++)
+  {
+    struct TALER_CoinSpendPublicKeyP coin_pub;
+    struct TALER_Amount amount_with_fee;
+    struct FindRefundContext ictx;
+    enum GNUNET_PQ_QueryStatus ires;
+    struct GNUNET_PQ_QueryParam params[] = {
+      GNUNET_PQ_query_param_auto_from_type (&coin_pub),
+      GNUNET_PQ_query_param_end
+    };
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
+                                            &coin_pub),
+      TALER_PQ_result_spec_amount ("amount_with_fee",
+                                   &amount_with_fee),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      ctx->err = GNUNET_SYSERR;
+      return;
+    }
+
+    TALER_amount_get_zero (amount_with_fee.currency,
+                           &ictx.refunded_amount);
+    ictx.err = GNUNET_OK; /* no error so far */
+    ires = GNUNET_PQ_eval_prepared_multi_select (ctx->pg->conn,
+                                                 "find_refunds",
+                                                 params,
+                                                 &process_refund_cb,
+                                                 &ictx);
+    if ( (GNUNET_OK != ictx.err) ||
+         (GNUNET_PQ_STATUS_HARD_ERROR == ires) )
+      goto rollback;
+    if (GNUNET_PQ_STATUS_SOFT_ERROR == ires)
+      goto rollback; // FIXME: #5010: actually rollback + retry!
+
+    /**
+     * FIXME:
+     * Here we know how much the coin is worth, and how much it has
+     * been refunded out of it, so the actual logic can take place.
+     */
+
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Refund situation for coin '%s',  deposited: %s, refunded: %s\n",
+                TALER_B2S (&coin_pub),
+                TALER_amount_to_string (&amount_with_fee),
+                TALER_amount_to_string (&ictx.refunded_amount));
+    /*NOTE: this makes testcase fail. To keep around until logic has been written*/
+    ctx->err = GNUNET_SYSERR;
+    return;
+  }
+
+ rollback:
+  ctx->err = GNUNET_SYSERR;
+  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+              "Failed transaction, doing rollback\n");
+  PQclear (result);
+  postgres_rollback (ctx->pg);
+  return;
+}
+
+
+
 /**
  * Function called when some backoffice staff decides to award or
  * increase the refund on an existing contract.
@@ -1778,18 +1883,16 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
  *         #GNUNET_SYSERR on database error, i.e. contract unknown, DB on fire,
  *               (FIXME: distinguish hard/soft? who does retries?)
  */
-int
+static int
 postgres_increase_refund_for_contract (void *cls,
                                        const struct GNUNET_HashCode *h_contract_terms,
                                        const struct TALER_MerchantPublicKeyP *merchant_pub,
                                        const struct TALER_Amount *refund,
                                        const char *reason)
 {
-
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int i;
-
+  struct InsertRefundContext ctx;
+  enum GNUNET_PQ_QueryStatus ret;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -1803,107 +1906,28 @@ postgres_increase_refund_for_contract (void *cls,
     return GNUNET_SYSERR;
   }
 
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_deposits",
-                                    params);
-
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  ctx.pg = pg;
+  ctx.err = GNUNET_OK;
+  ret = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+                                              "find_deposits",
+                                              params,
+                                              &process_deposits_cb,
+                                              &ctx);
+  switch (ret)
   {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-
-  if (0 == PQntuples (result))
-  {
+  case GNUNET_PQ_STATUS_SUCCESS_NO_RESULTS:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown contract: %s (merchant_pub: %s), no refund possible\n",
                 GNUNET_h2s (h_contract_terms),
                 TALER_B2S (merchant_pub));
     return GNUNET_SYSERR;
-  }
-
-  for (i=0;i<PQntuples (result);i++)
-  {
-    struct TALER_CoinSpendPublicKeyP coin_pub;
-    struct TALER_Amount amount_with_fee;
-    struct TALER_Amount refunded_amount;
-
-    struct GNUNET_PQ_ResultSpec rs[] = {
-      GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
-                                            &coin_pub),
-      TALER_PQ_result_spec_amount ("amount_with_fee",
-                                   &amount_with_fee),
-      GNUNET_PQ_result_spec_end
-    };
-
-    if (GNUNET_OK !=
-        GNUNET_PQ_extract_result (result,
-                                  rs,
-                                  i))
-    {
-      GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
-    }
-    struct GNUNET_PQ_QueryParam params[] = {
-      GNUNET_PQ_query_param_auto_from_type (&coin_pub),
-      GNUNET_PQ_query_param_end
-    };
-
-    result = GNUNET_PQ_exec_prepared (pg->conn,
-                                      "find_refunds",
-                                      params);
-
-    if (PGRES_TUPLES_OK != PQresultStatus (result))
-    {
-      BREAK_DB_ERR (result);
-      goto rollback;
-    }
-    TALER_amount_get_zero (amount_with_fee.currency,
-                           &refunded_amount);
-    if (0 < PQntuples (result))
-    {
-      for (i=0; PQntuples (result); i++)
-      {
-        /*Sum up refund*/
-        struct TALER_Amount acc;
-        struct GNUNET_PQ_ResultSpec rs[] = {
-          TALER_PQ_result_spec_amount ("refund_amount",
-                                       &acc),
-          GNUNET_PQ_result_spec_end
-        };
-
-        if (GNUNET_OK !=
-            GNUNET_PQ_extract_result (result,
-                                      rs,
-                                      i))
-          goto rollback;
-
-        if (GNUNET_SYSERR == TALER_amount_add (&refunded_amount,
-                                               &refunded_amount,
-                                               &acc))
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Could not add amounts\n");
-          goto rollback;
-        }
-      }
-    }
-
-    /**
-     * FIXME:
-     * Here we know how much the coin is worth, and how much it has
-     * been refunded out of it, so the actual logic can take place.
-     */
-
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Refund situation for coin '%s',  deposited: %s, refunded: %s\n",
-                TALER_B2S (&coin_pub),
-                TALER_amount_to_string (&amount_with_fee),
-                TALER_amount_to_string (&refunded_amount));
-    /*NOTE: this makes testcase fail. To keep around until logic has been written*/
+  case GNUNET_PQ_STATUS_SOFT_ERROR:
+    return GNUNET_SYSERR; /* UGH, BUG #5010! */
+  case GNUNET_PQ_STATUS_HARD_ERROR:
     return GNUNET_SYSERR;
+  default:
+    /* got one or more deposits */
+    break;
   }
 
   if (GNUNET_OK != postgres_commit (cls))
@@ -1914,14 +1938,8 @@ postgres_increase_refund_for_contract (void *cls,
   }
 
   return GNUNET_OK;
-
-  rollback:
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed transaction, doing rollback\n");
-    PQclear (result);
-    postgres_rollback (pg);
-    return GNUNET_SYSERR;
 }
+
 
 /**
  * Lookup proof information about a wire transfer.
