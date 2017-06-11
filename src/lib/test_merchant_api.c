@@ -522,9 +522,9 @@ struct Command
       uint64_t account_credit;
 
       /**
-       * Set (!) to the wire transfer identifier observed.
+       * Set (!) to the wire transfer subject observed.
        */
-      struct TALER_WireTransferIdentifierRawP wtid;
+      char *subject;
 
     } check_bank_transfer;
 
@@ -1465,6 +1465,8 @@ cleanup_state (struct InterpreterState *is)
       }
       break;
     case OC_CHECK_BANK_TRANSFER:
+      GNUNET_free_non_null (cmd->details.check_bank_transfer.subject);
+      cmd->details.check_bank_transfer.subject = NULL;
       break;
     case OC_CHECK_BANK_TRANSFERS_EMPTY:
       break;
@@ -1944,11 +1946,11 @@ interpreter_run (void *cls)
       }
       if (GNUNET_OK !=
           TALER_FAKEBANK_check (fakebank,
-                          &amount,
-                          cmd->details.check_bank_transfer.account_debit,
-                          cmd->details.check_bank_transfer.account_credit,
-                          EXCHANGE_URI,
-                          &cmd->details.check_bank_transfer.wtid))
+                                &amount,
+                                cmd->details.check_bank_transfer.account_debit,
+                                cmd->details.check_bank_transfer.account_credit,
+                                EXCHANGE_URI,
+                                &cmd->details.check_bank_transfer.subject))
       {
         GNUNET_break (0);
         fail (is);
@@ -1970,18 +1972,29 @@ interpreter_run (void *cls)
       return;
     }
   case OC_TRACK_TRANSFER:
-    ref = find_command (is,
-                        cmd->details.track_transfer.check_bank_ref);
-    GNUNET_assert (NULL != ref);
-    cmd->details.track_transfer.tdo =
-      TALER_MERCHANT_track_transfer (ctx,
-                                     MERCHANT_URI,
-                                     instance,
-                                     &ref->details.check_bank_transfer.wtid,
-                                     EXCHANGE_URI,
-                                     &track_transfer_cb,
-                                     is);
-    return;
+    {
+      struct TALER_WireTransferIdentifierRawP wtid;
+      const char *subject;
+
+      ref = find_command (is,
+                          cmd->details.track_transfer.check_bank_ref);
+      GNUNET_assert (NULL != ref);
+      subject = ref->details.check_bank_transfer.subject;
+      GNUNET_assert (GNUNET_OK ==
+                     GNUNET_STRINGS_string_to_data (subject,
+                                                    strlen (subject),
+                                                    &wtid,
+                                                    sizeof (wtid)));
+      cmd->details.track_transfer.tdo
+        = TALER_MERCHANT_track_transfer (ctx,
+                                         MERCHANT_URI,
+                                         instance,
+                                         &wtid,
+                                         EXCHANGE_URI,
+                                         &track_transfer_cb,
+                                         is);
+      return;
+    }
   case OC_TRACK_TRANSACTION:
   {
     const struct Command *proposal_ref;
