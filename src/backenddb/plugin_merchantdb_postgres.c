@@ -342,9 +342,9 @@ postgres_initialize (void *cls)
                             "(h_contract_terms"
                             ",coin_pub"
                             ",reason"
-                            "refund_amount_val"
-                            "refund_amount_frac"
-                            "refund_amount_curr) VALUES"
+                            ",refund_amount_val"
+                            ",refund_amount_frac"
+                            ",refund_amount_curr) VALUES"
                             "($1, $2, $3, $4, $5, $6)",
                             6),
     GNUNET_PQ_make_prepare ("insert_proof",
