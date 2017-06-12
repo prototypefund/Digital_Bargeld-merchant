@@ -1973,7 +1973,10 @@ process_deposits_cb (void *cls,
     }
 
     /*Always commit the smallest as refund*/
-    // FIXME, missing the db INSERT
+
+    /*FIXME, insert refund into table; make temporariliy testcase fail*/
+    ctx->err = GNUNET_SYSERR;
+    return;
 
 
     /*FIXME: bug, this erases currency too.*/
