@@ -1788,11 +1788,30 @@ process_refund_cb (void *cls,
  */
 struct InsertRefundContext
 {
+  /**
+   * Used to provide a connection to the db
+   */
   struct PostgresClosure *pg;
 
+  /**
+   * Return code for the caller: GNUNET_NO, GNUNET_OK, GNUNET_SYSERR
+   */
   int err;
 
-  struct TALER_Amount refund;
+  /**
+   * Amount to which increase the refund for this contract
+   */
+  struct TALER_Amount *refund;
+
+  /**
+   * Hash code representing the contract
+   */
+  const struct GNUNET_HashCode *h_contract_terms;
+
+  /**
+   * Human-readable reason behind this refund
+   */
+  const char *reason;
 };
 
 
@@ -1847,7 +1866,7 @@ process_deposits_cb (void *cls,
   struct TALER_Amount *big;
   struct TALER_Amount *small;
 
-  TALER_amount_get_zero (ctx->refund.currency,
+  TALER_amount_get_zero (ctx->refund->currency,
                          &previous_refund);
 
   for (unsigned int i=0;i<num_results;i++)
@@ -1925,13 +1944,13 @@ process_deposits_cb (void *cls,
     }
 
 
-    big = &ctx->refund;
+    big = ctx->refund;
     small = &ictx.refunded_amount;
 
     if (-1 == TALER_amount_cmp (big, small))
     {
       big = &ictx.refunded_amount;
-      small = &ctx->refund;
+      small = ctx->refund;
     }
 
     /*Subtract from refund what has already been awarded*/
@@ -1953,13 +1972,13 @@ process_deposits_cb (void *cls,
     small->value = 0; 
     small->fraction = 0; 
 
-    big = &ctx->refund;
+    big = ctx->refund;
     small = &diff;
 
     if (-1 == TALER_amount_cmp (big, small))
     {
       big = &diff;
-      small = &ctx->refund;
+      small = ctx->refund;
     }
     if (GNUNET_SYSERR == TALER_amount_subtract (big,
                                                 big,
@@ -1974,22 +1993,33 @@ process_deposits_cb (void *cls,
 
     /*Always commit the smallest as refund*/
 
-    /*FIXME, insert refund into table; make temporariliy testcase fail*/
-    ctx->err = GNUNET_SYSERR;
-    return;
+    if (0 != insert_refund (ctx->pg,
+                            ctx->h_contract_terms,
+                            &coin_pub,
+                            ctx->reason,
+                            small))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Could not commit refund worth %s for coin '%s'"
+                  ", as of contract/reason: %s/%s\n",
+                  TALER_amount_to_string (small),
+                  TALER_B2S (&coin_pub),
+                  GNUNET_h2s (ctx->h_contract_terms),
+                  ctx->reason); 
+      ctx->err = GNUNET_SYSERR;
+      return;    
+    }
 
-
-    /*FIXME: bug, this erases currency too.*/
     small->value = 0; 
     small->fraction = 0; 
 
-    if ( (0 == ctx->refund.value) &&
-         (0 == ctx->refund.fraction) )
+    if ( (0 == ctx->refund->value) &&
+         (0 == ctx->refund->fraction) )
       break;
 
   }
 
-  if (-1 == TALER_amount_cmp (&ctx->refund, &previous_refund))
+  if (-1 == TALER_amount_cmp (ctx->refund, &previous_refund))
   {
 
     ctx->err = GNUNET_NO;
@@ -2043,6 +2073,7 @@ postgres_increase_refund_for_contract (void *cls,
   struct PostgresClosure *pg = cls;
   struct InsertRefundContext ctx;
   enum GNUNET_DB_QueryStatus ret;
+  struct TALER_Amount _refund = *refund;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -2058,7 +2089,10 @@ postgres_increase_refund_for_contract (void *cls,
 
   ctx.pg = pg;
   ctx.err = GNUNET_OK;
-  ctx.refund = *refund;
+  ctx.refund = &_refund;
+  ctx.reason = reason;
+  ctx.h_contract_terms = h_contract_terms;
+
   ret = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
                                               "find_deposits",
                                               params,
