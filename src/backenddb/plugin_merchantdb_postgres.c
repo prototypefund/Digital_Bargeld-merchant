@@ -236,7 +236,7 @@ postgres_initialize (void *cls)
                             ",PRIMARY KEY (order_id, merchant_pub)"
                             ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
-                            " rtransaction_id INT8 NOT NULL"
+                            " rtransaction_id BIGSERIAL"
                             ",h_contract_terms BYTEA NOT NULL"
                             ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
                             ",reason VARCHAR NOT NULL"
@@ -337,6 +337,16 @@ postgres_initialize (void *cls)
                             ",wtid) VALUES "
                             "($1, $2, $3)",
                             3),
+    GNUNET_PQ_make_prepare ("insert_refund",
+                            "INSERT INTO merchant_refunds"
+                            "(h_contract_terms"
+                            ",coin_pub"
+                            ",reason"
+                            "refund_amount_val"
+                            "refund_amount_frac"
+                            "refund_amount_curr) VALUES"
+                            "($1, $2, $3, $4, $5, $6)",
+                            6),
     GNUNET_PQ_make_prepare ("insert_proof",
                             "INSERT INTO merchant_proofs"
                             "(exchange_uri"
@@ -1787,6 +1797,38 @@ struct InsertRefundContext
 
 
 /**
+ * Insert a refund row into merchant_refunds.  Not meant to be exported
+ * in the db API.
+ *
+ * @param cls closure, tipically a connection to the db
+ * @param h_contract_terms hashcode of the contract related to this refund
+ * @param coin_pub public key of the coin giving the (part of) refund
+ * @param reason human readable explaination behind the refund
+ * @param refund how much this coin is refunding
+ */
+enum GNUNET_DB_QueryStatus
+insert_refund (void *cls,
+               const struct GNUNET_HashCode *h_contract_terms,
+               const struct TALER_CoinSpendPublicKeyP *coin_pub,
+               const char *reason,
+               const struct TALER_Amount *refund)
+{
+  struct PostgresClosure *pg = cls;
+  
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (coin_pub),
+    GNUNET_PQ_query_param_string (reason),
+    TALER_PQ_query_param_amount (refund),
+    GNUNET_PQ_query_param_end
+  };
+  
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_refund",
+                                             params);
+}
+
+/**
  * Function to be called with the results of a SELECT statement
  * that has returned @a num_results results.
  *
@@ -1849,16 +1891,6 @@ process_deposits_cb (void *cls,
       goto rollback;
     if (GNUNET_DB_STATUS_SOFT_ERROR == ires)
       goto rollback; // FIXME: #5010: actually rollback + retry!
-
-    /**
-     * FIXME:
-     * Here we know how much the coin is worth, and how much it has
-     * been refunded out of it, so the actual logic can take place.
-     *
-     * Need:
-     * 1 a "insert refund" function
-     * 2 logic to abort the operation
-     */
 
     /*How much coin i will give for refund: needed by merchant_refunds table*/
     if (GNUNET_SYSERR == TALER_amount_subtract (&diff, // to commit as refund
@@ -1927,7 +1959,7 @@ process_deposits_cb (void *cls,
     if (-1 == TALER_amount_cmp (big, small))
     {
       big = &diff;
-      small - &ctx->refund;
+      small = &ctx->refund;
     }
     if (GNUNET_SYSERR == TALER_amount_subtract (big,
                                                 big,
