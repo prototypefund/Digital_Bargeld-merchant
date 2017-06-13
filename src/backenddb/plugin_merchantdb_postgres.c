@@ -1864,6 +1864,7 @@ process_deposits_cb (void *cls,
   struct InsertRefundContext *ctx = cls;
   struct TALER_Amount previous_refund;
   struct TALER_Amount diff;
+  struct TALER_Amount attempted_refund = *ctx->refund;
   struct TALER_Amount *big;
   struct TALER_Amount *small;
 
@@ -1908,9 +1909,14 @@ process_deposits_cb (void *cls,
                                                  &ictx);
     if ( (GNUNET_OK != ictx.err) ||
          (GNUNET_DB_STATUS_HARD_ERROR == ires) )
+    {
+      ctx->err = GNUNET_SYSERR;
       goto rollback;
+    }
     if (GNUNET_DB_STATUS_SOFT_ERROR == ires)
+    { ctx->err = GNUNET_SYSERR;
       goto rollback; // FIXME: #5010: actually rollback + retry!
+    }
 
     /*How much coin i will give for refund: needed by merchant_refunds table*/
     if (GNUNET_SYSERR == TALER_amount_subtract (&diff, // to commit as refund
@@ -1923,6 +1929,7 @@ process_deposits_cb (void *cls,
                   TALER_B2S (&coin_pub),
                   TALER_amount_to_string (&amount_with_fee),
                   TALER_amount_to_string (&ictx.refunded_amount));
+      ctx->err = GNUNET_SYSERR;
       goto rollback;
     }
 
@@ -1941,6 +1948,7 @@ process_deposits_cb (void *cls,
                   TALER_B2S (&coin_pub),
                   TALER_amount_to_string (&previous_refund),
                   TALER_amount_to_string (&ictx.refunded_amount));
+      ctx->err = GNUNET_SYSERR;
       goto rollback;
     }
 
@@ -2020,12 +2028,12 @@ process_deposits_cb (void *cls,
 
   }
 
-  if (-1 == TALER_amount_cmp (ctx->refund, &previous_refund))
+  if (-1 == TALER_amount_cmp (&attempted_refund, &previous_refund))
   {
 
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Attempted refund lesser than the previous awarded one. %s vs %s\n",
-                TALER_amount_to_string (ctx->refund),
+                TALER_amount_to_string (&attempted_refund),
                 TALER_amount_to_string (&previous_refund));
     ctx->err = GNUNET_NO;
     return;  
@@ -2041,7 +2049,6 @@ process_deposits_cb (void *cls,
   return;
 
   rollback:
-    ctx->err = GNUNET_SYSERR;
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed transaction, doing rollback\n");
     PQclear (result);

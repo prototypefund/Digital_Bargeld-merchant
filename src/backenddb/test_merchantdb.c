@@ -387,7 +387,7 @@ run (void *cls)
   refund_deadline = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&refund_deadline);
   GNUNET_assert (GNUNET_OK ==
-                 TALER_string_to_amount (CURRENCY ":1.000010",
+                 TALER_string_to_amount (CURRENCY ":10",
                                          &amount_with_fee));
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":0.000010",
@@ -562,7 +562,7 @@ run (void *cls)
                                                 &h_contract_terms,
                                                 &merchant_pub,
                                                 &little_refund_amount,
-                                                "refund testing"));
+                                                "make refund testing fail"));
   if (-1 == result)
     result = 0;
 
