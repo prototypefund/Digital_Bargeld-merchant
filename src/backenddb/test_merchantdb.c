@@ -84,7 +84,7 @@ struct GNUNET_HashCode h_contract_terms;
 /**
  * Proposal's hash.
  */
-struct GNUNET_HashCode h_contract_terms2;
+struct GNUNET_HashCode h_contract_terms;
 
 /**
  * Time of the transaction.
@@ -120,6 +120,13 @@ static struct TALER_Amount refund_fee;
  * Amount to be refunded.
  */
 static struct TALER_Amount refund_amount;
+
+/**
+ * Amount to be refunded.  Used to trigger error about
+ * subsequest refund amount being lesser than the previous
+ * ones.
+ */
+static struct TALER_Amount little_refund_amount;
 
 /**
  * Public key of the coin.  Set to some random value.
@@ -351,8 +358,11 @@ run (void *cls)
     result = 77;
     return;
   }
+
   if (GNUNET_OK != plugin->drop_tables (plugin->cls))
   {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Dropping tables failed\n");
     result = 77;
     return;
   }
@@ -386,8 +396,11 @@ run (void *cls)
                  TALER_string_to_amount (CURRENCY ":0.000010",
                                          &refund_fee));
   GNUNET_assert (GNUNET_OK ==
-                 TALER_string_to_amount (CURRENCY ":1",
+                 TALER_string_to_amount (CURRENCY ":2",
                                          &refund_amount));
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":1",
+                                         &little_refund_amount));
   RND_BLK (&coin_pub);
   deposit_proof = json_object ();
   GNUNET_assert (0 ==
@@ -403,7 +416,7 @@ run (void *cls)
   contract_terms = json_object ();
 
   TALER_JSON_hash (contract_terms,
-                   &h_contract_terms2);
+                   &h_contract_terms);
 
   FAILIF (GNUNET_OK !=
           plugin->insert_contract_terms (plugin->cls,
@@ -430,7 +443,7 @@ run (void *cls)
   FAILIF (GNUNET_OK !=
           plugin->find_contract_terms_from_hash (plugin->cls,
                                                 &out,
-                                                &h_contract_terms2,
+                                                &h_contract_terms,
                                                 &merchant_pub));
   FAILIF (1 !=
           plugin->find_contract_terms_by_date_and_range (plugin->cls,
@@ -541,6 +554,14 @@ run (void *cls)
                                                 &h_contract_terms,
                                                 &merchant_pub,
                                                 &refund_amount,
+                                                "refund testing"));
+
+  /*Should fail as this refund a lesser amount respect to the previous one*/
+  FAILIF (GNUNET_NO !=
+          plugin->increase_refund_for_contract (plugin->cls,
+                                                &h_contract_terms,
+                                                &merchant_pub,
+                                                &little_refund_amount,
                                                 "refund testing"));
   if (-1 == result)
     result = 0;

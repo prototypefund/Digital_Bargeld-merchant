@@ -120,6 +120,7 @@ postgres_drop_tables (void *cls)
     GNUNET_PQ_make_try_execute ("DROP TABLE merchant_transactions;"),
     GNUNET_PQ_make_try_execute ("DROP TABLE merchant_proofs;"),
     GNUNET_PQ_make_try_execute ("DROP TABLE merchant_contract_terms;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_refunds;"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
 
@@ -1993,7 +1994,6 @@ process_deposits_cb (void *cls,
 
     /*Always commit the smallest as refund*/
 
-    /*Empirically, INSERT returns 1 result*/
     if (1 != insert_refund (ctx->pg,
                             ctx->h_contract_terms,
                             &coin_pub,
@@ -2023,6 +2023,10 @@ process_deposits_cb (void *cls,
   if (-1 == TALER_amount_cmp (ctx->refund, &previous_refund))
   {
 
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Attempted refund lesser than the previous awarded one. %s vs %s\n",
+                TALER_amount_to_string (ctx->refund),
+                TALER_amount_to_string (&previous_refund));
     ctx->err = GNUNET_NO;
     return;  
   }
