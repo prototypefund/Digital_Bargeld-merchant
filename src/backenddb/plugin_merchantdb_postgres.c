@@ -1993,7 +1993,8 @@ process_deposits_cb (void *cls,
 
     /*Always commit the smallest as refund*/
 
-    if (0 != insert_refund (ctx->pg,
+    /*Empirically, INSERT returns 1 result*/
+    if (1 != insert_refund (ctx->pg,
                             ctx->h_contract_terms,
                             &coin_pub,
                             ctx->reason,
