@@ -128,6 +128,13 @@ static struct TALER_Amount refund_amount;
  */
 static struct TALER_Amount little_refund_amount;
 
+
+/**
+ * Amount to be refunded in a call which is subsequent
+ * to the good one, expected to succeed.
+ */
+static struct TALER_Amount right_second_refund_amount;
+
 /**
  * Public key of the coin.  Set to some random value.
  */
@@ -387,7 +394,7 @@ run (void *cls)
   refund_deadline = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&refund_deadline);
   GNUNET_assert (GNUNET_OK ==
-                 TALER_string_to_amount (CURRENCY ":10",
+                 TALER_string_to_amount (CURRENCY ":2",
                                          &amount_with_fee));
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":0.000010",
@@ -401,6 +408,9 @@ run (void *cls)
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":1",
                                          &little_refund_amount));
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":4",
+                                         &right_second_refund_amount));
   RND_BLK (&coin_pub);
   deposit_proof = json_object ();
   GNUNET_assert (0 ==
@@ -563,6 +573,13 @@ run (void *cls)
                                                 &merchant_pub,
                                                 &little_refund_amount,
                                                 "make refund testing fail"));
+  FAILIF (GNUNET_OK !=
+          plugin->increase_refund_for_contract (plugin->cls,
+                                                &h_contract_terms,
+                                                &merchant_pub,
+                                                &right_second_refund_amount,
+                                                "make refund testing fail"));
+
   if (-1 == result)
     result = 0;
 

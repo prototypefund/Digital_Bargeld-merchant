@@ -2002,22 +2002,24 @@ process_deposits_cb (void *cls,
 
     /*Always commit the smallest as refund*/
 
-    if (1 != insert_refund (ctx->pg,
-                            ctx->h_contract_terms,
-                            &coin_pub,
-                            ctx->reason,
-                            small))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Could not commit refund worth %s for coin '%s'"
-                  ", as of contract/reason: %s/%s\n",
-                  TALER_amount_to_string (small),
-                  TALER_B2S (&coin_pub),
-                  GNUNET_h2s (ctx->h_contract_terms),
-                  ctx->reason); 
-      ctx->err = GNUNET_SYSERR;
-      return;    
-    }
+    if ( (0 != small->value) || (0 != small->fraction) )
+      if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+            insert_refund (ctx->pg,
+                           ctx->h_contract_terms,
+                           &coin_pub,
+                           ctx->reason,
+                           small))
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Could not commit refund worth %s for coin '%s'"
+                      ", as of contract/reason: %s/%s\n",
+                      TALER_amount_to_string (small),
+                      TALER_B2S (&coin_pub),
+                      GNUNET_h2s (ctx->h_contract_terms),
+                      ctx->reason); 
+          ctx->err = GNUNET_SYSERR;
+          return;    
+        }
 
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Detracting %s as refund, from coin %s\n",
@@ -2029,15 +2031,21 @@ process_deposits_cb (void *cls,
 
     if ( (0 == ctx->refund->value) &&
          (0 == ctx->refund->fraction) )
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "All refund amount has been allocated\n");
       break;
+    }
 
   }
 
-  if (-1 == TALER_amount_cmp (&attempted_refund, &previous_refund))
+  if (-1 == TALER_amount_cmp (&attempted_refund,
+                              &previous_refund))
   {
 
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Attempted refund lesser than the previous awarded one. %s vs %s\n",
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Attempted refund lesser than the previous"
+                "awarded one. %s vs %s\n",
                 TALER_amount_to_string (&attempted_refund),
                 TALER_amount_to_string (&previous_refund));
     ctx->err = GNUNET_NO;
