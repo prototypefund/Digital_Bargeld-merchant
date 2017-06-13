@@ -2019,6 +2019,11 @@ process_deposits_cb (void *cls,
       return;    
     }
 
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Detracting %s as refund, from coin %s\n",
+                TALER_amount_to_string (small),
+                TALER_B2S (&coin_pub));
+
     small->value = 0; 
     small->fraction = 0; 
 
