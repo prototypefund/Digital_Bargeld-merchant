@@ -136,6 +136,12 @@ static struct TALER_Amount little_refund_amount;
 static struct TALER_Amount right_second_refund_amount;
 
 /**
+ * Refund amount meant to raise an error because the
+ * contract's coins aren't enough to pay it back
+ */
+static struct TALER_Amount too_big_refund_amount;
+
+/**
  * Public key of the coin.  Set to some random value.
  */
 static struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -394,7 +400,7 @@ run (void *cls)
   refund_deadline = GNUNET_TIME_absolute_get();
   GNUNET_TIME_round_abs (&refund_deadline);
   GNUNET_assert (GNUNET_OK ==
-                 TALER_string_to_amount (CURRENCY ":2",
+                 TALER_string_to_amount (CURRENCY ":5",
                                          &amount_with_fee));
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":0.000010",
@@ -409,8 +415,11 @@ run (void *cls)
                  TALER_string_to_amount (CURRENCY ":1",
                                          &little_refund_amount));
   GNUNET_assert (GNUNET_OK ==
-                 TALER_string_to_amount (CURRENCY ":4",
+                 TALER_string_to_amount (CURRENCY ":3",
                                          &right_second_refund_amount));
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":30",
+                                         &too_big_refund_amount));
   RND_BLK (&coin_pub);
   deposit_proof = json_object ();
   GNUNET_assert (0 ==
@@ -578,7 +587,15 @@ run (void *cls)
                                                 &h_contract_terms,
                                                 &merchant_pub,
                                                 &right_second_refund_amount,
-                                                "make refund testing fail"));
+                                                "right refund increase"));
+
+  FAILIF (GNUNET_NO !=
+          plugin->increase_refund_for_contract (plugin->cls,
+                                                &h_contract_terms,
+                                                &merchant_pub,
+                                                &too_big_refund_amount,
+                                                "make refund testing fail due"
+                                                " to too big refund amount"));
 
   if (-1 == result)
     result = 0;

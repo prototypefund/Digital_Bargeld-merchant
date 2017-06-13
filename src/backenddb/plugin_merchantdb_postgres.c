@@ -2039,6 +2039,9 @@ process_deposits_cb (void *cls,
 
   }
 
+  /**
+   * Check if the refund is bigger than the previous awarded.
+   */
   if (-1 == TALER_amount_cmp (&attempted_refund,
                               &previous_refund))
   {
@@ -2050,6 +2053,18 @@ process_deposits_cb (void *cls,
                 TALER_amount_to_string (&previous_refund));
     ctx->err = GNUNET_NO;
     return;  
+  }
+
+  /**
+   * Check if all the refund has been allocated
+   */
+  if ( (0 != ctx->refund->value) ||
+       (0 != ctx->refund->fraction) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "This refund is bigger than the coins capacity\n");
+    ctx->err = GNUNET_NO;
+    return;
   }
 
   /**
