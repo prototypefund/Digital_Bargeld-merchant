@@ -28,7 +28,26 @@
 
 struct ProcessRefundData
 {
-  /*TBD*/
+  /**
+   * The array containing all the refund permissions.
+   */
+  json_t *response;
+
+  /**
+   * Hashed version of contract terms; needed by the callback
+   * to pack the response.
+   */
+  struct GNUNET_HashCode *h_contract_terms;
+
+  /**
+   * Both public and private key are needed by the callback
+   */
+   struct MerchantInstance *merchant;
+
+  /**
+   * Return code: GNUNET_OK if successful, GNUNET_SYSERR otherwise
+   */
+  int ret;
 };
 
 /**
@@ -243,8 +262,56 @@ process_refunds_cb (void *cls,
                     const struct TALER_Amount *refund_amount,
                     const struct TALER_Amount *refund_fee)
 {
-  /* TBD */
+  struct ProcessRefundData *prd = cls;
+  struct TALER_RefundRequestPS rr;
+  struct GNUNET_CRYPTO_EddsaSignature sig;
+  json_t *element;
 
+  rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
+  rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
+  rr.h_contract_terms = *prd->h_contract_terms;
+  rr.coin_pub = *coin_pub;
+  rr.merchant = prd->merchant->pubkey;
+  rr.rtransaction_id = GNUNET_htonll (rtransaction_id);
+  TALER_amount_hton (&rr.refund_amount,
+                     refund_amount);
+  TALER_amount_hton (&rr.refund_fee,
+                     refund_fee);
+
+  if (GNUNET_OK != GNUNET_CRYPTO_eddsa_sign (&prd->merchant->privkey.eddsa_priv,
+                                             &rr.purpose,
+                                             &sig))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not sign refund request\n");
+    prd->ret = GNUNET_SYSERR;
+    return;
+  }
+
+  element = json_pack ("{s:o, s:o, s:s, s:s, s:I, s:s, s:s}",
+                       "refund_amount", TALER_JSON_from_amount (refund_amount),
+                       "refund_fee", TALER_JSON_from_amount (refund_fee),
+                       "h_contract_terms", GNUNET_JSON_from_data_auto (prd->h_contract_terms),
+                       "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
+                       "rtransaction_id", (json_int_t) rtransaction_id,
+                       "merchant_pub", GNUNET_JSON_from_data_auto (&prd->merchant->pubkey),
+                       "merchant_sig", GNUNET_JSON_from_data_auto (&sig));
+  if (NULL == element)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not pack a response's element up\n");
+    prd->ret = GNUNET_SYSERR;
+    return;
+  }
+
+  if (-1 == json_array_append_new (prd->response,
+                                   element))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not append a response's element\n");
+    prd->ret = GNUNET_SYSERR;
+    return; 
+  }
 }
 
 /**
@@ -308,10 +375,11 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   }
 
   /* Convert order id to h_contract_terms */
-  if (GNUNET_OK != db->find_contract_terms (db->cls,
-                                            &contract_terms,
-                                            order_id,
-                                            &mi->pubkey))
+  res = db->find_contract_terms (db->cls,
+                                 &contract_terms,
+                                 order_id,
+                                 &mi->pubkey);
+  if (GNUNET_NO == res)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
                 "Unknown order id given: %s\n",
@@ -319,6 +387,18 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_REFUND_ORDER_ID_UNKNOWN,
                                          "Order id not found in database");
+  }
+  if (GNUNET_SYSERR == res)
+  {
+  
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
+                "database hard error on order_id lookup: %s\n",
+                order_id);
+
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_NONE,
+                                              "database hard error: looking up"
+                                              " oder_id from merchant_contract_terms table");
   }
 
   if (GNUNET_OK !=
@@ -336,15 +416,48 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                               "Could not hash contract terms");
   }
   struct ProcessRefundData cb_cls;
-
+  cb_cls.response = json_array ();
+  cb_cls.h_contract_terms = &h_contract_terms;
+  cb_cls.merchant = mi;
   res = db->get_refunds_from_contract_terms_hash (db->cls,
                                                   &mi->pubkey,
                                                   &h_contract_terms,
                                                   process_refunds_cb,
                                                   &cb_cls);
 
-  /* FIXME: work out 'res' and set response up properly */
-  return MHD_YES;
+  if (GNUNET_NO == res)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Contract terms hash not found in database\n");
+    /*This is very odd, as the unhashed version *was* found earlier*/
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_REFUND_H_CONTRACT_TERMS_UNKNOWN,
+                                         "h_contract_terms not found in database");
+  }
+
+  if (GNUNET_SYSERR == res)
+  {
+  
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
+                "database hard error on order_id lookup: %s\n",
+                order_id);
+
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_NONE,
+                                              "database hard error: looking for "
+                                              "h_contract_terms in merchant_refunds table");
+  }
+  if (GNUNET_SYSERR == cb_cls.ret)
+  {
+    /* NOTE: error already logged by the callback */
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_NONE,
+                                              "Could not generate a response"); 
+  }
+  
+  return TMH_RESPONSE_reply_json (connection,
+                                  cb_cls.response,
+                                  MHD_HTTP_OK);
 }
 
 
