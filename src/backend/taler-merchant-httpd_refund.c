@@ -26,6 +26,10 @@
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 
+struct ProcessRefundData
+{
+  /*TBD*/
+};
 
 /**
  * Information we keep for individual calls
@@ -90,6 +94,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   json_t *contract_terms;
   const char *order_id;
   const char *reason;
+  const char *merchant;
   struct MerchantInstance *mi;
   struct GNUNET_HashCode h_contract_terms;
 
@@ -97,7 +102,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     TALER_JSON_spec_amount ("refund", &refund),
     GNUNET_JSON_spec_string ("order_id", &order_id),
     GNUNET_JSON_spec_string ("reason", &reason),
-    GNUNET_JSON_spec_end
+    GNUNET_JSON_spec_string ("reason", &merchant),
+    GNUNET_JSON_spec_end ()
   }; 
 
 
@@ -139,7 +145,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     return MHD_NO;
   }
 
-  mi = get_instance (root);
+  mi = TMH_lookup_instance (merchant);
   if (NULL == mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -220,6 +226,28 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 
 
 /**
+ * Function called with information about a refund.
+ *
+ * @param cls closure
+ * @param coin_pub public coin from which the refund comes from
+ * @param rtransaction_id identificator of the refund
+ * @param reason human-readable explaination of the refund
+ * @param refund_amount refund amount which is being taken from coin_pub
+ * @param refund_fee cost of this refund operation
+ */
+void
+process_refunds_cb (void *cls,
+                    const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                    uint64_t rtransaction_id,
+                    const char *reason,
+                    const struct TALER_Amount *refund_amount,
+                    const struct TALER_Amount *refund_fee)
+{
+  /* TBD */
+
+}
+
+/**
  * Return refund situation about a contract.
  *
  * @param rh context of the handler
@@ -238,6 +266,8 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
 {
   const char *order_id;
   const char *instance;
+  struct GNUNET_HashCode h_contract_terms;
+  json_t *contract_terms;
   int res;
   struct MerchantInstance *mi;
 
@@ -245,23 +275,76 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                           MHD_GET_ARGUMENT_KIND,
                                           "instance");
   if (NULL == instance)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Argument 'instance' not given\n");
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
                                            "instance");
+  }
 
   mi = TMH_lookup_instance (instance);
-  GNUNET_assert (NULL != mi);
+
+  if (NULL == mi)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unknown instance given: %s\n",
+                instance);
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_REFUND_INSTANCE_UNKNOWN,
+                                         "Unknown instance given");
+  }
 
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
                                           "order_id");
   if (NULL == order_id)
+  { 
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
+                "Argument 'order_id' not given\n");
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
                                            "order_id");
-  /* FIXME: TBD */
+  }
 
-  /* return res; */
+  /* Convert order id to h_contract_terms */
+  if (GNUNET_OK != db->find_contract_terms (db->cls,
+                                            &contract_terms,
+                                            order_id,
+                                            &mi->pubkey))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
+                "Unknown order id given: %s\n",
+                order_id);
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_REFUND_ORDER_ID_UNKNOWN,
+                                         "Order id not found in database");
+  }
+
+  if (GNUNET_OK !=
+      TALER_JSON_hash (contract_terms,
+                       &h_contract_terms))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not hash contract terms\n");
+    /**
+     * Do we really need a error code for failing to hash something?
+     * The HTTP 500 Internal server error sufficies for now.
+     */
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_NONE,
+                                              "Could not hash contract terms");
+  }
+  struct ProcessRefundData cb_cls;
+
+  res = db->get_refunds_from_contract_terms_hash (db->cls,
+                                                  &mi->pubkey,
+                                                  &h_contract_terms,
+                                                  process_refunds_cb,
+                                                  &cb_cls);
+
+  /* FIXME: work out 'res' and set response up properly */
+  return MHD_YES;
 }
 
 
