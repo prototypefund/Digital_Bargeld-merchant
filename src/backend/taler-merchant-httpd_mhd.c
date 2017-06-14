@@ -146,10 +146,10 @@ TMH_MHD_handler_send_json_pack_error (struct TMH_RequestHandler *rh,
                                          size_t *upload_data_size)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
-                                     rh->response_code,
-                                     "{s:s}",
-                                     "error",
-                                     rh->data);
+                                       rh->response_code,
+                                       "{s:s}",
+                                       "error",
+                                       rh->data);
 }
 
 
