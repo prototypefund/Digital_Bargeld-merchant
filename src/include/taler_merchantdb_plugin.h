@@ -529,6 +529,7 @@ struct TALER_MERCHANTDB_Plugin
    * increase the refund on an existing contract.
    *
    * @param cls closure
+   * @param merchant_pub merchant's instance public key
    * @param h_contract_terms
    * @param merchant_pub merchant's instance public key
    * @param refund maximum refund to return to the customer for this contract
@@ -550,6 +551,9 @@ struct TALER_MERCHANTDB_Plugin
   /**
    * Obtain refunds associated with a contract.
    *
+   * @param cls closure, typically a connection to the db
+   * @param merchant_pub public key of the merchant instance
+   * @param h_contract_terms hash code of the contract
    * @param rc function to call for each coin on which there is a refund
    * @param rc_cls closure for @a rc
    * @return #GNUNET_OK if we called @a rc on all coins
@@ -558,12 +562,10 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*get_refunds_from_contract_terms_hash)(void *cls,
+                                          const struct TALER_MerchantPublicKeyP *merchant_pub,
                                           const struct GNUNET_HashCode *h_contract_terms,
                                           TALER_MERCHANTDB_RefundCallback rc,
                                           void *rc_cls);
-
-
 };
-
 
 #endif

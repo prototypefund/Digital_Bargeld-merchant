@@ -238,6 +238,7 @@ postgres_initialize (void *cls)
                             ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
                             " rtransaction_id BIGSERIAL"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
                             ",h_contract_terms BYTEA NOT NULL"
                             ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
                             ",reason VARCHAR NOT NULL"
@@ -340,14 +341,15 @@ postgres_initialize (void *cls)
                             3),
     GNUNET_PQ_make_prepare ("insert_refund",
                             "INSERT INTO merchant_refunds"
-                            "(h_contract_terms"
+                            "(merchant_pub"
+                            ",h_contract_terms"
                             ",coin_pub"
                             ",reason"
                             ",refund_amount_val"
                             ",refund_amount_frac"
                             ",refund_amount_curr) VALUES"
-                            "($1, $2, $3, $4, $5, $6)",
-                            6),
+                            "($1, $2, $3, $4, $5, $6, $7)",
+                            7),
     GNUNET_PQ_make_prepare ("insert_proof",
                             "INSERT INTO merchant_proofs"
                             "(exchange_uri"
@@ -410,8 +412,9 @@ postgres_initialize (void *cls)
                             3),
     GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
                             "SELECT * FROM merchant_refunds"
-                            " WHERE h_contract_terms=$1",
-                            1),
+                            " WHERE merchant_pub=$1"
+                            " AND h_contract_terms=$2",
+                            2),
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range",
                             "SELECT"
                             " contract_terms"
@@ -1647,6 +1650,9 @@ postgres_find_deposits_by_wtid (void *cls,
 /**
  * Obtain refunds associated with a contract.
  *
+ * @param cls closure, typically a connection to the db
+ * @param merchant_pub public key of the merchant instance
+ * @param h_contract_terms hash code of the contract
  * @param rc function to call for each coin on which there is a refund
  * @param rc_cls closure for @a rc
  * @return #GNUNET_OK if we called @a rc on all coins
@@ -1655,6 +1661,7 @@ postgres_find_deposits_by_wtid (void *cls,
  */
 int
 postgres_get_refunds_from_contract_terms_hash (void *cls,
+                                               const struct TALER_MerchantPublicKeyP *merchant_pub,
                                                const struct GNUNET_HashCode *h_contract_terms,
                                                TALER_MERCHANTDB_RefundCallback rc,
                                                void *rc_cls)
@@ -1665,6 +1672,7 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
   unsigned int i;
 
   struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_end
   };
@@ -1805,6 +1813,11 @@ struct InsertRefundContext
   struct TALER_Amount *refund;
 
   /**
+   * Merchant instance public key
+   */
+  const struct TALER_MerchantPublicKeyP *merchant_pub;
+
+  /**
    * Hash code representing the contract
    */
   const struct GNUNET_HashCode *h_contract_terms;
@@ -1821,6 +1834,7 @@ struct InsertRefundContext
  * in the db API.
  *
  * @param cls closure, tipically a connection to the db
+ * @param merchant_pub merchant instance public key
  * @param h_contract_terms hashcode of the contract related to this refund
  * @param coin_pub public key of the coin giving the (part of) refund
  * @param reason human readable explaination behind the refund
@@ -1828,6 +1842,7 @@ struct InsertRefundContext
  */
 enum GNUNET_DB_QueryStatus
 insert_refund (void *cls,
+               const struct TALER_MerchantPublicKeyP *merchant_pub,
                const struct GNUNET_HashCode *h_contract_terms,
                const struct TALER_CoinSpendPublicKeyP *coin_pub,
                const char *reason,
@@ -1836,6 +1851,7 @@ insert_refund (void *cls,
   struct PostgresClosure *pg = cls;
   
   struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_string (reason),
@@ -2005,6 +2021,7 @@ process_deposits_cb (void *cls,
     if ( (0 != small->value) || (0 != small->fraction) )
       if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
             insert_refund (ctx->pg,
+                           ctx->merchant_pub,
                            ctx->h_contract_terms,
                            &coin_pub,
                            ctx->reason,
@@ -2132,6 +2149,7 @@ postgres_increase_refund_for_contract (void *cls,
   ctx.refund = &_refund;
   ctx.reason = reason;
   ctx.h_contract_terms = h_contract_terms;
+  ctx.merchant_pub = merchant_pub;
 
   ret = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
                                               "find_deposits",

@@ -565,6 +565,7 @@ run (void *cls)
                                       NULL));
   FAILIF (GNUNET_NO !=
           plugin->get_refunds_from_contract_terms_hash (plugin->cls,
+                                                        &merchant_pub,
                                                         &h_contract_terms,
                                                         &refund_cb,
                                                         NULL));
