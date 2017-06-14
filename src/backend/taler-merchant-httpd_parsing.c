@@ -303,6 +303,9 @@ TMH_PARSE_json_data (struct MHD_Connection *connection,
   {
     if (NULL == error_json_name)
       error_json_name = "<no field>";
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Parsing failed due to field '%s'\n",
+                error_json_name);
     ret = (MHD_YES ==
            TMH_RESPONSE_reply_json_pack (connection,
                                          MHD_HTTP_BAD_REQUEST,

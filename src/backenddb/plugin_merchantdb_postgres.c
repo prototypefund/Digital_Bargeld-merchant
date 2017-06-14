@@ -602,7 +602,7 @@ postgres_find_contract_terms_from_hash (void *cls,
  * Retrieve proposal data given its order id.
  *
  * @param cls closure
- * @param[out] contract_terms where to store the retrieved proposal data
+ * @param[out] contract_terms where to store the retrieved contract terms
  * @param order id order id used to perform the lookup
  * @return #GNUNET_OK on success, #GNUNET_NO if no proposal is
  * found, #GNUNET_SYSERR upon error

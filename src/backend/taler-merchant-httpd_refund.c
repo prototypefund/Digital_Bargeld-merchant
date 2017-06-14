@@ -85,7 +85,21 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 {
   int res;
   struct TMH_JsonParseContext *ctx;
+  struct TALER_Amount refund;
   json_t *root;
+  json_t *contract_terms;
+  const char *order_id;
+  const char *reason;
+  struct MerchantInstance *mi;
+  struct GNUNET_HashCode h_contract_terms;
+
+  struct GNUNET_JSON_Specification spec[] = {
+    TALER_JSON_spec_amount ("refund", &refund),
+    GNUNET_JSON_spec_string ("order_id", &order_id),
+    GNUNET_JSON_spec_string ("reason", &reason),
+    GNUNET_JSON_spec_end
+  }; 
+
 
   if (NULL == *connection_cls)
   {
@@ -109,9 +123,98 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   if ((GNUNET_NO == res) || (NULL == root))
     return MHD_YES;
 
-  /* FIXME: TBD */
+  res = TMH_PARSE_json_data (connection,
+                             root,
+                             spec);
+  if (GNUNET_NO == res)
+  {
+    GNUNET_break_op (0);
+    return MHD_YES;
+  }
 
+  if (GNUNET_SYSERR == res)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Hard error from JSON parser\n");
+    return MHD_NO;
+  }
+
+  mi = get_instance (root);
+  if (NULL == mi)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "No instance found\n");
+    GNUNET_JSON_parse_free (spec);
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_REFUND_INSTANCE_UNKNOWN,
+                                        "Unknown instance given");
+  }
+  
+  /* Convert order id to h_contract_terms */
+  if (GNUNET_OK != db->find_contract_terms (db->cls,
+                                            &contract_terms,
+                                            order_id,
+                                            &mi->pubkey))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
+                "Unknown order id given: %s\n",
+                order_id);
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_REFUND_ORDER_ID_UNKNOWN,
+                                         "Order id not found in database");
+  }
+
+  if (GNUNET_OK !=
+      TALER_JSON_hash (contract_terms,
+                       &h_contract_terms))
+  {
+    GNUNET_JSON_parse_free (spec);
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not hash contract terms\n");
+    /**
+     * Do we really need a error code for failing to hash something?
+     * The HTTP 500 Internal server error sufficies for now.
+     */
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_NONE,
+                                              "Could not hash contract terms");
+  }
+
+  res = db->increase_refund_for_contract (db->cls,
+                                          &h_contract_terms,
+                                          &mi->pubkey,
+                                          &refund,
+                                          reason);
+  if (GNUNET_NO == res)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Inconsistent refund amount: %s\n",
+                TALER_amount_to_string (&refund));
+    GNUNET_JSON_parse_free (spec);
+    /**
+     * FIXME: should the db function distinguish between a refund amount
+     * lower than the previous one and a one which is too big to be paid back?
+     */
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              TALER_EC_REFUND_INCONSISTENT_AMOUNT,
+                                              "Amount either lower than the previous"
+                                              " or too big to be paid back");
+  }
+
+  /**
+   * FIXME: return to the frontend.  The frontend will then return
+   * a "402 Payment required" carrying a "X-Taler-Refund-Url: www"
+   * where 'www' is the URL where the wallet can automatically fetch
+   * the refund permission.
+   *
+   * Just a "200 OK" should be fine here, as the frontend has all
+   * the information needed to generate the right response.
+   */
+  return MHD_YES;
+
+  json_decref (contract_terms);
   json_decref (root);
+  GNUNET_JSON_parse_free (spec);
   return res;
 }
 
