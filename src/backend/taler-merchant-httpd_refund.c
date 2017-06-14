@@ -157,7 +157,8 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
 					   TALER_EC_PARAMETER_MISSING,
                                            "order_id");
   /* FIXME: TBD */
-  return res;
+
+  /* return res; */
 }
 
 
