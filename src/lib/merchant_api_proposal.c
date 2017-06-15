@@ -16,7 +16,7 @@
 */
 /**
  * @file lib/merchant_api_proposal.c
- * @brief Implementation of the /proposal PUT and GET
+ * @brief Implementation of the /proposal POST and GET
  * @author Christian Grothoff
  * @author Marcello Stanisci
  */
@@ -192,7 +192,7 @@ handle_proposal_finished (void *cls,
 
 
 /**
- * PUT an order to the backend and receives the related proposal.
+ * POST an order to the backend and receives the related proposal.
  *
  * @param ctx execution context
  * @param backend_uri URI of the backend

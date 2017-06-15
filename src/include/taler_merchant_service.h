@@ -28,7 +28,26 @@
 #include <jansson.h>
 
 
-/* ********************* /map/{in,out} *********************** */
+/* ********************* /refund ************************** */
+
+struct TALER_MERCHANT_RefundIncreaseOperation;
+
+/**
+ * Callbacks of this type get passed the result of a GET /refund
+ * request to the backend.
+ *
+ * @param cls closure
+ * @param http_status the HTTP status of the connection to the backend
+ * @param ec taler-specific error code
+ * @param obj the resposne in JSON format. NOTE, this object is an array,
+ * so it makes little sense to extract values from it and serve them to the
+ * callback.
+ */
+typedef void
+(*TALER_MERCHANT_RefundIncreaseCallback) (void *cls,
+                                          unsigned int http_status,
+                                          enum TALER_ErrorCode ec,
+                                          const json_t *obj);
 
 /* *********************  /proposal *********************** */
 
