@@ -32,22 +32,91 @@
 
 struct TALER_MERCHANT_RefundIncreaseOperation;
 
+struct TALER_MERCHANT_RefundLookupOperation;
+
 /**
- * Callbacks of this type get passed the result of a GET /refund
- * request to the backend.
+ * Callback to process a POST /refund request
  *
  * @param cls closure
- * @param http_status the HTTP status of the connection to the backend
+ * @param http_status HTTP status code for this request
  * @param ec taler-specific error code
- * @param obj the resposne in JSON format. NOTE, this object is an array,
- * so it makes little sense to extract values from it and serve them to the
- * callback.
+ * @param obj the response body
  */
 typedef void
 (*TALER_MERCHANT_RefundIncreaseCallback) (void *cls,
                                           unsigned int http_status,
                                           enum TALER_ErrorCode ec,
                                           const json_t *obj);
+
+/**
+ * Callback to process a GET /refund request
+ *
+ * @param cls closure
+ * @param http_status HTTP status code for this request
+ * @param ec taler-specific error code
+ * @param obj the response body
+ */
+typedef void
+(*TALER_MERCHANT_RefundLookupCallback) (void *cls,
+                                                 unsigned int http_status,
+                                                 enum TALER_ErrorCode ec,
+                                                 const json_t *obj);
+
+/**
+ * Does a GET /refund.
+ *
+ * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
+ * @param order_id order id used to perform the lookup
+ * @param cb callback which will work the response gotten from the backend
+ * @param cb_cls closure to pass to the callback
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_RefundLookupOperation *
+TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
+                              const char *backend_uri,
+                              const char *order_id,
+                              const char *instance,
+                              TALER_MERCHANT_RefundLookupCallback cb,
+                              void *cb_cls);
+
+/**
+ * Increase the refund associated to a order
+ *
+ * @param ctx the CURL context used to connect to the backend
+ * @param backend_uri backend's base URL, including final "/"
+ * @param order_id id of the order whose refund is to be increased
+ * @param refund amount to which increase the refund
+ * @param reason human-readable reason justifying the refund
+ * @param instance id of the merchant instance issuing the request
+ * @param cb callback processing the response from /refund
+ * @param cb_cls closure for cb
+ */
+struct TALER_MERCHANT_RefundIncreaseOperation *
+TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
+                                const char *backend_uri,
+                                const char *order_id,
+                                const struct TALER_Amount *refund,
+                                const char *reason,
+                                const char *instance,
+                                TALER_MERCHANT_RefundIncreaseCallback cb,
+                                void *cb_cls);
+
+/**
+ * Cancel a POST /refund request.
+ *
+ * @param rio the refund increasing operation to cancel
+ */
+void
+TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOperation *rio);
+
+/**
+ * Cancel a GET /refund request.
+ *
+ * @param rlo the refund increasing operation to cancel
+ */
+void
+TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation *rlo);
 
 /* *********************  /proposal *********************** */
 
@@ -620,37 +689,5 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
  */
 void
 TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *ho);
-
-/************************ /refund ****************************/
-
-/**
- * Increase the refund associated to a order
- *
- * @param ctx the CURL context used to connect to the backend
- * @param backend_uri backend's base URL, including final "/"
- * @param order_id id of the order whose refund is to be increased
- * @param refund amount to which increase the refund
- * @param reason human-readable reason justifying the refund
- * @param instance id of the merchant instance issuing the request
- * @param cb callback processing the response from /refund
- * @param cb_cls closure for cb
- */
-struct TALER_MERCHANT_RefundIncreaseOperation *
-TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
-                                const char *backend_uri,
-                                const char *order_id,
-                                const struct TALER_Amount *refund,
-                                const char *reason,
-                                const char *instance,
-                                TALER_MERCHANT_RefundIncreaseCallback cb,
-                                void *cb_cls);
-
-/**
- * Cancel a POST /refund request.
- *
- * @param rio the refund increasing operation to cancel
- */
-void
-TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOperation *rio);
 
 #endif  /* _TALER_MERCHANT_SERVICE_H */

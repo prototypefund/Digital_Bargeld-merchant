@@ -31,6 +31,36 @@
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
 
+
+struct TALER_MERCHANT_RefundLookupOperation
+{
+  /**
+   * URL of the request, includes parameters
+   */
+  char *url;
+
+  /**
+   * Handle of the request
+   */
+  struct GNUNET_CURL_Job *job;
+
+  /**
+   * Function to call with the response
+   */
+  TALER_MERCHANT_RefundLookupCallback cb;
+
+  /**
+   * Closure for cb
+   */
+  void *cb_cls;
+
+  /**
+   * Reference to the execution context
+   */
+  struct GNUNET_CURL_Context *ctx;
+
+};
+
 struct TALER_MERCHANT_RefundIncreaseOperation
 {
   /**
@@ -78,7 +108,7 @@ handle_refund_increase_finished (void *cls,
                                  long response_code,
                                  const json_t *json)
 {
-
+  /* TBD */
 }
 
 /**
@@ -133,28 +163,21 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                    "%s%s",
                    backend_uri,
                    "/refund");
-  /**
-   * FIXME: pack the data to POST.
-   */
   req = json_pack ("{s:o, s:s, s:s}",
                    "refund", TALER_JSON_from_amount (refund),
                    "order_id", order_id,
                    "reason", reason,
                    "instance", instance);
-
   eh = curl_easy_init ();
-
   rio->json_enc = json_dumps (req,
                               JSON_COMPACT);
   json_decref (req);
-
   if (NULL == rio->json_enc)
   {
     GNUNET_break (0);
     GNUNET_free (rio);
     return NULL;
   }
-  
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
@@ -172,7 +195,73 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                                   GNUNET_YES,
                                   &handle_refund_increase_finished,
                                   rio);
-
-
   return NULL;
+}
+
+/**
+ * Process GET /refund response
+ */
+void
+handle_refund_lookup_finished (void *cls,
+                               long response_code,
+                               const json_t *json)
+{
+  /**
+   *  TBD
+   */
+
+}
+
+/**
+ * Does a GET /refund.
+ *
+ * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
+ * @param order_id order id used to perform the lookup
+ * @param cb callback which will work the response gotten from the backend
+ * @param cb_cls closure to pass to the callback
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_RefundLookupOperation *
+TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
+                              const char *backend_uri,
+                              const char *order_id,
+                              const char *instance,
+                              TALER_MERCHANT_RefundLookupCallback cb,
+                              void *cb_cls)
+{
+  struct TALER_MERCHANT_RefundLookupOperation *rlo;
+  CURL *eh;
+
+  rlo = GNUNET_new (struct TALER_MERCHANT_RefundLookupOperation);
+  rlo->ctx = ctx;
+  rlo->cb = cb;
+  rlo->cb_cls = cb_cls;
+
+  GNUNET_asprintf (&rlo->url,
+                   "%s/refund?instance=%s&order_id=%s",
+                   backend_uri,
+                   instance,
+                   order_id);
+  eh = curl_easy_init ();
+  if (CURLE_OK != curl_easy_setopt (eh,
+                                    CURLOPT_URL,
+                                    rlo->url))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+
+  if (NULL == (rlo->job = GNUNET_CURL_job_add (ctx,
+                                               eh,
+                                               GNUNET_NO,
+                                               handle_refund_lookup_finished,
+                                               rlo)))
+  {
+    GNUNET_break (0);
+    return NULL;
+  
+  }
+
+  return rlo;
 }
