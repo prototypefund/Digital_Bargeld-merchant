@@ -190,7 +190,17 @@ enum OpCode
   /**
    * Test getting transactions based on timestamp
    */
-  OC_HISTORY
+  OC_HISTORY,
+
+  /**
+   * Test the increase of a order refund
+   */
+  OP_REFUND_INCREASE,
+
+  /**
+   * Test refund lookup
+   */
+  OP_REFUND_LOOKUP 
 
 };
 
