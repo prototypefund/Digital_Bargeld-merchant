@@ -108,7 +108,40 @@ handle_refund_increase_finished (void *cls,
                                  long response_code,
                                  const json_t *json)
 {
-  /* TBD */
+  struct TALER_MERCHANT_RefundIncreaseOperation *rio = cls;
+  char *error;
+  char *hint;
+  enum TALER_ErrorCode code;
+
+  rio->job = NULL;
+  switch (response_code)
+  {
+  case 0:
+    /* Hard error */
+    break;
+  case MHD_HTTP_OK:
+    rio->cb (rio->cb_cls,
+             MHD_HTTP_OK,
+             TALER_EC_NONE,
+             json);
+    break;
+  default:
+    /**
+     * The backend gave response, but it's error, log it.
+     * NOTE that json must be a Taler-specific error object (FIXME,
+     * need a link to error objects at docs)
+     */
+    json_unpack ((json_t *) json,
+                 "{s:s, s:I, s:s}",
+                 "error", &error,
+                 "code", &code,
+                 "hint", &hint);
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed POST /refund, error: %s, code: %d, hint: %s\n",
+                error,
+                code,
+                hint);
+  }
 }
 
 /**
