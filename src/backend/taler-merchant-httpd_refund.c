@@ -227,7 +227,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   }
 
   /**
-   * FIXME: return to the frontend.  The frontend will then return
+   * Return to the frontend at this point.  The frontend will then return
    * a "402 Payment required" carrying a "X-Taler-Refund-Url: www"
    * where 'www' is the URL where the wallet can automatically fetch
    * the refund permission.
