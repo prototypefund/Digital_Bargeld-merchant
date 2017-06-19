@@ -609,7 +609,37 @@ struct Command
 
     } history;
 
+    struct {
+      /**
+       * Reference to the order we want reimbursed
+       */
+      char *order_id;
 
+      /**
+       * Handle to a refund increase operation
+       */
+      struct TALER_MERCHANT_RefundIncreaseOperation *rio;
+
+      /**
+       * Amount to refund
+       */
+      const char *refund_amount;
+
+    } refund_increase;
+
+    struct {
+
+      /**
+       * Reference to the order whose refund was increased
+       */
+      char *order_id;
+
+      /**
+       * Handle to the operation
+       */
+      struct TALER_MERCHANT_RefundLookupOperation *rlo;
+
+    } refund_lookup;
 
   } details;
 
