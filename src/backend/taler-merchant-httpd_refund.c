@@ -235,12 +235,11 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
    * Just a "200 OK" should be fine here, as the frontend has all
    * the information needed to generate the right response.
    */
-  return MHD_YES;
 
   json_decref (contract_terms);
   json_decref (root);
   GNUNET_JSON_parse_free (spec);
-  return res;
+  return MHD_YES;
 }
 
 

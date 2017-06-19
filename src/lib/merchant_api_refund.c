@@ -198,7 +198,7 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                    "%s%s",
                    backend_uri,
                    "/refund");
-  req = json_pack ("{s:o, s:s, s:s}",
+  req = json_pack ("{s:o, s:s, s:s, s:s}",
                    "refund", TALER_JSON_from_amount (refund),
                    "order_id", order_id,
                    "reason", reason,
@@ -230,7 +230,7 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                                   GNUNET_YES,
                                   &handle_refund_increase_finished,
                                   rio);
-  return NULL;
+  return rio;
 }
 
 /**

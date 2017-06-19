@@ -2133,7 +2133,7 @@ interpreter_run (void *cls)
   {
     struct TALER_Amount refund_amount;
 
-    GNUNET_assert (GNUNET_OK !=
+    GNUNET_assert (GNUNET_OK ==
       TALER_string_to_amount (cmd->details.refund_increase.refund_amount,
                               &refund_amount));
     if (NULL ==
@@ -2152,8 +2152,8 @@ interpreter_run (void *cls)
       fail (is);
       return; 
     }
-  }
     break;
+  }
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
@@ -2514,7 +2514,12 @@ run (void *cls)
       .details.history.start = 10,
       .details.history.nrows = 10
     },
-
+    { .oc = OC_REFUND_INCREASE,
+      .label = "increase-1",
+      .details.refund_increase.refund_amount = "EUR:0.1",
+      .details.refund_increase.reason = "refund test",
+      .details.refund_increase.order_id = "1"    
+    },
     /* end of testcase */
     { .oc = OC_END }
   };
