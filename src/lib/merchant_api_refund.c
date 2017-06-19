@@ -39,6 +39,11 @@ struct TALER_MERCHANT_RefundIncreaseOperation
   char *url;
 
   /**
+   * The request body
+   */
+  char *json_enc;
+
+  /**
    * The CURL context to connect to the backend
    */
   struct GNUNET_CURL_Context *ctx;
@@ -52,8 +57,29 @@ struct TALER_MERCHANT_RefundIncreaseOperation
    * Clasure to pass to the callback
    */
   void *cb_cls;
+
+  /**
+   * Handle for the request
+   */
+  struct GNUNET_CURL_Job *job;
+
 };
 
+
+/**
+ * Callback to process POST /refund response
+ *
+ * @param cls the `struct TALER_MERCHANT_RefundIncreaseOperation`
+ * @param response_code HTTP response code, 0 on error
+ * @param json response body, NULL if not JSON
+ */
+static void
+handle_refund_increase_finished (void *cls,
+                                 long response_code,
+                                 const json_t *json)
+{
+
+}
 
 /**
  * Increase the refund associated to a order
@@ -61,6 +87,11 @@ struct TALER_MERCHANT_RefundIncreaseOperation
  * @param ctx the CURL context used to connect to the backend
  * @param backend_uri backend's base URL, including final "/"
  * @param order_id id of the order whose refund is to be increased
+ * @param refund amount to which increase the refund
+ * @param reason human-readable reason justifying the refund
+ * @param instance id of the merchant instance issuing the request
+ * @param cb callback processing the response from /refund
+ * @param cb_cls closure for cb
  */
 struct TALER_MERCHANT_RefundIncreaseOperation *
 TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
@@ -68,6 +99,7 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                                 const char *order_id,
                                 const struct TALER_Amount *refund,
                                 const char *reason,
+                                const char *instance,
                                 TALER_MERCHANT_RefundIncreaseCallback cb,
                                 void *cb_cls)
 {
@@ -80,12 +112,49 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
   rio->cb = cb;
   rio->cb_cls = cb_cls;
   GNUNET_asprintf (&rio->url,
-                   "%s/%s",
+                   "%s%s",
                    backend_uri,
                    "/refund");
   /**
    * FIXME: pack the data to POST.
    */
+  req = json_pack ("{s:o, s:s, s:s}",
+                   "refund", TALER_JSON_from_amount (refund),
+                   "order_id", order_id,
+                   "reason", reason,
+                   "instance", instance);
+
+  eh = curl_easy_init ();
+
+  rio->json_enc = json_dumps (req,
+                              JSON_COMPACT);
+  json_decref (req);
+
+  if (NULL == rio->json_enc)
+  {
+    GNUNET_break (0);
+    GNUNET_free (rio);
+    return NULL;
+  }
+  
+  GNUNET_assert (CURLE_OK ==
+                 curl_easy_setopt (eh,
+                                   CURLOPT_URL,
+                                   rio->url));
+  GNUNET_assert (CURLE_OK ==
+                 curl_easy_setopt (eh,
+                                   CURLOPT_POSTFIELDS,
+                                   rio->json_enc));
+  GNUNET_assert (CURLE_OK ==
+                 curl_easy_setopt (eh,
+                                   CURLOPT_POSTFIELDSIZE,
+                                   strlen (rio->json_enc)));
+  rio->job = GNUNET_CURL_job_add (ctx,
+                                  eh,
+                                  GNUNET_YES,
+                                  &handle_refund_increase_finished,
+                                  rio);
+
 
   return NULL;
 }

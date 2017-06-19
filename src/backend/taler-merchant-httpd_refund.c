@@ -121,7 +121,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     TALER_JSON_spec_amount ("refund", &refund),
     GNUNET_JSON_spec_string ("order_id", &order_id),
     GNUNET_JSON_spec_string ("reason", &reason),
-    GNUNET_JSON_spec_string ("reason", &merchant),
+    GNUNET_JSON_spec_string ("instance", &merchant),
     GNUNET_JSON_spec_end ()
   }; 
 

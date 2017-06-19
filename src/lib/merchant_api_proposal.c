@@ -103,11 +103,11 @@ struct TALER_MERCHANT_ProposalLookupOperation
 
 /**
  * Function called when we're done processing the
- * HTTP PUT /proposal request.
+ * HTTP POST /proposal request.
  *
  * @param cls the `struct TALER_MERCHANT_ProposalOperation`
  * @param response_code HTTP response code, 0 on error
- * @param json response body, NULL if not in JSON
+ * @param json response body, NULL if not JSON
  */
 static void
 handle_proposal_finished (void *cls,
@@ -239,7 +239,6 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
                                    po->url));
-  /* FIXME: as for the specs, POST becomes PUT */
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_POSTFIELDS,

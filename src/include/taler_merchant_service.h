@@ -621,4 +621,28 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
 void
 TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *ho);
 
+/************************ /refund ****************************/
+
+/**
+ * Increase the refund associated to a order
+ *
+ * @param ctx the CURL context used to connect to the backend
+ * @param backend_uri backend's base URL, including final "/"
+ * @param order_id id of the order whose refund is to be increased
+ * @param refund amount to which increase the refund
+ * @param reason human-readable reason justifying the refund
+ * @param instance id of the merchant instance issuing the request
+ * @param cb callback processing the response from /refund
+ * @param cb_cls closure for cb
+ */
+struct TALER_MERCHANT_RefundIncreaseOperation *
+TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
+                                const char *backend_uri,
+                                const char *order_id,
+                                const struct TALER_Amount *refund,
+                                const char *reason,
+                                const char *instance,
+                                TALER_MERCHANT_RefundIncreaseCallback cb,
+                                void *cb_cls);
+
 #endif  /* _TALER_MERCHANT_SERVICE_H */
