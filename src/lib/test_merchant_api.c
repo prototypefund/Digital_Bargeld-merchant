@@ -195,12 +195,12 @@ enum OpCode
   /**
    * Test the increase of a order refund
    */
-  OP_REFUND_INCREASE,
+  OC_REFUND_INCREASE,
 
   /**
    * Test refund lookup
    */
-  OP_REFUND_LOOKUP 
+  OC_REFUND_LOOKUP 
 
 };
 
@@ -634,6 +634,11 @@ struct Command
        * Amount to refund
        */
       const char *refund_amount;
+      
+      /**
+       * Reason for refunding
+       */
+      const char *reason;
 
     } refund_increase;
 
@@ -1129,12 +1134,64 @@ proposal_cb (void *cls,
 
 
 /**
+ * Process POST /refund (increase) response
+ *
+ * @param cls closure
+ * @param http_status HTTP status code
+ * @param ec taler-specific error object
+ * @param obj response body; is NULL on success.
+ */
+static void
+refund_increase_cb (void *cls,
+                    unsigned int http_status,
+                    enum TALER_ErrorCode ec,
+                    const json_t *obj)
+{
+  struct InterpreterState *is = cls;
+
+  if (MHD_HTTP_OK != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Refund increase failed\n");
+    fail (is);
+    return;
+  }
+}
+
+/**
+ * Process GET /refund (increase) response
+ *
+ * @param cls closure
+ * @param http_status HTTP status code
+ * @param ec taler-specific error object
+ * @param obj response body; is NULL on success.
+ */
+static void
+refund_lookup_cb (void *cls,
+                  unsigned int http_status,
+                  enum TALER_ErrorCode ec,
+                  const json_t *obj)
+{
+  struct InterpreterState *is = cls;
+
+  if (MHD_HTTP_OK != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Refund lookup failed\n");
+    fail (is);
+    return;
+  }
+}
+
+
+
+/**
  * Function called with the result of a /pay operation.
  *
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code
+ * @param ec taler-specific error object
  * @param obj the received JSON reply, should be kept as proof (and, in case of errors,
  *            be forwarded to the customer)
  */
@@ -2071,8 +2128,32 @@ interpreter_run (void *cls)
       fail (is);
       return;
     }
-  break;
+    break;
+  case OC_REFUND_INCREASE:
+  {
+    struct TALER_Amount refund_amount;
 
+    GNUNET_assert (GNUNET_OK !=
+      TALER_string_to_amount (cmd->details.refund_increase.refund_amount,
+                              &refund_amount));
+    if (NULL ==
+       (cmd->details.refund_increase.rio =
+          TALER_MERCHANT_refund_increase (ctx,
+                                          MERCHANT_URI,
+                                          cmd->details.refund_increase.order_id,
+                                          &refund_amount,
+                                          cmd->details.refund_increase.reason,
+                                          instance,
+                                          refund_increase_cb,
+                                          NULL)))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Could not issue a /refund increase request\n");
+      fail (is);
+      return; 
+    }
+  }
+    break;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
