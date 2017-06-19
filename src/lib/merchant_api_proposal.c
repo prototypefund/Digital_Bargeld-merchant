@@ -337,7 +337,7 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
 
 
 /**
- * Cancel a PUT /proposal request.  This function cannot be used
+ * Cancel a POST /proposal request.  This function cannot be used
  * on a request handle if a response is already served for it.
  *
  * @param po the proposal operation request handle

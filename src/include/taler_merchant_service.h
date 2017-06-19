@@ -645,4 +645,12 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                                 TALER_MERCHANT_RefundIncreaseCallback cb,
                                 void *cb_cls);
 
+/**
+ * Cancel a POST /refund request.
+ *
+ * @param rio the refund increasing operation to cancel
+ */
+void
+TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOperation *rio);
+
 #endif  /* _TALER_MERCHANT_SERVICE_H */

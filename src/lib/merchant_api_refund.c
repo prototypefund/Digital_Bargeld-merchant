@@ -82,6 +82,24 @@ handle_refund_increase_finished (void *cls,
 }
 
 /**
+ * Cancel a POST /refund request.
+ *
+ * @param rio the refund increasing operation to cancel
+ */
+void
+TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOperation *rio)
+{
+  if (NULL != rio->job)
+  {
+    GNUNET_CURL_job_cancel (rio->job);
+    rio->job = NULL;
+  }
+  GNUNET_free (rio->url);
+  GNUNET_free (rio->json_enc);
+  GNUNET_free (rio);
+}
+
+/**
  * Increase the refund associated to a order
  *
  * @param ctx the CURL context used to connect to the backend
