@@ -144,6 +144,7 @@ handle_refund_increase_finished (void *cls,
                 code,
                 hint);
   }
+  TALER_MERCHANT_refund_increase_cancel (rio);
 }
 
 /**

@@ -833,10 +833,6 @@ history_cb (void *cls,
     fail (is);
     return;
   }
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "/history data: %s\n",
-              json_dumps (json, JSON_INDENT (1)));
-
   next_command (is);
 }
 
@@ -1148,6 +1144,11 @@ refund_increase_cb (void *cls,
                     const json_t *obj)
 {
   struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "/refund (increase) response object: %s\n",
+              json_dumps (obj, JSON_INDENT (2)));
 
   if (MHD_HTTP_OK != http_status)
   {
@@ -1156,6 +1157,8 @@ refund_increase_cb (void *cls,
     fail (is);
     return;
   }
+  cmd->details.refund_increase.rio = NULL;
+  next_command (is);
 }
 
 /**
@@ -1313,10 +1316,6 @@ track_transfer_cb (void *cls,
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Tracked transfers: '%s'.\n",
-              json_dumps (json, JSON_INDENT (1)));
 
   cmd->details.track_transfer.tdo = NULL;
   if (cmd->expected_response_code != http_status)
@@ -1592,6 +1591,8 @@ cleanup_state (struct InterpreterState *is)
     case OC_REFUND_INCREASE:
       if (NULL != cmd->details.refund_increase.rio)
       {
+        GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                    "Cleaning up /refund (increase)\n");
         TALER_MERCHANT_refund_increase_cancel (cmd->details.refund_increase.rio);
         cmd->details.refund_increase.rio = NULL;
       }
@@ -2152,7 +2153,7 @@ interpreter_run (void *cls)
                                           cmd->details.refund_increase.reason,
                                           instance,
                                           refund_increase_cb,
-                                          NULL)))
+                                          is)))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Could not issue a /refund increase request\n");
@@ -2205,6 +2206,7 @@ do_shutdown (void *cls)
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Shutdown executing\n");
   cleanup_state (is);
+
   if (NULL != is->task)
   {
     GNUNET_SCHEDULER_cancel (is->task);
@@ -2232,7 +2234,11 @@ do_shutdown (void *cls)
   TALER_FAKEBANK_stop (fakebank);
   fakebank = NULL;
 
+  /**
+   * WARNING: hangs when attempting to drop tables.
+   */
   db->drop_tables (db->cls);
+
   TALER_MERCHANTDB_plugin_unload (db);
   GNUNET_CONFIGURATION_destroy (cfg);
 }

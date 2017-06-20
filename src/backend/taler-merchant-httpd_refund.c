@@ -281,7 +281,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 
   return TMH_RESPONSE_reply_json_pack (connection, 
                                        MHD_HTTP_OK,
-                                       "{s:s}",
+                                       "{s:o}",
                                        "sig", GNUNET_JSON_from_data_auto (&sig));
 }
 
