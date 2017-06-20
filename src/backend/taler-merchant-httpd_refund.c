@@ -26,6 +26,28 @@
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 
+#define REFUND_CONFIRMATION 0
+
+/**
+ * We confirm with a signature that the refund has been successfully
+ * done. Even though the frontend doesn't usually do crypto, this signature
+ * may turn useful in court.
+ */
+struct RefundConfirmationP
+{
+  
+  /**
+   * Purpose is simply set to zero, see macro REFUND_CONFIRMATION above
+   */
+  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
+
+  /**
+   * Hashing the order id, as frontends don't handle contract terms
+   */
+  struct GNUNET_HashCode h_order_id GNUNET_PACKED;
+
+};
+
 struct ProcessRefundData
 {
   /**
@@ -116,6 +138,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   const char *merchant;
   struct MerchantInstance *mi;
   struct GNUNET_HashCode h_contract_terms;
+  struct RefundConfirmationP confirmation;
+  struct GNUNET_CRYPTO_EddsaSignature sig;
 
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("refund", &refund),
@@ -239,7 +263,26 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   json_decref (contract_terms);
   json_decref (root);
   GNUNET_JSON_parse_free (spec);
-  return MHD_YES;
+
+  confirmation.purpose.purpose = REFUND_CONFIRMATION;
+  confirmation.purpose.size = htonl (sizeof (struct RefundConfirmationP));
+
+  if (GNUNET_OK != GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
+                                             &confirmation.purpose,
+                                             &sig))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to sign successful refund confirmation\n");
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_NONE,
+                                              "Refund done, but failed to sign confirmation");
+  
+  }
+
+  return TMH_RESPONSE_reply_json_pack (connection, 
+                                       MHD_HTTP_OK,
+                                       "{s:s}",
+                                       "sig", GNUNET_JSON_from_data_auto (&sig));
 }
 
 
