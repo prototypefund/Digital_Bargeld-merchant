@@ -350,9 +350,13 @@ postgres_initialize (void *cls)
                             ",reason"
                             ",refund_amount_val"
                             ",refund_amount_frac"
-                            ",refund_amount_curr) VALUES"
-                            "($1, $2, $3, $4, $5, $6, $7)",
-                            7),
+                            ",refund_amount_curr"
+                            ",refund_fee_val"
+                            ",refund_fee_frac"
+                            ",refund_fee_curr"
+                            ") VALUES"
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                            10),
     GNUNET_PQ_make_prepare ("insert_proof",
                             "INSERT INTO merchant_proofs"
                             "(exchange_uri"
@@ -1864,6 +1868,7 @@ insert_refund (void *cls,
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_string (reason),
     TALER_PQ_query_param_amount (refund),
+    TALER_PQ_query_param_amount (refund_fee),
     GNUNET_PQ_query_param_end
   };
   
