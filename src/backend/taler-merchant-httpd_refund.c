@@ -250,6 +250,16 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                                               " or too big to be paid back");
   }
 
+  if (GNUNET_SYSERR == res)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not commit refund increase\n"); 
+    GNUNET_JSON_parse_free (spec);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_NONE,
+                                              "Internal hard db error");
+  }
+
   /**
    * Return to the frontend at this point.  The frontend will then return
    * a "402 Payment required" carrying a "X-Taler-Refund-Url: www"

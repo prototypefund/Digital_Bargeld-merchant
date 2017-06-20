@@ -2156,6 +2156,7 @@ postgres_increase_refund_for_contract (void *cls,
                                               params,
                                               &process_deposits_cb,
                                               &ctx);
+
   switch (ret)
   {
   case GNUNET_DB_STATUS_SUCCESS_NO_RESULTS:
@@ -2170,18 +2171,15 @@ postgres_increase_refund_for_contract (void *cls,
     return GNUNET_SYSERR;
   default:
     /* Got one or more deposits */
+    if (GNUNET_OK != postgres_commit (cls))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Failed to commit transaction increasing refund\n");
+      return GNUNET_SYSERR;
+    }
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Committed db transaction\n");
     return ctx.err;
-    break;
   }
-
-  if (GNUNET_OK != postgres_commit (cls))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Failed to commit transaction increasing refund\n");
-    return GNUNET_SYSERR;
-  }
-
-  return GNUNET_OK;
 }
 
 
