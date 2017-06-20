@@ -245,6 +245,9 @@ postgres_initialize (void *cls)
                             ",refund_amount_val INT8 NOT NULL"
                             ",refund_amount_frac INT4 NOT NULL"
                             ",refund_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",refund_fee_val INT8 NOT NULL"
+                            ",refund_fee_frac INT4 NOT NULL"
+                            ",refund_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transactions ("
                             " h_contract_terms BYTEA NOT NULL"
@@ -1707,6 +1710,9 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
                                     &rtransaction_id),
       TALER_PQ_result_spec_amount ("refund_amount",
                                    &refund_amount),
+      /**
+       * BUGGY: this column is not in that table.
+       */
       TALER_PQ_result_spec_amount ("refund_fee",
                                    &refund_fee),
       GNUNET_PQ_result_spec_string ("reason",
@@ -1839,6 +1845,7 @@ struct InsertRefundContext
  * @param coin_pub public key of the coin giving the (part of) refund
  * @param reason human readable explaination behind the refund
  * @param refund how much this coin is refunding
+ * @param refund_fee refund fee for this coin
  */
 enum GNUNET_DB_QueryStatus
 insert_refund (void *cls,
@@ -1846,7 +1853,8 @@ insert_refund (void *cls,
                const struct GNUNET_HashCode *h_contract_terms,
                const struct TALER_CoinSpendPublicKeyP *coin_pub,
                const char *reason,
-               const struct TALER_Amount *refund)
+               const struct TALER_Amount *refund,
+               const struct TALER_Amount *refund_fee)
 {
   struct PostgresClosure *pg = cls;
   
@@ -1891,6 +1899,7 @@ process_deposits_cb (void *cls,
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
+    struct TALER_Amount refund_fee;
     struct FindRefundContext ictx;
     enum GNUNET_DB_QueryStatus ires;
     struct GNUNET_PQ_QueryParam params[] = {
@@ -1902,6 +1911,8 @@ process_deposits_cb (void *cls,
                                             &coin_pub),
       TALER_PQ_result_spec_amount ("amount_with_fee",
                                    &amount_with_fee),
+      TALER_PQ_result_spec_amount ("refund_fee",
+                                   &refund_fee),
       GNUNET_PQ_result_spec_end
     };
 
@@ -2025,7 +2036,8 @@ process_deposits_cb (void *cls,
                            ctx->h_contract_terms,
                            &coin_pub,
                            ctx->reason,
-                           small))
+                           small,
+                           &refund_fee))
         {
           GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                       "Could not commit refund worth %s for coin '%s'"

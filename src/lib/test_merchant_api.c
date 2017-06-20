@@ -1176,6 +1176,7 @@ refund_lookup_cb (void *cls,
                   const json_t *obj)
 {
   struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
 
   if (MHD_HTTP_OK != http_status)
   {
@@ -1184,6 +1185,10 @@ refund_lookup_cb (void *cls,
     fail (is);
     return;
   }
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Ok /refund lookup\n");
+  cmd->details.refund_lookup.rlo = NULL;
+  next_command (is);
 }
 
 
@@ -1591,13 +1596,17 @@ cleanup_state (struct InterpreterState *is)
     case OC_REFUND_INCREASE:
       if (NULL != cmd->details.refund_increase.rio)
       {
-        GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                    "Cleaning up /refund (increase)\n");
         TALER_MERCHANT_refund_increase_cancel (cmd->details.refund_increase.rio);
         cmd->details.refund_increase.rio = NULL;
       }
       break;
 
+    case OC_REFUND_LOOKUP:
+      if (NULL != cmd->details.refund_lookup.rlo)
+      {
+        TALER_MERCHANT_refund_lookup_cancel (cmd->details.refund_lookup.rlo); 
+        cmd->details.refund_lookup.rlo = NULL;
+      }
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -2162,6 +2171,24 @@ interpreter_run (void *cls)
     }
     break;
   }
+  case OC_REFUND_LOOKUP:
+  {
+    if (NULL ==
+        (cmd->details.refund_lookup.rlo =
+           TALER_MERCHANT_refund_lookup (ctx,
+                                         MERCHANT_URI,
+                                         cmd->details.refund_lookup.order_id,
+                                         instance,
+                                         refund_lookup_cb,
+                                         is)))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Could not issue a /refund lookup request\n");
+      fail (is);
+      return;
+    }
+    break;
+  }
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
@@ -2528,10 +2555,14 @@ run (void *cls)
       .details.history.nrows = 10
     },
     { .oc = OC_REFUND_INCREASE,
-      .label = "increase-1",
+      .label = "refund-increase-1",
       .details.refund_increase.refund_amount = "EUR:0.1",
       .details.refund_increase.reason = "refund test",
       .details.refund_increase.order_id = "1"    
+    },
+    { .oc = OC_REFUND_LOOKUP,
+      .label = "refund-lookup-1",
+      .details.refund_lookup.order_id = "1"
     },
     /* end of testcase */
     { .oc = OC_END }

@@ -234,6 +234,26 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
   return rio;
 }
 
+
+/**
+ * Cancel a /refund lookup operation
+ *
+ * @param 
+ */
+void
+TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation *rlo)
+{
+  if (NULL != rlo->job)
+  {
+    GNUNET_CURL_job_cancel (rlo->job);
+    rlo->job = NULL;
+  }
+  
+  GNUNET_free (rlo->url);
+  GNUNET_free (rlo);
+}
+
+
 /**
  * Process GET /refund response
  */
@@ -260,6 +280,7 @@ handle_refund_lookup_finished (void *cls,
              MHD_HTTP_OK,
              TALER_EC_NONE,
              json);
+    TALER_MERCHANT_refund_lookup_cancel (rlo);
     break;
   default:
     /**
