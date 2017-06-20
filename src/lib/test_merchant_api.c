@@ -1582,11 +1582,18 @@ cleanup_state (struct InterpreterState *is)
       }
       break;
     case OC_HISTORY:
-
       if (NULL != cmd->details.history.ho)
       {
         TALER_MERCHANT_history_cancel (cmd->details.history.ho);
         cmd->details.history.ho = NULL;
+      }
+      break;
+
+    case OC_REFUND_INCREASE:
+      if (NULL != cmd->details.refund_increase.rio)
+      {
+        TALER_MERCHANT_refund_increase_cancel (cmd->details.refund_increase.rio);
+        cmd->details.refund_increase.rio = NULL;
       }
       break;
 
