@@ -1185,8 +1185,11 @@ refund_lookup_cb (void *cls,
     fail (is);
     return;
   }
+
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Ok /refund lookup\n");
+              "/refund lookup:\n%s\n",
+              json_dumps (obj, JSON_INDENT (2)));
+
   cmd->details.refund_lookup.rlo = NULL;
   next_command (is);
 }

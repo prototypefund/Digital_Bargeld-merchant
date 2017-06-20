@@ -340,7 +340,7 @@ process_refunds_cb (void *cls,
     return;
   }
 
-  element = json_pack ("{s:o, s:o, s:s, s:s, s:I, s:s, s:s}",
+  element = json_pack ("{s:o, s:o, s:o, s:o, s:I, s:o, s:o}",
                        "refund_amount", TALER_JSON_from_amount (refund_amount),
                        "refund_fee", TALER_JSON_from_amount (refund_fee),
                        "h_contract_terms", GNUNET_JSON_from_data_auto (prd->h_contract_terms),
