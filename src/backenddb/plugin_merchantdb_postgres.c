@@ -826,8 +826,12 @@ postgres_store_deposit (void *cls,
   };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "storing payment for h_contract_terms '%s'\n",
-              GNUNET_h2s (h_contract_terms));
+              "storing payment for h_contract_terms '%s'"
+              ", coin_pub: %s, amount_with_fee: %s, merchant_pub: %s\n",
+              GNUNET_h2s (h_contract_terms),
+              TALER_B2S (coin_pub),
+              TALER_amount_to_string (amount_with_fee),
+              TALER_B2S (merchant_pub));
   result = GNUNET_PQ_exec_prepared (pg->conn,
                                     "insert_deposit",
                                     params);
