@@ -1931,6 +1931,10 @@ process_deposits_cb (void *cls,
       return;
     }
 
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Processing refund for coin %s, deposited %s from it\n",
+                TALER_B2S (&coin_pub),
+                TALER_amount_to_string (&amount_with_fee));
     TALER_amount_get_zero (amount_with_fee.currency,
                            &ictx.refunded_amount);
     ictx.err = GNUNET_OK; /* no error so far */
