@@ -2084,8 +2084,8 @@ process_deposits_cb (void *cls,
   /**
    * Check if the refund is bigger than the previous awarded.
    */
-  if (-1 == TALER_amount_cmp (&attempted_refund,
-                              &previous_refund))
+  if (2 != (1 + TALER_amount_cmp (&attempted_refund,
+                                  &previous_refund)))
   {
 
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,

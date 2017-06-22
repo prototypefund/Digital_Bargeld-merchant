@@ -576,6 +576,14 @@ run (void *cls)
                                                 &refund_amount,
                                                 "refund testing"));
 
+  FAILIF (GNUNET_NO !=
+          plugin->increase_refund_for_contract (plugin->cls,
+                                                &h_contract_terms,
+                                                &merchant_pub,
+                                                &refund_amount,
+                                                "same refund amount as "
+                                                "the previous one, should fail"));
+
   /*Should fail as this refund a lesser amount respect to the previous one*/
   FAILIF (GNUNET_NO !=
           plugin->increase_refund_for_contract (plugin->cls,

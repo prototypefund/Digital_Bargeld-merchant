@@ -484,7 +484,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
     /*This is very odd, as the unhashed version *was* found earlier*/
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_REFUND_H_CONTRACT_TERMS_UNKNOWN,
-                                         "h_contract_terms not found in database");
+                                         "h_contract_terms not found among granted refunds");
   }
 
   if (GNUNET_SYSERR == res)
