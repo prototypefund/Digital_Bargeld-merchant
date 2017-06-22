@@ -249,6 +249,9 @@ handle_pay_finished (void *cls,
 
 /**
  * Pay a merchant.  API for wallets that have the coin's private keys.
+ * _NOTE_: this function does NOT calculate each coin amount in order
+ * to match the contract total price.  This calculation is to be made
+ * by the logic using this library.
  *
  * @param ctx the execution loop context
  * @param merchant_uri base URI of the merchant's backend

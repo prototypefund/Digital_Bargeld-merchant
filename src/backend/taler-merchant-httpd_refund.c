@@ -246,8 +246,9 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
      */
     return TMH_RESPONSE_reply_external_error (connection,
                                               TALER_EC_REFUND_INCONSISTENT_AMOUNT,
-                                              "Amount either lower than the previous"
-                                              " or too big to be paid back");
+                                              "Amount incorrect: either not bigger"
+                                              " than the previous one or too big to"
+                                              " be paid back");
   }
 
   if (GNUNET_SYSERR == res)
