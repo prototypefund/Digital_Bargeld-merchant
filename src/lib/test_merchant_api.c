@@ -1610,6 +1610,7 @@ cleanup_state (struct InterpreterState *is)
         TALER_MERCHANT_refund_lookup_cancel (cmd->details.refund_lookup.rlo); 
         cmd->details.refund_lookup.rlo = NULL;
       }
+      break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -2405,6 +2406,7 @@ run (void *cls)
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
                   \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
                   \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
+                  \"summary\":\"useful product\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
 
