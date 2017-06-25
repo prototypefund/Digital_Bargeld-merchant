@@ -747,7 +747,7 @@ run (void *cls,
                                  NULL);
   GNUNET_assert (GNUNET_OK ==
                  GNUNET_log_setup ("taler-merchant-httpd",
-                                   "DEBUG",
+                                   "WARNING",
                                    NULL));
   if (GNUNET_SYSERR ==
       TMH_EXCHANGES_init (config))
