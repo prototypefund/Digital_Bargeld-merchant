@@ -23,6 +23,7 @@
 #define TALER_MERCHANTDB_PLUGIN_H
 
 #include <gnunet/gnunet_util_lib.h>
+#include <gnunet/gnunet_db_lib.h>
 #include <jansson.h>
 
 /**
@@ -191,9 +192,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param merchant_pub merchant's public key
    * @param timestamp timestamp of this proposal data
    * @param contract_terms proposal data to store
-   * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*insert_contract_terms) (void *cls,
                            const char *order_id,
                            const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -207,10 +208,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param[out] contract_terms where to store the result
    * @param order_id order_id used to lookup.
    * @param merchant_pub instance's public key.
-   * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
-   * found, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_contract_terms) (void *cls,
                          json_t **contract_terms,
                          const char *order_id,
@@ -224,10 +224,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param[out] contract_terms where to store the result
    * @param h_contract_terms hashcode used to lookup.
    * @param merchant_pub instance's public key.
-   * @return #GNUNET_OK on success, #GNUNET_NO if no contract is
-   * found, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_contract_terms_from_hash) (void *cls,
                                    json_t **contract_terms,
                                    const struct GNUNET_HashCode *h_contract_terms,
@@ -251,9 +250,9 @@ struct TALER_MERCHANTDB_Plugin
    * This is typically used to show live updates on the merchant's backoffice
    * @param cb function to call with transaction data, can be NULL.
    * @param cb_cls closure for @a cb
-   * @return numer of found tuples, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_contract_terms_by_date_and_range) (void *cls,
                                            struct GNUNET_TIME_Absolute date,
                                            const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -272,10 +271,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param merchant_pub public key of the merchant using this method
    * @param cb the callback
    * @param cb_cls closure to pass to @a cb
-   * @return #GNUNET_YES, #GNUNET_NO, #GNUNET_SYSERR according to the
-   * query being successful, unsuccessful, or generated errors.
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_contract_terms_history) (void *cls,
                                  const char *order_id,
                                  const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -294,9 +292,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param nrows only nrows rows are returned.
    * @param cb function to call with transaction data, can be NULL.
    * @param cb_cls closure for @a cb
-   * @return numer of found tuples, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_contract_terms_by_date) (void *cls,
                                  struct GNUNET_TIME_Absolute date,
                                  const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -316,9 +314,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param timestamp time of the confirmation
    * @param refund refund deadline
    * @param total_amount total amount we receive for the contract after fees
-   * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*store_transaction) (void *cls,
                         const struct GNUNET_HashCode *h_contract_terms,
 			const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -340,9 +338,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param deposit_fee fee the exchange will charge for this coin
    * @param signkey_pub public key used by the exchange for @a exchange_proof
    * @param exchange_proof proof from exchange that coin was accepted
-   * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*store_deposit) (void *cls,
                     const struct GNUNET_HashCode *h_contract_terms,
                     const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -363,9 +361,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param coin_pub public key of the coin
    * @param wtid identifier of the wire transfer in which the exchange
    *             send us the money for the coin deposit
-   * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*store_coin_to_transfer) (void *cls,
                              const struct GNUNET_HashCode *h_contract_terms,
                              const struct TALER_CoinSpendPublicKeyP *coin_pub,
@@ -381,9 +379,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param execution_time when was @a wtid executed
    * @param signkey_pub public key used by the exchange for @a exchange_proof
    * @param exchange_proof proof from exchange about what the deposit was for
-   * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*store_transfer_to_proof) (void *cls,
                               const char *exchange_uri,
                               const struct TALER_WireTransferIdentifierRawP *wtid,
@@ -399,10 +397,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param date limit to transactions' age
    * @param cb function to call with transaction data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
-   *         upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_transactions_by_date) (void *cls,
                                 struct GNUNET_TIME_Absolute date,
                                 TALER_MERCHANTDB_TransactionCallback cb,
@@ -416,9 +413,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param merchant_pub merchant's public key.
    * @param cb function to call with transaction data
    * @param cb_cls closure for @a cb
-   * @return number of found tuples, #GNUNET_SYSERR upon error
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_transaction) (void *cls,
                        const struct GNUNET_HashCode *h_contract_terms,
 		       const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -435,15 +432,15 @@ struct TALER_MERCHANTDB_Plugin
    *        in order to find the result.
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
-   *         #GNUNET_SYSERR on hard errors
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_payments) (void *cls,
                     const struct GNUNET_HashCode *h_contract_terms,
                     const struct TALER_MerchantPublicKeyP *merchant_pub,
                     TALER_MERCHANTDB_CoinDepositCallback cb,
                     void *cb_cls);
+  
 
   /**
    * Lookup information about coin payments by h_contract_terms and coin.
@@ -455,10 +452,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param coin_pub public key to use for the search
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
-   *         #GNUNET_SYSERR on hard errors
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_payments_by_hash_and_coin) (void *cls,
                                      const struct GNUNET_HashCode *h_contract_terms,
                                      const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -478,10 +474,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param h_contract_terms proposal data's hashcode
    * @param cb function to call with transfer data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
-   *         #GNUNET_SYSERR on hard errors
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_transfers_by_hash) (void *cls,
                              const struct GNUNET_HashCode *h_contract_terms,
                              TALER_MERCHANTDB_TransferCallback cb,
@@ -495,10 +490,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param wtid wire transfer identifier to find matching transactions for
    * @param cb function to call with payment data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
-   *         #GNUNET_SYSERR on hard errors
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_deposits_by_wtid) (void *cls,
                             const struct TALER_WireTransferIdentifierRawP *wtid,
                             TALER_MERCHANTDB_CoinDepositCallback cb,
@@ -513,10 +507,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param wtid wire transfer identifier for the search
    * @param cb function to call with proof data
    * @param cb_cls closure for @a cb
-   * @return #GNUNET_OK on success, #GNUNET_NO if h_contract_terms is unknown,
-   *         #GNUNET_SYSERR on hard errors
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*find_proof_by_wtid) (void *cls,
                          const char *exchange_uri,
                          const struct TALER_WireTransferIdentifierRawP *wtid,
@@ -535,12 +528,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param refund maximum refund to return to the customer for this contract
    * @param reason 0-terminated UTF-8 string giving the reason why the customer
    *               got a refund (free form, business-specific)
-   * @return #GNUNET_OK if the refund is accepted
-   *         #GNUNET_NO if the refund is at or below the previous refund amount
-   *         #GNUNET_SYSERR on database error, i.e. contract unknown, DB on fire,
-   *               (FIXME: distinguish hard/soft? who does retries?)
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*increase_refund_for_contract)(void *cls,
                                   const struct GNUNET_HashCode *h_contract_terms,
                                   const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -556,11 +546,9 @@ struct TALER_MERCHANTDB_Plugin
    * @param h_contract_terms hash code of the contract
    * @param rc function to call for each coin on which there is a refund
    * @param rc_cls closure for @a rc
-   * @return #GNUNET_OK if we called @a rc on all coins
-   *         #GNUNET_NO if there are no refunds for @a h_contract_terms
-   *         #GNUNET_SYSERR if there were errors talking to the DB
+   * @return transaction status
    */
-  int
+  enum GNUNET_DB_QueryStatus
   (*get_refunds_from_contract_terms_hash)(void *cls,
                                           const struct TALER_MerchantPublicKeyP *merchant_pub,
                                           const struct GNUNET_HashCode *h_contract_terms,

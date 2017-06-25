@@ -182,6 +182,11 @@ static json_t *contract;
  */
 static json_t *contract_terms;
 
+/**
+ * Mock proposal data, not need to be well-formed
+ */
+static json_t *contract_terms_future;
+
 
 
 /**
@@ -433,75 +438,85 @@ run (void *cls)
                                       json_string ("backenddb test B")));
   contract = json_object ();
   contract_terms = json_object ();
+  GNUNET_assert (0 ==
+                 json_object_set_new (contract_terms,
+                                      "order",
+                                      json_string ("1")));
+  
+  contract_terms_future = json_object ();
+  GNUNET_assert (0 ==
+                 json_object_set_new (contract_terms_future,
+                                      "order",
+                                      json_string ("2")));
 
   TALER_JSON_hash (contract_terms,
                    &h_contract_terms);
 
   FAILIF (GNUNET_OK !=
           plugin->insert_contract_terms (plugin->cls,
-                                        order_id,
-                                        &merchant_pub,
-                                        timestamp,
-                                        contract_terms));
+					 order_id,
+					 &merchant_pub,
+					 timestamp,
+					 contract_terms));
 
   json_t *out;
 
   FAILIF (GNUNET_OK !=
           plugin->find_contract_terms (plugin->cls,
-                                      &out,
-                                      order_id,
-                                      &merchant_pub));
+				       &out,
+				       order_id,
+				       &merchant_pub));
 
   FAILIF (GNUNET_OK !=
           plugin->find_contract_terms_history (plugin->cls,
-                                              order_id,
-                                              &merchant_pub,
-                                              pd_cb,
-                                              NULL));
+					       order_id,
+					       &merchant_pub,
+					       &pd_cb,
+					       NULL));
 
   FAILIF (GNUNET_OK !=
           plugin->find_contract_terms_from_hash (plugin->cls,
-                                                &out,
-                                                &h_contract_terms,
-                                                &merchant_pub));
+						 &out,
+						 &h_contract_terms,
+						 &merchant_pub));
   FAILIF (1 !=
           plugin->find_contract_terms_by_date_and_range (plugin->cls,
-                                                        fake_now,
-                                                        &merchant_pub,
-                                                        2,
-                                                        1,
-                                                        GNUNET_NO,
-                                                        pd_cb,
-                                                        NULL));
+							 fake_now,
+							 &merchant_pub,
+							 2,
+							 1,
+							 GNUNET_NO,
+							 &pd_cb,
+							 NULL));
   timestamp = GNUNET_TIME_absolute_get ();
   GNUNET_TIME_round_abs (&timestamp);
 
   FAILIF (GNUNET_OK !=
           plugin->insert_contract_terms (plugin->cls,
-                                        order_id_future,
-                                        &merchant_pub,
-                                        timestamp,
-                                        contract_terms));
+					 order_id_future,
+					 &merchant_pub,
+					 timestamp,
+					 contract_terms_future));
 
   fake_now = GNUNET_TIME_absolute_subtract (timestamp, delta);
 
   FAILIF (2 !=
           plugin->find_contract_terms_by_date_and_range (plugin->cls,
-                                                        fake_now,
-                                                        &merchant_pub,
-                                                        0,
-                                                        5,
-                                                        GNUNET_YES,
-                                                        pd_cb,
-                                                        NULL));
+							 fake_now,
+							 &merchant_pub,
+							 0,
+							 5,
+							 GNUNET_YES,
+							 &pd_cb,
+							 NULL));
 
   FAILIF (0 !=
           plugin->find_contract_terms_by_date (plugin->cls,
-                                              fake_now,
-                                              &merchant_pub,
-                                              1,
-                                              pd_cb,
-                                              NULL));
+					       fake_now,
+					       &merchant_pub,
+					       1,
+					       &pd_cb,
+					       NULL));
 
   FAILIF (GNUNET_OK !=
           plugin->store_transaction (plugin->cls,

@@ -155,14 +155,8 @@ postgres_start (void *cls)
   }
   PQclear (result);
   return GNUNET_OK;
-
-  /**
-   * NOTE: this function equals 99% the one from the exchange codebase.
-   * The difference is that here we don't use the session->state field (
-   * see original code: exchange/src/exchangedb/plugin_exchangedb_postgres.c).
-   * Good/bad?
-   */
 }
+
 
 /**
  * Roll back the current transaction of a database connection.
@@ -188,31 +182,19 @@ postgres_rollback (void *cls)
  * Commit the current transaction of a database connection.
  *
  * @param cls the `struct PostgresClosure` with the plugin-specific state
- * @return #GNUNET_SYSERR on hard error,
- *         #GNUNET_NO if commit failed but retry may work,
- *         #GNUNET_OK on success
+ * @return transaction status code
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_commit (void *cls)
 {
   struct PostgresClosure *pg = cls;
-  enum GNUNET_DB_QueryStatus ret;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_end
   };
 
-  ret = GNUNET_PQ_eval_prepared_non_select (pg->conn,
-                                            "end_transaction",
-                                            params);
-  switch (ret)
-  {
-  case GNUNET_DB_STATUS_HARD_ERROR:
-    return GNUNET_SYSERR;
-  case GNUNET_DB_STATUS_SOFT_ERROR:
-    return GNUNET_NO;
-  default:
-    return GNUNET_OK;
-  }
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+					     "end_transaction",
+					     params);
 }
 
 
@@ -235,6 +217,7 @@ postgres_initialize (void *cls)
                             ",timestamp INT8 NOT NULL"
                             ",row_id BIGSERIAL"
                             ",PRIMARY KEY (order_id, merchant_pub)"
+			    ",UNIQUE (h_contract_terms, merchant_pub)"
                             ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
                             " rtransaction_id BIGSERIAL"
@@ -562,17 +545,15 @@ postgres_initialize (void *cls)
  * @param contract_terms where to store the retrieved proposal data
  * @param h_contract_terms proposal data's hashcode that will be used to
  * perform the lookup
- * @return #GNUNET_OK on success, #GNUNET_NO if no proposal is
- * found, #GNUNET_SYSERR upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms_from_hash (void *cls,
                                        json_t **contract_terms,
                                        const struct GNUNET_HashCode *h_contract_terms,
                                        const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
-  enum GNUNET_DB_QueryStatus res;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -584,24 +565,10 @@ postgres_find_contract_terms_from_hash (void *cls,
     GNUNET_PQ_result_spec_end
   };
 
-  res = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-                                                  "find_contract_terms_from_hash",
-                                                  params,
-                                                  rs);
-  if (res < 0)
-  {
-    GNUNET_break (0);
-    return GNUNET_SYSERR;
-  }
-  if (1 < res)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Mupltiple proposal data hash the same hashcode!\n");
-    return GNUNET_SYSERR;
-  }
-  if (0 == res)
-    return GNUNET_NO;
-  return GNUNET_OK;
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						   "find_contract_terms_from_hash",
+						   params,
+						   rs);
 }
 
 
@@ -611,17 +578,15 @@ postgres_find_contract_terms_from_hash (void *cls,
  * @param cls closure
  * @param[out] contract_terms where to store the retrieved contract terms
  * @param order id order id used to perform the lookup
- * @return #GNUNET_OK on success, #GNUNET_NO if no proposal is
- * found, #GNUNET_SYSERR upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms (void *cls,
                               json_t **contract_terms,
                               const char *order_id,
                               const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
-  enum GNUNET_DB_QueryStatus res;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -638,24 +603,10 @@ postgres_find_contract_terms (void *cls,
               "Finding contract term, order_id: '%s', merchant_pub: '%s'.\n",
               order_id,
               TALER_B2S (merchant_pub));
-  res = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-                                                  "find_contract_terms",
-                                                  params,
-                                                  rs);
-  if (res < 0)
-  {
-    GNUNET_break (0);
-    return GNUNET_SYSERR;
-  }
-  if (res > 1)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Mupltiple proposal data share the same hashcode.\n");
-    return GNUNET_SYSERR;
-  }
-  if (0 == res)
-    return GNUNET_NO;
-  return GNUNET_OK;
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						   "find_contract_terms",
+						   params,
+						   rs);
 }
 
 
@@ -665,9 +616,9 @@ postgres_find_contract_terms (void *cls,
  * @param cls closure
  * @param order_id identificator of the proposal being stored
  * @param contract_terms proposal data to store
- * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_insert_contract_terms (void *cls,
                                const char *order_id,
                                const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -675,20 +626,7 @@ postgres_insert_contract_terms (void *cls,
                                const json_t *contract_terms)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  int ret;
   struct GNUNET_HashCode h_contract_terms;
-
-  if (GNUNET_OK != TALER_JSON_hash (contract_terms,
-                                    &h_contract_terms))
-    return GNUNET_SYSERR;
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "inserting contract_terms: order_id: %s, merchant_pub: %s, h_contract_terms: %s.\n",
-              order_id,
-              TALER_B2S (merchant_pub),
-              GNUNET_h2s (&h_contract_terms));
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -697,32 +635,21 @@ postgres_insert_contract_terms (void *cls,
     GNUNET_PQ_query_param_auto_from_type (&h_contract_terms),
     GNUNET_PQ_query_param_end
   };
-
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "insert_contract_terms",
-                                    params);
-
-  /**
-   * We don't treat a unique_violation (code '23505') error as
-   * an actual error, since there is no problem if a frontend tries
-   * to store twice the same proposal.  That is especially needed
-   * when DB-less frontends perform replayed payments.
-   */
-  if (PGRES_COMMAND_OK != PQresultStatus (result)
-      && (0 != memcmp ("23505",
-                       EXTRACT_DB_ERROR (result),
-                       5)))
-  {
-    ret = GNUNET_SYSERR;
-    BREAK_DB_ERR (result);
-  }
-  else
-  {
-    ret = GNUNET_OK;
-  }
-  PQclear (result);
-  return ret;
+  
+  if (GNUNET_OK !=
+      TALER_JSON_hash (contract_terms,
+		       &h_contract_terms))
+    return GNUNET_SYSERR;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "inserting contract_terms: order_id: %s, merchant_pub: %s, h_contract_terms: %s.\n",
+              order_id,
+              TALER_B2S (merchant_pub),
+              GNUNET_h2s (&h_contract_terms));
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+					     "insert_contract_terms",
+					     params);
 }
+
 
 /**
  * Insert transaction data into the database.
@@ -736,9 +663,9 @@ postgres_insert_contract_terms (void *cls,
  * @param timestamp time of the confirmation
  * @param refund refund deadline
  * @param total_amount total amount we receive for the contract after fees
- * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_store_transaction (void *cls,
                             const struct GNUNET_HashCode *h_contract_terms,
 			    const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -749,9 +676,6 @@ postgres_store_transaction (void *cls,
                             const struct TALER_Amount *total_amount)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  int ret;
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_string (exchange_uri),
@@ -767,21 +691,9 @@ postgres_store_transaction (void *cls,
               "Storing transaction with h_contract_terms '%s', merchant_pub '%s'.\n",
               GNUNET_h2s (h_contract_terms),
               TALER_B2S (merchant_pub));
-
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "insert_transaction",
-                                    params);
-  if (PGRES_COMMAND_OK != PQresultStatus (result))
-  {
-    ret = GNUNET_SYSERR;
-    BREAK_DB_ERR (result);
-  }
-  else
-  {
-    ret = GNUNET_OK;
-  }
-  PQclear (result);
-  return ret;
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+					     "insert_transaction",
+					     params);
 }
 
 
@@ -797,9 +709,9 @@ postgres_store_transaction (void *cls,
  * @param refund_fee fee the exchange will charge for refunding this coin
  * @param signkey_pub public key used by the exchange for @a exchange_proof
  * @param exchange_proof proof from exchange that coin was accepted
- * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_store_deposit (void *cls,
                         const struct GNUNET_HashCode *h_contract_terms,
                         const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -811,8 +723,6 @@ postgres_store_deposit (void *cls,
                         const json_t *exchange_proof)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  int ret;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -832,20 +742,9 @@ postgres_store_deposit (void *cls,
               TALER_B2S (coin_pub),
               TALER_amount_to_string (amount_with_fee),
               TALER_B2S (merchant_pub));
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "insert_deposit",
-                                    params);
-  if (PGRES_COMMAND_OK != PQresultStatus (result))
-  {
-    ret = GNUNET_SYSERR;
-    BREAK_DB_ERR (result);
-  }
-  else
-  {
-    ret = GNUNET_OK;
-  }
-  PQclear (result);
-  return ret;
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+					     "insert_deposit",
+					     params);
 }
 
 
@@ -858,18 +757,15 @@ postgres_store_deposit (void *cls,
  * @param coin_pub public key of the coin
  * @param wtid identifier of the wire transfer in which the exchange
  *             send us the money for the coin deposit
- * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_store_coin_to_transfer (void *cls,
                                  const struct GNUNET_HashCode *h_contract_terms,
                                  const struct TALER_CoinSpendPublicKeyP *coin_pub,
                                  const struct TALER_WireTransferIdentifierRawP *wtid)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  int ret;
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
@@ -877,20 +773,9 @@ postgres_store_coin_to_transfer (void *cls,
     GNUNET_PQ_query_param_end
   };
 
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "insert_transfer",
-                                    params);
-  if (PGRES_COMMAND_OK != PQresultStatus (result))
-  {
-    ret = GNUNET_SYSERR;
-    BREAK_DB_ERR (result);
-  }
-  else
-  {
-    ret = GNUNET_OK;
-  }
-  PQclear (result);
-  return ret;
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+					     "insert_transfer",
+					     params);
 }
 
 
@@ -903,9 +788,9 @@ postgres_store_coin_to_transfer (void *cls,
  * @param execution_time when was @a wtid executed
  * @param signkey_pub public key used by the exchange for @a exchange_proof
  * @param exchange_proof proof from exchange about what the deposit was for
- * @return #GNUNET_OK on success, #GNUNET_SYSERR upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_store_transfer_to_proof (void *cls,
                                   const char *exchange_uri,
                                   const struct TALER_WireTransferIdentifierRawP *wtid,
@@ -914,9 +799,6 @@ postgres_store_transfer_to_proof (void *cls,
                                   const json_t *exchange_proof)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  int ret;
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (exchange_uri),
     GNUNET_PQ_query_param_auto_from_type (wtid),
@@ -926,21 +808,11 @@ postgres_store_transfer_to_proof (void *cls,
     GNUNET_PQ_query_param_end
   };
 
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "insert_proof",
-                                    params);
-  if (PGRES_COMMAND_OK != PQresultStatus (result))
-  {
-    ret = GNUNET_SYSERR;
-    BREAK_DB_ERR (result);
-  }
-  else
-  {
-    ret = GNUNET_OK;
-  }
-  PQclear (result);
-  return ret;
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+					     "insert_proof",
+					     params);
 }
+
 
 /**
  * Lookup for a proposal, respecting the signature used by the
@@ -951,10 +823,9 @@ postgres_store_transfer_to_proof (void *cls,
  * @param merchant_pub public key of the merchant using this method
  * @param cb the callback
  * @param cb_cls closure to pass to the callback
- * @return GNUNET_YES, GNUNET_NO, GNUNET_SYSERR according to the
- * query being successful, unsuccessful, or generated errors.
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms_history (void *cls,
                                      const char *order_id,
                                      const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -962,53 +833,102 @@ postgres_find_contract_terms_history (void *cls,
                                      void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int i;
   json_t *contract_terms;
-
+  enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
-
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_contract_terms",
-                                    params);
-  i = PQntuples (result);
-  if (1 < i)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Mupltiple proposal data share the same hashcode.\n");
-    return GNUNET_SYSERR;
-  }
-
-  if (0 == i)
-    return GNUNET_NO;
-
   struct GNUNET_PQ_ResultSpec rs[] = {
     TALER_PQ_result_spec_json ("contract_terms",
                                &contract_terms),
     GNUNET_PQ_result_spec_end
   };
-  if (GNUNET_OK !=
-      GNUNET_PQ_extract_result (result,
-                                rs,
-                                0))
-  {
-    GNUNET_break (0);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
 
+  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						 "find_contract_terms",
+						 params,
+						 rs);
+  if (qs <= 0)
+    return qs;
   cb (cb_cls,
       order_id,
       0,
       contract_terms);
+  GNUNET_PQ_cleanup_result (rs);
+  return qs;
+}
 
-  PQclear (result);
-  return GNUNET_OK;
 
+/**
+ * Closure for #find_contracts_cb().
+ */
+struct FindContractsContext
+{
+  /**
+   * Function to call on each result.
+   */
+  TALER_MERCHANTDB_ProposalDataCallback cb;
+
+  /**
+   * Closure for @e cb.
+   */
+  void *cb_cls;
+
+  /**
+   * Transaction status code to set.
+   */ 
+  enum GNUNET_DB_QueryStatus qs;
+};
+
+  
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results.
+ *
+ * @param cls of type `struct FindContractsContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+find_contracts_cb (void *cls,
+		   PGresult *result,
+		   unsigned int num_results)
+{
+  struct FindContractsContext *fcctx = cls;
+  
+  for (unsigned int i = 0; i < num_results; i++)
+  {
+    char *order_id;
+    json_t *contract_terms;
+    uint64_t row_id;
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_string ("order_id",
+                                    &order_id),
+      TALER_PQ_result_spec_json ("contract_terms",
+                                 &contract_terms),
+      GNUNET_PQ_result_spec_uint64 ("row_id",
+                                    &row_id),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      fcctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
+    }
+    fcctx->qs = i + 1;
+    fcctx->cb (fcctx->cb_cls,
+	       order_id,
+	       row_id,
+	       contract_terms);
+    GNUNET_PQ_cleanup_result (rs);
+  }
 }
 
 
@@ -1035,9 +955,9 @@ postgres_find_contract_terms_history (void *cls,
  * Web interface.
  * @param cb function to call with transaction data, can be NULL.
  * @param cb_cls closure for @a cb
- * @return numer of found tuples, #GNUNET_SYSERR upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms_by_date_and_range (void *cls,
                                                struct GNUNET_TIME_Absolute date,
                                                const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -1050,8 +970,6 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
   uint64_t s64 = start;
   uint64_t r64 = nrows;
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int n;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -1059,63 +977,25 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
     GNUNET_PQ_query_param_uint64 (&r64),
     GNUNET_PQ_query_param_end
   };
+  const char *stmt;
+  enum GNUNET_DB_QueryStatus qs;
+  struct FindContractsContext fcctx = {
+    .cb = cb,
+    .cb_cls = cb_cls
+  };
 
   if (GNUNET_YES == future)
-    result = GNUNET_PQ_exec_prepared (pg->conn,
-                                      "find_contract_terms_by_date_and_range_future",
-                                      params);
+    stmt = "find_contract_terms_by_date_and_range_future";
   else
-    result = GNUNET_PQ_exec_prepared (pg->conn,
-                                      "find_contract_terms_by_date_and_range",
-                                      params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
-  {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if ( (0 == (n = PQntuples (result))) ||
-       (NULL == cb) )
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "No records found.\n");
-    PQclear (result);
-    return n;
-  }
-  for (unsigned int i = 0; i < n; i++)
-  {
-    char *order_id;
-    json_t *contract_terms;
-    uint64_t row_id;
-
-    struct GNUNET_PQ_ResultSpec rs[] = {
-      GNUNET_PQ_result_spec_string ("order_id",
-                                    &order_id),
-      TALER_PQ_result_spec_json ("contract_terms",
-                                 &contract_terms),
-      GNUNET_PQ_result_spec_uint64 ("row_id",
-                                    &row_id),
-      GNUNET_PQ_result_spec_end
-    };
-
-    if (GNUNET_OK !=
-        GNUNET_PQ_extract_result (result,
-                                  rs,
-                                  i))
-    {
-      GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
-    }
-    cb (cb_cls,
-        order_id,
-        row_id,
-        contract_terms);
-
-    GNUNET_PQ_cleanup_result (rs);
-  }
-  PQclear (result);
-  return n;
+    stmt = "find_contract_terms_by_date_and_range";
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+					     stmt,
+					     params,
+					     &find_contracts_cb,
+					     &fcctx);
+  if (0 >= qs)
+    return qs;
+  return fcctx.qs;
 }
 
 
@@ -1130,78 +1010,40 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
  * @param nrows at most nrows rows are returned.
  * @param cb function to call with transaction data, can be NULL.
  * @param cb_cls closure for @a cb
- * @return numer of found tuples, #GNUNET_SYSERR upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms_by_date (void *cls,
-                                     struct GNUNET_TIME_Absolute date,
-                                     const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                     unsigned int nrows,
-                                     TALER_MERCHANTDB_ProposalDataCallback cb,
-                                     void *cb_cls)
+				      struct GNUNET_TIME_Absolute date,
+				      const struct TALER_MerchantPublicKeyP *merchant_pub,
+				      unsigned int nrows,
+				      TALER_MERCHANTDB_ProposalDataCallback cb,
+				      void *cb_cls)
 {
-
-  uint64_t r64 = nrows;
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int n;
-  unsigned int i;
-
+  uint64_t r64 = nrows;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_uint64 (&r64),
     GNUNET_PQ_query_param_end
   };
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_contract_terms_by_date",
-                                    params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
-  {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if (0 == (n = PQntuples (result)) || NULL == cb)
-  {
-    PQclear (result);
-    return n;
-  }
-  for (i = 0; i < n; i++)
-  {
-    char *order_id;
-    json_t *contract_terms;
-    uint64_t row_id;
+  enum GNUNET_DB_QueryStatus qs;
+  struct FindContractsContext fcctx = {
+    .cb = cb,
+    .cb_cls = cb_cls
+  };
 
-    struct GNUNET_PQ_ResultSpec rs[] = {
-      GNUNET_PQ_result_spec_string ("order_id",
-                                    &order_id),
-      TALER_PQ_result_spec_json ("contract_terms",
-                                 &contract_terms),
-      GNUNET_PQ_result_spec_uint64 ("row_id",
-                                    &row_id),
-      GNUNET_PQ_result_spec_end
-    };
-
-    if (GNUNET_OK !=
-        GNUNET_PQ_extract_result (result,
-                                  rs,
-                                  i))
-    {
-      GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
-    }
-    cb (cb_cls,
-        order_id,
-        row_id,
-        contract_terms);
-
-    GNUNET_PQ_cleanup_result (rs);
-  }
-  PQclear (result);
-  return n;
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+					     "find_contract_terms_by_date",
+					     params,
+					     &find_contracts_cb,
+					     &fcctx);
+  if (0 >= qs)
+    return qs;
+  return fcctx.qs;
 }
+
 
 /**
  * Find information about a transaction.
@@ -1211,10 +1053,9 @@ postgres_find_contract_terms_by_date (void *cls,
  * @param merchant_pub merchant's public key
  * @param cb function to call with transaction data
  * @param cb_cls closure for @a cb
- * @return #GNUNET_OK if found, #GNUNET_NO if not, #GNUNET_SYSERR
- *         upon error
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_find_transaction (void *cls,
                            const struct GNUNET_HashCode *h_contract_terms,
 			   const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -1222,72 +1063,42 @@ postgres_find_transaction (void *cls,
                            void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
+  char *exchange_uri;
+  struct GNUNET_HashCode h_wire;
+  struct GNUNET_TIME_Absolute timestamp;
+  struct GNUNET_TIME_Absolute refund_deadline;
+  struct TALER_Amount total_amount;
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    GNUNET_PQ_result_spec_string ("exchange_uri",
+				  &exchange_uri),
+    GNUNET_PQ_result_spec_auto_from_type ("h_wire",
+					  &h_wire),
+    GNUNET_PQ_result_spec_absolute_time ("timestamp",
+					 &timestamp),
+    GNUNET_PQ_result_spec_absolute_time ("refund_deadline",
+					 &refund_deadline),
+    TALER_PQ_result_spec_amount ("total_amount",
+				 &total_amount),
+    GNUNET_PQ_result_spec_end
+  };
+  enum GNUNET_DB_QueryStatus qs;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Finding transaction for h_contract_terms '%s', merchant_pub: '%s'.\n",
               GNUNET_h2s (h_contract_terms),
               TALER_B2S (merchant_pub));
 
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_transaction",
-                                    params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						 "find_transaction",
+						 params,
+						 rs);
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
   {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if (0 == PQntuples (result))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Could NOT find transaction for h_contract_terms '%s'\n",
-                GNUNET_h2s (h_contract_terms));
-
-    PQclear (result);
-    return GNUNET_NO;
-  }
-  if (1 != PQntuples (result))
-  {
-    GNUNET_break (0);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-
-  {
-    char *exchange_uri;
-    struct GNUNET_HashCode h_wire;
-    struct GNUNET_TIME_Absolute timestamp;
-    struct GNUNET_TIME_Absolute refund_deadline;
-    struct TALER_Amount total_amount;
-    struct GNUNET_PQ_ResultSpec rs[] = {
-      GNUNET_PQ_result_spec_string ("exchange_uri",
-                                    &exchange_uri),
-      GNUNET_PQ_result_spec_auto_from_type ("h_wire",
-                                            &h_wire),
-      GNUNET_PQ_result_spec_absolute_time ("timestamp",
-                                           &timestamp),
-      GNUNET_PQ_result_spec_absolute_time ("refund_deadline",
-                                           &refund_deadline),
-      TALER_PQ_result_spec_amount ("total_amount",
-                                   &total_amount),
-      GNUNET_PQ_result_spec_end
-    };
-
-    if (GNUNET_OK !=
-        GNUNET_PQ_extract_result (result,
-                                  rs,
-                                  0))
-    {
-      GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
-    }
     cb (cb_cls,
 	merchant_pub,
         exchange_uri,
@@ -1298,65 +1109,59 @@ postgres_find_transaction (void *cls,
         &total_amount);
     GNUNET_PQ_cleanup_result (rs);
   }
-  PQclear (result);
-  return GNUNET_OK;
+  return qs;
 }
 
 
 /**
- * Lookup information about coin payments by proposal data hash
- * (and @a merchant_pub)
- *
- * @param cls closure
- * @param h_contract_terms key for the search
- * @param merchant_pub merchant's public key
- * @param cb function to call with payment data
- * @param cb_cls closure for @a cb
- * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
- *         #GNUNET_SYSERR on hard errors
+ * Closure for #find_payments_cb().
  */
-static int
-postgres_find_payments (void *cls,
-                        const struct GNUNET_HashCode *h_contract_terms,
-		        const struct TALER_MerchantPublicKeyP *merchant_pub,
-                        TALER_MERCHANTDB_CoinDepositCallback cb,
-                        void *cb_cls)
+struct FindPaymentsContext
 {
-  struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int i;
+  /**
+   * Function to call with results.
+   */
+  TALER_MERCHANTDB_CoinDepositCallback cb;
+  
+  /**
+   * Closure for @e cls.
+   */
+  void *cb_cls;
 
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_end
-  };
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "finding payment for h_contract_terms '%s'\n",
-              GNUNET_h2s (h_contract_terms));
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_deposits",
-                                    params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
-  {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if (0 == PQntuples (result))
-  {
-    PQclear (result);
-    return GNUNET_NO;
-  }
+  /** 
+   * Contract term hash used for the search.
+   */
+  const struct GNUNET_HashCode *h_contract_terms;
+  
+  /**
+   * Transaction status (set).
+   */
+  enum GNUNET_DB_QueryStatus qs;
+};
 
-  for (i=0;i<PQntuples (result);i++)
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results.
+ *
+ * @param cls of type `struct FindPaymentsContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+find_payments_cb (void *cls,
+		  PGresult *result,
+		  unsigned int num_results)
+{
+  struct FindPaymentsContext *fpc = cls;
+  
+  for (unsigned int i=0;i<num_results;i++)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
     struct TALER_Amount refund_fee;
     json_t *exchange_proof;
-
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
@@ -1377,79 +1182,120 @@ postgres_find_payments (void *cls,
                                   i))
     {
       GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
+      fpc->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
-    cb (cb_cls,
-        h_contract_terms,
-        &coin_pub,
-        &amount_with_fee,
-        &deposit_fee,
-        &refund_fee,
-        exchange_proof);
+    fpc->qs = i + 1;
+    fpc->cb (fpc->cb_cls,
+	     fpc->h_contract_terms,
+	     &coin_pub,
+	     &amount_with_fee,
+	     &deposit_fee,
+	     &refund_fee,
+	     exchange_proof);
     GNUNET_PQ_cleanup_result (rs);
   }
-  PQclear (result);
-  return GNUNET_OK;
-
-  GNUNET_break (0);
-  return GNUNET_SYSERR;
 }
 
 
 /**
- * Retrieve information about a deposited coin.
+ * Lookup information about coin payments by proposal data hash
+ * (and @a merchant_pub)
  *
  * @param cls closure
- * @param h_contract_terms hashcode of the proposal data paid by @a coin_pub
- * @param merchant_pub merchant's public key.
- * @param coin_pub coin's public key used for the search
+ * @param h_contract_terms key for the search
+ * @param merchant_pub merchant's public key
  * @param cb function to call with payment data
  * @param cb_cls closure for @a cb
- * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
- *         #GNUNET_SYSERR on hard errors
+ * @return transaction status
  */
-static int
-postgres_find_payments_by_hash_and_coin (void *cls,
-                                         const struct GNUNET_HashCode *h_contract_terms,
-                                         const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                                         TALER_MERCHANTDB_CoinDepositCallback cb,
-                                         void *cb_cls)
+static enum GNUNET_DB_QueryStatus
+postgres_find_payments (void *cls,
+                        const struct GNUNET_HashCode *h_contract_terms,
+		        const struct TALER_MerchantPublicKeyP *merchant_pub,
+                        TALER_MERCHANTDB_CoinDepositCallback cb,
+                        void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int i;
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_end
   };
+  struct FindPaymentsContext fpc = {
+    .h_contract_terms = h_contract_terms,
+    .cb = cb,
+    .cb_cls = cb_cls
+  };
+  enum GNUNET_DB_QueryStatus qs;
+  
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Finding payment for h_contract_terms '%s'\n",
+              GNUNET_h2s (h_contract_terms));
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+					     "find_deposits",
+					     params,
+					     &find_payments_cb,
+					     &fpc);
+  if (qs <= 0)
+    return qs;
+  return fpc.qs;
+}
 
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_deposits_by_hash_and_coin",
-                                    params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
-  {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if (0 == PQntuples (result))
-  {
-    PQclear (result);
-    return GNUNET_NO;
-  }
 
-  for (i=0;i<PQntuples (result);i++)
+/**
+ * Closure for #find_payments_by_coin_cb().
+ */
+struct FindPaymentsByCoinContext
+{
+  /**
+   * Function to call with results.
+   */
+  TALER_MERCHANTDB_CoinDepositCallback cb;
+  
+  /**
+   * Closure for @e cls.
+   */
+  void *cb_cls;
+
+  /**
+   * Coin we are looking for.
+   */ 
+  const struct TALER_CoinSpendPublicKeyP *coin_pub;
+
+  /**
+   * Hash of the contract we are looking for.
+   */ 
+  const struct GNUNET_HashCode *h_contract_terms;
+  
+  /**
+   * Transaction status (set).
+   */
+  enum GNUNET_DB_QueryStatus qs;
+};
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results.
+ *
+ * @param cls of type `struct FindPaymentsByCoinContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+find_payments_by_coin_cb (void *cls,
+			  PGresult *result,
+			  unsigned int num_results)
+{
+  struct FindPaymentsByCoinContext *fpc = cls;
+  
+  for (unsigned int i=0;i<num_results;i++)
   {
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
     struct TALER_Amount refund_fee;
     json_t *exchange_proof;
-
     struct GNUNET_PQ_ResultSpec rs[] = {
       TALER_PQ_result_spec_amount ("amount_with_fee",
                                    &amount_with_fee),
@@ -1468,70 +1314,110 @@ postgres_find_payments_by_hash_and_coin (void *cls,
                                   i))
     {
       GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
+      fpc->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
-    cb (cb_cls,
-        h_contract_terms,
-        coin_pub,
-        &amount_with_fee,
-        &deposit_fee,
-        &refund_fee,
-        exchange_proof);
+    fpc->qs = i + 1;
+    fpc->cb (fpc->cb_cls,
+	     fpc->h_contract_terms,
+	     fpc->coin_pub,
+	     &amount_with_fee,
+	     &deposit_fee,
+	     &refund_fee,
+	     exchange_proof);
     GNUNET_PQ_cleanup_result (rs);
   }
-  PQclear (result);
-  return GNUNET_OK;
-
-  GNUNET_break (0);
-  return GNUNET_SYSERR;
 }
 
 
 /**
- * Lookup information about a transfer by @a h_contract_terms.  Note
- * that in theory there could be multiple wire transfers for a
- * single @a h_contract_terms, as the transaction may have involved
- * multiple coins and the coins may be spread over different wire
- * transfers.
+ * Retrieve information about a deposited coin.
  *
  * @param cls closure
- * @param h_contract_terms key for the search
- * @param cb function to call with transfer data
+ * @param h_contract_terms hashcode of the proposal data paid by @a coin_pub
+ * @param merchant_pub merchant's public key.
+ * @param coin_pub coin's public key used for the search
+ * @param cb function to call with payment data
  * @param cb_cls closure for @a cb
- * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
- *         #GNUNET_SYSERR on hard errors
+ * @return transaction status
  */
-static int
-postgres_find_transfers_by_hash (void *cls,
-                                 const struct GNUNET_HashCode *h_contract_terms,
-                                 TALER_MERCHANTDB_TransferCallback cb,
-                                 void *cb_cls)
+static enum GNUNET_DB_QueryStatus
+postgres_find_payments_by_hash_and_coin (void *cls,
+                                         const struct GNUNET_HashCode *h_contract_terms,
+                                         const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                         TALER_MERCHANTDB_CoinDepositCallback cb,
+                                         void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int i;
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_end
   };
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_transfers_by_hash",
-                                    params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
-  {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if (0 == PQntuples (result))
-  {
-    PQclear (result);
-    return GNUNET_NO;
-  }
+  struct FindPaymentsByCoinContext fpc = {
+    .cb = cb,
+    .cb_cls = cb_cls,
+    .h_contract_terms = h_contract_terms,
+    .coin_pub = coin_pub
+  };
+  enum GNUNET_DB_QueryStatus qs;
 
-  for (i=0;i<PQntuples (result);i++)
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+					     "find_deposits_by_hash_and_coin",
+					     params,
+					     &find_payments_by_coin_cb,
+					     &fpc);
+  if (0 >= qs)
+    return qs;
+  return fpc.qs;
+}
+
+
+/**
+ * Closure for #find_transfers_cb().
+ */
+struct FindTransfersContext
+{
+  /**
+   * Function to call on results.
+   */
+  TALER_MERCHANTDB_TransferCallback cb;
+
+  /**
+   * Closure for @e cb.
+   */
+  void *cb_cls;
+
+  /** 
+   * Hash of the contract we are looking under.
+   */
+  const struct GNUNET_HashCode *h_contract_terms;
+  
+  /**
+   * Transaction status (set).
+   */
+  enum GNUNET_DB_QueryStatus qs;
+};
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results.
+ *
+ * @param cls of type `struct FindTransfersContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+find_transfers_cb (void *cls,
+		   PGresult *result,
+		   unsigned int num_results)
+{
+  struct FindTransfersContext *ftc = cls;
+
+  for (unsigned int i=0;i<PQntuples (result);i++)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_WireTransferIdentifierRawP wtid;
@@ -1556,62 +1442,102 @@ postgres_find_transfers_by_hash (void *cls,
                                   i))
     {
       GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
+      ftc->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
-    cb (cb_cls,
-        h_contract_terms,
-        &coin_pub,
-        &wtid,
-        execution_time,
-        proof);
+    ftc->qs = i + 1;
+    ftc->cb (ftc->cb_cls,
+	     ftc->h_contract_terms,
+	     &coin_pub,
+	     &wtid,
+	     execution_time,
+	     proof);
     GNUNET_PQ_cleanup_result (rs);
   }
-  PQclear (result);
-  return GNUNET_OK;
+}
+  
+
+/**
+ * Lookup information about a transfer by @a h_contract_terms.  Note
+ * that in theory there could be multiple wire transfers for a
+ * single @a h_contract_terms, as the transaction may have involved
+ * multiple coins and the coins may be spread over different wire
+ * transfers.
+ *
+ * @param cls closure
+ * @param h_contract_terms key for the search
+ * @param cb function to call with transfer data
+ * @param cb_cls closure for @a cb
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_find_transfers_by_hash (void *cls,
+                                 const struct GNUNET_HashCode *h_contract_terms,
+                                 TALER_MERCHANTDB_TransferCallback cb,
+                                 void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_end
+  };
+  struct FindTransfersContext ftc = {
+    .h_contract_terms = h_contract_terms,
+    .cb = cb,
+    .cb_cls = cb_cls
+  };
+  enum GNUNET_DB_QueryStatus qs;
+  
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+					     "find_transfers_by_hash",
+					     params,
+					     &find_transfers_cb,
+					     &ftc);
+  if (0 >= qs)
+    return qs;
+  return ftc.qs;
 }
 
 
 /**
- * Lookup information about a coin deposits by @a wtid.
- *
- * @param cls closure
- * @param wtid wire transfer identifier to find matching transactions for
- * @param cb function to call with payment data
- * @param cb_cls closure for @a cb
- * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
- *         #GNUNET_SYSERR on hard errors
+ * Closure for #find_deposits_cb().
  */
-static int
-postgres_find_deposits_by_wtid (void *cls,
-                                const struct TALER_WireTransferIdentifierRawP *wtid,
-                                TALER_MERCHANTDB_CoinDepositCallback cb,
-                                void *cb_cls)
+struct FindDepositsContext
 {
-  struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int i;
 
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (wtid),
-    GNUNET_PQ_query_param_end
-  };
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_deposits_by_wtid",
-                                    params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
-  {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if (0 == PQntuples (result))
-  {
-    PQclear (result);
-    return GNUNET_NO;
-  }
+  /**
+   * Function to call for each result.
+   */ 
+  TALER_MERCHANTDB_CoinDepositCallback cb;
 
-  for (i=0;i<PQntuples (result);i++)
+  /**
+   * Closure for @e cb.
+   */
+  void *cb_cls;
+  
+  /**
+   * Transaction status (set).
+   */
+  enum GNUNET_DB_QueryStatus qs;
+};
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results.
+ *
+ * @param cls of type `struct FindDepositsContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+find_deposits_cb (void *cls,
+		  PGresult *result,
+		  unsigned int num_results)
+{
+  struct FindDepositsContext *fdc = cls;
+
+  for (unsigned int i=0;i<PQntuples (result);i++)
   {
     struct GNUNET_HashCode h_contract_terms;
     struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -1619,7 +1545,6 @@ postgres_find_deposits_by_wtid (void *cls,
     struct TALER_Amount deposit_fee;
     struct TALER_Amount refund_fee;
     json_t *exchange_proof;
-
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("h_contract_terms",
                                             &h_contract_terms),
@@ -1642,75 +1567,103 @@ postgres_find_deposits_by_wtid (void *cls,
                                   i))
     {
       GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
+      fdc->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
-    cb (cb_cls,
-        &h_contract_terms,
-        &coin_pub,
-        &amount_with_fee,
-        &deposit_fee,
-        &refund_fee,
-        exchange_proof);
+    fdc->qs = i + 1;
+    fdc->cb (fdc->cb_cls,
+	     &h_contract_terms,
+	     &coin_pub,
+	     &amount_with_fee,
+	     &deposit_fee,
+	     &refund_fee,
+	     exchange_proof);
     GNUNET_PQ_cleanup_result (rs);
   }
-  PQclear (result);
-  return GNUNET_OK;
 }
 
+
 /**
- * Obtain refunds associated with a contract.
+ * Lookup information about a coin deposits by @a wtid.
  *
- * @param cls closure, typically a connection to the db
- * @param merchant_pub public key of the merchant instance
- * @param h_contract_terms hash code of the contract
- * @param rc function to call for each coin on which there is a refund
- * @param rc_cls closure for @a rc
- * @return #GNUNET_OK if we called @a rc on all coins
- *         #GNUNET_NO if there are no refunds for @a h_contract_terms
- *         #GNUNET_SYSERR if there were errors talking to the DB
+ * @param cls closure
+ * @param wtid wire transfer identifier to find matching transactions for
+ * @param cb function to call with payment data
+ * @param cb_cls closure for @a cb
+ * @return transaction status
  */
-int
-postgres_get_refunds_from_contract_terms_hash (void *cls,
-                                               const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                               const struct GNUNET_HashCode *h_contract_terms,
-                                               TALER_MERCHANTDB_RefundCallback rc,
-                                               void *rc_cls)
+static enum GNUNET_DB_QueryStatus
+postgres_find_deposits_by_wtid (void *cls,
+                                const struct TALER_WireTransferIdentifierRawP *wtid,
+                                TALER_MERCHANTDB_CoinDepositCallback cb,
+                                void *cb_cls)
 {
-
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  unsigned int i;
-
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (wtid),
     GNUNET_PQ_query_param_end
   };
+  struct FindDepositsContext fdc = {
+    .cb = cb,
+    .cb_cls = cb_cls
+  };
+  enum GNUNET_DB_QueryStatus qs;
 
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_refunds_from_contract_terms_hash",
-                                    params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
-  {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if (0 == PQntuples (result))
-  {
-    PQclear (result);
-    return GNUNET_NO;
-  }
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+					     "find_deposits_by_wtid",
+					     params,
+					     &find_deposits_cb,
+					     &fdc);
+  if (0 >= qs)
+    return qs;
+  return fdc.qs;
+}
 
-  for (i=0;i<PQntuples (result);i++)
+
+/**
+ * Closure for #get_refunds_cb().
+ */
+struct GetRefundsContext
+{
+  /**
+   * Function to call for each refund.
+   */
+  TALER_MERCHANTDB_RefundCallback rc;
+
+  /**
+   * Closure for @e rc.
+   */ 
+  void *rc_cls;
+
+  /**
+   * Transaction result.
+   */
+  enum GNUNET_DB_QueryStatus qs;
+};
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results.
+ *
+ * @param cls of type `struct GetRefundsContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+get_refunds_cb (void *cls,
+		PGresult *result,
+		unsigned int num_results)
+{
+  struct GetRefundsContext *grc = cls;
+  
+  for (unsigned int i=0;i<num_results;i++)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     uint64_t rtransaction_id;
     struct TALER_Amount refund_amount;
     struct TALER_Amount refund_fee;
     char *reason;
-
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
@@ -1734,20 +1687,57 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
                                   i))
     {
       GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
+      grc->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
-    rc (rc_cls,
-        &coin_pub,
-        rtransaction_id,
-        reason,
-        &refund_amount,
-        &refund_fee);
-
+    grc->rc (grc->rc_cls,
+	     &coin_pub,
+	     rtransaction_id,
+	     reason,
+	     &refund_amount,
+	     &refund_fee);
     GNUNET_PQ_cleanup_result (rs);
   }
-  PQclear (result);
-  return GNUNET_OK;
+}
+
+
+/**
+ * Obtain refunds associated with a contract.
+ *
+ * @param cls closure, typically a connection to the db
+ * @param merchant_pub public key of the merchant instance
+ * @param h_contract_terms hash code of the contract
+ * @param rc function to call for each coin on which there is a refund
+ * @param rc_cls closure for @a rc
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_get_refunds_from_contract_terms_hash (void *cls,
+                                               const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                               const struct GNUNET_HashCode *h_contract_terms,
+                                               TALER_MERCHANTDB_RefundCallback rc,
+                                               void *rc_cls)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_end
+  };
+  struct GetRefundsContext grc = {
+    .rc = rc,
+    .rc_cls = rc_cls
+  };
+  enum GNUNET_DB_QueryStatus qs;
+
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+					     "find_refunds_from_contract_terms_hash",
+					     params,
+					     &get_refunds_cb,
+					     &grc);
+  if (0 >= qs)
+    return qs;
+  return grc.qs;
 }
 
 
@@ -1756,8 +1746,14 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
  */
 struct FindRefundContext
 {
+  /**
+   *
+   */
   struct TALER_Amount refunded_amount;
 
+  /**
+   *
+   */
   int err;
 };
 
@@ -1791,8 +1787,10 @@ process_refund_cb (void *cls,
         GNUNET_PQ_extract_result (result,
                                   rs,
                                   i))
+    {
       ictx->err = GNUNET_SYSERR;
-
+      return;
+    }
     if (GNUNET_SYSERR ==
         TALER_amount_add (&ictx->refunded_amount,
                           &ictx->refunded_amount,
@@ -1801,6 +1799,7 @@ process_refund_cb (void *cls,
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Could not add amounts\n");
       ictx->err = GNUNET_SYSERR;
+      return;
     }
   }
 }
@@ -1865,7 +1864,6 @@ insert_refund (void *cls,
                const struct TALER_Amount *refund_fee)
 {
   struct PostgresClosure *pg = cls;
-  
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
@@ -1959,9 +1957,10 @@ process_deposits_cb (void *cls,
     }
 
     /*How much coin i will give for refund: needed by merchant_refunds table*/
-    if (GNUNET_SYSERR == TALER_amount_subtract (&diff, // to commit as refund
-                                                &amount_with_fee,
-                                                &ictx.refunded_amount))
+    if (GNUNET_SYSERR ==
+	TALER_amount_subtract (&diff, // to commit as refund
+			       &amount_with_fee,
+			       &ictx.refunded_amount))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Could not compute refundable amount out of coin (%s),"
@@ -2003,9 +2002,10 @@ process_deposits_cb (void *cls,
     }
 
     /*Subtract from refund what has already been awarded*/
-    if (GNUNET_SYSERR == TALER_amount_subtract (big,
-                                                big,
-                                                small))
+    if (GNUNET_SYSERR ==
+	TALER_amount_subtract (big,
+			       big,
+			       small))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Could not subtract previous refund amount, attempted operation was:"
@@ -2029,9 +2029,10 @@ process_deposits_cb (void *cls,
       big = &diff;
       small = ctx->refund;
     }
-    if (GNUNET_SYSERR == TALER_amount_subtract (big,
-                                                big,
-                                                small))
+    if (GNUNET_SYSERR ==
+	TALER_amount_subtract (big,
+			       big,
+			       small))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Could not subtract refund amount, attempted operation was:"
@@ -2042,7 +2043,9 @@ process_deposits_cb (void *cls,
 
     /*Always commit the smallest as refund*/
 
-    if ( (0 != small->value) || (0 != small->fraction) )
+    if ( (0 != small->value) ||
+	 (0 != small->fraction) )
+    {
       if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
             insert_refund (ctx->pg,
                            ctx->merchant_pub,
@@ -2051,18 +2054,18 @@ process_deposits_cb (void *cls,
                            ctx->reason,
                            small,
                            &refund_fee))
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Could not commit refund worth %s for coin '%s'"
-                      ", as of contract/reason: %s/%s\n",
-                      TALER_amount_to_string (small),
-                      TALER_B2S (&coin_pub),
-                      GNUNET_h2s (ctx->h_contract_terms),
-                      ctx->reason); 
-          ctx->err = GNUNET_SYSERR;
-          return;    
-        }
-
+      {
+	GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		    "Could not commit refund worth %s for coin '%s'"
+		    ", as of contract/reason: %s/%s\n",
+		    TALER_amount_to_string (small),
+		    TALER_B2S (&coin_pub),
+		    GNUNET_h2s (ctx->h_contract_terms),
+		    ctx->reason); 
+	ctx->err = GNUNET_SYSERR;
+	return;    
+      }
+    }
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Detracting %s as refund, from coin %s\n",
                 TALER_amount_to_string (small),
@@ -2070,7 +2073,6 @@ process_deposits_cb (void *cls,
 
     small->value = 0; 
     small->fraction = 0; 
-
     if ( (0 == ctx->refund->value) &&
          (0 == ctx->refund->fraction) )
     {
@@ -2078,7 +2080,6 @@ process_deposits_cb (void *cls,
                   "All refund amount has been allocated\n");
       break;
     }
-
   }
 
   /**
@@ -2118,14 +2119,12 @@ process_deposits_cb (void *cls,
   ctx->err = GNUNET_OK;
   return;
 
-  rollback:
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed transaction, doing rollback\n");
-    PQclear (result);
-    postgres_rollback (ctx->pg);
-    return;
+ rollback:
+  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+	      "Failed transaction, doing rollback\n");
+  PQclear (result);
+  postgres_rollback (ctx->pg);
 }
-
 
 
 /**
@@ -2138,14 +2137,13 @@ process_deposits_cb (void *cls,
  * @param refund maximum refund to return to the customer for this contract
  * @param reason 0-terminated UTF-8 string giving the reason why the customer
  *               got a refund (free form, business-specific)
- * @return #GNUNET_OK if the refund is accepted
- *         #GNUNET_NO if the refund cannot be issued: this can happen for two
+ * @return transaction status
+ *         #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT if the refund is accepted
+ *         #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if the refund cannot be issued: this can happen for two
  *               reasons: the issued refund is not greater of the previous refund,
  *               or the coins don't have enough amount left to pay for this refund.
- *         #GNUNET_SYSERR on database error, i.e. contract unknown, DB on fire,
- *               (FIXME: distinguish hard/soft? who does retries?)
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_increase_refund_for_contract (void *cls,
                                        const struct GNUNET_HashCode *h_contract_terms,
                                        const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -2154,7 +2152,7 @@ postgres_increase_refund_for_contract (void *cls,
 {
   struct PostgresClosure *pg = cls;
   struct InsertRefundContext ctx;
-  enum GNUNET_DB_QueryStatus ret;
+  enum GNUNET_DB_QueryStatus qs;
   struct TALER_Amount _refund = *refund;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
@@ -2166,44 +2164,43 @@ postgres_increase_refund_for_contract (void *cls,
       postgres_start (cls))
   {
     GNUNET_break (0);
-    return GNUNET_SYSERR;
+    return GNUNET_DB_STATUS_HARD_ERROR;
   }
-
   ctx.pg = pg;
   ctx.err = GNUNET_OK;
   ctx.refund = &_refund;
   ctx.reason = reason;
   ctx.h_contract_terms = h_contract_terms;
   ctx.merchant_pub = merchant_pub;
-
-  ret = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
-                                              "find_deposits",
-                                              params,
-                                              &process_deposits_cb,
-                                              &ctx);
-
-  switch (ret)
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+					     "find_deposits",
+					     params,
+					     &process_deposits_cb,
+					     &ctx);
+  switch (qs)
   {
   case GNUNET_DB_STATUS_SUCCESS_NO_RESULTS:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown contract: %s (merchant_pub: %s), no refund possible\n",
                 GNUNET_h2s (h_contract_terms),
                 TALER_B2S (merchant_pub));
-    return GNUNET_SYSERR;
+    return qs;
   case GNUNET_DB_STATUS_SOFT_ERROR:
-    return GNUNET_SYSERR; /* UGH, BUG #5010! */
+    return qs;
   case GNUNET_DB_STATUS_HARD_ERROR:
-    return GNUNET_SYSERR;
+    return qs;
   default:
     /* Got one or more deposits */
-    if (GNUNET_OK != postgres_commit (cls))
+    qs = postgres_commit (cls);
+    if (0 > qs)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Failed to commit transaction increasing refund\n");
-      return GNUNET_SYSERR;
+      return qs;
     }
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "Committed db transaction\n");
-    return ctx.err;
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+		"Committed db transaction\n");
+    return qs;
   }
 }
 
@@ -2216,10 +2213,9 @@ postgres_increase_refund_for_contract (void *cls,
  * @param wtid wire transfer identifier for the search
  * @param cb function to call with proof data
  * @param cb_cls closure for @a cb
- * @return #GNUNET_OK on success, #GNUNET_NO if transaction Id is unknown,
- *         #GNUNET_SYSERR on hard errors
+ * @return transaction status
  */
-static int
+static enum GNUNET_DB_QueryStatus
 postgres_find_proof_by_wtid (void *cls,
                              const char *exchange_uri,
                              const struct TALER_WireTransferIdentifierRawP *wtid,
@@ -2227,58 +2223,30 @@ postgres_find_proof_by_wtid (void *cls,
                              void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (wtid),
     GNUNET_PQ_query_param_string (exchange_uri),
     GNUNET_PQ_query_param_end
   };
+  json_t *proof;
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_json ("proof",
+			       &proof),
+    GNUNET_PQ_result_spec_end
+  };
+  enum GNUNET_DB_QueryStatus qs;
 
-  result = GNUNET_PQ_exec_prepared (pg->conn,
-                                    "find_proof_by_wtid",
-                                    params);
-  if (PGRES_TUPLES_OK != PQresultStatus (result))
+  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						 "find_proof_by_wtid",
+						 params,
+						 rs);
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
   {
-    BREAK_DB_ERR (result);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  if (0 == PQntuples (result))
-  {
-    PQclear (result);
-    return GNUNET_NO;
-  }
-  if (1 != PQntuples (result))
-  {
-    GNUNET_break (0);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-
-  {
-    json_t *proof;
-    struct GNUNET_PQ_ResultSpec rs[] = {
-      TALER_PQ_result_spec_json ("proof",
-                                 &proof),
-      GNUNET_PQ_result_spec_end
-    };
-
-    if (GNUNET_OK !=
-        GNUNET_PQ_extract_result (result,
-                                  rs,
-                                  0))
-    {
-      GNUNET_break (0);
-      PQclear (result);
-      return GNUNET_SYSERR;
-    }
     cb (cb_cls,
         proof);
     GNUNET_PQ_cleanup_result (rs);
   }
-
-  PQclear (result);
-  return GNUNET_OK;
+  return qs;
 }
 
 
