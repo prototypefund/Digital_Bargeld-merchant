@@ -663,7 +663,7 @@ get_instance (struct json_t *json)
  * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  * (for example, if no "default" instance is defined)
  */
-static unsigned int
+static int
 iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
                    const char *allowed)
 {
@@ -716,14 +716,11 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   return GNUNET_OK;
 
  fail:
-  do {
-    GNUNET_PLUGIN_unload (lib_name,
-                          iic->plugin);
-    GNUNET_free (lib_name);
-    GNUNET_free (iic);
-    GNUNET_SCHEDULER_shutdown ();
-    return GNUNET_SYSERR;
-  } while (0);
+  GNUNET_PLUGIN_unload (lib_name,
+			iic->plugin);
+  GNUNET_free (lib_name);
+  GNUNET_free (iic);
+  return GNUNET_SYSERR;
 }
 
 
@@ -853,8 +850,14 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-  iterate_instances (config,
-                     wireformat);
+  if (GNUNET_OK !=
+      iterate_instances (config,
+			 wireformat))
+  {
+    GNUNET_free (wireformat);
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
   GNUNET_free (wireformat);
 
   if (NULL ==
