@@ -347,7 +347,7 @@ process_wire_fees (void *cls,
     else
       endp->next = af;
     endp = af;
-    // FIXME: also preserve `fees` in backend DB (under wire method + exchange master pub!)
+    // FIXME #4943: also preserve `fees` in backend DB (under wire method + exchange master pub!)
     fees = fees->next;
   }
 }
