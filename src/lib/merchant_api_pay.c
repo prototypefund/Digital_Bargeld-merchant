@@ -29,6 +29,7 @@
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
 #include <taler/taler_exchange_service.h>
+#include "merchant_api_common.h"
 
 
 /**
@@ -150,7 +151,6 @@ check_forbidden (struct TALER_MERCHANT_Pay *ph,
     GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin_pub),
     GNUNET_JSON_spec_end()
   };
-  unsigned int i;
   int ret;
 
   if (GNUNET_OK !=
@@ -161,7 +161,7 @@ check_forbidden (struct TALER_MERCHANT_Pay *ph,
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
   }
-  for (i=0;i<ph->num_coins;i++)
+  for (unsigned int i=0;i<ph->num_coins;i++)
   {
     if (0 == memcmp (&ph->coins[i].coin_pub,
                      &coin_pub,
@@ -479,10 +479,8 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   ph->ctx = ctx;
   ph->cb = pay_cb;
   ph->cb_cls = pay_cb_cls;
-  GNUNET_asprintf (&ph->url,
-                   "%s%s",
-                   merchant_uri,
-                   "/pay");
+  ph->url = MAH_path_to_url_ (merchant_uri,
+			      "/pay");
   ph->num_coins = num_coins;
   ph->coins = GNUNET_new_array (num_coins,
                                 struct TALER_MERCHANT_PaidCoin);

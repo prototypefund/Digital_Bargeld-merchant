@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
+  Copyright (C) 2014-2017 GNUnet e.V. and INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -29,6 +29,7 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
+#include "merchant_api_common.h"
 
 
 /**
@@ -218,11 +219,8 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
   po->ctx = ctx;
   po->cb = proposal_cb;
   po->cb_cls = proposal_cb_cls;
-  GNUNET_asprintf (&po->url,
-                   "%s%s",
-                   backend_uri,
-                   "/proposal");
-
+  po->url = MAH_path_to_url_ (backend_uri,
+			      "/proposal");
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
   eh = curl_easy_init ();
@@ -303,17 +301,20 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
 {
   struct TALER_MERCHANT_ProposalLookupOperation *plo;
   CURL *eh;
+  char *base;
 
   plo = GNUNET_new (struct TALER_MERCHANT_ProposalLookupOperation);
   plo->ctx = ctx;
   plo->cb = plo_cb;
   plo->cb_cls = plo_cb_cls;
-
+  base = MAH_path_to_url_ (backend_uri,
+			   "/proposal");
   GNUNET_asprintf (&plo->url,
-                   "%s/proposal?order_id=%s&instance=%s",
-                   backend_uri,
+                   "%s?order_id=%s&instance=%s",
+                   base,
                    order_id,
                    instance);
+  GNUNET_free (base);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,

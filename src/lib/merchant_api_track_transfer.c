@@ -30,6 +30,7 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
+#include "merchant_api_common.h"
 
 
 /**
@@ -234,6 +235,7 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   struct TALER_MERCHANT_TrackTransferHandle *tdo;
   CURL *eh;
   char *wtid_str;
+  char *base;
 
   wtid_str = GNUNET_STRINGS_data_to_string_alloc (wtid,
                                                   sizeof (struct TALER_WireTransferIdentifierRawP));
@@ -242,12 +244,15 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   tdo->cb = track_transfer_cb; // very last to be called
   tdo->cb_cls = track_transfer_cb_cls;
   /* TODO: do we need to escape 'exchange_uri' here? */
+  base = MAH_path_to_url_ (backend_uri,
+			   "/track/transfer");
   GNUNET_asprintf (&tdo->url,
-                   "%s/track/transfer?wtid=%s&exchange=%s&instance=%s",
-                   backend_uri,
+                   "%s?wtid=%s&exchange=%s&instance=%s",
+                   base,
                    wtid_str,
                    exchange_uri,
 		   instance);
+  GNUNET_free (base);
   GNUNET_free (wtid_str);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
