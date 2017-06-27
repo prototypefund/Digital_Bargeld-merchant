@@ -616,7 +616,7 @@ run (void *cls)
                                                 &right_second_refund_amount,
                                                 "right refund increase"));
 
-  FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
+  FAILIF (GNUNET_DB_STATUS_HARD_ERROR != 
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
                                                 &merchant_pub,

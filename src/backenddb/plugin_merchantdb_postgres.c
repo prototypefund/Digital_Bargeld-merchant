@@ -342,7 +342,7 @@ postgres_initialize (void *cls)
                             3),
     GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
                             "SELECT"
-			    "coin_pub"
+			    " coin_pub"
 			    ",rtransaction_id"
 			    ",refund_amount_val"
 			    ",refund_amount_frac"
@@ -1757,7 +1757,7 @@ process_refund_cb (void *cls,
 
   for (unsigned int i=0; i<num_results; i++)
   {
-    /*Sum up refund*/
+    /* Sum up existing refunds */
     struct TALER_Amount acc;
     struct GNUNET_PQ_ResultSpec rs[] = {
       TALER_PQ_result_spec_amount ("refund_amount",
@@ -1770,6 +1770,7 @@ process_refund_cb (void *cls,
                                   rs,
                                   i))
     {
+      GNUNET_break (0);
       ictx->err = GNUNET_SYSERR;
       return;
     }
@@ -1778,11 +1779,13 @@ process_refund_cb (void *cls,
                           &ictx->refunded_amount,
                           &acc))
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Could not add amounts\n");
+      GNUNET_break (0);
       ictx->err = GNUNET_SYSERR;
       return;
     }
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Found refund of %s\n",
+                TALER_amount2s (&acc));
   }
 }
 
@@ -1800,7 +1803,7 @@ struct InsertRefundContext
   /**
    * Amount to which increase the refund for this contract
    */
-  struct TALER_Amount *refund;
+  const struct TALER_Amount *refund;
 
   /**
    * Merchant instance public key
@@ -1833,16 +1836,12 @@ struct InsertRefundContext
  * @param num_result the number of results in @a result
  */
 static void
-process_deposits_cb (void *cls,
-                     PGresult *result,
-                     unsigned int num_results)
+process_deposits_for_refund_cb (void *cls,
+				PGresult *result,
+				unsigned int num_results)
 {
   struct InsertRefundContext *ctx = cls;
   struct TALER_Amount previous_refund;
-  struct TALER_Amount diff;
-  struct TALER_Amount attempted_refund = *ctx->refund;
-  struct TALER_Amount *big;
-  struct TALER_Amount *small;
 
   TALER_amount_get_zero (ctx->refund->currency,
                          &previous_refund);
@@ -1867,6 +1866,9 @@ process_deposits_cb (void *cls,
                                    &refund_fee),
       GNUNET_PQ_result_spec_end
     };
+    struct TALER_Amount left;
+    struct TALER_Amount remaining_refund;
+    const struct TALER_Amount *increment;
 
     if (GNUNET_OK !=
         GNUNET_PQ_extract_result (result,
@@ -1879,9 +1881,9 @@ process_deposits_cb (void *cls,
     }
 
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Processing refund for coin %s, deposited %s from it\n",
+                "Processing refund for coin %s, deposit value was %s\n",
                 TALER_B2S (&coin_pub),
-                TALER_amount_to_string (&amount_with_fee));
+                TALER_amount2s (&amount_with_fee));
     TALER_amount_get_zero (amount_with_fee.currency,
                            &ictx.refunded_amount);
     ictx.err = GNUNET_OK; /* no error so far */
@@ -1902,23 +1904,15 @@ process_deposits_cb (void *cls,
       ctx->qs = GNUNET_DB_STATUS_SOFT_ERROR;
       return;
     }
-
-    /* How much coin i will give for refund: needed by
-       merchant_refunds table*/
-    if (GNUNET_SYSERR ==
-	TALER_amount_subtract (&diff, 
-			       &amount_with_fee,
-			       &ictx.refunded_amount))
-    {
-      GNUNET_break (0);
-      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
-      return;
-    }
-
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Processing refund for coin %s total up to %s\n",
+                TALER_B2S (&coin_pub),
+                TALER_amount2s (&ictx.refunded_amount));
+    
     /**
-     * Sum coin's i contribution for refunding to the total (previously awarded)
-     * refund.  If this value will exceed the current awarded refund, we'll return
-     * GNUNET_NO
+     * Sum coin's contribution for refunding to the total (previously
+     * awarded) refund.  If this value will exceed the current awarded
+     * refund, we'll return #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS.
      */
     if (GNUNET_SYSERR ==
 	TALER_amount_add (&previous_refund,
@@ -1930,55 +1924,84 @@ process_deposits_cb (void *cls,
       return;
     }
 
-    big = ctx->refund;
-    small = &ictx.refunded_amount;
-    if (-1 == TALER_amount_cmp (big, small))
+    if (0 >= TALER_amount_cmp (ctx->refund,
+			       &previous_refund))
     {
-      big = &ictx.refunded_amount;
-      small = ctx->refund;
+      /* refund <= refunded_amount; nothing to do! */ 
+      ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
+      return;
     }
 
-    /* Subtract from refund what has already been awarded */
+    /* How much of the coin is left after the existing refunds? */
     if (GNUNET_SYSERR ==
-	TALER_amount_subtract (big,
-			       big,
-			       small))
+	TALER_amount_subtract (&left, 
+			       &amount_with_fee,
+			       &ictx.refunded_amount))
     {
       GNUNET_break (0);
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
 
-    /**
-     * Only useful if small is refund, harmless if it is not.
-     * It makes us avoid one 'if' statement.
-     */
-    small->value = 0; 
-    small->fraction = 0; 
-
-    big = ctx->refund;
-    small = &diff;
-
-    if (-1 == TALER_amount_cmp (big,
-				small))
+    if ( (0 == left.value) &&
+	 (0 == left.fraction) )
     {
-      big = &diff;
-      small = ctx->refund;
+      /* coin was fully refunded, move to next coin */
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+		  "Coin %s fully refunded, moving to next coin\n",
+		  TALER_B2S (&coin_pub));
+      continue;
     }
+
+    /* How much of the refund is left? */
     if (GNUNET_SYSERR ==
-	TALER_amount_subtract (big,
-			       big,
-			       small))
+	TALER_amount_subtract (&remaining_refund, 
+			       ctx->refund,
+			       &previous_refund))
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Could not subtract refund amount, attempted operation was:"
-                  " %s - %s\n",
-                  TALER_amount_to_string (big),
-                  TALER_amount_to_string (small));
+      GNUNET_break (0);
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
 
-    /*Always commit the smallest as refund*/
+    /* By how much will we increase the refund for this coin? */
+    if (0 >= TALER_amount_cmp (&remaining_refund,
+			       &left))
+    {
+      /* remaining_refund <= left */
+      increment = &remaining_refund;
+    }
+    else
+    {
+      increment = &left;
+    }
+    
+    if (GNUNET_SYSERR ==
+	TALER_amount_add (&previous_refund,
+			  &previous_refund,
+			  increment))
+    {
+      GNUNET_break (0);
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
+    }
+    
+    /* Subtract from refund what has already been awarded */
+    if (GNUNET_SYSERR ==
+	TALER_amount_subtract (&remaining_refund,
+			       ctx->refund,
+			       &ictx.refunded_amount))
+    {
+      GNUNET_break (0);
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
+    }
 
-    if ( (0 != small->value) ||
-	 (0 != small->fraction) )
+    /* actually run the refund */
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+		"Coin %s refund will be incremented by %s\n",
+		TALER_B2S (&coin_pub),
+		TALER_amount2s (increment));
     {
       enum GNUNET_DB_QueryStatus qs;
       
@@ -1988,64 +2011,31 @@ process_deposits_cb (void *cls,
 			       ctx->h_contract_terms,
 			       &coin_pub,
 			       ctx->reason,
-			       small,
+			       increment,
 			       &refund_fee)))
       {
 	GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
 	ctx->qs = qs;
 	return;    
       }
-    }
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Detracting %s as refund, from coin %s\n",
-                TALER_amount_to_string (small),
-                TALER_B2S (&coin_pub));
-
-    small->value = 0; 
-    small->fraction = 0; 
-    if ( (0 == ctx->refund->value) &&
-         (0 == ctx->refund->fraction) )
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "All refund amount has been allocated\n");
-      break;
+      
+      /* stop immediately if we are done */
+      if (0 == TALER_amount_cmp (ctx->refund,
+				 &previous_refund))
+	return;
     }
   }
 
   /**
-   * Check if the refund is bigger than the previous awarded.
-   */
-  if (2 != (1 + TALER_amount_cmp (&attempted_refund,
-                                  &previous_refund)))
-  {
-
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Attempted refund lesser than the previous"
-                "awarded one. %s vs %s\n",
-                TALER_amount_to_string (&attempted_refund),
-                TALER_amount_to_string (&previous_refund));
-    ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
-    return;  
-  }
-
-  /**
-   * Check if all the refund has been allocated
-   */
-  if ( (0 != ctx->refund->value) ||
-       (0 != ctx->refund->fraction) )
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "This refund is bigger than the coins capacity\n");
-    ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
-    return;
-  }
-
-  /**
-   * FIXME: We should check if all the refund has been covered.
+   * We end up here if nto all of the refund has been covered.
    * Although this should be checked as the business should never
    * issue a refund bigger than the contract's actual price, we cannot
    * rely upon the frontend being correct.
    */
+  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+	      "The refund of %s is bigger than the order's value\n",
+	      TALER_amount2s (ctx->refund));
+  ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
 }
 
 
@@ -2075,7 +2065,6 @@ postgres_increase_refund_for_contract (void *cls,
   struct PostgresClosure *pg = cls;
   struct InsertRefundContext ctx;
   enum GNUNET_DB_QueryStatus qs;
-  struct TALER_Amount _refund = *refund;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -2090,14 +2079,14 @@ postgres_increase_refund_for_contract (void *cls,
   }
   ctx.pg = pg;
   ctx.qs = GNUNET_DB_STATUS_SUCCESS_ONE_RESULT;
-  ctx.refund = &_refund;
+  ctx.refund = refund;
   ctx.reason = reason;
   ctx.h_contract_terms = h_contract_terms;
   ctx.merchant_pub = merchant_pub;
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     "find_deposits",
 					     params,
-					     &process_deposits_cb,
+					     &process_deposits_for_refund_cb,
 					     &ctx);
   switch (qs)
   {
@@ -2117,7 +2106,7 @@ postgres_increase_refund_for_contract (void *cls,
     if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != ctx.qs)
     {
       postgres_rollback (cls);
-      return qs;
+      return ctx.qs;
     }
     qs = postgres_commit (cls);
     if (0 > qs)
@@ -2128,7 +2117,7 @@ postgres_increase_refund_for_contract (void *cls,
     }
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 		"Committed refund transaction\n");
-    return qs;
+    return ctx.qs;
   }
 }
 
