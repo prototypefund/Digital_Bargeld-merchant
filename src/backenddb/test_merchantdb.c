@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA
+  (C) 2014-2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -188,7 +188,6 @@ static json_t *contract_terms;
 static json_t *contract_terms_future;
 
 
-
 /**
  * Function called with information about a transaction.
  *
@@ -229,6 +228,7 @@ transaction_cb (void *cls,
                                 &amount_with_fee));
 }
 
+
 /**
  * Function called with information about a refund.
  *
@@ -239,17 +239,19 @@ transaction_cb (void *cls,
  * @param refund_amount refund amount which is being taken from coin_pub
  * @param refund_fee cost of this refund operation
  */
-void
-refund_cb(void *cls,
-          const struct TALER_CoinSpendPublicKeyP *coin_pub,
-          uint64_t rtransaction_id,
-          const char *reason,
-          const struct TALER_Amount *refund_amount,
-          const struct TALER_Amount *refund_fee)
+static void
+refund_cb (void *cls,
+	   const struct TALER_CoinSpendPublicKeyP *coin_pub,
+	   uint64_t rtransaction_id,
+	   const char *reason,
+	   const struct TALER_Amount *refund_amount,
+	   const struct TALER_Amount *refund_fee)
 {
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "refund_cb\n");
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+	      "refund_cb\n");
   /* FIXME, more logic here? */
 }
+
 
 /**
  * Callback for `find_contract_terms_by_date`.
@@ -267,6 +269,7 @@ pd_cb (void *cls,
 {
   return;
 }
+
 
 /**
  * Function called with information about a coin that was deposited.
@@ -452,7 +455,7 @@ run (void *cls)
   TALER_JSON_hash (contract_terms,
                    &h_contract_terms);
 
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->insert_contract_terms (plugin->cls,
 					 order_id,
 					 &merchant_pub,
@@ -461,20 +464,20 @@ run (void *cls)
 
   json_t *out;
 
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_contract_terms (plugin->cls,
 				       &out,
 				       order_id,
 				       &merchant_pub));
 
-  FAILIF (GNUNET_OK !=
-          plugin->find_contract_terms_history (plugin->cls,
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+	  plugin->find_contract_terms_history (plugin->cls,
 					       order_id,
 					       &merchant_pub,
 					       &pd_cb,
 					       NULL));
 
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_contract_terms_from_hash (plugin->cls,
 						 &out,
 						 &h_contract_terms,
@@ -491,7 +494,7 @@ run (void *cls)
   timestamp = GNUNET_TIME_absolute_get ();
   GNUNET_TIME_round_abs (&timestamp);
 
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->insert_contract_terms (plugin->cls,
 					 order_id_future,
 					 &merchant_pub,
@@ -518,7 +521,7 @@ run (void *cls)
 					       &pd_cb,
 					       NULL));
 
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->store_transaction (plugin->cls,
                                      &h_contract_terms,
 				     &merchant_pub,
@@ -527,7 +530,7 @@ run (void *cls)
                                      timestamp,
                                      refund_deadline,
                                      &amount_with_fee));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->store_deposit (plugin->cls,
                                  &h_contract_terms,
 				 &merchant_pub,
@@ -537,61 +540,61 @@ run (void *cls)
                                  &refund_fee,
                                  &signkey_pub,
                                  deposit_proof));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->store_coin_to_transfer (plugin->cls,
                                           &h_contract_terms,
                                           &coin_pub,
                                           &wtid));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->store_transfer_to_proof (plugin->cls,
                                            EXCHANGE_URI,
                                            &wtid,
                                            GNUNET_TIME_UNIT_ZERO_ABS,
                                            &signkey_pub,
                                            transfer_proof));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_transaction (plugin->cls,
                                     &h_contract_terms,
 				    &merchant_pub,
                                     &transaction_cb,
                                     NULL));
 
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_payments (plugin->cls,
                                  &h_contract_terms,
                                  &merchant_pub,
                                  &deposit_cb,
                                  NULL));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_transfers_by_hash (plugin->cls,
                                           &h_contract_terms,
                                           &transfer_cb,
                                           NULL));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_deposits_by_wtid (plugin->cls,
                                          &wtid,
                                          &deposit_cb,
                                          NULL));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_proof_by_wtid (plugin->cls,
                                       EXCHANGE_URI,
                                       &wtid,
                                       &proof_cb,
                                       NULL));
-  FAILIF (GNUNET_NO !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
           plugin->get_refunds_from_contract_terms_hash (plugin->cls,
                                                         &merchant_pub,
                                                         &h_contract_terms,
                                                         &refund_cb,
                                                         NULL));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
                                                 &merchant_pub,
                                                 &refund_amount,
                                                 "refund testing"));
 
-  FAILIF (GNUNET_NO !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
                                                 &merchant_pub,
@@ -600,20 +603,20 @@ run (void *cls)
                                                 "the previous one, should fail"));
 
   /*Should fail as this refund a lesser amount respect to the previous one*/
-  FAILIF (GNUNET_NO !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
                                                 &merchant_pub,
                                                 &little_refund_amount,
                                                 "make refund testing fail"));
-  FAILIF (GNUNET_OK !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
                                                 &merchant_pub,
                                                 &right_second_refund_amount,
                                                 "right refund increase"));
 
-  FAILIF (GNUNET_NO !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
                                                 &merchant_pub,
@@ -625,7 +628,8 @@ run (void *cls)
     result = 0;
 
  drop:
-  GNUNET_break (GNUNET_OK == plugin->drop_tables (plugin->cls));
+  GNUNET_break (GNUNET_OK ==
+		plugin->drop_tables (plugin->cls));
   TALER_MERCHANTDB_plugin_unload (plugin);
   plugin = NULL;
   if (NULL != deposit_proof)
