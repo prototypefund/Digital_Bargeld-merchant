@@ -254,13 +254,13 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*find_contract_terms_by_date_and_range) (void *cls,
-                                           struct GNUNET_TIME_Absolute date,
-                                           const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                           unsigned int start,
-                                           unsigned int nrows,
-                                           unsigned int future,
-                                           TALER_MERCHANTDB_ProposalDataCallback cb,
-                                           void *cb_cls);
+					    struct GNUNET_TIME_Absolute date,
+					    const struct TALER_MerchantPublicKeyP *merchant_pub,
+					    uint64_t start,
+					    uint64_t nrows,
+					    int future,
+					    TALER_MERCHANTDB_ProposalDataCallback cb,
+					    void *cb_cls);
 
   /**
    * Lookup for a proposal, respecting the signature used by the
@@ -296,11 +296,11 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*find_contract_terms_by_date) (void *cls,
-                                 struct GNUNET_TIME_Absolute date,
-                                 const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                 unsigned int nrows,
-                                 TALER_MERCHANTDB_ProposalDataCallback cb,
-                                 void *cb_cls);
+				  struct GNUNET_TIME_Absolute date,
+				  const struct TALER_MerchantPublicKeyP *merchant_pub,
+				  uint64_t nrows,
+				  TALER_MERCHANTDB_ProposalDataCallback cb,
+				  void *cb_cls);
 
 
   /**

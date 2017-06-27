@@ -341,7 +341,17 @@ postgres_initialize (void *cls)
                             " LIMIT $3",
                             3),
     GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
-                            "SELECT * FROM merchant_refunds"
+                            "SELECT"
+			    "coin_pub"
+			    ",rtransaction_id"
+			    ",refund_amount_val"
+			    ",refund_amount_frac"
+			    ",refund_amount_curr"
+			    ",refund_fee_val"
+			    ",refund_fee_frac"
+			    ",refund_fee_curr"
+			    ",reason"
+			    " FROM merchant_refunds"
                             " WHERE merchant_pub=$1"
                             " AND h_contract_terms=$2",
                             2),
@@ -899,22 +909,20 @@ find_contracts_cb (void *cls,
  */
 static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms_by_date_and_range (void *cls,
-                                               struct GNUNET_TIME_Absolute date,
-                                               const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                               unsigned int start,
-                                               unsigned int nrows,
-                                               unsigned int future,
-                                               TALER_MERCHANTDB_ProposalDataCallback cb,
-                                               void *cb_cls)
+						struct GNUNET_TIME_Absolute date,
+						const struct TALER_MerchantPublicKeyP *merchant_pub,
+						uint64_t start,
+						uint64_t nrows,
+						int future,
+						TALER_MERCHANTDB_ProposalDataCallback cb,
+						void *cb_cls)
 {
-  uint64_t s64 = start;
-  uint64_t r64 = nrows;
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_uint64 (&s64),
-    GNUNET_PQ_query_param_uint64 (&r64),
+    GNUNET_PQ_query_param_uint64 (&start),
+    GNUNET_PQ_query_param_uint64 (&nrows),
     GNUNET_PQ_query_param_end
   };
   const char *stmt;
@@ -956,16 +964,15 @@ static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms_by_date (void *cls,
 				      struct GNUNET_TIME_Absolute date,
 				      const struct TALER_MerchantPublicKeyP *merchant_pub,
-				      unsigned int nrows,
+				      uint64_t nrows,
 				      TALER_MERCHANTDB_ProposalDataCallback cb,
 				      void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
-  uint64_t r64 = nrows;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_uint64 (&r64),
+    GNUNET_PQ_query_param_uint64 (&nrows),
     GNUNET_PQ_query_param_end
   };
   enum GNUNET_DB_QueryStatus qs;
@@ -1611,9 +1618,6 @@ get_refunds_cb (void *cls,
                                     &rtransaction_id),
       TALER_PQ_result_spec_amount ("refund_amount",
                                    &refund_amount),
-      /**
-       * BUGGY: this column is not in that table.
-       */
       TALER_PQ_result_spec_amount ("refund_fee",
                                    &refund_fee),
       GNUNET_PQ_result_spec_string ("reason",
