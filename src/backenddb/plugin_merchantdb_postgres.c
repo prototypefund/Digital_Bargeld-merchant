@@ -1798,11 +1798,6 @@ struct InsertRefundContext
   struct PostgresClosure *pg;
 
   /**
-   * Return code for the caller: GNUNET_NO, GNUNET_OK, GNUNET_SYSERR
-   */
-  int err;
-
-  /**
    * Amount to which increase the refund for this contract
    */
   struct TALER_Amount *refund;
@@ -1821,6 +1816,11 @@ struct InsertRefundContext
    * Human-readable reason behind this refund
    */
   const char *reason;
+
+  /**
+   * Transaction status code.
+   */
+  enum GNUNET_DB_QueryStatus qs;
 };
 
 
@@ -1874,7 +1874,7 @@ process_deposits_cb (void *cls,
                                   i))
     {
       GNUNET_break (0);
-      ctx->err = GNUNET_SYSERR;
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
       return;
     }
 
@@ -1892,29 +1892,27 @@ process_deposits_cb (void *cls,
                                                  &ictx);
     if ( (GNUNET_OK != ictx.err) ||
          (GNUNET_DB_STATUS_HARD_ERROR == ires) )
-    {
-      ctx->err = GNUNET_SYSERR;
-      goto rollback;
+    { 
+      GNUNET_break (0);
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
     if (GNUNET_DB_STATUS_SOFT_ERROR == ires)
-    { ctx->err = GNUNET_SYSERR;
-      goto rollback; // FIXME: #5010: actually rollback + retry!
+    {
+      ctx->qs = GNUNET_DB_STATUS_SOFT_ERROR;
+      return;
     }
 
-    /*How much coin i will give for refund: needed by merchant_refunds table*/
+    /* How much coin i will give for refund: needed by
+       merchant_refunds table*/
     if (GNUNET_SYSERR ==
-	TALER_amount_subtract (&diff, // to commit as refund
+	TALER_amount_subtract (&diff, 
 			       &amount_with_fee,
 			       &ictx.refunded_amount))
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Could not compute refundable amount out of coin (%s),"
-                  " attempted subtraction: %s - %s\n",
-                  TALER_B2S (&coin_pub),
-                  TALER_amount_to_string (&amount_with_fee),
-                  TALER_amount_to_string (&ictx.refunded_amount));
-      ctx->err = GNUNET_SYSERR;
-      goto rollback;
+      GNUNET_break (0);
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
 
     /**
@@ -1922,41 +1920,31 @@ process_deposits_cb (void *cls,
      * refund.  If this value will exceed the current awarded refund, we'll return
      * GNUNET_NO
      */
-    if (GNUNET_SYSERR == TALER_amount_add (&previous_refund,
-                                           &previous_refund,
-                                           &ictx.refunded_amount))
+    if (GNUNET_SYSERR ==
+	TALER_amount_add (&previous_refund,
+			  &previous_refund,
+			  &ictx.refunded_amount))
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Could not compute sum of previous refunds for coin (%s),"
-                  " attempted sum: %s - %s\n",
-                  TALER_B2S (&coin_pub),
-                  TALER_amount_to_string (&previous_refund),
-                  TALER_amount_to_string (&ictx.refunded_amount));
-      ctx->err = GNUNET_SYSERR;
-      goto rollback;
+      GNUNET_break (0);
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
     }
-
 
     big = ctx->refund;
     small = &ictx.refunded_amount;
-
     if (-1 == TALER_amount_cmp (big, small))
     {
       big = &ictx.refunded_amount;
       small = ctx->refund;
     }
 
-    /*Subtract from refund what has already been awarded*/
+    /* Subtract from refund what has already been awarded */
     if (GNUNET_SYSERR ==
 	TALER_amount_subtract (big,
 			       big,
 			       small))
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Could not subtract previous refund amount, attempted operation was:"
-                  " %s - %s\n",
-                  TALER_amount_to_string (big),
-                  TALER_amount_to_string (small));
+      GNUNET_break (0);
     }
 
     /**
@@ -1969,7 +1957,8 @@ process_deposits_cb (void *cls,
     big = ctx->refund;
     small = &diff;
 
-    if (-1 == TALER_amount_cmp (big, small))
+    if (-1 == TALER_amount_cmp (big,
+				small))
     {
       big = &diff;
       small = ctx->refund;
@@ -1991,23 +1980,19 @@ process_deposits_cb (void *cls,
     if ( (0 != small->value) ||
 	 (0 != small->fraction) )
     {
+      enum GNUNET_DB_QueryStatus qs;
+      
       if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-            insert_refund (ctx->pg,
-                           ctx->merchant_pub,
-                           ctx->h_contract_terms,
-                           &coin_pub,
-                           ctx->reason,
-                           small,
-                           &refund_fee))
+	  (qs = insert_refund (ctx->pg,
+			       ctx->merchant_pub,
+			       ctx->h_contract_terms,
+			       &coin_pub,
+			       ctx->reason,
+			       small,
+			       &refund_fee)))
       {
-	GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		    "Could not commit refund worth %s for coin '%s'"
-		    ", as of contract/reason: %s/%s\n",
-		    TALER_amount_to_string (small),
-		    TALER_B2S (&coin_pub),
-		    GNUNET_h2s (ctx->h_contract_terms),
-		    ctx->reason); 
-	ctx->err = GNUNET_SYSERR;
+	GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
+	ctx->qs = qs;
 	return;    
       }
     }
@@ -2039,7 +2024,7 @@ process_deposits_cb (void *cls,
                 "awarded one. %s vs %s\n",
                 TALER_amount_to_string (&attempted_refund),
                 TALER_amount_to_string (&previous_refund));
-    ctx->err = GNUNET_NO;
+    ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
     return;  
   }
 
@@ -2051,24 +2036,16 @@ process_deposits_cb (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "This refund is bigger than the coins capacity\n");
-    ctx->err = GNUNET_NO;
+    ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
     return;
   }
 
   /**
-   * NOTE: we don't check if all the refund has been covered.
-   * Although this should be checked, it's safe to assume yes,
-   * as the business will never issue a refund bigger than the
-   * contract's actual price.
+   * FIXME: We should check if all the refund has been covered.
+   * Although this should be checked as the business should never
+   * issue a refund bigger than the contract's actual price, we cannot
+   * rely upon the frontend being correct.
    */
-  ctx->err = GNUNET_OK;
-  return;
-
- rollback:
-  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-	      "Failed transaction, doing rollback\n");
-  PQclear (result);
-  postgres_rollback (ctx->pg);
 }
 
 
@@ -2112,7 +2089,7 @@ postgres_increase_refund_for_contract (void *cls,
     return GNUNET_DB_STATUS_HARD_ERROR;
   }
   ctx.pg = pg;
-  ctx.err = GNUNET_OK;
+  ctx.qs = GNUNET_DB_STATUS_SUCCESS_ONE_RESULT;
   ctx.refund = &_refund;
   ctx.reason = reason;
   ctx.h_contract_terms = h_contract_terms;
@@ -2129,13 +2106,19 @@ postgres_increase_refund_for_contract (void *cls,
                 "Unknown contract: %s (merchant_pub: %s), no refund possible\n",
                 GNUNET_h2s (h_contract_terms),
                 TALER_B2S (merchant_pub));
+    postgres_rollback (cls);
     return qs;
   case GNUNET_DB_STATUS_SOFT_ERROR:
-    return qs;
   case GNUNET_DB_STATUS_HARD_ERROR:
+    postgres_rollback (cls);
     return qs;
   default:
     /* Got one or more deposits */
+    if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != ctx.qs)
+    {
+      postgres_rollback (cls);
+      return qs;
+    }
     qs = postgres_commit (cls);
     if (0 > qs)
     {
@@ -2144,7 +2127,7 @@ postgres_increase_refund_for_contract (void *cls,
       return qs;
     }
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		"Committed db transaction\n");
+		"Committed refund transaction\n");
     return qs;
   }
 }
