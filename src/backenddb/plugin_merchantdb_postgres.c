@@ -1686,17 +1686,55 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
 
 
 /**
+ * Insert a refund row into merchant_refunds.  Not meant to be exported
+ * in the db API.
+ *
+ * @param cls closure, tipically a connection to the db
+ * @param merchant_pub merchant instance public key
+ * @param h_contract_terms hashcode of the contract related to this refund
+ * @param coin_pub public key of the coin giving the (part of) refund
+ * @param reason human readable explaination behind the refund
+ * @param refund how much this coin is refunding
+ * @param refund_fee refund fee for this coin
+ */
+enum GNUNET_DB_QueryStatus
+insert_refund (void *cls,
+               const struct TALER_MerchantPublicKeyP *merchant_pub,
+               const struct GNUNET_HashCode *h_contract_terms,
+               const struct TALER_CoinSpendPublicKeyP *coin_pub,
+               const char *reason,
+               const struct TALER_Amount *refund,
+               const struct TALER_Amount *refund_fee)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (coin_pub),
+    GNUNET_PQ_query_param_string (reason),
+    TALER_PQ_query_param_amount (refund),
+    TALER_PQ_query_param_amount (refund_fee),
+    GNUNET_PQ_query_param_end
+  };
+  
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_refund",
+                                             params);
+}
+
+
+/**
  * Closure for #process_refund_cb.
  */
 struct FindRefundContext
 {
   /**
-   *
+   * Updated to reflect total amount refunded so far.
    */
   struct TALER_Amount refunded_amount;
 
   /**
-   *
+   * Set to #GNUNET_SYSERR on hard errors.
    */
   int err;
 };
@@ -1785,43 +1823,6 @@ struct InsertRefundContext
   const char *reason;
 };
 
-
-/**
- * Insert a refund row into merchant_refunds.  Not meant to be exported
- * in the db API.
- *
- * @param cls closure, tipically a connection to the db
- * @param merchant_pub merchant instance public key
- * @param h_contract_terms hashcode of the contract related to this refund
- * @param coin_pub public key of the coin giving the (part of) refund
- * @param reason human readable explaination behind the refund
- * @param refund how much this coin is refunding
- * @param refund_fee refund fee for this coin
- */
-enum GNUNET_DB_QueryStatus
-insert_refund (void *cls,
-               const struct TALER_MerchantPublicKeyP *merchant_pub,
-               const struct GNUNET_HashCode *h_contract_terms,
-               const struct TALER_CoinSpendPublicKeyP *coin_pub,
-               const char *reason,
-               const struct TALER_Amount *refund,
-               const struct TALER_Amount *refund_fee)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
-    GNUNET_PQ_query_param_auto_from_type (coin_pub),
-    GNUNET_PQ_query_param_string (reason),
-    TALER_PQ_query_param_amount (refund),
-    TALER_PQ_query_param_amount (refund_fee),
-    GNUNET_PQ_query_param_end
-  };
-  
-  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
-                                             "insert_refund",
-                                             params);
-}
 
 /**
  * Function to be called with the results of a SELECT statement
