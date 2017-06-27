@@ -43,66 +43,6 @@ struct PostgresClosure
 
 };
 
-/**
- * Error code returned by Postgres for deadlock.
- * FIXME: no threads, really needed?
- */
-#define PQ_DIAG_SQLSTATE_DEADLOCK "40P01"
-
-/**
- * Error code returned by Postgres on serialization failure.
- */
-#define PQ_DIAG_SQLSTATE_SERIALIZATION_FAILURE "40001"
-
-/**
- * Extract error code.
- *
- * @param res postgres result object with error details
- */
-#define EXTRACT_DB_ERROR(res)                                         \
-  PQresultErrorField(res, PG_DIAG_SQLSTATE)
-
-/**
- * Log a query error.
- *
- * @param result PQ result object of the query that failed
- * @param conn SQL connection that was used
- */
-#define QUERY_ERR(result,conn)                         \
-  GNUNET_log (GNUNET_ERROR_TYPE_WARNING,             \
-              "Query failed at %s:%u: %s/%s/%s/%s/%s\n", \
-              __FILE__, __LINE__, \
-              PQresultErrorField (result, PG_DIAG_MESSAGE_PRIMARY), \
-              PQresultErrorField (result, PG_DIAG_MESSAGE_DETAIL), \
-              PQresultErrorMessage (result), \
-              PQresStatus (PQresultStatus (result)), \
-              PQerrorMessage (conn));
-
-/**
- * Log error from PostGres.
- *
- * @param kind log level to use
- * @param cmd command that failed
- * @param res postgres result object with error details
- */
-#define PQSQL_strerror(kind, cmd, res)                                \
-  GNUNET_log_from (kind, "merchantdb-postgres",                       \
-                   "SQL %s failed at %s:%u with error: %s",           \
-                   cmd, __FILE__, __LINE__, PQresultErrorMessage (res));
-
-
-/**
- * Log a really unexpected PQ error.
- *
- * @param result PQ result object of the PQ operation that failed
- */
-#define BREAK_DB_ERR(result) do {               \
-    GNUNET_break (0);                           \
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,        \
-                "Database failure: %s\n",       \
-                PQresultErrorMessage (result)); \
-  } while (0)
-
 
 /**
  * Drop merchant tables
