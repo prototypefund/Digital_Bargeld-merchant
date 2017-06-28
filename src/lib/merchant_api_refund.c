@@ -263,7 +263,6 @@ handle_refund_lookup_finished (void *cls,
 {
   struct TALER_MERCHANT_RefundLookupOperation *rlo = cls;
   char *error;
-  char *hint;
   enum TALER_ErrorCode code;
 
   rlo->job = NULL;
@@ -290,8 +289,7 @@ handle_refund_lookup_finished (void *cls,
     json_unpack ((json_t *) json,
                  "{s:s, s:I, s:s}",
                  "error", &error,
-                 "code", &code,
-                 "hint", &hint);
+                 "code", &code);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed GET /refund, error: %s, code: %d, hint: %s\n",
                 error,
