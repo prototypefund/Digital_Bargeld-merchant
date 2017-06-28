@@ -291,10 +291,9 @@ handle_refund_lookup_finished (void *cls,
                  "error", &error,
                  "code", &code);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed GET /refund, error: %s, code: %d, hint: %s\n",
+                "Failed GET /refund, error: %s, code: %d\n",
                 error,
-                code,
-                hint);
+                code);
   }
 }
 
