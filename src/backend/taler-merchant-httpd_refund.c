@@ -299,6 +299,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 
 /**
  * Function called with information about a refund.
+ * It is responsible for packing up the data to return.
  *
  * @param cls closure
  * @param coin_pub public coin from which the refund comes from

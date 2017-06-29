@@ -1674,14 +1674,18 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
   };
   enum GNUNET_DB_QueryStatus qs;
 
+  TALER_LOG_DEBUG ("Looking for refund %s + %s\n",
+                   GNUNET_h2s (h_contract_terms),
+                   TALER_B2S (merchant_pub));
+
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     "find_refunds_from_contract_terms_hash",
 					     params,
 					     &get_refunds_cb,
 					     &grc);
   if (0 >= qs)
-    return qs;
-  return grc.qs;
+    return qs; 
+  return grc.qs; /*FIXME: who sets this?*/
 }
 
 
@@ -1716,6 +1720,10 @@ insert_refund (void *cls,
     TALER_PQ_query_param_amount (refund_fee),
     GNUNET_PQ_query_param_end
   };
+
+  TALER_LOG_DEBUG ("Inserting refund %s + %s\n",
+                   GNUNET_h2s (h_contract_terms),
+                   TALER_B2S (merchant_pub));
   
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "insert_refund",
