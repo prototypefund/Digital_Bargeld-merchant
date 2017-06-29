@@ -42,6 +42,11 @@ extern struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
  */
 #define TRACK_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
+/**
+ * How often do we retry the simple INSERT database transaction?
+ */
+#define MAX_RETRIES 3
+
 
 /**
  * Generate /track/transaction response.
@@ -266,6 +271,12 @@ struct TrackTransactionContext
    */
   struct MerchantInstance *mi;
 
+  /**
+   * Set to negative values in #coin_cb() if we encounter
+   * a database problem.
+   */
+  enum GNUNET_DB_QueryStatus qs;
+
 };
 
 
@@ -405,6 +416,7 @@ wire_deposits_cb (void *cls,
                   const struct TALER_TrackTransferDetails *details)
 {
   struct TrackTransactionContext *tctx = cls;
+  enum GNUNET_DB_QueryStatus qs;
 
   tctx->wdh = NULL;
   if (MHD_HTTP_OK != http_status)
@@ -420,15 +432,24 @@ wire_deposits_cb (void *cls,
                                     "details", json));
     return;
   }
-  if (GNUNET_OK !=
-      db->store_transfer_to_proof (db->cls,
-                                   tctx->exchange_uri,
-                                   &tctx->current_wtid,
-                                   tctx->current_execution_time,
-                                   exchange_pub,
-                                   json))
+  for (unsigned int i=0;i<MAX_RETRIES;i++)
+  {
+    qs = db->store_transfer_to_proof (db->cls,
+				      tctx->exchange_uri,
+				      &tctx->current_wtid,
+				      tctx->current_execution_time,
+				      exchange_pub,
+				      json);
+    if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+      break;
+  }
+  if (0 > qs)
   {
     /* Not good, but not fatal either, log error and continue */
+    /* Special report if retries insufficient */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to store transfer-to-proof mapping in DB\n");
   }
@@ -438,10 +459,10 @@ wire_deposits_cb (void *cls,
   {
     if (GNUNET_YES == tcc->have_wtid)
       continue;
-    for (unsigned int i=0;i<details_length;i++)
+    for (unsigned int d=0;d<details_length;d++)
     {
 
-      if (0 == memcmp (&details[i].coin_pub,
+      if (0 == memcmp (&details[d].coin_pub,
                        &tcc->coin_pub,
                        sizeof (struct TALER_CoinSpendPublicKeyP)))
       {
@@ -450,13 +471,22 @@ wire_deposits_cb (void *cls,
         tcc->have_wtid = GNUNET_YES;
       }
 
-      if (GNUNET_OK !=
-          db->store_coin_to_transfer (db->cls,
-                                      &details[i].h_contract_terms,
-                                      &details[i].coin_pub,
-                                      &tctx->current_wtid))
+      for (unsigned int i=0;i<MAX_RETRIES;i++)
       {
-        /* Not good, but not fatal either, log error and continue */
+	qs = db->store_coin_to_transfer (db->cls,
+					 &details[d].h_contract_terms,
+					 &details[d].coin_pub,
+					 &tctx->current_wtid);
+	if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+	  break;
+      }
+      if (0 > qs)
+      { 
+	/* Not good, but not fatal either, log error and continue */
+	/* Special report if retries insufficient */
+	GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+	/* Always report on hard error as well to enable diagnostics */
+	GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                     "Failed to store coin-to-transfer mapping in DB\n");
       }
@@ -534,6 +564,7 @@ wtid_cb (void *cls,
   struct TrackCoinContext *tcc = cls;
   struct TrackTransactionContext *tctx = tcc->tctx;
   struct ProofCheckContext pcc;
+  enum GNUNET_DB_QueryStatus qs;
 
   tcc->dwh = NULL;
   if (MHD_HTTP_OK != http_status)
@@ -556,15 +587,28 @@ wtid_cb (void *cls,
   tctx->current_wtid = *wtid;
   tctx->current_execution_time = execution_time;
   pcc.p_ret = NULL;
+  qs = db->find_proof_by_wtid (db->cls,
+			       tctx->exchange_uri,
+			       wtid,
+			       &proof_cb,
+			       &pcc);
+  if (0 > qs)
+  {
+    /* Simple select queries should not cause serialization issues */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    resume_track_transaction_with_response
+      (tcc->tctx,
+       MHD_HTTP_INTERNAL_SERVER_ERROR,
+       TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSACTION_DB_FETCH_FAILED,
+					 "Fail to query database about proofs"));
+    return;
+  }
   /* WARNING: if two transactions got aggregated under the same
      WTID, then this branch is always taken (when attempting to
      track the second transaction). */
-  if (GNUNET_OK ==
-      db->find_proof_by_wtid (db->cls,
-                              tctx->exchange_uri,
-                              wtid,
-                              &proof_cb,
-                              &pcc))
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
   {
     GNUNET_break_op (0);
     resume_track_transaction_with_response
@@ -860,21 +904,28 @@ coin_cb (void *cls,
 {
   struct TrackTransactionContext *tctx = cls;
   struct TrackCoinContext *tcc;
+  enum GNUNET_DB_QueryStatus qs;
 
   tcc = GNUNET_new (struct TrackCoinContext);
   tcc->tctx = tctx;
   tcc->coin_pub = *coin_pub;
+
   tcc->amount_with_fee = *amount_with_fee;
   tcc->deposit_fee = *deposit_fee;
   GNUNET_CONTAINER_DLL_insert (tctx->tcc_head,
                                tctx->tcc_tail,
                                tcc);
-  GNUNET_break (GNUNET_SYSERR !=
-                db->find_transfers_by_hash (db->cls,
-                                            h_contract_terms,
-                                            &transfer_cb,
-                                            tcc));
+  qs = db->find_transfers_by_hash (db->cls,
+				   h_contract_terms,
+				   &transfer_cb,
+				   tcc);
+  if (0 > qs)
+  {
+    GNUNET_break (0);
+    tctx->qs = qs;
+  }
 }
+
 
 /**
  * Handle a "/track/transaction" request.
@@ -897,6 +948,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   const char *order_id;
   const char *instance;
   int ret;
+  enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_HashCode h_instance;
   struct GNUNET_HashCode h_contract_terms;
   struct json_t *contract_terms;
@@ -972,11 +1024,18 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
 					 "unknown instance");
 
-  if (GNUNET_YES !=
-      db->find_contract_terms (db->cls,
-                               &contract_terms,
-                               order_id,
-                               &tctx->mi->pubkey))
+  qs = db->find_contract_terms (db->cls,
+				&contract_terms,
+				order_id,
+				&tctx->mi->pubkey);
+  if (0 > qs)
+  {
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
+                                              "Database error finding contract terms");
+  }
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
 					 "Given order_id doesn't map to any proposal");
@@ -988,12 +1047,19 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
               "Trying to track h_contract_terms '%s'\n",
               GNUNET_h2s (&h_contract_terms));
 
-  ret = db->find_transaction (db->cls,
-                              &h_contract_terms,
-			      &tctx->mi->pubkey,
-                              &transaction_cb,
-                              tctx);
-  if (GNUNET_NO == ret)
+  qs = db->find_transaction (db->cls,
+			     &h_contract_terms,
+			     &tctx->mi->pubkey,
+			     &transaction_cb,
+			     tctx);
+  if (0 > qs)
+  {
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
+                                              "Database error finding transaction");
+  }  
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "h_contract_terms not found\n");
@@ -1001,8 +1067,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 					 TALER_EC_TRACK_TRANSACTION_TRANSACTION_UNKNOWN,
                                          "h_contract_terms is unknown");
   }
-  if ( (GNUNET_SYSERR == ret) ||
-       (0 != memcmp (&tctx->h_contract_terms,
+  if ( (0 != memcmp (&tctx->h_contract_terms,
                      &h_contract_terms,
                      sizeof (struct GNUNET_HashCode))) ||
        (NULL == tctx->exchange_uri) )
@@ -1010,25 +1075,28 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     GNUNET_break (0);
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
-                                              "Database error");
+                                              "Database error: failed to obtain correct data from database");
   }
-  ret = db->find_payments (db->cls,
-                           &h_contract_terms,
-                           &tctx->mi->pubkey,
-                           &coin_cb,
-                           tctx);
-  if (GNUNET_SYSERR == ret)
+  tctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
+  qs = db->find_payments (db->cls,
+			  &h_contract_terms,
+			  &tctx->mi->pubkey,
+			  &coin_cb,
+			  tctx);
+  if ( (0 > qs) ||
+       (0 > tctx->qs) )
   {
-    GNUNET_break (0);
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != tctx->qs);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_TRACK_TRANSACTION_DB_FETCH_PAYMENT_ERROR,
-					      "Database error");
+					      "Database error: failed in find payment data");
   }
-  if (GNUNET_NO == ret)
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSACTION_DB_NO_DEPOSITS_ERROR,
-                                         "deposits");
+                                         "deposit data not found");
   }
   *connection_cls = tctx;
 

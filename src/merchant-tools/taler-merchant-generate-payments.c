@@ -1738,9 +1738,14 @@ run (void *cls,
     fprintf (stderr, "\n");
     GNUNET_free (wget_cmd);
   }
+  /* timeout, given 60s + 5s per command, which should be more
+     than enough */
   timeout_task
-    = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply
-                                    (GNUNET_TIME_UNIT_SECONDS, 150),
+    = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_add
+				    (GNUNET_TIME_UNIT_MINUTES,
+				     GNUNET_TIME_relative_multiply
+				     (GNUNET_TIME_UNIT_SECONDS,
+				      5 * times)),
                                     &do_timeout, NULL);
   run_test ();
 }
