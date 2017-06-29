@@ -1634,6 +1634,7 @@ get_refunds_cb (void *cls,
       grc->qs = GNUNET_DB_STATUS_HARD_ERROR;
       return;
     }
+    grc->qs = i + 1;
     grc->rc (grc->rc_cls,
 	     &coin_pub,
 	     rtransaction_id,
