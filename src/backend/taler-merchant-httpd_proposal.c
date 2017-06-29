@@ -30,6 +30,12 @@
 
 
 /**
+ * How often do we retry the simple INSERT database transaction?
+ */
+#define MAX_RETRIES 3
+
+
+/**
  * Check that the given JSON array of products is well-formed.
  *
  * @param products JSON array to check
@@ -115,10 +121,6 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
 }
 
 
-extern struct MerchantInstance *
-get_instance (struct json_t *json);
-
-
 /**
  * Transform an order into a proposal and store it in the database.
  * Write the resulting proposal or an error message ot a MHD connection
@@ -156,12 +158,12 @@ proposal_put (struct MHD_Connection *connection,
     GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
     GNUNET_JSON_spec_end ()
   };
-
+  enum GNUNET_DB_QueryStatus qs;
 
   /* Add order_id if it doesn't exist. */
-
-  if (NULL == json_string_value (json_object_get (order,
-                                                  "order_id")))
+  if (NULL ==
+      json_string_value (json_object_get (order,
+					  "order_id")))
   {
     char buf[256];
     time_t timer;
@@ -175,7 +177,8 @@ proposal_put (struct MHD_Connection *connection,
                     sizeof (buf),
                     "%H:%M:%S",
                     tm_info);
-    snprintf (buf + off, sizeof (buf) - off,
+    snprintf (buf + off,
+	      sizeof (buf) - off,
               "-%llX",
               (long long unsigned) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK,
                                                              UINT64_MAX));
@@ -210,8 +213,7 @@ proposal_put (struct MHD_Connection *connection,
   {
     struct GNUNET_TIME_Absolute t;
 
-    /* FIXME: read the delay for pay_deadline from config */
-    t = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_HOURS);
+    t = GNUNET_TIME_relative_to_absolute (default_pay_deadline);
     (void) GNUNET_TIME_round_abs (&t);
     json_object_set_new (order,
                          "pay_deadline",
@@ -258,7 +260,7 @@ proposal_put (struct MHD_Connection *connection,
 					   "order:products");
   }
 
-  mi = get_instance (merchant);
+  mi = TMH_lookup_instance_json (merchant);
   if (NULL == mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -299,21 +301,27 @@ proposal_put (struct MHD_Connection *connection,
                             &pdps.purpose,
                             &merchant_sig);
 
-  /* fetch timestamp from order */
-
-  if (GNUNET_OK !=
-      db->insert_contract_terms (db->cls,
-                                order_id,
-                                &mi->pubkey,
-                                timestamp,
-                                order))
+  for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
+    qs = db->insert_contract_terms (db->cls,
+				    order_id,
+				    &mi->pubkey,
+				    timestamp,
+				    order);
+    if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+      break;
+  }
+  if (0 > qs)
+  {
+    /* Special report if retries insufficient */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PROPOSAL_STORE_DB_ERROR,
                                               "db error: could not store this proposal's data into db");
   }
-
 
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
@@ -369,7 +377,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
   if (GNUNET_SYSERR == res)
     return MHD_NO;
   /* the POST's body has to be further fetched */
-  if ((GNUNET_NO == res) || (NULL == root))
+  if ( (GNUNET_NO == res) ||
+       (NULL == root) )
     return MHD_YES;
 
   order = json_object_get (root,
@@ -412,6 +421,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   const char *order_id;
   const char *instance;
   int res;
+  enum GNUNET_DB_QueryStatus qs;
   json_t *contract_terms;
   struct MerchantInstance *mi;
 
@@ -434,18 +444,25 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 					   TALER_EC_PARAMETER_MISSING,
                                            "order_id");
 
-  res = db->find_contract_terms (db->cls,
-                                 &contract_terms,
-                                 order_id,
-                                 &mi->pubkey);
-  if (GNUNET_NO == res)
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
-                                         "unknown transaction id");
-  if (GNUNET_SYSERR == res)
+  qs = db->find_contract_terms (db->cls,
+				&contract_terms,
+				order_id,
+				&mi->pubkey);
+  if (0 > qs)
+  {
+    /* single, read-only SQL statements should never cause
+       serialization problems */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PROPOSAL_LOOKUP_DB_ERROR,
                                               "An error occurred while retrieving proposal data from db");
+  }
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
+                                         "unknown transaction id");
 
   res = TMH_RESPONSE_reply_json (connection,
                                  contract_terms,

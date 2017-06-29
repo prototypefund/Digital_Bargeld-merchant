@@ -398,14 +398,15 @@ get_wire_fees (struct Exchange *exchange,
 static int
 process_find_operations (struct Exchange *exchange)
 {
-  struct TMH_EXCHANGES_FindOperation *fo;
   struct TMH_EXCHANGES_FindOperation *fn;
   struct GNUNET_TIME_Absolute now;
   int need_wire;
 
   now = GNUNET_TIME_absolute_get ();
   need_wire = GNUNET_NO;
-  for (fo = exchange->fo_head; NULL != fo; fo = fn)
+  for (struct TMH_EXCHANGES_FindOperation *fo = exchange->fo_head;
+       NULL != fo;
+       fo = fn)
   {
     const struct TALER_Amount *wire_fee;
 
@@ -887,9 +888,6 @@ accept_exchanges (void *cls,
 int
 TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
-  struct Exchange *exchange;
-  json_t *j_exchange;
-
   merchant_curl_ctx
     = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
                         &merchant_curl_rc);
@@ -905,8 +903,12 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
                                          (void *) cfg);
   /* build JSON with list of trusted exchanges (will be included in contracts) */
   trusted_exchanges = json_array ();
-  for (exchange = exchange_head; NULL != exchange; exchange = exchange->next)
+  for (struct Exchange *exchange = exchange_head;
+       NULL != exchange;
+       exchange = exchange->next)
   {
+    json_t *j_exchange;
+
     if (GNUNET_YES != exchange->trusted)
       continue;
     j_exchange = json_pack ("{s:s, s:o}",

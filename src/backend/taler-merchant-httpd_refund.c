@@ -28,6 +28,14 @@
 
 #define REFUND_CONFIRMATION 0
 
+
+/**
+ * How often do we retry the non-trivial refund INSERT database
+ * transaction?
+ */
+#define MAX_RETRIES 5
+
+
 /**
  * We confirm with a signature that the refund has been successfully
  * done. Even though the frontend doesn't usually do crypto, this signature
@@ -67,9 +75,9 @@ struct ProcessRefundData
    struct MerchantInstance *merchant;
 
   /**
-   * Return code: GNUNET_OK if successful, GNUNET_SYSERR otherwise
+   * Return code: #TALER_EC_NONE if successful.
    */
-  int ret;
+  enum TALER_ErrorCode ec;
 };
 
 /**
@@ -107,10 +115,6 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
 }
 
 
-extern struct MerchantInstance *
-get_instance (struct json_t *json);
-
-
 /**
  * Handle request for increasing the refund associated with
  * a contract.
@@ -140,7 +144,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   struct GNUNET_HashCode h_contract_terms;
   struct RefundConfirmationP confirmation;
   struct GNUNET_CRYPTO_EddsaSignature sig;
-
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("refund", &refund),
     GNUNET_JSON_spec_string ("order_id", &order_id),
@@ -148,7 +151,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_JSON_spec_string ("instance", &merchant),
     GNUNET_JSON_spec_end ()
   }; 
-
+  enum GNUNET_DB_QueryStatus qs;
 
   if (NULL == *connection_cls)
   {
@@ -169,7 +172,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   if (GNUNET_SYSERR == res)
     return MHD_NO;
   /* the POST's body has to be further fetched */
-  if ((GNUNET_NO == res) || (NULL == root))
+  if ( (GNUNET_NO == res) ||
+       (NULL == root) )
     return MHD_YES;
 
   res = TMH_PARSE_json_data (connection,
@@ -196,14 +200,26 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_REFUND_INSTANCE_UNKNOWN,
-                                        "Unknown instance given");
+					 "Unknown instance given");
   }
   
   /* Convert order id to h_contract_terms */
-  if (GNUNET_OK != db->find_contract_terms (db->cls,
-                                            &contract_terms,
-                                            order_id,
-                                            &mi->pubkey))
+  qs = db->find_contract_terms (db->cls,
+				&contract_terms,
+				order_id,
+				&mi->pubkey);
+  if (0 > qs)
+  {
+    /* single, read-only SQL statements should never cause
+       serialization problems */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_REFUND_LOOKUP_DB_ERROR,
+                                              "An error occurred while retrieving payment data from db");
+  }
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
                 "Unknown order id given: %s\n",
@@ -220,45 +236,40 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_JSON_parse_free (spec);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not hash contract terms\n");
-    /**
-     * Do we really need a error code for failing to hash something?
-     * The HTTP 500 Internal server error sufficies for now.
-     */
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_NONE,
+                                              TALER_EC_INTERNAL_LOGIC_ERROR,
                                               "Could not hash contract terms");
   }
-
-  res = db->increase_refund_for_contract (db->cls,
-                                          &h_contract_terms,
-                                          &mi->pubkey,
-                                          &refund,
-                                          reason);
-  if (GNUNET_NO == res)
+  for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Inconsistent refund amount: %s\n",
-                TALER_amount_to_string (&refund));
-    GNUNET_JSON_parse_free (spec);
-    /**
-     * FIXME: should the db function distinguish between a refund amount
-     * lower than the previous one and a one which is too big to be paid back?
-     */
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              TALER_EC_REFUND_INCONSISTENT_AMOUNT,
-                                              "Amount incorrect: either not bigger"
-                                              " than the previous one or too big to"
-                                              " be paid back");
+    qs = db->increase_refund_for_contract (db->cls,
+					   &h_contract_terms,
+					   &mi->pubkey,
+					   &refund,
+					   reason);
+    if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+      break;
   }
-
-  if (GNUNET_SYSERR == res)
+  if (0 > qs)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not commit refund increase\n"); 
+    /* Special report if retries insufficient */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_NONE,
-                                              "Internal hard db error");
+                                              TALER_EC_REFUND_MERCHANT_DB_COMMIT_ERROR,
+                                              "Internal database error or refund amount too big");
+  }
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Refunded amount lower or equal to previous refund: %s\n",
+                TALER_amount2s (&refund));
+    GNUNET_JSON_parse_free (spec);
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              TALER_EC_REFUND_INCONSISTENT_AMOUNT,
+                                              "Amount incorrect: not larger than the previous one");
   }
 
   /**
@@ -278,9 +289,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   confirmation.purpose.purpose = REFUND_CONFIRMATION;
   confirmation.purpose.size = htonl (sizeof (struct RefundConfirmationP));
 
-  if (GNUNET_OK != GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
-                                             &confirmation.purpose,
-                                             &sig))
+  if (GNUNET_OK !=
+      GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
+				&confirmation.purpose,
+				&sig))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to sign successful refund confirmation\n");
@@ -308,7 +320,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
  * @param refund_amount refund amount which is being taken from coin_pub
  * @param refund_fee cost of this refund operation
  */
-void
+static void
 process_refunds_cb (void *cls,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
                     uint64_t rtransaction_id,
@@ -332,13 +344,14 @@ process_refunds_cb (void *cls,
   TALER_amount_hton (&rr.refund_fee,
                      refund_fee);
 
-  if (GNUNET_OK != GNUNET_CRYPTO_eddsa_sign (&prd->merchant->privkey.eddsa_priv,
-                                             &rr.purpose,
-                                             &sig))
+  if (GNUNET_OK !=
+      GNUNET_CRYPTO_eddsa_sign (&prd->merchant->privkey.eddsa_priv,
+				&rr.purpose,
+				&sig))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not sign refund request\n");
-    prd->ret = GNUNET_SYSERR;
+    prd->ec = TALER_EC_INTERNAL_LOGIC_ERROR;
     return;
   }
 
@@ -354,7 +367,7 @@ process_refunds_cb (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not pack a response's element up\n");
-    prd->ret = GNUNET_SYSERR;
+    prd->ec = TALER_EC_PARSER_OUT_OF_MEMORY;
     return;
   }
 
@@ -363,7 +376,7 @@ process_refunds_cb (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not append a response's element\n");
-    prd->ret = GNUNET_SYSERR;
+    prd->ec = TALER_EC_PARSER_OUT_OF_MEMORY;
     return; 
   }
 }
@@ -389,8 +402,9 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   const char *instance;
   struct GNUNET_HashCode h_contract_terms;
   json_t *contract_terms;
-  int res;
   struct MerchantInstance *mi;
+  enum GNUNET_DB_QueryStatus qs;
+  struct ProcessRefundData prd;
 
   instance = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -429,11 +443,23 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   }
 
   /* Convert order id to h_contract_terms */
-  res = db->find_contract_terms (db->cls,
-                                 &contract_terms,
-                                 order_id,
-                                 &mi->pubkey);
-  if (GNUNET_NO == res)
+  qs = db->find_contract_terms (db->cls,
+				&contract_terms,
+				order_id,
+				&mi->pubkey);
+  if (0 > qs)
+  {
+    /* single, read-only SQL statements should never cause
+       serialization problems */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_REFUND_LOOKUP_DB_ERROR,
+                                              "database error looking up order_id from merchant_contract_terms table");
+  }
+
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
                 "Unknown order id given: %s\n",
@@ -442,18 +468,6 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                          TALER_EC_REFUND_ORDER_ID_UNKNOWN,
                                          "Order id not found in database");
   }
-  if (GNUNET_SYSERR == res)
-  {
-  
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
-                "database hard error on order_id lookup: %s\n",
-                order_id);
-
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_NONE,
-                                              "database hard error: looking up"
-                                              " oder_id from merchant_contract_terms table");
-  }
 
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
@@ -461,57 +475,46 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not hash contract terms\n");
-    /**
-     * Do we really need a error code for failing to hash something?
-     * The HTTP 500 Internal server error sufficies for now.
-     */
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_NONE,
+                                              TALER_EC_INTERNAL_LOGIC_ERROR,
                                               "Could not hash contract terms");
   }
-  struct ProcessRefundData cb_cls;
-  cb_cls.response = json_array ();
-  cb_cls.h_contract_terms = &h_contract_terms;
-  cb_cls.merchant = mi;
-  res = db->get_refunds_from_contract_terms_hash (db->cls,
-                                                  &mi->pubkey,
-                                                  &h_contract_terms,
-                                                  process_refunds_cb,
-                                                  &cb_cls);
-
-  if (GNUNET_NO == res)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Contract terms hash not found in database\n");
-    /*This is very odd, as the unhashed version *was* found earlier*/
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_REFUND_H_CONTRACT_TERMS_UNKNOWN,
-                                         "h_contract_terms not found among granted refunds");
+  prd.response = json_array ();
+  prd.h_contract_terms = &h_contract_terms;
+  prd.merchant = mi;
+  prd.ec = TALER_EC_NONE;
+  for (unsigned int i=0;i<MAX_RETRIES;i++)
+  {  
+    qs = db->get_refunds_from_contract_terms_hash (db->cls,
+						   &mi->pubkey,
+						   &h_contract_terms,
+						   &process_refunds_cb,
+						   &prd);
+    if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+      break;
   }
-
-  if (GNUNET_SYSERR == res)
+  if (0 > qs)
   {
-  
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
                 "database hard error on order_id lookup: %s\n",
                 order_id);
-
+    json_decref (prd.response);
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_NONE,
+                                              TALER_EC_REFUND_LOOKUP_DB_ERROR,
                                               "database hard error: looking for "
                                               "h_contract_terms in merchant_refunds table");
   }
-  if (GNUNET_SYSERR == cb_cls.ret)
+  if (TALER_EC_NONE != prd.ec)
   {
+    json_decref (prd.response);
     /* NOTE: error already logged by the callback */
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_NONE,
+                                              prd.ec,
                                               "Could not generate a response"); 
   }
-  
-  return TMH_RESPONSE_reply_json (connection,
-                                  cb_cls.response,
-                                  MHD_HTTP_OK);
+   return TMH_RESPONSE_reply_json (connection,
+				   prd.response,
+				   MHD_HTTP_OK);
 }
 
 

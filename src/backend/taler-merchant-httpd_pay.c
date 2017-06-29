@@ -38,6 +38,10 @@
  */
 #define PAY_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
+/**
+ * How often do we retry the simple INSERT database transaction?
+ */
+#define MAX_RETRIES 3
 
 /**
  * Information we keep for an individual call to the /pay handler.
@@ -325,7 +329,9 @@ static struct PayContext *pc_tail;
 void
 MH_force_pc_resume ()
 {
-  for (struct PayContext *pc = pc_head; NULL != pc; pc = pc->next)
+  for (struct PayContext *pc = pc_head;
+       NULL != pc;
+       pc = pc->next)
   {
     if (GNUNET_YES == pc->suspended)
     {
@@ -375,11 +381,9 @@ resume_pay_with_response (struct PayContext *pc,
 static void
 abort_deposit (struct PayContext *pc)
 {
-  unsigned int i;
-
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Aborting pending /deposit operations\n");
-  for (i=0;i<pc->coins_cnt;i++)
+  for (unsigned int i;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dci = &pc->dc[i];
 
@@ -449,6 +453,7 @@ deposit_cb (void *cls,
 {
   struct DepositConfirmation *dc = cls;
   struct PayContext *pc = dc->pc;
+  enum GNUNET_DB_QueryStatus qs;
 
   dc->dh = NULL;
   pc->pending--;
@@ -493,19 +498,26 @@ deposit_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Storing successful payment for h_contract_terms '%s'\n",
               GNUNET_h2s (&pc->h_contract_terms));
-
-  if (GNUNET_OK !=
-      db->store_deposit (db->cls,
-			 &pc->h_contract_terms,
-			 &pc->mi->pubkey,
-			 &dc->coin_pub,
-			 &dc->amount_with_fee,
-			 &dc->deposit_fee,
-			 &dc->refund_fee,
-                         sign_key,
-			 proof))
+  for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
-    GNUNET_break (0);
+    qs = db->store_deposit (db->cls,
+			    &pc->h_contract_terms,
+			    &pc->mi->pubkey,
+			    &dc->coin_pub,
+			    &dc->amount_with_fee,
+			    &dc->deposit_fee,
+			    &dc->refund_fee,
+			    sign_key,
+			    proof);
+    if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+      break;
+  }
+  if (0 > qs)
+  {
+    /* Special report if retries insufficient */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     /* internal error */
     abort_deposit (pc);
     /* Forward error including 'proof' for the body */
@@ -929,7 +941,6 @@ check_coin_paid (void *cls,
                  const json_t *exchange_proof)
 {
   struct PayContext *pc = cls;
-  unsigned int i;
 
   if (0 != memcmp (&pc->h_contract_terms,
                    h_contract_terms,
@@ -938,7 +949,7 @@ check_coin_paid (void *cls,
     GNUNET_break (0);
     return;
   }
-  for (i=0;i<pc->coins_cnt;i++)
+  for (unsigned int i=0;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
     /* Get matching coin from results*/
@@ -1009,11 +1020,6 @@ check_transaction_exists (void *cls,
 }
 
 
-// FIXME: declare in proper header!
-extern struct MerchantInstance *
-get_instance (struct json_t *json);
-
-
 /**
  * Try to parse the pay request into the given pay context.
  * Schedules an error response in the connection on failure.
@@ -1046,6 +1052,7 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
     GNUNET_JSON_spec_end()
   };
+  enum GNUNET_DB_QueryStatus qs;
 
   res = TMH_PARSE_json_data (connection,
                              root,
@@ -1055,11 +1062,23 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_break (0);
     return res;
   }
-  res = db->find_contract_terms (db->cls,
+  qs = db->find_contract_terms (db->cls,
                                 &pc->contract_terms,
                                 order_id,
                                 &merchant_pub);
-  if (GNUNET_OK != res)
+  if (0 > qs)
+  {
+    /* single, read-only SQL statements should never cause
+       serialization problems */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_PAY_DB_FETCH_PAY_ERROR,
+					      "db error to previous /pay data");
+
+  }
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     GNUNET_JSON_parse_free (spec);
     if (MHD_YES !=
@@ -1106,15 +1125,16 @@ parse_pay (struct MHD_Connection *connection,
     }
     return GNUNET_NO;
   }
-  pc->mi = get_instance (merchant);
+  pc->mi = TMH_lookup_instance_json (merchant);
   if (NULL == pc->mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unable to find the specified instance\n");
     GNUNET_JSON_parse_free (spec);
-    if (MHD_NO == TMH_RESPONSE_reply_not_found (connection,
-                                                TALER_EC_PAY_INSTANCE_UNKNOWN,
-                                                "Unknown instance given"))
+    if (MHD_NO ==
+	TMH_RESPONSE_reply_not_found (connection,
+				      TALER_EC_PAY_INSTANCE_UNKNOWN,
+				      "Unknown instance given"))
     {
       GNUNET_break (0);
       return GNUNET_SYSERR;
@@ -1296,6 +1316,7 @@ handler_pay_json (struct MHD_Connection *connection,
                   struct PayContext *pc)
 {
   int ret;
+  enum GNUNET_DB_QueryStatus qs;
 
   ret = parse_pay (connection,
                    root,
@@ -1304,14 +1325,18 @@ handler_pay_json (struct MHD_Connection *connection,
     return (GNUNET_NO == ret) ? MHD_YES : MHD_NO;
 
   /* Check if this payment attempt has already succeeded */
-  if (GNUNET_SYSERR ==
-      db->find_payments (db->cls,
-		         &pc->h_contract_terms,
-                         &pc->mi->pubkey,
-		         &check_coin_paid,
-		         pc))
+  qs = db->find_payments (db->cls,
+			  &pc->h_contract_terms,
+			  &pc->mi->pubkey,
+			  &check_coin_paid,
+			  pc);
+  if (0 > qs)
   {
-    GNUNET_break (0);
+    /* single, read-only SQL statements should never cause
+       serialization problems */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
 					      "Merchant database error");
@@ -1333,14 +1358,18 @@ handler_pay_json (struct MHD_Connection *connection,
     return ret;
   }
   /* Check if transaction is already known, if not store it. */
-  if (GNUNET_SYSERR ==
-      db->find_transaction (db->cls,
-			    &pc->h_contract_terms,
-			    &pc->mi->pubkey,
-			    &check_transaction_exists,
-                            pc))
+  qs = db->find_transaction (db->cls,
+			     &pc->h_contract_terms,
+			     &pc->mi->pubkey,
+			     &check_transaction_exists,
+			     pc);
+  if (0 > qs)
   {
-    GNUNET_break (0);
+    /* single, read-only SQL statements should never cause
+       serialization problems */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
                                                "Merchant database error");
@@ -1378,17 +1407,25 @@ handler_pay_json (struct MHD_Connection *connection,
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Storing transaction '%s'\n",
                 GNUNET_h2s (&pc->h_contract_terms));
-    if (GNUNET_OK !=
-        db->store_transaction (db->cls,
-                               &pc->h_contract_terms,
-                               &pc->mi->pubkey,
-                               pc->chosen_exchange,
-                               &pc->mi->h_wire,
-                               pc->timestamp,
-                               pc->refund_deadline,
-                               &pc->amount))
+    for (unsigned int i=0;i<MAX_RETRIES;i++)
     {
-      GNUNET_break (0);
+      qs = db->store_transaction (db->cls,
+				  &pc->h_contract_terms,
+				  &pc->mi->pubkey,
+				  pc->chosen_exchange,
+				  &pc->mi->h_wire,
+				  pc->timestamp,
+				  pc->refund_deadline,
+				  &pc->amount);
+      if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+	break;
+    }
+    if (0 > qs)
+    {
+      /* Special report if retries insufficient */
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
       return TMH_RESPONSE_reply_internal_error (connection,
 						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
 						"Merchant database error");

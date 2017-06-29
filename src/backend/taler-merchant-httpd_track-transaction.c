@@ -44,6 +44,53 @@ extern struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
 
 
 /**
+ * Generate /track/transaction response.
+ *
+ * @param num_transfers how many wire transfers make up the transaction
+ * @param transfers data on each wire transfer
+ * @param exchange_uri URI of the exchange that made the transfer
+ * @return MHD response object
+ */
+static struct MHD_Response *
+make_track_transaction_ok (unsigned int num_transfers,
+			   const struct TALER_MERCHANT_TransactionWireTransfer *transfers,
+			   const char *exchange_uri)
+{
+  struct MHD_Response *ret;
+  json_t *j_transfers;
+  struct TALER_Amount sum;
+
+  j_transfers = json_array ();
+  for (unsigned int i=0;i<num_transfers;i++)
+  {
+    const struct TALER_MERCHANT_TransactionWireTransfer *transfer = &transfers[i];
+
+    sum = transfer->coins[0].amount_with_fee;
+    for (unsigned int j=1;j<transfer->num_coins;j++)
+    {
+      const struct TALER_MERCHANT_CoinWireTransfer *coin = &transfer->coins[j];
+
+      GNUNET_assert (GNUNET_SYSERR != TALER_amount_add (&sum,
+                                                        &sum,
+                                                        &coin->amount_with_fee));
+    }
+
+    GNUNET_assert (0 ==
+                   json_array_append_new (j_transfers,
+                                          json_pack ("{s:s, s:o, s:o, s:o}",
+                                                     "exchange", exchange_uri,
+                                                     "wtid", GNUNET_JSON_from_data_auto (&transfer->wtid),
+                                                     "execution_time", GNUNET_JSON_from_time_abs (transfer->execution_time),
+                                                     "amount", TALER_JSON_from_amount (&sum))));
+  }
+  ret = TMH_RESPONSE_make_json (j_transfers);
+  json_decref (j_transfers);
+  return ret;
+}
+
+
+
+/**
  * Context for a /track/transaction operation.
  */
 struct TrackTransactionContext;
@@ -358,8 +405,6 @@ wire_deposits_cb (void *cls,
                   const struct TALER_TrackTransferDetails *details)
 {
   struct TrackTransactionContext *tctx = cls;
-  struct TrackCoinContext *tcc;
-  unsigned int i;
 
   tctx->wdh = NULL;
   if (MHD_HTTP_OK != http_status)
@@ -387,11 +432,13 @@ wire_deposits_cb (void *cls,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to store transfer-to-proof mapping in DB\n");
   }
-  for (tcc=tctx->tcc_head;NULL != tcc;tcc=tcc->next)
+  for (struct TrackCoinContext *tcc=tctx->tcc_head;
+       NULL != tcc;
+       tcc=tcc->next)
   {
     if (GNUNET_YES == tcc->have_wtid)
       continue;
-    for (i=0;i<details_length;i++)
+    for (unsigned int i=0;i<details_length;i++)
     {
 
       if (0 == memcmp (&details[i].coin_pub,
@@ -574,10 +621,11 @@ trace_coins (struct TrackTransactionContext *tctx)
      is worst-case O(n^2), in pracitce this is O(n) */
   for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
   {
-    struct TrackCoinContext *tcc2;
     int found = GNUNET_NO;
 
-    for (tcc2 = tctx->tcc_head; tcc2 != tcc; tcc2 = tcc2->next)
+    for (struct TrackCoinContext *tcc2 = tctx->tcc_head;
+	 tcc2 != tcc;
+	 tcc2 = tcc2->next)
     {
       if (0 == memcmp (&tcc->wtid,
                        &tcc2->wtid,
@@ -601,10 +649,11 @@ trace_coins (struct TrackTransactionContext *tctx)
     wtid_off = 0;
     for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
     {
-      struct TrackCoinContext *tcc2;
       int found = GNUNET_NO;
 
-      for (tcc2 = tctx->tcc_head; tcc2 != tcc; tcc2 = tcc2->next)
+      for (struct TrackCoinContext *tcc2 = tctx->tcc_head;
+	   tcc2 != tcc;
+	   tcc2 = tcc2->next)
       {
         if (0 == memcmp (&tcc->wtid,
                          &tcc2->wtid,
@@ -624,7 +673,9 @@ trace_coins (struct TrackTransactionContext *tctx)
         wt->execution_time = tcc->execution_time;
         /* count number of coins with this wtid */
         num_coins = 0;
-        for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
+        for (struct TrackCoinContext *tcc2 = tctx->tcc_head;
+	     NULL != tcc2;
+	     tcc2 = tcc2->next)
         {
           if (0 == memcmp (&wt->wtid,
                            &tcc2->wtid,
@@ -636,7 +687,9 @@ trace_coins (struct TrackTransactionContext *tctx)
         wt->coins = GNUNET_new_array (num_coins,
                                       struct TALER_MERCHANT_CoinWireTransfer);
         num_coins = 0;
-        for (tcc2 = tctx->tcc_head; NULL != tcc2; tcc2 = tcc2->next)
+        for (struct TrackCoinContext *tcc2 = tctx->tcc_head;
+	     NULL != tcc2;
+	     tcc2 = tcc2->next)
         {
           if (0 == memcmp (&wt->wtid,
                            &tcc2->wtid,
@@ -653,9 +706,9 @@ trace_coins (struct TrackTransactionContext *tctx)
     } /* for all tcc */
     GNUNET_assert (wtid_off == num_wtid);
 
-    resp = TMH_RESPONSE_make_track_transaction_ok (num_wtid,
-                                                   wts,
-                                                   tctx->exchange_uri);
+    resp = make_track_transaction_ok (num_wtid,
+				      wts,
+				      tctx->exchange_uri);
     for (wtid_off=0;wtid_off < num_wtid; wtid_off++)
       GNUNET_free (wts[wtid_off].coins);
     resume_track_transaction_with_response (tctx,

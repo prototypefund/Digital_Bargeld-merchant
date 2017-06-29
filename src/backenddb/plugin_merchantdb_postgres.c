@@ -1686,7 +1686,7 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
 					     &grc);
   if (0 >= qs)
     return qs; 
-  return grc.qs; /*FIXME: who sets this?*/
+  return grc.qs; 
 }
 
 

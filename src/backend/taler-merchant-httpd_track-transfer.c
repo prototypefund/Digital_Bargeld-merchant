@@ -130,11 +130,13 @@ struct TrackTransferContext
   int check_transfer_result;
 };
 
+
 /**
  * Represents an entry in the table used to sum up
  * individual deposits for each h_contract_terms.
  */
-struct Entry {
+struct Entry
+{
 
   /**
    * Sum accumulator for deposited value.
@@ -195,8 +197,8 @@ hashmap_free (void *cls,
               void *value)
 {
   struct TALER_Amount *amount = value;
+  
   GNUNET_free (amount);
-  /*NOTE: how to find out when iteration should stop?*/
   return GNUNET_YES;
 }
 
@@ -494,7 +496,6 @@ wire_transfer_cb (void *cls,
                   const struct TALER_TrackTransferDetails *details)
 {
   struct TrackTransferContext *rctx = cls;
-  unsigned int i;
   int ret;
   json_t *jresponse;
 
@@ -534,7 +535,7 @@ wire_transfer_cb (void *cls,
     return;
   }
   rctx->original_response = json;
-  for (i=0;i<details_length;i++)
+  for (unsigned int i=0;i<details_length;i++)
   {
     rctx->current_offset = i;
     rctx->current_detail = &details[i];

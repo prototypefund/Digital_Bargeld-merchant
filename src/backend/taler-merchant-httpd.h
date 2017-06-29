@@ -269,6 +269,12 @@ extern struct TALER_MERCHANTDB_Plugin *db;
 extern struct GNUNET_TIME_Relative wire_transfer_delay;
 
 /**
+ * If the frontend does NOT specify a payment deadline, how long should
+ * offers we make be valid by default?
+ */
+extern struct GNUNET_TIME_Relative default_pay_deadline;
+
+/**
  * Kick MHD to run now, to be called after MHD_resume_connection().
  * Basically, we need to explicitly resume MHD's event loop whenever
  * we made progress serving a request.  This function re-schedules
@@ -285,6 +291,23 @@ TMH_trigger_daemon (void);
  */
 struct MerchantInstance *
 TMH_lookup_instance (const char *name);
+
+
+/**
+ * Extract merchant instance from the given JSON
+ *
+ * @param json the JSON to inspect; it is not required to
+ * comply with any particular format. It will only be checked
+ * if the field "instance" is there.
+ * @return a pointer to a #struct MerchantInstance. This will be
+ * the 'default' merchant if the frontend did not specif any
+ * "instance" field. The user should not care to free the returned
+ * value, as it is taken from a global array that will be freed
+ * by the general shutdown routine. NULL if the frontend specified
+ * a wrong instance
+ */
+struct MerchantInstance *
+TMH_lookup_instance_json (struct json_t *json);
 
 
 #endif

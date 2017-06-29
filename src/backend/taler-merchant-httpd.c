@@ -73,6 +73,12 @@ static long long unsigned port;
 struct GNUNET_TIME_Relative wire_transfer_delay;
 
 /**
+ * If the frontend does NOT specify a payment deadline, how long should
+ * offers we make be valid by default?
+ */
+struct GNUNET_TIME_Relative default_pay_deadline;
+
+/**
  * Default maximum wire fee to assume, unless stated differently in the proposal
  * already.
  */
@@ -222,28 +228,27 @@ url_handler (void *cls,
       "<html><title>404: not found</title></html>", 0,
       &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
     };
-  struct TM_HandlerContext *hc;
-  struct TMH_RequestHandler *rh;
-  unsigned int i;
-  int ret;
-
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Handling request for URL `%s'\n",
               url);
-  for (i=0;NULL != handlers[i].url;i++)
+  for (unsigned int i=0;NULL != handlers[i].url;i++)
   {
-    rh = &handlers[i];
+    struct TMH_RequestHandler *rh = &handlers[i];
+    
     if ( (0 == strcasecmp (url,
                            rh->url)) &&
          ( (NULL == rh->method) ||
            (0 == strcasecmp (method,
                              rh->method)) ) )
     {
+      struct TM_HandlerContext *hc;
+      int ret;
+
       ret = rh->handler (rh,
-                         connection,
-                         con_cls,
-                         upload_data,
-                         upload_data_size);
+			 connection,
+			 con_cls,
+			 upload_data,
+			 upload_data_size);
       hc = *con_cls;
       if (NULL != hc)
         hc->rh = rh;
@@ -435,11 +440,12 @@ prepare_daemon ()
   GNUNET_NETWORK_fdset_copy_native (wws, &ws, max + 1);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Adding run_daemon select task\n");
-  ret =
-      GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_HIGH,
-				   tv, wrs, wws,
-                                   &run_daemon,
-                                   NULL);
+  ret = GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_HIGH,
+				     tv,
+				     wrs,
+				     wws,
+				     &run_daemon,
+				     NULL);
   GNUNET_NETWORK_fdset_destroy (wrs);
   GNUNET_NETWORK_fdset_destroy (wws);
   return ret;
@@ -641,7 +647,7 @@ TMH_lookup_instance (const char *name)
  * a wrong instance
  */
 struct MerchantInstance *
-get_instance (struct json_t *json)
+TMH_lookup_instance_json (struct json_t *json)
 {
   struct json_t *instance;
   const char *instance_str;
@@ -785,6 +791,19 @@ run (void *cls,
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "merchant",
                                "WIRE_TRANSFER_DELAY");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_time (config,
+                                           "merchant",
+                                           "DEFAULT_PAY_DEADLINE",
+                                           &default_pay_deadline))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "DEFAULT_PAY_DEADLINE");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
