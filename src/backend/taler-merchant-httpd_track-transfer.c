@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA
+  (C) 2014-2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -37,6 +37,10 @@
  */
 #define TRACK_TIMEOUT (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 30))
 
+/**
+ * How often do we retry the simple INSERT database transaction?
+ */
+#define MAX_RETRIES 3
 
 /**
  * Context used for handing /track/transfer requests.
@@ -307,8 +311,9 @@ transform_response (const json_t *result,
     GNUNET_CRYPTO_hash_from_string (key,
                                     &h_key);
 
-    if (NULL != (current_entry = GNUNET_CONTAINER_multihashmap_get (map,
-                                                                    &h_key)))
+    if (NULL != (current_entry =
+		 GNUNET_CONTAINER_multihashmap_get (map,
+						    &h_key)))
     {
       /* The map already knows this h_contract_terms*/
       if ( (GNUNET_SYSERR ==
@@ -496,8 +501,8 @@ wire_transfer_cb (void *cls,
                   const struct TALER_TrackTransferDetails *details)
 {
   struct TrackTransferContext *rctx = cls;
-  int ret;
   json_t *jresponse;
+  enum GNUNET_DB_QueryStatus qs;
 
   rctx->wdh = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
@@ -515,17 +520,23 @@ wire_transfer_cb (void *cls,
                                     "details", json));
     return;
   }
-
-  if (GNUNET_OK !=
-      db->store_transfer_to_proof (db->cls,
-                                   rctx->uri,
-                                   &rctx->wtid,
-                                   execution_time,
-                                   exchange_pub,
-                                   json))
+  for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to persist wire transfer proof in DB\n");
+    qs = db->store_transfer_to_proof (db->cls,
+				      rctx->uri,
+				      &rctx->wtid,
+				      execution_time,
+				      exchange_pub,
+				      json);
+    if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+      break;
+  }
+  if (0 > qs)
+  {
+    /* Special report if retries insufficient */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     resume_track_transfer_with_response
       (rctx,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
@@ -540,16 +551,19 @@ wire_transfer_cb (void *cls,
     rctx->current_offset = i;
     rctx->current_detail = &details[i];
     rctx->check_transfer_result = GNUNET_NO;
-    ret = db->find_payments_by_hash_and_coin (db->cls,
-                                              &details[i].h_contract_terms,
-                                              &rctx->mi->pubkey,
-                                              &details[i].coin_pub,
-                                              &check_transfer,
-                                              rctx);
-    if (GNUNET_SYSERR == ret)
+    qs = db->find_payments_by_hash_and_coin (db->cls,
+					     &details[i].h_contract_terms,
+					     &rctx->mi->pubkey,
+					     &details[i].coin_pub,
+					     &check_transfer,
+					     rctx);
+    if (0 > qs)
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to obtain existing payment data from DB\n");
+      /* single, read-only SQL statements should never cause
+	 serialization problems */
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
       resume_track_transfer_with_response
         (rctx,
          MHD_HTTP_INTERNAL_SERVER_ERROR,
@@ -558,7 +572,7 @@ wire_transfer_cb (void *cls,
                                       "details", "failed to obtain deposit data from local database"));
       return;
     }
-    if (GNUNET_NO == ret)
+    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     {
       /* The exchange says we made this deposit, but WE do not
          recall making it! Well, let's say thanks and accept the
@@ -596,14 +610,21 @@ wire_transfer_cb (void *cls,
     }
     /* Response is consistent with the /deposit we made, remember
        it for future reference */
-    ret = db->store_coin_to_transfer (db->cls,
-                                      &details[i].h_contract_terms,
-                                      &details[i].coin_pub,
-                                      &rctx->wtid);
-    if (GNUNET_OK != ret)
+    for (unsigned int i=0;i<MAX_RETRIES;i++)
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to persist coin to wire transfer mapping in DB\n");
+      qs = db->store_coin_to_transfer (db->cls,
+				       &details[i].h_contract_terms,
+				       &details[i].coin_pub,
+				       &rctx->wtid);
+      if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+	break;
+    }
+    if (0 > qs)
+    {
+      /* Special report if retries insufficient */
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
       resume_track_transfer_with_response
         (rctx,
          MHD_HTTP_INTERNAL_SERVER_ERROR,
@@ -618,7 +639,9 @@ wire_transfer_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "About to call tracks transformator.\n");
 
-  if (NULL == (jresponse = transform_response (json, rctx)))
+  if (NULL == (jresponse =
+	       transform_response (json,
+				   rctx)))
   {
     resume_track_transfer_with_response
       (rctx,
@@ -712,12 +735,14 @@ proof_cb (void *cls,
   struct TrackTransferContext *rctx = cls;
   json_t *transformed_response;
 
-  if (NULL == (transformed_response = transform_response (proof,
-                                                          rctx)))
+  if (NULL == (transformed_response =
+	       transform_response (proof,
+				   rctx)))
   {
     rctx->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
-    rctx->response = TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
-                                                       "Fail to elaborate response.");
+    rctx->response
+      = TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
+					  "Fail to elaborate response.");
     return;
   }
 
@@ -751,6 +776,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   const char *uri;
   const char *instance_str;
   int ret;
+  enum GNUNET_DB_QueryStatus qs;
 
   if (NULL == *connection_cls)
   {
@@ -835,11 +861,21 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   }
 
   /* Check if reply is already in database! */
-  ret = db->find_proof_by_wtid (db->cls,
-                                rctx->uri,
-                                &rctx->wtid,
-                                &proof_cb,
-                                rctx);
+  qs = db->find_proof_by_wtid (db->cls,
+			       rctx->uri,
+			       &rctx->wtid,
+			       &proof_cb,
+			       rctx);
+  if (0 > qs)
+  {
+    /* Simple select queries should not cause serialization issues */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_TRACK_TRANSFER_DB_FETCH_FAILED,
+					      "Fail to query database about proofs");   
+  }
   if (0 != rctx->response_code)
   {
     ret = MHD_queue_response (connection,
