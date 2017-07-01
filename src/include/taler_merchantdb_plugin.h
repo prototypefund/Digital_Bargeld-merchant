@@ -391,6 +391,32 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
+   * Store information about wire fees charged by an exchange,
+   * including signature (so we have proof).
+   *
+   * @param cls closure
+   * @paramm exchange_pub public key of the exchange
+   * @param h_wire_method hash of wire method
+   * @param wire_fee wire fee charged
+   * @param closing_fee closing fee charged (irrelevant for us,
+   *              but needed to check signature)
+   * @param start_date start of fee being used
+   * @param end_date end of fee being used
+   * @param exchange_sig signature of exchange over fee structure
+   * @return transaction status code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*store_wire_fee_by_exchange) (void *cls,
+				 const struct TALER_MasterPublicKeyP *exchange_pub,
+				 const struct GNUNET_HashCode *h_wire_method,
+				 const struct TALER_Amount *wire_fee,
+				 const struct TALER_Amount *closing_fee,
+				 struct GNUNET_TIME_Absolute start_date,
+				 struct GNUNET_TIME_Absolute end_date,
+				 const struct TALER_MasterSignatureP *exchange_sig);
+				 
+
+  /**
    * Find information about a transaction.
    *
    * @param cls our plugin handle
@@ -404,6 +430,7 @@ struct TALER_MERCHANTDB_Plugin
                                 struct GNUNET_TIME_Absolute date,
                                 TALER_MERCHANTDB_TransactionCallback cb,
                                 void *cb_cls);
+  
 
   /**
    * Find information about a transaction.

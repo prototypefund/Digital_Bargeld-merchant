@@ -223,6 +223,20 @@ postgres_initialize (void *cls)
                                 " ON merchant_transfers (h_contract_terms, coin_pub)"),
     GNUNET_PQ_make_try_execute ("CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid"
                                 " ON merchant_transfers (wtid)"),
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS exchange_wire_fees ("
+			    " exchange_pub BYTEA NOT NULL CHECK (length(exchange_pub)=32)"
+			    ",h_wire_method BYTEA NOT NULL CHECK (length(h_wire_method)=64)"
+                            ",wire_fee_val INT8 NOT NULL"
+                            ",wire_fee_frac INT4 NOT NULL"
+                            ",wire_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",closing_fee_val INT8 NOT NULL"
+                            ",closing_fee_frac INT4 NOT NULL"
+                            ",closing_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+			    ",start_date INT8 NOT NULL"
+			    ",end_date INT8 NOT NULL"
+			    ",exchange_sig BYTEA NOT NULL CHECK (length(exchange_sig)=64)"
+			    ",PRIMARY KEY (exchange_pub,h_wire_method,start_date,end_date)"
+			    ");"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
   struct GNUNET_PQ_PreparedStatement ps[] = {
@@ -299,6 +313,22 @@ postgres_initialize (void *cls)
                             " VALUES "
                             "($1, $2, $3, $4, $5)",
                             4),
+    GNUNET_PQ_make_prepare ("insert_wire_fee",
+                            "INSERT INTO exchange_wire_fees"
+                            "(exchange_pub"
+                            ",h_wire_method"
+                            ",wire_fee_val"
+                            ",wire_fee_frac"
+                            ",wire_fee_curr"
+                            ",closing_fee_val"
+                            ",closing_fee_frac"
+                            ",closing_fee_curr"
+                            ",start_date"
+                            ",end_data"
+                            ",exchange_sig)"
+                            " VALUES "
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+                            11),
     GNUNET_PQ_make_prepare ("find_contract_terms_from_hash",
                             "SELECT"
                             " contract_terms"
@@ -1733,6 +1763,49 @@ insert_refund (void *cls,
 
 
 /**
+ * Store information about wire fees charged by an exchange,
+ * including signature (so we have proof).
+ *
+ * @param cls closure
+ * @paramm exchange_pub public key of the exchange
+ * @param h_wire_method hash of wire method
+ * @param wire_fee wire fee charged
+ * @param closing_fee closing fee charged (irrelevant for us,
+ *              but needed to check signature)
+ * @param start_date start of fee being used
+ * @param end_date end of fee being used
+ * @param exchange_sig signature of exchange over fee structure
+ * @return transaction status code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_store_wire_fee_by_exchange (void *cls,
+				     const struct TALER_MasterPublicKeyP *exchange_pub,
+				     const struct GNUNET_HashCode *h_wire_method,
+				     const struct TALER_Amount *wire_fee,
+				     const struct TALER_Amount *closing_fee,
+				     struct GNUNET_TIME_Absolute start_date,
+				     struct GNUNET_TIME_Absolute end_date,
+				     const struct TALER_MasterSignatureP *exchange_sig)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (exchange_pub),
+    GNUNET_PQ_query_param_auto_from_type (h_wire_method),
+    TALER_PQ_query_param_amount (wire_fee),
+    TALER_PQ_query_param_amount (closing_fee),
+    GNUNET_PQ_query_param_absolute_time (&start_date),
+    GNUNET_PQ_query_param_absolute_time (&end_date),
+    GNUNET_PQ_query_param_auto_from_type (exchange_sig),
+    GNUNET_PQ_query_param_end
+  };
+
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_wire_fee",
+                                             params);  
+}
+
+
+/**
  * Closure for #process_refund_cb.
  */
 struct FindRefundContext
@@ -2227,6 +2300,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->store_deposit = &postgres_store_deposit;
   plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
+  plugin->store_wire_fee_by_exchange = &postgres_store_wire_fee_by_exchange;
   plugin->find_transaction = &postgres_find_transaction;
   plugin->find_payments_by_hash_and_coin = &postgres_find_payments_by_hash_and_coin;
   plugin->find_payments = &postgres_find_payments;

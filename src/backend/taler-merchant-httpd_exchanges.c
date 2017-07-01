@@ -341,15 +341,36 @@ process_wire_fees (void *cls,
   }
   while (NULL != fees)
   {
+    struct GNUNET_HashCode h_wire_method;
+    enum GNUNET_DB_QueryStatus qs;
+    
     af = GNUNET_new (struct TALER_EXCHANGE_WireAggregateFees);
     *af = *fees;
+    GNUNET_CRYPTO_hash (wire_method,
+			strlen (wire_method) + 1,
+			&h_wire_method);
+    qs = db->store_wire_fee_by_exchange (db->cls,
+					 &exchange->master_pub,
+					 &h_wire_method,
+					 &af->wire_fee,
+					 &af->closing_fee,
+					 af->start_date,
+					 af->end_date,
+					 &af->master_sig);
+    if (0 > qs)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		  "Failed to persist exchange wire fees in merchant DB!\n");
+      GNUNET_free (af);
+      fees = fees->next;
+      continue;
+    }
     af->next = NULL;
     if (NULL == endp)
       f->af = af;
     else
       endp->next = af;
     endp = af;
-    // FIXME #4943: also preserve `fees` in backend DB (under wire method + exchange master pub!)
     fees = fees->next;
   }
 }
