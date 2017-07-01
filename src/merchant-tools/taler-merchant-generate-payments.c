@@ -1315,10 +1315,12 @@ interpreter_run (void *cls)
  *
  * @param cls closure
  * @param keys information about keys of the exchange
+ * @param compat version compatibility data
  */
 static void
 cert_cb (void *cls,
-         const struct TALER_EXCHANGE_Keys *keys)
+         const struct TALER_EXCHANGE_Keys *keys,
+	 enum TALER_EXCHANGE_VersionCompatibility compat)
 {
   struct InterpreterState *is = cls;
 

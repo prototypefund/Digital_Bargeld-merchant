@@ -255,10 +255,12 @@ json_t *trusted_exchanges;
  *   in order to get the "good" keys.
  * @param keys information about the various keys used
  *        by the exchange
+ * @param compat version compatibility data
  */
 static void
 keys_mgmt_cb (void *cls,
-              const struct TALER_EXCHANGE_Keys *keys);
+              const struct TALER_EXCHANGE_Keys *keys,
+	      enum TALER_EXCHANGE_VersionCompatibility compat);
 
 
 /**
@@ -589,10 +591,12 @@ wire_task_cb (void *cls)
  *   in order to get the "good" keys.
  * @param keys information about the various keys used
  *        by the exchange
+ * @param compat version compatibility data
  */
 static void
 keys_mgmt_cb (void *cls,
-              const struct TALER_EXCHANGE_Keys *keys)
+              const struct TALER_EXCHANGE_Keys *keys,
+	      enum TALER_EXCHANGE_VersionCompatibility compat)
 {
   struct Exchange *exchange = cls;
   struct GNUNET_TIME_Absolute expire;
@@ -611,6 +615,14 @@ keys_mgmt_cb (void *cls,
       GNUNET_SCHEDULER_cancel (exchange->wire_task);
       exchange->wire_task = NULL;
     }
+    if (TALER_EXCHANGE_VC_INCOMPATIBLE_NEWER == compat)
+    {
+      /* Give up, log hard error. */
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		  "Exchange `%s' runs an incompatible more recent version of the Taler protocol. Will not retry. This client may need to be updated.\n",
+		  exchange->uri);
+      return;
+    }
     exchange->retry_delay = RETRY_BACKOFF (exchange->retry_delay);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Failed to fetch /keys from `%s', retrying in %s\n",
@@ -621,6 +633,19 @@ keys_mgmt_cb (void *cls,
                                                          &retry_exchange,
                                                          exchange);
     return;
+  }
+  if (0 != (TALER_EXCHANGE_VC_NEWER & compat))
+  {
+    /* Warn user exactly once about need to upgrade */
+    static int once;
+
+    if (0 == once)
+    {
+      once = 1;
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+		  "Exchange `%s' runs a more recent version of the Taler protocol. You may want to update this client.\n",
+		  exchange->uri);
+    }
   }
   expire = TALER_EXCHANGE_check_keys_current (exchange->conn);
   if (0 == expire.abs_value_us)
