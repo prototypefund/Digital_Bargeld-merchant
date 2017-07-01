@@ -324,7 +324,7 @@ postgres_initialize (void *cls)
                             ",closing_fee_frac"
                             ",closing_fee_curr"
                             ",start_date"
-                            ",end_data"
+                            ",end_date"
                             ",exchange_sig)"
                             " VALUES "
                             "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
