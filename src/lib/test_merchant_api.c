@@ -1210,7 +1210,6 @@ refund_lookup_cb (void *cls,
   struct TALER_CoinSpendPublicKeyP coin_pub;
   struct TALER_CoinSpendPublicKeyP resp_coin_pub;
   struct json_t *resp_element;
-  uint64_t resp_rtid;
   const char *error_name;
   unsigned int error_line;
 
@@ -1218,7 +1217,6 @@ refund_lookup_cb (void *cls,
    GNUNET_JSON_spec_fixed_auto ("coin_pub", &resp_coin_pub),
    TALER_JSON_spec_amount ("refund_amount", &resp_refund_amount),
    TALER_JSON_spec_amount ("refund_fee", &resp_refund_fee),
-   GNUNET_JSON_spec_uint64 ("rtransaction_id", &resp_rtid),
    GNUNET_JSON_spec_end ()  
   };
 
@@ -1229,18 +1227,6 @@ refund_lookup_cb (void *cls,
     fail (is);
     return;
   }
-
-  /**
-   * #5087 goes below.
-   *
-   * 1) Retrieve refund amount.  x
-   * 2) Retrieve # of coins used to pay for the contract
-   *    (Actually, always ONE coins is spent).  It's not required
-   *    to know which denomination got used, as the refund gets taken
-   *    from the _deposited_ amount.  x
-   * 3) Extract values from response
-   * 4) Match those!
-   */
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "/refund lookup:\n%s\n",
@@ -1271,9 +1257,9 @@ refund_lookup_cb (void *cls,
                                       &coin_pub.eddsa_pub);
 
   /**
-   * NOTE: cannot reconstrcut and match a mocked JSON against
-   * the response because the testcase has no hold of merchant
-   * priv, which is needed to mock the signature and get the pub.
+   * NOTE: cannot reconstruct and match (with json_equal()) a mocked
+   * JSON against the response because the testcase has no hold of
+   * merchant priv, which is needed to mock the signature and get the pub.
    */
 
   GNUNET_assert (NULL != (resp_element = json_array_get (obj, 0)));
@@ -1282,6 +1268,22 @@ refund_lookup_cb (void *cls,
                                                  spec,
                                                  &error_name,
                                                  &error_line));
+  if (0 != memcmp (&refund_amount,
+                   &resp_refund_amount,
+                   sizeof (struct TALER_Amount)) ||
+      0 != memcmp (&refund_fee,
+                   &resp_refund_fee,
+                   sizeof (struct TALER_Amount)) ||
+      0 != memcmp (&coin_pub,
+                   &resp_coin_pub,
+                   sizeof (struct TALER_CoinSpendPublicKeyP)))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
+                "Bad refund given\n");
+    fail (is);
+  
+  }
+
   cmd->details.refund_lookup.rlo = NULL;
   next_command (is);
 }
