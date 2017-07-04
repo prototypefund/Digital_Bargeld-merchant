@@ -654,6 +654,23 @@ struct Command
        */
       struct TALER_MERCHANT_RefundLookupOperation *rlo;
 
+      /**
+       * Used to retrieve the asked refund amount.
+       * This information helps the callback to mock a GET /refund
+       * response and match it against what the backend actually
+       * responded.
+       */
+      char *increase_ref;
+
+      /**
+       * Used to retrieve the number and denomination of coins
+       * used to pay for the related contract.
+       * This information helps the callback to mock a GET /refund
+       * response and match it against what the backend actually
+       * responded.
+       */
+      char *pay_ref;
+
     } refund_lookup;
 
   } details;
@@ -2569,7 +2586,9 @@ run (void *cls)
     },
     { .oc = OC_REFUND_LOOKUP,
       .label = "refund-lookup-1",
-      .details.refund_lookup.order_id = "1"
+      .details.refund_lookup.order_id = "1",
+      .details.refund_lookup.increase_ref = "refund-increase-1",
+      .details.refund_lookup.pay_ref = "deposit-simple-1"
     },
     /* end of testcase */
     { .oc = OC_END }
