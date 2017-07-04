@@ -68,75 +68,6 @@ postgres_drop_tables (void *cls)
                                     es);
 }
 
-/**
- * Start a transaction.
- *
- * @param cls the `struct PostgresClosure` with the plugin-specific state
- * @return #GNUNET_OK on success
- */
-static int
-postgres_start (void *cls)
-{
-  struct PostgresClosure *pg = cls;
-  PGresult *result;
-  ExecStatusType ex;
-
-  result = PQexec (pg->conn,
-                   "START TRANSACTION ISOLATION LEVEL SERIALIZABLE");
-  if (PGRES_COMMAND_OK !=
-      (ex = PQresultStatus (result)))
-  {
-    TALER_LOG_ERROR ("Failed to start transaction (%s): %s\n",
-                     PQresStatus (ex),
-                     PQerrorMessage (pg->conn));
-    GNUNET_break (0);
-    PQclear (result);
-    return GNUNET_SYSERR;
-  }
-  PQclear (result);
-  return GNUNET_OK;
-}
-
-
-/**
- * Roll back the current transaction of a database connection.
- *
- * @param cls the `struct PostgresClosure` with the plugin-specific state
- * @return #GNUNET_OK on success
- */
-static void
-postgres_rollback (void *cls)
-{
-  struct PostgresClosure *pg = cls;
-  PGresult *result;
-
-  result = PQexec (pg->conn,
-                   "ROLLBACK");
-  GNUNET_break (PGRES_COMMAND_OK ==
-                PQresultStatus (result));
-  PQclear (result);
-}
-
-
-/**
- * Commit the current transaction of a database connection.
- *
- * @param cls the `struct PostgresClosure` with the plugin-specific state
- * @return transaction status code
- */
-static enum GNUNET_DB_QueryStatus
-postgres_commit (void *cls)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_end
-  };
-
-  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
-					     "end_transaction",
-					     params);
-}
-
 
 /**
  * Initialize merchant tables
@@ -519,6 +450,93 @@ postgres_initialize (void *cls)
 
 
 /**
+ * Check that the database connection is still up.
+ *
+ * @param pg connection to check
+ */
+static void
+check_connection (struct PostgresClosure *pg)
+{
+  if (CONNECTION_BAD != PQstatus (pg->conn))
+    return;
+  PQfinish (pg->conn);
+  GNUNET_break (GNUNET_OK ==
+		postgres_initialize (pg));
+}
+
+
+/**
+ * Start a transaction.
+ *
+ * @param cls the `struct PostgresClosure` with the plugin-specific state
+ * @return #GNUNET_OK on success
+ */
+static int
+postgres_start (void *cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  ExecStatusType ex;
+
+  check_connection (pg);
+  result = PQexec (pg->conn,
+                   "START TRANSACTION ISOLATION LEVEL SERIALIZABLE");
+  if (PGRES_COMMAND_OK !=
+      (ex = PQresultStatus (result)))
+  {
+    TALER_LOG_ERROR ("Failed to start transaction (%s): %s\n",
+                     PQresStatus (ex),
+                     PQerrorMessage (pg->conn));
+    GNUNET_break (0);
+    PQclear (result);
+    return GNUNET_SYSERR;
+  }
+  PQclear (result);
+  return GNUNET_OK;
+}
+
+
+/**
+ * Roll back the current transaction of a database connection.
+ *
+ * @param cls the `struct PostgresClosure` with the plugin-specific state
+ * @return #GNUNET_OK on success
+ */
+static void
+postgres_rollback (void *cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+
+  result = PQexec (pg->conn,
+                   "ROLLBACK");
+  GNUNET_break (PGRES_COMMAND_OK ==
+                PQresultStatus (result));
+  PQclear (result);
+}
+
+
+/**
+ * Commit the current transaction of a database connection.
+ *
+ * @param cls the `struct PostgresClosure` with the plugin-specific state
+ * @return transaction status code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_commit (void *cls)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_end
+  };
+
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+					     "end_transaction",
+					     params);
+}
+
+
+/**
  * Retrieve proposal data given its proposal data's hashcode
  *
  * @param cls closure
@@ -545,6 +563,7 @@ postgres_find_contract_terms_from_hash (void *cls,
     GNUNET_PQ_result_spec_end
   };
 
+  check_connection (pg);
   return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
 						   "find_contract_terms_from_hash",
 						   params,
@@ -583,6 +602,7 @@ postgres_find_contract_terms (void *cls,
               "Finding contract term, order_id: '%s', merchant_pub: '%s'.\n",
               order_id,
               TALER_B2S (merchant_pub));
+  check_connection (pg);
   return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
 						   "find_contract_terms",
 						   params,
@@ -625,6 +645,7 @@ postgres_insert_contract_terms (void *cls,
               order_id,
               TALER_B2S (merchant_pub),
               GNUNET_h2s (&h_contract_terms));
+  check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
 					     "insert_contract_terms",
 					     params);
@@ -671,6 +692,7 @@ postgres_store_transaction (void *cls,
               "Storing transaction with h_contract_terms '%s', merchant_pub '%s'.\n",
               GNUNET_h2s (h_contract_terms),
               TALER_B2S (merchant_pub));
+  check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
 					     "insert_transaction",
 					     params);
@@ -722,6 +744,7 @@ postgres_store_deposit (void *cls,
               TALER_B2S (coin_pub),
               TALER_amount_to_string (amount_with_fee),
               TALER_B2S (merchant_pub));
+  check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
 					     "insert_deposit",
 					     params);
@@ -753,6 +776,7 @@ postgres_store_coin_to_transfer (void *cls,
     GNUNET_PQ_query_param_end
   };
 
+  check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
 					     "insert_transfer",
 					     params);
@@ -788,6 +812,7 @@ postgres_store_transfer_to_proof (void *cls,
     GNUNET_PQ_query_param_end
   };
 
+  check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
 					     "insert_proof",
 					     params);
@@ -807,10 +832,10 @@ postgres_store_transfer_to_proof (void *cls,
  */
 static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms_history (void *cls,
-                                     const char *order_id,
-                                     const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                     TALER_MERCHANTDB_ProposalDataCallback cb,
-                                     void *cb_cls)
+				      const char *order_id,
+				      const struct TALER_MerchantPublicKeyP *merchant_pub,
+				      TALER_MERCHANTDB_ProposalDataCallback cb,
+				      void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
   json_t *contract_terms;
@@ -966,6 +991,7 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
     stmt = "find_contract_terms_by_date_and_range_future";
   else
     stmt = "find_contract_terms_by_date_and_range";
+  check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     stmt,
 					     params,
@@ -1011,6 +1037,7 @@ postgres_find_contract_terms_by_date (void *cls,
     .cb_cls = cb_cls
   };
 
+  check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     "find_contract_terms_by_date",
 					     params,
@@ -1070,6 +1097,7 @@ postgres_find_transaction (void *cls,
               GNUNET_h2s (h_contract_terms),
               TALER_B2S (merchant_pub));
 
+  check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
 						 "find_transaction",
 						 params,
@@ -1209,6 +1237,7 @@ postgres_find_payments (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Finding payment for h_contract_terms '%s'\n",
               GNUNET_h2s (h_contract_terms));
+  check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     "find_deposits",
 					     params,
@@ -1341,6 +1370,7 @@ postgres_find_payments_by_hash_and_coin (void *cls,
   };
   enum GNUNET_DB_QueryStatus qs;
 
+  check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     "find_deposits_by_hash_and_coin",
 					     params,
@@ -1465,6 +1495,7 @@ postgres_find_transfers_by_hash (void *cls,
   };
   enum GNUNET_DB_QueryStatus qs;
   
+  check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     "find_transfers_by_hash",
 					     params,
@@ -1586,6 +1617,7 @@ postgres_find_deposits_by_wtid (void *cls,
   };
   enum GNUNET_DB_QueryStatus qs;
 
+  check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     "find_deposits_by_wtid",
 					     params,
@@ -1709,6 +1741,7 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
                    GNUNET_h2s (h_contract_terms),
                    TALER_B2S (merchant_pub));
 
+  check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     "find_refunds_from_contract_terms_hash",
 					     params,
@@ -1756,6 +1789,7 @@ insert_refund (void *cls,
                    GNUNET_h2s (h_contract_terms),
                    TALER_B2S (merchant_pub));
   
+  check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "insert_refund",
                                              params);
@@ -1799,6 +1833,7 @@ postgres_store_wire_fee_by_exchange (void *cls,
     GNUNET_PQ_query_param_end
   };
 
+  check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "insert_wire_fee",
                                              params);  
@@ -2235,6 +2270,7 @@ postgres_find_proof_by_wtid (void *cls,
   };
   enum GNUNET_DB_QueryStatus qs;
 
+  check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
 						 "find_proof_by_wtid",
 						 params,
