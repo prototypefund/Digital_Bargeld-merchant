@@ -1248,12 +1248,15 @@ refund_lookup_cb (void *cls,
   struct TALER_Amount coin_amount;
   struct TALER_CoinSpendPublicKeyP coin_pub;
   struct TALER_CoinSpendPublicKeyP resp_coin_pub;
+  struct GNUNET_CRYPTO_EddsaPublicKey merchant_pub;
+  struct GNUNET_CRYPTO_EddsaPublicKey resp_merchant_pub;
   struct json_t *resp_element;
   const char *error_name;
   unsigned int error_line;
 
   struct GNUNET_JSON_Specification spec[] = {
    GNUNET_JSON_spec_fixed_auto ("coin_pub", &resp_coin_pub),
+   GNUNET_JSON_spec_fixed_auto ("merchant_pub", &resp_merchant_pub),
    TALER_JSON_spec_amount ("refund_amount", &resp_refund_amount),
    TALER_JSON_spec_amount ("refund_fee", &resp_refund_fee),
    GNUNET_JSON_spec_end ()  
@@ -1307,6 +1310,9 @@ refund_lookup_cb (void *cls,
                                                  spec,
                                                  &error_name,
                                                  &error_line));
+  GNUNET_CRYPTO_eddsa_key_get_public (instance_priv,
+                                      &merchant_pub);
+
   if (0 != memcmp (&refund_amount,
                    &resp_refund_amount,
                    sizeof (struct TALER_Amount)) ||
@@ -1315,7 +1321,10 @@ refund_lookup_cb (void *cls,
                    sizeof (struct TALER_Amount)) ||
       0 != memcmp (&coin_pub,
                    &resp_coin_pub,
-                   sizeof (struct TALER_CoinSpendPublicKeyP)))
+                   sizeof (struct TALER_CoinSpendPublicKeyP)) ||
+      0 != memcmp (&merchant_pub,
+                   &resp_merchant_pub,
+                   sizeof (struct GNUNET_CRYPTO_EddsaPublicKey)))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
                 "Bad refund given\n");
