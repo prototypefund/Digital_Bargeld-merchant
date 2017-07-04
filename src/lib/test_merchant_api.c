@@ -717,6 +717,40 @@ struct InterpreterState
  */
 static struct GNUNET_DISK_PipeHandle *sigpipe;
 
+/**
+ * Return instance private key from config
+ *
+ * @param config configuration handle
+ * @param instance instance name
+ * @return pointer to private key, NULL on error
+ */
+struct GNUNET_CRYPTO_EddsaPrivateKey *
+get_instance_priv (struct GNUNET_CONFIGURATION_Handle *config,
+                   const char *instance)
+{
+  char *config_section;
+  char *filename;
+  struct GNUNET_CRYPTO_EddsaPrivateKey *ret;
+  
+  (void) GNUNET_asprintf (&config_section,
+                          "merchant-instance-%s",
+                          instance);
+
+  if (GNUNET_OK !=
+        GNUNET_CONFIGURATION_get_value_filename (config,
+                                                 config_section,
+                                                 "KEYFILE",
+                                                 &filename))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+  if (NULL ==
+       (ret = GNUNET_CRYPTO_eddsa_key_create_from_file (filename)))
+    GNUNET_break (0);
+
+  return ret;
+}
 
 /**
  * The testcase failed, return with an error code.
