@@ -640,6 +640,11 @@ struct Command
        */
       const char *reason;
 
+      /**
+       * Refund fee (MUST match the value given in config)
+       */
+      const char *refund_fee;
+
     } refund_increase;
 
     struct {
@@ -1179,12 +1184,12 @@ refund_increase_cb (void *cls,
 }
 
 /**
- * Process GET /refund (increase) response
+ * Process GET /refund (increase) response. 
  *
  * @param cls closure
  * @param http_status HTTP status code
  * @param ec taler-specific error object
- * @param obj response body; is NULL on success.
+ * @param obj response body; is NULL on error.
  */
 static void
 refund_lookup_cb (void *cls,
@@ -1194,6 +1199,28 @@ refund_lookup_cb (void *cls,
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
+  const struct Command *pay_ref;
+  const struct Command *increase_ref;
+  const struct Command *coin_ref;
+  struct TALER_Amount refund_amount;
+  struct TALER_Amount resp_refund_amount;
+  struct TALER_Amount refund_fee;
+  struct TALER_Amount resp_refund_fee;
+  struct TALER_Amount coin_amount;
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+  struct TALER_CoinSpendPublicKeyP resp_coin_pub;
+  struct json_t *resp_element;
+  uint64_t resp_rtid;
+  const char *error_name;
+  unsigned int error_line;
+
+  struct GNUNET_JSON_Specification spec[] = {
+   GNUNET_JSON_spec_fixed_auto ("coin_pub", &resp_coin_pub),
+   TALER_JSON_spec_amount ("refund_amount", &resp_refund_amount),
+   TALER_JSON_spec_amount ("refund_fee", &resp_refund_fee),
+   GNUNET_JSON_spec_uint64 ("rtransaction_id", &resp_rtid),
+   GNUNET_JSON_spec_end ()  
+  };
 
   if (MHD_HTTP_OK != http_status)
   {
@@ -1203,10 +1230,58 @@ refund_lookup_cb (void *cls,
     return;
   }
 
+  /**
+   * #5087 goes below.
+   *
+   * 1) Retrieve refund amount.  x
+   * 2) Retrieve # of coins used to pay for the contract
+   *    (Actually, always ONE coins is spent).  It's not required
+   *    to know which denomination got used, as the refund gets taken
+   *    from the _deposited_ amount.  x
+   * 3) Extract values from response
+   * 4) Match those!
+   */
+
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "/refund lookup:\n%s\n",
               json_dumps (obj, JSON_INDENT (2)));
 
+  increase_ref = find_command (is, cmd->details.refund_lookup.increase_ref);
+  GNUNET_assert (NULL != increase_ref);
+
+  GNUNET_assert (GNUNET_OK ==
+    TALER_string_to_amount (increase_ref->details.refund_increase.refund_amount,
+                            &refund_amount));
+  GNUNET_assert (GNUNET_OK ==
+    TALER_string_to_amount (increase_ref->details.refund_increase.refund_fee,
+                            &refund_fee));
+
+  pay_ref = find_command (is, cmd->details.refund_lookup.pay_ref);
+  GNUNET_assert (NULL != pay_ref);
+
+  GNUNET_assert (GNUNET_OK ==
+    TALER_string_to_amount (pay_ref->details.pay.amount_without_fee,
+                            &coin_amount));
+
+  /* Get coin pub */
+  coin_ref = find_command (is, pay_ref->details.pay.coin_ref);
+  GNUNET_assert (NULL != coin_ref);
+ 
+  GNUNET_CRYPTO_eddsa_key_get_public (&coin_ref->details.reserve_withdraw.coin_priv.eddsa_priv,
+                                      &coin_pub.eddsa_pub);
+
+  /**
+   * NOTE: cannot reconstrcut and match a mocked JSON against
+   * the response because the testcase has no hold of merchant
+   * priv, which is needed to mock the signature and get the pub.
+   */
+
+  GNUNET_assert (NULL != (resp_element = json_array_get (obj, 0)));
+  
+  GNUNET_assert (GNUNET_OK == GNUNET_JSON_parse (resp_element,
+                                                 spec,
+                                                 &error_name,
+                                                 &error_line));
   cmd->details.refund_lookup.rlo = NULL;
   next_command (is);
 }
@@ -1653,137 +1728,137 @@ interpreter_run (void *cls)
   struct Command *cmd = &is->commands[is->ip];
   const struct Command *ref;
   struct TALER_ReservePublicKeyP reserve_pub;
-  struct TALER_CoinSpendPublicKeyP coin_pub;
-  struct TALER_Amount amount;
-  struct GNUNET_TIME_Absolute execution_date;
-  json_t *sender_details;
-  json_t *transfer_details;
+      struct TALER_CoinSpendPublicKeyP coin_pub;
+      struct TALER_Amount amount;
+      struct GNUNET_TIME_Absolute execution_date;
+      json_t *sender_details;
+      json_t *transfer_details;
 
-  is->task = NULL;
-  tc = GNUNET_SCHEDULER_get_task_context ();
-  if (0 != (tc->reason & GNUNET_SCHEDULER_REASON_SHUTDOWN))
-  {
-    fprintf (stderr,
-             "Test aborted by shutdown request\n");
-    fail (is);
-    return;
-  }
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-	      "Interpreter runs command %u/%s(%u)\n",
-	      is->ip,
-	      cmd->label,
-	      cmd->oc);
-  switch (cmd->oc)
-  {
-    case OC_END:
-      result = GNUNET_OK;
-      if (instance_idx + 1 == ninstances)
+      is->task = NULL;
+      tc = GNUNET_SCHEDULER_get_task_context ();
+      if (0 != (tc->reason & GNUNET_SCHEDULER_REASON_SHUTDOWN))
       {
-        GNUNET_SCHEDULER_shutdown ();
+        fprintf (stderr,
+                 "Test aborted by shutdown request\n");
+        fail (is);
         return;
       }
-      cleanup_state (is);
-      is->ip = 0;
-      instance_idx++;
-      instance = instances[instance_idx];
-      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "Switching instance: `%s'\n",
-                  instance);
-      is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
-                                           is);
-      return;
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Interpreter runs command %u/%s(%u)\n",
+                  is->ip,
+                  cmd->label,
+                  cmd->oc);
+      switch (cmd->oc)
+      {
+        case OC_END:
+          result = GNUNET_OK;
+          if (instance_idx + 1 == ninstances)
+          {
+            GNUNET_SCHEDULER_shutdown ();
+            return;
+          }
+          cleanup_state (is);
+          is->ip = 0;
+          instance_idx++;
+          instance = instances[instance_idx];
+          GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                      "Switching instance: `%s'\n",
+                      instance);
+          is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
+                                               is);
+          return;
 
-    case OC_PROPOSAL_LOOKUP:
-    {
-      const char *order_id;
+        case OC_PROPOSAL_LOOKUP:
+        {
+          const char *order_id;
 
-      GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
-      ref = find_command (is, cmd->details.proposal_lookup.proposal_reference);
-      GNUNET_assert (NULL != ref);
+          GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
+          ref = find_command (is, cmd->details.proposal_lookup.proposal_reference);
+          GNUNET_assert (NULL != ref);
 
-      order_id =
-        json_string_value (json_object_get (ref->details.proposal.contract_terms,
-                                            "order_id"));
-      GNUNET_assert (NULL !=
-                      (cmd->details.proposal_lookup.plo
-                       = TALER_MERCHANT_proposal_lookup (ctx,
-                                                         MERCHANT_URI,
-                                                         order_id,
-                                                         instance,
-                                                         proposal_lookup_cb,
-                                                         is)));
-    }
+          order_id =
+            json_string_value (json_object_get (ref->details.proposal.contract_terms,
+                                                "order_id"));
+          GNUNET_assert (NULL !=
+                          (cmd->details.proposal_lookup.plo
+                           = TALER_MERCHANT_proposal_lookup (ctx,
+                                                             MERCHANT_URI,
+                                                             order_id,
+                                                             instance,
+                                                             proposal_lookup_cb,
+                                                             is)));
+        }
 
-    return;
+        return;
 
-  case OC_ADMIN_ADD_INCOMING:
-    if (NULL !=
-        cmd->details.admin_add_incoming.reserve_reference)
-    {
-      ref = find_command (is,
-                          cmd->details.admin_add_incoming.reserve_reference);
-      GNUNET_assert (NULL != ref);
-      GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
-      cmd->details.admin_add_incoming.reserve_priv
-        = ref->details.admin_add_incoming.reserve_priv;
-    }
-    else
-    {
-      struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
+      case OC_ADMIN_ADD_INCOMING:
+        if (NULL !=
+            cmd->details.admin_add_incoming.reserve_reference)
+        {
+          ref = find_command (is,
+                              cmd->details.admin_add_incoming.reserve_reference);
+          GNUNET_assert (NULL != ref);
+          GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
+          cmd->details.admin_add_incoming.reserve_priv
+            = ref->details.admin_add_incoming.reserve_priv;
+        }
+        else
+        {
+          struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
 
-      priv = GNUNET_CRYPTO_eddsa_key_create ();
-      cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
-      GNUNET_free (priv);
-    }
-    GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
-                                        &reserve_pub.eddsa_pub);
-    if (GNUNET_OK !=
-        TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
-                                &amount))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to parse amount `%s' at %u\n",
-                  cmd->details.admin_add_incoming.amount,
-                  is->ip);
-      fail (is);
-      return;
-    }
+          priv = GNUNET_CRYPTO_eddsa_key_create ();
+          cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
+          GNUNET_free (priv);
+        }
+        GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
+                                            &reserve_pub.eddsa_pub);
+        if (GNUNET_OK !=
+            TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
+                                    &amount))
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Failed to parse amount `%s' at %u\n",
+                      cmd->details.admin_add_incoming.amount,
+                      is->ip);
+          fail (is);
+          return;
+        }
 
-    execution_date = GNUNET_TIME_absolute_get ();
-    GNUNET_TIME_round_abs (&execution_date);
-    sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
-                                 JSON_REJECT_DUPLICATES,
-                                 NULL);
-    if (NULL == sender_details)
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to parse sender details `%s' at %u\n",
-                  cmd->details.admin_add_incoming.sender_details,
-                  is->ip);
-      fail (is);
-      return;
-    }
-    transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
-                                   JSON_REJECT_DUPLICATES,
-                                   NULL);
+        execution_date = GNUNET_TIME_absolute_get ();
+        GNUNET_TIME_round_abs (&execution_date);
+        sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
+                                     JSON_REJECT_DUPLICATES,
+                                     NULL);
+        if (NULL == sender_details)
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Failed to parse sender details `%s' at %u\n",
+                      cmd->details.admin_add_incoming.sender_details,
+                      is->ip);
+          fail (is);
+          return;
+        }
+        transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
+                                       JSON_REJECT_DUPLICATES,
+                                       NULL);
 
-    if (NULL == transfer_details)
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to parse transfer details `%s' at %u\n",
-                  cmd->details.admin_add_incoming.transfer_details,
-                  is->ip);
-      fail (is);
-      return;
-    }
+        if (NULL == transfer_details)
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Failed to parse transfer details `%s' at %u\n",
+                      cmd->details.admin_add_incoming.transfer_details,
+                      is->ip);
+          fail (is);
+          return;
+        }
 
-    cmd->details.admin_add_incoming.aih
-      = TALER_EXCHANGE_admin_add_incoming (exchange,
-                                           "http://localhost:18080/",
-                                           &reserve_pub,
-                                           &amount,
-                                           execution_date,
-                                           sender_details,
+        cmd->details.admin_add_incoming.aih
+          = TALER_EXCHANGE_admin_add_incoming (exchange,
+                                               "http://localhost:18080/",
+                                               &reserve_pub,
+                                               &amount,
+                                               execution_date,
+                                               sender_details,
                                            transfer_details,
                                            &add_incoming_cb,
                                            is);
@@ -2581,6 +2656,7 @@ run (void *cls)
     { .oc = OC_REFUND_INCREASE,
       .label = "refund-increase-1",
       .details.refund_increase.refund_amount = "EUR:0.1",
+      .details.refund_increase.refund_fee = "EUR:0.01",
       .details.refund_increase.reason = "refund test",
       .details.refund_increase.order_id = "1"    
     },
@@ -2588,7 +2664,7 @@ run (void *cls)
       .label = "refund-lookup-1",
       .details.refund_lookup.order_id = "1",
       .details.refund_lookup.increase_ref = "refund-increase-1",
-      .details.refund_lookup.pay_ref = "deposit-simple-1"
+      .details.refund_lookup.pay_ref = "deposit-simple"
     },
     /* end of testcase */
     { .oc = OC_END }
