@@ -96,6 +96,11 @@ unsigned int ninstances = 0;
 static char *instance;
 
 /**
+ * Current instance key
+ */
+struct GNUNET_CRYPTO_EddsaPrivateKey *instance_priv;
+
+/**
  * Current instance being tested
  */
 unsigned int instance_idx = 0;
@@ -1797,6 +1802,7 @@ interpreter_run (void *cls)
           is->ip = 0;
           instance_idx++;
           instance = instances[instance_idx];
+          instance_priv = get_instance_priv (cfg, instance);
           GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                       "Switching instance: `%s'\n",
                       instance);
@@ -2782,6 +2788,7 @@ main (int argc,
                          GNUNET_strdup (token));
   GNUNET_free (_instances);
   instance = instances[instance_idx];
+  instance_priv = get_instance_priv (cfg, instance);
   db = TALER_MERCHANTDB_plugin_load (cfg);
   if (NULL == db)
   {
