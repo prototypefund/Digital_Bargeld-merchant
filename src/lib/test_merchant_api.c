@@ -1298,12 +1298,6 @@ refund_lookup_cb (void *cls,
   GNUNET_CRYPTO_eddsa_key_get_public (&coin_ref->details.reserve_withdraw.coin_priv.eddsa_priv,
                                       &coin_pub.eddsa_pub);
 
-  /**
-   * NOTE: cannot reconstruct and match (with json_equal()) a mocked
-   * JSON against the response because the testcase has no hold of
-   * merchant priv, which is needed to mock the signature and get the pub.
-   */
-
   GNUNET_assert (NULL != (resp_element = json_array_get (obj, 0)));
   
   GNUNET_assert (GNUNET_OK == GNUNET_JSON_parse (resp_element,
@@ -1325,6 +1319,7 @@ refund_lookup_cb (void *cls,
       0 != memcmp (&merchant_pub,
                    &resp_merchant_pub,
                    sizeof (struct GNUNET_CRYPTO_EddsaPublicKey)))
+  /*FIXME: match doable with json_equal() now!*/
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
                 "Bad refund given\n");
