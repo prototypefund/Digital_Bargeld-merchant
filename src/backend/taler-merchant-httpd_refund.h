@@ -26,6 +26,26 @@
 #include "taler-merchant-httpd.h"
 
 /**
+ * We confirm with a signature that the refund has been successfully
+ * done. Even though the frontend doesn't usually do crypto, this signature
+ * may turn useful in court.
+ */
+struct RefundConfirmationP
+{
+  
+  /**
+   * Set to TALER_SIGNATURE_MERCHANT_REFUND_OK.
+   */
+  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
+
+  /**
+   * Hashing the order id, as frontends don't handle contract terms
+   */
+  struct GNUNET_HashCode h_order_id GNUNET_PACKED;
+
+};
+
+/**
  * Handle request for increasing the refund associated with
  * a contract.
  *

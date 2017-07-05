@@ -25,36 +25,13 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
-
-#define REFUND_CONFIRMATION 0
-
+#include "taler-merchant-httpd_refund.h"
 
 /**
  * How often do we retry the non-trivial refund INSERT database
  * transaction?
  */
 #define MAX_RETRIES 5
-
-
-/**
- * We confirm with a signature that the refund has been successfully
- * done. Even though the frontend doesn't usually do crypto, this signature
- * may turn useful in court.
- */
-struct RefundConfirmationP
-{
-  
-  /**
-   * Purpose is simply set to zero, see macro REFUND_CONFIRMATION above
-   */
-  struct GNUNET_CRYPTO_EccSignaturePurpose purpose;
-
-  /**
-   * Hashing the order id, as frontends don't handle contract terms
-   */
-  struct GNUNET_HashCode h_order_id GNUNET_PACKED;
-
-};
 
 struct ProcessRefundData
 {
@@ -286,7 +263,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   json_decref (root);
   GNUNET_JSON_parse_free (spec);
 
-  confirmation.purpose.purpose = REFUND_CONFIRMATION;
+  confirmation.purpose.purpose = TALER_SIGNATURE_MERCHANT_REFUND_OK;
   confirmation.purpose.size = htonl (sizeof (struct RefundConfirmationP));
 
   if (GNUNET_OK !=
