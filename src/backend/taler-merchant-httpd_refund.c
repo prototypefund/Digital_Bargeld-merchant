@@ -119,7 +119,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   const char *merchant;
   struct MerchantInstance *mi;
   struct GNUNET_HashCode h_contract_terms;
-  struct RefundConfirmationP confirmation;
+  struct TALER_MerchantRefundConfirmationPS confirmation;
   struct GNUNET_CRYPTO_EddsaSignature sig;
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("refund", &refund),
@@ -264,7 +264,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   GNUNET_JSON_parse_free (spec);
 
   confirmation.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK);
-  confirmation.purpose.size = htonl (sizeof (struct RefundConfirmationP));
+  confirmation.purpose.size = htonl (sizeof (struct TALER_MerchantRefundConfirmationPS));
 
   if (GNUNET_OK !=
       GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
