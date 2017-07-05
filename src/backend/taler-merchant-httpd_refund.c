@@ -263,7 +263,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   json_decref (root);
   GNUNET_JSON_parse_free (spec);
 
-  confirmation.purpose.purpose = TALER_SIGNATURE_MERCHANT_REFUND_OK;
+  confirmation.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK);
   confirmation.purpose.size = htonl (sizeof (struct RefundConfirmationP));
 
   if (GNUNET_OK !=

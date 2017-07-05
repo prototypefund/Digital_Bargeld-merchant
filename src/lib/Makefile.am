@@ -1,5 +1,5 @@
 # This Makefile.am is in the public domain
-AM_CPPFLAGS = -I$(top_srcdir)/src/include
+AM_CPPFLAGS = -I$(top_srcdir)/src/include -I$(top_srcdir)/src/backend
 
 if USE_COVERAGE
   AM_CFLAGS = --coverage -O0
