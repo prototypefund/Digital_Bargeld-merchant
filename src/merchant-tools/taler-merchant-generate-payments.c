@@ -781,11 +781,18 @@ make_order (char *maxfee,
   json_t *maxfee_j;
   json_t *ret;
   unsigned long long id;
+  struct GNUNET_TIME_Absolute now;
+  char *timestamp;
 
   TALER_string_to_amount (maxfee, &tmp_amount);
   maxfee_j = TALER_JSON_from_amount (&tmp_amount);
   TALER_string_to_amount (total, &tmp_amount);
   total_j = TALER_JSON_from_amount (&tmp_amount);
+  now = GNUNET_TIME_absolute_get ();
+
+  GNUNET_asprintf (&timestamp,
+                   "/Date(%u)/",
+                   now.abs_value_us / 1000LL / 1000LL);
 
   GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
                               &id,
@@ -793,7 +800,7 @@ make_order (char *maxfee,
   ret = json_pack ("{s:o, s:s, s:s, s:s, s:s, s:o, s:s, s:[{s:s}]}",
                    "max_fee", maxfee_j,
                    "order_id", TALER_b2s (&id, sizeof (id)),
-                   "timestamp", "/Date(42)/",
+                   "timestamp", timestamp,
                    "refund_deadline", "/Date(0)/",
                    "pay_deadline", "/Date(9999999999)/",
                    "amount", total_j,
