@@ -1252,7 +1252,23 @@ refund_lookup_cb_minimal (void *cls,
 {
   struct GNUNET_CONTAINER_MultiHashMap *map;
   struct InterpreterState *is = cls;
-   struct Command *cmd = &is->commands[is->ip];
+  struct Command *cmd = &is->commands[is->ip];
+  size_t index;
+  json_t *elem;
+  const char *error_name;
+  unsigned int error_line;
+  struct GNUNET_HashCode h_coin_pub;
+  char *icoin_ref;
+  char *icoin_refs;
+  const struct Command *icoin;
+  const struct Command *pay;
+  struct TALER_CoinSpendPublicKeyP icoin_pub;
+  struct GNUNET_HashCode h_icoin_pub;
+  struct TALER_Amount *iamount;
+  struct TALER_Amount acc;
+  const struct Command *increase;
+  struct TALER_Amount refund_amount;
+ 
 
   if (MHD_HTTP_OK != http_status)
   {
@@ -1264,22 +1280,16 @@ refund_lookup_cb_minimal (void *cls,
 
   map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
 
-  size_t index;
-  json_t *elem;
-
   json_array_foreach (obj, index, elem)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
-    struct TALER_Amount *refund_amount = GNUNET_new (struct TALER_Amount);
+    struct TALER_Amount *irefund_amount = GNUNET_new (struct TALER_Amount);
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin_pub),
-      TALER_JSON_spec_amount ("refund_amount", refund_amount),
+      TALER_JSON_spec_amount ("refund_amount", irefund_amount),
       GNUNET_JSON_spec_end ()
-};
-  const char *error_name;
-  unsigned int error_line;
-  struct GNUNET_HashCode h_coin_pub;
-      
+  };
+     
   if (GNUNET_OK !=
         GNUNET_JSON_parse (elem,
                            spec,
@@ -1298,15 +1308,74 @@ refund_lookup_cb_minimal (void *cls,
   GNUNET_assert (GNUNET_OK ==
     GNUNET_CONTAINER_multihashmap_put (map,
                                        &h_coin_pub,
-                                       refund_amount,
+                                       irefund_amount,
                                        GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY)); 
+  };
   
-  /* do the job */
-  
+  /**
+   *
+   * do the job:
+   *
+   * 1) check if used coin exists in from-refund ones
+   * 2) if so, sum up refunded amount
+   *
+   */
+
+  GNUNET_assert (NULL !=
+    (pay = find_command (is, cmd->details.refund_lookup.pay_ref)));
+  icoin_refs = GNUNET_strdup (pay->details.pay.coin_ref);
+  GNUNET_assert (NULL !=
+    (icoin_ref = strtok (icoin_refs, ";")));
+  TALER_amount_get_zero ("EUR", &acc);
+  do
+  {
+    /**
+     * 1 Get coin pub, V
+     * 2 hash it, V
+     * 3 look in the map, V
+     * 4 if found, sum up, V
+     * 5 iterate, V
+     */
+    GNUNET_assert (NULL != (icoin = find_command (is, icoin_ref)));
+    GNUNET_CRYPTO_eddsa_key_get_public (&icoin->details.reserve_withdraw.coin_priv.eddsa_priv,
+                                        &icoin_pub.eddsa_pub);
+    GNUNET_CRYPTO_hash (&icoin_pub,
+                        sizeof (struct TALER_CoinSpendPublicKeyP),
+                        &h_icoin_pub);
+    /*Can be NULL: not all coins are involved in refund*/
+    iamount = GNUNET_CONTAINER_multihashmap_get (map, &h_icoin_pub);
+    if (NULL != iamount)
+      GNUNET_assert (GNUNET_OK == TALER_amount_add (&acc,
+                                                    &acc,
+                                                    iamount)); 
+    
+    icoin_ref = strtok (NULL, ";");
+    if (NULL == icoin_ref)
+      break;
+  } while (0);
+
+  /**
+   * Check if refund has been 100% covered
+   */
+  GNUNET_assert (increase =
+    find_command (is, cmd->details.refund_lookup.increase_ref));
+  GNUNET_assert (GNUNET_OK ==
+    TALER_string_to_amount (increase->details.refund_increase.refund_amount,
+                            &refund_amount));
+
+  if (0 != TALER_amount_cmp (&acc,
+                             &refund_amount))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Incomplete refund: asked '%s', got '%s'\n",
+                TALER_amount_to_string (&refund_amount),
+                TALER_amount_to_string (&acc));
+    fail (is);
+  }
+
   GNUNET_CONTAINER_multihashmap_iterate (map,
                                          &hashmap_free,
                                          NULL);
-  }
   cmd->details.refund_lookup.rlo = NULL;
   next_command (is);
 }
