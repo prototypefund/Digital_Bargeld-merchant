@@ -286,403 +286,397 @@ struct Command
   union
   {
 
-    /**
-     * Information for a #OC_ADMIN_ADD_INCOMING command.
-     */
-    struct
-    {
-
-      /**
-       * Label to another admin_add_incoming command if we
-       * should deposit into an existing reserve, NULL if
-       * a fresh reserve should be created.
-       */
-      const char *reserve_reference;
-
-      /**
-       * String describing the amount to add to the reserve.
-       */
-      const char *amount;
-
-      /**
-       * Sender's bank account details (JSON).
-       */
-      const char *sender_details;
-
-      /**
-       * Transfer details (JSON)
-       */
-       const char *transfer_details;
-
-      /**
-       * Set (by the interpreter) to the reserve's private key
-       * we used to fill the reserve.
-       */
-      struct TALER_ReservePrivateKeyP reserve_priv;
-
-      /**
-       * Set to the API's handle during the operation.
-       */
-      struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
-
-    } admin_add_incoming;
-
-    /**
-     * Information for OC_PROPOSAL_LOOKUP command.
-     */
-    struct
-    {
-
-      /**
-       * Reference to the proposal we want to lookup.
-       */
-      const char *proposal_reference;
-
-      struct TALER_MERCHANT_ProposalLookupOperation *plo;
-
-    } proposal_lookup;
-
-    /**
-     * Information for a #OC_WITHDRAW_STATUS command.
-     */
-    struct
-    {
-
-      /**
-       * Label to the #OC_ADMIN_ADD_INCOMING command which
-       * created the reserve.
-       */
-      const char *reserve_reference;
-
-      /**
-       * Set to the API's handle during the operation.
-       */
-      struct TALER_EXCHANGE_ReserveStatusHandle *wsh;
-
-      /**
-       * Expected reserve balance.
-       */
-      const char *expected_balance;
-
-    } reserve_status;
-
-    /**
-     * Information for a #OC_WITHDRAW_SIGN command.
-     */
-    struct
-    {
-
-      /**
-       * Which reserve should we withdraw from?
-       */
-      const char *reserve_reference;
-
-      /**
-       * String describing the denomination value we should withdraw.
-       * A corresponding denomination key must exist in the exchange's
-       * offerings.  Can be NULL if @e pk is set instead.
-       */
-      const char *amount;
-
-      /**
-       * If @e amount is NULL, this specifies the denomination key to
-       * use.  Otherwise, this will be set (by the interpreter) to the
-       * denomination PK matching @e amount.
-       */
-      const struct TALER_EXCHANGE_DenomPublicKey *pk;
-
-      /**
-       * Set (by the interpreter) to the exchange's signature over the
-       * coin's public key.
-       */
-      struct TALER_DenominationSignature sig;
-
-      /**
-       * Set (by the interpreter) to the coin's private key.
-       */
-      struct TALER_CoinSpendPrivateKeyP coin_priv;
-
-      /**
-       * Blinding key used for the operation.
-       */
-      struct TALER_DenominationBlindingKeyP blinding_key;
-
-      /**
-       * Withdraw handle (while operation is running).
-       */
-      struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
-
-    } reserve_withdraw;
-
-    /**
-     * Information for an #OC_PROPOSAL command.
-     */
-    struct
-    {
-
-      /**
-       * The order.
-       * It's dynamically generated because we need different transaction_id
-       * for different merchant instances.
-       */
-      char order[ORDER_MAX_SIZE];
-
-      /**
-       * Handle to the active PUT /proposal operation, or NULL.
-       */
-      struct TALER_MERCHANT_ProposalOperation *po;
-
-      /**
-       * Full contract in JSON, set by the /contract operation.
-       * FIXME: verify in the code that this bit is actually proposal
-       * data and not the whole proposal.
-       */
-      json_t *contract_terms;
-
-      /**
-       * Proposal's signature.
-       */
-      struct TALER_MerchantSignatureP merchant_sig;
-
-      /**
-       * Proposal data's hashcode.
-       */
-      struct GNUNET_HashCode hash;
-
-    } proposal;
-
-    /**
-     * Information for a #OC_PAY command.
-     * FIXME: support tests where we pay with multiple coins at once.
-     */
-    struct
-    {
-
-      /**
-       * Reference to the contract.
-       */
-      const char *contract_ref;
-
-      /**
-       * Reference to a reserve_withdraw operation for a coin to
-       * be used for the /deposit operation.
-       */
-      const char *coin_ref;
-
-      /**
-       * If this @e coin_ref refers to an operation that generated
-       * an array of coins, this value determines which coin to use.
-       */
-      unsigned int coin_idx;
-
-      /**
-       * Amount to pay (from the coin, including fee).
-       */
-      const char *amount_with_fee;
-
-      /**
-       * Amount to pay (from the coin, excluding fee).  The sum of the
-       * deltas between all @e amount_with_fee and the @e
-       * amount_without_fee must be less than max_fee, and the sum of
-       * the @e amount_with_fee must be larger than the @e
-       * total_amount.
-       */
-      const char *amount_without_fee;
-
-      /**
-       * Deposit handle while operation is running.
-       */
-      struct TALER_MERCHANT_Pay *ph;
-
-      /**
-       * Hashcode of the proposal data associated to this payment.
-       */
-      struct GNUNET_HashCode h_contract_terms;
-
-      /**
-       * Merchant's public key
-       */
-      struct TALER_MerchantPublicKeyP merchant_pub;
-
-    } pay;
-
-    struct {
-
-      /**
-       * Process for the aggregator.
-       */
-      struct GNUNET_OS_Process *aggregator_proc;
-
-      /**
-       * ID of task called whenever we get a SIGCHILD.
-       */
-      struct GNUNET_SCHEDULER_Task *child_death_task;
-
-    } run_aggregator;
-
-    struct {
-
-      /**
-       * Which amount do we expect to see transferred?
-       */
-      const char *amount;
-
-      /**
-       * Which account do we expect to be debited?
-       */
-      uint64_t account_debit;
-
-      /**
-       * Which account do we expect to be credited?
-       */
-      uint64_t account_credit;
-
-      /**
-       * Set (!) to the wire transfer subject observed.
-       */
-      char *subject;
-
-    } check_bank_transfer;
-
-    struct {
-
-      /**
-       * #OC_CHECK_BANK_TRANSFER command from which we should grab
-       * the WTID.
-       */
-      char *check_bank_ref;
-
-      /**
-       * #OC_PAY command which we expect in the result.
-       * Since we are tracking a bank transaction, we want to know
-       * which (Taler) deposit is associated with the bank
-       * transaction being tracked now.
-       */
-      char *expected_pay_ref;
-
-      /**
-       * Handle to a /track/transfer operation
-       */
-      struct TALER_MERCHANT_TrackTransferHandle *tdo;
-
-    } track_transfer;
-
-    struct {
-
-      /**
-       * #OC_PAY command from which we should grab
-       * the WTID.
-       */
-      char *pay_ref;
-
-      /**
-       * #OC_CHECK_BANK_TRANSFER command which we expect in the result.
-       */
-      char *expected_transfer_ref;
-
-      /**
-       * Wire fee we expect to pay for this transaction.
-       */
-      const char *wire_fee;
-
-      /**
-       * Handle to a /track/transaction operation
-       */
-      struct TALER_MERCHANT_TrackTransactionHandle *tth;
-
-    } track_transaction;
-
-    struct {
-      /**
-       * Date we want retrieved transactions younger than
-       */
-      struct GNUNET_TIME_Absolute date;
-
-      /**
-       * How many "rows" we expect in the result
-       */
-      unsigned int nresult;
-
-      /**
-       * Handle to the merchant
-       */
-
-      /**
-       * Handle to /history request
-       */
-      struct TALER_MERCHANT_HistoryOperation *ho;
-
-      /**
-       * The backend will return records with row_id
-       * less than this value.
-       */
-      unsigned int start;
-
-      /**
-       * The backend will return at most `nrows` records.
-       */
-      unsigned int nrows;
-
-    } history;
-
-    struct {
-      /**
-       * Reference to the order we want reimbursed
-       */
-      char *order_id;
-
-      /**
-       * Handle to a refund increase operation
-       */
-      struct TALER_MERCHANT_RefundIncreaseOperation *rio;
-
-      /**
-       * Amount to refund
-       */
-      const char *refund_amount;
-      
-      /**
-       * Reason for refunding
-       */
-      const char *reason;
-
-      /**
-       * Refund fee (MUST match the value given in config)
-       */
-      const char *refund_fee;
-
-    } refund_increase;
-
-    struct {
-
-      /**
-       * Reference to the order whose refund was increased
-       */
-      char *order_id;
-
-      /**
-       * Handle to the operation
-       */
-      struct TALER_MERCHANT_RefundLookupOperation *rlo;
-
-      /**
-       * Used to retrieve the asked refund amount.
-       * This information helps the callback to mock a GET /refund
-       * response and match it against what the backend actually
-       * responded.
-       */
-      char *increase_ref;
-
-      /**
-       * Used to retrieve the number and denomination of coins
-       * used to pay for the related contract.
-       * This information helps the callback to mock a GET /refund
-       * response and match it against what the backend actually
-       * responded.
-       */
-      char *pay_ref;
-
-    } refund_lookup;
+/**
+ * Information for a #OC_ADMIN_ADD_INCOMING command.
+ */
+struct
+{
+
+  /**
+   * Label to another admin_add_incoming command if we
+   * should deposit into an existing reserve, NULL if
+   * a fresh reserve should be created.
+   */
+  const char *reserve_reference;
+
+  /**
+   * String describing the amount to add to the reserve.
+   */
+  const char *amount;
+
+  /**
+   * Sender's bank account details (JSON).
+   */
+  const char *sender_details;
+
+  /**
+   * Transfer details (JSON)
+   */
+   const char *transfer_details;
+
+  /**
+   * Set (by the interpreter) to the reserve's private key
+   * we used to fill the reserve.
+   */
+  struct TALER_ReservePrivateKeyP reserve_priv;
+
+  /**
+   * Set to the API's handle during the operation.
+   */
+  struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
+
+} admin_add_incoming;
+
+/**
+ * Information for OC_PROPOSAL_LOOKUP command.
+ */
+struct
+{
+
+  /**
+   * Reference to the proposal we want to lookup.
+   */
+  const char *proposal_reference;
+
+  struct TALER_MERCHANT_ProposalLookupOperation *plo;
+
+} proposal_lookup;
+
+/**
+ * Information for a #OC_WITHDRAW_STATUS command.
+ */
+struct
+{
+
+  /**
+   * Label to the #OC_ADMIN_ADD_INCOMING command which
+   * created the reserve.
+   */
+  const char *reserve_reference;
+
+  /**
+   * Set to the API's handle during the operation.
+   */
+  struct TALER_EXCHANGE_ReserveStatusHandle *wsh;
+
+  /**
+   * Expected reserve balance.
+   */
+  const char *expected_balance;
+
+} reserve_status;
+
+/**
+ * Information for a #OC_WITHDRAW_SIGN command.
+ */
+struct
+{
+
+  /**
+   * Which reserve should we withdraw from?
+   */
+  const char *reserve_reference;
+
+  /**
+   * String describing the denomination value we should withdraw.
+   * A corresponding denomination key must exist in the exchange's
+   * offerings.  Can be NULL if @e pk is set instead.
+   */
+  const char *amount;
+
+  /**
+   * If @e amount is NULL, this specifies the denomination key to
+   * use.  Otherwise, this will be set (by the interpreter) to the
+   * denomination PK matching @e amount.
+   */
+  const struct TALER_EXCHANGE_DenomPublicKey *pk;
+
+  /**
+   * Set (by the interpreter) to the exchange's signature over the
+   * coin's public key.
+   */
+  struct TALER_DenominationSignature sig;
+
+  /**
+   * Set (by the interpreter) to the coin's private key.
+   */
+  struct TALER_CoinSpendPrivateKeyP coin_priv;
+
+  /**
+   * Blinding key used for the operation.
+   */
+  struct TALER_DenominationBlindingKeyP blinding_key;
+
+  /**
+   * Withdraw handle (while operation is running).
+   */
+  struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
+
+} reserve_withdraw;
+
+/**
+ * Information for an #OC_PROPOSAL command.
+ */
+struct
+{
+
+  /**
+   * The order.
+   * It's dynamically generated because we need different transaction_id
+   * for different merchant instances.
+   */
+  char order[ORDER_MAX_SIZE];
+
+  /**
+   * Handle to the active PUT /proposal operation, or NULL.
+   */
+  struct TALER_MERCHANT_ProposalOperation *po;
+
+  /**
+   * Full contract in JSON, set by the /contract operation.
+   * FIXME: verify in the code that this bit is actually proposal
+   * data and not the whole proposal.
+   */
+  json_t *contract_terms;
+
+  /**
+   * Proposal's signature.
+   */
+  struct TALER_MerchantSignatureP merchant_sig;
+
+  /**
+   * Proposal data's hashcode.
+   */
+  struct GNUNET_HashCode hash;
+
+} proposal;
+
+/**
+ * Information for a #OC_PAY command.
+ * FIXME: support tests where we pay with multiple coins at once.
+ */
+struct
+{
+
+  /**
+   * Reference to the contract.
+   */
+  const char *contract_ref;
+
+  /**
+   * ";"-separated list of references to withdrawn coins to be used
+   * in the payment.
+   */
+  char *coin_ref;
+
+  /**
+   * Amount to pay (from the coin, including fee).
+   */
+  const char *amount_with_fee;
+
+  /**
+   * Amount to pay (from the coin, excluding fee).  The sum of the
+   * deltas between all @e amount_with_fee and the @e
+   * amount_without_fee must be less than max_fee, and the sum of
+   * the @e amount_with_fee must be larger than the @e
+   * total_amount.
+   */
+  const char *amount_without_fee;
+
+  /**
+   * Deposit handle while operation is running.
+   */
+  struct TALER_MERCHANT_Pay *ph;
+
+  /**
+   * Hashcode of the proposal data associated to this payment.
+   */
+  struct GNUNET_HashCode h_contract_terms;
+
+  /**
+   * Merchant's public key
+   */
+  struct TALER_MerchantPublicKeyP merchant_pub;
+
+} pay;
+
+struct {
+
+  /**
+   * Process for the aggregator.
+   */
+  struct GNUNET_OS_Process *aggregator_proc;
+
+  /**
+   * ID of task called whenever we get a SIGCHILD.
+   */
+  struct GNUNET_SCHEDULER_Task *child_death_task;
+
+} run_aggregator;
+
+struct {
+
+  /**
+   * Which amount do we expect to see transferred?
+   */
+  const char *amount;
+
+  /**
+   * Which account do we expect to be debited?
+   */
+  uint64_t account_debit;
+
+  /**
+   * Which account do we expect to be credited?
+   */
+  uint64_t account_credit;
+
+  /**
+   * Set (!) to the wire transfer subject observed.
+   */
+  char *subject;
+
+} check_bank_transfer;
+
+struct {
+
+  /**
+   * #OC_CHECK_BANK_TRANSFER command from which we should grab
+   * the WTID.
+   */
+  char *check_bank_ref;
+
+  /**
+   * #OC_PAY command which we expect in the result.
+   * Since we are tracking a bank transaction, we want to know
+   * which (Taler) deposit is associated with the bank
+   * transaction being tracked now.
+   */
+  char *expected_pay_ref;
+
+  /**
+   * Handle to a /track/transfer operation
+   */
+  struct TALER_MERCHANT_TrackTransferHandle *tdo;
+
+} track_transfer;
+
+struct {
+
+  /**
+   * #OC_PAY command from which we should grab
+   * the WTID.
+   */
+  char *pay_ref;
+
+  /**
+   * #OC_CHECK_BANK_TRANSFER command which we expect in the result.
+   */
+  char *expected_transfer_ref;
+
+  /**
+   * Wire fee we expect to pay for this transaction.
+   */
+  const char *wire_fee;
+
+  /**
+   * Handle to a /track/transaction operation
+   */
+  struct TALER_MERCHANT_TrackTransactionHandle *tth;
+
+} track_transaction;
+
+struct {
+  /**
+   * Date we want retrieved transactions younger than
+   */
+  struct GNUNET_TIME_Absolute date;
+
+  /**
+   * How many "rows" we expect in the result
+   */
+  unsigned int nresult;
+
+  /**
+   * Handle to the merchant
+   */
+
+  /**
+   * Handle to /history request
+   */
+  struct TALER_MERCHANT_HistoryOperation *ho;
+
+  /**
+   * The backend will return records with row_id
+   * less than this value.
+   */
+  unsigned int start;
+
+  /**
+   * The backend will return at most `nrows` records.
+   */
+  unsigned int nrows;
+
+} history;
+
+struct {
+  /**
+   * Reference to the order we want reimbursed
+   */
+  char *order_id;
+
+  /**
+   * Handle to a refund increase operation
+   */
+  struct TALER_MERCHANT_RefundIncreaseOperation *rio;
+
+  /**
+   * Amount to refund
+   */
+  const char *refund_amount;
+  
+  /**
+   * Reason for refunding
+   */
+  const char *reason;
+
+  /**
+   * Refund fee (MUST match the value given in config)
+   */
+  const char *refund_fee;
+
+} refund_increase;
+
+struct {
+
+  /**
+   * Reference to the order whose refund was increased
+   */
+  char *order_id;
+
+  /**
+   * Handle to the operation
+   */
+  struct TALER_MERCHANT_RefundLookupOperation *rlo;
+
+  /**
+   * Used to retrieve the asked refund amount.
+   * This information helps the callback to mock a GET /refund
+   * response and match it against what the backend actually
+   * responded.
+   */
+  char *increase_ref;
+
+  /**
+   * Used to retrieve the number and denomination of coins
+   * used to pay for the related contract.
+   * This information helps the callback to mock a GET /refund
+   * response and match it against what the backend actually
+   * responded.
+   */
+  char *pay_ref;
+
+} refund_lookup;
 
   } details;
 
@@ -732,27 +726,27 @@ static struct GNUNET_DISK_PipeHandle *sigpipe;
  */
 struct GNUNET_CRYPTO_EddsaPrivateKey *
 get_instance_priv (struct GNUNET_CONFIGURATION_Handle *config,
-                   const char *instance)
+               const char *instance)
 {
   char *config_section;
   char *filename;
   struct GNUNET_CRYPTO_EddsaPrivateKey *ret;
   
   (void) GNUNET_asprintf (&config_section,
-                          "merchant-instance-%s",
-                          instance);
+                      "merchant-instance-%s",
+                      instance);
 
   if (GNUNET_OK !=
-        GNUNET_CONFIGURATION_get_value_filename (config,
-                                                 config_section,
-                                                 "KEYFILE",
-                                                 &filename))
+    GNUNET_CONFIGURATION_get_value_filename (config,
+                                             config_section,
+                                             "KEYFILE",
+                                             &filename))
   {
     GNUNET_break (0);
     return NULL;
   }
   if (NULL ==
-       (ret = GNUNET_CRYPTO_eddsa_key_create_from_file (filename)))
+   (ret = GNUNET_CRYPTO_eddsa_key_create_from_file (filename)))
     GNUNET_break (0);
 
   return ret;
@@ -767,9 +761,9 @@ static void
 fail (struct InterpreterState *is)
 {
   GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-              "Interpreter failed at step %s (#%u)\n",
-              is->commands[is->ip].label,
-              is->ip);
+          "Interpreter failed at step %s (#%u)\n",
+          is->commands[is->ip].label,
+          is->ip);
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_shutdown ();
 }
@@ -784,7 +778,7 @@ fail (struct InterpreterState *is)
  */
 static const struct Command *
 find_command (const struct InterpreterState *is,
-              const char *label)
+          const char *label)
 {
   unsigned int i;
   const struct Command *cmd;
@@ -797,12 +791,12 @@ find_command (const struct InterpreterState *is,
   }
   for (i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
     if ( (NULL != cmd->label) &&
-         (0 == strcmp (cmd->label,
-                       label)) )
+       (0 == strcmp (cmd->label,
+                     label)) )
       return cmd;
   GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-              "Command not found: %s\n",
-              label);
+          "Command not found: %s\n",
+          label);
   return NULL;
 }
 
@@ -841,9 +835,9 @@ next_command (struct InterpreterState *is)
  */
 static void
 add_incoming_cb (void *cls,
-                 unsigned int http_status,
+             unsigned int http_status,
 		 enum TALER_ErrorCode ec,
-                 const json_t *full_response)
+             const json_t *full_response)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -871,9 +865,9 @@ add_incoming_cb (void *cls,
  */
 static void
 history_cb (void *cls,
-            unsigned int http_status,
+        unsigned int http_status,
 	    enum TALER_ErrorCode ec,
-            const json_t *json)
+        const json_t *json)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -909,7 +903,7 @@ history_cb (void *cls,
  */
 static int
 compare_admin_add_incoming_history (const struct TALER_EXCHANGE_ReserveHistory *h,
-                                    const struct Command *cmd)
+                                const struct Command *cmd)
 {
   struct TALER_Amount amount;
 
@@ -919,10 +913,10 @@ compare_admin_add_incoming_history (const struct TALER_EXCHANGE_ReserveHistory *
     return GNUNET_SYSERR;
   }
   GNUNET_assert (GNUNET_OK ==
-                 TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
-                                         &amount));
+             TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
+                                     &amount));
   if (0 != TALER_amount_cmp (&amount,
-                             &h->amount))
+                         &h->amount))
   {
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
@@ -941,7 +935,7 @@ compare_admin_add_incoming_history (const struct TALER_EXCHANGE_ReserveHistory *
  */
 static int
 compare_reserve_withdraw_history (const struct TALER_EXCHANGE_ReserveHistory *h,
-                                  const struct Command *cmd)
+                              const struct Command *cmd)
 {
   struct TALER_Amount amount;
   struct TALER_Amount amount_with_fee;
@@ -952,14 +946,14 @@ compare_reserve_withdraw_history (const struct TALER_EXCHANGE_ReserveHistory *h,
     return GNUNET_SYSERR;
   }
   GNUNET_assert (GNUNET_OK ==
-                 TALER_string_to_amount (cmd->details.reserve_withdraw.amount,
-                                         &amount));
+    TALER_string_to_amount (cmd->details.reserve_withdraw.amount,
+                            &amount));
   GNUNET_assert (GNUNET_OK ==
-                 TALER_amount_add (&amount_with_fee,
-                                   &amount,
-                                   &cmd->details.reserve_withdraw.pk->fee_withdraw));
+    TALER_amount_add (&amount_with_fee,
+                      &amount,
+                      &cmd->details.reserve_withdraw.pk->fee_withdraw));
   if (0 != TALER_amount_cmp (&amount_with_fee,
-                             &h->amount))
+      &h->amount))
   {
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
@@ -1017,15 +1011,15 @@ reserve_status_cb (void *cls,
       {
       case OC_ADMIN_ADD_INCOMING:
         if ( ( (NULL != rel->label) &&
-               (0 == strcmp (cmd->details.reserve_status.reserve_reference,
-                             rel->label) ) ) ||
-             ( (NULL != rel->details.admin_add_incoming.reserve_reference) &&
-               (0 == strcmp (cmd->details.reserve_status.reserve_reference,
-                             rel->details.admin_add_incoming.reserve_reference) ) ) )
+             (0 == strcmp (cmd->details.reserve_status.reserve_reference,
+                           rel->label) ) ) ||
+           ( (NULL != rel->details.admin_add_incoming.reserve_reference) &&
+             (0 == strcmp (cmd->details.reserve_status.reserve_reference,
+                         rel->details.admin_add_incoming.reserve_reference) ) ) )
         {
           if (GNUNET_OK !=
-              compare_admin_add_incoming_history (&history[j],
-                                                  rel))
+            compare_admin_add_incoming_history (&history[j],
+                                                rel))
           {
             GNUNET_break (0);
             fail (is);
@@ -1040,7 +1034,7 @@ reserve_status_cb (void *cls,
         {
           if (GNUNET_OK !=
               compare_reserve_withdraw_history (&history[j],
-                                             rel))
+                                               rel))
           {
             GNUNET_break (0);
             fail (is);
@@ -1050,7 +1044,7 @@ reserve_status_cb (void *cls,
         }
         break;
       default:
-        /* unreleated, just skip */
+      /* unreleated, just skip */
         break;
       }
     }
@@ -1067,7 +1061,7 @@ reserve_status_cb (void *cls,
                                              &amount));
       if (0 != TALER_amount_cmp (&amount,
                                  balance))
-      {
+      {    
         GNUNET_break (0);
         fail (is);
         return;
@@ -1075,9 +1069,9 @@ reserve_status_cb (void *cls,
     }
     break;
   default:
-    /* Unsupported status code (by test harness) */
-    GNUNET_break (0);
-    break;
+  /* Unsupported status code (by test harness) */
+  GNUNET_break (0);
+  break;
   }
   next_command (is);
 }
@@ -1095,10 +1089,10 @@ reserve_status_cb (void *cls,
  */
 static void
 reserve_withdraw_cb (void *cls,
-                     unsigned int http_status,
+                 unsigned int http_status,
 		     enum TALER_ErrorCode ec,
-                     const struct TALER_DenominationSignature *sig,
-                     const json_t *full_response)
+                 const struct TALER_DenominationSignature *sig,
+                 const json_t *full_response)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -1129,7 +1123,7 @@ reserve_withdraw_cb (void *cls,
       = GNUNET_CRYPTO_rsa_signature_dup (sig->rsa_signature);
     break;
   case MHD_HTTP_PAYMENT_REQUIRED:
-    /* nothing to check */
+  /* nothing to check */
     break;
   default:
     /* Unsupported status code (by test harness) */
@@ -1156,12 +1150,12 @@ reserve_withdraw_cb (void *cls,
  */
 static void
 proposal_cb (void *cls,
-             unsigned int http_status,
+         unsigned int http_status,
 	     enum TALER_ErrorCode ec,
-             const json_t *obj,
-             const json_t *contract_terms,
-             const struct TALER_MerchantSignatureP *sig,
-             const struct GNUNET_HashCode *hash)
+         const json_t *obj,
+         const json_t *contract_terms,
+         const struct TALER_MerchantSignatureP *sig,
+         const struct GNUNET_HashCode *hash)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -1201,16 +1195,16 @@ proposal_cb (void *cls,
  */
 static void
 refund_increase_cb (void *cls,
-                    unsigned int http_status,
-                    enum TALER_ErrorCode ec,
-                    const json_t *obj)
+                unsigned int http_status,
+                enum TALER_ErrorCode ec,
+                const json_t *obj)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "/refund (increase) response object: %s\n",
-              json_dumps (obj, JSON_INDENT (2)));
+          "/refund (increase) response object: %s\n",
+          json_dumps (obj, JSON_INDENT (2)));
 
   if (MHD_HTTP_OK != http_status)
   {
@@ -1220,6 +1214,100 @@ refund_increase_cb (void *cls,
     return;
   }
   cmd->details.refund_increase.rio = NULL;
+  next_command (is);
+}
+
+
+/**
+ * Callback that frees all the elements in the hashmap
+ *
+ * @param cls closure, NULL
+ * @param key current key
+ * @param value a `struct TALER_Amount`
+ */
+static int
+hashmap_free (void *cls,
+          const struct GNUNET_HashCode *key,
+          void *value)
+{
+  struct TALER_Amount *refund_amount = value;
+
+  GNUNET_free (refund_amount);
+  return GNUNET_YES;
+}
+
+/**
+ * Process GET /refund (increase) response. 
+ *
+ * @param cls closure
+ * @param http_status HTTP status code
+ * @param ec taler-specific error object
+ * @param obj response body; is NULL on error.
+ */
+static void
+refund_lookup_cb_minimal (void *cls,
+                      unsigned int http_status,
+                      enum TALER_ErrorCode ec,
+                      const json_t *obj)
+{
+  struct GNUNET_CONTAINER_MultiHashMap *map;
+  struct InterpreterState *is = cls;
+   struct Command *cmd = &is->commands[is->ip];
+
+  if (MHD_HTTP_OK != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Refund lookup failed\n");
+    fail (is);
+    return;
+  }
+
+  map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
+
+  size_t index;
+  json_t *elem;
+
+  json_array_foreach (obj, index, elem)
+  {
+    struct TALER_CoinSpendPublicKeyP coin_pub;
+    struct TALER_Amount *refund_amount = GNUNET_new (struct TALER_Amount);
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin_pub),
+      TALER_JSON_spec_amount ("refund_amount", refund_amount),
+      GNUNET_JSON_spec_end ()
+};
+  const char *error_name;
+  unsigned int error_line;
+  struct GNUNET_HashCode h_coin_pub;
+      
+  if (GNUNET_OK !=
+        GNUNET_JSON_parse (elem,
+                           spec,
+                           &error_name,
+                           &error_line))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not parse GET /refund response\n");
+    fail (is);
+    return;
+  }
+  GNUNET_CRYPTO_hash (&coin_pub,
+                      sizeof (struct TALER_CoinSpendPublicKeyP),
+                      &h_coin_pub);
+  
+  GNUNET_assert (GNUNET_OK ==
+    GNUNET_CONTAINER_multihashmap_put (map,
+                                       &h_coin_pub,
+                                       refund_amount,
+                                       GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY)); 
+  
+  /* do the job */
+  
+  GNUNET_CONTAINER_multihashmap_iterate (map,
+                                         &hashmap_free,
+                                         NULL);
+  }
+  cmd->details.refund_lookup.rlo = NULL;
   next_command (is);
 }
 
@@ -1344,7 +1432,7 @@ refund_lookup_cb (void *cls,
 static void
 pay_cb (void *cls,
         unsigned int http_status,
-	enum TALER_ErrorCode ec,
+        enum TALER_ErrorCode ec,
         const json_t *obj)
 {
   struct InterpreterState *is = cls;
@@ -1393,8 +1481,8 @@ pay_cb (void *cls,
     if (GNUNET_OK !=
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
                                     &mr.purpose,
-  		                    &sig,
-  				    &cmd->details.pay.merchant_pub.eddsa_pub))
+                                    &sig,
+                                    &cmd->details.pay.merchant_pub.eddsa_pub))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Merchant signature given in response to /pay invalid\n");
@@ -1448,7 +1536,7 @@ maint_child_death (void *cls)
 static void
 track_transfer_cb (void *cls,
                    unsigned int http_status,
-		   enum TALER_ErrorCode ec,
+                   enum TALER_ErrorCode ec,
                    const struct TALER_ExchangePublicKeyP *sign_key,
                    const json_t *json,
                    const struct GNUNET_HashCode *h_wire,
@@ -1517,7 +1605,7 @@ proposal_lookup_cb (void *cls,
 static void
 track_transaction_cb (void *cls,
                       unsigned int http_status,
-		      enum TALER_ErrorCode ec,
+                      enum TALER_ErrorCode ec,
                       const json_t *json)
 {
   struct InterpreterState *is = cls;
@@ -1770,138 +1858,138 @@ interpreter_run (void *cls)
   struct Command *cmd = &is->commands[is->ip];
   const struct Command *ref;
   struct TALER_ReservePublicKeyP reserve_pub;
-      struct TALER_CoinSpendPublicKeyP coin_pub;
-      struct TALER_Amount amount;
-      struct GNUNET_TIME_Absolute execution_date;
-      json_t *sender_details;
-      json_t *transfer_details;
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+  struct TALER_Amount amount;
+  struct GNUNET_TIME_Absolute execution_date;
+  json_t *sender_details;
+  json_t *transfer_details;
 
-      is->task = NULL;
-      tc = GNUNET_SCHEDULER_get_task_context ();
-      if (0 != (tc->reason & GNUNET_SCHEDULER_REASON_SHUTDOWN))
+  is->task = NULL;
+  tc = GNUNET_SCHEDULER_get_task_context ();
+  if (0 != (tc->reason & GNUNET_SCHEDULER_REASON_SHUTDOWN))
+  {
+    fprintf (stderr,
+             "Test aborted by shutdown request\n");
+    fail (is);
+    return;
+  }
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Interpreter runs command %u/%s(%u)\n",
+              is->ip,
+              cmd->label,
+              cmd->oc);
+  switch (cmd->oc)
+  {
+    case OC_END:
+      result = GNUNET_OK;
+      if (instance_idx + 1 == ninstances)
       {
-        fprintf (stderr,
-                 "Test aborted by shutdown request\n");
-        fail (is);
+        GNUNET_SCHEDULER_shutdown ();
         return;
       }
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Interpreter runs command %u/%s(%u)\n",
-                  is->ip,
-                  cmd->label,
-                  cmd->oc);
-      switch (cmd->oc)
-      {
-        case OC_END:
-          result = GNUNET_OK;
-          if (instance_idx + 1 == ninstances)
-          {
-            GNUNET_SCHEDULER_shutdown ();
-            return;
-          }
-          cleanup_state (is);
-          is->ip = 0;
-          instance_idx++;
-          instance = instances[instance_idx];
-          instance_priv = get_instance_priv (cfg, instance);
-          GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                      "Switching instance: `%s'\n",
-                      instance);
-          is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
-                                               is);
-          return;
+      cleanup_state (is);
+      is->ip = 0;
+      instance_idx++;
+      instance = instances[instance_idx];
+      instance_priv = get_instance_priv (cfg, instance);
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "Switching instance: `%s'\n",
+                  instance);
+      is->task = GNUNET_SCHEDULER_add_now (interpreter_run,
+                                           is);
+      return;
 
-        case OC_PROPOSAL_LOOKUP:
-        {
-          const char *order_id;
+    case OC_PROPOSAL_LOOKUP:
+    {
+      const char *order_id;
 
-          GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
-          ref = find_command (is, cmd->details.proposal_lookup.proposal_reference);
-          GNUNET_assert (NULL != ref);
+      GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
+      ref = find_command (is, cmd->details.proposal_lookup.proposal_reference);
+      GNUNET_assert (NULL != ref);
 
-          order_id =
-            json_string_value (json_object_get (ref->details.proposal.contract_terms,
-                                                "order_id"));
-          GNUNET_assert (NULL !=
-                          (cmd->details.proposal_lookup.plo
-                           = TALER_MERCHANT_proposal_lookup (ctx,
-                                                             MERCHANT_URI,
-                                                             order_id,
-                                                             instance,
-                                                             proposal_lookup_cb,
-                                                             is)));
-        }
+      order_id =
+        json_string_value (json_object_get (ref->details.proposal.contract_terms,
+                                            "order_id"));
+      GNUNET_assert (NULL !=
+                      (cmd->details.proposal_lookup.plo
+                       = TALER_MERCHANT_proposal_lookup (ctx,
+                                                         MERCHANT_URI,
+                                                         order_id,
+                                                         instance,
+                                                         proposal_lookup_cb,
+                                                         is)));
+    }
 
-        return;
+    return;
 
-      case OC_ADMIN_ADD_INCOMING:
-        if (NULL !=
-            cmd->details.admin_add_incoming.reserve_reference)
-        {
-          ref = find_command (is,
-                              cmd->details.admin_add_incoming.reserve_reference);
-          GNUNET_assert (NULL != ref);
-          GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
-          cmd->details.admin_add_incoming.reserve_priv
-            = ref->details.admin_add_incoming.reserve_priv;
-        }
-        else
-        {
-          struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
+  case OC_ADMIN_ADD_INCOMING:
+    if (NULL !=
+        cmd->details.admin_add_incoming.reserve_reference)
+    {
+      ref = find_command (is,
+                          cmd->details.admin_add_incoming.reserve_reference);
+      GNUNET_assert (NULL != ref);
+      GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
+      cmd->details.admin_add_incoming.reserve_priv
+        = ref->details.admin_add_incoming.reserve_priv;
+    }
+    else
+    {
+      struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
 
-          priv = GNUNET_CRYPTO_eddsa_key_create ();
-          cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
-          GNUNET_free (priv);
-        }
-        GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
-                                            &reserve_pub.eddsa_pub);
-        if (GNUNET_OK !=
-            TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
-                                    &amount))
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Failed to parse amount `%s' at %u\n",
-                      cmd->details.admin_add_incoming.amount,
-                      is->ip);
-          fail (is);
-          return;
-        }
+      priv = GNUNET_CRYPTO_eddsa_key_create ();
+      cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
+      GNUNET_free (priv);
+    }
+    GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
+                                        &reserve_pub.eddsa_pub);
+    if (GNUNET_OK !=
+        TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
+                                &amount))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed to parse amount `%s' at %u\n",
+                  cmd->details.admin_add_incoming.amount,
+                  is->ip);
+      fail (is);
+      return;
+    }
 
-        execution_date = GNUNET_TIME_absolute_get ();
-        GNUNET_TIME_round_abs (&execution_date);
-        sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
-                                     JSON_REJECT_DUPLICATES,
-                                     NULL);
-        if (NULL == sender_details)
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Failed to parse sender details `%s' at %u\n",
-                      cmd->details.admin_add_incoming.sender_details,
-                      is->ip);
-          fail (is);
-          return;
-        }
-        transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
-                                       JSON_REJECT_DUPLICATES,
-                                       NULL);
+    execution_date = GNUNET_TIME_absolute_get ();
+    GNUNET_TIME_round_abs (&execution_date);
+    sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
+                                 JSON_REJECT_DUPLICATES,
+                                 NULL);
+    if (NULL == sender_details)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed to parse sender details `%s' at %u\n",
+                  cmd->details.admin_add_incoming.sender_details,
+                  is->ip);
+      fail (is);
+      return;
+    }
+    transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
+                                   JSON_REJECT_DUPLICATES,
+                                   NULL);
 
-        if (NULL == transfer_details)
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Failed to parse transfer details `%s' at %u\n",
-                      cmd->details.admin_add_incoming.transfer_details,
-                      is->ip);
-          fail (is);
-          return;
-        }
+    if (NULL == transfer_details)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed to parse transfer details `%s' at %u\n",
+                  cmd->details.admin_add_incoming.transfer_details,
+                  is->ip);
+      fail (is);
+      return;
+    }
 
-        cmd->details.admin_add_incoming.aih
-          = TALER_EXCHANGE_admin_add_incoming (exchange,
-                                               "http://localhost:18080/",
-                                               &reserve_pub,
-                                               &amount,
-                                               execution_date,
-                                               sender_details,
+    cmd->details.admin_add_incoming.aih
+      = TALER_EXCHANGE_admin_add_incoming (exchange,
+                                           "http://localhost:18080/",
+                                           &reserve_pub,
+                                           &amount,
+                                           execution_date,
+                                           sender_details,
                                            transfer_details,
                                            &add_incoming_cb,
                                            is);
@@ -1960,11 +2048,11 @@ interpreter_run (void *cls)
       fail (is);
       return;
     }
-
+    
     /* create coin's private key */
     {
       struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-
+    
       priv = GNUNET_CRYPTO_eddsa_key_create ();
       cmd->details.reserve_withdraw.coin_priv.eddsa_priv = *priv;
       GNUNET_free (priv);
@@ -1974,7 +2062,7 @@ interpreter_run (void *cls)
     GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
                                 &cmd->details.reserve_withdraw.blinding_key,
                                 sizeof (cmd->details.reserve_withdraw.blinding_key));
-
+    
     cmd->details.reserve_withdraw.wsh
       = TALER_EXCHANGE_reserve_withdraw (exchange,
                                          cmd->details.reserve_withdraw.pk,
@@ -1991,136 +2079,146 @@ interpreter_run (void *cls)
     }
     return;
   case OC_PROPOSAL:
+  {
+    json_t *order;
+    json_error_t error;
+  
+    order = json_loads (cmd->details.proposal.order,
+                        JSON_REJECT_DUPLICATES,
+                        &error);
+    if (NULL != instance)
     {
-      json_t *order;
-      json_error_t error;
-
-      order = json_loads (cmd->details.proposal.order,
-                          JSON_REJECT_DUPLICATES,
-                          &error);
-      if (NULL != instance)
-      {
-        json_t *merchant;
-
-        merchant = json_object ();
-        json_object_set_new (merchant,
-                             "instance",
-                             json_string (instance));
-        json_object_set_new (order,
-                             "merchant",
-                             merchant);
-      }
-      if (NULL == order)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse the order `%s' at command #%u: %s at %u\n",
-                    cmd->details.proposal.order,
-                    is->ip,
-                    error.text,
-                    (unsigned int) error.column);
-        fail (is);
-        return;
-      }
-      cmd->details.proposal.po
-        = TALER_MERCHANT_order_put (ctx,
-                                    MERCHANT_URI,
-                                    order,
-                                    &proposal_cb,
-                                    is);
-      json_decref (order);
-      if (NULL == cmd->details.proposal.po)
-      {
-        GNUNET_break (0);
-        fail (is);
-        return;
-      }
+      json_t *merchant;
+  
+      merchant = json_object ();
+      json_object_set_new (merchant,
+                           "instance",
+                           json_string (instance));
+      json_object_set_new (order,
+                           "merchant",
+                           merchant);
+    }
+    if (NULL == order)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed to parse the order `%s' at command #%u: %s at %u\n",
+                  cmd->details.proposal.order,
+                  is->ip,
+                  error.text,
+                  (unsigned int) error.column);
+      fail (is);
       return;
     }
-  case OC_PAY:
+    cmd->details.proposal.po
+      = TALER_MERCHANT_order_put (ctx,
+                                  MERCHANT_URI,
+                                  order,
+                                  &proposal_cb,
+                                  is);
+    json_decref (order);
+    if (NULL == cmd->details.proposal.po)
     {
-      struct TALER_MERCHANT_PayCoin pc;
-      const char *order_id;
-      struct GNUNET_TIME_Absolute refund_deadline;
-      struct GNUNET_TIME_Absolute pay_deadline;
-      struct GNUNET_TIME_Absolute timestamp;
-      struct GNUNET_HashCode h_wire;
-      struct TALER_MerchantPublicKeyP merchant_pub;
-      struct TALER_MerchantSignatureP merchant_sig;
-      struct TALER_Amount total_amount;
-      struct TALER_Amount max_fee;
-      const char *error_name;
-      unsigned int error_line;
+      GNUNET_break (0);
+      fail (is);
+      return;
+    }
+    return;
+  }
+  case OC_PAY:
+  {
+    struct TALER_MERCHANT_PayCoin *pc;
+    struct TALER_MERCHANT_PayCoin *icoin;
+    char *coins;
+    unsigned int npc;
+    const char *order_id;
+    struct GNUNET_TIME_Absolute refund_deadline;
+    struct GNUNET_TIME_Absolute pay_deadline;
+    struct GNUNET_TIME_Absolute timestamp;
+    struct GNUNET_HashCode h_wire;
+    struct TALER_MerchantPublicKeyP merchant_pub;
+    struct TALER_MerchantSignatureP merchant_sig;
+    struct TALER_Amount total_amount;
+    struct TALER_Amount max_fee;
+    char *token;
+    const char *error_name;
+    unsigned int error_line;
+  
+    /* get proposal */
+    ref = find_command (is,
+                        cmd->details.pay.contract_ref);
+    GNUNET_assert (NULL != ref);
+    merchant_sig = ref->details.proposal.merchant_sig;
+    GNUNET_assert (NULL != ref->details.proposal.contract_terms);
+    {
+      /* Get information that need to be replied in the deposit permission */
+      struct GNUNET_JSON_Specification spec[] = {
+        GNUNET_JSON_spec_string ("order_id", &order_id),
+        GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
+        GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
+        GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
+        GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
+        GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
+        TALER_JSON_spec_amount ("amount", &total_amount),
+        TALER_JSON_spec_amount ("max_fee", &max_fee),
+        GNUNET_JSON_spec_end()
+      };
 
-      /* get proposal */
-      ref = find_command (is,
-                          cmd->details.pay.contract_ref);
+    if (GNUNET_OK !=
+        GNUNET_JSON_parse (ref->details.proposal.contract_terms,
+                           spec,
+                           &error_name,
+                           &error_line))
+    {
+      GNUNET_break_op (0);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Parser failed on %s:%u\n",
+                  error_name,
+                  error_line);
+      fail (is);
+      return;
+    }
+    cmd->details.pay.merchant_pub = merchant_pub;
+    }
+  /* strtok loop here */
+    coins = GNUNET_strdup (cmd->details.pay.coin_ref);
+    GNUNET_break (NULL != (token = strtok (coins, ";")));
+    pc = GNUNET_new (struct TALER_MERCHANT_PayCoin);
+    icoin = pc;
+    npc = 1;
+    do
+    {
+      const struct Command *coin_ref;
+
+      coin_ref = find_command (is,
+                               token);
       GNUNET_assert (NULL != ref);
-      merchant_sig = ref->details.proposal.merchant_sig;
-      GNUNET_assert (NULL != ref->details.proposal.contract_terms);
+      switch (coin_ref->oc)
       {
-        /* Get information that need to be replied in the deposit permission */
-        struct GNUNET_JSON_Specification spec[] = {
-          GNUNET_JSON_spec_string ("order_id", &order_id),
-          GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
-          GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
-          GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
-          GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
-          GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
-          TALER_JSON_spec_amount ("amount", &total_amount),
-          TALER_JSON_spec_amount ("max_fee", &max_fee),
-          GNUNET_JSON_spec_end()
-        };
-
-        if (GNUNET_OK !=
-            GNUNET_JSON_parse (ref->details.proposal.contract_terms,
-                               spec,
-                               &error_name,
-                               &error_line))
-        {
-          GNUNET_break_op (0);
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Parser failed on %s:%u\n",
-                      error_name,
-                      error_line);
-          fail (is);
-          return;
-        }
-        cmd->details.pay.merchant_pub = merchant_pub;
+      case OC_WITHDRAW_SIGN:
+        icoin->coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
+        icoin->denom_pub = coin_ref->details.reserve_withdraw.pk->key;
+        icoin->denom_sig = coin_ref->details.reserve_withdraw.sig;
+        icoin->denom_value = coin_ref->details.reserve_withdraw.pk->value;
+	break;
+      default:
+        GNUNET_assert (0);
       }
 
+      if (GNUNET_OK !=
+          TALER_string_to_amount (cmd->details.pay.amount_without_fee,
+                                  &icoin->amount_without_fee))
       {
-        const struct Command *coin_ref;
-	memset (&pc, 0, sizeof (pc));
-	coin_ref = find_command (is,
-	                         cmd->details.pay.coin_ref);
-	GNUNET_assert (NULL != ref);
-	switch (coin_ref->oc)
-	{
-	case OC_WITHDRAW_SIGN:
-	  pc.coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
-	  pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
-	  pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
-          pc.denom_value = coin_ref->details.reserve_withdraw.pk->value;
-	  break;
-	default:
-	  GNUNET_assert (0);
-	}
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+	            "Failed to parse amount `%s' at %u\n",
+	            cmd->details.pay.amount_without_fee,
+	            is->ip);
+	fail (is);
+	return;
+      }
 
-	if (GNUNET_OK !=
-	    TALER_string_to_amount (cmd->details.pay.amount_without_fee,
-				    &pc.amount_without_fee))
-	{
-	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		      "Failed to parse amount `%s' at %u\n",
-		      cmd->details.pay.amount_without_fee,
-		      is->ip);
-	  fail (is);
-	  return;
-	}
-
-	if (GNUNET_OK !=
-	    TALER_string_to_amount (cmd->details.pay.amount_with_fee,
-				    &pc.amount_with_fee))
+      if (GNUNET_OK !=
+          TALER_string_to_amount (cmd->details.pay.amount_with_fee,
+                                  &icoin->amount_with_fee))
 	{
 	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
 		      "Failed to parse amount `%s' at %u\n",
@@ -2129,28 +2227,35 @@ interpreter_run (void *cls)
 	  fail (is);
 	  return;
 	}
-      }
+      token = strtok (NULL, ";");
+      if (NULL == token)
+        break;
+      icoin->next = GNUNET_new (struct TALER_MERCHANT_PayCoin);
+      icoin = icoin->next;
+    } while (1);
 
-      cmd->details.pay.ph
-	= TALER_MERCHANT_pay_wallet (ctx,
-				     MERCHANT_URI,
-                                     instance,
-				     &ref->details.proposal.hash,
-				     &total_amount,
-				     &max_fee,
-				     &merchant_pub,
-                                     &merchant_sig,
-				     timestamp,
-				     refund_deadline,
-				     pay_deadline,
-				     &h_wire,
-				     EXCHANGE_URI,
-                                     order_id,
-				     1 /* num_coins */,
-				     &pc /* coins */,
-				     &pay_cb,
-				     is);
-    }
+    icoin->next = NULL;
+
+    cmd->details.pay.ph
+      = TALER_MERCHANT_pay_wallet (ctx,
+                                   MERCHANT_URI,
+                                   instance,
+				   &ref->details.proposal.hash,
+				   &total_amount,
+				   &max_fee,
+				   &merchant_pub,
+                                   &merchant_sig,
+				   timestamp,
+				   refund_deadline,
+				   pay_deadline,
+				   &h_wire,
+				   EXCHANGE_URI,
+                                   order_id,
+				   npc /* num_coins */,
+				   pc /* coins */,
+				   &pay_cb,
+				   is);
+  }
     if (NULL == cmd->details.pay.ph)
     {
       GNUNET_break (0);
@@ -2161,7 +2266,7 @@ interpreter_run (void *cls)
   case OC_RUN_AGGREGATOR:
     {
       const struct GNUNET_DISK_FileHandle *pr;
-
+    
       cmd->details.run_aggregator.aggregator_proc
         = GNUNET_OS_start_process (GNUNET_NO,
                                    GNUNET_OS_INHERIT_STD_ALL,
@@ -2228,7 +2333,7 @@ interpreter_run (void *cls)
     {
       struct TALER_WireTransferIdentifierRawP wtid;
       const char *subject;
-
+    
       ref = find_command (is,
                           cmd->details.track_transfer.check_bank_ref);
       GNUNET_assert (NULL != ref);
@@ -2252,7 +2357,7 @@ interpreter_run (void *cls)
   {
     const struct Command *proposal_ref;
     const char *order_id;
-
+    
     ref = find_command (is,
                         cmd->details.track_transaction.pay_ref);
     GNUNET_assert (NULL != ref);
@@ -2273,13 +2378,13 @@ interpreter_run (void *cls)
 
     if (NULL ==
        (cmd->details.history.ho = TALER_MERCHANT_history (ctx,
-	                                                  MERCHANT_URI,
+    	                                                  MERCHANT_URI,
                                                           instance,
                                                           cmd->details.history.start,
                                                           cmd->details.history.nrows,
-	                                                  cmd->details.history.date,
-							  &history_cb,
-							  is)))
+    	                                                  cmd->details.history.date,
+    							  &history_cb,
+    							  is)))
     {
       fail (is);
       return;
@@ -2288,7 +2393,7 @@ interpreter_run (void *cls)
   case OC_REFUND_INCREASE:
   {
     struct TALER_Amount refund_amount;
-
+    
     GNUNET_assert (GNUNET_OK ==
       TALER_string_to_amount (cmd->details.refund_increase.refund_amount,
                               &refund_amount));
@@ -2318,7 +2423,7 @@ interpreter_run (void *cls)
                                          MERCHANT_URI,
                                          cmd->details.refund_lookup.order_id,
                                          instance,
-                                         refund_lookup_cb,
+                                         refund_lookup_cb_minimal,
                                          is)))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -2327,7 +2432,7 @@ interpreter_run (void *cls)
       return;
     }
     break;
-  }
+  }     
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
@@ -2421,7 +2526,7 @@ do_shutdown (void *cls)
  */
 static void
 cert_cb (void *cls,
-         const struct TALER_EXCHANGE_Keys *keys,
+     const struct TALER_EXCHANGE_Keys *keys,
 	 enum TALER_EXCHANGE_VersionCompatibility vc)
 {
   struct InterpreterState *is = cls;
@@ -2431,12 +2536,12 @@ cert_cb (void *cls,
   ERR (NULL == keys);
   ERR (0 == keys->num_sign_keys);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Read %u signing keys\n",
-              keys->num_sign_keys);
+          "Read %u signing keys\n",
+          keys->num_sign_keys);
   ERR (0 == keys->num_denom_keys);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Read %u denomination keys\n",
-              keys->num_denom_keys);
+          "Read %u denomination keys\n",
+          keys->num_denom_keys);
 #undef ERR
 
   /* run actual tests via interpreter-loop */
@@ -2444,7 +2549,7 @@ cert_cb (void *cls,
 	      "Certificate callback invoked, starting interpreter\n");
   is->keys = keys;
   is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                       is);
+                                   is);
 }
 
 
@@ -2482,14 +2587,22 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":62, \"uuid\":1 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
-      .details.admin_add_incoming.amount = "EUR:5.01" },
-
+      .details.admin_add_incoming.amount = "EUR:10.02" },
+    
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_withdraw.reserve_reference = "create-reserve-1",
       .details.reserve_withdraw.amount = "EUR:5" },
+    
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference = "create-reserve-1",
+      .details.reserve_withdraw.amount = "EUR:5" },
+    
     /* Check that deposit and withdraw operation are in history, and
        that the balance is now at zero */
     { .oc = OC_WITHDRAW_STATUS,
@@ -2509,18 +2622,18 @@ run (void *cls)
                   \"refund_deadline\":\"\\/Date(0)\\/\",\
                   \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
                   \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
-		  \"summary\": \"merchant-lib testcase\",\
+    		  \"summary\": \"merchant-lib testcase\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }"},
-
+    
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-1",
-      .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.coin_ref = "withdraw-coin-1;withdraw-coin-2",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-
+    
     /* Try to replay payment reusing coin */
     { .oc = OC_PAY,
       .label = "replay-simple",
@@ -2529,8 +2642,8 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-
-
+    
+    
     /* Create another contract */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-2",
@@ -2546,7 +2659,7 @@ run (void *cls)
                   \"summary\":\"useful product\",\
                   \"products\":\
                      [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
-
+    
     /* Try to double-spend the 5 EUR coin at the same merchant (but different
        transaction ID) */
     { .oc = OC_PAY,
@@ -2556,7 +2669,7 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-
+    
     /* Fill second reserve with EUR:1 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
@@ -2564,7 +2677,7 @@ run (void *cls)
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":63, \"uuid\":2 }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 2}",
       .details.admin_add_incoming.amount = "EUR:1" },
-
+    
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2b",
@@ -2573,30 +2686,30 @@ run (void *cls)
       .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":63, \"uuid\":3  }",
       .details.admin_add_incoming.transfer_details = "{ \"uuid\": 3}",
       .details.admin_add_incoming.amount = "EUR:4.01" },
-
+    
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.reserve_withdraw.reserve_reference = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
-
+    
     /* Proposal lookup */
     {
       .oc = OC_PROPOSAL_LOOKUP,
       .label = "fetch-proposal-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.proposal_lookup.proposal_reference = "create-proposal-2" },
-
+    
     /* Check nothing happened on the bank side so far */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
-
-
+    
+    
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator" },
-
+    
     /* Obtain WTID of the transfer */
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-498c",
@@ -2604,11 +2717,11 @@ run (void *cls)
       .details.check_bank_transfer.account_debit = 2, /* exchange-outgoing */
       .details.check_bank_transfer.account_credit = 62 /* merchant */
     },
-
+    
     /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
-
+    
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-1",
       .expected_response_code = MHD_HTTP_OK,
@@ -2616,7 +2729,7 @@ run (void *cls)
       .details.track_transaction.pay_ref = "deposit-simple",
       .details.track_transaction.wire_fee = "EUR:0.01",
     },
-
+    
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-1",
@@ -2630,7 +2743,7 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-498c",
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
-
+    
     /* Pay again successfully on 2nd contract */
     { .oc = OC_PAY,
       .label = "deposit-simple-2",
@@ -2639,11 +2752,11 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-2",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-
+    
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator-2" },
-
+    
     /* Obtain WTID of the transfer */
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-498c-2",
@@ -2651,11 +2764,11 @@ run (void *cls)
       .details.check_bank_transfer.account_debit = 2, /* exchange-outgoing */
       .details.check_bank_transfer.account_credit = 62 /* merchant */
     },
-
+    
     /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
-
+    
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-2",
@@ -2669,7 +2782,7 @@ run (void *cls)
       .details.track_transfer.check_bank_ref = "check_bank_transfer-498c-2",
       .details.track_transfer.expected_pay_ref = "deposit-simple-2"
     },
-
+    
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-2",
       .expected_response_code = MHD_HTTP_OK,
@@ -2677,7 +2790,7 @@ run (void *cls)
       .details.track_transaction.wire_fee = "EUR:0.01",
       .details.track_transaction.pay_ref = "deposit-simple-2"
     },
-
+    
     { .oc = OC_HISTORY,
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
@@ -2712,7 +2825,6 @@ run (void *cls)
     /* end of testcase */
     { .oc = OC_END }
   };
-
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Interpreter initializing\n");
   fakebank = TALER_FAKEBANK_start (BANK_PORT);
@@ -2728,17 +2840,17 @@ run (void *cls)
   is->commands = commands;
 
   ctx = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
-                          &rc);
+                      &rc);
   GNUNET_assert (NULL != ctx);
   rc = GNUNET_CURL_gnunet_rc_create (ctx);
   exchange = TALER_EXCHANGE_connect (ctx,
-                                     EXCHANGE_URI,
-                                     &cert_cb, is,
-                                     TALER_EXCHANGE_OPTION_END);
+                                 EXCHANGE_URI,
+                                 &cert_cb, is,
+                                 TALER_EXCHANGE_OPTION_END);
   GNUNET_assert (NULL != exchange);
   timeout_task
     = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply
-                                    (GNUNET_TIME_UNIT_SECONDS, 150),
+                                   (GNUNET_TIME_UNIT_SECONDS, 150),
                                     &do_timeout, NULL);
   GNUNET_SCHEDULER_add_shutdown (&do_shutdown, is);
 }
@@ -2752,7 +2864,7 @@ run (void *cls)
  */
 int
 main (int argc,
-      char * const *argv)
+  char * const *argv)
 {
   char *_instances;
   char *token;
@@ -2765,24 +2877,24 @@ main (int argc,
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
   GNUNET_log_setup ("test-merchant-api",
-                    "DEBUG",
-                    NULL);
+                "DEBUG",
+                NULL);
   cfg = GNUNET_CONFIGURATION_create ();
   GNUNET_assert (GNUNET_OK ==
-                 GNUNET_CONFIGURATION_load (cfg,
-                                            "test_merchant_api.conf"));
+             GNUNET_CONFIGURATION_load (cfg,
+                                        "test_merchant_api.conf"));
   GNUNET_assert (GNUNET_OK ==
-                 GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                        "merchant",
-                                                        "INSTANCES",
-                                                        &_instances));
+             GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                    "merchant",
+                                                    "INSTANCES",
+                                                    &_instances));
   fprintf (stderr,
-           "Found instances `%s'\n",
-           _instances);
+       "Found instances `%s'\n",
+       _instances);
   GNUNET_break (NULL != (token = strtok (_instances, " ")));
   GNUNET_array_append (instances,
-                       ninstances,
-                       GNUNET_strdup (token));
+                   ninstances,
+                   GNUNET_strdup (token));
   while (NULL != (token = strtok (NULL, " ")))
     GNUNET_array_append (instances,
                          ninstances,
@@ -2819,13 +2931,13 @@ main (int argc,
   GNUNET_OS_process_wait (proc);
   GNUNET_OS_process_destroy (proc);
   proc = GNUNET_OS_start_process (GNUNET_NO,
-                                  GNUNET_OS_INHERIT_STD_ALL,
-                                  NULL, NULL, NULL,
-                                  "taler-exchange-dbinit",
-                                  "taler-exchange-dbinit",
-                                  "-c", "test_merchant_api.conf",
-                                  "-r",
-                                  NULL);
+                              GNUNET_OS_INHERIT_STD_ALL,
+                              NULL, NULL, NULL,
+                              "taler-exchange-dbinit",
+                              "taler-exchange-dbinit",
+                              "-c", "test_merchant_api.conf",
+                              "-r",
+                              NULL);
   if (NULL == proc)
   {
     fprintf (stderr,
@@ -2849,24 +2961,24 @@ main (int argc,
   }
   /* give child time to start and bind against the socket */
   fprintf (stderr,
-           "Waiting for taler-exchange-httpd to be ready\n");
+       "Waiting for taler-exchange-httpd to be ready\n");
   cnt = 0;
   do
+  {
+    fprintf (stderr, ".");
+    sleep (1);
+    cnt++;
+    if (cnt > 60)
     {
-      fprintf (stderr, ".");
-      sleep (1);
-      cnt++;
-      if (cnt > 60)
-      {
-        fprintf (stderr,
-                 "\nFailed to start taler-exchange-httpd\n");
-        GNUNET_OS_process_kill (exchanged,
-                                SIGKILL);
-        GNUNET_OS_process_wait (exchanged);
-        GNUNET_OS_process_destroy (exchanged);
-        return 77;
-      }
+      fprintf (stderr,
+               "\nFailed to start taler-exchange-httpd\n");
+      GNUNET_OS_process_kill (exchanged,
+                              SIGKILL);
+      GNUNET_OS_process_wait (exchanged);
+      GNUNET_OS_process_destroy (exchanged);
+      return 77;
     }
+  }
   while (0 != system ("wget -q -t 1 -T 1 " EXCHANGE_URI "keys -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
   merchantd = GNUNET_OS_start_process (GNUNET_NO,
@@ -2892,25 +3004,25 @@ main (int argc,
            "Waiting for taler-merchant-httpd to be ready\n");
   cnt = 0;
   do
+  {
+    fprintf (stderr, ".");
+    sleep (1);
+    cnt++;
+    if (cnt > 60)
     {
-      fprintf (stderr, ".");
-      sleep (1);
-      cnt++;
-      if (cnt > 60)
-      {
-        fprintf (stderr,
-                 "\nFailed to start taler-merchant-httpd\n");
-        GNUNET_OS_process_kill (merchantd,
-                                SIGKILL);
-        GNUNET_OS_process_wait (merchantd);
-        GNUNET_OS_process_destroy (merchantd);
-        GNUNET_OS_process_kill (exchanged,
-                                SIGKILL);
-        GNUNET_OS_process_wait (exchanged);
-        GNUNET_OS_process_destroy (exchanged);
-        return 77;
-      }
+      fprintf (stderr,
+               "\nFailed to start taler-merchant-httpd\n");
+      GNUNET_OS_process_kill (merchantd,
+                              SIGKILL);
+      GNUNET_OS_process_wait (merchantd);
+      GNUNET_OS_process_destroy (merchantd);
+      GNUNET_OS_process_kill (exchanged,
+                              SIGKILL);
+      GNUNET_OS_process_wait (exchanged);
+      GNUNET_OS_process_destroy (exchanged);
+      return 77;
     }
+  }
   while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URI " -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
 
@@ -2918,20 +3030,20 @@ main (int argc,
   sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO, GNUNET_NO, GNUNET_NO);
   GNUNET_assert (NULL != sigpipe);
   shc_chld = GNUNET_SIGNAL_handler_install (GNUNET_SIGCHLD,
-                                            &sighandler_child_death);
+                                        &sighandler_child_death);
   GNUNET_SCHEDULER_run (&run, NULL);
   GNUNET_SIGNAL_handler_uninstall (shc_chld);
   shc_chld = NULL;
   GNUNET_DISK_pipe_close (sigpipe);
   GNUNET_OS_process_kill (merchantd,
-                          SIGTERM);
+                      SIGTERM);
   GNUNET_OS_process_wait (merchantd);
   GNUNET_OS_process_destroy (merchantd);
   GNUNET_OS_process_kill (exchanged,
-                          SIGTERM);
+                      SIGTERM);
   GNUNET_OS_process_wait (exchanged);
   GNUNET_OS_process_destroy (exchanged);
   if (77 == result)
-    return 77;
+return 77;
   return (GNUNET_OK == result) ? 0 : 1;
 }

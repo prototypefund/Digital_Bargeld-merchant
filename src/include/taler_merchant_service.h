@@ -295,6 +295,11 @@ struct TALER_MERCHANT_PayCoin
    * Amount this coin is to contribute (without fee).
    */
   struct TALER_Amount amount_without_fee;
+
+  /**
+   * Next coin used to pay
+   */
+  struct TALER_MERCHANT_PayCoin *next;
 };
 
 
