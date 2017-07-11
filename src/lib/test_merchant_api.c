@@ -1245,10 +1245,10 @@ hashmap_free (void *cls,
  * @param obj response body; is NULL on error.
  */
 static void
-refund_lookup_cb_minimal (void *cls,
-                      unsigned int http_status,
-                      enum TALER_ErrorCode ec,
-                      const json_t *obj)
+refund_lookup_cb (void *cls,
+                  unsigned int http_status,
+                  enum TALER_ErrorCode ec,
+                  const json_t *obj)
 {
   struct GNUNET_CONTAINER_MultiHashMap *map;
   struct InterpreterState *is = cls;
@@ -1376,113 +1376,6 @@ refund_lookup_cb_minimal (void *cls,
   GNUNET_CONTAINER_multihashmap_iterate (map,
                                          &hashmap_free,
                                          NULL);
-  cmd->details.refund_lookup.rlo = NULL;
-  next_command (is);
-}
-
-/**
- * Process GET /refund (increase) response. 
- *
- * @param cls closure
- * @param http_status HTTP status code
- * @param ec taler-specific error object
- * @param obj response body; is NULL on error.
- */
-static void
-refund_lookup_cb (void *cls,
-                  unsigned int http_status,
-                  enum TALER_ErrorCode ec,
-                  const json_t *obj)
-{
-  struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-  const struct Command *pay_ref;
-  const struct Command *increase_ref;
-  const struct Command *coin_ref;
-  struct TALER_Amount refund_amount;
-  struct TALER_Amount refund_fee;
-  struct TALER_Amount coin_amount;
-  struct TALER_CoinSpendPublicKeyP coin_pub;
-  struct TALER_MerchantPublicKeyP merchant_pub;
-  struct json_t *resp_element;
-  struct json_t *mock_element;
-  struct TALER_RefundRequestPS rr;
-  struct GNUNET_CRYPTO_EddsaSignature sig;
-
-  if (MHD_HTTP_OK != http_status)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Refund lookup failed\n");
-    fail (is);
-    return;
-  }
-
-  increase_ref = find_command (is, cmd->details.refund_lookup.increase_ref);
-  GNUNET_assert (NULL != increase_ref);
-
-  GNUNET_assert (GNUNET_OK ==
-    TALER_string_to_amount (increase_ref->details.refund_increase.refund_amount,
-                            &refund_amount));
-  GNUNET_assert (GNUNET_OK ==
-    TALER_string_to_amount (increase_ref->details.refund_increase.refund_fee,
-                            &refund_fee));
-
-  pay_ref = find_command (is, cmd->details.refund_lookup.pay_ref);
-  GNUNET_assert (NULL != pay_ref);
-
-  GNUNET_assert (GNUNET_OK ==
-    TALER_string_to_amount (pay_ref->details.pay.amount_without_fee,
-                            &coin_amount));
-
-  /* Get coin pub */
-  coin_ref = find_command (is, pay_ref->details.pay.coin_ref);
-  GNUNET_assert (NULL != coin_ref);
- 
-  GNUNET_CRYPTO_eddsa_key_get_public (&coin_ref->details.reserve_withdraw.coin_priv.eddsa_priv,
-                                      &coin_pub.eddsa_pub);
-
-  GNUNET_assert (NULL != (resp_element = json_array_get (obj, 0)));
-  
-  GNUNET_CRYPTO_eddsa_key_get_public (instance_priv,
-                                      &merchant_pub.eddsa_pub);
-
-  rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
-  rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
-
-  rr.h_contract_terms = pay_ref->details.pay.h_contract_terms;
-  rr.coin_pub = coin_pub;
-  rr.merchant = merchant_pub;
-  rr.rtransaction_id = GNUNET_htonll (instance_idx + 1);
-  TALER_amount_hton (&rr.refund_amount,
-                     &refund_amount);
-  TALER_amount_hton (&rr.refund_fee,
-                     &refund_fee);
-
-  GNUNET_assert (GNUNET_OK == GNUNET_CRYPTO_eddsa_sign (instance_priv,
-                                                        &rr.purpose,
-                                                        &sig));
-  GNUNET_assert (NULL != (mock_element = json_pack ("{s:o, s:o, s:o, s:o, s:o, s:I, s:o}",
-                  "coin_pub", GNUNET_JSON_from_data_auto (&coin_pub),
-                  "merchant_pub", GNUNET_JSON_from_data_auto (&merchant_pub),
-                  "refund_amount", TALER_JSON_from_amount (&refund_amount),
-                  "refund_fee", TALER_JSON_from_amount (&refund_fee),
-                  "h_contract_terms", GNUNET_JSON_from_data_auto (&pay_ref->details.pay.h_contract_terms),
-                  "rtransaction_id", (json_int_t) instance_idx + 1,
-                  "merchant_sig", GNUNET_JSON_from_data_auto (&sig))));
-
-  if (1 != json_equal (mock_element, resp_element))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Got unexpected refund\n");
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "resp: %s\n",
-                json_dumps (resp_element, JSON_INDENT (2)));
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "mock: %s\n",
-                json_dumps (mock_element, JSON_INDENT (2)));
-    fail (is);
-  }
-
   cmd->details.refund_lookup.rlo = NULL;
   next_command (is);
 }
@@ -2492,7 +2385,7 @@ interpreter_run (void *cls)
                                          MERCHANT_URI,
                                          cmd->details.refund_lookup.order_id,
                                          instance,
-                                         refund_lookup_cb_minimal,
+                                         refund_lookup_cb,
                                          is)))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
