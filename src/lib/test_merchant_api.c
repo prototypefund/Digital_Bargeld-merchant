@@ -1312,15 +1312,7 @@ refund_lookup_cb (void *cls,
                                        GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY)); 
   };
   
-  /**
-   *
-   * do the job:
-   *
-   * 1) check if used coin exists in from-refund ones
-   * 2) if so, sum up refunded amount
-   *
-   */
-
+  /* Retrieve coins used to pay, from OC_PAY command */
   GNUNET_assert (NULL !=
     (pay = find_command (is, cmd->details.refund_lookup.pay_ref)));
   icoin_refs = GNUNET_strdup (pay->details.pay.coin_ref);
@@ -1329,13 +1321,6 @@ refund_lookup_cb (void *cls,
   TALER_amount_get_zero ("EUR", &acc);
   do
   {
-    /**
-     * 1 Get coin pub, V
-     * 2 hash it, V
-     * 3 look in the map, V
-     * 4 if found, sum up, V
-     * 5 iterate, V
-     */
     GNUNET_assert (NULL != (icoin = find_command (is, icoin_ref)));
     GNUNET_CRYPTO_eddsa_key_get_public (&icoin->details.reserve_withdraw.coin_priv.eddsa_priv,
                                         &icoin_pub.eddsa_pub);
