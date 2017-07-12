@@ -1195,9 +1195,9 @@ proposal_cb (void *cls,
  */
 static void
 refund_increase_cb (void *cls,
-                unsigned int http_status,
-                enum TALER_ErrorCode ec,
-                const json_t *obj)
+                    unsigned int http_status,
+                    enum TALER_ErrorCode ec,
+                    const json_t *obj)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -1227,8 +1227,8 @@ refund_increase_cb (void *cls,
  */
 static int
 hashmap_free (void *cls,
-          const struct GNUNET_HashCode *key,
-          void *value)
+              const struct GNUNET_HashCode *key,
+              void *value)
 {
   struct TALER_Amount *refund_amount = value;
 
