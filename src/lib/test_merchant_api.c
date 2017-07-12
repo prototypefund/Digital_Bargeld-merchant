@@ -726,7 +726,7 @@ static struct GNUNET_DISK_PipeHandle *sigpipe;
  */
 struct GNUNET_CRYPTO_EddsaPrivateKey *
 get_instance_priv (struct GNUNET_CONFIGURATION_Handle *config,
-               const char *instance)
+                   const char *instance)
 {
   char *config_section;
   char *filename;
@@ -778,7 +778,7 @@ fail (struct InterpreterState *is)
  */
 static const struct Command *
 find_command (const struct InterpreterState *is,
-          const char *label)
+              const char *label)
 {
   unsigned int i;
   const struct Command *cmd;
@@ -835,9 +835,9 @@ next_command (struct InterpreterState *is)
  */
 static void
 add_incoming_cb (void *cls,
-             unsigned int http_status,
+                 unsigned int http_status,
 		 enum TALER_ErrorCode ec,
-             const json_t *full_response)
+                 const json_t *full_response)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -865,9 +865,9 @@ add_incoming_cb (void *cls,
  */
 static void
 history_cb (void *cls,
-        unsigned int http_status,
+            unsigned int http_status,
 	    enum TALER_ErrorCode ec,
-        const json_t *json)
+            const json_t *json)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -903,7 +903,7 @@ history_cb (void *cls,
  */
 static int
 compare_admin_add_incoming_history (const struct TALER_EXCHANGE_ReserveHistory *h,
-                                const struct Command *cmd)
+                                    const struct Command *cmd)
 {
   struct TALER_Amount amount;
 
@@ -935,7 +935,7 @@ compare_admin_add_incoming_history (const struct TALER_EXCHANGE_ReserveHistory *
  */
 static int
 compare_reserve_withdraw_history (const struct TALER_EXCHANGE_ReserveHistory *h,
-                              const struct Command *cmd)
+                                  const struct Command *cmd)
 {
   struct TALER_Amount amount;
   struct TALER_Amount amount_with_fee;
@@ -1089,10 +1089,10 @@ reserve_status_cb (void *cls,
  */
 static void
 reserve_withdraw_cb (void *cls,
-                 unsigned int http_status,
+                     unsigned int http_status,
 		     enum TALER_ErrorCode ec,
-                 const struct TALER_DenominationSignature *sig,
-                 const json_t *full_response)
+                     const struct TALER_DenominationSignature *sig,
+                     const json_t *full_response)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -1150,12 +1150,12 @@ reserve_withdraw_cb (void *cls,
  */
 static void
 proposal_cb (void *cls,
-         unsigned int http_status,
+             unsigned int http_status,
 	     enum TALER_ErrorCode ec,
-         const json_t *obj,
-         const json_t *contract_terms,
-         const struct TALER_MerchantSignatureP *sig,
-         const struct GNUNET_HashCode *hash)
+             const json_t *obj,
+             const json_t *contract_terms,
+             const struct TALER_MerchantSignatureP *sig,
+             const struct GNUNET_HashCode *hash)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -2488,7 +2488,7 @@ do_shutdown (void *cls)
  */
 static void
 cert_cb (void *cls,
-     const struct TALER_EXCHANGE_Keys *keys,
+         const struct TALER_EXCHANGE_Keys *keys,
 	 enum TALER_EXCHANGE_VersionCompatibility vc)
 {
   struct InterpreterState *is = cls;
@@ -2826,7 +2826,7 @@ run (void *cls)
  */
 int
 main (int argc,
-  char * const *argv)
+      char * const *argv)
 {
   char *_instances;
   char *token;
