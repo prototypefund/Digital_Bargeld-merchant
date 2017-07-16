@@ -913,8 +913,8 @@ compare_admin_add_incoming_history (const struct TALER_EXCHANGE_ReserveHistory *
     return GNUNET_SYSERR;
   }
   GNUNET_assert (GNUNET_OK ==
-             TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
-                                     &amount));
+    TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
+                            &amount));
   if (0 != TALER_amount_cmp (&amount,
                          &h->amount))
   {
@@ -1010,6 +1010,11 @@ reserve_status_cb (void *cls,
       switch ((rel = &is->commands[i])->oc)
       {
       case OC_ADMIN_ADD_INCOMING:
+        /**
+         * If the command being iterated over filled a reserve AND
+         * it is the one referenced by the current "history command"
+         * ...
+         */
         if ( ( (NULL != rel->label) &&
              (0 == strcmp (cmd->details.reserve_status.reserve_reference,
                            rel->label) ) ) ||
@@ -1017,9 +1022,12 @@ reserve_status_cb (void *cls,
              (0 == strcmp (cmd->details.reserve_status.reserve_reference,
                          rel->details.admin_add_incoming.reserve_reference) ) ) )
         {
-          if (GNUNET_OK !=
-            compare_admin_add_incoming_history (&history[j],
-                                                rel))
+          /**
+           * ... then make sure the history element mentions a "deposit
+           * operation" on that reserve.
+           */
+          if (GNUNET_OK != compare_admin_add_incoming_history (&history[j],
+                                                               rel))
           {
             GNUNET_break (0);
             fail (is);
@@ -1029,12 +1037,20 @@ reserve_status_cb (void *cls,
         }
         break;
       case OC_WITHDRAW_SIGN:
+        /**
+         * If the command being iterated over emptied a reserve AND
+         * it is the one referenced by the current "history command"
+         * ...
+         */
         if (0 == strcmp (cmd->details.reserve_status.reserve_reference,
                          rel->details.reserve_withdraw.reserve_reference))
         {
-          if (GNUNET_OK !=
-              compare_reserve_withdraw_history (&history[j],
-                                               rel))
+          /**
+           * ... then make sure the history element mentions a "withdraw
+           * operation" on that reserve.
+           */
+          if (GNUNET_OK != compare_reserve_withdraw_history (&history[j],
+                                                             rel))
           {
             GNUNET_break (0);
             fail (is);
@@ -1104,8 +1120,6 @@ reserve_withdraw_cb (void *cls,
                 "Unexpected response code %u to command %s\n",
                 http_status,
                 cmd->label);
-    json_dumpf (full_response, stderr, 0);
-    GNUNET_break (0);
     fail (is);
     return;
   }
@@ -1118,6 +1132,10 @@ reserve_withdraw_cb (void *cls,
       fail (is);
       return;
     }
+    /**
+     * NOTE: this assert is OK on the second instance run because the
+     * interpreter is "cleaned" by cleanup_state()
+     */
     GNUNET_assert (NULL == cmd->details.reserve_withdraw.sig.rsa_signature);
     cmd->details.reserve_withdraw.sig.rsa_signature
       = GNUNET_CRYPTO_rsa_signature_dup (sig->rsa_signature);
@@ -1135,7 +1153,7 @@ reserve_withdraw_cb (void *cls,
 
 
 /**
- * Callback that works PUT /proposal's output.
+ * Callback that works POST /proposal's output.
  *
  * @param cls closure
  * @param http_status HTTP response code, 200 indicates success;
@@ -1173,11 +1191,9 @@ proposal_cb (void *cls,
     break;
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "unexpected status code from /proposal: %u. Step %u\n",
+                "Unexpected status code from /proposal: %u. Step %u\n",
                 http_status,
                 is->ip);
-    json_dumpf (obj, stderr, 0);
-    GNUNET_break (0);
     fail (is);
     return;
   }
@@ -1201,10 +1217,6 @@ refund_increase_cb (void *cls,
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-          "/refund (increase) response object: %s\n",
-          json_dumps (obj, JSON_INDENT (2)));
 
   if (MHD_HTTP_OK != http_status)
   {
@@ -1290,17 +1302,10 @@ refund_lookup_cb (void *cls,
       GNUNET_JSON_spec_end ()
   };
      
-  if (GNUNET_OK !=
-        GNUNET_JSON_parse (elem,
-                           spec,
-                           &error_name,
-                           &error_line))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not parse GET /refund response\n");
-    fail (is);
-    return;
-  }
+  GNUNET_assert (GNUNET_OK == GNUNET_JSON_parse (elem,
+                                                 spec,
+                                                 &error_name,
+                                                 &error_line));
   GNUNET_CRYPTO_hash (&coin_pub,
                       sizeof (struct TALER_CoinSpendPublicKeyP),
                       &h_coin_pub);
@@ -1313,11 +1318,9 @@ refund_lookup_cb (void *cls,
   };
   
   /* Retrieve coins used to pay, from OC_PAY command */
-  GNUNET_assert (NULL !=
-    (pay = find_command (is, cmd->details.refund_lookup.pay_ref)));
+  GNUNET_assert (NULL != (pay = find_command (is, cmd->details.refund_lookup.pay_ref)));
   icoin_refs = GNUNET_strdup (pay->details.pay.coin_ref);
-  GNUNET_assert (NULL !=
-    (icoin_ref = strtok (icoin_refs, ";")));
+  GNUNET_assert (NULL != (icoin_ref = strtok (icoin_refs, ";")));
   TALER_amount_get_zero ("EUR", &acc);
   do
   {
@@ -1396,9 +1399,6 @@ pay_cb (void *cls,
                 "Unexpected response code %u to command %s\n",
                 http_status,
                 cmd->label);
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Response was %s\n",
-                json_dumps (obj, JSON_INDENT (2)));
     fail (is);
     return;
   }
@@ -1410,20 +1410,11 @@ pay_cb (void *cls,
       GNUNET_JSON_spec_fixed_auto ("h_contract_terms", &cmd->details.pay.h_contract_terms),
       GNUNET_JSON_spec_end ()
     };
-    if (GNUNET_OK !=
+    GNUNET_assert (GNUNET_OK ==
         GNUNET_JSON_parse (obj,
                            spec,
                            &error_name,
-                           &error_line))
-    {
-      GNUNET_break_op (0);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Parser failed on %s:%u\n",
-                  error_name,
-                  error_line);
-      fail (is);
-      return;
-    }
+                           &error_line));
     mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
     mr.h_contract_terms = cmd->details.pay.h_contract_terms;
@@ -1503,7 +1494,6 @@ track_transfer_cb (void *cls,
                 "Unexpected response code %u to command %s\n",
                 http_status,
                 cmd->label);
-    json_dumpf (json, stderr, 0);
     fail (is);
     return;
   }
@@ -1567,7 +1557,6 @@ track_transaction_cb (void *cls,
                 "Unexpected response code %u to command %s\n",
                 http_status,
                 cmd->label);
-    json_dumpf (json, stderr, 0);
     fail (is);
     return;
   }
@@ -1817,8 +1806,8 @@ interpreter_run (void *cls)
   tc = GNUNET_SCHEDULER_get_task_context ();
   if (0 != (tc->reason & GNUNET_SCHEDULER_REASON_SHUTDOWN))
   {
-    fprintf (stderr,
-             "Test aborted by shutdown request\n");
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Test aborted by shutdown request\n");
     fail (is);
     return;
   }
@@ -1853,20 +1842,17 @@ interpreter_run (void *cls)
       const char *order_id;
 
       GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
-      ref = find_command (is, cmd->details.proposal_lookup.proposal_reference);
-      GNUNET_assert (NULL != ref);
+      GNUNET_assert (NULL != (ref = find_command (is, cmd->details.proposal_lookup.proposal_reference)));
 
-      order_id =
-        json_string_value (json_object_get (ref->details.proposal.contract_terms,
-                                            "order_id"));
-      GNUNET_assert (NULL !=
-                      (cmd->details.proposal_lookup.plo
-                       = TALER_MERCHANT_proposal_lookup (ctx,
-                                                         MERCHANT_URI,
-                                                         order_id,
-                                                         instance,
-                                                         proposal_lookup_cb,
-                                                         is)));
+      order_id = json_string_value (json_object_get (ref->details.proposal.contract_terms,
+                                    "order_id"));
+      GNUNET_assert (NULL != (cmd->details.proposal_lookup.plo
+        = TALER_MERCHANT_proposal_lookup (ctx,
+                                          MERCHANT_URI,
+                                          order_id,
+                                          instance,
+                                          proposal_lookup_cb,
+                                          is)));
     }
 
     return;
@@ -1875,9 +1861,8 @@ interpreter_run (void *cls)
     if (NULL !=
         cmd->details.admin_add_incoming.reserve_reference)
     {
-      ref = find_command (is,
-                          cmd->details.admin_add_incoming.reserve_reference);
-      GNUNET_assert (NULL != ref);
+      GNUNET_assert (NULL != (ref
+        = find_command (is, cmd->details.admin_add_incoming.reserve_reference)));
       GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
       cmd->details.admin_add_incoming.reserve_priv
         = ref->details.admin_add_incoming.reserve_priv;
@@ -1892,45 +1877,19 @@ interpreter_run (void *cls)
     }
     GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
                                         &reserve_pub.eddsa_pub);
-    if (GNUNET_OK !=
-        TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
-                                &amount))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to parse amount `%s' at %u\n",
-                  cmd->details.admin_add_incoming.amount,
-                  is->ip);
-      fail (is);
-      return;
-    }
-
+    GNUNET_assert (GNUNET_OK ==
+      TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
+                              &amount));
     execution_date = GNUNET_TIME_absolute_get ();
     GNUNET_TIME_round_abs (&execution_date);
-    sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
-                                 JSON_REJECT_DUPLICATES,
-                                 NULL);
-    if (NULL == sender_details)
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to parse sender details `%s' at %u\n",
-                  cmd->details.admin_add_incoming.sender_details,
-                  is->ip);
-      fail (is);
-      return;
-    }
-    transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
-                                   JSON_REJECT_DUPLICATES,
-                                   NULL);
-
-    if (NULL == transfer_details)
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to parse transfer details `%s' at %u\n",
-                  cmd->details.admin_add_incoming.transfer_details,
-                  is->ip);
-      fail (is);
-      return;
-    }
+    GNUNET_assert (NULL != (sender_details
+      = json_loads (cmd->details.admin_add_incoming.sender_details,
+                    JSON_REJECT_DUPLICATES,
+                    NULL)));
+    GNUNET_assert (NULL != (transfer_details
+      = json_loads (cmd->details.admin_add_incoming.transfer_details,
+                    JSON_REJECT_DUPLICATES,
+                    NULL)));
 
     cmd->details.admin_add_incoming.aih
       = TALER_EXCHANGE_admin_add_incoming (exchange,
@@ -1954,9 +1913,9 @@ interpreter_run (void *cls)
   case OC_WITHDRAW_STATUS:
     GNUNET_assert (NULL !=
                    cmd->details.reserve_status.reserve_reference);
-    ref = find_command (is,
-                        cmd->details.reserve_status.reserve_reference);
-    GNUNET_assert (NULL != ref);
+    GNUNET_assert (NULL != (ref = find_command
+      (is,
+       cmd->details.reserve_status.reserve_reference)));
     GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
     GNUNET_CRYPTO_eddsa_key_get_public (&ref->details.admin_add_incoming.reserve_priv.eddsa_priv,
                                         &reserve_pub.eddsa_pub);
@@ -1967,37 +1926,18 @@ interpreter_run (void *cls)
                                        is);
     return;
   case OC_WITHDRAW_SIGN:
-    GNUNET_assert (NULL !=
-                   cmd->details.reserve_withdraw.reserve_reference);
-    ref = find_command (is,
-                        cmd->details.reserve_withdraw.reserve_reference);
-    GNUNET_assert (NULL != ref);
+    GNUNET_assert (NULL != cmd->details.reserve_withdraw.reserve_reference);
+    GNUNET_assert (NULL != (ref = find_command
+      (is,
+       cmd->details.reserve_withdraw.reserve_reference)));
     GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
-    if (NULL != cmd->details.reserve_withdraw.amount)
-    {
-      if (GNUNET_OK !=
-          TALER_string_to_amount (cmd->details.reserve_withdraw.amount,
-                                  &amount))
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse amount `%s' at %u\n",
-                    cmd->details.reserve_withdraw.amount,
-                    is->ip);
-        fail (is);
-        return;
-      }
-      cmd->details.reserve_withdraw.pk = find_pk (is->keys,
-                                                  &amount);
-    }
-    if (NULL == cmd->details.reserve_withdraw.pk)
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to determine denomination key at %u\n",
-                  is->ip);
-      fail (is);
-      return;
-    }
-    
+    GNUNET_assert (NULL != cmd->details.reserve_withdraw.amount);
+    GNUNET_assert (GNUNET_OK ==
+      TALER_string_to_amount (cmd->details.reserve_withdraw.amount,
+                              &amount));
+    GNUNET_assert (NULL != (cmd->details.reserve_withdraw.pk
+      = find_pk (is->keys,
+                 &amount)));
     /* create coin's private key */
     {
       struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
