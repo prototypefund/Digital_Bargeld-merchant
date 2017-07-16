@@ -288,6 +288,15 @@ postgres_initialize (void *cls)
                             " FROM merchant_refunds"
                             " WHERE coin_pub=$1",
                             1),
+    GNUNET_PQ_make_prepare ("find_contract_terms_history",
+                            "SELECT"
+                            " contract_terms"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " order_id=$1"
+                            " AND merchant_pub=$2"
+                            " AND paid=$3",
+                            3),
     GNUNET_PQ_make_prepare ("find_contract_terms",
                             "SELECT"
                             " contract_terms"
@@ -296,6 +305,7 @@ postgres_initialize (void *cls)
                             " order_id=$1"
                             " AND merchant_pub=$2",
                             2),
+
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date",
                             "SELECT"
                             " contract_terms"
@@ -305,9 +315,10 @@ postgres_initialize (void *cls)
                             " WHERE"
                             " timestamp<$1"
                             " AND merchant_pub=$2"
+                            " AND paid=$4"
                             " ORDER BY row_id DESC, timestamp DESC"
                             " LIMIT $3",
-                            3),
+                            4),
     GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
                             "SELECT"
 			    " coin_pub"
@@ -333,9 +344,10 @@ postgres_initialize (void *cls)
                             " timestamp<$1"
                             " AND merchant_pub=$2"
                             " AND row_id<$3"
+                            " AND paid=$5"
                             " ORDER BY row_id DESC, timestamp DESC"
                             " LIMIT $4",
-                            4),
+                            5),
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_future",
                             "SELECT"
                             " contract_terms"
@@ -346,9 +358,10 @@ postgres_initialize (void *cls)
                             " timestamp>$1"
                             " AND merchant_pub=$2"
                             " AND row_id>$3"
+                            " AND paid=$5"
                             " ORDER BY row_id DESC, timestamp DESC"
                             " LIMIT $4",
-                            4),
+                            5),
     GNUNET_PQ_make_prepare ("find_transaction",
                             "SELECT"
                             " exchange_uri"
@@ -579,7 +592,8 @@ postgres_find_contract_terms_from_hash (void *cls,
 
 
 /**
- * Retrieve proposal data given its order id.
+ * Retrieve proposal data given its order id.  Ignores if the
+ * proposal has been paid or not.
  *
  * @param cls closure
  * @param[out] contract_terms where to store the retrieved contract terms
@@ -593,6 +607,7 @@ postgres_find_contract_terms (void *cls,
                               const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
+
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
@@ -883,9 +898,12 @@ postgres_find_contract_terms_history (void *cls,
   struct PostgresClosure *pg = cls;
   json_t *contract_terms;
   enum GNUNET_DB_QueryStatus qs;
+  unsigned int yes = GNUNET_YES;
+
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_auto_from_type (&yes),
     GNUNET_PQ_query_param_end
   };
   struct GNUNET_PQ_ResultSpec rs[] = {
@@ -895,7 +913,7 @@ postgres_find_contract_terms_history (void *cls,
   };
 
   qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-						 "find_contract_terms",
+						 "find_contract_terms_history",
 						 params,
 						 rs);
   if (qs <= 0)
@@ -1016,11 +1034,14 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
 						void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
+  unsigned int yes = GNUNET_YES;
+
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_uint64 (&start),
     GNUNET_PQ_query_param_uint64 (&nrows),
+    GNUNET_PQ_query_param_auto_from_type (&yes),
     GNUNET_PQ_query_param_end
   };
   const char *stmt;
@@ -1068,10 +1089,13 @@ postgres_find_contract_terms_by_date (void *cls,
 				      void *cb_cls)
 {
   struct PostgresClosure *pg = cls;
+  unsigned int yes = GNUNET_YES;
+
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_absolute_time (&date),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_uint64 (&nrows),
+    GNUNET_PQ_query_param_auto_from_type (&yes),
     GNUNET_PQ_query_param_end
   };
   enum GNUNET_DB_QueryStatus qs;

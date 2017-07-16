@@ -84,7 +84,7 @@ struct GNUNET_HashCode h_contract_terms;
 /**
  * Proposal's hash.
  */
-struct GNUNET_HashCode h_contract_terms;
+struct GNUNET_HashCode h_contract_terms_future;
 
 /**
  * Time of the transaction.
@@ -462,6 +462,11 @@ run (void *cls)
 					 timestamp,
 					 contract_terms));
 
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+          plugin->mark_proposal_paid (plugin->cls,
+                                      &h_contract_terms,
+                                      &merchant_pub));
+
   json_t *out;
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
@@ -503,6 +508,13 @@ run (void *cls)
 
   fake_now = GNUNET_TIME_absolute_subtract (timestamp, delta);
 
+  TALER_JSON_hash (contract_terms_future,
+                   &h_contract_terms_future);
+
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+          plugin->mark_proposal_paid (plugin->cls,
+                                      &h_contract_terms_future,
+                                      &merchant_pub));
   FAILIF (2 !=
           plugin->find_contract_terms_by_date_and_range (plugin->cls,
 							 fake_now,
