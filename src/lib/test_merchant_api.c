@@ -1396,7 +1396,9 @@ pay_cb (void *cls,
                 "Unexpected response code %u to command %s\n",
                 http_status,
                 cmd->label);
-    json_dumpf (obj, stderr, 0);
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Response was %s\n",
+                json_dumps (obj, JSON_INDENT (2)));
     fail (is);
     return;
   }

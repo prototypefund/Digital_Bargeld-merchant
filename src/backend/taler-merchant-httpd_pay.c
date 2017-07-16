@@ -1317,6 +1317,8 @@ handler_pay_json (struct MHD_Connection *connection,
 {
   int ret;
   enum GNUNET_DB_QueryStatus qs;
+  enum GNUNET_DB_QueryStatus qs_st;
+  enum GNUNET_DB_QueryStatus qs_mp;
 
   ret = parse_pay (connection,
                    root,
@@ -1404,33 +1406,61 @@ handler_pay_json (struct MHD_Connection *connection,
                                              "The time to pay for this contract has expired.");
     }
 
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Storing transaction '%s'\n",
-                GNUNET_h2s (&pc->h_contract_terms));
     for (unsigned int i=0;i<MAX_RETRIES;i++)
     {
-      qs = db->store_transaction (db->cls,
-				  &pc->h_contract_terms,
-				  &pc->mi->pubkey,
-				  pc->chosen_exchange,
-				  &pc->mi->h_wire,
-				  pc->timestamp,
-				  pc->refund_deadline,
-				  &pc->amount);
-      if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
-	break;
+
+      if (GNUNET_OK != db->start (db->cls))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Could not start transaction to store successful payment\n");
+        return TMH_RESPONSE_reply_internal_error (connection,
+                                                  TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+                                                  "Merchant database error");
+      }
+
+      qs_st = db->store_transaction (db->cls,
+                                     &pc->h_contract_terms,
+                                     &pc->mi->pubkey,
+                                     pc->chosen_exchange,
+                                     &pc->mi->h_wire,
+                                     pc->timestamp,
+                                     pc->refund_deadline,
+                                     &pc->amount);
+
+      qs_mp = db->mark_proposal_paid (db->cls,
+                                      &pc->h_contract_terms,
+                                      &pc->mi->pubkey);
+
+      /* Only retry if SOFT error occurred.  Exit in case of OK or HARD failure */
+      if ( (GNUNET_DB_STATUS_SOFT_ERROR == qs_st) &&
+           (GNUNET_DB_STATUS_SOFT_ERROR == qs_mp) )
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Rolling back db transaction\n");
+        db->rollback (db->cls);
+      }
+
+      break;
     }
-    if (0 > qs)
+
+    /* Break if AT LEAST one error occurred */
+    if (2 != (qs_st + qs_mp))
     {
+      db->rollback (db->cls);
       /* Special report if retries insufficient */
-      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs_st);
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs_mp);
       /* Always report on hard error as well to enable diagnostics */
-      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR != qs_st);
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR != qs_mp);
+
       return TMH_RESPONSE_reply_internal_error (connection,
 						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
 						"Merchant database error");
     }
   }
+
+  db->commit (db->cls);
 
   MHD_suspend_connection (connection);
   pc->suspended = GNUNET_YES;

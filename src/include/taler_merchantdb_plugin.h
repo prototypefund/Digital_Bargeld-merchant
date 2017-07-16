@@ -196,10 +196,23 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*insert_contract_terms) (void *cls,
-                           const char *order_id,
-                           const struct TALER_MerchantPublicKeyP *merchant_pub,
-                           struct GNUNET_TIME_Absolute timestamp,
-                           const json_t *contract_terms);
+                            const char *order_id,
+                            const struct TALER_MerchantPublicKeyP *merchant_pub,
+                            struct GNUNET_TIME_Absolute timestamp,
+                            const json_t *contract_terms);
+
+  /**
+   * Mark contract terms as payed.  Needed by /history as only payed
+   * contracts must be shown.  NOTE: we can't get the list of (payed)
+   * contracts from the transactions table because it lacks contract_terms
+   * plain JSON.  In facts, the protocol doesn't allow to store contract_terms
+   * in transactions table, as /pay handler doesn't receive this data
+   * (only /proposal does).
+   */
+  enum GNUNET_DB_QueryStatus
+  (*mark_proposal_paid) (void *cls,
+                         const struct GNUNET_HashCode *h_contract_terms,
+                         const struct TALER_MerchantPublicKeyP *merchant_pub);
 
   /**
    * Retrieve proposal data given its order ID.
@@ -581,6 +594,36 @@ struct TALER_MERCHANTDB_Plugin
                                           const struct GNUNET_HashCode *h_contract_terms,
                                           TALER_MERCHANTDB_RefundCallback rc,
                                           void *rc_cls);
+
+  /**
+   * Roll back the current transaction of a database connection.
+   *
+   * @param cls the `struct PostgresClosure` with the plugin-specific state
+   * @return #GNUNET_OK on success
+   */
+  void
+  (*rollback) (void *cls);
+
+
+  /**
+   * Start a transaction.
+   *
+   * @param cls the `struct PostgresClosure` with the plugin-specific state
+   * @return #GNUNET_OK on success
+   */
+  int
+  (*start) (void *cls);
+
+
+  /**
+   * Commit the current transaction of a database connection.
+   *
+   * @param cls the `struct PostgresClosure` with the plugin-specific state
+   * @return transaction status code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*commit) (void *cls);
+
 };
 
 #endif

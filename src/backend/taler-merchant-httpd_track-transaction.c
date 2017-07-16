@@ -812,7 +812,8 @@ handle_track_transaction_timeout (void *cls)
 
 /**
  * Function called with information about a transaction.
- * Its duty is to fill up the "context" for the whole operation.
+ * Responsible to fill up the "context" for the whole
+ * tracking operation.
  *
  * @param cls closure
  * @param transaction_id of the contract

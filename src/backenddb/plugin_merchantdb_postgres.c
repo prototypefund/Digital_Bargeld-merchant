@@ -87,6 +87,7 @@ postgres_initialize (void *cls)
                             ",h_contract_terms BYTEA NOT NULL"
                             ",timestamp INT8 NOT NULL"
                             ",row_id BIGSERIAL UNIQUE" 
+                            ",paid BYTEA NOT NULL "
                             ",PRIMARY KEY (order_id, merchant_pub)"
 			    ",UNIQUE (h_contract_terms, merchant_pub)"
                             ");"),
@@ -134,13 +135,13 @@ postgres_initialize (void *cls)
                             ",PRIMARY KEY (h_contract_terms, coin_pub)"
                             ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
-                          " exchange_uri VARCHAR NOT NULL"
-                          ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
-                          ",execution_time INT8 NOT NULL"
-                          ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
-                          ",proof BYTEA NOT NULL"
-                          ",PRIMARY KEY (wtid, exchange_uri)"
-                          ");"),
+                            " exchange_uri VARCHAR NOT NULL"
+                            ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
+                            ",execution_time INT8 NOT NULL"
+                            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
+                            ",proof BYTEA NOT NULL"
+                            ",PRIMARY KEY (wtid, exchange_uri)"
+                            ");"),
     /* Note that h_contract_terms + coin_pub may actually be unknown to
        us, e.g. someone else deposits something for us at the exchange.
        Hence those cannot be foreign keys into deposits/transactions! */
@@ -239,11 +240,17 @@ postgres_initialize (void *cls)
                             "(order_id"
                             ",merchant_pub"
                             ",timestamp"
+                            ",paid"
                             ",contract_terms"
                             ",h_contract_terms)"
                             " VALUES "
-                            "($1, $2, $3, $4, $5)",
-                            4),
+                            "($1, $2, $3, $4, $5, $6)",
+                            6),
+    GNUNET_PQ_make_prepare ("mark_proposal_paid",
+                            "UPDATE merchant_contract_terms SET"
+                            " paid=$1 WHERE h_contract_terms=$2"
+                            " AND merchant_pub=$3",
+                            3),
     GNUNET_PQ_make_prepare ("insert_wire_fee",
                             "INSERT INTO exchange_wire_fees"
                             "(exchange_pub"
@@ -471,7 +478,7 @@ check_connection (struct PostgresClosure *pg)
  * @param cls the `struct PostgresClosure` with the plugin-specific state
  * @return #GNUNET_OK on success
  */
-static int
+int
 postgres_start (void *cls)
 {
   struct PostgresClosure *pg = cls;
@@ -502,7 +509,7 @@ postgres_start (void *cls)
  * @param cls the `struct PostgresClosure` with the plugin-specific state
  * @return #GNUNET_OK on success
  */
-static void
+void
 postgres_rollback (void *cls)
 {
   struct PostgresClosure *pg = cls;
@@ -627,10 +634,13 @@ postgres_insert_contract_terms (void *cls,
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_HashCode h_contract_terms;
+  unsigned int no = GNUNET_NO;
+
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_absolute_time (&timestamp),
+    GNUNET_PQ_query_param_auto_from_type (&no),
     TALER_PQ_query_param_json (contract_terms),
     GNUNET_PQ_query_param_auto_from_type (&h_contract_terms),
     GNUNET_PQ_query_param_end
@@ -649,6 +659,39 @@ postgres_insert_contract_terms (void *cls,
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
 					     "insert_contract_terms",
 					     params);
+}
+
+/**
+ * Mark contract terms as payed.  Needed by /history as only payed
+ * contracts must be shown.  NOTE: we can't get the list of (payed)
+ * contracts from the transactions table because it lacks contract_terms
+ * plain JSON.  In facts, the protocol doesn't allow to store contract_terms
+ * in transactions table, as /pay handler doesn't receive this data
+ * (only /proposal does).
+ */
+enum GNUNET_DB_QueryStatus
+postgres_mark_proposal_paid (void *cls,
+                             const struct GNUNET_HashCode *h_contract_terms,
+                             const struct TALER_MerchantPublicKeyP *merchant_pub)
+{
+  unsigned int yes = GNUNET_YES;
+  struct PostgresClosure *pg = cls;
+
+  TALER_LOG_DEBUG ("Marking proposal paid, h_contract_terms: '%s',"
+                   " merchant_pub: '%s'\n",
+                   GNUNET_h2s (h_contract_terms),
+                   TALER_B2S (merchant_pub));
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (&yes),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_end
+  };
+  
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "mark_proposal_paid",
+                                             params);
 }
 
 
@@ -2351,6 +2394,10 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_contract_terms_from_hash = &postgres_find_contract_terms_from_hash;
   plugin->get_refunds_from_contract_terms_hash = &postgres_get_refunds_from_contract_terms_hash;
   plugin->increase_refund_for_contract = postgres_increase_refund_for_contract;
+  plugin->mark_proposal_paid = postgres_mark_proposal_paid;
+  plugin->start = postgres_start;
+  plugin->commit = postgres_commit;
+  plugin->rollback = postgres_rollback;
 
   return plugin;
 }
