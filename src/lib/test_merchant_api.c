@@ -2433,51 +2433,63 @@ run (void *cls)
   struct InterpreterState *is;
   static struct Command commands[] =
   {
-    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
+    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per
+       config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":62, \"uuid\":1 }",
-      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
+      .details.admin_add_incoming.sender_details
+      = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \
+        \"account_number\":62, \"uuid\":1 }",
+      .details.admin_add_incoming.transfer_details
+        = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = "EUR:10.02" },
     
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_withdraw.reserve_reference = "create-reserve-1",
+      .details.reserve_withdraw.reserve_reference
+        = "create-reserve-1",
       .details.reserve_withdraw.amount = "EUR:5" },
     
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_withdraw.reserve_reference = "create-reserve-1",
+      .details.reserve_withdraw.reserve_reference
+        = "create-reserve-1",
       .details.reserve_withdraw.amount = "EUR:5" },
     
-    /* Check that deposit and withdraw operation are in history, and
-       that the balance is now at zero */
+    /* Check that deposit and withdraw operation are in history,
+       and that the balance is now at zero */
     { .oc = OC_WITHDRAW_STATUS,
       .label = "withdraw-status-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_status.reserve_reference = "create-reserve-1",
+      .details.reserve_status.reserve_reference
+        = "create-reserve-1",
       .details.reserve_status.expected_balance = "EUR:0" },
     /* Create proposal */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.proposal.order = "{\
-                  \"max_fee\":\
-                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
-                  \"order_id\":\"1\",\
-                  \"timestamp\":\"\\/Date(42)\\/\",\
-                  \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
-                  \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
-    		  \"summary\": \"merchant-lib testcase\",\
-                  \"products\":\
-                     [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }"},
-    
+        \"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"1\",\
+        \"timestamp\":\"\\/Date(42)\\/\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+    	\"summary\": \"merchant-lib testcase\",\
+        \"products\":\
+          [ {\"description\":\"ice cream\",\
+             \"value\":\"{EUR:5}\"} ] }"},
     { .oc = OC_PAY,
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
@@ -2485,7 +2497,6 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1;withdraw-coin-2",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-    
     /* Try to replay payment reusing coin */
     { .oc = OC_PAY,
       .label = "replay-simple",
@@ -2494,26 +2505,31 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-    
-    
     /* Create another contract */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.proposal.order = "{\
-                  \"max_fee\":\
-                     {\"currency\":\"EUR\", \"value\":0, \"fraction\":50000000},\
-                  \"order_id\":\"2\",\
-                  \"timestamp\":\"\\/Date(42)\\/\",\
-                  \"refund_deadline\":\"\\/Date(0)\\/\",\
-                  \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
-                  \"amount\":{\"currency\":\"EUR\", \"value\":5, \"fraction\":0},\
-                  \"summary\":\"useful product\",\
-                  \"products\":\
-                     [ {\"description\":\"ice cream\", \"value\":\"{EUR:5}\"} ] }" },
-    
-    /* Try to double-spend the 5 EUR coin at the same merchant (but different
-       transaction ID) */
+        \"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"2\",\
+        \"timestamp\":\"\\/Date(42)\\/\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\":\"useful product\",\
+        \"products\":\
+          [ {\"description\":\"ice cream\",\
+             \"value\":\"{EUR:5}\"} ] }" },
+    /**
+     * Try to double-spend the 5 EUR coin at the same
+     * merchant (but different transaction ID)
+     */
     { .oc = OC_PAY,
       .label = "deposit-double-2",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
@@ -2521,29 +2537,40 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-    
     /* Fill second reserve with EUR:1 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":63, \"uuid\":2 }",
-      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 2}",
+      .details.admin_add_incoming.sender_details
+        = "{ \"type\":\"test\",\
+          \"bank_uri\":\"" BANK_URI "\",\
+          \"account_number\":63,\
+          \"uuid\":2 }",
+      .details.admin_add_incoming.transfer_details
+        = "{ \"uuid\": 2}",
       .details.admin_add_incoming.amount = "EUR:1" },
     
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2b",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.reserve_reference = "create-reserve-2",
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \"account_number\":63, \"uuid\":3  }",
-      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 3}",
+      .details.admin_add_incoming.reserve_reference
+        = "create-reserve-2",
+      .details.admin_add_incoming.sender_details
+        = "{ \"type\":\"test\",\
+          \"bank_uri\":\"" BANK_URI "\",\
+          \"account_number\":63,\
+          \"uuid\":3  }",
+      .details.admin_add_incoming.transfer_details
+        = "{ \"uuid\": 3}",
       .details.admin_add_incoming.amount = "EUR:4.01" },
     
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_withdraw.reserve_reference = "create-reserve-2",
+      .details.reserve_withdraw.reserve_reference
+        = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
     
     /* Proposal lookup */
@@ -2551,7 +2578,8 @@ run (void *cls)
       .oc = OC_PROPOSAL_LOOKUP,
       .label = "fetch-proposal-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.proposal_lookup.proposal_reference = "create-proposal-2" },
+      .details.proposal_lookup.proposal_reference
+        = "create-proposal-2" },
     
     /* Check nothing happened on the bank side so far */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
@@ -2566,8 +2594,10 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-498c",
       .details.check_bank_transfer.amount = "EUR:4.98",
-      .details.check_bank_transfer.account_debit = 2, /* exchange-outgoing */
-      .details.check_bank_transfer.account_credit = 62 /* merchant */
+      /* exchange-outgoing */
+      .details.check_bank_transfer.account_debit = 2, 
+      /* merchant */
+      .details.check_bank_transfer.account_credit = 62 
     },
     
     /* Check that there are no other unusual transfers */
@@ -2577,7 +2607,8 @@ run (void *cls)
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-498c",
+      .details.track_transaction.expected_transfer_ref
+        = "check_bank_transfer-498c",
       .details.track_transaction.pay_ref = "deposit-simple",
       .details.track_transaction.wire_fee = "EUR:0.01",
     },
@@ -2586,13 +2617,15 @@ run (void *cls)
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transfer.check_bank_ref = "check_bank_transfer-498c",
+      .details.track_transfer.check_bank_ref
+        = "check_bank_transfer-498c",
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-1-again",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transfer.check_bank_ref = "check_bank_transfer-498c",
+      .details.track_transfer.check_bank_ref
+        = "check_bank_transfer-498c",
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
     
@@ -2613,8 +2646,10 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-498c-2",
       .details.check_bank_transfer.amount = "EUR:4.98",
-      .details.check_bank_transfer.account_debit = 2, /* exchange-outgoing */
-      .details.check_bank_transfer.account_credit = 62 /* merchant */
+      /* exchange-outgoing */
+      .details.check_bank_transfer.account_debit = 2, 
+      /* merchant */
+      .details.check_bank_transfer.account_credit = 62 
     },
     
     /* Check that there are no other unusual transfers */
@@ -2625,20 +2660,25 @@ run (void *cls)
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transfer.check_bank_ref = "check_bank_transfer-498c-2",
-      .details.track_transfer.expected_pay_ref = "deposit-simple-2"
+      .details.track_transfer.check_bank_ref
+        = "check_bank_transfer-498c-2",
+      .details.track_transfer.expected_pay_ref
+        = "deposit-simple-2"
     },
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-2-again",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transfer.check_bank_ref = "check_bank_transfer-498c-2",
-      .details.track_transfer.expected_pay_ref = "deposit-simple-2"
+      .details.track_transfer.check_bank_ref
+        = "check_bank_transfer-498c-2",
+      .details.track_transfer.expected_pay_ref
+        = "deposit-simple-2"
     },
     
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.track_transaction.expected_transfer_ref = "check_bank_transfer-498c-2",
+      .details.track_transaction.expected_transfer_ref
+        = "check_bank_transfer-498c-2",
       .details.track_transaction.wire_fee = "EUR:0.01",
       .details.track_transaction.pay_ref = "deposit-simple-2"
     },
