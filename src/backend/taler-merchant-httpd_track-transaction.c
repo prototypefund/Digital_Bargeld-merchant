@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 INRIA
+  (C) 2014-2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -75,9 +75,10 @@ make_track_transaction_ok (unsigned int num_transfers,
     {
       const struct TALER_MERCHANT_CoinWireTransfer *coin = &transfer->coins[j];
 
-      GNUNET_assert (GNUNET_SYSERR != TALER_amount_add (&sum,
-                                                        &sum,
-                                                        &coin->amount_with_fee));
+      GNUNET_assert (GNUNET_SYSERR !=
+		     TALER_amount_add (&sum,
+				       &sum,
+				       &coin->amount_with_fee));
     }
 
     GNUNET_assert (0 ==
@@ -1091,7 +1092,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != tctx->qs);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_TRACK_TRANSACTION_DB_FETCH_PAYMENT_ERROR,
-					      "Database error: failed in find payment data");
+					      "Database error: failed to find payment data");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
