@@ -1976,10 +1976,20 @@ interpreter_run (void *cls)
   {
     json_t *order;
     json_error_t error;
+    struct GNUNET_TIME_Absolute timestamp;
+    char *date;
   
     GNUNET_assert (NULL != (order = json_loads (cmd->details.proposal.order,
                                                 JSON_REJECT_DUPLICATES,
                                                 &error)));
+
+    timestamp = GNUNET_TIME_absolute_get ();
+    GNUNET_asprintf (&date,
+                     "/Date(%llu)/",
+                     timestamp.abs_value_us / 1000LL / 1000LL);
+    json_object_set_new (order,
+                         "timestamp",
+                         json_string (date));
     if (NULL != instance)
     {
       json_t *merchant;
@@ -2479,7 +2489,6 @@ run (void *cls)
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"1\",\
-        \"timestamp\":\"\\/Date(42)\\/\",\
         \"refund_deadline\":\"\\/Date(0)\\/\",\
         \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
         \"amount\":\
@@ -2515,7 +2524,6 @@ run (void *cls)
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"2\",\
-        \"timestamp\":\"\\/Date(42)\\/\",\
         \"refund_deadline\":\"\\/Date(0)\\/\",\
         \"pay_deadline\":\"\\/Date(9999999999)\\/\",\
         \"amount\":\
