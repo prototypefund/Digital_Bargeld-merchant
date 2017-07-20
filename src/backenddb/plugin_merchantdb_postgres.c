@@ -267,13 +267,29 @@ postgres_initialize (void *cls)
                             " VALUES "
                             "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
                             11),
+    GNUNET_PQ_make_prepare ("lookup_wire_fee",
+                            "SELECT"
+                            " wire_fee_val"
+                            ",wire_fee_frac"
+                            ",wire_fee_curr"
+                            ",closing_fee_val"
+                            ",closing_fee_frac"
+                            ",closing_fee_curr"
+                            ",start_date"
+                            ",end_date"
+                            ",exchange_sig"
+                            " FROM exchange_wire_fees"
+                            " WHERE exchange_pub=$1"
+			    "   AND h_wire_method=$2"
+			    "   AND start_date <= $3"
+			    "   AND end_date > $3",
+                            1),
     GNUNET_PQ_make_prepare ("find_contract_terms_from_hash",
                             "SELECT"
                             " contract_terms"
                             " FROM merchant_contract_terms"
-                            " WHERE"
-                            " h_contract_terms=$1"
-                            " AND merchant_pub=$2",
+                            " WHERE h_contract_terms=$1"
+                            "   AND merchant_pub=$2",
                             2),
     GNUNET_PQ_make_prepare ("end_transaction",
                             "COMMIT",
@@ -1908,6 +1924,62 @@ postgres_store_wire_fee_by_exchange (void *cls,
 
 
 /**
+ * Obtain information about wire fees charged by an exchange,
+ * including signature (so we have proof).
+ *
+ * @param cls closure
+ * @param exchange_pub public key of the exchange
+ * @param h_wire_method hash of wire method
+ * @param contract_date date of the contract to use for the lookup
+ * @param[out] wire_fee wire fee charged
+ * @param[out] closing_fee closing fee charged (irrelevant for us,
+ *              but needed to check signature)
+ * @param[out] start_date start of fee being used
+ * @param[out] end_date end of fee being used
+ * @param[out] exchange_sig signature of exchange over fee structure
+ * @return transaction status code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_lookup_wire_fee (void *cls,
+			  const struct TALER_MasterPublicKeyP *exchange_pub,
+			  const struct GNUNET_HashCode *h_wire_method,
+			  struct GNUNET_TIME_Absolute contract_date,
+			  struct TALER_Amount *wire_fee,
+			  struct TALER_Amount *closing_fee,
+			  struct GNUNET_TIME_Absolute *start_date,
+			  struct GNUNET_TIME_Absolute *end_date,
+			  struct TALER_MasterSignatureP *exchange_sig)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (exchange_pub),
+    GNUNET_PQ_query_param_auto_from_type (h_wire_method),
+    GNUNET_PQ_query_param_absolute_time (&contract_date),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_amount ("wire_fee",
+				 wire_fee),
+    TALER_PQ_result_spec_amount ("closing_fee",
+				 closing_fee),
+    GNUNET_PQ_result_spec_absolute_time ("start_date",
+					 start_date),
+    GNUNET_PQ_result_spec_absolute_time ("end_date",
+					 end_date),
+    GNUNET_PQ_result_spec_auto_from_type ("exchange_sig",
+					  exchange_sig),
+    GNUNET_PQ_result_spec_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						   "lookup_wire_fee",
+						   params,
+						   rs);
+}
+
+
+/**
  * Closure for #process_refund_cb.
  */
 struct FindRefundContext
@@ -2417,6 +2489,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_contract_terms_by_date_and_range = &postgres_find_contract_terms_by_date_and_range;
   plugin->find_contract_terms_from_hash = &postgres_find_contract_terms_from_hash;
   plugin->get_refunds_from_contract_terms_hash = &postgres_get_refunds_from_contract_terms_hash;
+  plugin->lookup_wire_fee = &postgres_lookup_wire_fee;
   plugin->increase_refund_for_contract = postgres_increase_refund_for_contract;
   plugin->mark_proposal_paid = postgres_mark_proposal_paid;
   plugin->start = postgres_start;

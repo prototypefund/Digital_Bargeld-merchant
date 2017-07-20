@@ -363,6 +363,153 @@ proof_cb (void *cls,
 
 
 /**
+ * Test the wire fee storage.
+ *
+ * @return #GNUNET_OK on success
+ */
+static int
+test_wire_fee ()
+{
+  struct TALER_MasterPublicKeyP exchange_pub;
+  struct GNUNET_HashCode h_wire_method;
+  struct GNUNET_TIME_Absolute contract_date;
+  struct TALER_Amount wire_fee1;
+  struct TALER_Amount closing_fee1;
+  struct TALER_Amount wire_fee2;
+  struct TALER_Amount closing_fee2;
+  struct TALER_Amount wire_fee3;
+  struct TALER_Amount closing_fee3;
+  struct GNUNET_TIME_Absolute date1;
+  struct GNUNET_TIME_Absolute date2;
+  struct GNUNET_TIME_Absolute date3;
+  struct GNUNET_TIME_Absolute start_date;
+  struct GNUNET_TIME_Absolute end_date;
+  struct TALER_MasterSignatureP exchange_sig;
+  struct TALER_MasterSignatureP exchange_sig2;
+
+  RND_BLK (&exchange_pub);
+  RND_BLK (&h_wire_method);
+  RND_BLK (&exchange_sig);
+  date1 = GNUNET_TIME_absolute_get ();
+  date2 = GNUNET_TIME_absolute_add (date1,
+				    GNUNET_TIME_UNIT_DAYS);
+  date3 = GNUNET_TIME_absolute_add (date2,
+				    GNUNET_TIME_UNIT_DAYS);
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":5",
+                                         &closing_fee1));
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":4",
+                                         &wire_fee1));
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":3",
+                                         &closing_fee2));
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":2",
+                                         &wire_fee2));
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+      plugin->store_wire_fee_by_exchange (plugin->cls,
+					  &exchange_pub,
+					  &h_wire_method,
+					  &wire_fee1,
+					  &closing_fee1,
+					  date1,
+					  date2,
+					  &exchange_sig))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+      plugin->store_wire_fee_by_exchange (plugin->cls,
+					  &exchange_pub,
+					  &h_wire_method,
+					  &wire_fee2,
+					  &closing_fee2,
+					  date2,
+					  date3,
+					  &exchange_sig))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  contract_date = date2; /* test inclusive/exclusive range */
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+      plugin->lookup_wire_fee (plugin->cls,
+			       &exchange_pub,
+			       &h_wire_method,
+			       contract_date,
+			       &wire_fee3,
+			       &closing_fee3,
+			       &start_date,
+			       &end_date,
+			       &exchange_sig2))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if ( (start_date.abs_value_us != date2.abs_value_us) ||
+       (end_date.abs_value_us != date3.abs_value_us) ||
+       (0 != memcmp (&exchange_sig,
+		     &exchange_sig2,
+		     sizeof (exchange_sig))) ||
+       (0 != TALER_amount_cmp (&wire_fee2,
+			       &wire_fee3)) ||
+       (0 != TALER_amount_cmp (&closing_fee2,
+			       &closing_fee3)) )
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  contract_date = GNUNET_TIME_absolute_add (date1,
+					    GNUNET_TIME_UNIT_SECONDS);
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+      plugin->lookup_wire_fee (plugin->cls,
+			       &exchange_pub,
+			       &h_wire_method,
+			       contract_date,
+			       &wire_fee3,
+			       &closing_fee3,
+			       &start_date,
+			       &end_date,
+			       &exchange_sig2))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if ( (start_date.abs_value_us != date1.abs_value_us) ||
+       (end_date.abs_value_us != date2.abs_value_us) ||
+       (0 != memcmp (&exchange_sig,
+		     &exchange_sig2,
+		     sizeof (exchange_sig))) ||
+       (0 != TALER_amount_cmp (&wire_fee1,
+			       &wire_fee3)) ||
+       (0 != TALER_amount_cmp (&closing_fee1,
+			       &closing_fee3)) )
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  contract_date = date3; /* outside of valid range! */
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
+      plugin->lookup_wire_fee (plugin->cls,
+			       &exchange_pub,
+			       &h_wire_method,
+			       contract_date,
+			       &wire_fee3,
+			       &closing_fee3,
+			       &start_date,
+			       &end_date,
+			       &exchange_sig2))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  return GNUNET_OK;
+}
+
+
+/**
  * Main function that will be run by the scheduler.
  *
  * @param cls closure with config
@@ -635,7 +782,10 @@ run (void *cls)
                                                 &too_big_refund_amount,
                                                 "make refund testing fail due"
                                                 " to too big refund amount"));
-
+  
+  FAILIF (GNUNET_OK !=
+	  test_wire_fee ());
+  
   if (-1 == result)
     result = 0;
 

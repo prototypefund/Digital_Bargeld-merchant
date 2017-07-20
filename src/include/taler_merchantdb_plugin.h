@@ -408,7 +408,7 @@ struct TALER_MERCHANTDB_Plugin
    * including signature (so we have proof).
    *
    * @param cls closure
-   * @paramm exchange_pub public key of the exchange
+   * @param exchange_pub public key of the exchange
    * @param h_wire_method hash of wire method
    * @param wire_fee wire fee charged
    * @param closing_fee closing fee charged (irrelevant for us,
@@ -555,8 +555,36 @@ struct TALER_MERCHANTDB_Plugin
                          const struct TALER_WireTransferIdentifierRawP *wtid,
                          TALER_MERCHANTDB_ProofCallback cb,
                          void *cb_cls);
+  
 
+  /**
+   * Obtain information about wire fees charged by an exchange,
+   * including signature (so we have proof).
+   *
+   * @param cls closure
+   * @param exchange_pub public key of the exchange
+   * @param h_wire_method hash of wire method
+   * @param contract_date date of the contract to use for the lookup
+   * @param[out] wire_fee wire fee charged
+   * @param[out] closing_fee closing fee charged (irrelevant for us,
+   *              but needed to check signature)
+   * @param[out] start_date start of fee being used
+   * @param[out] end_date end of fee being used
+   * @param[out] exchange_sig signature of exchange over fee structure
+   * @return transaction status code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*lookup_wire_fee) (void *cls,
+		      const struct TALER_MasterPublicKeyP *exchange_pub,
+		      const struct GNUNET_HashCode *h_wire_method,
+		      struct GNUNET_TIME_Absolute contract_date,
+		      struct TALER_Amount *wire_fee,
+		      struct TALER_Amount *closing_fee,
+		      struct GNUNET_TIME_Absolute *start_date,
+		      struct GNUNET_TIME_Absolute *end_date,
+		      struct TALER_MasterSignatureP *exchange_sig);
 
+  
   /**
    * Function called when some backoffice staff decides to award or
    * increase the refund on an existing contract.
