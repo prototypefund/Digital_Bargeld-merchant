@@ -1917,6 +1917,11 @@ postgres_store_wire_fee_by_exchange (void *cls,
   };
 
   check_connection (pg);
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+	      "Storing wire fee for %s starting at %s of %s\n",
+	      TALER_B2S (exchange_pub),
+	      GNUNET_STRINGS_absolute_time_to_string (start_date),
+	      TALER_amount2s (wire_fee));
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "insert_wire_fee",
                                              params);  
