@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
+  Copyright (C) 2014-2017 GNUnet e.V. and INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -2619,7 +2619,7 @@ run (void *cls)
       .details.track_transaction.expected_transfer_ref
         = "check_bank_transfer-498c",
       .details.track_transaction.pay_ref = "deposit-simple",
-      .details.track_transaction.wire_fee = "EUR:0.01",
+      .details.track_transaction.wire_fee = "EUR:0.01"
     },
     
     /* Trace the WTID back to the original transaction */
