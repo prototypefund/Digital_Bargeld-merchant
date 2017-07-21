@@ -1995,6 +1995,7 @@ interpreter_run (void *cls)
     GNUNET_assert (NULL != (order = json_loads (cmd->details.proposal.order,
                                                 JSON_REJECT_DUPLICATES,
                                                 &error)));
+    (void) GNUNET_TIME_round_abs (&timestamp);
     json_object_set_new (order,
                          "timestamp",
                          GNUNET_JSON_from_time_abs (timestamp));
