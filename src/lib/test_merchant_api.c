@@ -286,398 +286,395 @@ struct Command
   union
   {
 
-/**
- * Information for a #OC_ADMIN_ADD_INCOMING command.
- */
-struct
-{
-
-  /**
-   * Label to another admin_add_incoming command if we
-   * should deposit into an existing reserve, NULL if
-   * a fresh reserve should be created.
-   */
-  const char *reserve_reference;
-
-  /**
-   * String describing the amount to add to the reserve.
-   */
-  const char *amount;
-
-  /**
-   * Sender's bank account details (JSON).
-   */
-  const char *sender_details;
-
-  /**
-   * Transfer details (JSON)
-   */
-   const char *transfer_details;
-
-  /**
-   * Set (by the interpreter) to the reserve's private key
-   * we used to fill the reserve.
-   */
-  struct TALER_ReservePrivateKeyP reserve_priv;
-
-  /**
-   * Set to the API's handle during the operation.
-   */
-  struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
-
-} admin_add_incoming;
-
-/**
- * Information for OC_PROPOSAL_LOOKUP command.
- */
-struct
-{
-
-  /**
-   * Reference to the proposal we want to lookup.
-   */
-  const char *proposal_reference;
-
-  struct TALER_MERCHANT_ProposalLookupOperation *plo;
-
-} proposal_lookup;
-
-/**
- * Information for a #OC_WITHDRAW_STATUS command.
- */
-struct
-{
-
-  /**
-   * Label to the #OC_ADMIN_ADD_INCOMING command which
-   * created the reserve.
-   */
-  const char *reserve_reference;
-
-  /**
-   * Set to the API's handle during the operation.
-   */
-  struct TALER_EXCHANGE_ReserveStatusHandle *wsh;
-
-  /**
-   * Expected reserve balance.
-   */
-  const char *expected_balance;
-
-} reserve_status;
-
-/**
- * Information for a #OC_WITHDRAW_SIGN command.
- */
-struct
-{
-
-  /**
-   * Which reserve should we withdraw from?
-   */
-  const char *reserve_reference;
-
-  /**
-   * String describing the denomination value we should withdraw.
-   * A corresponding denomination key must exist in the exchange's
-   * offerings.  Can be NULL if @e pk is set instead.
-   */
-  const char *amount;
-
-  /**
-   * If @e amount is NULL, this specifies the denomination key to
-   * use.  Otherwise, this will be set (by the interpreter) to the
-   * denomination PK matching @e amount.
-   */
-  const struct TALER_EXCHANGE_DenomPublicKey *pk;
-
-  /**
-   * Set (by the interpreter) to the exchange's signature over the
-   * coin's public key.
-   */
-  struct TALER_DenominationSignature sig;
-
-  /**
-   * Set (by the interpreter) to the coin's private key.
-   */
-  struct TALER_CoinSpendPrivateKeyP coin_priv;
-
-  /**
-   * Blinding key used for the operation.
-   */
-  struct TALER_DenominationBlindingKeyP blinding_key;
-
-  /**
-   * Withdraw handle (while operation is running).
-   */
-  struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
-
-} reserve_withdraw;
-
-/**
- * Information for an #OC_PROPOSAL command.
- */
-struct
-{
-
-  /**
-   * The order.
-   * It's dynamically generated because we need different transaction_id
-   * for different merchant instances.
-   */
-  char order[ORDER_MAX_SIZE];
-
-  /**
-   * Handle to the active PUT /proposal operation, or NULL.
-   */
-  struct TALER_MERCHANT_ProposalOperation *po;
-
-  /**
-   * Full contract in JSON, set by the /contract operation.
-   * FIXME: verify in the code that this bit is actually proposal
-   * data and not the whole proposal.
-   */
-  json_t *contract_terms;
-
-  /**
-   * Proposal's signature.
-   */
-  struct TALER_MerchantSignatureP merchant_sig;
-
-  /**
-   * Proposal data's hashcode.
-   */
-  struct GNUNET_HashCode hash;
-
-} proposal;
-
-/**
- * Information for a #OC_PAY command.
- * FIXME: support tests where we pay with multiple coins at once.
- */
-struct
-{
-
-  /**
-   * Reference to the contract.
-   */
-  const char *contract_ref;
-
-  /**
-   * ";"-separated list of references to withdrawn coins to be used
-   * in the payment.
-   */
-  char *coin_ref;
-
-  /**
-   * Amount to pay (from the coin, including fee).
-   */
-  const char *amount_with_fee;
-
-  /**
-   * Amount to pay (from the coin, excluding fee).  The sum of the
-   * deltas between all @e amount_with_fee and the @e
-   * amount_without_fee must be less than max_fee, and the sum of
-   * the @e amount_with_fee must be larger than the @e
-   * total_amount.
-   */
-  const char *amount_without_fee;
-
-  /**
-   * Deposit handle while operation is running.
-   */
-  struct TALER_MERCHANT_Pay *ph;
-
-  /**
-   * Hashcode of the proposal data associated to this payment.
-   */
-  struct GNUNET_HashCode h_contract_terms;
-
-  /**
-   * Merchant's public key
-   */
-  struct TALER_MerchantPublicKeyP merchant_pub;
-
-} pay;
-
-struct {
-
-  /**
-   * Process for the aggregator.
-   */
-  struct GNUNET_OS_Process *aggregator_proc;
-
-  /**
-   * ID of task called whenever we get a SIGCHILD.
-   */
-  struct GNUNET_SCHEDULER_Task *child_death_task;
-
-} run_aggregator;
-
-struct {
-
-  /**
-   * Which amount do we expect to see transferred?
-   */
-  const char *amount;
-
-  /**
-   * Which account do we expect to be debited?
-   */
-  uint64_t account_debit;
-
-  /**
-   * Which account do we expect to be credited?
-   */
-  uint64_t account_credit;
-
-  /**
-   * Set (!) to the wire transfer subject observed.
-   */
-  char *subject;
-
-} check_bank_transfer;
-
-struct {
-
-  /**
-   * #OC_CHECK_BANK_TRANSFER command from which we should grab
-   * the WTID.
-   */
-  char *check_bank_ref;
-
-  /**
-   * #OC_PAY command which we expect in the result.
-   * Since we are tracking a bank transaction, we want to know
-   * which (Taler) deposit is associated with the bank
-   * transaction being tracked now.
-   */
-  char *expected_pay_ref;
-
-  /**
-   * Handle to a /track/transfer operation
-   */
-  struct TALER_MERCHANT_TrackTransferHandle *tdo;
-
-} track_transfer;
-
-struct {
-
-  /**
-   * #OC_PAY command from which we should grab
-   * the WTID.
-   */
-  char *pay_ref;
-
-  /**
-   * #OC_CHECK_BANK_TRANSFER command which we expect in the result.
-   */
-  char *expected_transfer_ref;
-
-  /**
-   * Wire fee we expect to pay for this transaction.
-   */
-  const char *wire_fee;
-
-  /**
-   * Handle to a /track/transaction operation
-   */
-  struct TALER_MERCHANT_TrackTransactionHandle *tth;
-
-} track_transaction;
-
-struct {
-  /**
-   * Date we want retrieved transactions younger than
-   */
-  struct GNUNET_TIME_Absolute date;
-
-  /**
-   * How many "rows" we expect in the result
-   */
-  unsigned int nresult;
-
-  /**
-   * Handle to the merchant
-   */
-
-  /**
-   * Handle to /history request
-   */
-  struct TALER_MERCHANT_HistoryOperation *ho;
-
-  /**
-   * The backend will return records with row_id
-   * less than this value.
-   */
-  unsigned int start;
-
-  /**
-   * The backend will return at most `nrows` records.
-   */
-  unsigned int nrows;
-
-} history;
-
-struct {
-  /**
-   * Reference to the order we want reimbursed
-   */
-  char *order_id;
-
-  /**
-   * Handle to a refund increase operation
-   */
-  struct TALER_MERCHANT_RefundIncreaseOperation *rio;
-
-  /**
-   * Amount to refund
-   */
-  const char *refund_amount;
-  
-  /**
-   * Reason for refunding
-   */
-  const char *reason;
-
-  /**
-   * Refund fee (MUST match the value given in config)
-   */
-  const char *refund_fee;
-
-} refund_increase;
-
-struct {
-
-  /**
-   * Reference to the order whose refund was increased
-   */
-  char *order_id;
-
-  /**
-   * Handle to the operation
-   */
-  struct TALER_MERCHANT_RefundLookupOperation *rlo;
-
-  /**
-   * Used to retrieve the asked refund amount.
-   * This information helps the callback to mock a GET /refund
-   * response and match it against what the backend actually
-   * responded.
-   */
-  char *increase_ref;
-
-  /**
-   * Used to retrieve the number and denomination of coins
-   * used to pay for the related contract.
-   * This information helps the callback to mock a GET /refund
-   * response and match it against what the backend actually
-   * responded.
-   */
-  char *pay_ref;
-
-} refund_lookup;
-
+    /**
+     * Information for a #OC_ADMIN_ADD_INCOMING command.
+     */
+    struct
+    {
+
+      /**
+       * Label to another admin_add_incoming command if we
+       * should deposit into an existing reserve, NULL if
+       * a fresh reserve should be created.
+       */
+      const char *reserve_reference;
+
+      /**
+       * String describing the amount to add to the reserve.
+       */
+      const char *amount;
+
+      /**
+       * Sender's bank account details (JSON).
+       */
+      const char *sender_details;
+
+      /**
+       * Transfer details (JSON)
+       */
+      const char *transfer_details;
+
+      /**
+       * Set (by the interpreter) to the reserve's private key
+       * we used to fill the reserve.
+       */
+      struct TALER_ReservePrivateKeyP reserve_priv;
+      
+      /**
+       * Set to the API's handle during the operation.
+       */
+      struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
+      
+    } admin_add_incoming;
+
+    /**
+     * Information for OC_PROPOSAL_LOOKUP command.
+     */
+    struct
+    {
+      
+      /**
+       * Reference to the proposal we want to lookup.
+       */
+      const char *proposal_reference;
+      
+      struct TALER_MERCHANT_ProposalLookupOperation *plo;
+      
+    } proposal_lookup;
+    
+    /**
+     * Information for a #OC_WITHDRAW_STATUS command.
+     */
+    struct
+    {
+      
+      /**
+       * Label to the #OC_ADMIN_ADD_INCOMING command which
+       * created the reserve.
+       */
+      const char *reserve_reference;
+      
+      /**
+       * Set to the API's handle during the operation.
+       */
+      struct TALER_EXCHANGE_ReserveStatusHandle *wsh;
+      
+      /**
+       * Expected reserve balance.
+       */
+      const char *expected_balance;
+      
+    } reserve_status;
+    
+    /**
+     * Information for a #OC_WITHDRAW_SIGN command.
+     */
+    struct
+    {
+      
+      /**
+       * Which reserve should we withdraw from?
+       */
+      const char *reserve_reference;
+      
+      /**
+       * String describing the denomination value we should withdraw.
+       * A corresponding denomination key must exist in the exchange's
+       * offerings.  Can be NULL if @e pk is set instead.
+       */
+      const char *amount;
+      
+      /**
+       * If @e amount is NULL, this specifies the denomination key to
+       * use.  Otherwise, this will be set (by the interpreter) to the
+       * denomination PK matching @e amount.
+       */
+      const struct TALER_EXCHANGE_DenomPublicKey *pk;
+      
+      /**
+       * Set (by the interpreter) to the exchange's signature over the
+       * coin's public key.
+       */
+      struct TALER_DenominationSignature sig;
+      
+      /**
+       * Set (by the interpreter) to the coin's private key.
+       */
+      struct TALER_CoinSpendPrivateKeyP coin_priv;
+      
+      /**
+       * Blinding key used for the operation.
+       */
+      struct TALER_DenominationBlindingKeyP blinding_key;
+      
+      /**
+       * Withdraw handle (while operation is running).
+       */
+      struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
+      
+    } reserve_withdraw;
+    
+    /**
+     * Information for an #OC_PROPOSAL command.
+     */
+    struct
+    {
+      
+      /**
+       * The order.
+       * It's dynamically generated because we need different transaction_id
+       * for different merchant instances.
+       */
+      char order[ORDER_MAX_SIZE];
+      
+      /**
+       * Handle to the active PUT /proposal operation, or NULL.
+       */
+      struct TALER_MERCHANT_ProposalOperation *po;
+      
+      /**
+       * Full contract in JSON, set by the /contract operation.
+       * FIXME: verify in the code that this bit is actually proposal
+       * data and not the whole proposal.
+       */
+      json_t *contract_terms;
+      
+      /**
+       * Proposal's signature.
+       */
+      struct TALER_MerchantSignatureP merchant_sig;
+      
+      /**
+       * Proposal data's hashcode.
+       */
+      struct GNUNET_HashCode hash;
+      
+    } proposal;
+    
+    /**
+     * Information for a #OC_PAY command.
+     * FIXME: support tests where we pay with multiple coins at once.
+     */
+    struct
+    {
+      
+      /**
+       * Reference to the contract.
+       */
+      const char *contract_ref;
+      
+      /**
+       * ";"-separated list of references to withdrawn coins to be used
+       * in the payment.
+       */
+      char *coin_ref;
+      
+      /**
+       * Amount to pay (from the coin, including fee).
+       */
+      const char *amount_with_fee;
+      
+      /**
+       * Amount to pay (from the coin, excluding fee).  The sum of the
+       * deltas between all @e amount_with_fee and the @e
+       * amount_without_fee must be less than max_fee, and the sum of
+       * the @e amount_with_fee must be larger than the @e
+       * total_amount.
+       */
+      const char *amount_without_fee;
+      
+      /**
+       * Deposit handle while operation is running.
+       */
+      struct TALER_MERCHANT_Pay *ph;
+      
+      /**
+       * Hashcode of the proposal data associated to this payment.
+       */
+      struct GNUNET_HashCode h_contract_terms;
+
+      /**
+       * Merchant's public key
+       */
+      struct TALER_MerchantPublicKeyP merchant_pub;
+      
+    } pay;
+    
+    struct {
+      
+      /**
+       * Process for the aggregator.
+       */
+      struct GNUNET_OS_Process *aggregator_proc;
+      
+      /**
+       * ID of task called whenever we get a SIGCHILD.
+       */
+      struct GNUNET_SCHEDULER_Task *child_death_task;
+      
+    } run_aggregator;
+    
+    struct {
+      
+      /**
+       * Which amount do we expect to see transferred?
+       */
+      const char *amount;
+      
+      /**
+       * Which account do we expect to be debited?
+       */
+      uint64_t account_debit;
+      
+      /**
+       * Which account do we expect to be credited?
+       */
+      uint64_t account_credit;
+      
+      /**
+       * Set (!) to the wire transfer subject observed.
+       */
+      char *subject;
+      
+    } check_bank_transfer;
+    
+    struct {
+      
+      /**
+       * #OC_CHECK_BANK_TRANSFER command from which we should grab
+       * the WTID.
+       */
+      char *check_bank_ref;
+      
+      /**
+       * #OC_PAY command which we expect in the result.
+       * Since we are tracking a bank transaction, we want to know
+       * which (Taler) deposit is associated with the bank
+       * transaction being tracked now.
+       */
+      char *expected_pay_ref;
+      
+      /**
+       * Handle to a /track/transfer operation
+       */
+      struct TALER_MERCHANT_TrackTransferHandle *tdo;
+      
+    } track_transfer;
+    
+    struct {
+      
+      /**
+       * #OC_PAY command from which we should grab
+       * the WTID.
+       */
+      char *pay_ref;
+      
+      /**
+       * #OC_CHECK_BANK_TRANSFER command which we expect in the result.
+       */
+      char *expected_transfer_ref;
+      
+      /**
+       * Wire fee we expect to pay for this transaction.
+       */
+      const char *wire_fee;
+      
+      /**
+       * Handle to a /track/transaction operation
+       */
+      struct TALER_MERCHANT_TrackTransactionHandle *tth;
+      
+    } track_transaction;
+    
+    struct {
+      
+      /**
+       * Date we want retrieved transactions younger than
+       */
+      struct GNUNET_TIME_Absolute date;
+      
+      /**
+       * How many "rows" we expect in the result
+       */
+      unsigned int nresult;
+      
+      /**
+       * Handle to /history request
+       */
+      struct TALER_MERCHANT_HistoryOperation *ho;
+      
+      /**
+       * The backend will return records with row_id
+       * less than this value.
+       */
+      unsigned int start;
+      
+      /**
+       * The backend will return at most `nrows` records.
+       */
+      unsigned int nrows;
+      
+    } history;
+
+    struct {
+      /**
+       * Reference to the order we want reimbursed
+       */
+      char *order_id;
+      
+      /**
+       * Handle to a refund increase operation
+       */
+      struct TALER_MERCHANT_RefundIncreaseOperation *rio;
+      
+      /**
+       * Amount to refund
+       */
+      const char *refund_amount;
+      
+      /**
+       * Reason for refunding
+       */
+      const char *reason;
+      
+      /**
+       * Refund fee (MUST match the value given in config)
+       */
+      const char *refund_fee;
+      
+    } refund_increase;
+
+    struct {
+      
+      /**
+       * Reference to the order whose refund was increased
+       */
+      char *order_id;
+      
+      /**
+       * Handle to the operation
+       */
+      struct TALER_MERCHANT_RefundLookupOperation *rlo;
+      
+      /**
+       * Used to retrieve the asked refund amount.
+       * This information helps the callback to mock a GET /refund
+       * response and match it against what the backend actually
+       * responded.
+       */
+      char *increase_ref;
+      
+      /**
+       * Used to retrieve the number and denomination of coins
+       * used to pay for the related contract.
+       * This information helps the callback to mock a GET /refund
+       * response and match it against what the backend actually
+       * responded.
+       */
+      char *pay_ref;
+      
+    } refund_lookup;
+    
   } details;
 
 };
