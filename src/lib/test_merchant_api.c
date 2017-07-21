@@ -26,7 +26,6 @@
 #include <taler/taler_util.h>
 #include <taler/taler_signatures.h>
 #include "taler_merchant_service.h"
-#include "taler-merchant-httpd_refund.h"
 #include "taler_merchantdb_lib.h"
 #include <gnunet/gnunet_util_lib.h>
 #include <gnunet/gnunet_curl_lib.h>
