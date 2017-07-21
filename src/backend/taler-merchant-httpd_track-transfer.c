@@ -96,6 +96,11 @@ struct TrackTransferContext
   char *uri;
 
   /**
+   * Wire method used for the transfer.
+   */
+  char *wire_method;
+
+  /**
    * Pointer to the detail that we are currently
    * checking in #check_transfer().
    */
@@ -182,6 +187,11 @@ free_transfer_track_context (struct TrackTransferContext *rctx)
   {
     GNUNET_free (rctx->uri);
     rctx->uri = NULL;
+  }
+  if (NULL != rctx->wire_method)
+  {
+    GNUNET_free (rctx->wire_method);
+    rctx->wire_method = NULL;
   }
   GNUNET_free (rctx);
 }
@@ -459,13 +469,96 @@ check_transfer (void *cls,
                                      "exchange_deposit_proof", exchange_proof,
                                      "conflict_offset", (json_int_t) rctx->current_offset,
                                      "exchange_transfer_proof", rctx->original_response,
-                                     "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
+                                     "coin_pub", GNUNET_JSON_from_data_auto (coin_pub), 
                                      "h_contract_terms", GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
                                      "amount_with_fee", TALER_JSON_from_amount (amount_with_fee),
                                      "deposit_fee", TALER_JSON_from_amount (deposit_fee));
     return;
   }
   rctx->check_transfer_result = GNUNET_OK;
+}
+
+
+/**
+ * Check that the given @a wire_fee is what the 
+ * @a exchange_pub should charge at the @a execution_time.
+ * If the fee is correct (according to our database),
+ * return #GNUNET_OK.  If we do not have the fee structure
+ * in our DB, we just accept it and return #GNUNET_NO;
+ * if we have proof that the fee is bogus, we respond with
+ * the proof to the client and return #GNUNET_SYSERR.
+ *
+ * @param rctx context of the transfer to respond to
+ * @param json response from the exchange
+ * @param execution_time time of the wire transfer
+ * @param wire_fee fee claimed by the exchange
+ * @return #GNUNET_SYSERR if we returned hard proof of
+ *   missbehavior from the exchange to the client
+ */
+static int
+check_wire_fee (struct TrackTransferContext *rctx,
+		const json_t *json,
+		struct GNUNET_TIME_Absolute execution_time,
+		const struct TALER_Amount *wire_fee)
+{
+  const struct TALER_MasterPublicKeyP *master_pub;
+  struct GNUNET_HashCode h_wire_method;
+  struct TALER_Amount expected_fee;
+  struct TALER_Amount closing_fee;
+  struct TALER_MasterSignatureP master_sig;
+  struct GNUNET_TIME_Absolute start_date;
+  struct GNUNET_TIME_Absolute end_date;
+  enum GNUNET_DB_QueryStatus qs;
+  const struct TALER_EXCHANGE_Keys *keys;
+
+  keys = TALER_EXCHANGE_get_keys (rctx->eh);
+  if (NULL == keys)
+  {
+    GNUNET_break (0);
+    return GNUNET_NO;
+  }
+  master_pub = &keys->master_pub;
+  GNUNET_CRYPTO_hash (rctx->wire_method,
+		      strlen (rctx->wire_method) + 1,
+		      &h_wire_method);
+  qs = db->lookup_wire_fee (db->cls,
+			    master_pub,
+			    &h_wire_method,
+			    execution_time,
+			    &expected_fee,
+			    &closing_fee,
+			    &start_date,
+			    &end_date,
+			    &master_sig);
+  if (0 >= qs)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+		"Failed to find wire fee for `%s' at %s in DB, accepting blindly that the fee is %s\n",
+		TALER_B2S (master_pub),
+		GNUNET_STRINGS_absolute_time_to_string (execution_time),
+		TALER_amount2s (wire_fee));
+    return GNUNET_NO;
+  }
+  if (0 <= TALER_amount_cmp (&expected_fee,
+			     wire_fee))
+    return GNUNET_OK; /* expected_fee >= wire_fee */
+  
+  /* Wire fee check failed, export proof to client */
+  resume_track_transfer_with_response
+    (rctx,
+     MHD_HTTP_INTERNAL_SERVER_ERROR,
+     TMH_RESPONSE_make_json_pack ("{s:I, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:O}",
+				  "code", (json_int_t) TALER_EC_TRACK_TRANSFER_JSON_BAD_WIRE_FEE,
+				  "wire_fee", TALER_JSON_from_amount (wire_fee),
+				  "execution_time", GNUNET_JSON_from_time_abs (execution_time),
+				  "expected_wire_fee", TALER_JSON_from_amount (&expected_fee),
+				  "expected_closing_fee", TALER_JSON_from_amount (&closing_fee),
+				  "start_date", GNUNET_JSON_from_time_abs (start_date),
+				  "end_date", GNUNET_JSON_from_time_abs (end_date),
+				  "master_sig", GNUNET_JSON_from_data_auto (&master_sig),
+				  "master_pub", GNUNET_JSON_from_data_auto (master_pub),
+				  "json", json));
+  return GNUNET_SYSERR;
 }
 
 
@@ -546,6 +639,14 @@ wire_transfer_cb (void *cls,
     return;
   }
   rctx->original_response = json;
+
+  if (GNUNET_SYSERR ==
+      check_wire_fee (rctx,
+		      json,
+		      execution_time,
+		      wire_fee))
+    return;
+
   for (unsigned int i=0;i<details_length;i++)
   {
     rctx->current_offset = i;
@@ -775,6 +876,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   const char *str;
   const char *uri;
   const char *instance_str;
+  const char *wire_method;
   int ret;
   enum GNUNET_DB_QueryStatus qs;
 
@@ -830,6 +932,26 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
 					   TALER_EC_PARAMETER_MISSING,
                                            "exchange");
   rctx->uri = GNUNET_strdup (uri);
+
+  wire_method = MHD_lookup_connection_value (connection,
+					     MHD_GET_ARGUMENT_KIND,
+					     "wire_method");
+  if (NULL == wire_method)
+  {
+    if (1)
+    {
+      /* temporary work-around until demo is adjusted... */
+      GNUNET_break (0);
+      wire_method = "test";
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		  "Client needs fixing, see API change for #4943!\n");
+    }
+    else
+      return TMH_RESPONSE_reply_arg_missing (connection,
+					     TALER_EC_PARAMETER_MISSING,
+					     "wire_method");
+  }
+  rctx->wire_method = GNUNET_strdup (wire_method);
 
   instance_str = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,

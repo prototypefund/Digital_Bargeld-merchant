@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016 INRIA
+  Copyright (C) 2014-2017 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -30,23 +30,11 @@
 
 /* ********************* /refund ************************** */
 
-struct TALER_MERCHANT_RefundIncreaseOperation;
-
+/**
+ * Handle for a GET /refund operation.
+ */
 struct TALER_MERCHANT_RefundLookupOperation;
 
-/**
- * Callback to process a POST /refund request
- *
- * @param cls closure
- * @param http_status HTTP status code for this request
- * @param ec taler-specific error code
- * @param obj the response body
- */
-typedef void
-(*TALER_MERCHANT_RefundIncreaseCallback) (void *cls,
-                                          unsigned int http_status,
-                                          enum TALER_ErrorCode ec,
-                                          const json_t *obj);
 
 /**
  * Callback to process a GET /refund request
@@ -58,9 +46,9 @@ typedef void
  */
 typedef void
 (*TALER_MERCHANT_RefundLookupCallback) (void *cls,
-                                                 unsigned int http_status,
-                                                 enum TALER_ErrorCode ec,
-                                                 const json_t *obj);
+					unsigned int http_status,
+					enum TALER_ErrorCode ec,
+					const json_t *obj);
 
 /**
  * Does a GET /refund.
@@ -79,6 +67,36 @@ TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
                               const char *instance,
                               TALER_MERCHANT_RefundLookupCallback cb,
                               void *cb_cls);
+
+/**
+ * Cancel a GET /refund request.
+ *
+ * @param rlo the refund increasing operation to cancel
+ */
+void
+TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation *rlo);
+
+
+/**
+ * Handle for a POST /refund operation.
+ */
+struct TALER_MERCHANT_RefundIncreaseOperation;
+
+
+/**
+ * Callback to process a POST /refund request
+ *
+ * @param cls closure
+ * @param http_status HTTP status code for this request
+ * @param ec taler-specific error code
+ * @param obj the response body
+ */
+typedef void
+(*TALER_MERCHANT_RefundIncreaseCallback) (void *cls,
+                                          unsigned int http_status,
+                                          enum TALER_ErrorCode ec,
+                                          const json_t *obj);
+
 
 /**
  * Increase the refund associated to a order
@@ -110,13 +128,6 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
 void
 TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOperation *rio);
 
-/**
- * Cancel a GET /refund request.
- *
- * @param rlo the refund increasing operation to cancel
- */
-void
-TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation *rlo);
 
 /* *********************  /proposal *********************** */
 
@@ -125,11 +136,6 @@ TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation
  * Handle to a PUT /proposal operation
  */
 struct TALER_MERCHANT_ProposalOperation;
-
-/**
- * Handle to a GET /proposal operation
- */
-struct TALER_MERCHANT_ProposalLookupOperation;
 
 /**
  * Callbacks of this type are used to serve the result of submitting a
@@ -153,19 +159,6 @@ typedef void
                                     const struct TALER_MerchantSignatureP *sig,
                                     const struct GNUNET_HashCode *hash);
 
-
-/**
- * Callback called to work a GET /proposal response.
- *
- * @param cls closure
- * @param http_status HTTP status code of the request
- * @param body JSON containing the response's payload.
- * In case of errors, it contains the appropriate error encoding.
- */
-typedef void
-(*TALER_MERCHANT_ProposalLookupOperationCallback) (void *cls,
-                                                   unsigned int http_status,
-                                                   const json_t *body);
 
 /**
  * PUT an order to the backend and receives the related proposal.
@@ -194,6 +187,26 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
  */
 void
 TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po);
+
+
+/**
+ * Handle to a GET /proposal operation
+ */
+struct TALER_MERCHANT_ProposalLookupOperation;
+
+
+/**
+ * Callback called to work a GET /proposal response.
+ *
+ * @param cls closure
+ * @param http_status HTTP status code of the request
+ * @param body JSON containing the response's payload.
+ * In case of errors, it contains the appropriate error encoding.
+ */
+typedef void
+(*TALER_MERCHANT_ProposalLookupOperationCallback) (void *cls,
+                                                   unsigned int http_status,
+                                                   const json_t *body);
 
 
 /**
@@ -456,7 +469,8 @@ struct TALER_MERCHANT_TrackTransferHandle;
  * by the exchange for a given h_contract_terms, by _one_ wire
  * transfer.
  */
-struct TALER_MERCHANT_TrackTransferDetails {
+struct TALER_MERCHANT_TrackTransferDetails
+{
 
   /**
    * Total amount paid back by the exchange.
@@ -501,12 +515,14 @@ typedef void
                                          unsigned int details_length,
                                          const struct TALER_MERCHANT_TrackTransferDetails *details);
 
+
 /**
  * Request backend to return deposits associated with a given wtid.
  *
  * @param ctx execution context
  * @param backend_uri base URI of the backend
  * @param instance which merchant instance is going to be tracked
+ * @param wire_method wire method used for the wire transfer
  * @param wtid base32 string indicating a wtid
  * @param exchange base URL of the exchange in charge of returning the wanted information
  * @param track_transfer_cb the callback to call when a reply for this request is available
@@ -517,6 +533,7 @@ struct TALER_MERCHANT_TrackTransferHandle *
 TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                const char *backend_uri,
                                const char *instance,
+			       const char *wire_method,
                                const struct TALER_WireTransferIdentifierRawP *wtid,
                                const char *exchange_uri,
                                TALER_MERCHANT_TrackTransferCallback track_transfer_cb,

@@ -2041,7 +2041,7 @@ interpreter_run (void *cls)
     merchant_sig = ref->details.proposal.merchant_sig;
     GNUNET_assert (NULL != ref->details.proposal.contract_terms);
     {
-      /* Get information that need to be replied in the deposit permission */
+      /* Get information that needs to be replied in the deposit permission */
       struct GNUNET_JSON_Specification spec[] = {
         GNUNET_JSON_spec_string ("order_id", &order_id),
         GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
@@ -2207,6 +2207,7 @@ interpreter_run (void *cls)
           = TALER_MERCHANT_track_transfer (ctx,
                                            MERCHANT_URI,
                                            instance,
+					   "test",
                                            &wtid,
                                            EXCHANGE_URI,
                                            &track_transfer_cb,

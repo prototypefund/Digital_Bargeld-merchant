@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
+  Copyright (C) 2014-2017 GNUnet e.V. and INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -112,9 +112,8 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
   num_details = json_array_size (deposits);
   {
     struct TALER_MERCHANT_TrackTransferDetails details[num_details];
-    unsigned int i;
 
-    for (i=0;i<num_details;i++)
+    for (unsigned int i=0;i<num_details;i++)
     {
       struct TALER_MERCHANT_TrackTransferDetails *detail = &details[i];
       json_t *deposit = json_array_get (deposits, i);
@@ -217,6 +216,7 @@ handle_track_transfer_finished (void *cls,
  * @param ctx execution context
  * @param backend_uri base URI of the backend
  * @param instance which merchant instance is going to be tracked
+ * @param wire_method wire method used for the wire transfer
  * @param wtid base32 string indicating a wtid
  * @param exchange_uri base URL of the exchange in charge of returning the wanted information
  * @param track_transfer_cb the callback to call when a reply for this request is available
@@ -227,6 +227,7 @@ struct TALER_MERCHANT_TrackTransferHandle *
 TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                const char *backend_uri,
                                const char *instance,
+			       const char *wire_method,
                                const struct TALER_WireTransferIdentifierRawP *wtid,
                                const char *exchange_uri,
                                TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
@@ -247,11 +248,12 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   base = MAH_path_to_url_ (backend_uri,
 			   "/track/transfer");
   GNUNET_asprintf (&tdo->url,
-                   "%s?wtid=%s&exchange=%s&instance=%s",
+                   "%s?wtid=%s&exchange=%s&instance=%s&wire_method",
                    base,
                    wtid_str,
                    exchange_uri,
-		   instance);
+		   instance,
+		   wire_method);
   GNUNET_free (base);
   GNUNET_free (wtid_str);
   eh = curl_easy_init ();

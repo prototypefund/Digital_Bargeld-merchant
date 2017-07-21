@@ -95,7 +95,6 @@ make_track_transaction_ok (unsigned int num_transfers,
 }
 
 
-
 /**
  * Context for a /track/transaction operation.
  */
