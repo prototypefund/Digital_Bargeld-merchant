@@ -1082,9 +1082,9 @@ reserve_status_cb (void *cls,
     }
     break;
   default:
-  /* Unsupported status code (by test harness) */
-  GNUNET_break (0);
-  break;
+    /* Unsupported status code (by test harness) */
+    GNUNET_break (0);
+    break;
   }
   next_command (is);
 }
@@ -1138,7 +1138,7 @@ reserve_withdraw_cb (void *cls,
       = GNUNET_CRYPTO_rsa_signature_dup (sig->rsa_signature);
     break;
   case MHD_HTTP_PAYMENT_REQUIRED:
-  /* nothing to check */
+    /* nothing to check */
     break;
   default:
     /* Unsupported status code (by test harness) */
@@ -1323,7 +1323,8 @@ refund_lookup_cb (void *cls,
   icoin_refs = GNUNET_strdup (pay->details.pay.coin_ref);
   GNUNET_assert (NULL != (icoin_ref =
 			  strtok (icoin_refs, ";")));
-  TALER_amount_get_zero ("EUR", &acc);
+  TALER_amount_get_zero ("EUR",
+			 &acc);
   do
   {
     GNUNET_assert (NULL != (icoin =
@@ -1334,7 +1335,7 @@ refund_lookup_cb (void *cls,
     GNUNET_CRYPTO_hash (&icoin_pub,
                         sizeof (struct TALER_CoinSpendPublicKeyP),
                         &h_icoin_pub);
-    /*Can be NULL: not all coins are involved in refund*/
+    /* Can be NULL: not all coins are involved in refund */
     iamount = GNUNET_CONTAINER_multihashmap_get (map,
 						 &h_icoin_pub);
     if (NULL != iamount)
@@ -1455,8 +1456,11 @@ maint_child_death (void *cls)
   char c[16];
 
   cmd->details.run_aggregator.child_death_task = NULL;
-  pr = GNUNET_DISK_pipe_handle (sigpipe, GNUNET_DISK_PIPE_END_READ);
-  GNUNET_break (0 < GNUNET_DISK_file_read (pr, &c, sizeof (c)));
+  pr = GNUNET_DISK_pipe_handle (sigpipe,
+				GNUNET_DISK_PIPE_END_READ);
+  GNUNET_break (0 < GNUNET_DISK_file_read (pr,
+					   &c,
+					   sizeof (c)));
   GNUNET_OS_process_wait (cmd->details.run_aggregator.aggregator_proc);
   GNUNET_OS_process_destroy (cmd->details.run_aggregator.aggregator_proc);
   cmd->details.run_aggregator.aggregator_proc = NULL;
@@ -1849,7 +1853,9 @@ interpreter_run (void *cls)
       const char *order_id;
 
       GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
-      GNUNET_assert (NULL != (ref = find_command (is, cmd->details.proposal_lookup.proposal_reference)));
+      GNUNET_assert (NULL != (ref =
+			      find_command (is,
+					    cmd->details.proposal_lookup.proposal_reference)));
 
       order_id = json_string_value (json_object_get (ref->details.proposal.contract_terms,
                                     "order_id"));
@@ -1872,7 +1878,8 @@ interpreter_run (void *cls)
         cmd->details.admin_add_incoming.reserve_reference)
     {
       GNUNET_assert (NULL != (ref
-        = find_command (is, cmd->details.admin_add_incoming.reserve_reference)));
+        = find_command (is,
+			cmd->details.admin_add_incoming.reserve_reference)));
       GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
       cmd->details.admin_add_incoming.reserve_priv
         = ref->details.admin_add_incoming.reserve_priv;
@@ -1985,19 +1992,13 @@ interpreter_run (void *cls)
     json_t *order;
     json_error_t error;
     struct GNUNET_TIME_Absolute timestamp;
-    char *date;
   
     GNUNET_assert (NULL != (order = json_loads (cmd->details.proposal.order,
                                                 JSON_REJECT_DUPLICATES,
                                                 &error)));
-
-    timestamp = GNUNET_TIME_absolute_get ();
-    GNUNET_asprintf (&date,
-                     "/Date(%llu)/",
-                     timestamp.abs_value_us / 1000LL / 1000LL);
     json_object_set_new (order,
                          "timestamp",
-                         json_string (date));
+                         GNUNET_JSON_from_time_abs (timestamp));
     if (NULL != instance)
     {
       json_t *merchant;
