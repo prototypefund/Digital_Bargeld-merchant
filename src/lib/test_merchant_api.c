@@ -64,7 +64,7 @@
 /**
  * Handle to database.
  */
-struct TALER_MERCHANTDB_Plugin *db;
+static struct TALER_MERCHANTDB_Plugin *db;
 
 /**
  * Configuration handle.
@@ -89,7 +89,7 @@ static char **instances;
 /**
  * How many merchant instances this test runs
  */
-unsigned int ninstances = 0;
+static unsigned int ninstances = 0;
 
 /**
  * Current instance
@@ -99,12 +99,12 @@ static char *instance;
 /**
  * Current instance key
  */
-struct GNUNET_CRYPTO_EddsaPrivateKey *instance_priv;
+static struct GNUNET_CRYPTO_EddsaPrivateKey *instance_priv;
 
 /**
  * Current instance being tested
  */
-unsigned int instance_idx = 0;
+static unsigned int instance_idx = 0;
 
 /**
  * Task run on timeout.
@@ -780,7 +780,6 @@ static const struct Command *
 find_command (const struct InterpreterState *is,
               const char *label)
 {
-  unsigned int i;
   const struct Command *cmd;
 
   if (NULL == label)
@@ -789,7 +788,9 @@ find_command (const struct InterpreterState *is,
                 "Attempt to lookup command for empty label\n");
     return NULL;
   }
-  for (i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
+  for (unsigned int i=0;
+       OC_END != (cmd = &is->commands[i])->oc;
+       i++)
     if ( (NULL != cmd->label) &&
        (0 == strcmp (cmd->label,
                      label)) )
@@ -985,7 +986,6 @@ reserve_status_cb (void *cls,
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
   struct Command *rel;
-  unsigned int i;
   unsigned int j;
   struct TALER_Amount amount;
 
@@ -1005,7 +1005,7 @@ reserve_status_cb (void *cls,
   {
   case MHD_HTTP_OK:
     j = 0;
-    for (i=0;i<is->ip;i++)
+    for (unsigned int i=0;i<is->ip;i++)
     {
       switch ((rel = &is->commands[i])->oc)
       {
@@ -1248,6 +1248,7 @@ hashmap_free (void *cls,
   return GNUNET_YES;
 }
 
+
 /**
  * Process GET /refund (increase) response. 
  *
@@ -1281,7 +1282,6 @@ refund_lookup_cb (void *cls,
   const struct Command *increase;
   struct TALER_Amount refund_amount;
  
-
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1295,47 +1295,56 @@ refund_lookup_cb (void *cls,
   json_array_foreach (obj, index, elem)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
-    struct TALER_Amount *irefund_amount = GNUNET_new (struct TALER_Amount);
+    struct TALER_Amount *irefund_amount
+      = GNUNET_new (struct TALER_Amount);
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin_pub),
       TALER_JSON_spec_amount ("refund_amount", irefund_amount),
       GNUNET_JSON_spec_end ()
-  };
+    };
      
-  GNUNET_assert (GNUNET_OK == GNUNET_JSON_parse (elem,
-                                                 spec,
-                                                 &error_name,
-                                                 &error_line));
-  GNUNET_CRYPTO_hash (&coin_pub,
-                      sizeof (struct TALER_CoinSpendPublicKeyP),
-                      &h_coin_pub);
-  
-  GNUNET_assert (GNUNET_OK ==
-    GNUNET_CONTAINER_multihashmap_put (map,
-                                       &h_coin_pub,
-                                       irefund_amount,
-                                       GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY)); 
+    GNUNET_assert (GNUNET_OK ==
+		   GNUNET_JSON_parse (elem,
+				      spec,
+				      &error_name,
+				      &error_line));
+    GNUNET_CRYPTO_hash (&coin_pub,
+			sizeof (struct TALER_CoinSpendPublicKeyP),
+			&h_coin_pub);
+    
+    GNUNET_assert (GNUNET_OK ==
+		   GNUNET_CONTAINER_multihashmap_put (map,
+						      &h_coin_pub,
+						      irefund_amount,
+						      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY)); 
   };
   
   /* Retrieve coins used to pay, from OC_PAY command */
-  GNUNET_assert (NULL != (pay = find_command (is, cmd->details.refund_lookup.pay_ref)));
+  GNUNET_assert (NULL != (pay =
+			  find_command (is,
+					cmd->details.refund_lookup.pay_ref)));
   icoin_refs = GNUNET_strdup (pay->details.pay.coin_ref);
-  GNUNET_assert (NULL != (icoin_ref = strtok (icoin_refs, ";")));
+  GNUNET_assert (NULL != (icoin_ref =
+			  strtok (icoin_refs, ";")));
   TALER_amount_get_zero ("EUR", &acc);
   do
   {
-    GNUNET_assert (NULL != (icoin = find_command (is, icoin_ref)));
+    GNUNET_assert (NULL != (icoin =
+			    find_command (is,
+					  icoin_ref)));
     GNUNET_CRYPTO_eddsa_key_get_public (&icoin->details.reserve_withdraw.coin_priv.eddsa_priv,
                                         &icoin_pub.eddsa_pub);
     GNUNET_CRYPTO_hash (&icoin_pub,
                         sizeof (struct TALER_CoinSpendPublicKeyP),
                         &h_icoin_pub);
     /*Can be NULL: not all coins are involved in refund*/
-    iamount = GNUNET_CONTAINER_multihashmap_get (map, &h_icoin_pub);
+    iamount = GNUNET_CONTAINER_multihashmap_get (map,
+						 &h_icoin_pub);
     if (NULL != iamount)
-      GNUNET_assert (GNUNET_OK == TALER_amount_add (&acc,
-                                                    &acc,
-                                                    iamount)); 
+      GNUNET_assert (GNUNET_OK ==
+		     TALER_amount_add (&acc,
+				       &acc,
+				       iamount)); 
     
     icoin_ref = strtok (NULL, ";");
     if (NULL == icoin_ref)
@@ -1577,14 +1586,14 @@ static const struct TALER_EXCHANGE_DenomPublicKey *
 find_pk (const struct TALER_EXCHANGE_Keys *keys,
          const struct TALER_Amount *amount)
 {
-  unsigned int i;
   struct GNUNET_TIME_Absolute now;
-  struct TALER_EXCHANGE_DenomPublicKey *pk;
   char *str;
 
   now = GNUNET_TIME_absolute_get ();
-  for (i=0;i<keys->num_denom_keys;i++)
+  for (unsigned int i=0;i<keys->num_denom_keys;i++)
   {
+    const struct TALER_EXCHANGE_DenomPublicKey *pk;
+    
     pk = &keys->denom_keys[i];
     if ( (0 == TALER_amount_cmp (amount,
                                  &pk->value)) &&
@@ -1594,8 +1603,10 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
   }
   /* do 2nd pass to check if expiration times are to blame for failure */
   str = TALER_amount_to_string (amount);
-  for (i=0;i<keys->num_denom_keys;i++)
+  for (unsigned int i=0;i<keys->num_denom_keys;i++)
   {
+    const struct TALER_EXCHANGE_DenomPublicKey *pk;
+
     pk = &keys->denom_keys[i];
     if ( (0 == TALER_amount_cmp (amount,
                                  &pk->value)) &&
