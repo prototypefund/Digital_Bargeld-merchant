@@ -248,7 +248,7 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   base = MAH_path_to_url_ (backend_uri,
 			   "/track/transfer");
   GNUNET_asprintf (&tdo->url,
-                   "%s?wtid=%s&exchange=%s&instance=%s&wire_method",
+                   "%s?wtid=%s&exchange=%s&instance=%s&wire_method=%s",
                    base,
                    wtid_str,
                    exchange_uri,
