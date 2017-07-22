@@ -533,8 +533,9 @@ check_wire_fee (struct TrackTransferContext *rctx,
   if (0 >= qs)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-		"Failed to find wire fee for `%s' at %s in DB, accepting blindly that the fee is %s\n",
+		"Failed to find wire fee for `%s' and method `%s' at %s in DB, accepting blindly that the fee is %s\n",
 		TALER_B2S (master_pub),
+		rctx->wire_method,
 		GNUNET_STRINGS_absolute_time_to_string (execution_time),
 		TALER_amount2s (wire_fee));
     return GNUNET_NO;

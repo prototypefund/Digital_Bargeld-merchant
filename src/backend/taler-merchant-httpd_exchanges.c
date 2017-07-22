@@ -312,7 +312,12 @@ process_wire_fees (void *cls,
   struct FeesByWireMethod *f;
   struct TALER_EXCHANGE_WireAggregateFees *endp;
   struct TALER_EXCHANGE_WireAggregateFees *af;
-
+  const struct TALER_EXCHANGE_Keys *keys;
+  const struct TALER_MasterPublicKeyP *master_pub;
+  
+  keys = TALER_EXCHANGE_get_keys (exchange->conn);
+  GNUNET_assert (NULL != keys);
+  master_pub = &keys->master_pub;
   for (f = exchange->wire_fees_head; NULL != f; f = f->next)
     if (0 == strcasecmp (wire_method,
                          f->wire_method))
@@ -349,8 +354,14 @@ process_wire_fees (void *cls,
     GNUNET_CRYPTO_hash (wire_method,
 			strlen (wire_method) + 1,
 			&h_wire_method);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+		"Storing wire fee for `%s' and method `%s' at %s in DB; the fee is %s\n",
+		TALER_B2S (master_pub),
+		wire_method,
+		GNUNET_STRINGS_absolute_time_to_string (af->start_date),
+		TALER_amount2s (&af->wire_fee));
     qs = db->store_wire_fee_by_exchange (db->cls,
-					 &exchange->master_pub,
+					 master_pub,
 					 &h_wire_method,
 					 &af->wire_fee,
 					 &af->closing_fee,
