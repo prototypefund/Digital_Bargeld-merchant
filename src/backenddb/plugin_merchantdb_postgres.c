@@ -1066,7 +1066,9 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
     .cb = cb,
     .cb_cls = cb_cls
   };
-
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "DB serving /history with date %s\n",
+              GNUNET_STRINGS_absolute_time_to_string (date));
   if (GNUNET_YES == future)
     stmt = "find_contract_terms_by_date_and_range_future";
   else

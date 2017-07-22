@@ -2711,7 +2711,7 @@ run (void *cls)
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
       /*all records to be returned*/
-      .details.history.date.abs_value_us = 43 * 1000LL * 1000LL,
+      .details.history.date.abs_value_us = 99999999999 * 1000LL * 1000LL,
       .details.history.nresult = 2,
       .details.history.start = 10,
       .details.history.nrows = 10
