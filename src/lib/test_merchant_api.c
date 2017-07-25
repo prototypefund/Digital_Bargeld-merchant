@@ -2257,6 +2257,10 @@ interpreter_run (void *cls)
     return;
   }
   case OC_HISTORY:
+    if (0 == cmd->details.history.date.abs_value_us)
+      cmd->details.history.date = GNUNET_TIME_absolute_add
+        (GNUNET_TIME_absolute_get (),
+         GNUNET_TIME_UNIT_HOURS);
     if (NULL == (cmd->details.history.ho
         = TALER_MERCHANT_history (ctx,
     	                          MERCHANT_URI,
@@ -2710,8 +2714,12 @@ run (void *cls)
     { .oc = OC_HISTORY,
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
-      /*all records to be returned*/
-      .details.history.date.abs_value_us = 99999999999 * 1000LL * 1000LL,
+      /**
+       * all records to be returned; setting date as 0 lets the interpreter
+       * set it as 'now' + one hour delta, just to make sure it surpasses the
+       * proposal's timestamp.
+       */
+      .details.history.date.abs_value_us = 0,
       .details.history.nresult = 2,
       .details.history.start = 10,
       .details.history.nrows = 10
@@ -2720,7 +2728,7 @@ run (void *cls)
       .label = "history-2",
       .expected_response_code = MHD_HTTP_OK,
       /*no records returned, time limit too ancient*/
-      .details.history.date.abs_value_us = 0,
+      .details.history.date.abs_value_us = 1,
       .details.history.nresult = 0,
       .details.history.start = 10,
       .details.history.nrows = 10
