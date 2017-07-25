@@ -2575,6 +2575,11 @@ run (void *cls)
        * make sure it surpasses the proposal's timestamp.
        */
       .details.history.date.abs_value_us = 0,
+      /**
+       * We only expect ONE result (create-proposal-1) to be
+       * included in /history response, because create-proposal-3
+       * did NOT go through because of double spending.
+       */
       .details.history.nresult = 1,
       .details.history.start = 10,
       .details.history.nrows = 10
