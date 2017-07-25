@@ -2734,6 +2734,11 @@ run (void *cls)
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.history.date.abs_value_us = 0,
+      /**
+       * Now we expect BOTH contracts (create-proposal-{1,2})
+       * to be included in /history response, because
+       * create-proposal-2 has now been correctly paid.
+       */
       .details.history.nresult = 2,
       .details.history.start = 10,
       .details.history.nrows = 10
