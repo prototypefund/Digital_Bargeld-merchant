@@ -464,6 +464,7 @@ deposit_cb (void *cls,
 		http_status);
     /* Transaction failed; stop all other ongoing deposits */
     abort_deposit (pc);
+    db->rollback (db->cls);
 
     if (NULL == proof)
     {
@@ -520,6 +521,7 @@ deposit_cb (void *cls,
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     /* internal error */
     abort_deposit (pc);
+    db->rollback (db->cls);
     /* Forward error including 'proof' for the body */
     resume_pay_with_response (pc,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
@@ -530,6 +532,22 @@ deposit_cb (void *cls,
 
   if (0 != pc->pending)
     return; /* still more to do */
+
+  qs = db->mark_proposal_paid (db->cls,
+                               &pc->h_contract_terms,
+                               &pc->mi->pubkey);
+  if (0 > qs)
+    resume_pay_with_response (pc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
+                              TMH_RESPONSE_make_internal_error (TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
+                                                                "Merchant database error: could not mark proposal as 'paid'"));
+  qs = db->commit (db->cls);
+  if (0 > qs)
+    resume_pay_with_response (pc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
+                              TMH_RESPONSE_make_internal_error (TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
+                                                                "Merchant database error: could not commit"));
+
   resume_pay_with_response (pc,
                             MHD_HTTP_OK,
                             sign_success_response (pc));
@@ -850,6 +868,17 @@ process_pay_with_exchange (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Exchange and fee structure OK. Initiating deposit operation for coins\n");
 
+  if (GNUNET_OK != db->start (db->cls))
+  {
+    GNUNET_break (0);
+    resume_pay_with_response (pc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
+                              TMH_RESPONSE_make_json_pack ("{s:s, s:I}",
+                                                           "hint", "Merchant database error: could not start transaction",
+                                                           "code", (json_int_t) TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR));
+    return;
+  }
+
   /* Initiate /deposit operation for all coins */
   for (unsigned int i=0;i<pc->coins_cnt;i++)
   {
@@ -882,6 +911,7 @@ process_pay_with_exchange (void *cls,
       /* Signature was invalid.  If the exchange was unavailable,
        * we'd get that information in the callback. */
       GNUNET_break_op (0);
+      db->rollback (db->cls);
       resume_pay_with_response (pc,
                                 MHD_HTTP_UNAUTHORIZED,
                                 TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:i}",
@@ -1318,7 +1348,6 @@ handler_pay_json (struct MHD_Connection *connection,
   int ret;
   enum GNUNET_DB_QueryStatus qs;
   enum GNUNET_DB_QueryStatus qs_st;
-  enum GNUNET_DB_QueryStatus qs_mp;
 
   ret = parse_pay (connection,
                    root,
@@ -1409,15 +1438,6 @@ handler_pay_json (struct MHD_Connection *connection,
     for (unsigned int i=0;i<MAX_RETRIES;i++)
     {
 
-      if (GNUNET_OK != db->start (db->cls))
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Could not start transaction to store successful payment\n");
-        return TMH_RESPONSE_reply_internal_error (connection,
-                                                  TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
-                                                  "Merchant database error");
-      }
-
       qs_st = db->store_transaction (db->cls,
                                      &pc->h_contract_terms,
                                      &pc->mi->pubkey,
@@ -1427,13 +1447,8 @@ handler_pay_json (struct MHD_Connection *connection,
                                      pc->refund_deadline,
                                      &pc->amount);
 
-      qs_mp = db->mark_proposal_paid (db->cls,
-                                      &pc->h_contract_terms,
-                                      &pc->mi->pubkey);
-
       /* Only retry if SOFT error occurred.  Exit in case of OK or HARD failure */
-      if ( (GNUNET_DB_STATUS_SOFT_ERROR == qs_st) &&
-           (GNUNET_DB_STATUS_SOFT_ERROR == qs_mp) )
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs_st)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                     "Rolling back db transaction\n");
@@ -1441,26 +1456,34 @@ handler_pay_json (struct MHD_Connection *connection,
       }
 
       break;
+
+      /* Only retry if SOFT error occurred.  Exit in case of OK or HARD failure */
+      if (GNUNET_DB_STATUS_HARD_ERROR == qs_st)
+      {
+        GNUNET_break (0);
+        db->rollback (db->cls);
+        return TMH_RESPONSE_reply_internal_error (connection,
+                                                  TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+						  "Merchant database error: hard error while storing transaction");
+      }
+
+      continue;
     }
 
-    /* Break if AT LEAST one error occurred */
-    if (2 != (qs_st + qs_mp))
+    /**
+     * Break if we couldn't modify one, and only one line; this
+     * includes hard errors.
+     */
+    if (1 != qs_st)
     {
-      db->rollback (db->cls);
-      /* Special report if retries insufficient */
-      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs_st);
-      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs_mp);
-      /* Always report on hard error as well to enable diagnostics */
-      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR != qs_st);
-      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR != qs_mp);
-
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "No DB errors occurred, but more than one line was modified!\n");
       return TMH_RESPONSE_reply_internal_error (connection,
 						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
-						"Merchant database error");
+						"Merchant database error: badly stored transaction");
     }
-  }
 
-  db->commit (db->cls);
+  }
 
   MHD_suspend_connection (connection);
   pc->suspended = GNUNET_YES;
