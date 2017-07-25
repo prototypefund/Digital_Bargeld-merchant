@@ -2565,7 +2565,21 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-    
+
+    { .oc = OC_HISTORY,
+      .label = "history-0",
+      .expected_response_code = MHD_HTTP_OK,
+      /**
+       * all records to be returned; setting date as 0 lets the
+       * interpreter set it as 'now' + one hour delta, just to
+       * make sure it surpasses the proposal's timestamp.
+       */
+      .details.history.date.abs_value_us = 0,
+      .details.history.nresult = 1,
+      .details.history.start = 10,
+      .details.history.nrows = 10
+    },
+
     /* Fill second reserve with EUR:1 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
@@ -2714,16 +2728,12 @@ run (void *cls)
     { .oc = OC_HISTORY,
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
-      /**
-       * all records to be returned; setting date as 0 lets the interpreter
-       * set it as 'now' + one hour delta, just to make sure it surpasses the
-       * proposal's timestamp.
-       */
       .details.history.date.abs_value_us = 0,
       .details.history.nresult = 2,
       .details.history.start = 10,
       .details.history.nrows = 10
     },
+
     { .oc = OC_HISTORY,
       .label = "history-2",
       .expected_response_code = MHD_HTTP_OK,
@@ -2733,6 +2743,7 @@ run (void *cls)
       .details.history.start = 10,
       .details.history.nrows = 10
     },
+
     { .oc = OC_REFUND_INCREASE,
       .label = "refund-increase-1",
       .details.refund_increase.refund_amount = "EUR:0.1",
