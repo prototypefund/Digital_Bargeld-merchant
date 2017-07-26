@@ -10,6 +10,11 @@ plugin_LTLIBRARIES = \
 endif
 endif
 
+if USE_COVERAGE
+  AM_CFLAGS = --coverage -O0
+  XLIB = -lgcov
+endif
+
 lib_LTLIBRARIES = \
   libtalermerchantdb.la
 
