@@ -2252,9 +2252,12 @@ interpreter_run (void *cls)
   }
   case OC_HISTORY:
     if (0 == cmd->details.history.date.abs_value_us)
+    {
       cmd->details.history.date = GNUNET_TIME_absolute_add
         (GNUNET_TIME_absolute_get (),
          GNUNET_TIME_UNIT_HOURS);
+      GNUNET_TIME_round_abs (&cmd->details.history.date);
+    }
     if (NULL == (cmd->details.history.ho
         = TALER_MERCHANT_history (ctx,
     	                          MERCHANT_URI,
