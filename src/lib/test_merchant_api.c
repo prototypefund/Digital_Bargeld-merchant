@@ -1990,16 +1990,10 @@ interpreter_run (void *cls)
   {
     json_t *order;
     json_error_t error;
-    struct GNUNET_TIME_Absolute timestamp;
   
     GNUNET_assert (NULL != (order = json_loads (cmd->details.proposal.order,
                                                 JSON_REJECT_DUPLICATES,
                                                 &error)));
-    timestamp = GNUNET_TIME_absolute_get ();
-    (void) GNUNET_TIME_round_abs (&timestamp);
-    json_object_set_new (order,
-                         "timestamp",
-                         GNUNET_JSON_from_time_abs (timestamp));
     if (NULL != instance)
     {
       json_t *merchant;
