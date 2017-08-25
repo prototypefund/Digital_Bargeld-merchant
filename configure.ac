@@ -152,27 +152,14 @@ AS_IF([test $microhttpd = 0],
 *** You need libmicrohttpd to build this program.
 *** ]])])
 
-
-# check for libjansson (Jansson JSON library)
 jansson=0
-AC_MSG_CHECKING([for jansson])
-AC_ARG_WITH([jansson],
-            [AS_HELP_STRING([--with-jansson=PFX], [base of jansson installation])],
-            [AC_MSG_RESULT([given as $with_jansson])],
-            [AC_MSG_RESULT([not given])
-             with_jansson=yes])
-AS_CASE([$with_jansson],
-        [yes], [],
-        [no], [AC_MSG_ERROR([--with-jansson is required])],
-        [LDFLAGS="-L$with_jansson/lib $LDFLAGS"
-         CPPFLAGS="-I$with_jansson/include $CPPFLAGS"])
-AC_CHECK_LIB(jansson,json_pack,
-  [AC_CHECK_HEADER([jansson.h],[jansson=1])])
-AS_IF([test $jansson = 0],
-  [AC_MSG_ERROR([[
+PKG_CHECK_MODULES([JANSSON], [jansson >= 2.3], 
+                  [LDFLAGS="$JANSSON_LIBS $LDFLAGS"
+                   CPPFLAGS="$JANSSON_CFLAGS $CPPFLAGS"],
+                  [AC_MSG_ERROR([[
 ***
 *** You need libjansson to build this program.
-*** ]])])
+***]])])
 
 # check for libgnurl
 # libgnurl
