@@ -45,18 +45,22 @@ pd_cb (void *cls,
   json_t *amount;
   json_t *timestamp;
   json_t *instance;
-  json_t *summary;
+  json_t *summary=NULL;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "/history's row_id: %llu\n",
               (unsigned long long) row_id);
 
   GNUNET_assert (-1 != json_unpack ((json_t *) contract_terms,
-                                    "{s:o, s:o, s:{s:o}, s:o}",
+                                    "{s:o, s:o, s:{s:o}, s?:o}",
                                     "amount", &amount,
                                     "timestamp", &timestamp,
                                     "merchant", "instance", &instance,
                                     "summary", &summary));
+
+  if (NULL == summary) {
+    summary = json_string (order_id);
+  }
 
   GNUNET_break (NULL != (entry = json_pack ("{s:I, s:s, s:O, s:O, s:O, s:O}",
                                             "row_id", row_id,
