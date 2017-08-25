@@ -489,9 +489,11 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                               prd.ec,
                                               "Could not generate a response"); 
   }
-   return TMH_RESPONSE_reply_json (connection,
-				   prd.response,
-				   MHD_HTTP_OK);
+
+  return TMH_RESPONSE_reply_json_pack (connection, 
+                                       MHD_HTTP_OK,
+                                       "{s:o}",
+                                       "refund_permissions", prd.response);
 }
 
 
