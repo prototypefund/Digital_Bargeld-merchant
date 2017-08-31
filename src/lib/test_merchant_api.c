@@ -205,7 +205,7 @@ enum OpCode
   /**
    * Test refund lookup
    */
-  OC_REFUND_LOOKUP 
+  OC_REFUND_LOOKUP
 
 };
 
@@ -318,12 +318,12 @@ struct Command
        * we used to fill the reserve.
        */
       struct TALER_ReservePrivateKeyP reserve_priv;
-      
+
       /**
        * Set to the API's handle during the operation.
        */
       struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
-      
+
     } admin_add_incoming;
 
     /**
@@ -331,148 +331,148 @@ struct Command
      */
     struct
     {
-      
+
       /**
        * Reference to the proposal we want to lookup.
        */
       const char *proposal_reference;
-      
+
       struct TALER_MERCHANT_ProposalLookupOperation *plo;
-      
+
     } proposal_lookup;
-    
+
     /**
      * Information for a #OC_WITHDRAW_STATUS command.
      */
     struct
     {
-      
+
       /**
        * Label to the #OC_ADMIN_ADD_INCOMING command which
        * created the reserve.
        */
       const char *reserve_reference;
-      
+
       /**
        * Set to the API's handle during the operation.
        */
       struct TALER_EXCHANGE_ReserveStatusHandle *wsh;
-      
+
       /**
        * Expected reserve balance.
        */
       const char *expected_balance;
-      
+
     } reserve_status;
-    
+
     /**
      * Information for a #OC_WITHDRAW_SIGN command.
      */
     struct
     {
-      
+
       /**
        * Which reserve should we withdraw from?
        */
       const char *reserve_reference;
-      
+
       /**
        * String describing the denomination value we should withdraw.
        * A corresponding denomination key must exist in the exchange's
        * offerings.  Can be NULL if @e pk is set instead.
        */
       const char *amount;
-      
+
       /**
        * If @e amount is NULL, this specifies the denomination key to
        * use.  Otherwise, this will be set (by the interpreter) to the
        * denomination PK matching @e amount.
        */
       const struct TALER_EXCHANGE_DenomPublicKey *pk;
-      
+
       /**
        * Set (by the interpreter) to the exchange's signature over the
        * coin's public key.
        */
       struct TALER_DenominationSignature sig;
-      
+
       /**
        * Set (by the interpreter) to the coin's private key.
        */
       struct TALER_CoinSpendPrivateKeyP coin_priv;
-      
+
       /**
        * Blinding key used for the operation.
        */
       struct TALER_DenominationBlindingKeyP blinding_key;
-      
+
       /**
        * Withdraw handle (while operation is running).
        */
       struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
-      
+
     } reserve_withdraw;
-    
+
     /**
      * Information for an #OC_PROPOSAL command.
      */
     struct
     {
-      
+
       /**
        * The order.
        * It's dynamically generated because we need different transaction_id
        * for different merchant instances.
        */
       char order[ORDER_MAX_SIZE];
-      
+
       /**
        * Handle to the active PUT /proposal operation, or NULL.
        */
       struct TALER_MERCHANT_ProposalOperation *po;
-      
+
       /**
        * Full contract in JSON, set by the /contract operation.
        * FIXME: verify in the code that this bit is actually proposal
        * data and not the whole proposal.
        */
       json_t *contract_terms;
-      
+
       /**
        * Proposal's signature.
        */
       struct TALER_MerchantSignatureP merchant_sig;
-      
+
       /**
        * Proposal data's hashcode.
        */
       struct GNUNET_HashCode hash;
-      
+
     } proposal;
-    
+
     /**
      * Information for a #OC_PAY command.
      * FIXME: support tests where we pay with multiple coins at once.
      */
     struct
     {
-      
+
       /**
        * Reference to the contract.
        */
       const char *contract_ref;
-      
+
       /**
        * ";"-separated list of references to withdrawn coins to be used
        * in the payment.
        */
       char *coin_ref;
-      
+
       /**
        * Amount to pay (from the coin, including fee).
        */
       const char *amount_with_fee;
-      
+
       /**
        * Amount to pay (from the coin, excluding fee).  The sum of the
        * deltas between all @e amount_with_fee and the @e
@@ -481,12 +481,12 @@ struct Command
        * total_amount.
        */
       const char *amount_without_fee;
-      
+
       /**
        * Deposit handle while operation is running.
        */
       struct TALER_MERCHANT_Pay *ph;
-      
+
       /**
        * Hashcode of the proposal data associated to this payment.
        */
@@ -496,55 +496,55 @@ struct Command
        * Merchant's public key
        */
       struct TALER_MerchantPublicKeyP merchant_pub;
-      
+
     } pay;
-    
+
     struct {
-      
+
       /**
        * Process for the aggregator.
        */
       struct GNUNET_OS_Process *aggregator_proc;
-      
+
       /**
        * ID of task called whenever we get a SIGCHILD.
        */
       struct GNUNET_SCHEDULER_Task *child_death_task;
-      
+
     } run_aggregator;
-    
+
     struct {
-      
+
       /**
        * Which amount do we expect to see transferred?
        */
       const char *amount;
-      
+
       /**
        * Which account do we expect to be debited?
        */
       uint64_t account_debit;
-      
+
       /**
        * Which account do we expect to be credited?
        */
       uint64_t account_credit;
-      
+
       /**
        * Set (!) to the wire transfer subject observed.
        */
       char *subject;
-      
+
     } check_bank_transfer;
-    
+
     struct {
-      
+
       /**
        * #OC_CHECK_BANK_TRANSFER command from which we should grab
        * the WTID.
        */
       char *check_bank_ref;
-      
+
       /**
        * #OC_PAY command which we expect in the result.
        * Since we are tracking a bank transaction, we want to know
@@ -552,67 +552,67 @@ struct Command
        * transaction being tracked now.
        */
       char *expected_pay_ref;
-      
+
       /**
        * Handle to a /track/transfer operation
        */
       struct TALER_MERCHANT_TrackTransferHandle *tdo;
-      
+
     } track_transfer;
-    
+
     struct {
-      
+
       /**
        * #OC_PAY command from which we should grab
        * the WTID.
        */
       char *pay_ref;
-      
+
       /**
        * #OC_CHECK_BANK_TRANSFER command which we expect in the result.
        */
       char *expected_transfer_ref;
-      
+
       /**
        * Wire fee we expect to pay for this transaction.
        */
       const char *wire_fee;
-      
+
       /**
        * Handle to a /track/transaction operation
        */
       struct TALER_MERCHANT_TrackTransactionHandle *tth;
-      
+
     } track_transaction;
-    
+
     struct {
-      
+
       /**
        * Date we want retrieved transactions younger than
        */
       struct GNUNET_TIME_Absolute date;
-      
+
       /**
        * How many "rows" we expect in the result
        */
       unsigned int nresult;
-      
+
       /**
        * Handle to /history request
        */
       struct TALER_MERCHANT_HistoryOperation *ho;
-      
+
       /**
        * The backend will return records with row_id
        * less than this value.
        */
       unsigned int start;
-      
+
       /**
        * The backend will return at most `nrows` records.
        */
       unsigned int nrows;
-      
+
     } history;
 
     struct {
@@ -620,41 +620,41 @@ struct Command
        * Reference to the order we want reimbursed
        */
       char *order_id;
-      
+
       /**
        * Handle to a refund increase operation
        */
       struct TALER_MERCHANT_RefundIncreaseOperation *rio;
-      
+
       /**
        * Amount to refund
        */
       const char *refund_amount;
-      
+
       /**
        * Reason for refunding
        */
       const char *reason;
-      
+
       /**
        * Refund fee (MUST match the value given in config)
        */
       const char *refund_fee;
-      
+
     } refund_increase;
 
     struct {
-      
+
       /**
        * Reference to the order whose refund was increased
        */
       char *order_id;
-      
+
       /**
        * Handle to the operation
        */
       struct TALER_MERCHANT_RefundLookupOperation *rlo;
-      
+
       /**
        * Used to retrieve the asked refund amount.
        * This information helps the callback to mock a GET /refund
@@ -662,7 +662,7 @@ struct Command
        * responded.
        */
       char *increase_ref;
-      
+
       /**
        * Used to retrieve the number and denomination of coins
        * used to pay for the related contract.
@@ -671,9 +671,9 @@ struct Command
        * responded.
        */
       char *pay_ref;
-      
+
     } refund_lookup;
-    
+
   } details;
 
 };
@@ -727,7 +727,7 @@ get_instance_priv (struct GNUNET_CONFIGURATION_Handle *config,
   char *config_section;
   char *filename;
   struct GNUNET_CRYPTO_EddsaPrivateKey *ret;
-  
+
   (void) GNUNET_asprintf (&config_section,
                       "merchant-instance-%s",
                       instance);
@@ -1073,7 +1073,7 @@ reserve_status_cb (void *cls,
                                              &amount));
       if (0 != TALER_amount_cmp (&amount,
                                  balance))
-      {    
+      {
         GNUNET_break (0);
         fail (is);
         return;
@@ -1246,7 +1246,7 @@ hashmap_free (void *cls,
 
 
 /**
- * Process GET /refund (increase) response. 
+ * Process GET /refund (increase) response.
  *
  * @param cls closure
  * @param http_status HTTP status code
@@ -1277,7 +1277,7 @@ refund_lookup_cb (void *cls,
   struct TALER_Amount acc;
   const struct Command *increase;
   struct TALER_Amount refund_amount;
- 
+
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1298,7 +1298,7 @@ refund_lookup_cb (void *cls,
       TALER_JSON_spec_amount ("refund_amount", irefund_amount),
       GNUNET_JSON_spec_end ()
     };
-     
+
     GNUNET_assert (GNUNET_OK ==
 		   GNUNET_JSON_parse (elem,
 				      spec,
@@ -1307,14 +1307,14 @@ refund_lookup_cb (void *cls,
     GNUNET_CRYPTO_hash (&coin_pub,
 			sizeof (struct TALER_CoinSpendPublicKeyP),
 			&h_coin_pub);
-    
+
     GNUNET_assert (GNUNET_OK ==
 		   GNUNET_CONTAINER_multihashmap_put (map,
 						      &h_coin_pub,
 						      irefund_amount,
-						      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY)); 
+						      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY));
   };
-  
+
   /* Retrieve coins used to pay, from OC_PAY command */
   GNUNET_assert (NULL != (pay =
 			  find_command (is,
@@ -1341,8 +1341,8 @@ refund_lookup_cb (void *cls,
       GNUNET_assert (GNUNET_OK ==
 		     TALER_amount_add (&acc,
 				       &acc,
-				       iamount)); 
-    
+				       iamount));
+
     icoin_ref = strtok (NULL, ";");
     if (NULL == icoin_ref)
       break;
@@ -1361,7 +1361,7 @@ refund_lookup_cb (void *cls,
                              &refund_amount))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Incomplete refund: asked '%s', got '%s'\n",
+                "Incomplete refund: ex[ected '%s', got '%s'\n",
                 TALER_amount_to_string (&refund_amount),
                 TALER_amount_to_string (&acc));
     fail (is);
@@ -1593,7 +1593,7 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
   for (unsigned int i=0;i<keys->num_denom_keys;i++)
   {
     const struct TALER_EXCHANGE_DenomPublicKey *pk;
-    
+
     pk = &keys->denom_keys[i];
     if ( (0 == TALER_amount_cmp (amount,
                                  &pk->value)) &&
@@ -1778,7 +1778,7 @@ cleanup_state (struct InterpreterState *is)
     case OC_REFUND_LOOKUP:
       if (NULL != cmd->details.refund_lookup.rlo)
       {
-        TALER_MERCHANT_refund_lookup_cancel (cmd->details.refund_lookup.rlo); 
+        TALER_MERCHANT_refund_lookup_cancel (cmd->details.refund_lookup.rlo);
         cmd->details.refund_lookup.rlo = NULL;
       }
       break;
@@ -1960,7 +1960,7 @@ interpreter_run (void *cls)
     /* create coin's private key */
     {
       struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-    
+
       priv = GNUNET_CRYPTO_eddsa_key_create ();
       cmd->details.reserve_withdraw.coin_priv.eddsa_priv = *priv;
       GNUNET_free (priv);
@@ -1970,7 +1970,7 @@ interpreter_run (void *cls)
     GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
                                 &cmd->details.reserve_withdraw.blinding_key,
                                 sizeof (cmd->details.reserve_withdraw.blinding_key));
-    
+
     cmd->details.reserve_withdraw.wsh
       = TALER_EXCHANGE_reserve_withdraw
         (exchange,
@@ -1990,14 +1990,14 @@ interpreter_run (void *cls)
   {
     json_t *order;
     json_error_t error;
-  
+
     GNUNET_assert (NULL != (order = json_loads (cmd->details.proposal.order,
                                                 JSON_REJECT_DUPLICATES,
                                                 &error)));
     if (NULL != instance)
     {
       json_t *merchant;
-  
+
       merchant = json_object ();
       json_object_set_new (merchant,
                            "instance",
@@ -2037,7 +2037,7 @@ interpreter_run (void *cls)
     char *token;
     const char *error_name;
     unsigned int error_line;
-  
+
     /* get proposal */
     GNUNET_assert (NULL != (ref = find_command
       (is,
@@ -2145,7 +2145,7 @@ interpreter_run (void *cls)
   case OC_RUN_AGGREGATOR:
     {
       const struct GNUNET_DISK_FileHandle *pr;
-    
+
       GNUNET_assert (NULL != (cmd->details.run_aggregator.aggregator_proc
         = GNUNET_OS_start_process (GNUNET_NO,
                                    GNUNET_OS_INHERIT_STD_ALL,
@@ -2198,7 +2198,7 @@ interpreter_run (void *cls)
     {
       struct TALER_WireTransferIdentifierRawP wtid;
       const char *subject;
-    
+
       GNUNET_assert (NULL != ( ref = find_command
         (is,
          cmd->details.track_transfer.check_bank_ref)));
@@ -2226,7 +2226,7 @@ interpreter_run (void *cls)
   {
     const struct Command *proposal_ref;
     const char *order_id;
-    
+
     GNUNET_assert(NULL != (ref = find_command
       (is,
        cmd->details.track_transaction.pay_ref)));
@@ -2275,7 +2275,7 @@ interpreter_run (void *cls)
   case OC_REFUND_INCREASE:
   {
     struct TALER_Amount refund_amount;
-    
+
     GNUNET_assert (GNUNET_OK == TALER_string_to_amount
       (cmd->details.refund_increase.refund_amount,
        &refund_amount));
@@ -2310,7 +2310,7 @@ interpreter_run (void *cls)
       fail (is);
     }
     break;
-  }     
+  }
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
@@ -2466,7 +2466,7 @@ run (void *cls)
       .details.admin_add_incoming.transfer_details
         = "{ \"uuid\": 1}",
       .details.admin_add_incoming.amount = "EUR:10.02" },
-    
+
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-1",
@@ -2474,7 +2474,7 @@ run (void *cls)
       .details.reserve_withdraw.reserve_reference
         = "create-reserve-1",
       .details.reserve_withdraw.amount = "EUR:5" },
-    
+
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-2",
@@ -2482,7 +2482,7 @@ run (void *cls)
       .details.reserve_withdraw.reserve_reference
         = "create-reserve-1",
       .details.reserve_withdraw.amount = "EUR:5" },
-    
+
     /* Check that deposit and withdraw operation are in history,
        and that the balance is now at zero */
     { .oc = OC_WITHDRAW_STATUS,
@@ -2491,7 +2491,7 @@ run (void *cls)
       .details.reserve_status.reserve_reference
         = "create-reserve-1",
       .details.reserve_status.expected_balance = "EUR:0" },
-    
+
     /* Create proposal */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-1",
@@ -2594,7 +2594,7 @@ run (void *cls)
       .details.admin_add_incoming.transfer_details
         = "{ \"uuid\": 2}",
       .details.admin_add_incoming.amount = "EUR:1" },
-    
+
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2b",
@@ -2609,7 +2609,7 @@ run (void *cls)
       .details.admin_add_incoming.transfer_details
         = "{ \"uuid\": 3}",
       .details.admin_add_incoming.amount = "EUR:4.01" },
-    
+
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-2",
@@ -2617,7 +2617,7 @@ run (void *cls)
       .details.reserve_withdraw.reserve_reference
         = "create-reserve-2",
       .details.reserve_withdraw.amount = "EUR:5" },
-    
+
     /* Proposal lookup */
     {
       .oc = OC_PROPOSAL_LOOKUP,
@@ -2625,29 +2625,29 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.proposal_lookup.proposal_reference
         = "create-proposal-2" },
-    
+
     /* Check nothing happened on the bank side so far */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
-        
+
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator" },
-    
+
     /* Obtain WTID of the transfer generated by "deposit-simple" */
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-498c",
       .details.check_bank_transfer.amount = "EUR:4.98",
       /* exchange-outgoing */
-      .details.check_bank_transfer.account_debit = 2, 
+      .details.check_bank_transfer.account_debit = 2,
       /* merchant */
-      .details.check_bank_transfer.account_credit = 62 
+      .details.check_bank_transfer.account_credit = 62
     },
-    
+
     /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
-    
+
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-1",
       .expected_response_code = MHD_HTTP_OK,
@@ -2656,7 +2656,7 @@ run (void *cls)
       .details.track_transaction.pay_ref = "deposit-simple",
       .details.track_transaction.wire_fee = "EUR:0.01"
     },
-    
+
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-1",
@@ -2672,7 +2672,7 @@ run (void *cls)
         = "check_bank_transfer-498c",
       .details.track_transfer.expected_pay_ref = "deposit-simple"
     },
-    
+
     /* Pay again successfully on 2nd contract */
     { .oc = OC_PAY,
       .label = "deposit-simple-2",
@@ -2681,25 +2681,25 @@ run (void *cls)
       .details.pay.coin_ref = "withdraw-coin-2",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
-    
+
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator-2" },
-    
+
     /* Obtain WTID of the transfer */
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-498c-2",
       .details.check_bank_transfer.amount = "EUR:4.98",
       /* exchange-outgoing */
-      .details.check_bank_transfer.account_debit = 2, 
+      .details.check_bank_transfer.account_debit = 2,
       /* merchant */
-      .details.check_bank_transfer.account_credit = 62 
+      .details.check_bank_transfer.account_credit = 62
     },
-    
+
     /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
-    
+
     /* Trace the WTID back to the original transaction */
     { .oc = OC_TRACK_TRANSFER,
       .label = "track-transfer-2",
@@ -2717,7 +2717,7 @@ run (void *cls)
       .details.track_transfer.expected_pay_ref
         = "deposit-simple-2"
     },
-    
+
     { .oc = OC_TRACK_TRANSACTION,
       .label = "track-transaction-2",
       .expected_response_code = MHD_HTTP_OK,
@@ -2726,7 +2726,7 @@ run (void *cls)
       .details.track_transaction.wire_fee = "EUR:0.01",
       .details.track_transaction.pay_ref = "deposit-simple-2"
     },
-    
+
     { .oc = OC_HISTORY,
       .label = "history-1",
       .expected_response_code = MHD_HTTP_OK,
@@ -2756,7 +2756,7 @@ run (void *cls)
       .details.refund_increase.refund_amount = "EUR:0.1",
       .details.refund_increase.refund_fee = "EUR:0.01",
       .details.refund_increase.reason = "refund test",
-      .details.refund_increase.order_id = "1"    
+      .details.refund_increase.order_id = "1"
     },
     { .oc = OC_REFUND_LOOKUP,
       .label = "refund-lookup-1",
