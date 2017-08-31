@@ -1437,7 +1437,11 @@ handler_pay_json (struct MHD_Connection *connection,
 
     for (unsigned int i=0;i<MAX_RETRIES;i++)
     {
-
+      if (GNUNET_OK != db->start (db->cls))
+      {
+        qs_st = GNUNET_DB_STATUS_HARD_ERROR;
+        break;
+      }
       qs_st = db->store_transaction (db->cls,
                                      &pc->h_contract_terms,
                                      &pc->mi->pubkey,
@@ -1450,13 +1454,9 @@ handler_pay_json (struct MHD_Connection *connection,
       /* Only retry if SOFT error occurred.  Exit in case of OK or HARD failure */
       if (GNUNET_DB_STATUS_SOFT_ERROR == qs_st)
       {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Rolling back db transaction\n");
         db->rollback (db->cls);
-        break;
+        continue;
       }
-
-
       /* Only retry if SOFT error occurred.  Exit in case of OK or HARD failure */
       if (GNUNET_DB_STATUS_HARD_ERROR == qs_st)
       {
@@ -1466,22 +1466,22 @@ handler_pay_json (struct MHD_Connection *connection,
                                                   TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
 						  "Merchant database error: hard error while storing transaction");
       }
-      continue;
+      break;
     }
 
     /**
      * Break if we couldn't modify one, and only one line; this
      * includes hard errors.
      */
-    if (1 != qs_st)
+    if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs_st)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "No DB errors occurred, but more than one line was modified!\n");
+                  "Unexpected query status %d while storing /pay transaction!\n",
+                  (int) qs_st);
       return TMH_RESPONSE_reply_internal_error (connection,
 						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
-						"Merchant database error: badly stored transaction");
+						"Merchant database error: failed to store transaction");
     }
-
   }
 
   MHD_suspend_connection (connection);
