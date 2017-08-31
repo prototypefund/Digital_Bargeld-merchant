@@ -592,7 +592,7 @@ run (void *cls)
                  json_object_set_new (contract_terms,
                                       "order",
                                       json_string ("1")));
-  
+
   contract_terms_future = json_object ();
   GNUNET_assert (0 ==
                  json_object_set_new (contract_terms_future,
@@ -759,7 +759,7 @@ run (void *cls)
                                                 &merchant_pub,
                                                 &refund_amount,
                                                 "same refund amount as "
-                                                "the previous one, should fail"));
+                                                "the previous one, should succeed without changes (0)"));
 
   /*Should fail as this refund a lesser amount respect to the previous one*/
   FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
@@ -767,7 +767,7 @@ run (void *cls)
                                                 &h_contract_terms,
                                                 &merchant_pub,
                                                 &little_refund_amount,
-                                                "make refund testing fail"));
+                                                "lower refund amount as the previous one, should succeed without changes (0)"));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
@@ -775,17 +775,17 @@ run (void *cls)
                                                 &right_second_refund_amount,
                                                 "right refund increase"));
 
-  FAILIF (GNUNET_DB_STATUS_HARD_ERROR != 
+  FAILIF (GNUNET_DB_STATUS_HARD_ERROR !=
           plugin->increase_refund_for_contract (plugin->cls,
                                                 &h_contract_terms,
                                                 &merchant_pub,
                                                 &too_big_refund_amount,
                                                 "make refund testing fail due"
                                                 " to too big refund amount"));
-  
+
   FAILIF (GNUNET_OK !=
 	  test_wire_fee ());
-  
+
   if (-1 == result)
     result = 0;
 

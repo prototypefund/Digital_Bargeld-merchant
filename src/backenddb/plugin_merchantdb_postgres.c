@@ -2200,14 +2200,16 @@ process_deposits_for_refund_cb (void *cls,
               TALER_amount2s (&current_refund));
 
   /* stop immediately if we are done */
-  if (0 == TALER_amount_cmp (ctx->refund,
+  if (0 >= TALER_amount_cmp (ctx->refund,
                              &current_refund))
+  {
+    ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
     return;
-
+  }
 
   /* Phase 2:  Try to increase current refund until it matches desired refund */
 
-  for (unsigned int i=0; i<num_results; i++)
+  for (unsigned int i=0;i<num_results; i++)
   {
     const struct TALER_Amount *increment;
     struct TALER_Amount left;
@@ -2345,6 +2347,10 @@ postgres_increase_refund_for_contract (void *cls,
     GNUNET_PQ_query_param_end
   };
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Asked to refund %s on contract %s\n",
+              TALER_amount2s (refund),
+              GNUNET_h2s (h_contract_terms));
   if (GNUNET_OK !=
       postgres_start (cls))
   {
