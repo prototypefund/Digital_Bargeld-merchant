@@ -1453,9 +1453,9 @@ handler_pay_json (struct MHD_Connection *connection,
         GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                     "Rolling back db transaction\n");
         db->rollback (db->cls);
+        break;
       }
 
-      break;
 
       /* Only retry if SOFT error occurred.  Exit in case of OK or HARD failure */
       if (GNUNET_DB_STATUS_HARD_ERROR == qs_st)
@@ -1466,7 +1466,6 @@ handler_pay_json (struct MHD_Connection *connection,
                                                   TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
 						  "Merchant database error: hard error while storing transaction");
       }
-
       continue;
     }
 
