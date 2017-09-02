@@ -387,9 +387,10 @@ process_wire_fees (void *cls,
     }
     if (0 == qs)
     {
-      /* Entry was already in DB, fine, continue as if we succeeded */
+      /* Entry was already in DB, fine, continue as if we had succeeded */
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+		  "Fees already in DB, rolling back transaction attempt!\n");
       db->rollback (db->cls);
-      fees = fees->next;
     }
     if (0 < qs)
     {

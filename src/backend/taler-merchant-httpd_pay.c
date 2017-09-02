@@ -620,6 +620,52 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
 
 
 /**
+ * Check if the existing transaction matches our transaction.
+ * Update `transaction_exists` accordingly.
+ *
+ * @param cls closure with the `struct PayContext`
+ * @param merchant_pub merchant's public key
+ * @param exchange_uri URI of the exchange
+ * @param h_contract_terms hashed proposal data
+ * @param h_xwire hash of our wire details
+ * @param timestamp time of the confirmation
+ * @param refund refund deadline
+ * @param total_amount total amount we receive for the contract after fees
+ */
+static void
+check_transaction_exists (void *cls,
+			  const struct TALER_MerchantPublicKeyP *merchant_pub,
+			  const char *exchange_uri,
+			  const struct GNUNET_HashCode *h_contract_terms,
+			  const struct GNUNET_HashCode *h_xwire,
+			  struct GNUNET_TIME_Absolute timestamp,
+			  struct GNUNET_TIME_Absolute refund,
+			  const struct TALER_Amount *total_amount)
+{
+  struct PayContext *pc = cls;
+
+  if ( (0 == memcmp (h_contract_terms,
+		     &pc->h_contract_terms,
+                     sizeof (struct GNUNET_HashCode))) &&
+       (0 == memcmp (h_xwire,
+		     &pc->mi->h_wire,
+		     sizeof (struct GNUNET_HashCode))) &&
+       (timestamp.abs_value_us == pc->timestamp.abs_value_us) &&
+       (refund.abs_value_us == pc->refund_deadline.abs_value_us) &&
+       (0 == TALER_amount_cmp (total_amount,
+			       &pc->amount) ) )
+  {
+    pc->transaction_exists = GNUNET_YES;
+  }
+  else
+  {
+    GNUNET_break_op (0);
+    pc->transaction_exists = GNUNET_SYSERR;
+  }
+}
+
+
+/**
  * Function called with the result of our exchange lookup.
  *
  * @param cls the `struct PayContext`
@@ -639,6 +685,8 @@ process_pay_with_exchange (void *cls,
   struct TALER_Amount wire_fee_delta;
   struct TALER_Amount wire_fee_customer_contribution;
   const struct TALER_EXCHANGE_Keys *keys;
+  enum GNUNET_DB_QueryStatus qs;
+  enum GNUNET_DB_QueryStatus qs_st;
 
   pc->fo = NULL;
   if (NULL == mh)
@@ -869,6 +917,7 @@ process_pay_with_exchange (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Exchange and fee structure OK. Initiating deposit operation for coins\n");
 
+
   if (GNUNET_OK != db->start (db->cls))
   {
     GNUNET_break (0);
@@ -879,6 +928,122 @@ process_pay_with_exchange (void *cls,
                                                            "code", (json_int_t) TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR));
     return;
   }
+
+  /* Check if transaction is already known, if not store it. */
+  /* FIXME: What if transaction exists, with a failed payment at
+     a different exchange? */
+  qs = db->find_transaction (db->cls,
+			     &pc->h_contract_terms,
+			     &pc->mi->pubkey,
+			     &check_transaction_exists,
+			     pc);
+  if (0 > qs)
+  {
+    /* single, read-only SQL statements should never cause
+       serialization problems */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    /* FIXME: factor common logic of these calls into a function! */
+    resume_pay_with_response (pc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
+                              TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+                                                           "code", (json_int_t) TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
+                                                           "hint", "Merchant database error"));
+    return;
+  }
+  if (GNUNET_SYSERR == pc->transaction_exists)
+  {
+    GNUNET_break (0);
+    /* FIXME: factor common logic of these calls into a function! */
+    resume_pay_with_response (pc,
+                              MHD_HTTP_BAD_REQUEST,
+                              TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+                                                           "code", (json_int_t) TALER_EC_PAY_DB_TRANSACTION_ID_CONFLICT,
+                                                           "hint", "Transaction ID reused with different transaction details"));
+    return;
+  }
+  if (GNUNET_NO == pc->transaction_exists)
+  {
+    struct GNUNET_TIME_Absolute now;
+
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Dealing with new transaction `%s'\n",
+                GNUNET_h2s (&pc->h_contract_terms));
+
+    now = GNUNET_TIME_absolute_get ();
+    if (now.abs_value_us > pc->pay_deadline.abs_value_us)
+    {
+      /* Time expired, we don't accept this payment now! */
+      const char *pd_str;
+
+      pd_str = GNUNET_STRINGS_absolute_time_to_string (pc->pay_deadline);
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Attempt to pay coins for expired contract. Deadline: `%s'\n",
+		  pd_str);
+      resume_pay_with_response (pc,
+                                MHD_HTTP_BAD_REQUEST,
+                                TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+                                                             "code", (json_int_t) TALER_EC_PAY_OFFER_EXPIRED,
+                                                             "hint", "The time to pay for this contract has expired."));
+      return;
+    }
+
+    qs_st = db->store_transaction (db->cls,
+                                   &pc->h_contract_terms,
+                                   &pc->mi->pubkey,
+                                   pc->chosen_exchange,
+                                   &pc->mi->h_wire,
+                                   pc->timestamp,
+                                   pc->refund_deadline,
+                                   &pc->amount);
+    /* Only retry if SOFT error occurred.  Exit in case of OK or HARD failure */
+    if (GNUNET_DB_STATUS_SOFT_ERROR == qs_st)
+    {
+      db->rollback (db->cls);
+      GNUNET_break (0);  // FIXME: implement proper retries!
+      resume_pay_with_response (pc,
+                                MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+                                                             "code", (json_int_t) TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+                                                             "hint", "Soft merchant database error: retries not implemented"));
+      return;
+    }
+    /* Exit in case of HARD failure */
+    if (GNUNET_DB_STATUS_HARD_ERROR == qs_st)
+    {
+      GNUNET_break (0);
+      db->rollback (db->cls);
+      resume_pay_with_response (pc,
+                                MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+                                                             "code", (json_int_t) TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+                                                             "hint", "Merchant database error: hard error while storing transaction"));
+    }
+  }
+
+  /**
+   * Break if we couldn't modify one, and only one line; this
+   * includes hard errors.
+   */
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs_st)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected query status %d while storing /pay transaction!\n",
+                (int) qs_st);
+    resume_pay_with_response (pc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
+                              TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+                                                           "code", (json_int_t) TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+                                                           "hint", "Merchant database error: failed to store transaction"));
+    return;
+  }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Found transaction data for proposal `%s' of merchant `%s', initiating deposits\n",
+              GNUNET_h2s (&pc->h_contract_terms),
+              TALER_B2S (&pc->mi->pubkey));
+
 
   /* Initiate /deposit operation for all coins */
   for (unsigned int i=0;i<pc->coins_cnt;i++)
@@ -1001,52 +1166,6 @@ check_coin_paid (void *cls,
      * contract that it already paid for?
      */
     pc->pending--;
-  }
-}
-
-
-/**
- * Check if the existing transaction matches our transaction.
- * Update `transaction_exists` accordingly.
- *
- * @param cls closure with the `struct PayContext`
- * @param merchant_pub merchant's public key
- * @param exchange_uri URI of the exchange
- * @param h_contract_terms hashed proposal data
- * @param h_xwire hash of our wire details
- * @param timestamp time of the confirmation
- * @param refund refund deadline
- * @param total_amount total amount we receive for the contract after fees
- */
-static void
-check_transaction_exists (void *cls,
-			  const struct TALER_MerchantPublicKeyP *merchant_pub,
-			  const char *exchange_uri,
-			  const struct GNUNET_HashCode *h_contract_terms,
-			  const struct GNUNET_HashCode *h_xwire,
-			  struct GNUNET_TIME_Absolute timestamp,
-			  struct GNUNET_TIME_Absolute refund,
-			  const struct TALER_Amount *total_amount)
-{
-  struct PayContext *pc = cls;
-
-  if ( (0 == memcmp (h_contract_terms,
-		     &pc->h_contract_terms,
-                     sizeof (struct GNUNET_HashCode))) &&
-       (0 == memcmp (h_xwire,
-		     &pc->mi->h_wire,
-		     sizeof (struct GNUNET_HashCode))) &&
-       (timestamp.abs_value_us == pc->timestamp.abs_value_us) &&
-       (refund.abs_value_us == pc->refund_deadline.abs_value_us) &&
-       (0 == TALER_amount_cmp (total_amount,
-			       &pc->amount) ) )
-  {
-    pc->transaction_exists = GNUNET_YES;
-  }
-  else
-  {
-    GNUNET_break_op (0);
-    pc->transaction_exists = GNUNET_SYSERR;
   }
 }
 
@@ -1348,7 +1467,6 @@ handler_pay_json (struct MHD_Connection *connection,
 {
   int ret;
   enum GNUNET_DB_QueryStatus qs;
-  enum GNUNET_DB_QueryStatus qs_st;
 
   ret = parse_pay (connection,
                    root,
@@ -1389,107 +1507,6 @@ handler_pay_json (struct MHD_Connection *connection,
     MHD_destroy_response (resp);
     return ret;
   }
-  /* Check if transaction is already known, if not store it. */
-  /* FIXME: What if transaction exists, with a failed payment at
-     a different exchange? */
-  qs = db->find_transaction (db->cls,
-			     &pc->h_contract_terms,
-			     &pc->mi->pubkey,
-			     &check_transaction_exists,
-			     pc);
-  if (0 > qs)
-  {
-    /* single, read-only SQL statements should never cause
-       serialization problems */
-    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
-    /* Always report on hard error as well to enable diagnostics */
-    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
-                                               "Merchant database error");
-  }
-  if (GNUNET_SYSERR == pc->transaction_exists)
-  {
-    GNUNET_break (0);
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              TALER_EC_PAY_DB_TRANSACTION_ID_CONFLICT,
-					      "Transaction ID reused with different transaction details");
-  }
-  if (GNUNET_NO == pc->transaction_exists)
-  {
-    struct GNUNET_TIME_Absolute now;
-
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Dealing with new transaction `%s'\n",
-                GNUNET_h2s (&pc->h_contract_terms));
-
-    now = GNUNET_TIME_absolute_get ();
-    if (now.abs_value_us > pc->pay_deadline.abs_value_us)
-    {
-      /* Time expired, we don't accept this payment now! */
-      const char *pd_str;
-
-      pd_str = GNUNET_STRINGS_absolute_time_to_string (pc->pay_deadline);
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "Attempt to pay coins for expired contract. Deadline: `%s'\n",
-		  pd_str);
-      return TMH_RESPONSE_reply_bad_request (connection,
-					     TALER_EC_PAY_OFFER_EXPIRED,
-                                             "The time to pay for this contract has expired.");
-    }
-
-    for (unsigned int i=0;i<MAX_RETRIES;i++)
-    {
-      if (GNUNET_OK != db->start (db->cls))
-      {
-        qs_st = GNUNET_DB_STATUS_HARD_ERROR;
-        break;
-      }
-      qs_st = db->store_transaction (db->cls,
-                                     &pc->h_contract_terms,
-                                     &pc->mi->pubkey,
-                                     pc->chosen_exchange,
-                                     &pc->mi->h_wire,
-                                     pc->timestamp,
-                                     pc->refund_deadline,
-                                     &pc->amount);
-
-      /* Only retry if SOFT error occurred.  Exit in case of OK or HARD failure */
-      if (GNUNET_DB_STATUS_SOFT_ERROR == qs_st)
-      {
-        db->rollback (db->cls);
-        continue;
-      }
-      /* Only retry if SOFT error occurred.  Exit in case of OK or HARD failure */
-      if (GNUNET_DB_STATUS_HARD_ERROR == qs_st)
-      {
-        GNUNET_break (0);
-        db->rollback (db->cls);
-        return TMH_RESPONSE_reply_internal_error (connection,
-                                                  TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
-						  "Merchant database error: hard error while storing transaction");
-      }
-      break;
-    }
-
-    /**
-     * Break if we couldn't modify one, and only one line; this
-     * includes hard errors.
-     */
-    if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs_st)
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Unexpected query status %d while storing /pay transaction!\n",
-                  (int) qs_st);
-      return TMH_RESPONSE_reply_internal_error (connection,
-						TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
-						"Merchant database error: failed to store transaction");
-    }
-  }
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Found transaction data for proposal `%s' of merchant `%s'\n",
-              GNUNET_h2s (&pc->h_contract_terms),
-              TALER_B2S (&pc->mi->pubkey));
 
   MHD_suspend_connection (connection);
   pc->suspended = GNUNET_YES;
@@ -1514,8 +1531,8 @@ handler_pay_json (struct MHD_Connection *connection,
 
 
 /**
- * Process a payment for a proposal.
- * Takes data from the given MHD connection.
+ * Process a payment for a proposal.  Takes data from the given MHD
+ * connection.
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle

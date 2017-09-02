@@ -528,6 +528,8 @@ postgres_start (void *cls)
   ExecStatusType ex;
 
   check_connection (pg);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Starting merchant DB transaction\n");
   result = PQexec (pg->conn,
                    "START TRANSACTION ISOLATION LEVEL SERIALIZABLE");
   if (PGRES_COMMAND_OK !=
@@ -557,6 +559,8 @@ postgres_rollback (void *cls)
   struct PostgresClosure *pg = cls;
   PGresult *result;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Rolling back merchant DB transaction\n");
   result = PQexec (pg->conn,
                    "ROLLBACK");
   GNUNET_break (PGRES_COMMAND_OK ==
@@ -579,6 +583,8 @@ postgres_commit (void *cls)
     GNUNET_PQ_query_param_end
   };
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Committing merchant DB transaction\n");
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
 					     "end_transaction",
 					     params);
