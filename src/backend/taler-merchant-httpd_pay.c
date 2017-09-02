@@ -497,8 +497,9 @@ deposit_cb (void *cls,
   }
   /* store result to DB */
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Storing successful payment for h_contract_terms '%s'\n",
-              GNUNET_h2s (&pc->h_contract_terms));
+              "Storing successful payment for h_contract_terms `%s' and merchant `%s'\n",
+              GNUNET_h2s (&pc->h_contract_terms),
+              TALER_B2S (&pc->mi->pubkey));
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
     qs = db->store_deposit (db->cls,
@@ -1389,6 +1390,8 @@ handler_pay_json (struct MHD_Connection *connection,
     return ret;
   }
   /* Check if transaction is already known, if not store it. */
+  /* FIXME: What if transaction exists, with a failed payment at
+     a different exchange? */
   qs = db->find_transaction (db->cls,
 			     &pc->h_contract_terms,
 			     &pc->mi->pubkey,
@@ -1417,7 +1420,7 @@ handler_pay_json (struct MHD_Connection *connection,
     struct GNUNET_TIME_Absolute now;
 
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Dealing with new transaction '%s'\n",
+                "Dealing with new transaction `%s'\n",
                 GNUNET_h2s (&pc->h_contract_terms));
 
     now = GNUNET_TIME_absolute_get ();
@@ -1428,7 +1431,7 @@ handler_pay_json (struct MHD_Connection *connection,
 
       pd_str = GNUNET_STRINGS_absolute_time_to_string (pc->pay_deadline);
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "Attempt to get coins for expired contract. Deadline: '%s'\n",
+                  "Attempt to pay coins for expired contract. Deadline: `%s'\n",
 		  pd_str);
       return TMH_RESPONSE_reply_bad_request (connection,
 					     TALER_EC_PAY_OFFER_EXPIRED,
@@ -1483,6 +1486,10 @@ handler_pay_json (struct MHD_Connection *connection,
 						"Merchant database error: failed to store transaction");
     }
   }
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Found transaction data for proposal `%s' of merchant `%s'\n",
+              GNUNET_h2s (&pc->h_contract_terms),
+              TALER_B2S (&pc->mi->pubkey));
 
   MHD_suspend_connection (connection);
   pc->suspended = GNUNET_YES;

@@ -60,12 +60,12 @@ postgres_drop_tables (void *cls)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_ExecuteStatement es[] = {
-    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_transfers;"),
-    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_deposits;"),
-    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_transactions;"),
-    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_proofs;"),
-    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_contract_terms;"),
-    GNUNET_PQ_make_try_execute ("DROP TABLE merchant_refunds;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_transfers CASCADE;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_deposits CASCADE;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_transactions CASCADE;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_proofs CASCADE;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_contract_terms CASCADE;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_refunds CASCADE;"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
 
@@ -85,32 +85,21 @@ postgres_initialize (void *cls)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_ExecuteStatement es[] = {
+    /* Offers we made to customers */
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_contract_terms ("
                             "order_id VARCHAR NOT NULL"
-                            ",merchant_pub BYTEA NOT NULL"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
                             ",contract_terms BYTEA NOT NULL"
-                            ",h_contract_terms BYTEA NOT NULL"
+                            ",h_contract_terms BYTEA NOT NULL CHECK (LENGTH(h_contract_terms)=64)"
                             ",timestamp INT8 NOT NULL"
                             ",row_id BIGSERIAL UNIQUE"
-                            ",paid BYTEA NOT NULL "
+                            ",paid BYTEA NOT NULL " /* WHY is this a BYTEA!? Why does this EXIST!? */
                             ",PRIMARY KEY (order_id, merchant_pub)"
 			    ",UNIQUE (h_contract_terms, merchant_pub)"
                             ");"),
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
-                            " rtransaction_id BIGSERIAL UNIQUE"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",h_contract_terms BYTEA NOT NULL"
-                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-                            ",reason VARCHAR NOT NULL"
-                            ",refund_amount_val INT8 NOT NULL"
-                            ",refund_amount_frac INT4 NOT NULL"
-                            ",refund_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
-                            ",refund_fee_val INT8 NOT NULL"
-                            ",refund_fee_frac INT4 NOT NULL"
-                            ",refund_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
-                            ");"),
+    /* Contracts that were paid via some exchange (or attempted to be paid???) */
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transactions ("
-                            " h_contract_terms BYTEA NOT NULL"
+                            " h_contract_terms BYTEA NOT NULL CHECK (LENGTH(h_contract_terms)=64)"
                             ",exchange_uri VARCHAR NOT NULL"
                             ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
                             ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
@@ -120,11 +109,12 @@ postgres_initialize (void *cls)
                             ",total_amount_frac INT4 NOT NULL"
                             ",total_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",PRIMARY KEY (h_contract_terms, merchant_pub)"
+                            ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)"
                             ");"),
+    /* Table with the proofs for each coin we deposited at the exchange */
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_deposits ("
                             " h_contract_terms BYTEA NOT NULL"
                             ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_transactions (h_contract_terms, merchant_pub)"
                             ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
                             ",amount_with_fee_val INT8 NOT NULL"
                             ",amount_with_fee_frac INT4 NOT NULL"
@@ -138,6 +128,7 @@ postgres_initialize (void *cls)
                             ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
                             ",exchange_proof BYTEA NOT NULL"
                             ",PRIMARY KEY (h_contract_terms, coin_pub)"
+                            ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_transactions (h_contract_terms, merchant_pub)"
                             ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
                             " exchange_uri VARCHAR NOT NULL"
@@ -174,6 +165,19 @@ postgres_initialize (void *cls)
 			    ",exchange_sig BYTEA NOT NULL CHECK (length(exchange_sig)=64)"
 			    ",PRIMARY KEY (exchange_pub,h_wire_method,start_date,end_date)"
 			    ");"),
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
+                            " rtransaction_id BIGSERIAL UNIQUE"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+                            ",h_contract_terms BYTEA NOT NULL"
+                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                            ",reason VARCHAR NOT NULL"
+                            ",refund_amount_val INT8 NOT NULL"
+                            ",refund_amount_frac INT4 NOT NULL"
+                            ",refund_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",refund_fee_val INT8 NOT NULL"
+                            ",refund_fee_frac INT4 NOT NULL"
+                            ",refund_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ");"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
   struct GNUNET_PQ_PreparedStatement ps[] = {
@@ -700,6 +704,7 @@ postgres_insert_contract_terms (void *cls,
 					     params);
 }
 
+
 /**
  * Mark contract terms as payed.  Needed by /history as only payed
  * contracts must be shown.  NOTE: we can't get the list of (payed)
@@ -715,12 +720,6 @@ postgres_mark_proposal_paid (void *cls,
 {
   unsigned int yes = GNUNET_YES;
   struct PostgresClosure *pg = cls;
-
-  TALER_LOG_DEBUG ("Marking proposal paid, h_contract_terms: '%s',"
-                   " merchant_pub: '%s'\n",
-                   GNUNET_h2s (h_contract_terms),
-                   TALER_B2S (merchant_pub));
-
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (&yes),
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
@@ -728,6 +727,10 @@ postgres_mark_proposal_paid (void *cls,
     GNUNET_PQ_query_param_end
   };
 
+  TALER_LOG_DEBUG ("Marking proposal paid, h_contract_terms: '%s',"
+                   " merchant_pub: '%s'\n",
+                   GNUNET_h2s (h_contract_terms),
+                   TALER_B2S (merchant_pub));
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "mark_proposal_paid",
                                              params);
@@ -820,11 +823,12 @@ postgres_store_deposit (void *cls,
   };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "storing payment for h_contract_terms '%s'"
-              ", coin_pub: %s, amount_with_fee: %s, merchant_pub: %s\n",
+              "Storing payment for h_contract_terms `%s', coin_pub: `%s', amount_with_fee: %s\n",
               GNUNET_h2s (h_contract_terms),
               TALER_B2S (coin_pub),
-              TALER_amount_to_string (amount_with_fee),
+              TALER_amount_to_string (amount_with_fee));
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Merchant pub is `%s'\n",
               TALER_B2S (merchant_pub));
   check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,

@@ -314,7 +314,7 @@ process_wire_fees (void *cls,
   struct TALER_EXCHANGE_WireAggregateFees *af;
   const struct TALER_EXCHANGE_Keys *keys;
   const struct TALER_MasterPublicKeyP *master_pub;
-  
+
   keys = TALER_EXCHANGE_get_keys (exchange->conn);
   GNUNET_assert (NULL != keys);
   master_pub = &keys->master_pub;
@@ -348,7 +348,7 @@ process_wire_fees (void *cls,
   {
     struct GNUNET_HashCode h_wire_method;
     enum GNUNET_DB_QueryStatus qs;
-    
+
     af = GNUNET_new (struct TALER_EXCHANGE_WireAggregateFees);
     *af = *fees;
     GNUNET_CRYPTO_hash (wire_method,
@@ -360,6 +360,14 @@ process_wire_fees (void *cls,
 		wire_method,
 		GNUNET_STRINGS_absolute_time_to_string (af->start_date),
 		TALER_amount2s (&af->wire_fee));
+    if (GNUNET_OK !=
+        db->start (db->cls))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		  "Failed to start database transaction!\n");
+      GNUNET_free (af);
+      break;
+    }
     qs = db->store_wire_fee_by_exchange (db->cls,
 					 master_pub,
 					 &h_wire_method,
@@ -374,8 +382,29 @@ process_wire_fees (void *cls,
 		  "Failed to persist exchange wire fees in merchant DB!\n");
       GNUNET_free (af);
       fees = fees->next;
+      db->rollback (db->cls);
       continue;
     }
+    if (0 == qs)
+    {
+      /* Entry was already in DB, fine, continue as if we succeeded */
+      db->rollback (db->cls);
+      fees = fees->next;
+    }
+    if (0 < qs)
+    {
+      /* Inserted into DB, make sure transaction completes */
+      qs = db->commit (db->cls);
+      if (0 > qs)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to persist exchange wire fees in merchant DB!\n");
+        GNUNET_free (af);
+        fees = fees->next;
+        continue;
+      }
+    }
+
     af->next = NULL;
     if (NULL == endp)
       f->af = af;

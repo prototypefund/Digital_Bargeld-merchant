@@ -127,7 +127,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_JSON_spec_string ("reason", &reason),
     GNUNET_JSON_spec_string ("instance", &merchant),
     GNUNET_JSON_spec_end ()
-  }; 
+  };
   enum GNUNET_DB_QueryStatus qs;
 
   if (NULL == *connection_cls)
@@ -179,7 +179,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                                          TALER_EC_REFUND_INSTANCE_UNKNOWN,
 					 "Unknown instance given");
   }
-  
+
   /* Convert order id to h_contract_terms */
   qs = db->find_contract_terms (db->cls,
 				&contract_terms,
@@ -198,7 +198,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown order id given: %s\n",
                 order_id);
     return TMH_RESPONSE_reply_not_found (connection,
@@ -276,10 +276,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_NONE,
                                               "Refund done, but failed to sign confirmation");
-  
+
   }
 
-  return TMH_RESPONSE_reply_json_pack (connection, 
+  return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_OK,
                                        "{s:o}",
                                        "sig", GNUNET_JSON_from_data_auto (&sig));
@@ -310,6 +310,11 @@ process_refunds_cb (void *cls,
   struct GNUNET_CRYPTO_EddsaSignature sig;
   json_t *element;
 
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Found refund of %s for coin %s with reason `%s' in database\n",
+              TALER_B2S (coin_pub),
+              TALER_amount2s (refund_amount),
+              reason);
   rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
   rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
   rr.h_contract_terms = *prd->h_contract_terms;
@@ -354,9 +359,10 @@ process_refunds_cb (void *cls,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not append a response's element\n");
     prd->ec = TALER_EC_PARSER_OUT_OF_MEMORY;
-    return; 
+    return;
   }
 }
+
 
 /**
  * Return refund situation about a contract.
@@ -411,8 +417,8 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                           MHD_GET_ARGUMENT_KIND,
                                           "order_id");
   if (NULL == order_id)
-  { 
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Argument 'order_id' not given\n");
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
@@ -438,7 +444,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
 
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown order id given: %s\n",
                 order_id);
     return TMH_RESPONSE_reply_not_found (connection,
@@ -461,7 +467,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   prd.merchant = mi;
   prd.ec = TALER_EC_NONE;
   for (unsigned int i=0;i<MAX_RETRIES;i++)
-  {  
+  {
     qs = db->get_refunds_from_contract_terms_hash (db->cls,
 						   &mi->pubkey,
 						   &h_contract_terms,
@@ -472,8 +478,8 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   }
   if (0 > qs)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR, 
-                "database hard error on order_id lookup: %s\n",
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Database hard error on order_id lookup: %s\n",
                 order_id);
     json_decref (prd.response);
     return TMH_RESPONSE_reply_internal_error (connection,
@@ -487,10 +493,10 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
     /* NOTE: error already logged by the callback */
     return TMH_RESPONSE_reply_internal_error (connection,
                                               prd.ec,
-                                              "Could not generate a response"); 
+                                              "Could not generate a response");
   }
 
-  return TMH_RESPONSE_reply_json_pack (connection, 
+  return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_OK,
                                        "{s:o}",
                                        "refund_permissions", prd.response);

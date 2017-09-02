@@ -1182,7 +1182,7 @@ proposal_cb (void *cls,
     cmd->details.proposal.merchant_sig = *sig;
     cmd->details.proposal.hash = *hash;
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Hashed proposal, '%s'\n",
+                "Hashed proposal is `%s'\n",
                 GNUNET_h2s (hash));
     break;
   default:
@@ -1277,7 +1277,9 @@ refund_lookup_cb (void *cls,
   struct TALER_Amount acc;
   const struct Command *increase;
   struct TALER_Amount refund_amount;
+  const json_t *arr;
 
+  cmd->details.refund_lookup.rlo = NULL;
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1287,8 +1289,15 @@ refund_lookup_cb (void *cls,
   }
 
   map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
-
-  json_array_foreach (obj, index, elem)
+  arr = json_object_get (obj,
+                         "refund_permissions");
+  if (NULL == arr)
+  {
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
+  json_array_foreach (arr, index, elem)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount *irefund_amount
@@ -1307,7 +1316,6 @@ refund_lookup_cb (void *cls,
     GNUNET_CRYPTO_hash (&coin_pub,
 			sizeof (struct TALER_CoinSpendPublicKeyP),
 			&h_coin_pub);
-
     GNUNET_assert (GNUNET_OK ==
 		   GNUNET_CONTAINER_multihashmap_put (map,
 						      &h_coin_pub,
@@ -1315,16 +1323,16 @@ refund_lookup_cb (void *cls,
 						      GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY));
   };
 
-  /* Retrieve coins used to pay, from OC_PAY command */
+  /* Retrieve coins used to pay, from #OC_PAY command */
   GNUNET_assert (NULL != (pay =
 			  find_command (is,
 					cmd->details.refund_lookup.pay_ref)));
   icoin_refs = GNUNET_strdup (pay->details.pay.coin_ref);
-  GNUNET_assert (NULL != (icoin_ref =
-			  strtok (icoin_refs, ";")));
   TALER_amount_get_zero ("EUR",
 			 &acc);
-  do
+  for (icoin_ref = strtok (icoin_refs, ";");
+       NULL != icoin_ref;
+       icoin_ref = strtok (NULL, ";"))
   {
     GNUNET_assert (NULL != (icoin =
 			    find_command (is,
@@ -1337,40 +1345,35 @@ refund_lookup_cb (void *cls,
     /* Can be NULL: not all coins are involved in refund */
     iamount = GNUNET_CONTAINER_multihashmap_get (map,
 						 &h_icoin_pub);
-    if (NULL != iamount)
-      GNUNET_assert (GNUNET_OK ==
-		     TALER_amount_add (&acc,
-				       &acc,
-				       iamount));
+    if (NULL == iamount)
+      continue;
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_amount_add (&acc,
+                                     &acc,
+                                     iamount));
+  }
 
-    icoin_ref = strtok (NULL, ";");
-    if (NULL == icoin_ref)
-      break;
-  } while (0);
-
-  /**
-   * Check if refund has been 100% covered
-   */
+  /* Check if refund has been 100% covered */
   GNUNET_assert (increase =
-    find_command (is, cmd->details.refund_lookup.increase_ref));
+                 find_command (is,
+                               cmd->details.refund_lookup.increase_ref));
   GNUNET_assert (GNUNET_OK ==
-    TALER_string_to_amount (increase->details.refund_increase.refund_amount,
-                            &refund_amount));
-
+                 TALER_string_to_amount (increase->details.refund_increase.refund_amount,
+                                         &refund_amount));
+  GNUNET_CONTAINER_multihashmap_iterate (map,
+                                         &hashmap_free,
+                                         NULL);
+  GNUNET_CONTAINER_multihashmap_destroy (map);
   if (0 != TALER_amount_cmp (&acc,
                              &refund_amount))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Incomplete refund: ex[ected '%s', got '%s'\n",
+                "Incomplete refund: expected '%s', got '%s'\n",
                 TALER_amount_to_string (&refund_amount),
                 TALER_amount_to_string (&acc));
     fail (is);
+    return;
   }
-
-  GNUNET_CONTAINER_multihashmap_iterate (map,
-                                         &hashmap_free,
-                                         NULL);
-  cmd->details.refund_lookup.rlo = NULL;
   next_command (is);
 }
 
@@ -2819,12 +2822,12 @@ main (int argc,
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
   GNUNET_log_setup ("test-merchant-api",
-                "DEBUG",
-                NULL);
+                    "DEBUG",
+                    NULL);
   cfg = GNUNET_CONFIGURATION_create ();
-  GNUNET_assert (GNUNET_OK == GNUNET_CONFIGURATION_load
-    (cfg,
-     "test_merchant_api.conf"));
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_CONFIGURATION_load (cfg,
+                                            "test_merchant_api.conf"));
   GNUNET_assert (GNUNET_OK ==
     GNUNET_CONFIGURATION_get_value_string (cfg,
                                            "merchant",
@@ -2942,7 +2945,7 @@ main (int argc,
     return 77;
   }
   /* give child time to start and bind against the socket */
-  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Waiting for taler-merchant-httpd to be ready\n");
   cnt = 0;
   do
