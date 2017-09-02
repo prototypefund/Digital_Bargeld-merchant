@@ -66,6 +66,7 @@ postgres_drop_tables (void *cls)
     GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_proofs CASCADE;"),
     GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_contract_terms CASCADE;"),
     GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_refunds CASCADE;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS exchange_wire_fees CASCADE;"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
 
