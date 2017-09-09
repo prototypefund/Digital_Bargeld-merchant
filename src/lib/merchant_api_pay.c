@@ -401,7 +401,6 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   CURL *eh;
   struct TALER_Amount total_fee;
   struct TALER_Amount total_amount;
-  unsigned int i;
 
   if (0 == num_coins)
   {
@@ -409,7 +408,7 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
     return NULL;
   }
   j_coins = json_array ();
-  for (i=0;i<num_coins;i++)
+  for (unsigned int i=0;i<num_coins;i++)
   {
     json_t *j_coin;
     const struct TALER_MERCHANT_PaidCoin *pc = &coins[i];
@@ -459,9 +458,14 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			"ub_sig", GNUNET_JSON_from_rsa_signature (pc->denom_sig.rsa_signature),
 			"coin_sig", GNUNET_JSON_from_data_auto (&pc->coin_sig)
 			);
-    GNUNET_assert (0 ==
-                   json_array_append_new (j_coins,
-                                          j_coin));
+    if (0 !=
+        json_array_append_new (j_coins,
+                               j_coin))
+    {
+      GNUNET_break (0);
+      json_decref (j_coins);
+      return NULL;
+    }
   }
 
   pay_obj = json_pack ("{"
@@ -474,7 +478,11 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 		       "coins", j_coins,
                        "order_id", order_id,
                        "merchant_pub", GNUNET_JSON_from_data_auto (merchant_pub));
-
+  if (NULL == pay_obj)
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   ph = GNUNET_new (struct TALER_MERCHANT_Pay);
   ph->ctx = ctx;
   ph->cb = pay_cb;
