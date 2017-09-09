@@ -558,6 +558,7 @@ handle_wire_data (void *cls,
                   const json_t *obj)
 {
   struct Exchange *exchange = cls;
+  const struct TALER_EXCHANGE_Keys *keys;
 
   exchange->wire_request = NULL;
   if (MHD_HTTP_OK != http_status)
@@ -568,11 +569,13 @@ handle_wire_data (void *cls,
                 ec);
     return;
   }
-  if (GNUNET_OK !=
-      TALER_EXCHANGE_wire_get_fees (&TALER_EXCHANGE_get_keys (exchange->conn)->master_pub,
-                                    obj,
-                                    &process_wire_fees,
-                                    exchange))
+  keys = TALER_EXCHANGE_get_keys (exchange->conn);
+  if ( (NULL == keys) ||
+       (GNUNET_OK !=
+        TALER_EXCHANGE_wire_get_fees (&keys->master_pub,
+                                      obj,
+                                      &process_wire_fees,
+                                      exchange)) )
   {
     /* Report hard failure to all callbacks! */
     struct TMH_EXCHANGES_FindOperation *fo;
