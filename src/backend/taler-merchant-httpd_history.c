@@ -27,9 +27,29 @@
 
 
 /**
+ * Closure for #pd_cb.
+ */
+struct ProcessContractClosure
+{
+
+  /**
+   * Updated by #pd_cb to build the response.
+   */
+  json_t *response;
+
+  /**
+   * Set to #GNUNET_SYSERR if the database returned a contract
+   * that was not well-formed.
+   */
+  int failure;
+
+};
+
+
+/**
  * Function called with information about a transaction.
  *
- * @param cls closure
+ * @param cls closure of type `struct ProcessContractClosure`
  * @param order_id transaction's order ID.
  * @param row_id serial numer of the transaction in the table,
  * used as index by the frontend to skip previous results.
@@ -40,27 +60,33 @@ pd_cb (void *cls,
        uint64_t row_id,
        const json_t *contract_terms)
 {
-  json_t *response = cls;
+  struct ProcessContractClosure *pcc = cls;
   json_t *entry;
   json_t *amount;
   json_t *timestamp;
   json_t *instance;
-  json_t *summary=NULL;
+  json_t *summary;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "/history's row_id: %llu\n",
               (unsigned long long) row_id);
-
-  GNUNET_assert (-1 != json_unpack ((json_t *) contract_terms,
-                                    "{s:o, s:o, s:{s:o}, s?:o}",
-                                    "amount", &amount,
-                                    "timestamp", &timestamp,
-                                    "merchant", "instance", &instance,
-                                    "summary", &summary));
-
-  if (NULL == summary) {
-    summary = json_string (order_id);
+  summary = NULL;
+  if (-1 == json_unpack ((json_t *) contract_terms,
+                         "{s:o, s:o, s:{s:o}, s?:o}",
+                         "amount", &amount,
+                         "timestamp", &timestamp,
+                         "merchant", "instance", &instance,
+                         "summary", &summary))
+  {
+    GNUNET_break (0);
+    pcc->failure = GNUNET_SYSERR;
+    return;
   }
+
+  /* summary is optional, but we need something, so we use
+     the order ID if it is not given. */
+  if (NULL == summary)
+    summary = json_string (order_id);
 
   GNUNET_break (NULL != (entry = json_pack ("{s:I, s:s, s:O, s:O, s:O, s:O}",
                                             "row_id", row_id,
@@ -70,8 +96,9 @@ pd_cb (void *cls,
                                             "instance", instance,
                                             "summary", summary)));
 
-  GNUNET_break (0 == json_array_append_new (response,
-                                            entry));
+  GNUNET_break (0 ==
+                json_array_append_new (pcc->response,
+                                       entry));
 }
 
 
@@ -103,6 +130,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   int start = -1;
   unsigned int delta;
   enum GNUNET_DB_QueryStatus qs;
+  struct ProcessContractClosure pcc;
 
   response = json_array ();
   str = MHD_lookup_connection_value (connection,
@@ -151,20 +179,22 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "order_id");
-
   if (NULL != str)
   {
+    pcc.response = response;
+    pcc.failure = GNUNET_NO;
     qs = db->find_contract_terms_history (db->cls,
 					  str,
 					  &mi->pubkey,
 					  &pd_cb,
-					  response);
+					  &pcc);
     /* single, read-only SQL statements should never cause
        serialization problems */
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    if (0 > qs)
+    if ( (0 > qs) ||
+         (GNUNET_SYSERR == pcc.failure) )
     {
       json_decref (response);
       return TMH_RESPONSE_reply_internal_error (connection,
@@ -179,7 +209,6 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   }
 
   delta = 20;
-
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "start");
@@ -216,13 +245,15 @@ MH_handler_history (struct TMH_RequestHandler *rh,
               start,
               delta);
 
+  pcc.response = response;
+  pcc.failure = GNUNET_NO;
   if (0 > start)
     qs = db->find_contract_terms_by_date (db->cls,
 					  date,
 					  &mi->pubkey,
 					  delta,
 					  &pd_cb,
-					  response);
+					  &pcc);
   else
     qs = db->find_contract_terms_by_date_and_range (db->cls,
 						    date,
@@ -231,8 +262,9 @@ MH_handler_history (struct TMH_RequestHandler *rh,
 						    delta,
 						    GNUNET_NO,
 						    &pd_cb,
-						    response);
-  if (0 > qs)
+						    &pcc);
+  if ( (0 > qs) ||
+       (GNUNET_SYSERR == pcc.failure) )
   {
     /* single, read-only SQL statements should never cause
        serialization problems */
