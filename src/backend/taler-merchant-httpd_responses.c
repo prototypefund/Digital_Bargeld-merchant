@@ -44,7 +44,11 @@ TMH_RESPONSE_make_json (const json_t *json)
 
   json_str = json_dumps (json,
 			 JSON_INDENT(2));
-  GNUNET_assert (NULL != json_str);
+  if (NULL == json_str)
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   resp = MHD_create_response_from_buffer (strlen (json_str),
 					  json_str,
                                           MHD_RESPMEM_MUST_FREE);
@@ -268,7 +272,7 @@ TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_NOT_FOUND,
                                        "{s:I, s:s}",
-				       "code", (json_int_t) ec,       
+				       "code", (json_int_t) ec,
                                        "error", object);
 }
 
