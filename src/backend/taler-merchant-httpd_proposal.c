@@ -434,8 +434,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                            "instance");
 
   mi = TMH_lookup_instance (instance);
-  GNUNET_assert (NULL != mi);
-
+  if (NULL == mi)
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
+                                         "instance");
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
                                           "order_id");
