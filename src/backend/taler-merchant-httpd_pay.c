@@ -383,7 +383,7 @@ abort_deposit (struct PayContext *pc)
 {
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Aborting pending /deposit operations\n");
-  for (unsigned int i;i<pc->coins_cnt;i++)
+  for (unsigned int i=0;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dci = &pc->dc[i];
 
@@ -686,7 +686,6 @@ process_pay_with_exchange (void *cls,
   struct TALER_Amount wire_fee_customer_contribution;
   const struct TALER_EXCHANGE_Keys *keys;
   enum GNUNET_DB_QueryStatus qs;
-  enum GNUNET_DB_QueryStatus qs_st;
 
   pc->fo = NULL;
   if (NULL == mh)
@@ -966,6 +965,7 @@ process_pay_with_exchange (void *cls,
   if (GNUNET_NO == pc->transaction_exists)
   {
     struct GNUNET_TIME_Absolute now;
+    enum GNUNET_DB_QueryStatus qs_st;
 
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Dealing with new transaction `%s'\n",
@@ -1020,24 +1020,24 @@ process_pay_with_exchange (void *cls,
                                                              "code", (json_int_t) TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
                                                              "hint", "Merchant database error: hard error while storing transaction"));
     }
-  }
 
-  /**
-   * Break if we couldn't modify one, and only one line; this
-   * includes hard errors.
-   */
-  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs_st)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected query status %d while storing /pay transaction!\n",
-                (int) qs_st);
-    resume_pay_with_response (pc,
-                              MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-                                                           "code", (json_int_t) TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
-                                                           "hint", "Merchant database error: failed to store transaction"));
-    return;
-  }
+    /**
+     * Break if we couldn't modify one, and only one line; this
+     * includes hard errors.
+     */
+    if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs_st)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Unexpected query status %d while storing /pay transaction!\n",
+                  (int) qs_st);
+      resume_pay_with_response (pc,
+                                MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+                                                             "code", (json_int_t) TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+                                                             "hint", "Merchant database error: failed to store transaction"));
+      return;
+    }
+  } /* end of if (GNUNET_NO == pc->transaction_esists) */
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Found transaction data for proposal `%s' of merchant `%s', initiating deposits\n",
