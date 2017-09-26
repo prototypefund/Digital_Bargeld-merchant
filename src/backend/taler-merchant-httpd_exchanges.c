@@ -694,6 +694,7 @@ keys_mgmt_cb (void *cls,
                 exchange->uri,
                 GNUNET_STRINGS_relative_time_to_string (exchange->retry_delay,
                                                         GNUNET_YES));
+    GNUNET_assert (NULL == exchange->retry_task);
     exchange->retry_task = GNUNET_SCHEDULER_add_delayed (exchange->retry_delay,
                                                          &retry_exchange,
                                                          exchange);
@@ -720,6 +721,8 @@ keys_mgmt_cb (void *cls,
     delay = GNUNET_TIME_absolute_get_remaining (expire);
   exchange->retry_delay
     = GNUNET_TIME_UNIT_ZERO;
+  if (NULL != exchange->retry_task)
+    GNUNET_SCHEDULER_cancel (exchange->retry_task);
   exchange->retry_task
     = GNUNET_SCHEDULER_add_delayed (delay,
                                     &retry_exchange,
@@ -858,6 +861,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Do not have current key data. Will request /keys now\n");
+    GNUNET_assert (NULL == exchange->retry_task);
     exchange->retry_task = GNUNET_SCHEDULER_add_now (&retry_exchange,
                                                      exchange);
   }
@@ -964,6 +968,7 @@ accept_exchanges (void *cls,
                                exchange_tail,
                                exchange);
   exchange->pending = GNUNET_YES;
+  GNUNET_assert (NULL == exchange->retry_task);
   exchange->retry_task = GNUNET_SCHEDULER_add_now (&retry_exchange,
                                                    exchange);
 }
