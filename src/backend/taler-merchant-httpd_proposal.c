@@ -293,9 +293,16 @@ proposal_put (struct MHD_Connection *connection,
   /* create proposal signature */
   pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
   pdps.purpose.size = htonl (sizeof (pdps));
-  GNUNET_assert (GNUNET_OK ==
-                 TALER_JSON_hash (order,
-                                  &pdps.hash));
+  if (GNUNET_OK !=
+      TALER_JSON_hash (order,
+                       &pdps.hash))
+  {
+    GNUNET_break (0);
+    GNUNET_JSON_parse_free (spec);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_INTERNAL_LOGIC_ERROR,
+                                              "Could not hash order");
+  }
 
   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                             &pdps.purpose,

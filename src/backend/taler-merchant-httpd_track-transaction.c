@@ -481,7 +481,7 @@ wire_deposits_cb (void *cls,
 	  break;
       }
       if (0 > qs)
-      { 
+      {
 	/* Not good, but not fatal either, log error and continue */
 	/* Special report if retries insufficient */
 	GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
@@ -1040,8 +1040,15 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
 					 "Given order_id doesn't map to any proposal");
-  TALER_JSON_hash (contract_terms,
-                   &h_contract_terms);
+  if (GNUNET_OK !=
+      TALER_JSON_hash (contract_terms,
+                       &h_contract_terms))
+  {
+    json_decref (contract_terms);
+    return TMH_RESPONSE_reply_internal_error (connection,
+					      TALER_EC_INTERNAL_LOGIC_ERROR,
+                                              "Failed to hash contract terms");
+  }
   json_decref (contract_terms);
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -1059,7 +1066,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
                                               "Database error finding transaction");
-  }  
+  }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,

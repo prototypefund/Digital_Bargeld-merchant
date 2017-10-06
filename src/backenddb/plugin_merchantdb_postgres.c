@@ -699,7 +699,10 @@ postgres_insert_contract_terms (void *cls,
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
 		       &h_contract_terms))
+  {
+    GNUNET_break (0);
     return GNUNET_SYSERR;
+  }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "inserting contract_terms: order_id: %s, merchant_pub: %s, h_contract_terms: %s.\n",
               order_id,

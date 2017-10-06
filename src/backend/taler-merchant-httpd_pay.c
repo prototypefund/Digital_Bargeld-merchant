@@ -1246,6 +1246,7 @@ parse_pay (struct MHD_Connection *connection,
       TALER_JSON_hash (pc->contract_terms,
                        &pc->h_contract_terms))
   {
+    GNUNET_break (0);
     GNUNET_JSON_parse_free (spec);
     if (MHD_YES !=
         TMH_RESPONSE_reply_internal_error (connection,

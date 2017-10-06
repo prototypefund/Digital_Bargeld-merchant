@@ -234,7 +234,7 @@ url_handler (void *cls,
   for (unsigned int i=0;NULL != handlers[i].url;i++)
   {
     struct TMH_RequestHandler *rh = &handlers[i];
-    
+
     if ( (0 == strcasecmp (url,
                            rh->url)) &&
          ( (NULL == rh->method) ||
@@ -564,20 +564,21 @@ instances_iterator_cb (void *cls,
     iic->ret |= GNUNET_SYSERR;
   }
 
-  if (GNUNET_YES != TALER_JSON_hash (mi->j_wire,
-                                     &mi->h_wire))
+  if (GNUNET_OK !=
+      TALER_JSON_hash (mi->j_wire,
+                       &mi->h_wire))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to hash wireformat\n");
     iic->ret |= GNUNET_SYSERR;
   }
-  #define EXTRADEBUG
-  #ifdef EXTRADEBUGG
+#define EXTRADEBUG
+#ifdef EXTRADEBUGG
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Found wireformat instance:\n");
               json_dumpf (mi->j_wire, stdout, 0);
               printf ("\n");
-  #endif
+#endif
 
   GNUNET_CRYPTO_hash (mi->id,
                       strlen (mi->id),

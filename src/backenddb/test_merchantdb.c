@@ -599,8 +599,9 @@ run (void *cls)
                                       "order",
                                       json_string ("2")));
 
-  TALER_JSON_hash (contract_terms,
-                   &h_contract_terms);
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_JSON_hash (contract_terms,
+                                  &h_contract_terms));
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->insert_contract_terms (plugin->cls,
@@ -655,8 +656,9 @@ run (void *cls)
 
   fake_now = GNUNET_TIME_absolute_subtract (timestamp, delta);
 
-  TALER_JSON_hash (contract_terms_future,
-                   &h_contract_terms_future);
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_JSON_hash (contract_terms_future,
+                                  &h_contract_terms_future));
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->mark_proposal_paid (plugin->cls,

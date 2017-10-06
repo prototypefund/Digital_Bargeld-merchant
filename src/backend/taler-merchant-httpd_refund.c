@@ -210,6 +210,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
       TALER_JSON_hash (contract_terms,
                        &h_contract_terms))
   {
+    GNUNET_break (0);
     GNUNET_JSON_parse_free (spec);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not hash contract terms\n");
@@ -456,6 +457,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
       TALER_JSON_hash (contract_terms,
                        &h_contract_terms))
   {
+    GNUNET_break (0);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not hash contract terms\n");
     return TMH_RESPONSE_reply_internal_error (connection,
