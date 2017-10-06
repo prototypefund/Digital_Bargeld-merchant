@@ -1328,8 +1328,9 @@ refund_lookup_cb (void *cls,
 			  find_command (is,
 					cmd->details.refund_lookup.pay_ref)));
   icoin_refs = GNUNET_strdup (pay->details.pay.coin_ref);
-  TALER_amount_get_zero ("EUR",
-			 &acc);
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_amount_get_zero ("EUR",
+                                        &acc));
   for (icoin_ref = strtok (icoin_refs, ";");
        NULL != icoin_ref;
        icoin_ref = strtok (NULL, ";"))

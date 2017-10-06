@@ -2132,8 +2132,9 @@ process_deposits_for_refund_cb (void *cls,
   struct TALER_Amount deposit_amount_with_fee[num_results];
   struct TALER_Amount deposit_refund_fee[num_results];
 
-  TALER_amount_get_zero (ctx->refund->currency,
-                         &current_refund);
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_amount_get_zero (ctx->refund->currency,
+                                        &current_refund));
 
   /* Pass 1:  Collect amount of existing refunds into current_refund.
    * Also store existing refunded amount for each deposit in deposit_refund. */
@@ -2170,8 +2171,9 @@ process_deposits_for_refund_cb (void *cls,
       GNUNET_PQ_query_param_end
     };
 
-    TALER_amount_get_zero (ctx->refund->currency,
-                           &ictx.refunded_amount);
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_amount_get_zero (ctx->refund->currency,
+                                          &ictx.refunded_amount));
     ictx.err = GNUNET_OK; /* no error so far */
     ires = GNUNET_PQ_eval_prepared_multi_select (ctx->pg->conn,
                                                  "find_refunds",
