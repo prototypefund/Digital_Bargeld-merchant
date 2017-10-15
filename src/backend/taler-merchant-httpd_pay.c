@@ -31,6 +31,7 @@
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
+#include "taler-merchant-httpd_refund.h"
 
 
 /**
@@ -405,6 +406,16 @@ abort_deposit (struct PayContext *pc)
 struct MHD_Response *
 sign_success_response (struct PayContext *pc)
 {
+  json_t *refunds;
+  enum TALER_ErrorCode ec;
+  const char *errmsg;
+
+  refunds = TM_get_refund_json (pc->mi, &pc->h_contract_terms, &ec, &errmsg);
+
+  if (NULL == refunds) {
+    return TMH_RESPONSE_make_internal_error (ec, errmsg);
+  }
+
   struct GNUNET_CRYPTO_EddsaSignature sig;
   struct PaymentResponsePS mr;
 
@@ -416,14 +427,16 @@ sign_success_response (struct PayContext *pc)
                             &mr.purpose,
 			    &sig);
 
-  return TMH_RESPONSE_make_json_pack ("{s:O, s:o, s:o}",
+  return TMH_RESPONSE_make_json_pack ("{s:O, s:o, s:o, s:o}",
                                       "contract_terms",
                                       pc->contract_terms,
                                       "sig",
                                       GNUNET_JSON_from_data_auto (&sig),
                                       "h_contract_terms",
                                       GNUNET_JSON_from_data (&pc->h_contract_terms,
-                                                             sizeof (struct GNUNET_HashCode)));
+                                                             sizeof (struct GNUNET_HashCode)),
+                                      "refund_permissions",
+                                      refunds);
 }
 
 

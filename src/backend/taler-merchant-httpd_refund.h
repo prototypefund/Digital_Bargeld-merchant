@@ -25,6 +25,7 @@
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 
+
 /**
  * Handle request for increasing the refund associated with
  * a contract.
@@ -59,4 +60,20 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                           void **connection_cls,
                           const char *upload_data,
                           size_t *upload_data_size);
+
+/**
+ * Get the JSON representation of a refund.
+ *
+ * @param merchant_pub the merchant's public key
+ * @param mi merchant instance
+ * @param ret_ec where to store error code
+ * @param ret_errmsg where to store error message
+ * @return NULL on error, JSON array with refunds on success
+ */
+json_t *
+TM_get_refund_json (const struct MerchantInstance *mi,
+                    const struct GNUNET_HashCode *h_contract_terms,
+                    enum TALER_ErrorCode *ret_ec,
+                    const char **ret_errmsg);
+
 #endif                          

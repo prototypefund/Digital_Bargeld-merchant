@@ -44,12 +44,12 @@ struct ProcessRefundData
    * Hashed version of contract terms; needed by the callback
    * to pack the response.
    */
-  struct GNUNET_HashCode *h_contract_terms;
+  const struct GNUNET_HashCode *h_contract_terms;
 
   /**
    * Both public and private key are needed by the callback
    */
-   struct MerchantInstance *merchant;
+   const struct MerchantInstance *merchant;
 
   /**
    * Return code: #TALER_EC_NONE if successful.
@@ -388,7 +388,6 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   json_t *contract_terms;
   struct MerchantInstance *mi;
   enum GNUNET_DB_QueryStatus qs;
-  struct ProcessRefundData prd;
 
   instance = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -464,15 +463,51 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                               TALER_EC_INTERNAL_LOGIC_ERROR,
                                               "Could not hash contract terms");
   }
+
+  json_t *response;
+  enum TALER_ErrorCode ec;
+  const char *errmsg;
+
+  response = TM_get_refund_json (mi, &h_contract_terms, &ec, &errmsg);
+
+  if (NULL == response) {
+    return TMH_RESPONSE_reply_internal_error (connection, ec, errmsg);
+  }
+
+  return TMH_RESPONSE_reply_json_pack (connection,
+                                       MHD_HTTP_OK,
+                                       "{s:o}",
+                                       "refund_permissions", response);
+}
+
+
+/**
+ * Get the JSON representation of a refund.
+ *
+ * @param merchant_pub the merchant's public key
+ * @param mi merchant instance
+ * @param ret_ec where to store error code
+ * @param ret_errmsg where to store error message
+ * @return NULL on error, JSON array with refunds on success
+ */
+json_t *
+TM_get_refund_json (const struct MerchantInstance *mi,
+                    const struct GNUNET_HashCode *h_contract_terms,
+                    enum TALER_ErrorCode *ret_ec,
+                    const char **ret_errmsg)
+{
+  enum GNUNET_DB_QueryStatus qs;
+  struct ProcessRefundData prd;
+
   prd.response = json_array ();
-  prd.h_contract_terms = &h_contract_terms;
+  prd.h_contract_terms = h_contract_terms;
   prd.merchant = mi;
   prd.ec = TALER_EC_NONE;
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
     qs = db->get_refunds_from_contract_terms_hash (db->cls,
 						   &mi->pubkey,
-						   &h_contract_terms,
+						   h_contract_terms,
 						   &process_refunds_cb,
 						   &prd);
     if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
@@ -481,27 +516,21 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   if (0 > qs)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Database hard error on order_id lookup: %s\n",
-                order_id);
+                "Database hard error on refunds_from_contract_terms_hash lookup: %s\n",
+                GNUNET_h2s (h_contract_terms));
     json_decref (prd.response);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_REFUND_LOOKUP_DB_ERROR,
-                                              "database hard error: looking for "
-                                              "h_contract_terms in merchant_refunds table");
+    *ret_ec = TALER_EC_REFUND_LOOKUP_DB_ERROR;
+    *ret_errmsg = ("database hard error: looking for "
+                  "h_contract_terms in merchant_refunds table");
   }
   if (TALER_EC_NONE != prd.ec)
   {
     json_decref (prd.response);
     /* NOTE: error already logged by the callback */
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              prd.ec,
-                                              "Could not generate a response");
+    *ret_ec = prd.ec;
+    *ret_errmsg = "Could not generate a response";
   }
-
-  return TMH_RESPONSE_reply_json_pack (connection,
-                                       MHD_HTTP_OK,
-                                       "{s:o}",
-                                       "refund_permissions", prd.response);
+  return prd.response;
 }
 
 
