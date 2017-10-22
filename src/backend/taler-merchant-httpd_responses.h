@@ -101,6 +101,23 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection);
  * needed for the reply.
  *
  * @param connection the MHD connection to use
+ * @param response_code response code to use
+ * @param ec error code to return
+ * @param msg human-readable diagnostic
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_rc (struct MHD_Connection *connection,
+                       unsigned int response_code,
+                       enum TALER_ErrorCode ec,
+                       const char *msg);
+
+
+/**
+ * Send a response indicating that we did not find the @a object
+ * needed for the reply.
+ *
+ * @param connection the MHD connection to use
  * @param ec error code to return
  * @param object name of the object we did not find
  * @return a MHD result code
@@ -149,7 +166,7 @@ TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
 struct MHD_Response *
 TMH_RESPONSE_make_internal_error (enum TALER_ErrorCode ec,
 				  const char *hint);
-  
+
 
 /**
  * Send a response indicating an external error.

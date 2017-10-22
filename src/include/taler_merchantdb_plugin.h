@@ -427,7 +427,7 @@ struct TALER_MERCHANTDB_Plugin
 				 struct GNUNET_TIME_Absolute start_date,
 				 struct GNUNET_TIME_Absolute end_date,
 				 const struct TALER_MasterSignatureP *exchange_sig);
-				 
+
 
   /**
    * Find information about a transaction.
@@ -443,7 +443,7 @@ struct TALER_MERCHANTDB_Plugin
                                 struct GNUNET_TIME_Absolute date,
                                 TALER_MERCHANTDB_TransactionCallback cb,
                                 void *cb_cls);
-  
+
 
   /**
    * Find information about a transaction.
@@ -480,7 +480,7 @@ struct TALER_MERCHANTDB_Plugin
                     const struct TALER_MerchantPublicKeyP *merchant_pub,
                     TALER_MERCHANTDB_CoinDepositCallback cb,
                     void *cb_cls);
-  
+
 
   /**
    * Lookup information about coin payments by h_contract_terms and coin.
@@ -555,7 +555,7 @@ struct TALER_MERCHANTDB_Plugin
                          const struct TALER_WireTransferIdentifierRawP *wtid,
                          TALER_MERCHANTDB_ProofCallback cb,
                          void *cb_cls);
-  
+
 
   /**
    * Obtain information about wire fees charged by an exchange,
@@ -584,7 +584,7 @@ struct TALER_MERCHANTDB_Plugin
 		      struct GNUNET_TIME_Absolute *end_date,
 		      struct TALER_MasterSignatureP *exchange_sig);
 
-  
+
   /**
    * Function called when some backoffice staff decides to award or
    * increase the refund on an existing contract.
@@ -622,6 +622,77 @@ struct TALER_MERCHANTDB_Plugin
                                           const struct GNUNET_HashCode *h_contract_terms,
                                           TALER_MERCHANTDB_RefundCallback rc,
                                           void *rc_cls);
+
+  /**
+   * Add @a credit to a reserve to be used for tipping.  Note that
+   * this function does not actually perform any wire transfers to
+   * credit the reserve, it merely tells the merchant backend that
+   * a reserve was topped up.  This has to happen before tips can be
+   * authorized.
+   *
+   * @param cls closure, typically a connection to the db
+   * @param reserve_priv which reserve is topped up or created
+   * @param credit_uuid unique identifier for the credit operation
+   * @param credit how much money was added to the reserve
+   * @param expiration when does the reserve expire?
+   * @return transaction status, usually
+   *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT for success
+   *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if @a credit_uuid already known
+   */
+  enum GNUNET_DB_QueryStatus
+  (*enable_tip_reserve)(void *cls,
+                        const struct TALER_ReservePrivateKeyP *reserve_priv,
+                        const struct GNUNET_HashCode *credit_uuid,
+                        const struct TALER_Amount *credit,
+                        struct GNUNET_TIME_Absolute expiration);
+
+
+  /**
+   * Authorize a tip over @a amount from reserve @a reserve_priv.  Remember
+   * the authorization under @a tip_id for later, together with the
+   * @a justification.
+   *
+   * @param cls closure, typically a connection to the db
+   * @param justification why was the tip approved
+   * @param amount how high is the tip (with fees)
+   * @param reserve_priv which reserve is debited
+   * @param[out] expiration set to when the tip expires
+   * @param[out] tip_id set to the unique ID for the tip
+   * @return transaction status,
+   *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if reserve has insufficient funds,
+   *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT upon success
+   */
+  enum GNUNET_DB_QueryStatus
+  (*authorize_tip)(void *cls,
+                   const char *justification,
+                   const struct TALER_Amount *amount,
+                   const struct TALER_ReservePrivateKeyP *reserve_priv,
+                   struct GNUNET_TIME_Absolute *expiration,
+                   struct GNUNET_HashCode *tip_id);
+
+
+  /**
+   * Pickup a tip over @a amount using pickup id @a pickup_id.
+   *
+   * @param cls closure, typically a connection to the db
+   * @param amount how high is the amount picked up (with fees)
+   * @param tip_id the unique ID from the tip authorization
+   * @param pickup_id the unique ID identifying the pick up operation
+   *        (to allow replays, hash over the coin envelope and denomination key)
+   * @param[out] reserve_priv which reserve key to use to sign
+   * @return taler error code
+   *      #TALER_EC_TIP_PICKUP_ID_UNKNOWN if @a tip_id is unknown
+   *      #TALER_EC_TIP_PICKUP_NO_FUNDS if @a tip_id has insufficient funds left
+   *      #TALER_EC_TIP_PICKUP_DB_ERROR on database errors
+   *      #TALER_EC_NONE upon success (@a reserve_priv was set)
+   */
+  enum TALER_ErrorCode
+  (*pickup_tip)(void *cls,
+                const struct TALER_Amount *amount,
+                const struct GNUNET_HashCode *tip_id,
+                const struct GNUNET_HashCode *pickup_id,
+                struct TALER_ReservePrivateKeyP *reserve_priv);
+
 
   /**
    * Roll back the current transaction of a database connection.

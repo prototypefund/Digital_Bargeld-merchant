@@ -239,6 +239,30 @@ TMH_RESPONSE_reply_request_too_large (struct MHD_Connection *connection)
 
 
 /**
+ * Send a response indicating that we did not find the @a object
+ * needed for the reply.
+ *
+ * @param connection the MHD connection to use
+ * @param response_code response code to use
+ * @param ec error code to return
+ * @param msg human-readable diagnostic
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_rc (struct MHD_Connection *connection,
+                       unsigned int response_code,
+                       enum TALER_ErrorCode ec,
+                       const char *msg)
+{
+  return TMH_RESPONSE_reply_json_pack (connection,
+                                       response_code,
+                                       "{s:I, s:s}",
+				       "code", (json_int_t) ec,
+                                       "error", msg);
+}
+
+
+/**
  * Send a response indicating that the JSON was malformed.
  *
  * @param connection the MHD connection to use

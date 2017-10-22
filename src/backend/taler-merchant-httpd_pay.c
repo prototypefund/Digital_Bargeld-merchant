@@ -1452,7 +1452,7 @@ parse_pay (struct MHD_Connection *connection,
     if (GNUNET_YES != res)
     {
       GNUNET_JSON_parse_free (spec);
-      GNUNET_break (0);
+      GNUNET_break_op (0);
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
 

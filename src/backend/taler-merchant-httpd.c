@@ -39,6 +39,9 @@
 #include "taler-merchant-httpd_pay.h"
 #include "taler-merchant-httpd_track-transaction.h"
 #include "taler-merchant-httpd_track-transfer.h"
+#include "taler-merchant-httpd_tip-authorize.h"
+#include "taler-merchant-httpd_tip-enable.h"
+#include "taler-merchant-httpd_tip-pickup.h"
 #include "taler-merchant-httpd_history.h"
 #include "taler-merchant-httpd_refund.h"
 
@@ -219,6 +222,24 @@ url_handler (void *cls,
         &MH_handler_refund_lookup, MHD_HTTP_OK},
       { "/refund", NULL, "application/json",
         "Only POST/GET are allowed", 0,
+        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+      { "/tip-authorize", MHD_HTTP_METHOD_POST, "text/plain",
+        NULL, 0,
+        &MH_handler_tip_authorize, MHD_HTTP_OK},
+      { "/tip-authorize", NULL, "application/json",
+        "Only POST is allowed", 0,
+        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+      { "/tip-pickup", MHD_HTTP_METHOD_POST, "text/plain",
+        NULL, 0,
+        &MH_handler_tip_pickup, MHD_HTTP_OK},
+      { "/tip-pickup", NULL, "application/json",
+        "Only POST is allowed", 0,
+        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+      { "/tip-enable", MHD_HTTP_METHOD_POST, "text/plain",
+        NULL, 0,
+        &MH_handler_tip_enable, MHD_HTTP_OK},
+      { "/tip-enable", NULL, "application/json",
+        "Only POST is allowed", 0,
         &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
       {NULL, NULL, NULL, NULL, 0, 0 }
     };

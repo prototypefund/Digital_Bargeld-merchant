@@ -119,6 +119,18 @@ struct MerchantInstance
    */
   struct TALER_MerchantPublicKeyP pubkey;
 
+  /**
+   * Exchange this instance uses for tipping, NULL if tipping
+   * is not supported.
+   */
+  const char *tip_exchange;
+
+  /**
+   * What is the private key of the reserve used for signing tips by this exchange?
+   * Only valid if @e tip_exchange is non-null.
+   */
+  struct TALER_ReservePrivateKeyP tip_reserve;
+
 };
 
 
