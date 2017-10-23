@@ -179,6 +179,38 @@ postgres_initialize (void *cls)
                             ",refund_fee_frac INT4 NOT NULL"
                             ",refund_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ");"),
+    /* balances of the reserves available for tips */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_reserves ("
+                            " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
+                            ",expiration INT8 NOT NULL"
+                            ",balance_val INT8 NOT NULL"
+                            ",balance_frac INT4 NOT NULL"
+                            ",balance_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",PRIMARY KEY (reserve_priv)"
+                            ");"),
+    /* tips that have been authorized */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tips ("
+                            " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
+                            ",tip_id BYTEA NOT NULL CHECK (LENGTH(tip_id)=64)"
+                            ",justification VARCHAR NOT NULL"
+                            ",timestamp INT8 NOT NULL"
+                            ",amount_val INT8 NOT NULL" /* overall tip amount */
+                            ",amount_frac INT4 NOT NULL"
+                            ",amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",left_val INT8 NOT NULL" /* tip amount not yet picked up */
+                            ",left_frac INT4 NOT NULL"
+                            ",left_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",PRIMARY KEY (tip_id)"
+                            ");"),
+    /* tips that have been picked up */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_pickups ("
+                            " tip_id BYTEA NOT NULL REFERENCES merchant_tips (tip_id) ON DELETE CASCADE"
+                            ",pickup_id BYTEA NOT NULL CHECK (LENGTH(pickup_id)=64)"
+                            ",amount_val INT8 NOT NULL"
+                            ",amount_frac INT4 NOT NULL"
+                            ",amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",PRIMARY KEY (pickup_id)"
+                            ");"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
   struct GNUNET_PQ_PreparedStatement ps[] = {
@@ -473,6 +505,33 @@ postgres_initialize (void *cls)
                             " WHERE wtid=$1"
                             "  AND exchange_uri=$2",
                             2),
+    GNUNET_PQ_make_prepare ("lookup_tip_reserve_balance",
+                            "SELECT"
+                            " expiration"
+                            ",balance_val"
+                            ",balance_frac"
+                            ",balance_curr"
+                            " FROM merchant_tip_reserves"
+                            " WHERE reserve_priv=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("update_tip_reserve_balance",
+                            "UPDATE merchant_tip_reserves SET"
+                            " expiration=$2"
+                            ",balance_val=$3"
+                            ",balance_frac=$4"
+                            ",balance_curr=$5"
+                            " WHERE reserve_priv=$1",
+                            5),
+    GNUNET_PQ_make_prepare ("insert_tip_reserve_balance",
+                            "INSERT INTO merchant_tip_reserves"
+                            "(reserve_priv"
+                            ",expiration"
+                            ",balance_val"
+                            ",balance_frac"
+                            ",balance_curr)"
+                            " VALUES "
+                            "($1, $2, $3, $4, $5)",
+                            5),
     GNUNET_PQ_PREPARED_STATEMENT_END
   };
 
