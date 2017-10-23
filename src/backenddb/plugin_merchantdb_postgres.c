@@ -2487,8 +2487,91 @@ postgres_enable_tip_reserve (void *cls,
                              const struct TALER_Amount *credit,
                              struct GNUNET_TIME_Absolute expiration)
 {
-  GNUNET_break (0); // not implemented
-  return GNUNET_DB_STATUS_HARD_ERROR;
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (reserve_priv),
+    GNUNET_PQ_query_param_end
+  };
+
+  struct GNUNET_TIME_Absolute old_expiration;
+  struct TALER_Amount old_balance;
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    GNUNET_PQ_result_spec_absolute_time ("expiration",
+                                        &old_expiration),
+    TALER_PQ_result_spec_amount ("balance",
+                                 &old_balance),
+    GNUNET_PQ_result_spec_end
+  };
+  enum GNUNET_DB_QueryStatus qs;
+  struct GNUNET_TIME_Absolute new_expiration;
+  struct TALER_Amount new_balance;
+
+  check_connection (pg);
+  if (GNUNET_OK !=
+      postgres_start (pg))
+  {
+    GNUNET_break (0);
+    return GNUNET_DB_STATUS_HARD_ERROR;
+  }
+  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						 "lookup_tip_reserve_balance",
+						 params,
+						 rs);
+  if (0 > qs)
+  {
+    postgres_rollback (pg);
+    return qs;
+  }
+  if ( (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs) &&
+       (GNUNET_TIME_absolute_get_remaining (old_expiration).rel_value_us > 0) )
+  {
+    new_expiration = GNUNET_TIME_absolute_max (old_expiration,
+                                               expiration);
+    if (GNUNET_OK !=
+        TALER_amount_add (&new_balance,
+                          credit,
+                          &old_balance))
+    {
+      GNUNET_break (0);
+      postgres_rollback (pg);
+      return GNUNET_DB_STATUS_HARD_ERROR;
+    }
+  }
+  else
+  {
+    if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "Old reserve balance of %s had expired at %s, not carrying it over!\n",
+                  TALER_amount2s (&old_balance),
+                  GNUNET_STRINGS_absolute_time_to_string (old_expiration));
+    }
+    new_expiration = expiration;
+    new_balance = *credit;
+  }
+
+  {
+    struct GNUNET_PQ_QueryParam params[] = {
+      GNUNET_PQ_query_param_auto_from_type (reserve_priv),
+      GNUNET_PQ_query_param_absolute_time (&new_expiration),
+      TALER_PQ_query_param_amount (&new_balance),
+      GNUNET_PQ_query_param_end
+    };
+    const char *stmt;
+
+    stmt = (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
+      ? "update_tip_reserve_balance"
+      : "insert_tip_reserve_balance";
+    qs = GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             stmt,
+                                             params);
+    if (0 > qs)
+    {
+      postgres_rollback (pg);
+      return qs;
+    }
+  }
+  return postgres_commit (pg);
 }
 
 
