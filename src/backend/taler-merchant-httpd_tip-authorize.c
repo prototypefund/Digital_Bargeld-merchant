@@ -81,7 +81,6 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                           const char *upload_data,
                           size_t *upload_data_size)
 {
-  enum GNUNET_DB_QueryStatus qs;
   struct MerchantInstance *mi;
   int res;
   struct TALER_Amount amount;
@@ -97,6 +96,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute expiration;
   struct GNUNET_HashCode tip_id;
   struct TMH_JsonParseContext *ctx;
+  enum TALER_ErrorCode ec;
 
   if (NULL == *connection_cls)
   {
@@ -144,20 +144,20 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
 					 TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
 					 "exchange for tipping not configured for the instance");
   }
-  qs = db->authorize_tip (db->cls,
+  ec = db->authorize_tip (db->cls,
                           justification,
                           &amount,
                           &mi->tip_reserve,
                           &expiration,
                           &tip_id);
-  if (0 > qs)
+  if (TALER_EC_NONE != ec)
   {
-    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* FIXME: differenciate better between ec's */
     return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_TIP_AUTHORIZE_DB_TRANSACTION_ERROR,
+					      ec,
                                               "Database error approving tip");
   }
-  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+  if (0)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Insufficient funds to authorize tip over `%s' at instance `%s'\n",
