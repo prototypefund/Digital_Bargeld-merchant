@@ -2465,6 +2465,89 @@ postgres_find_proof_by_wtid (void *cls,
 
 
 /**
+ * Add @a credit to a reserve to be used for tipping.  Note that
+ * this function does not actually perform any wire transfers to
+ * credit the reserve, it merely tells the merchant backend that
+ * a reserve was topped up.  This has to happen before tips can be
+ * authorized.
+ *
+ * @param cls closure, typically a connection to the db
+ * @param reserve_priv which reserve is topped up or created
+ * @param credit_uuid unique identifier for the credit operation
+ * @param credit how much money was added to the reserve
+ * @param expiration when does the reserve expire?
+ * @return transaction status, usually
+ *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT for success
+ *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if @a credit_uuid already known
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_enable_tip_reserve (void *cls,
+                             const struct TALER_ReservePrivateKeyP *reserve_priv,
+                             const struct GNUNET_HashCode *credit_uuid,
+                             const struct TALER_Amount *credit,
+                             struct GNUNET_TIME_Absolute expiration)
+{
+  GNUNET_break (0); // not implemented
+  return GNUNET_DB_STATUS_HARD_ERROR;
+}
+
+
+/**
+ * Authorize a tip over @a amount from reserve @a reserve_priv.  Remember
+ * the authorization under @a tip_id for later, together with the
+ * @a justification.
+ *
+ * @param cls closure, typically a connection to the db
+ * @param justification why was the tip approved
+ * @param amount how high is the tip (with fees)
+ * @param reserve_priv which reserve is debited
+ * @param[out] expiration set to when the tip expires
+ * @param[out] tip_id set to the unique ID for the tip
+ * @return transaction status,
+ *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if reserve has insufficient funds,
+ *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT upon success
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_authorize_tip (void *cls,
+                        const char *justification,
+                        const struct TALER_Amount *amount,
+                        const struct TALER_ReservePrivateKeyP *reserve_priv,
+                        struct GNUNET_TIME_Absolute *expiration,
+                        struct GNUNET_HashCode *tip_id)
+{
+  GNUNET_break (0); // not implemented
+  return GNUNET_DB_STATUS_HARD_ERROR;
+}
+
+
+/**
+ * Pickup a tip over @a amount using pickup id @a pickup_id.
+ *
+ * @param cls closure, typically a connection to the db
+ * @param amount how high is the amount picked up (with fees)
+ * @param tip_id the unique ID from the tip authorization
+ * @param pickup_id the unique ID identifying the pick up operation
+ *        (to allow replays, hash over the coin envelope and denomination key)
+ * @param[out] reserve_priv which reserve key to use to sign
+ * @return taler error code
+ *      #TALER_EC_TIP_PICKUP_ID_UNKNOWN if @a tip_id is unknown
+ *      #TALER_EC_TIP_PICKUP_NO_FUNDS if @a tip_id has insufficient funds left
+ *      #TALER_EC_TIP_PICKUP_DB_ERROR on database errors
+ *      #TALER_EC_NONE upon success (@a reserve_priv was set)
+ */
+static enum TALER_ErrorCode
+postgres_pickup_tip (void *cls,
+                     const struct TALER_Amount *amount,
+                     const struct GNUNET_HashCode *tip_id,
+                     const struct GNUNET_HashCode *pickup_id,
+                     struct TALER_ReservePrivateKeyP *reserve_priv)
+{
+  GNUNET_break (0); // not implemented
+  return -1;
+}
+
+
+/**
  * Initialize Postgres database subsystem.
  *
  * @param cls a configuration instance
@@ -2531,8 +2614,11 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_contract_terms_from_hash = &postgres_find_contract_terms_from_hash;
   plugin->get_refunds_from_contract_terms_hash = &postgres_get_refunds_from_contract_terms_hash;
   plugin->lookup_wire_fee = &postgres_lookup_wire_fee;
-  plugin->increase_refund_for_contract = postgres_increase_refund_for_contract;
-  plugin->mark_proposal_paid = postgres_mark_proposal_paid;
+  plugin->increase_refund_for_contract = &postgres_increase_refund_for_contract;
+  plugin->mark_proposal_paid = &postgres_mark_proposal_paid;
+  plugin->enable_tip_reserve = &postgres_enable_tip_reserve;
+  plugin->authorize_tip = &postgres_authorize_tip;
+  plugin->pickup_tip = &postgres_pickup_tip;
   plugin->start = postgres_start;
   plugin->commit = postgres_commit;
   plugin->rollback = postgres_rollback;
