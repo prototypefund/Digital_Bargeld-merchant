@@ -659,10 +659,14 @@ struct TALER_MERCHANTDB_Plugin
    * @param[out] expiration set to when the tip expires
    * @param[out] tip_id set to the unique ID for the tip
    * @return transaction status,
-   *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if reserve has insufficient funds,
-   *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT upon success
+   *      #TALER_EC_TIP_AUTHORIZE_RESERVE_EXPIRED if the reserve is known but has expired
+   *      #TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN if the reserve is not known
+   *      #TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS if the reserve has insufficient funds left
+   *      #TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR on hard DB errors
+   *      #TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR on soft DB errors (client should retry)
+   *      #TALER_EC_NONE upon success
    */
-  enum GNUNET_DB_QueryStatus
+  enum TALER_ErrorCode
   (*authorize_tip)(void *cls,
                    const char *justification,
                    const struct TALER_Amount *amount,

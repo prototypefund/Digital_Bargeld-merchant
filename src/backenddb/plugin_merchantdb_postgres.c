@@ -528,8 +528,57 @@ postgres_initialize (void *cls)
                             ",expiration"
                             ",balance_val"
                             ",balance_frac"
-                            ",balance_curr)"
-                            " VALUES "
+                            ",balance_curr"
+                            ") VALUES "
+                            "($1, $2, $3, $4, $5)",
+                            5),
+    GNUNET_PQ_make_prepare ("insert_tip_justification",
+                            "INSERT INTO merchant_tips"
+                            "(reserve_priv"
+                            ",tip_id"
+                            ",justification"
+                            ",timestamp"
+                            ",amount_val"
+                            ",amount_frac"
+                            ",amount_curr"
+                            ",left_val"
+                            ",left_frac"
+                            ",left_curr"
+                            ") VALUES "
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                            10),
+    GNUNET_PQ_make_prepare ("lookup_reserve_by_tip_id",
+                            "SELECT"
+                            " left_val"
+                            ",left_frac"
+                            ",left_curr"
+                            " FROM merchant_tips"
+                            " WHERE tip_id=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("lookup_amount_by_pickup",
+                            "SELECT"
+                            " amount_val"
+                            ",amount_frac"
+                            ",amount_curr"
+                            " FROM merchant_tip_pickups"
+                            " WHERE pickup_id=$1"
+                            " AND tip_id=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("update_tip_balance",
+                            "UPDATE merchant_tips SET"
+                            " left_val=$2"
+                            ",left_frac=$3"
+                            ",left_curr=$4"
+                            " WHERE tip_id=$1",
+                            4),
+    GNUNET_PQ_make_prepare ("insert_pickup_id",
+                            "INSERT INTO merchant_tip_pickups"
+                            "(tip_id"
+                            ",pickup_id"
+                            ",amount_val"
+                            ",amount_frac"
+                            ",amount_curr"
+                            ") VALUES "
                             "($1, $2, $3, $4, $5)",
                             5),
     GNUNET_PQ_PREPARED_STATEMENT_END
@@ -2551,7 +2600,6 @@ postgres_enable_tip_reserve (void *cls,
     GNUNET_PQ_query_param_auto_from_type (reserve_priv),
     GNUNET_PQ_query_param_end
   };
-
   struct GNUNET_TIME_Absolute old_expiration;
   struct TALER_Amount old_balance;
   struct GNUNET_PQ_ResultSpec rs[] = {
@@ -2645,11 +2693,15 @@ postgres_enable_tip_reserve (void *cls,
  * @param reserve_priv which reserve is debited
  * @param[out] expiration set to when the tip expires
  * @param[out] tip_id set to the unique ID for the tip
- * @return transaction status,
- *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if reserve has insufficient funds,
- *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT upon success
+ * @return taler error code
+ *      #TALER_EC_TIP_AUTHORIZE_RESERVE_EXPIRED if the reserve is known but has expired
+ *      #TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN if the reserve is not known
+ *      #TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS if the reserve has insufficient funds left
+ *      #TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR on hard DB errors
+ *      #TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR on soft DB errors (client should retry)
+ *      #TALER_EC_NONE upon success
  */
-static enum GNUNET_DB_QueryStatus
+static enum TALER_ErrorCode
 postgres_authorize_tip (void *cls,
                         const char *justification,
                         const struct TALER_Amount *amount,
@@ -2657,8 +2709,114 @@ postgres_authorize_tip (void *cls,
                         struct GNUNET_TIME_Absolute *expiration,
                         struct GNUNET_HashCode *tip_id)
 {
-  GNUNET_break (0); // not implemented
-  return GNUNET_DB_STATUS_HARD_ERROR;
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (reserve_priv),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_TIME_Absolute old_expiration;
+  struct TALER_Amount old_balance;
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    GNUNET_PQ_result_spec_absolute_time ("expiration",
+                                         &old_expiration),
+    TALER_PQ_result_spec_amount ("balance",
+                                 &old_balance),
+    GNUNET_PQ_result_spec_end
+  };
+  enum GNUNET_DB_QueryStatus qs;
+  struct TALER_Amount new_balance;
+
+  check_connection (pg);
+  if (GNUNET_OK !=
+      postgres_start (pg))
+  {
+    GNUNET_break (0);
+    return TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR;
+  }
+  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						 "lookup_tip_reserve_balance",
+						 params,
+						 rs);
+  if (0 >= qs)
+  {
+    /* reserve unknown */
+    postgres_rollback (pg);
+    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+      return TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN;
+    return (GNUNET_DB_STATUS_HARD_ERROR == qs)
+      ? TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR
+      : TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
+  }
+  if (0 == GNUNET_TIME_absolute_get_remaining (old_expiration).rel_value_us)
+  {
+    /* reserve expired, can't be used */
+    postgres_rollback (pg);
+    return TALER_EC_TIP_AUTHORIZE_RESERVE_EXPIRED;
+  }
+  if (GNUNET_SYSERR ==
+      TALER_amount_subtract (&new_balance,
+                             &old_balance,
+                             amount))
+  {
+    /* insufficient funds left in reserve */
+    postgres_rollback (pg);
+    return TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS;
+  }
+
+  /* Update reserve balance */
+  {
+    struct GNUNET_PQ_QueryParam params[] = {
+      GNUNET_PQ_query_param_auto_from_type (reserve_priv),
+      GNUNET_PQ_query_param_absolute_time (&old_expiration),
+      TALER_PQ_query_param_amount (&new_balance),
+      GNUNET_PQ_query_param_end
+    };
+
+    qs = GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "update_tip_reserve_balance",
+                                             params);
+    if (0 > qs)
+    {
+      postgres_rollback (pg);
+      return (GNUNET_DB_STATUS_HARD_ERROR == qs)
+        ? TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR
+        : TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
+    }
+  }
+  /* Generate and store tip ID */
+  *expiration = old_expiration;
+  GNUNET_CRYPTO_hash_create_random (GNUNET_CRYPTO_QUALITY_STRONG,
+                                    tip_id);
+  {
+    struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
+    struct GNUNET_PQ_QueryParam params[] = {
+      GNUNET_PQ_query_param_auto_from_type (reserve_priv),
+      GNUNET_PQ_query_param_auto_from_type (tip_id),
+      GNUNET_PQ_query_param_string (justification),
+      GNUNET_PQ_query_param_absolute_time (&now),
+      TALER_PQ_query_param_amount (amount), /* overall amount */
+      TALER_PQ_query_param_amount (amount), /* amount left */
+      GNUNET_PQ_query_param_end
+    };
+
+    GNUNET_TIME_round_abs (&now);
+    qs = GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_tip_justification",
+                                             params);
+    if (0 > qs)
+    {
+      postgres_rollback (pg);
+      return (GNUNET_DB_STATUS_HARD_ERROR == qs)
+        ? TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR
+        : TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
+    }
+  }
+  qs = postgres_commit (pg);
+  if (0 <= qs)
+    return TALER_EC_NONE; /* success! */
+  return (GNUNET_DB_STATUS_HARD_ERROR == qs)
+    ? TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR
+    : TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
 }
 
 
@@ -2674,7 +2832,9 @@ postgres_authorize_tip (void *cls,
  * @return taler error code
  *      #TALER_EC_TIP_PICKUP_ID_UNKNOWN if @a tip_id is unknown
  *      #TALER_EC_TIP_PICKUP_NO_FUNDS if @a tip_id has insufficient funds left
- *      #TALER_EC_TIP_PICKUP_DB_ERROR on database errors
+ *      #TALER_EC_TIP_PICKUP_DB_ERROR_HARD on hard database errors
+ *      #TALER_EC_TIP_PICKUP_AMOUNT_CHANGED if @a amount is different for known @a pickup_id
+ *      #TALER_EC_TIP_PICKUP_DB_ERROR_SOFT on soft database errors (client should retry)
  *      #TALER_EC_NONE upon success (@a reserve_priv was set)
  */
 static enum TALER_ErrorCode
@@ -2684,8 +2844,158 @@ postgres_pickup_tip (void *cls,
                      const struct GNUNET_HashCode *pickup_id,
                      struct TALER_ReservePrivateKeyP *reserve_priv)
 {
-  GNUNET_break (0); // not implemented
-  return -1;
+  struct PostgresClosure *pg = cls;
+  struct TALER_Amount left_amount;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (tip_id),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    GNUNET_PQ_result_spec_auto_from_type ("reserve_priv",
+                                          reserve_priv),
+    TALER_PQ_result_spec_amount ("left",
+                                 &left_amount),
+    GNUNET_PQ_result_spec_end
+  };
+  enum GNUNET_DB_QueryStatus qs;
+
+  check_connection (pg);
+  if (GNUNET_OK !=
+      postgres_start (pg))
+  {
+    GNUNET_break (0);
+    return GNUNET_DB_STATUS_HARD_ERROR;
+  }
+  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						 "lookup_reserve_by_tip_id",
+						 params,
+						 rs);
+  if (0 >= qs)
+  {
+    /* tip ID unknown */
+    memset (reserve_priv,
+            0,
+            sizeof (*reserve_priv));
+    postgres_rollback (pg);
+    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+      return TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN;
+    return (GNUNET_DB_STATUS_HARD_ERROR == qs)
+        ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
+        : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+  }
+
+  /* Check if pickup_id already exists */
+  {
+    struct TALER_Amount existing_amount;
+    struct GNUNET_PQ_QueryParam params[] = {
+      GNUNET_PQ_query_param_auto_from_type (pickup_id),
+      GNUNET_PQ_query_param_auto_from_type (tip_id),
+      GNUNET_PQ_query_param_end
+    };
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      TALER_PQ_result_spec_amount ("amount",
+                                   &existing_amount),
+      GNUNET_PQ_result_spec_end
+    };
+
+    qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                   "lookup_amount_by_pickup",
+                                                   params,
+                                                   rs);
+    if (0 > qs)
+    {
+      /* DB error */
+      memset (reserve_priv,
+              0,
+              sizeof (*reserve_priv));
+      postgres_rollback (pg);
+      return (GNUNET_DB_STATUS_HARD_ERROR == qs)
+        ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
+        : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+    }
+    if (0 !=
+        TALER_amount_cmp (&existing_amount,
+                          amount))
+    {
+      GNUNET_break_op (0);
+      postgres_rollback (pg);
+      return TALER_EC_TIP_PICKUP_AMOUNT_CHANGED;
+    }
+    if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
+      return TALER_EC_NONE; /* we are done! */
+  }
+
+  /* Calculate new balance */
+  {
+    struct TALER_Amount new_left;
+
+    if (GNUNET_SYSERR ==
+        TALER_amount_subtract (&new_left,
+                               &left_amount,
+                               amount))
+    {
+      /* attempt to take more tips than the tipping amount */
+      GNUNET_break_op (0);
+      memset (reserve_priv,
+              0,
+              sizeof (*reserve_priv));
+      postgres_rollback (pg);
+      return TALER_EC_TIP_PICKUP_NO_FUNDS;
+    }
+
+    /* Update DB: update balance */
+    {
+      struct GNUNET_PQ_QueryParam params[] = {
+        GNUNET_PQ_query_param_auto_from_type (tip_id),
+        TALER_PQ_query_param_amount (&new_left),
+        GNUNET_PQ_query_param_end
+      };
+
+      qs = GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                               "update_tip_balance",
+                                               params);
+      if (0 > qs)
+      {
+        postgres_rollback (pg);
+        memset (reserve_priv,
+                0,
+                sizeof (*reserve_priv));
+        return (GNUNET_DB_STATUS_HARD_ERROR == qs)
+          ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
+          : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+      }
+    }
+
+    /* Update DB: remember pickup_id */
+    {
+      struct GNUNET_PQ_QueryParam params[] = {
+        GNUNET_PQ_query_param_auto_from_type (tip_id),
+        GNUNET_PQ_query_param_auto_from_type (pickup_id),
+        TALER_PQ_query_param_amount (amount),
+        GNUNET_PQ_query_param_end
+      };
+
+      qs = GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                               "insert_pickup_id",
+                                               params);
+      if (0 > qs)
+      {
+        postgres_rollback (pg);
+        memset (reserve_priv,
+                0,
+                sizeof (*reserve_priv));
+        return (GNUNET_DB_STATUS_HARD_ERROR == qs)
+          ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
+          : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+      }
+    }
+  }
+  qs = postgres_commit (pg);
+  if (0 <= qs)
+    return TALER_EC_NONE; /* success  */
+  return (GNUNET_DB_STATUS_HARD_ERROR == qs)
+    ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
+    : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
 }
 
 
