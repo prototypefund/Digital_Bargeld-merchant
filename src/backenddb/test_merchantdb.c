@@ -17,6 +17,7 @@
  * @file merchant/test_merchantdb_postgres.c
  * @brief testcase for merchant's postgres db plugin
  * @author Marcello Stanisci
+ * @author Christian Grothoff
  */
 
 #include "platform.h"
@@ -510,6 +511,232 @@ test_wire_fee ()
 
 
 /**
+ * Test APIs related to tipping.
+ *
+ * @return #GNUNET_OK upon success
+ */
+static int
+test_tipping ()
+{
+  struct TALER_ReservePrivateKeyP tip_reserve_priv;
+  struct TALER_ReservePrivateKeyP pres;
+  struct GNUNET_HashCode tip_id;
+  struct GNUNET_HashCode tip_credit_uuid;
+  struct GNUNET_HashCode pickup_id;
+  struct GNUNET_TIME_Absolute tip_expiration;
+  struct GNUNET_TIME_Absolute reserve_expiration;
+  struct TALER_Amount total;
+  struct TALER_Amount amount;
+  struct TALER_Amount inc;
+
+  RND_BLK (&tip_reserve_priv);
+  if (TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN !=
+      plugin->authorize_tip (plugin->cls,
+                             "testing tips reserve unknown",
+                             &amount,
+                             &tip_reserve_priv,
+                             &tip_expiration,
+                             &tip_id))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
+  RND_BLK (&tip_credit_uuid);
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":5",
+                                         &total));
+  /* Pick short expiration, but long enough to
+     run 2 DB interactions even on very slow systems. */
+  reserve_expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS,
+                                                                                        2));
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+      plugin->enable_tip_reserve (plugin->cls,
+                                  &tip_reserve_priv,
+                                  &tip_credit_uuid,
+                                  &total,
+                                  reserve_expiration))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  /* check idempotency */
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
+      plugin->enable_tip_reserve (plugin->cls,
+                                  &tip_reserve_priv,
+                                  &tip_credit_uuid,
+                                  &total,
+                                  reserve_expiration))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  /* Make sure it has expired, so at this point the value is back at ZERO! */
+  sleep (3);
+  if (TALER_EC_TIP_AUTHORIZE_RESERVE_EXPIRED !=
+      plugin->authorize_tip (plugin->cls,
+                             "testing tips too late",
+                             &amount,
+                             &tip_reserve_priv,
+                             &tip_expiration,
+                             &tip_id))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
+  /* Re-add some funds again */
+  RND_BLK (&tip_credit_uuid);
+  reserve_expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS,
+                                                                                        2));
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+      plugin->enable_tip_reserve (plugin->cls,
+                                  &tip_reserve_priv,
+                                  &tip_credit_uuid,
+                                  &total,
+                                  reserve_expiration))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  /* top it up by adding more with a fresh UUID
+     and even longer expiration time (until end of test) */
+  RND_BLK (&tip_credit_uuid);
+  reserve_expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_DAYS);
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+      plugin->enable_tip_reserve (plugin->cls,
+                                  &tip_reserve_priv,
+                                  &tip_credit_uuid,
+                                  &total,
+                                  reserve_expiration))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
+  /* Now authorize some tips */
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":4",
+                                         &amount));
+  if (TALER_EC_NONE !=
+      plugin->authorize_tip (plugin->cls,
+                             "testing tips",
+                             &amount,
+                             &tip_reserve_priv,
+                             &tip_expiration,
+                             &tip_id))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if (tip_expiration.abs_value_us != reserve_expiration.abs_value_us)
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if (TALER_EC_NONE !=
+      plugin->authorize_tip (plugin->cls,
+                             "testing tips more",
+                             &amount,
+                             &tip_reserve_priv,
+                             &tip_expiration,
+                             &tip_id))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if (tip_expiration.abs_value_us != reserve_expiration.abs_value_us)
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
+  /* Let's try to pick up the authorized tip in 2 increments */
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":2",
+                                         &inc));
+  RND_BLK (&pickup_id);
+  if (TALER_EC_NONE !=
+      plugin->pickup_tip (plugin->cls,
+                          &inc,
+                          &tip_id,
+                          &pickup_id,
+                          &pres))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if (0 != memcmp (&pres,
+                   &tip_reserve_priv,
+                   sizeof (pres)))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  RND_BLK (&pickup_id);
+  if (TALER_EC_NONE !=
+      plugin->pickup_tip (plugin->cls,
+                          &inc,
+                          &tip_id,
+                          &pickup_id,
+                          &pres))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if (0 != memcmp (&pres,
+                   &tip_reserve_priv,
+                   sizeof (pres)))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
+  /* Third attempt should fail, as we've picked up 4/4 in amount */
+  RND_BLK (&pickup_id);
+  if (TALER_EC_TIP_PICKUP_NO_FUNDS !=
+      plugin->pickup_tip (plugin->cls,
+                          &inc,
+                          &tip_id,
+                          &pickup_id,
+                          &pres))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
+  /* We authorized 8 out of 10, so going for another 4 should fail with insufficient funds */
+  if (TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS !=
+      plugin->authorize_tip (plugin->cls,
+                             "testing tips insufficient funds",
+                             &amount,
+                             &tip_reserve_priv,
+                             &tip_expiration,
+                             &tip_id))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
+  /* Test that picking up with random (unauthorized) tip_id fails as well */
+  RND_BLK (&tip_id);
+  RND_BLK (&pickup_id);
+  if (TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN !=
+      plugin->pickup_tip (plugin->cls,
+                          &inc,
+                          &tip_id,
+                          &pickup_id,
+                          &pres))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
+  return GNUNET_OK;
+}
+
+
+/**
  * Main function that will be run by the scheduler.
  *
  * @param cls closure with config
@@ -519,6 +746,7 @@ run (void *cls)
 {
   struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   struct GNUNET_TIME_Absolute fake_now;
+  json_t *out;
   /* Data for 'store_payment()' */
 
   if (NULL == (plugin = TALER_MERCHANTDB_plugin_load (cfg)))
@@ -615,7 +843,6 @@ run (void *cls)
                                       &h_contract_terms,
                                       &merchant_pub));
 
-  json_t *out;
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_contract_terms (plugin->cls,
@@ -787,6 +1014,9 @@ run (void *cls)
 
   FAILIF (GNUNET_OK !=
 	  test_wire_fee ());
+  FAILIF (GNUNET_OK !=
+	  test_tipping ());
+
 
   if (-1 == result)
     result = 0;
