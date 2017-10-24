@@ -153,7 +153,7 @@ AS_IF([test $microhttpd = 0],
 *** ]])])
 
 jansson=0
-PKG_CHECK_MODULES([JANSSON], [jansson >= 2.3], 
+PKG_CHECK_MODULES([JANSSON], [jansson >= 2.3],
                   [LDFLAGS="$JANSSON_LIBS $LDFLAGS"
                    CPPFLAGS="$JANSSON_CFLAGS $CPPFLAGS"],
                   [AC_MSG_ERROR([[
@@ -265,6 +265,12 @@ AC_CHECK_PROG([tsc],[tsc],[yes],[no])
 AM_CONDITIONAL([HAVE_TSC], [test "x$tsc" = xyes])
 
 
+AC_ARG_ENABLE([[doc]],
+  [AS_HELP_STRING([[--disable-doc]], [do not build any documentation])], ,
+    [enable_doc=yes])
+test "x$enable_doc" = "xno" || enable_doc=yes
+AM_CONDITIONAL([ENABLE_DOC], [test "x$enable_doc" = "xyes"])
+
 else
 
 # logic if doc_only is set, make sure conditionals are still defined
@@ -275,6 +281,7 @@ AM_CONDITIONAL([HAVE_LIBCURL], [false])
 AM_CONDITIONAL([HAVE_LIBGNURL], [false])
 AM_CONDITIONAL([HAVE_TSC], [false])
 AM_CONDITIONAL([USE_COVERAGE], [false])
+AM_CONDITIONAL([ENABLE_DOC], [true])
 
 
 # end of 'doc_only'
