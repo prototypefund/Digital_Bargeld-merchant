@@ -685,11 +685,11 @@ typedef void
  * @param ctx execution context
  * @param backend_uri base URL of the merchant backend
  * @param instance which merchant instance is performing this call
- * @param start return `delta` records starting from position `start`
- * @param delta return `delta` records starting from position `start`
+ * @param start return @a delta records starting from position @a start
+ * @param delta return @a delta records starting from position @a start
  * @param date only transactions younger than/equals to date will be returned
  * @param history_cb callback which will work the response gotten from the backend
- * @param history_cb_cls closure to pass to history_cb
+ * @param history_cb_cls closure to pass to @a history_cb
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_HistoryOperation *
@@ -707,9 +707,212 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
 /**
  * Cancel a pending /history request
  *
- * @param handle from the operation to cancel
+ * @param ho handle from the operation to cancel
  */
 void
 TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *ho);
+
+
+/* ********************** /tip-enable ************************* */
+
+
+/**
+ * Handle for a /tip-enable operation.
+ */
+struct TALER_MERCHANT_TipEnableOperation;
+
+
+/**
+ * Callback for a /tip-enable request.  Returns the result of
+ * the operation.
+ *
+ * @param cls closure
+ * @param http_status HTTP status returned by the merchant backend
+ * @param ec taler-specific error code
+ */
+typedef void
+(*TALER_MERCHANT_TipEnableCallback) (void *cls,
+                                     unsigned int http_status,
+                                     enum TALER_ErrorCode ec);
+
+
+/**
+ * Issue a /tip-enable request to the backend.  Informs the backend
+ * that a reserve is now available for tipping.  Note that the
+ * respective @a reserve_priv must also be bound to one or more
+ * instances (together with the URI of the exchange) via the backend's
+ * configuration file before it can be used.  Usually, the process
+ * is that one first configures an exchange and a @a reserve_priv for
+ * an instance, and then enables (or re-enables) the reserve by
+ * performing wire transfers and informs the backend about it using
+ * this API.
+ *
+ * @param ctx execution context
+ * @param amount amount that was credited to the reserve
+ * @param expiration when will the reserve expire
+ * @param reserve_priv private key of the reserve
+ * @param credit_uuid unique ID of the wire transfer
+ * @param enable_cb callback which will work the response gotten from the backend
+ * @param enable_cb_cls closure to pass to @a enable_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_TipEnableOperation *
+TALER_MERCHANT_tip_enable (struct GNUNET_CURL_Context *ctx,
+                           const struct TALER_Amount *amount,
+                           struct GNUNET_TIME_Absolute expiration,
+                           const struct TALER_ReservePrivateKeyP *reserve_priv,
+                           const struct GNUNET_HashCode *credit_uuid,
+                           TALER_MERCHANT_TipEnableCallback enable_cb,
+                           void *enable_cb_cls);
+
+
+
+/**
+ * Cancel a pending /tip-enable request
+ *
+ * @param te handle from the operation to cancel
+ */
+void
+TALER_MERCHANT_tip_enable_cancel (struct TALER_MERCHANT_TipEnableOperation *te);
+
+
+/* ********************** /tip-authorize ********************** */
+
+/**
+ * Handle for a /tip-authorize operation.
+ */
+struct TALER_MERCHANT_TipAuthorizeOperation;
+
+
+/**
+ * Callback for a /tip-authorize request.  Returns the result of
+ * the operation.
+ *
+ * @param cls closure
+ * @param http_status HTTP status returned by the merchant backend
+ * @param ec taler-specific error code
+ */
+typedef void
+(*TALER_MERCHANT_TipAuthorizeCallback) (void *cls,
+                                        unsigned int http_status,
+                                        enum TALER_ErrorCode ec,
+                                        const struct GNUNET_HashCode *tip_id,
+                                        struct GNUNET_TIME_Absolute tip_expiration,
+                                        const char *exchange_uri);
+
+
+/**
+ * Issue a /tip-authorize request to the backend.  Informs the backend
+ * that a tip should be created.
+ *
+ * @param ctx execution context
+ * @param amount amount to be handed out as a tip
+ * @param instance which backend instance should create the tip (identifies the reserve and exchange)
+ * @param justification which justification should be stored (human-readable reason for the tip)
+ * @param authorize_cb callback which will work the response gotten from the backend
+ * @param authorize_cb_cls closure to pass to @a authorize_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_TipAuthorizeOperation *
+TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
+                              const struct TALER_Amount *amount,
+                              const char *instance,
+                              const char *justification,
+                              TALER_MERCHANT_TipAuthorizeCallback authorize_cb,
+                              void *authorize_cb_cls);
+
+
+
+/**
+ * Cancel a pending /tip-authorize request
+ *
+ * @param ta handle from the operation to cancel
+ */
+void
+TALER_MERCHANT_tip_authorize_cancel (struct TALER_MERCHANT_TipAuthorizeOperation *ta);
+
+/* ********************** /tip-pickup ************************* */
+
+
+/**
+ * Handle for a /tip-pickup operation.
+ */
+struct TALER_MERCHANT_TipPickupOperation;
+
+
+/**
+ * Callback for a /tip-pickup request.  Returns the result of
+ * the operation.
+ *
+ * @param cls closure
+ * @param http_status HTTP status returned by the merchant backend, "200 OK" on success
+ * @param ec taler-specific error code
+ * @param reserve_pub public key of the reserve that made the @a reserve_sigs, NULL on error
+ * @param num_reserve_sigs length of the @a reserve_sigs array, 0 on error
+ * @param reserve_sigs array of signatures authorizing withdrawals, NULL on error
+ * @param json original json response
+ */
+typedef void
+(*TALER_MERCHANT_TipPickupCallback) (void *cls,
+                                     unsigned int http_status,
+                                     enum TALER_ErrorCode ec,
+                                     const struct TALER_ReservePublicKeyP *reserve_pub,
+                                     unsigned int num_reserve_sigs,
+                                     const struct TALER_ReserveSignatureP *reserve_sigs,
+                                     const json_t *json);
+
+
+/**
+ * Details about a planchet that the customer wants to obtain
+ * a withdrawal authorization for to obtain a tip.
+ */
+struct TALER_MERCHANT_PlanchetDetail
+{
+  /**
+   * Hash of the denomination public key.
+   */
+  struct GNUNET_HashCode denom_pub_hash;
+
+  /**
+   * Blinded coin (see GNUNET_CRYPTO_rsa_blind()).
+   */
+  const char *coin_ev;
+
+  /**
+   * Number of bytes in @a coin_ev.
+   */
+  size_t coin_ev_size;
+};
+
+
+/**
+ * Issue a /tip-pickup request to the backend.  Informs the backend
+ * that a customer wants to pick up a tip.
+ *
+ * @param ctx execution context
+ * @param tip_id unique identifier for the tip
+ * @param num_planches number of planchets provided in @a planchets
+ * @param planchets array of planchets to be signed into existence for the tip
+ * @param pickup_cb callback which will work the response gotten from the backend
+ * @param pickup_cb_cls closure to pass to @a pickup_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_TipPickupOperation *
+TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
+                           const struct GNUNET_HashCode *tip_id,
+                           unsigned int num_planchets,
+                           struct TALER_MERCHANT_PlanchetDetail *planchets,
+                           TALER_MERCHANT_TipPickupCallback pickup_cb,
+                           void *pickup_cb_cls);
+
+
+/**
+ * Cancel a pending /tip-pickup request
+ *
+ * @param tp handle from the operation to cancel
+ */
+void
+TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tp);
+
 
 #endif  /* _TALER_MERCHANT_SERVICE_H */
