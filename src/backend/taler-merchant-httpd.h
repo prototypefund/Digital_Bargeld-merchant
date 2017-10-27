@@ -243,6 +243,13 @@ extern json_t *j_wire;
 extern struct TALER_Amount default_max_wire_fee;
 
 /**
+ * Default max deposit fee that the merchant is willing to
+ * pay; if deposit costs more, then the customer will cover
+ * the difference.
+ */
+extern struct TALER_Amount default_max_deposit_fee;
+
+/**
  * Default factor for wire fee amortization.
  */
 extern unsigned long long default_wire_fee_amortization;

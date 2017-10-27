@@ -138,7 +138,6 @@ proposal_put (struct MHD_Connection *connection,
   struct TALER_ProposalDataPS pdps;
   struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
   struct TALER_Amount total;
-  struct TALER_Amount max_fee;
   const char *order_id;
   json_t *products;
   json_t *merchant;
@@ -148,9 +147,9 @@ proposal_put (struct MHD_Connection *connection,
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
     GNUNET_JSON_spec_string ("order_id", &order_id),
-    TALER_JSON_spec_amount ("max_fee", &max_fee),
-    /* The following entries we don't actually need, except to check that
-       the order is well-formed */
+    /**
+     * The following entries we don't actually need,
+     * except to check that the order is well-formed */
     GNUNET_JSON_spec_json ("products", &products),
     GNUNET_JSON_spec_json ("merchant", &merchant),
     GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
@@ -226,6 +225,14 @@ proposal_put (struct MHD_Connection *connection,
     json_object_set_new (order,
                          "max_wire_fee",
                          TALER_JSON_from_amount (&default_max_wire_fee));
+  }
+
+  if (NULL == json_object_get (order,
+                               "max_fee"))
+  {
+    json_object_set_new (order,
+                         "max_fee",
+                         TALER_JSON_from_amount (&default_max_deposit_fee));
   }
 
   if (NULL == json_object_get (order,

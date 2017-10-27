@@ -88,6 +88,13 @@ struct GNUNET_TIME_Relative default_pay_deadline;
 struct TALER_Amount default_max_wire_fee;
 
 /**
+ * Default max deposit fee that the merchant is willing to
+ * pay; if deposit costs more, then the customer will cover
+ * the difference.
+ */
+struct TALER_Amount default_max_deposit_fee;
+
+/**
  * Default factor for wire fee amortization.
  */
 unsigned long long default_wire_fee_amortization;
@@ -751,7 +758,6 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   return GNUNET_SYSERR;
 }
 
-
 /**
  * Main function that will be run by the scheduler.
  *
@@ -836,33 +842,24 @@ run (void *cls,
                               "DEFAULT_MAX_WIRE_FEE",
                               &default_max_wire_fee))
   {
-    char *currency;
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "DEFAULT_MAX_WIRE_FEE");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  } 
 
-    if (GNUNET_OK !=
-        GNUNET_CONFIGURATION_get_value_string (config,
-                                               "taler",
-                                               "CURRENCY",
-                                               &currency))
-    {
-      GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                                 "taler",
-                                 "CURRENCY");
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    }
-    if (GNUNET_OK !=
-        TALER_amount_get_zero (currency,
-                               &default_max_wire_fee))
-    {
-      GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
-                                 "taler",
-                                 "CURRENCY",
-                                 "Specified value not legal for a Taler currency");
-      GNUNET_SCHEDULER_shutdown ();
-      GNUNET_free (currency);
-      return;
-    }
-    GNUNET_free (currency);
+  if (GNUNET_OK !=
+      TALER_config_get_denom (config,
+                              "merchant",
+                              "DEFAULT_MAX_DEPOSIT_FEE",
+                              &default_max_deposit_fee))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "DEFAULT_MAX_DEPOSIT_FEE");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
   }
 
   if (GNUNET_OK !=
