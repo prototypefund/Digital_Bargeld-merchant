@@ -748,6 +748,7 @@ typedef void
  * this API.
  *
  * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
  * @param amount amount that was credited to the reserve
  * @param expiration when will the reserve expire
  * @param reserve_priv private key of the reserve
@@ -758,6 +759,7 @@ typedef void
  */
 struct TALER_MERCHANT_TipEnableOperation *
 TALER_MERCHANT_tip_enable (struct GNUNET_CURL_Context *ctx,
+                           const char *backend_uri,
                            const struct TALER_Amount *amount,
                            struct GNUNET_TIME_Absolute expiration,
                            const struct TALER_ReservePrivateKeyP *reserve_priv,
@@ -770,10 +772,10 @@ TALER_MERCHANT_tip_enable (struct GNUNET_CURL_Context *ctx,
 /**
  * Cancel a pending /tip-enable request
  *
- * @param te handle from the operation to cancel
+ * @param teo handle from the operation to cancel
  */
 void
-TALER_MERCHANT_tip_enable_cancel (struct TALER_MERCHANT_TipEnableOperation *te);
+TALER_MERCHANT_tip_enable_cancel (struct TALER_MERCHANT_TipEnableOperation *teo);
 
 
 /* ********************** /tip-authorize ********************** */
@@ -806,6 +808,7 @@ typedef void
  * that a tip should be created.
  *
  * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
  * @param amount amount to be handed out as a tip
  * @param instance which backend instance should create the tip (identifies the reserve and exchange)
  * @param justification which justification should be stored (human-readable reason for the tip)
@@ -815,6 +818,7 @@ typedef void
  */
 struct TALER_MERCHANT_TipAuthorizeOperation *
 TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
+                              const char *backend_uri,
                               const struct TALER_Amount *amount,
                               const char *instance,
                               const char *justification,
@@ -890,6 +894,7 @@ struct TALER_MERCHANT_PlanchetDetail
  * that a customer wants to pick up a tip.
  *
  * @param ctx execution context
+ * @param backend_uri base URL of the merchant backend
  * @param tip_id unique identifier for the tip
  * @param num_planches number of planchets provided in @a planchets
  * @param planchets array of planchets to be signed into existence for the tip
@@ -899,6 +904,7 @@ struct TALER_MERCHANT_PlanchetDetail
  */
 struct TALER_MERCHANT_TipPickupOperation *
 TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
+                           const char *backend_uri,
                            const struct GNUNET_HashCode *tip_id,
                            unsigned int num_planchets,
                            struct TALER_MERCHANT_PlanchetDetail *planchets,
