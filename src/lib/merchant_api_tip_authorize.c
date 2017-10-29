@@ -207,6 +207,7 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
   {
     GNUNET_break (0);
     GNUNET_free (tao->url);
+    GNUNET_free (tao);
     return NULL;
   }
   if (NULL == (tao->json_enc =

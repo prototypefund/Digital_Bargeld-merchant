@@ -165,6 +165,7 @@ TALER_MERCHANT_tip_enable (struct GNUNET_CURL_Context *ctx,
   {
     GNUNET_break (0);
     GNUNET_free (teo->url);
+    GNUNET_free (teo);
     return NULL;
   }
   if (NULL == (teo->json_enc =
