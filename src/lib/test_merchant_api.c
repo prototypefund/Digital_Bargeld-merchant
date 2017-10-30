@@ -746,16 +746,8 @@ struct Command
     struct {
 
       /**
-       * Reference to the operation that enabled tips
-       * (for the reserve private key); NULL to use a
-       * random reserve private key.
-       */
-      const char *enable_ref;
-
-      /**
-       * The instance is usually taken from @e enable_ref.  However,
-       * if @e enable_ref is NULL, then this field can be used to
-       * manually specify an instance.
+       * Specify the instance (to succeed, this must match a prior
+       * enable action and the respective wire transfer's instance).
        */
       const char *instance;
 
@@ -770,6 +762,11 @@ struct Command
        * How much should the tip be?
        */
       const char *amount;
+
+      /**
+       * Handle for the ongoing operation.
+       */
+      struct TALER_MERCHANT_TipAuthorizeOperation *tao;
 
       /**
        * Unique ID for the authorized tip, set by the interpreter.
@@ -800,6 +797,11 @@ struct Command
        * Array of @e num_coins denominations of the coins we pick up.
        */
       const char **amounts;
+
+      /**
+       * Handle for the ongoing operation.
+       */
+      struct TALER_MERCHANT_TipPickupOperation *tpo;
 
       /* FIXME: will need some other temporary data structure here
          to store the blinding keys while the pickup operation
@@ -1953,7 +1955,6 @@ cleanup_state (struct InterpreterState *is)
         cmd->details.history.ho = NULL;
       }
       break;
-
     case OC_REFUND_INCREASE:
       if (NULL != cmd->details.refund_increase.rio)
       {
@@ -1961,7 +1962,6 @@ cleanup_state (struct InterpreterState *is)
         cmd->details.refund_increase.rio = NULL;
       }
       break;
-
     case OC_REFUND_LOOKUP:
       if (NULL != cmd->details.refund_lookup.rlo)
       {
@@ -1969,7 +1969,6 @@ cleanup_state (struct InterpreterState *is)
         cmd->details.refund_lookup.rlo = NULL;
       }
       break;
-
     case OC_TIP_ENABLE:
       if (NULL != cmd->details.tip_enable.teo)
       {
@@ -1977,7 +1976,20 @@ cleanup_state (struct InterpreterState *is)
         cmd->details.tip_enable.teo = NULL;
       }
       break;
-
+    case OC_TIP_AUTHORIZE:
+      if (NULL != cmd->details.tip_authorize.tao)
+      {
+        TALER_MERCHANT_tip_authorize_cancel (cmd->details.tip_authorize.tao);
+        cmd->details.tip_authorize.tao = NULL;
+      }
+      break;
+    case OC_TIP_PICKUP:
+      if (NULL != cmd->details.tip_pickup.tpo)
+      {
+        TALER_MERCHANT_tip_pickup_cancel (cmd->details.tip_pickup.tpo);
+        cmd->details.tip_pickup.tpo = NULL;
+      }
+      break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -2043,31 +2055,30 @@ interpreter_run (void *cls)
                                          is);
 
       break;
-    case OC_PROPOSAL_LOOKUP:
+  case OC_PROPOSAL_LOOKUP:
     {
       const char *order_id;
 
       GNUNET_assert (NULL != cmd->details.proposal_lookup.proposal_reference);
       GNUNET_assert (NULL != (ref =
-			      find_command (is,
-					    cmd->details.proposal_lookup.proposal_reference)));
+                              find_command (is,
+                                            cmd->details.proposal_lookup.proposal_reference)));
 
       order_id = json_string_value (json_object_get (ref->details.proposal.contract_terms,
-                                    "order_id"));
+                                                     "order_id"));
       if (NULL == (cmd->details.proposal_lookup.plo
-          = TALER_MERCHANT_proposal_lookup (ctx,
-                                            MERCHANT_URI,
-                                            order_id,
-                                            instance,
-                                            proposal_lookup_cb,
-                                            is)))
+                   = TALER_MERCHANT_proposal_lookup (ctx,
+                                                     MERCHANT_URI,
+                                                     order_id,
+                                                     instance,
+                                                     proposal_lookup_cb,
+                                                     is)))
       {
         GNUNET_break (0);
         fail (is);
       }
     }
     break;
-
   case OC_ADMIN_ADD_INCOMING:
     if (NULL !=
         cmd->details.admin_add_incoming.reserve_reference)
@@ -2183,155 +2194,155 @@ interpreter_run (void *cls)
     }
     break;
   case OC_PROPOSAL:
-  {
-    json_t *order;
-    json_error_t error;
-
-    GNUNET_assert (NULL != (order = json_loads (cmd->details.proposal.order,
-                                                JSON_REJECT_DUPLICATES,
-                                                &error)));
-    if (NULL != instance)
     {
-      json_t *merchant;
+      json_t *order;
+      json_error_t error;
 
-      merchant = json_object ();
-      json_object_set_new (merchant,
-                           "instance",
-                           json_string (instance));
-      json_object_set_new (order,
-                           "merchant",
-                           merchant);
-    }
-    cmd->details.proposal.po = TALER_MERCHANT_order_put (ctx,
-                                                         MERCHANT_URI,
-                                                         order,
-                                                         &proposal_cb,
-                                                         is);
-    json_decref (order);
-    if (NULL == cmd->details.proposal.po)
-    {
-      GNUNET_break (0);
-      fail (is);
-    }
-    break;
-  }
-  case OC_PAY:
-  {
-    struct TALER_MERCHANT_PayCoin *pc;
-    struct TALER_MERCHANT_PayCoin *icoin;
-    char *coins;
-    unsigned int npc;
-    const char *order_id;
-    struct GNUNET_TIME_Absolute refund_deadline;
-    struct GNUNET_TIME_Absolute pay_deadline;
-    struct GNUNET_TIME_Absolute timestamp;
-    struct GNUNET_HashCode h_wire;
-    struct TALER_MerchantPublicKeyP merchant_pub;
-    struct TALER_MerchantSignatureP merchant_sig;
-    struct TALER_Amount total_amount;
-    struct TALER_Amount max_fee;
-    char *token;
-    const char *error_name;
-    unsigned int error_line;
-
-    /* get proposal */
-    GNUNET_assert (NULL != (ref = find_command
-      (is,
-       cmd->details.pay.contract_ref)));
-    merchant_sig = ref->details.proposal.merchant_sig;
-    GNUNET_assert (NULL != ref->details.proposal.contract_terms);
-    {
-      /* Get information that needs to be replied in the deposit permission */
-      struct GNUNET_JSON_Specification spec[] = {
-        GNUNET_JSON_spec_string ("order_id", &order_id),
-        GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
-        GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
-        GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
-        GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
-        GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
-        TALER_JSON_spec_amount ("amount", &total_amount),
-        TALER_JSON_spec_amount ("max_fee", &max_fee),
-        GNUNET_JSON_spec_end()
-      };
-
-    if (GNUNET_OK !=
-        GNUNET_JSON_parse (ref->details.proposal.contract_terms,
-                           spec,
-                           &error_name,
-                           &error_line))
-    {
-      GNUNET_break_op (0);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Parser failed on %s:%u\n",
-                  error_name,
-                  error_line);
-      /**
-       * Let's use fail() here, as the proposal might be broken
-       * because of backend's fault.
-       */
-      fail (is);
-      return;
-    }
-    cmd->details.pay.merchant_pub = merchant_pub;
-    }
-    /* strtok loop here */
-    coins = GNUNET_strdup (cmd->details.pay.coin_ref);
-    GNUNET_assert (NULL != (token = strtok (coins, ";")));
-    pc = GNUNET_new (struct TALER_MERCHANT_PayCoin);
-    icoin = pc;
-    npc = 1;
-    do
-    {
-      const struct Command *coin_ref;
-
-      GNUNET_assert (coin_ref = find_command (is,
-                                              token));
-      switch (coin_ref->oc)
+      GNUNET_assert (NULL != (order = json_loads (cmd->details.proposal.order,
+                                                  JSON_REJECT_DUPLICATES,
+                                                  &error)));
+      if (NULL != instance)
       {
-      case OC_WITHDRAW_SIGN:
-        icoin->coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
-        icoin->denom_pub = coin_ref->details.reserve_withdraw.pk->key;
-        icoin->denom_sig = coin_ref->details.reserve_withdraw.sig;
-        icoin->denom_value = coin_ref->details.reserve_withdraw.pk->value;
-	break;
-      default:
-        GNUNET_assert (0);
+        json_t *merchant;
+
+        merchant = json_object ();
+        json_object_set_new (merchant,
+                             "instance",
+                             json_string (instance));
+        json_object_set_new (order,
+                             "merchant",
+                             merchant);
       }
+      cmd->details.proposal.po = TALER_MERCHANT_order_put (ctx,
+                                                           MERCHANT_URI,
+                                                           order,
+                                                           &proposal_cb,
+                                                           is);
+      json_decref (order);
+      if (NULL == cmd->details.proposal.po)
+        {
+          GNUNET_break (0);
+          fail (is);
+        }
+      break;
+    }
+  case OC_PAY:
+    {
+      struct TALER_MERCHANT_PayCoin *pc;
+      struct TALER_MERCHANT_PayCoin *icoin;
+      char *coins;
+      unsigned int npc;
+      const char *order_id;
+      struct GNUNET_TIME_Absolute refund_deadline;
+      struct GNUNET_TIME_Absolute pay_deadline;
+      struct GNUNET_TIME_Absolute timestamp;
+      struct GNUNET_HashCode h_wire;
+      struct TALER_MerchantPublicKeyP merchant_pub;
+      struct TALER_MerchantSignatureP merchant_sig;
+      struct TALER_Amount total_amount;
+      struct TALER_Amount max_fee;
+      char *token;
+      const char *error_name;
+      unsigned int error_line;
 
-      GNUNET_assert (GNUNET_OK ==
-        TALER_string_to_amount (cmd->details.pay.amount_without_fee,
-                                &icoin->amount_without_fee));
-      GNUNET_assert (GNUNET_OK ==
-          TALER_string_to_amount (cmd->details.pay.amount_with_fee,
-                                  &icoin->amount_with_fee));
-      token = strtok (NULL, ";");
-      if (NULL == token)
-        break;
-      icoin->next = GNUNET_new (struct TALER_MERCHANT_PayCoin);
-      icoin = icoin->next;
-    } while (1);
+      /* get proposal */
+      GNUNET_assert (NULL != (ref = find_command
+                              (is,
+                               cmd->details.pay.contract_ref)));
+      merchant_sig = ref->details.proposal.merchant_sig;
+      GNUNET_assert (NULL != ref->details.proposal.contract_terms);
+      {
+        /* Get information that needs to be replied in the deposit permission */
+        struct GNUNET_JSON_Specification spec[] = {
+          GNUNET_JSON_spec_string ("order_id", &order_id),
+          GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
+          GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
+          GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
+          GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
+          GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
+          TALER_JSON_spec_amount ("amount", &total_amount),
+          TALER_JSON_spec_amount ("max_fee", &max_fee),
+          GNUNET_JSON_spec_end()
+        };
 
-    icoin->next = NULL;
-    cmd->details.pay.ph = TALER_MERCHANT_pay_wallet
-      (ctx,
-       MERCHANT_URI,
-       instance,
-       &ref->details.proposal.hash,
-       &total_amount,
-       &max_fee,
-       &merchant_pub,
-       &merchant_sig,
-       timestamp,
-       refund_deadline,
-       pay_deadline,
-       &h_wire,
-       EXCHANGE_URI,
-       order_id,
-       npc /* num_coins */,
-       pc /* coins */,
-       &pay_cb,
-       is);
-  }
+        if (GNUNET_OK !=
+            GNUNET_JSON_parse (ref->details.proposal.contract_terms,
+                               spec,
+                               &error_name,
+                               &error_line))
+        {
+          GNUNET_break_op (0);
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Parser failed on %s:%u\n",
+                      error_name,
+                      error_line);
+          /**
+           * Let's use fail() here, as the proposal might be broken
+           * because of backend's fault.
+           */
+          fail (is);
+          return;
+        }
+        cmd->details.pay.merchant_pub = merchant_pub;
+      }
+      /* strtok loop here */
+      coins = GNUNET_strdup (cmd->details.pay.coin_ref);
+      GNUNET_assert (NULL != (token = strtok (coins, ";")));
+      pc = GNUNET_new (struct TALER_MERCHANT_PayCoin);
+      icoin = pc;
+      npc = 1;
+      do
+      {
+        const struct Command *coin_ref;
+
+        GNUNET_assert (coin_ref = find_command (is,
+                                                token));
+        switch (coin_ref->oc)
+        {
+        case OC_WITHDRAW_SIGN:
+          icoin->coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
+          icoin->denom_pub = coin_ref->details.reserve_withdraw.pk->key;
+          icoin->denom_sig = coin_ref->details.reserve_withdraw.sig;
+          icoin->denom_value = coin_ref->details.reserve_withdraw.pk->value;
+          break;
+        default:
+          GNUNET_assert (0);
+        }
+
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_string_to_amount (cmd->details.pay.amount_without_fee,
+                                               &icoin->amount_without_fee));
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_string_to_amount (cmd->details.pay.amount_with_fee,
+                                               &icoin->amount_with_fee));
+        token = strtok (NULL, ";");
+        if (NULL == token)
+          break;
+        icoin->next = GNUNET_new (struct TALER_MERCHANT_PayCoin);
+        icoin = icoin->next;
+      } while (1);
+
+      icoin->next = NULL;
+      cmd->details.pay.ph = TALER_MERCHANT_pay_wallet
+        (ctx,
+         MERCHANT_URI,
+         instance,
+         &ref->details.proposal.hash,
+         &total_amount,
+         &max_fee,
+         &merchant_pub,
+         &merchant_sig,
+         timestamp,
+         refund_deadline,
+         pay_deadline,
+         &h_wire,
+         EXCHANGE_URI,
+         order_id,
+         npc /* num_coins */,
+         pc /* coins */,
+         &pay_cb,
+         is);
+    }
     if (NULL == cmd->details.pay.ph)
     {
       GNUNET_break (0);
@@ -2469,118 +2480,118 @@ interpreter_run (void *cls)
     }
     break;
   case OC_REFUND_INCREASE:
-  {
-    struct TALER_Amount refund_amount;
-
-    GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-      (cmd->details.refund_increase.refund_amount,
-       &refund_amount));
-    if (NULL == (cmd->details.refund_increase.rio
-         = TALER_MERCHANT_refund_increase
-           (ctx,
-            MERCHANT_URI,
-            cmd->details.refund_increase.order_id,
-            &refund_amount,
-            cmd->details.refund_increase.reason,
-            instance,
-            refund_increase_cb,
-            is)))
     {
-      GNUNET_break (0);
-      fail (is);
+      struct TALER_Amount refund_amount;
+
+      GNUNET_assert (GNUNET_OK == TALER_string_to_amount
+                     (cmd->details.refund_increase.refund_amount,
+                      &refund_amount));
+      if (NULL == (cmd->details.refund_increase.rio
+                   = TALER_MERCHANT_refund_increase
+                   (ctx,
+                    MERCHANT_URI,
+                    cmd->details.refund_increase.order_id,
+                    &refund_amount,
+                    cmd->details.refund_increase.reason,
+                    instance,
+                    refund_increase_cb,
+                    is)))
+        {
+          GNUNET_break (0);
+          fail (is);
+        }
+      break;
     }
-    break;
-  }
   case OC_REFUND_LOOKUP:
-  {
-    if (NULL == (cmd->details.refund_lookup.rlo
-          = TALER_MERCHANT_refund_lookup
-            (ctx,
-             MERCHANT_URI,
-             cmd->details.refund_lookup.order_id,
-             instance,
-             refund_lookup_cb,
-             is)))
     {
-      GNUNET_break (0);
-      fail (is);
+      if (NULL == (cmd->details.refund_lookup.rlo
+                   = TALER_MERCHANT_refund_lookup
+                   (ctx,
+                    MERCHANT_URI,
+                    cmd->details.refund_lookup.order_id,
+                    instance,
+                    refund_lookup_cb,
+                    is)))
+      {
+        GNUNET_break (0);
+        fail (is);
+      }
+      break;
     }
-    break;
-  }
   case OC_TIP_ENABLE:
-  {
-    const struct Command *uuid_ref;
-    struct TALER_ReservePrivateKeyP reserve_priv;
-    struct GNUNET_TIME_Absolute expiration;
+    {
+      const struct Command *uuid_ref;
+      struct TALER_ReservePrivateKeyP reserve_priv;
+      struct GNUNET_TIME_Absolute expiration;
 
-    if (NULL != cmd->details.tip_enable.admin_add_incoming_ref)
-    {
-      ref = find_command (is,
-                          cmd->details.tip_enable.admin_add_incoming_ref);
-      GNUNET_assert (NULL != ref);
-    }
-    else
-    {
-      ref = NULL;
-    }
+      if (NULL != cmd->details.tip_enable.admin_add_incoming_ref)
+      {
+        ref = find_command (is,
+                            cmd->details.tip_enable.admin_add_incoming_ref);
+        GNUNET_assert (NULL != ref);
+      }
+      else
+      {
+        ref = NULL;
+      }
 
-    /* Initialize 'credit_uuid' */
-    if (NULL != cmd->details.tip_enable.uuid_ref)
-    {
-      uuid_ref = find_command (is,
-                               cmd->details.tip_enable.uuid_ref);
-      GNUNET_assert (NULL != uuid_ref);
-      GNUNET_assert (OC_TIP_ENABLE == uuid_ref->oc);
-      cmd->details.tip_enable.credit_uuid
-        = uuid_ref->details.tip_enable.credit_uuid;
-    }
-    else
-    {
-      uuid_ref = NULL;
-      GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
-                                  &cmd->details.tip_enable.credit_uuid,
-                                  sizeof (cmd->details.tip_enable.credit_uuid));
-    }
+      /* Initialize 'credit_uuid' */
+      if (NULL != cmd->details.tip_enable.uuid_ref)
+      {
+        uuid_ref = find_command (is,
+                                 cmd->details.tip_enable.uuid_ref);
+        GNUNET_assert (NULL != uuid_ref);
+        GNUNET_assert (OC_TIP_ENABLE == uuid_ref->oc);
+        cmd->details.tip_enable.credit_uuid
+          = uuid_ref->details.tip_enable.credit_uuid;
+      }
+      else
+      {
+        uuid_ref = NULL;
+        GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                                    &cmd->details.tip_enable.credit_uuid,
+                                    sizeof (cmd->details.tip_enable.credit_uuid));
+      }
 
-    /* Initialize 'amount' */
-    if ( (NULL != ref) &&
-         (NULL == cmd->details.tip_enable.amount) )
-    {
-      GNUNET_assert (GNUNET_OK ==
-                     TALER_string_to_amount (ref->details.admin_add_incoming.amount,
-                                             &amount));
-    }
-    else
-    {
-      GNUNET_assert (NULL != cmd->details.tip_enable.amount);
-      GNUNET_assert (GNUNET_OK ==
-                     TALER_string_to_amount (cmd->details.tip_enable.amount,
-                                             &amount));
-    }
-    if (NULL == ref)
-      GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
-                                  &reserve_priv,
-                                  sizeof (reserve_priv));
-    /* Simply picked long enough for the test (we do not test expiration
-       behavior for now) */
-    expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_HOURS);
+      /* Initialize 'amount' */
+      if ( (NULL != ref) &&
+           (NULL == cmd->details.tip_enable.amount) )
+      {
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_string_to_amount (ref->details.admin_add_incoming.amount,
+                                               &amount));
+      }
+      else
+      {
+        GNUNET_assert (NULL != cmd->details.tip_enable.amount);
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_string_to_amount (cmd->details.tip_enable.amount,
+                                               &amount));
+      }
+      if (NULL == ref)
+        GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                                    &reserve_priv,
+                                    sizeof (reserve_priv));
+      /* Simply picked long enough for the test (we do not test expiration
+         behavior for now) */
+      expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_HOURS);
 
-    if (NULL == (cmd->details.tip_enable.teo
-                 = TALER_MERCHANT_tip_enable
-                 (ctx,
-                  MERCHANT_URI,
-                  &amount,
-                  expiration,
-                  (ref != NULL) ? &cmd->details.admin_add_incoming.reserve_priv : &reserve_priv,
-                  &cmd->details.tip_enable.credit_uuid,
-                  &tip_enable_cb,
-                  is)))
-    {
-      GNUNET_break (0);
-      fail (is);
+      if (NULL == (cmd->details.tip_enable.teo
+                   = TALER_MERCHANT_tip_enable
+                   (ctx,
+                    MERCHANT_URI,
+                    &amount,
+                    expiration,
+                    (ref != NULL) ? &ref->details.admin_add_incoming.reserve_priv : &reserve_priv,
+                    &cmd->details.tip_enable.credit_uuid,
+                    &tip_enable_cb,
+                    is)))
+      {
+        GNUNET_break (0);
+        fail (is);
+      }
+      break;
     }
-    break;
-  }
   default:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instruction %d at %u (%s)\n",
