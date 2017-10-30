@@ -308,6 +308,7 @@ hashmap_free (void *cls,
   json_decref (mi->j_wire);
   GNUNET_free (mi->id);
   GNUNET_free (mi->keyfile);
+  GNUNET_free_non_null (mi->tip_exchange);
   GNUNET_free (mi);
   return GNUNET_YES;
 }
@@ -539,8 +540,47 @@ instances_iterator_cb (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
+  if (GNUNET_OK ==
+      GNUNET_CONFIGURATION_get_value_string (iic->config,
+                                             section,
+                                             "TIP_EXCHANGE",
+                                             &mi->tip_exchange))
+  {
+    char *tip_reserves;
 
-  if (GNUNET_YES != GNUNET_DISK_file_test (mi->keyfile))
+    if (GNUNET_OK !=
+        GNUNET_CONFIGURATION_get_value_string (iic->config,
+                                               section,
+                                               "TIP_RESERVE_PRIV",
+                                               &tip_reserves))
+    {
+      GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                                 section,
+                                 "TIP_RESERVE_PRIV");
+      GNUNET_free (mi);
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+    if (GNUNET_OK !=
+        GNUNET_STRINGS_string_to_data (tip_reserves,
+                                       strlen (tip_reserves),
+                                       &mi->tip_reserve,
+                                       sizeof (struct TALER_ReservePrivateKeyP)))
+    {
+      GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                 section,
+                                 "TIP_RESERVE_PRIV",
+                                 "Must decode to private EdDSA key");
+      GNUNET_free (tip_reserves);
+      GNUNET_free (mi);
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+    GNUNET_free (tip_reserves);
+  }
+
+  if (GNUNET_YES !=
+      GNUNET_DISK_file_test (mi->keyfile))
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Merchant private key `%s' does not exist yet, creating it!\n",
                 mi->keyfile);
@@ -847,7 +887,7 @@ run (void *cls,
                                "DEFAULT_MAX_WIRE_FEE");
     GNUNET_SCHEDULER_shutdown ();
     return;
-  } 
+  }
 
   if (GNUNET_OK !=
       TALER_config_get_denom (config,

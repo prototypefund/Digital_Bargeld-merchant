@@ -20,7 +20,6 @@
  * @author Marcello Stanisci
  *
  * TODO:
- * - implement getting reserve_priv from configuration in /admin/add/incoming
  * - implement tip_pickup
  * - implement spending with coins from tips
  * - add test logic for tips to main test interpreter
@@ -320,6 +319,13 @@ struct Command
       const char *reserve_reference;
 
       /**
+       * Instance to use if we are filling a tipping-reserve. In this
+       * case, @e reserve_priv is filled from the configuration instead
+       * of at random.  Usually NULL (for random @e reserve_priv).
+       */
+      const char *instance;
+
+      /**
        * String describing the amount to add to the reserve.
        */
       const char *amount;
@@ -340,13 +346,6 @@ struct Command
        * "instance" is non-NULL.
        */
       struct TALER_ReservePrivateKeyP reserve_priv;
-
-      /**
-       * Instance to use if we are filling a tipping-reserve. In this
-       * case, @e reserve_priv is filled from the configuration instead
-       * of at random.  Usually NULL (for random @e reserve_priv).
-       */
-      const char *instance;
 
       /**
        * Set to the API's handle during the operation.
@@ -2155,6 +2154,45 @@ interpreter_run (void *cls)
       GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
       cmd->details.admin_add_incoming.reserve_priv
         = ref->details.admin_add_incoming.reserve_priv;
+    }
+    else if (NULL !=
+             cmd->details.admin_add_incoming.instance)
+    {
+      char *section;
+      char *keys;
+
+      GNUNET_asprintf (&section,
+                       "merchant-instance-%s",
+                       cmd->details.admin_add_incoming.instance);
+      if (GNUNET_OK !=
+          GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                 section,
+                                                 "tipping-reserve-priv",
+                                                 &keys))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Configuration fails to specify reserve private key in section %s\n",
+                    section);
+        GNUNET_free (section);
+        fail (is);
+        return;
+      }
+      if (GNUNET_OK !=
+          GNUNET_STRINGS_string_to_data (keys,
+                                         strlen (keys),
+                                         &cmd->details.admin_add_incoming.reserve_priv,
+                                         sizeof (struct TALER_ReservePrivateKeyP)))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Reserve private key in section %s fails to decode to EdDSA key\n",
+                    section);
+        GNUNET_free (keys);
+        GNUNET_free (section);
+        fail (is);
+        return;
+      }
+      GNUNET_free (keys);
+      GNUNET_free (section);
     }
     else
     {
