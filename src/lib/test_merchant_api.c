@@ -21,7 +21,6 @@
  *
  * TODO:
  * - implement getting reserve_priv from configuration in /admin/add/incoming
- * - implement tip_authorize
  * - implement tip_pickup
  * - implement spending with coins from tips
  * - add test logic for tips to main test interpreter
@@ -772,6 +771,11 @@ struct Command
        * Unique ID for the authorized tip, set by the interpreter.
        */
       struct GNUNET_HashCode tip_id;
+
+      /**
+       * When does the authorization expire?
+       */
+      struct GNUNET_TIME_Absolute tip_expiration;
 
       /**
        * EC expected for the operation.
@@ -1765,6 +1769,64 @@ tip_enable_cb (void *cls,
 
 
 /**
+ * Callback for a /tip-authorize request.  Returns the result of
+ * the operation.
+ *
+ * @param cls closure
+ * @param http_status HTTP status returned by the merchant backend
+ * @param ec taler-specific error code
+ */
+static void
+tip_authorize_cb (void *cls,
+                  unsigned int http_status,
+                  enum TALER_ErrorCode ec,
+                  const struct GNUNET_HashCode *tip_id,
+                  struct GNUNET_TIME_Absolute tip_expiration,
+                  const char *exchange_uri)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  cmd->details.tip_authorize.tao = NULL;
+  if (cmd->expected_response_code != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u to command %s\n",
+                http_status,
+                cmd->label);
+    fail (is);
+    return;
+  }
+  if (cmd->details.tip_authorize.expected_ec != ec)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected error code %u to command %s\n",
+                ec,
+                cmd->label);
+    fail (is);
+    return;
+  }
+  if ( (MHD_HTTP_OK == http_status) &&
+       (TALER_EC_NONE == ec) )
+  {
+    if (0 != strcmp (exchange_uri,
+                     EXCHANGE_URI))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Unexpected exchange URI %s to command %s\n",
+                  exchange_uri,
+                  cmd->label);
+      fail (is);
+      return;
+    }
+    cmd->details.tip_authorize.tip_id = *tip_id;
+    cmd->details.tip_authorize.tip_expiration = tip_expiration;
+  }
+  next_command (is);
+}
+
+
+/**
  * Find denomination key matching the given amount.
  *
  * @param keys array of keys to search
@@ -2585,6 +2647,27 @@ interpreter_run (void *cls)
                     (ref != NULL) ? &ref->details.admin_add_incoming.reserve_priv : &reserve_priv,
                     &cmd->details.tip_enable.credit_uuid,
                     &tip_enable_cb,
+                    is)))
+      {
+        GNUNET_break (0);
+        fail (is);
+      }
+      break;
+    }
+  case OC_TIP_AUTHORIZE:
+    {
+      GNUNET_assert (NULL != cmd->details.tip_authorize.amount);
+      GNUNET_assert (GNUNET_OK ==
+                     TALER_string_to_amount (cmd->details.tip_authorize.amount,
+                                             &amount));
+      if (NULL == (cmd->details.tip_authorize.tao
+                   = TALER_MERCHANT_tip_authorize
+                   (ctx,
+                    MERCHANT_URI,
+                    &amount,
+                    cmd->details.tip_authorize.instance,
+                    cmd->details.tip_authorize.justification,
+                    &tip_authorize_cb,
                     is)))
       {
         GNUNET_break (0);
