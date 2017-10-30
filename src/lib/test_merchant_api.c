@@ -21,7 +21,6 @@
  *
  * TODO:
  * - implement getting reserve_priv from configuration in /admin/add/incoming
- * - implement tip_enable
  * - implement tip_authorize
  * - implement tip_pickup
  * - implement spending with coins from tips
@@ -725,6 +724,11 @@ struct Command
        * NULL, the amount is taken from the @e admin_add_incoming_ref.
        */
       const char *amount;
+
+      /**
+       * Handle to the ongoing operation.
+       */
+      struct TALER_MERCHANT_TipEnableOperation *teo;
 
       /**
        * UUID used for the enable operation, set by the interpreter to
@@ -1720,6 +1724,45 @@ track_transaction_cb (void *cls,
 
 
 /**
+ * Callback for a /tip-enable request.  Returns the result of
+ * the operation.
+ *
+ * @param cls closure
+ * @param http_status HTTP status returned by the merchant backend
+ * @param ec taler-specific error code
+ */
+static void
+tip_enable_cb (void *cls,
+               unsigned int http_status,
+               enum TALER_ErrorCode ec)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  cmd->details.tip_enable.teo = NULL;
+  if (cmd->expected_response_code != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u to command %s\n",
+                http_status,
+                cmd->label);
+    fail (is);
+    return;
+  }
+  if (cmd->details.tip_enable.expected_ec != ec)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected error code %u to command %s\n",
+                ec,
+                cmd->label);
+    fail (is);
+    return;
+  }
+  next_command (is);
+}
+
+
+/**
  * Find denomination key matching the given amount.
  *
  * @param keys array of keys to search
@@ -1926,6 +1969,15 @@ cleanup_state (struct InterpreterState *is)
         cmd->details.refund_lookup.rlo = NULL;
       }
       break;
+
+    case OC_TIP_ENABLE:
+      if (NULL != cmd->details.tip_enable.teo)
+      {
+        TALER_MERCHANT_tip_enable_cancel (cmd->details.tip_enable.teo);
+        cmd->details.tip_enable.teo = NULL;
+      }
+      break;
+
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -2449,6 +2501,80 @@ interpreter_run (void *cls)
              instance,
              refund_lookup_cb,
              is)))
+    {
+      GNUNET_break (0);
+      fail (is);
+    }
+    break;
+  }
+  case OC_TIP_ENABLE:
+  {
+    const struct Command *uuid_ref;
+    struct TALER_ReservePrivateKeyP reserve_priv;
+    struct GNUNET_TIME_Absolute expiration;
+
+    if (NULL != cmd->details.tip_enable.admin_add_incoming_ref)
+    {
+      ref = find_command (is,
+                          cmd->details.tip_enable.admin_add_incoming_ref);
+      GNUNET_assert (NULL != ref);
+    }
+    else
+    {
+      ref = NULL;
+    }
+
+    /* Initialize 'credit_uuid' */
+    if (NULL != cmd->details.tip_enable.uuid_ref)
+    {
+      uuid_ref = find_command (is,
+                               cmd->details.tip_enable.uuid_ref);
+      GNUNET_assert (NULL != uuid_ref);
+      GNUNET_assert (OC_TIP_ENABLE == uuid_ref->oc);
+      cmd->details.tip_enable.credit_uuid
+        = uuid_ref->details.tip_enable.credit_uuid;
+    }
+    else
+    {
+      uuid_ref = NULL;
+      GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                                  &cmd->details.tip_enable.credit_uuid,
+                                  sizeof (cmd->details.tip_enable.credit_uuid));
+    }
+
+    /* Initialize 'amount' */
+    if ( (NULL != ref) &&
+         (NULL == cmd->details.tip_enable.amount) )
+    {
+      GNUNET_assert (GNUNET_OK ==
+                     TALER_string_to_amount (ref->details.admin_add_incoming.amount,
+                                             &amount));
+    }
+    else
+    {
+      GNUNET_assert (NULL != cmd->details.tip_enable.amount);
+      GNUNET_assert (GNUNET_OK ==
+                     TALER_string_to_amount (cmd->details.tip_enable.amount,
+                                             &amount));
+    }
+    if (NULL == ref)
+      GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                                  &reserve_priv,
+                                  sizeof (reserve_priv));
+    /* Simply picked long enough for the test (we do not test expiration
+       behavior for now) */
+    expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_HOURS);
+
+    if (NULL == (cmd->details.tip_enable.teo
+                 = TALER_MERCHANT_tip_enable
+                 (ctx,
+                  MERCHANT_URI,
+                  &amount,
+                  expiration,
+                  (ref != NULL) ? &cmd->details.admin_add_incoming.reserve_priv : &reserve_priv,
+                  &cmd->details.tip_enable.credit_uuid,
+                  &tip_enable_cb,
+                  is)))
     {
       GNUNET_break (0);
       fail (is);
