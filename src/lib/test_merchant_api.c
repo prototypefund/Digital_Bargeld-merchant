@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2017 GNUnet e.V. and INRIA
+  Copyright (C) 2014-2017 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -18,6 +18,14 @@
  * @brief testcase to test merchant's HTTP API interface
  * @author Christian Grothoff
  * @author Marcello Stanisci
+ *
+ * TODO:
+ * - implement getting reserve_priv from configuration in /admin/add/incoming
+ * - implement tip_enable
+ * - implement tip_authorize
+ * - implement tip_pickup
+ * - implement spending with coins from tips
+ * - add test logic for tips to main test interpreter
  */
 #include "platform.h"
 #include <taler/taler_exchange_service.h>
@@ -205,7 +213,22 @@ enum OpCode
   /**
    * Test refund lookup
    */
-  OC_REFUND_LOOKUP
+  OC_REFUND_LOOKUP,
+
+  /**
+   * Start a reserve for tipping.
+   */
+  OC_TIP_ENABLE,
+
+  /**
+   * Authorize a tip.
+   */
+  OC_TIP_AUTHORIZE,
+
+  /**
+   * Pickup a tip.
+   */
+  OC_TIP_PICKUP
 
 };
 
@@ -314,10 +337,18 @@ struct Command
       const char *transfer_details;
 
       /**
-       * Set (by the interpreter) to the reserve's private key
-       * we used to fill the reserve.
+       * Usually set (by the interpreter) to the reserve's private key
+       * we used to fill the reserve.  Read from the configuration if
+       * "instance" is non-NULL.
        */
       struct TALER_ReservePrivateKeyP reserve_priv;
+
+      /**
+       * Instance to use if we are filling a tipping-reserve. In this
+       * case, @e reserve_priv is filled from the configuration instead
+       * of at random.  Usually NULL (for random @e reserve_priv).
+       */
+      const char *instance;
 
       /**
        * Set to the API's handle during the operation.
@@ -673,6 +704,115 @@ struct Command
       char *pay_ref;
 
     } refund_lookup;
+
+    struct {
+
+      /**
+       * Reference to the operation that provisioned the reserve.
+       * Used to determine the reserve private key and the instance.
+       */
+      const char *admin_add_incoming_ref;
+
+      /**
+       * Reference to another enable operation, usually NULL. Can
+       * be set to a non-NULL value to call enable again with the
+       * same @e credit_uuid that was previously used.
+       */
+      const char *uuid_ref;
+
+      /**
+       * How much should be put into the tipping reserve? If
+       * NULL, the amount is taken from the @e admin_add_incoming_ref.
+       */
+      const char *amount;
+
+      /**
+       * UUID used for the enable operation, set by the interpreter to
+       * a random value UNLESS @e uuid_ref is non-NULL.
+       */
+      struct GNUNET_HashCode credit_uuid;
+
+      /**
+       * EC expected for the operation.
+       */
+      enum TALER_ErrorCode expected_ec;
+
+    } tip_enable;
+
+    struct {
+
+      /**
+       * Reference to the operation that enabled tips
+       * (for the reserve private key); NULL to use a
+       * random reserve private key.
+       */
+      const char *enable_ref;
+
+      /**
+       * The instance is usually taken from @e enable_ref.  However,
+       * if @e enable_ref is NULL, then this field can be used to
+       * manually specify an instance.
+       */
+      const char *instance;
+
+      /**
+       * Reason to use for enabling the tip (required by the API, but not
+       * yet really useful as we do not have a way to read back the
+       * justifications stored in the merchant's DB).
+       */
+      const char *justification;
+
+      /**
+       * How much should the tip be?
+       */
+      const char *amount;
+
+      /**
+       * Unique ID for the authorized tip, set by the interpreter.
+       */
+      struct GNUNET_HashCode tip_id;
+
+      /**
+       * EC expected for the operation.
+       */
+      enum TALER_ErrorCode expected_ec;
+
+    } tip_authorize;
+
+    struct {
+
+      /**
+       * Reference to operation that authorized the tip. Used
+       * to obtain the `tip_id`.
+       */
+      const char *authorize_ref;
+
+      /**
+       * Number of coins we pick up.
+       */
+      unsigned int num_coins;
+
+      /**
+       * Array of @e num_coins denominations of the coins we pick up.
+       */
+      const char **amounts;
+
+      /* FIXME: will need some other temporary data structure here
+         to store the blinding keys while the pickup operation
+         runs. */
+
+      /**
+       * Set (by the interpreter) to an array of @a num_coins coins
+       * created from the (successful) tip operation.
+       */
+      struct FreshCoin *coins;
+
+      /**
+       * EC expected for the operation.
+       */
+      enum TALER_ErrorCode expected_ec;
+
+    } tip_pickup;
 
   } details;
 
