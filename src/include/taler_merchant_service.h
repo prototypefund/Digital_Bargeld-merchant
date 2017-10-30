@@ -793,6 +793,9 @@ struct TALER_MERCHANT_TipAuthorizeOperation;
  * @param cls closure
  * @param http_status HTTP status returned by the merchant backend
  * @param ec taler-specific error code
+ * @param tip_id which tip ID should be used to pickup the tip
+ * @param tip_expiration when does the tip expire (needs to be picked up before this time)
+ * @param exchange_uri at what exchange can the tip be picked up
  */
 typedef void
 (*TALER_MERCHANT_TipAuthorizeCallback) (void *cls,

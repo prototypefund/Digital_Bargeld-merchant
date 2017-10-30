@@ -1382,6 +1382,7 @@ refund_increase_cb (void *cls,
  * @param cls closure, NULL
  * @param key current key
  * @param value a `struct TALER_Amount`
+ * @return always #GNUNET_YES (continue to iterate)
  */
 static int
 hashmap_free (void *cls,
@@ -1678,6 +1679,7 @@ track_transfer_cb (void *cls,
  *
  * @param cls closure
  * @param http_status HTTP status code we got
+ * @param json full response we got
  */
 static void
 proposal_lookup_cb (void *cls,
@@ -1701,8 +1703,6 @@ proposal_lookup_cb (void *cls,
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
  * @param ec taler-specific error code
  * @param json original json reply
- * @param num_transfers number of wire transfers involved in setting the transaction
- * @param transfers detailed list of transfers involved and their coins
  */
 static void
 track_transaction_cb (void *cls,
@@ -1775,6 +1775,9 @@ tip_enable_cb (void *cls,
  * @param cls closure
  * @param http_status HTTP status returned by the merchant backend
  * @param ec taler-specific error code
+ * @param tip_id which tip ID should be used to pickup the tip
+ * @param tip_expiration when does the tip expire (needs to be picked up before this time)
+ * @param exchange_uri at what exchange can the tip be picked up
  */
 static void
 tip_authorize_cb (void *cls,
@@ -2066,6 +2069,7 @@ cleanup_state (struct InterpreterState *is)
 
 /**
  * Run the main interpreter loop that performs exchange operations.
+ *
  * @param cls contains the `struct InterpreterState`
  */
 static void
