@@ -251,14 +251,9 @@ struct Command
       struct TALER_DenominationSignature sig;
 
       /**
-       * Set (by the interpreter) to the coin's private key.
+       * Secrets of the planchet. Set by the interpreter.
        */
-      struct TALER_CoinSpendPrivateKeyP coin_priv;
-
-      /**
-       * Blinding key used for the operation.
-       */
-      struct TALER_DenominationBlindingKeyP blinding_key;
+      struct TALER_PlanchetSecretsP ps;
 
       /**
        * Withdraw handle (while operation is running).
@@ -951,7 +946,6 @@ interpreter_run (void *cls)
   struct Command *cmd = &is->commands[is->ip];
   const struct Command *ref;
   struct TALER_ReservePublicKeyP reserve_pub;
-  struct TALER_CoinSpendPublicKeyP coin_pub;
   struct TALER_Amount amount;
   struct GNUNET_TIME_Absolute execution_date;
   json_t *sender_details;
@@ -1056,7 +1050,7 @@ interpreter_run (void *cls)
           switch (coin_ref->oc)
           {
           case OC_WITHDRAW_SIGN:
-            pc.coin_priv = coin_ref->details.reserve_withdraw.coin_priv;
+            pc.coin_priv = coin_ref->details.reserve_withdraw.ps.coin_priv;
             pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
             pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
             pc.denom_value = coin_ref->details.reserve_withdraw.pk->value;
@@ -1275,26 +1269,12 @@ interpreter_run (void *cls)
         return;
       }
 
-      /* create coin's private key */
-      {
-        struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-
-        priv = GNUNET_CRYPTO_eddsa_key_create ();
-        cmd->details.reserve_withdraw.coin_priv.eddsa_priv = *priv;
-        GNUNET_free (priv);
-      }
-      GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.reserve_withdraw.coin_priv.eddsa_priv,
-                                          &coin_pub.eddsa_pub);
-      GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
-                                  &cmd->details.reserve_withdraw.blinding_key,
-                                  sizeof (cmd->details.reserve_withdraw.blinding_key));
-
+      TALER_planchet_setup_random (&cmd->details.reserve_withdraw.ps);
       cmd->details.reserve_withdraw.wsh
         = TALER_EXCHANGE_reserve_withdraw (exchange,
                                            cmd->details.reserve_withdraw.pk,
                                            &ref->details.admin_add_incoming.reserve_priv,
-                                           &cmd->details.reserve_withdraw.coin_priv,
-                                           &cmd->details.reserve_withdraw.blinding_key,
+                                           &cmd->details.reserve_withdraw.ps,
                                            &reserve_withdraw_cb,
                                            is);
       if (NULL == cmd->details.reserve_withdraw.wsh)

@@ -215,7 +215,7 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
                            const char *backend_uri,
                            const struct GNUNET_HashCode *tip_id,
                            unsigned int num_planchets,
-                           struct TALER_MERCHANT_PlanchetDetail *planchets,
+                           struct TALER_PlanchetDetail *planchets,
                            TALER_MERCHANT_TipPickupCallback pickup_cb,
                            void *pickup_cb_cls)
 {
@@ -227,7 +227,7 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
   pa = json_array ();
   for (unsigned int i=0;i<num_planchets;i++)
   {
-    const struct TALER_MERCHANT_PlanchetDetail *planchet = &planchets[i];
+    const struct TALER_PlanchetDetail *planchet = &planchets[i];
     json_t *p;
 
     p = json_pack ("{"

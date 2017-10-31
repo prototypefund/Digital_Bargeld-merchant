@@ -24,6 +24,7 @@
 
 #include <taler/taler_util.h>
 #include <taler/taler_error_codes.h>
+#include <taler/taler_exchange_service.h>
 #include <gnunet/gnunet_curl_lib.h>
 #include <jansson.h>
 
@@ -870,29 +871,6 @@ typedef void
 
 
 /**
- * Details about a planchet that the customer wants to obtain
- * a withdrawal authorization for to obtain a tip.
- */
-struct TALER_MERCHANT_PlanchetDetail
-{
-  /**
-   * Hash of the denomination public key.
-   */
-  struct GNUNET_HashCode denom_pub_hash;
-
-  /**
-   * Blinded coin (see GNUNET_CRYPTO_rsa_blind()).
-   */
-  const char *coin_ev;
-
-  /**
-   * Number of bytes in @a coin_ev.
-   */
-  size_t coin_ev_size;
-};
-
-
-/**
  * Issue a /tip-pickup request to the backend.  Informs the backend
  * that a customer wants to pick up a tip.
  *
@@ -910,7 +888,7 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
                            const char *backend_uri,
                            const struct GNUNET_HashCode *tip_id,
                            unsigned int num_planchets,
-                           struct TALER_MERCHANT_PlanchetDetail *planchets,
+                           struct TALER_PlanchetDetail *planchets,
                            TALER_MERCHANT_TipPickupCallback pickup_cb,
                            void *pickup_cb_cls);
 
