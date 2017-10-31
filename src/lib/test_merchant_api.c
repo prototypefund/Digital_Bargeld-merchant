@@ -20,7 +20,6 @@
  * @author Marcello Stanisci
  *
  * TODO:
- * - implement tip_pickup
  * - implement spending with coins from tips
  * - add test logic for tips to main test interpreter
  */
@@ -248,6 +247,36 @@ struct MeltDetails
    * be used for the /refresh/melt operation.
    */
   const char *coin_ref;
+
+};
+
+
+/**
+ * State of the interpreter loop.
+ */
+struct InterpreterState;
+
+
+/**
+ * Internal withdraw handle used when withdrawing tips.
+ */
+struct WithdrawHandle
+{
+
+  /**
+   * Withdraw operation this handle represents.
+   */
+  struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
+
+  /**
+   * Interpreter state we are part of.
+   */
+  struct InterpreterState *is;
+
+  /**
+   * Offset of this withdraw operation in the current @e is command.
+   */
+  unsigned int off;
 
 };
 
@@ -781,10 +810,21 @@ struct Command
       struct TALER_PlanchetSecretsP *psa;
 
       /**
-       * Set (by the interpreter) to an array of @a num_coins coins
+       * Array of denomination keys matching the @e amounts.
+       */
+      const struct TALER_EXCHANGE_DenomPublicKey **dks;
+
+      /**
+       * Temporary data structure of @e num_coins entries for the
+       * withdraw operations.
+       */
+      struct WithdrawHandle *withdraws;
+
+      /**
+       * Set (by the interpreter) to an array of @a num_coins signatures
        * created from the (successful) tip operation.
        */
-      struct TALER_FreshCoin *coins;
+      struct TALER_DenominationSignature *sigs;
 
       /**
        * EC expected for the operation.
@@ -1799,49 +1839,47 @@ tip_authorize_cb (void *cls,
 
 
 /**
- * Create a planchet for tipping.
+ * Callbacks of this type are used to serve the result of submitting a
+ * withdraw request to a exchange.
  *
- * @param keys the exchange's denominations
- * @param amount the desired amount
- * @param[out] pd blinded planchet (to be set)
- * @param[out] ps secret details needed to extract the coin later (set)
- * @return #GNUNET_OK on success, #GNUNET_SYSERR if @a amount is not in @a keys
+ * @param cls closure, a `struct WithdrawHandle *`
+ * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param sig signature over the coin, NULL on error
+ * @param full_response full response from the exchange (for logging, in case of errors)
  */
-static int
-make_planchet (const struct TALER_EXCHANGE_Keys *keys,
-               const char *amount,
-               struct TALER_PlanchetDetail *pd,
-               struct TALER_PlanchetSecretsP *ps)
+static void
+pickup_withdraw_cb (void *cls,
+                    unsigned int http_status,
+                    enum TALER_ErrorCode ec,
+                    const struct TALER_DenominationSignature *sig,
+                    const json_t *full_response)
 {
-  struct TALER_Amount a;
-  const struct TALER_EXCHANGE_DenomPublicKey *dk;
+  struct WithdrawHandle *wh = cls;
+  struct InterpreterState *is = wh->is;
+  struct Command *cmd = &is->commands[is->ip];
 
-  if (GNUNET_OK !=
-      TALER_string_to_amount (amount,
-                              &a))
+  wh->wsh = NULL;
+  GNUNET_assert (wh->off < cmd->details.tip_pickup.num_coins);
+  if ( (MHD_HTTP_OK != http_status) ||
+       (TALER_EC_NONE != ec) )
   {
     GNUNET_break (0);
-    return GNUNET_SYSERR;
+    fail (is);
+    return;
   }
-  dk = NULL;
-  for (unsigned int i=0;i<keys->num_denom_keys;i++)
-  {
-    if (0 ==
-        TALER_amount_cmp (&a,
-                          &keys->denom_keys[i].value))
-    {
-      dk = &keys->denom_keys[i];
-      break;
-    }
-  }
-  if (NULL == dk)
-  {
-    GNUNET_break (0);
-    return GNUNET_SYSERR;
-  }
-  return TALER_planchet_prepare (&dk->key,
-                                 ps,
-                                 pd);
+  if (NULL == cmd->details.tip_pickup.sigs)
+    cmd->details.tip_pickup.sigs = GNUNET_new_array (cmd->details.tip_pickup.num_coins,
+                                                     struct TALER_DenominationSignature);
+  cmd->details.tip_pickup.sigs[wh->off].rsa_signature
+    = GNUNET_CRYPTO_rsa_signature_dup (sig->rsa_signature);
+  for (unsigned int i=0;i<cmd->details.tip_pickup.num_coins;i++)
+    if (NULL != cmd->details.tip_pickup.withdraws[wh->off].wsh)
+      return; /* still some ops ongoing */
+  GNUNET_free (cmd->details.tip_pickup.withdraws);
+  cmd->details.tip_pickup.withdraws = NULL;
+  next_command (is);
 }
 
 
@@ -1870,8 +1908,58 @@ pickup_cb (void *cls,
   struct Command *cmd = &is->commands[is->ip];
 
   cmd->details.tip_pickup.tpo = NULL;
-  // FIXME: implement!
-  next_command (is);
+  if (http_status != cmd->expected_response_code)
+  {
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
+  if (ec != cmd->details.tip_pickup.expected_ec)
+  {
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
+
+  if ( (MHD_HTTP_OK != http_status) ||
+       (TALER_EC_NONE != ec) )
+  {
+    next_command (is);
+    return;
+  }
+  if (num_reserve_sigs != cmd->details.tip_pickup.num_coins)
+  {
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
+
+  /* pickup successful, now withdraw! */
+  cmd->details.tip_pickup.withdraws
+    = GNUNET_new_array (num_reserve_sigs,
+                        struct WithdrawHandle);
+  for (unsigned int i=0;i<num_reserve_sigs;i++)
+  {
+    struct WithdrawHandle *wh = &cmd->details.tip_pickup.withdraws[i];
+
+    wh->off = i;
+    wh->is = is;
+    wh->wsh = TALER_EXCHANGE_reserve_withdraw2 (exchange,
+                                                cmd->details.tip_pickup.dks[i],
+                                                &reserve_sigs[i],
+                                                reserve_pub,
+                                                &cmd->details.tip_pickup.psa[i],
+                                                &pickup_withdraw_cb,
+                                                wh);
+    if (NULL == wh->wsh)
+    {
+      GNUNET_break (0);
+      fail (is);
+      return;
+    }
+  }
+  if (0 == num_reserve_sigs)
+    next_command (is);
 }
 
 
@@ -2104,6 +2192,37 @@ cleanup_state (struct InterpreterState *is)
       {
         GNUNET_free (cmd->details.tip_pickup.psa);
         cmd->details.tip_pickup.psa = NULL;
+      }
+      if (NULL != cmd->details.tip_pickup.dks)
+      {
+        GNUNET_free (cmd->details.tip_pickup.dks);
+        cmd->details.tip_pickup.dks = NULL;
+      }
+      if (NULL != cmd->details.tip_pickup.withdraws)
+      {
+        for (unsigned int j=0;j<cmd->details.tip_pickup.num_coins;j++)
+        {
+          struct WithdrawHandle *wh = &cmd->details.tip_pickup.withdraws[j];
+
+          if (NULL != wh->wsh)
+          {
+            TALER_EXCHANGE_reserve_withdraw_cancel (wh->wsh);
+            wh->wsh = NULL;
+          }
+        }
+        GNUNET_free (cmd->details.tip_pickup.withdraws);
+        cmd->details.tip_pickup.withdraws = NULL;
+      }
+      if (NULL != cmd->details.tip_pickup.sigs)
+      {
+        for (unsigned int j=0;j<cmd->details.tip_pickup.num_coins;j++)
+        {
+          if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
+          {
+            GNUNET_CRYPTO_rsa_signature_free (cmd->details.tip_pickup.sigs[j].rsa_signature);
+            cmd->details.tip_pickup.sigs[j].rsa_signature = NULL;
+          }
+        }
       }
       break;
     default:
@@ -2768,19 +2887,33 @@ interpreter_run (void *cls)
       GNUNET_assert (OC_TIP_AUTHORIZE == ref->oc);
       cmd->details.tip_pickup.psa = GNUNET_new_array (num_planchets,
                                                       struct TALER_PlanchetSecretsP);
-
+      cmd->details.tip_pickup.dks = GNUNET_new_array (num_planchets,
+                                                      const struct TALER_EXCHANGE_DenomPublicKey *);
       for (unsigned int i=0;i<num_planchets;i++)
-        if (GNUNET_OK !=
-            make_planchet (is->keys,
-                           cmd->details.tip_pickup.amounts[i],
-                           &planchets[i],
-                           &cmd->details.tip_pickup.psa[i]))
+      {
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_string_to_amount (cmd->details.tip_pickup.amounts[i],
+                                               &amount));
+
+        cmd->details.tip_pickup.dks[i]
+          = find_pk (is->keys,
+                     &amount);
+        if (NULL == cmd->details.tip_pickup.dks[i])
         {
           GNUNET_break (0);
           fail (is);
           return;
         }
-
+        if (GNUNET_OK !=
+            TALER_planchet_prepare (&cmd->details.tip_pickup.dks[i]->key,
+                                    &cmd->details.tip_pickup.psa[i],
+                                    &planchets[i]))
+        {
+          GNUNET_break (0);
+          fail (is);
+          return;
+        }
+      }
       if (NULL == (cmd->details.tip_pickup.tpo
                    = TALER_MERCHANT_tip_pickup
                    (ctx,
