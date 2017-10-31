@@ -20,7 +20,6 @@
  * @author Marcello Stanisci
  *
  * TODO:
- * - implement spending with coins from tips
  * - add test logic for tips to main test interpreter
  */
 #include "platform.h"
@@ -489,7 +488,9 @@ struct Command
 
       /**
        * ";"-separated list of references to withdrawn coins to be used
-       * in the payment.
+       * in the payment.  Each reference has the syntax "LABEL[/NUMBER]"
+       * where NUMBER refers to a particular coin (in case multiple coins
+       * were created in a step).
        */
       char *coin_ref;
 
@@ -2555,7 +2556,24 @@ interpreter_run (void *cls)
       do
       {
         const struct Command *coin_ref;
+        char *ctok;
+        unsigned int ci;
 
+        /* Token syntax is "LABEL[/NUMBER]" */
+        ctok = strchr (token, '/');
+        if (NULL != ctok)
+        {
+          *ctok = '\0';
+          ctok++;
+        }
+        if (1 != sscanf (ctok,
+                         "%u",
+                         &ci))
+        {
+          GNUNET_break (0);
+          fail (is);
+          return;
+        }
         GNUNET_assert (coin_ref = find_command (is,
                                                 token));
         switch (coin_ref->oc)
@@ -2566,6 +2584,11 @@ interpreter_run (void *cls)
           icoin->denom_sig = coin_ref->details.reserve_withdraw.sig;
           icoin->denom_value = coin_ref->details.reserve_withdraw.pk->value;
           break;
+        case OC_TIP_PICKUP:
+          icoin->coin_priv = coin_ref->details.tip_pickup.psa[ci].coin_priv;
+          icoin->denom_pub = coin_ref->details.tip_pickup.dks[ci]->key;
+          icoin->denom_sig = coin_ref->details.tip_pickup.sigs[ci];
+          icoin->denom_value = coin_ref->details.tip_pickup.dks[ci]->value;
         default:
           GNUNET_assert (0);
         }
