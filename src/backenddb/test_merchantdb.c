@@ -528,20 +528,21 @@ test_tipping ()
   struct TALER_Amount total;
   struct TALER_Amount amount;
   struct TALER_Amount inc;
+  char *uri;
 
   RND_BLK (&tip_reserve_priv);
-  if (TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN !=
+  if (TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED !=
       plugin->authorize_tip (plugin->cls,
                              "testing tips reserve unknown",
                              &amount,
                              &tip_reserve_priv,
+			     "http://localhost:8081/",
                              &tip_expiration,
                              &tip_id))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
-
   RND_BLK (&tip_credit_uuid);
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":5",
@@ -578,6 +579,7 @@ test_tipping ()
                              "testing tips too late",
                              &amount,
                              &tip_reserve_priv,
+			     "http://localhost:8081/",
                              &tip_expiration,
                              &tip_id))
   {
@@ -623,6 +625,7 @@ test_tipping ()
                              "testing tips",
                              &amount,
                              &tip_reserve_priv,
+			     "http://localhost:8081/",
                              &tip_expiration,
                              &tip_id))
   {
@@ -634,11 +637,28 @@ test_tipping ()
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+      plugin->lookup_exchange_by_tip (plugin->cls,
+				      &tip_id,
+				      &uri))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  if (0 != strcmp ("http://localhost:8081/",
+		   uri))
+  {
+    GNUNET_free (uri);
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+  GNUNET_free (uri);
   if (TALER_EC_NONE !=
       plugin->authorize_tip (plugin->cls,
                              "testing tips more",
                              &amount,
                              &tip_reserve_priv,
+			     "http://localhost:8081/",
                              &tip_expiration,
                              &tip_id))
   {
@@ -711,6 +731,7 @@ test_tipping ()
                              "testing tips insufficient funds",
                              &amount,
                              &tip_reserve_priv,
+			     "http://localhost:8081/",
                              &tip_expiration,
                              &tip_id))
   {

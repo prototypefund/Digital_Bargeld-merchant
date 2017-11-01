@@ -656,6 +656,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param justification why was the tip approved
    * @param amount how high is the tip (with fees)
    * @param reserve_priv which reserve is debited
+   * @param exchange_uri which exchange manages the tip
    * @param[out] expiration set to when the tip expires
    * @param[out] tip_id set to the unique ID for the tip
    * @return transaction status,
@@ -671,9 +672,26 @@ struct TALER_MERCHANTDB_Plugin
                    const char *justification,
                    const struct TALER_Amount *amount,
                    const struct TALER_ReservePrivateKeyP *reserve_priv,
+		   const char *exchange_uri,
                    struct GNUNET_TIME_Absolute *expiration,
                    struct GNUNET_HashCode *tip_id);
 
+
+  /**
+   * Find out which exchange was associated with @a tip_id
+   *
+   * @param cls closure, typically a connection to the d
+   * @param tip_id the unique ID for the tip
+   * @param[out] exchange_uri set to the URI of the exchange
+   * @return transaction status, usually
+   *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT for success
+   *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if @a credit_uuid already known
+   */
+  enum GNUNET_DB_QueryStatus
+  (*lookup_exchange_by_tip)(void *cls,
+			    const struct GNUNET_HashCode *tip_id,
+			    char **exchange_uri);
+  
 
   /**
    * Pickup a tip over @a amount using pickup id @a pickup_id.

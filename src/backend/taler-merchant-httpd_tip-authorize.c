@@ -155,6 +155,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                           justification,
                           &amount,
                           &mi->tip_reserve,
+			  mi->tip_exchange,
                           &expiration,
                           &tip_id);
   if (TALER_EC_NONE != ec)
