@@ -2860,8 +2860,10 @@ interpreter_run (void *cls)
                                     &reserve_priv,
                                     sizeof (reserve_priv));
       /* Simply picked long enough for the test (we do not test expiration
-         behavior for now) */
-      expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_HOURS);
+         behavior for now), should be short enough so that the reserve
+	 expires before the test is run again, so that we avoid old
+	 state messing up fresh runs. */
+      expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_MINUTES);
 
       if (NULL == (cmd->details.tip_enable.teo
                    = TALER_MERCHANT_tip_enable
@@ -3118,6 +3120,47 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
       .details.tip_enable.amount = "EUR:5.01" },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_authorize.instance = "tip",
+      .details.tip_authorize.justification = "tip 1",
+      .details.tip_authorize.amount = "EUR:5.01" },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_authorize.instance = "tip",
+      .details.tip_authorize.justification = "tip 2",
+      .details.tip_authorize.amount = "EUR:5.01" },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-3-insufficient-funds",
+      .expected_response_code = MHD_HTTP_PRECONDITION_FAILED,
+      .details.tip_authorize.instance = "tip",
+      .details.tip_authorize.justification = "tip 3",
+      .details.tip_authorize.amount = "EUR:5.01",
+      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-4-unknown-instance",
+      .expected_response_code = MHD_HTTP_NOT_FOUND,
+      .details.tip_authorize.instance = "unknown",
+      .details.tip_authorize.justification = "tip 4",
+      .details.tip_authorize.amount = "EUR:5.01",
+      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-5-notip-instance",
+      .expected_response_code = MHD_HTTP_NOT_FOUND,
+      .details.tip_authorize.instance = "default",
+      .details.tip_authorize.justification = "tip 5",
+      .details.tip_authorize.amount = "EUR:5.01",
+      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-6-not-enabled-instance",
+      .expected_response_code = MHD_HTTP_NOT_FOUND,
+      .details.tip_authorize.instance = "dtip",
+      .details.tip_authorize.justification = "tip 6",
+      .details.tip_authorize.amount = "EUR:5.01",
+      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED },
+    
     
     
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per

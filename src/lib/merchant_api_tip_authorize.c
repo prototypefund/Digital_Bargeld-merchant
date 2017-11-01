@@ -139,6 +139,12 @@ handle_tip_authorize_finished (void *cls,
       response_code = 0;
     }
     break;
+  case MHD_HTTP_NOT_FOUND:
+    /* Well-defined status code, pass on to application! */
+    break;
+  case MHD_HTTP_PRECONDITION_FAILED:
+    /* Well-defined status code, pass on to application! */
+    break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
        leaves this to the application */

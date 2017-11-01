@@ -2804,7 +2804,7 @@ postgres_authorize_tip (void *cls,
     /* reserve unknown */
     postgres_rollback (pg);
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
-      return TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN;
+      return TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED;
     return (GNUNET_DB_STATUS_HARD_ERROR == qs)
       ? TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR
       : TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
@@ -2824,7 +2824,6 @@ postgres_authorize_tip (void *cls,
     postgres_rollback (pg);
     return TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS;
   }
-
   /* Update reserve balance */
   {
     struct GNUNET_PQ_QueryParam params[] = {

@@ -123,23 +123,30 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   res = TMH_PARSE_json_data (connection,
                              root,
                              spec);
-  json_decref (root);
   if (GNUNET_YES != res)
   {
     GNUNET_break_op (0);
+    json_decref (root);
     return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
   }
 
   mi = TMH_lookup_instance (instance);
   if (NULL == mi)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Instance `%s' not configured\n",
+                instance);
+    json_decref (root);  
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN,
 					 "unknown instance");
+  }
   if (NULL == mi->tip_exchange)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Instance `%s' not configured for tipping\n",
                 instance);
+    json_decref (root);
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
 					 "exchange for tipping not configured for the instance");
@@ -152,10 +159,31 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                           &tip_id);
   if (TALER_EC_NONE != ec)
   {
-    /* FIXME: differenciate better between ec's */
-    return TMH_RESPONSE_reply_internal_error (connection,
-					      ec,
-                                              "Database error approving tip");
+    unsigned int rc;
+
+    switch (ec)
+    {
+    case TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS:
+      rc = MHD_HTTP_PRECONDITION_FAILED;
+      break;
+    case TALER_EC_TIP_AUTHORIZE_RESERVE_EXPIRED:
+      rc = MHD_HTTP_PRECONDITION_FAILED;
+      break;
+    case TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN:
+      rc = MHD_HTTP_NOT_FOUND;
+      break;
+    case TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED:
+      rc = MHD_HTTP_NOT_FOUND;
+      break;
+    default:
+      rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      break;
+    }
+    json_decref (root);      
+    return TMH_RESPONSE_reply_rc (connection,
+				  rc,
+				  ec,
+				  "Database error approving tip");
   }
   if (0)
   {
@@ -163,17 +191,18 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                 "Insufficient funds to authorize tip over `%s' at instance `%s'\n",
                 TALER_amount2s (&amount),
                 instance);
+    json_decref (root);
     return TMH_RESPONSE_reply_rc (connection,
                                   MHD_HTTP_PRECONDITION_FAILED,
                                   TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS,
                                   "Insufficient funds for tip");
   }
-
+  json_decref (root);
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_OK,
                                        "{s:o, s:o, s:s}",
                                        "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
-                                       "tip_expiration", GNUNET_JSON_from_time_abs (expiration),
+                                       "expiration", GNUNET_JSON_from_time_abs (expiration),
                                        "exchange_uri", mi->tip_exchange);
 }
 
