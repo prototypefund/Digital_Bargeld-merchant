@@ -145,6 +145,7 @@ TALER_MERCHANT_tip_enable (struct GNUNET_CURL_Context *ctx,
   CURL *eh;
   json_t *te_obj;
 
+  (void) GNUNET_TIME_round_abs (&expiration);
   teo = GNUNET_new (struct TALER_MERCHANT_TipEnableOperation);
   teo->ctx = ctx;
   teo->cb = enable_cb;

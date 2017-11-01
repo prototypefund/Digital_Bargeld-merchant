@@ -3108,6 +3108,16 @@ run (void *cls)
       .details.admin_add_incoming.transfer_details
         = "{ \"uuid\": 100}",
       .details.admin_add_incoming.amount = "EUR:10.02" },
+    { .oc = OC_TIP_ENABLE,
+      .label = "enable-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
+      .details.tip_enable.amount = "EUR:5.01" },
+    { .oc = OC_TIP_ENABLE,
+      .label = "enable-tip-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
+      .details.tip_enable.amount = "EUR:5.01" },
     
     
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per
