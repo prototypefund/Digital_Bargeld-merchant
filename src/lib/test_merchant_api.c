@@ -2338,7 +2338,7 @@ interpreter_run (void *cls)
       if (GNUNET_OK !=
           GNUNET_CONFIGURATION_get_value_string (cfg,
                                                  section,
-                                                 "tipping-reserve-priv",
+                                                 "TIP_RESERVE_PRIV",
                                                  &keys))
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -2561,19 +2561,20 @@ interpreter_run (void *cls)
 
         /* Token syntax is "LABEL[/NUMBER]" */
         ctok = strchr (token, '/');
+	ci = 0;
         if (NULL != ctok)
         {
           *ctok = '\0';
           ctok++;
-        }
-        if (1 != sscanf (ctok,
-                         "%u",
-                         &ci))
-        {
-          GNUNET_break (0);
-          fail (is);
-          return;
-        }
+	  if (1 != sscanf (ctok,
+			   "%u",
+			   &ci))
+	  {
+	    GNUNET_break (0);
+	    fail (is);
+	    return;
+	  }
+	}
         GNUNET_assert (coin_ref = find_command (is,
                                                 token));
         switch (coin_ref->oc)
@@ -3096,6 +3097,19 @@ run (void *cls)
   struct InterpreterState *is;
   static struct Command commands[] =
   {
+    /* Test tipping */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.instance = "tip",
+      .details.admin_add_incoming.sender_details
+      = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \
+        \"account_number\":62, \"uuid\":100 }",
+      .details.admin_add_incoming.transfer_details
+        = "{ \"uuid\": 100}",
+      .details.admin_add_incoming.amount = "EUR:10.02" },
+    
+    
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per
        config */
     { .oc = OC_ADMIN_ADD_INCOMING,
