@@ -39,7 +39,7 @@
  */
 struct PlanchetDetail
 {
-  
+
   /**
    * The complete withdraw request that we are building to sign.
    * Built incrementally during the processing of the request.
@@ -87,7 +87,7 @@ struct PickupContext
    * Operation we run to find the exchange (and get its /keys).
    */
   struct TMH_EXCHANGES_FindOperation *fo;
-  
+
   /**
    * Array of planchets of length @e planchets_len.
    */
@@ -108,7 +108,7 @@ struct PickupContext
    * Total value of the coins we are withdrawing.
    */
   struct TALER_Amount total;
-  
+
   /**
    * Length of @e planchets.
    */
@@ -120,7 +120,7 @@ struct PickupContext
   enum TALER_ErrorCode ec;
 
   /**
-   * HTTP status code to return in combination with @e ec 
+   * HTTP status code to return in combination with @e ec
    * if @e ec is not #TALER_EC_NONE.
    */
   unsigned int response_code;
@@ -130,7 +130,7 @@ struct PickupContext
    * if @e ec is not #TALER_EC_NONE.
    */
   const char *error_hint;
-  
+
 };
 
 
@@ -170,7 +170,7 @@ pickup_cleanup (struct TM_HandlerContext *hc)
  *
  * @param connection MHD connection for sending the response
  * @param tip_id which tip are we picking up
- * @param pc pickup context 
+ * @param pc pickup context
  * @return #MHD_YES upon success, #MHD_NO if
  *         the connection ought to be dropped
  */
@@ -198,14 +198,19 @@ run_pickup (struct MHD_Connection *connection,
   if (TALER_EC_NONE != ec)
   {
     unsigned int response_code;
-    
+
     switch (ec)
     {
+    case TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN:
+      response_code = MHD_HTTP_NOT_FOUND;
+      break;
+    case TALER_EC_TIP_PICKUP_NO_FUNDS:
+      response_code = MHD_HTTP_SERVICE_UNAVAILABLE;
+      break;
     default:
       response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
       break;
     }
-    /* FIXME: be more specific in choice of HTTP status code */
     return TMH_RESPONSE_reply_rc (connection,
 				  response_code,
 				  ec,
@@ -218,7 +223,7 @@ run_pickup (struct MHD_Connection *connection,
   {
     struct PlanchetDetail *pd = &pc->planchets[i];
     struct TALER_ReserveSignatureP reserve_sig;
-    
+
     pd->wr.reserve_pub = reserve_pub;
     GNUNET_assert (GNUNET_OK ==
 		   GNUNET_CRYPTO_eddsa_sign (&reserve_priv.eddsa_priv,
@@ -323,14 +328,14 @@ exchange_found_cb (void *cls,
 		       &amount_with_fee);
   }
   GNUNET_CRYPTO_hash_context_finish (hc,
-				     &pc->pickup_id);  
+				     &pc->pickup_id);
   if (GNUNET_YES == ae)
   {
     pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_AMOUNT_OVERFLOW;
     pc->error_hint = "error computing total value of the tip";
     pc->response_code = MHD_HTTP_BAD_REQUEST;
     TMH_trigger_daemon ();
-    return;      
+    return;
   }
   pc->total = total;
   TMH_trigger_daemon ();
@@ -343,7 +348,7 @@ exchange_found_cb (void *cls,
  *
  * @param connection MHD connection for sending the response
  * @param tip_id which tip are we picking up
- * @param pc pickup context 
+ * @param pc pickup context
  * @return #MHD_YES upon success, #MHD_NO if
  *         the connection ought to be dropped
  */
@@ -373,7 +378,7 @@ prepare_pickup (struct MHD_Connection *connection,
 				  response_code,
 				  ec,
 				  "Could not determine exchange URI for the given tip id");
-    
+
   }
   pc->fo = TMH_EXCHANGES_find_exchange (pc->exchange_uri,
 					NULL,
@@ -413,7 +418,7 @@ parse_planchet (struct MHD_Connection *connection,
 			      &pd->coin_ev_size),
     GNUNET_JSON_spec_end()
   };
-  
+
   ret = TMH_PARSE_json_data (connection,
 			     planchet,
 			     spec);
