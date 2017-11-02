@@ -176,6 +176,9 @@ handle_tip_pickup_finished (void *cls,
     /* Server had an internal issue; we should retry, but this API
        leaves this to the application */
     break;
+  case MHD_HTTP_SERVICE_UNAVAILABLE:
+    /* legal, can happen if we pickup a tip twice... */
+    break;
   default:
     /* unexpected response code */
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,

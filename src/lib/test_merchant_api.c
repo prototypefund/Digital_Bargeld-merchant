@@ -1862,12 +1862,16 @@ pickup_withdraw_cb (void *cls,
   struct Command *cmd = &is->commands[is->ip];
 
   wh->wsh = NULL;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Withdraw operation completed with %u/%u\n",
+              http_status,
+              ec);
   GNUNET_assert (wh->off < cmd->details.tip_pickup.num_coins);
   if ( (MHD_HTTP_OK != http_status) ||
        (TALER_EC_NONE != ec) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u/%u to command %s\n",
+                "Unexpected response code %u/%u to command %s when withdrawing\n",
                 http_status,
                 ec,
                 cmd->label);
@@ -1944,6 +1948,9 @@ pickup_cb (void *cls,
   }
 
   /* pickup successful, now withdraw! */
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Obtained %u signatures for withdrawal from picking up a tip\n",
+              num_reserve_sigs);
   cmd->details.tip_pickup.withdraws
     = GNUNET_new_array (num_reserve_sigs,
                         struct WithdrawHandle);
@@ -2945,6 +2952,7 @@ interpreter_run (void *cls)
             fail (is);
             return;
           }
+          TALER_planchet_setup_random (&cmd->details.tip_pickup.psa[i]);
           if (GNUNET_OK !=
               TALER_planchet_prepare (&cmd->details.tip_pickup.dks[i]->key,
                                       &cmd->details.tip_pickup.psa[i],
@@ -3119,78 +3127,6 @@ run (void *cls)
   };
   static struct Command commands[] =
   {
-    /* Test tipping */
-    { .oc = OC_ADMIN_ADD_INCOMING,
-      .label = "create-reserve-tip-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.instance = "tip",
-      .details.admin_add_incoming.sender_details
-      = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \
-        \"account_number\":62, \"uuid\":100 }",
-      .details.admin_add_incoming.transfer_details
-        = "{ \"uuid\": 100}",
-      .details.admin_add_incoming.amount = "EUR:10.02" },
-    { .oc = OC_TIP_ENABLE,
-      .label = "enable-tip-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
-      .details.tip_enable.amount = "EUR:5.01" },
-    /* Test incrementing active reserve balance */
-    { .oc = OC_TIP_ENABLE,
-      .label = "enable-tip-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
-      .details.tip_enable.amount = "EUR:5.01" },
-    /* Authorize two tips */
-    { .oc = OC_TIP_AUTHORIZE,
-      .label = "authorize-tip-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.tip_authorize.instance = "tip",
-      .details.tip_authorize.justification = "tip 1",
-      .details.tip_authorize.amount = "EUR:5.01" },
-    { .oc = OC_TIP_AUTHORIZE,
-      .label = "authorize-tip-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.tip_authorize.instance = "tip",
-      .details.tip_authorize.justification = "tip 2",
-      .details.tip_authorize.amount = "EUR:5.01" },
-    /* Test authorization failure modes */
-    { .oc = OC_TIP_AUTHORIZE,
-      .label = "authorize-tip-3-insufficient-funds",
-      .expected_response_code = MHD_HTTP_PRECONDITION_FAILED,
-      .details.tip_authorize.instance = "tip",
-      .details.tip_authorize.justification = "tip 3",
-      .details.tip_authorize.amount = "EUR:5.01",
-      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS },
-    { .oc = OC_TIP_AUTHORIZE,
-      .label = "authorize-tip-4-unknown-instance",
-      .expected_response_code = MHD_HTTP_NOT_FOUND,
-      .details.tip_authorize.instance = "unknown",
-      .details.tip_authorize.justification = "tip 4",
-      .details.tip_authorize.amount = "EUR:5.01",
-      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN },
-    { .oc = OC_TIP_AUTHORIZE,
-      .label = "authorize-tip-5-notip-instance",
-      .expected_response_code = MHD_HTTP_NOT_FOUND,
-      .details.tip_authorize.instance = "default",
-      .details.tip_authorize.justification = "tip 5",
-      .details.tip_authorize.amount = "EUR:5.01",
-      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP },
-    { .oc = OC_TIP_AUTHORIZE,
-      .label = "authorize-tip-6-not-enabled-instance",
-      .expected_response_code = MHD_HTTP_NOT_FOUND,
-      .details.tip_authorize.instance = "dtip",
-      .details.tip_authorize.justification = "tip 6",
-      .details.tip_authorize.amount = "EUR:5.01",
-      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED },
-    /* Withdraw tip */
-    { .oc = OC_TIP_PICKUP,
-      .label = "pickup-tip-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.tip_pickup.authorize_ref = "authorize-tip-1",
-      .details.tip_pickup.amounts = pickup_amounts_1 },
-
-
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per
        config */
     { .oc = OC_ADMIN_ADD_INCOMING,
@@ -3500,6 +3436,136 @@ run (void *cls)
       .details.refund_lookup.increase_ref = "refund-increase-1",
       .details.refund_lookup.pay_ref = "deposit-simple"
     },
+
+    /* Test tipping */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.instance = "tip",
+      .details.admin_add_incoming.sender_details
+      = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \
+        \"account_number\":62, \"uuid\":100 }",
+      .details.admin_add_incoming.transfer_details
+        = "{ \"uuid\": 100}",
+      /* we run *two* instances, but only this first call will
+         actually fill the reserve, as the second one will be seen as
+         a duplicate. Hence fill with twice the require amount per
+         round. */
+      .details.admin_add_incoming.amount = "EUR:20.04" },
+    { .oc = OC_TIP_ENABLE,
+      .label = "enable-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
+      .details.tip_enable.amount = "EUR:5.01" },
+    /* Test incrementing active reserve balance */
+    { .oc = OC_TIP_ENABLE,
+      .label = "enable-tip-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
+      .details.tip_enable.amount = "EUR:5.01" },
+    /* Authorize two tips */
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_authorize.instance = "tip",
+      .details.tip_authorize.justification = "tip 1",
+      .details.tip_authorize.amount = "EUR:5.01" },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_authorize.instance = "tip",
+      .details.tip_authorize.justification = "tip 2",
+      .details.tip_authorize.amount = "EUR:5.01" },
+    /* Test authorization failure modes */
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-3-insufficient-funds",
+      .expected_response_code = MHD_HTTP_PRECONDITION_FAILED,
+      .details.tip_authorize.instance = "tip",
+      .details.tip_authorize.justification = "tip 3",
+      .details.tip_authorize.amount = "EUR:5.01",
+      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-4-unknown-instance",
+      .expected_response_code = MHD_HTTP_NOT_FOUND,
+      .details.tip_authorize.instance = "unknown",
+      .details.tip_authorize.justification = "tip 4",
+      .details.tip_authorize.amount = "EUR:5.01",
+      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-5-notip-instance",
+      .expected_response_code = MHD_HTTP_NOT_FOUND,
+      .details.tip_authorize.instance = "default",
+      .details.tip_authorize.justification = "tip 5",
+      .details.tip_authorize.amount = "EUR:5.01",
+      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP },
+    { .oc = OC_TIP_AUTHORIZE,
+      .label = "authorize-tip-6-not-enabled-instance",
+      .expected_response_code = MHD_HTTP_NOT_FOUND,
+      .details.tip_authorize.instance = "dtip",
+      .details.tip_authorize.justification = "tip 6",
+      .details.tip_authorize.amount = "EUR:5.01",
+      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED },
+    /* Withdraw tip */
+    { .oc = OC_TIP_PICKUP,
+      .label = "pickup-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_pickup.authorize_ref = "authorize-tip-1",
+      .details.tip_pickup.amounts = pickup_amounts_1 },
+    { .oc = OC_TIP_PICKUP,
+      .label = "pickup-tip-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_pickup.authorize_ref = "authorize-tip-2",
+      .details.tip_pickup.amounts = pickup_amounts_1 },
+    { .oc = OC_TIP_PICKUP,
+      .label = "pickup-tip-3-too-much",
+      .expected_response_code = MHD_HTTP_SERVICE_UNAVAILABLE,
+      .details.tip_pickup.expected_ec = TALER_EC_TIP_PICKUP_NO_FUNDS,
+      .details.tip_pickup.authorize_ref = "authorize-tip-1",
+      .details.tip_pickup.amounts = pickup_amounts_1 },
+    /* Spend tip (just to be sure...) */
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.proposal.order = "{\
+        \"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"1-tip\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+    	\"summary\": \"merchant-lib testcase\",\
+        \"products\":\
+          [ {\"description\":\"ice cream tip\",\
+             \"value\":\"{EUR:5}\"} ] }"},
+    { .oc = OC_PAY,
+      .label = "deposit-tip-simple",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay.contract_ref = "create-proposal-tip-1",
+      .details.pay.coin_ref = "pickup-tip-1",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99" },
+    /* Run transfers. */
+    { .oc = OC_RUN_AGGREGATOR,
+      .label = "run-aggregator-tip-1" },
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-tip-498c",
+      .details.check_bank_transfer.amount = "EUR:4.98",
+      /* exchange-outgoing */
+      .details.check_bank_transfer.account_debit = 2,
+      /* merchant */
+      .details.check_bank_transfer.account_credit = 62
+    },
+
+    /* Check that there are no other unusual transfers */
+    { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
+      .label = "check_bank_empty" },
+
+
     /* end of testcase */
     { .oc = OC_END }
   };
@@ -3566,6 +3632,7 @@ main (int argc,
                                            "merchant",
                                            "INSTANCES",
                                            &_instances));
+
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Found instances `%s'\n",
               _instances);
