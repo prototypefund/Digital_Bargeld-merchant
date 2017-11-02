@@ -1866,7 +1866,11 @@ pickup_withdraw_cb (void *cls,
   if ( (MHD_HTTP_OK != http_status) ||
        (TALER_EC_NONE != ec) )
   {
-    GNUNET_break (0);
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u/%u to command %s\n",
+                http_status,
+                ec,
+                cmd->label);
     fail (is);
     return;
   }
@@ -1911,7 +1915,11 @@ pickup_cb (void *cls,
   cmd->details.tip_pickup.tpo = NULL;
   if (http_status != cmd->expected_response_code)
   {
-    GNUNET_break (0);
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u/%u to command %s\n",
+                http_status,
+                ec,
+                cmd->label);
     fail (is);
     return;
   }
@@ -2590,6 +2598,7 @@ interpreter_run (void *cls)
           icoin->denom_pub = coin_ref->details.tip_pickup.dks[ci]->key;
           icoin->denom_sig = coin_ref->details.tip_pickup.sigs[ci];
           icoin->denom_value = coin_ref->details.tip_pickup.dks[ci]->value;
+          break;
         default:
           GNUNET_assert (0);
         }
@@ -2904,54 +2913,61 @@ interpreter_run (void *cls)
     }
   case OC_TIP_PICKUP:
     {
-      unsigned int num_planchets = cmd->details.tip_pickup.num_coins;
-      struct TALER_PlanchetDetail planchets[num_planchets];
+      unsigned int num_planchets;
 
-      ref = find_command (is,
-                          cmd->details.tip_pickup.authorize_ref);
-      GNUNET_assert (NULL != ref);
-      GNUNET_assert (OC_TIP_AUTHORIZE == ref->oc);
-      cmd->details.tip_pickup.psa = GNUNET_new_array (num_planchets,
-                                                      struct TALER_PlanchetSecretsP);
-      cmd->details.tip_pickup.dks = GNUNET_new_array (num_planchets,
-                                                      const struct TALER_EXCHANGE_DenomPublicKey *);
-      for (unsigned int i=0;i<num_planchets;i++)
+      for (num_planchets=0;
+           NULL != cmd->details.tip_pickup.amounts[num_planchets];
+           num_planchets++);
+      cmd->details.tip_pickup.num_coins = num_planchets;
       {
-        GNUNET_assert (GNUNET_OK ==
-                       TALER_string_to_amount (cmd->details.tip_pickup.amounts[i],
-                                               &amount));
+        struct TALER_PlanchetDetail planchets[num_planchets];
 
-        cmd->details.tip_pickup.dks[i]
-          = find_pk (is->keys,
-                     &amount);
-        if (NULL == cmd->details.tip_pickup.dks[i])
+        ref = find_command (is,
+                            cmd->details.tip_pickup.authorize_ref);
+        GNUNET_assert (NULL != ref);
+        GNUNET_assert (OC_TIP_AUTHORIZE == ref->oc);
+        cmd->details.tip_pickup.psa = GNUNET_new_array (num_planchets,
+                                                        struct TALER_PlanchetSecretsP);
+        cmd->details.tip_pickup.dks = GNUNET_new_array (num_planchets,
+                                                        const struct TALER_EXCHANGE_DenomPublicKey *);
+        for (unsigned int i=0;i<num_planchets;i++)
+        {
+          GNUNET_assert (GNUNET_OK ==
+                         TALER_string_to_amount (cmd->details.tip_pickup.amounts[i],
+                                                 &amount));
+
+          cmd->details.tip_pickup.dks[i]
+            = find_pk (is->keys,
+                       &amount);
+          if (NULL == cmd->details.tip_pickup.dks[i])
+          {
+            GNUNET_break (0);
+            fail (is);
+            return;
+          }
+          if (GNUNET_OK !=
+              TALER_planchet_prepare (&cmd->details.tip_pickup.dks[i]->key,
+                                      &cmd->details.tip_pickup.psa[i],
+                                      &planchets[i]))
+          {
+            GNUNET_break (0);
+            fail (is);
+            return;
+          }
+        }
+        if (NULL == (cmd->details.tip_pickup.tpo
+                     = TALER_MERCHANT_tip_pickup
+                     (ctx,
+                      MERCHANT_URI,
+                      &ref->details.tip_authorize.tip_id,
+                      num_planchets,
+                      planchets,
+                      &pickup_cb,
+                      is)))
         {
           GNUNET_break (0);
           fail (is);
-          return;
         }
-        if (GNUNET_OK !=
-            TALER_planchet_prepare (&cmd->details.tip_pickup.dks[i]->key,
-                                    &cmd->details.tip_pickup.psa[i],
-                                    &planchets[i]))
-        {
-          GNUNET_break (0);
-          fail (is);
-          return;
-        }
-      }
-      if (NULL == (cmd->details.tip_pickup.tpo
-                   = TALER_MERCHANT_tip_pickup
-                   (ctx,
-                    MERCHANT_URI,
-                    &ref->details.tip_authorize.tip_id,
-                    num_planchets,
-                    planchets,
-                    &pickup_cb,
-                    is)))
-      {
-        GNUNET_break (0);
-        fail (is);
       }
       break;
     }
@@ -3097,6 +3113,10 @@ static void
 run (void *cls)
 {
   struct InterpreterState *is;
+  static const char *pickup_amounts_1[] = {
+    "EUR:5",
+    NULL
+  };
   static struct Command commands[] =
   {
     /* Test tipping */
@@ -3115,11 +3135,13 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
       .details.tip_enable.amount = "EUR:5.01" },
+    /* Test incrementing active reserve balance */
     { .oc = OC_TIP_ENABLE,
       .label = "enable-tip-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
       .details.tip_enable.amount = "EUR:5.01" },
+    /* Authorize two tips */
     { .oc = OC_TIP_AUTHORIZE,
       .label = "authorize-tip-1",
       .expected_response_code = MHD_HTTP_OK,
@@ -3132,6 +3154,7 @@ run (void *cls)
       .details.tip_authorize.instance = "tip",
       .details.tip_authorize.justification = "tip 2",
       .details.tip_authorize.amount = "EUR:5.01" },
+    /* Test authorization failure modes */
     { .oc = OC_TIP_AUTHORIZE,
       .label = "authorize-tip-3-insufficient-funds",
       .expected_response_code = MHD_HTTP_PRECONDITION_FAILED,
@@ -3160,9 +3183,14 @@ run (void *cls)
       .details.tip_authorize.justification = "tip 6",
       .details.tip_authorize.amount = "EUR:5.01",
       .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED },
-    
-    
-    
+    /* Withdraw tip */
+    { .oc = OC_TIP_PICKUP,
+      .label = "pickup-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_pickup.authorize_ref = "authorize-tip-1",
+      .details.tip_pickup.amounts = pickup_amounts_1 },
+
+
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per
        config */
     { .oc = OC_ADMIN_ADD_INCOMING,

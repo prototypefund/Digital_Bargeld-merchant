@@ -224,6 +224,11 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
   json_t *pa;
   json_t *tp_obj;
 
+  if (0 == num_planchets)
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   pa = json_array ();
   for (unsigned int i=0;i<num_planchets;i++)
   {
@@ -243,8 +248,14 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
       json_decref (pa);
       return NULL;
     }
-    json_array_append_new (pa,
-                           p);
+    if (0 !=
+        json_array_append_new (pa,
+                               p))
+    {
+      GNUNET_break (0);
+      json_decref (pa);
+      return NULL;
+    }
   }
   tp_obj = json_pack ("{"
                       " s:o," /* tip_id */

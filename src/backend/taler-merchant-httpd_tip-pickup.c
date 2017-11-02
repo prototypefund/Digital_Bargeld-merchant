@@ -94,6 +94,11 @@ struct PickupContext
   struct PlanchetDetail *planchets;
 
   /**
+   * The connection we are processing.
+   */
+  struct MHD_Connection *connection;
+
+  /**
    * Tip ID that was supplied by the client.
    */
   struct GNUNET_HashCode tip_id;
@@ -230,7 +235,9 @@ run_pickup (struct MHD_Connection *connection,
 					     &pd->wr.purpose,
 					     &reserve_sig.eddsa_signature));
     json_array_append_new (sigs,
-			   GNUNET_JSON_from_data_auto (&reserve_sig));
+                           json_pack ("{s:o}",
+                                      "reserve_sig",
+                                      GNUNET_JSON_from_data_auto (&reserve_sig)));
   }
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_OK,
@@ -261,11 +268,14 @@ exchange_found_cb (void *cls,
   struct TALER_Amount total;
   int ae;
 
+  pc->fo = NULL;
+  MHD_resume_connection (pc->connection);
   if (NULL == eh)
   {
     pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_DOWN;
     pc->error_hint = "failed to contact exchange, check URL";
     pc->response_code = MHD_HTTP_FAILED_DEPENDENCY;
+    TMH_trigger_daemon ();
     return;
   }
   keys = TALER_EXCHANGE_get_keys (eh);
@@ -274,13 +284,17 @@ exchange_found_cb (void *cls,
     pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEYS;
     pc->error_hint = "could not obtain denomination keys from exchange, check URL";
     pc->response_code = MHD_HTTP_FAILED_DEPENDENCY;
+    TMH_trigger_daemon ();
     return;
   }
-
+  GNUNET_assert (0 != pc->planchets_len);
   ae = GNUNET_NO;
   memset (&total,
 	  0,
 	  sizeof (total));
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Calculating tip amount over %u planchets!\n",
+              pc->planchets_len);
   hc = GNUNET_CRYPTO_hash_context_start ();
   for (unsigned int i=0;i<pc->planchets_len;i++)
   {
@@ -309,7 +323,9 @@ exchange_found_cb (void *cls,
 	TALER_amount_add (&amount_with_fee,
 			  &dk->value,
 			  &dk->fee_withdraw))
+    {
       ae = GNUNET_YES;
+    }
     if (0 == i)
     {
       total = amount_with_fee;
@@ -320,7 +336,9 @@ exchange_found_cb (void *cls,
 	  TALER_amount_add (&total,
 			    &total,
 			    &amount_with_fee))
+      {
 	ae = GNUNET_YES;
+      }
     }
     TALER_amount_hton (&pd->wr.withdraw_fee,
 		       &dk->fee_withdraw);
@@ -346,35 +364,44 @@ exchange_found_cb (void *cls,
  * Prepare (and eventually execute) a pickup. Finds the exchange
  * handle we need for #run_pickup().
  *
- * @param connection MHD connection for sending the response
- * @param tip_id which tip are we picking up
  * @param pc pickup context
  * @return #MHD_YES upon success, #MHD_NO if
  *         the connection ought to be dropped
  */
 static int
-prepare_pickup (struct MHD_Connection *connection,
-		struct PickupContext *pc)
+prepare_pickup (struct PickupContext *pc)
 {
-  enum TALER_ErrorCode ec;
+  enum GNUNET_DB_QueryStatus qs;
 
-  ec = db->lookup_exchange_by_tip (db->cls,
+  qs = db->lookup_exchange_by_tip (db->cls,
 				   &pc->tip_id,
 				   &pc->exchange_uri);
-  if (TALER_EC_NONE != ec)
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
   {
     unsigned int response_code;
+    enum TALER_ErrorCode ec;
 
-    switch (ec)
+    switch (qs)
     {
-    case TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN:
+    case GNUNET_DB_STATUS_SUCCESS_NO_RESULTS:
+      ec = TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN;
       response_code = MHD_HTTP_NOT_FOUND;
       break;
+    case GNUNET_DB_STATUS_SOFT_ERROR:
+      ec = TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+      response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      break;
+    case GNUNET_DB_STATUS_HARD_ERROR:
+      ec = TALER_EC_TIP_PICKUP_DB_ERROR_HARD;
+      response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      break;
     default:
+      GNUNET_break (0);
+      ec = TALER_EC_INTERNAL_LOGIC_ERROR;
       response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
       break;
     }
-    return TMH_RESPONSE_reply_rc (connection,
+    return TMH_RESPONSE_reply_rc (pc->connection,
 				  response_code,
 				  ec,
 				  "Could not determine exchange URI for the given tip id");
@@ -386,11 +413,12 @@ prepare_pickup (struct MHD_Connection *connection,
 					pc);
   if (NULL == pc->fo)
   {
-    return TMH_RESPONSE_reply_rc (connection,
+    return TMH_RESPONSE_reply_rc (pc->connection,
 				  MHD_HTTP_INTERNAL_SERVER_ERROR,
 				  TALER_EC_INTERNAL_INVARIANT_FAILURE,
 				  "consult server logs");
   }
+  MHD_suspend_connection (pc->connection);
   return MHD_YES;
 }
 
@@ -466,6 +494,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
   {
     pc = GNUNET_new (struct PickupContext);
     pc->hc.cc = &pickup_cleanup;
+    pc->connection = connection;
     *connection_cls = pc;
   }
   else
@@ -511,6 +540,15 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
 				  TALER_EC_TIP_PICKUP_EXCHANGE_TOO_MANY_PLANCHETS,
 				  "limit of 1024 planchets exceeded by request");
   }
+  if (0 == pc->planchets_len)
+  {
+    GNUNET_JSON_parse_free (spec);
+    json_decref (root);
+    return TMH_RESPONSE_reply_rc (connection,
+				  MHD_HTTP_BAD_REQUEST,
+				  TALER_EC_PARAMETER_MALFORMED,
+				  "no planchets specified");
+  }
   pc->planchets = GNUNET_new_array (pc->planchets_len,
 				    struct PlanchetDetail);
   for (unsigned int i=0;i<pc->planchets_len;i++)
@@ -527,8 +565,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
     }
   }
   pc->tip_id = tip_id;
-  res = prepare_pickup (connection,
-			pc);
+  res = prepare_pickup (pc);
   GNUNET_JSON_parse_free (spec);
   json_decref (root);
   return res;
