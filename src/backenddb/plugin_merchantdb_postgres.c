@@ -28,6 +28,11 @@
 #include <taler/taler_json_lib.h>
 #include "taler_merchantdb_plugin.h"
 
+/**
+ * How often do we re-try if we run into a DB serialization error?
+ */
+#define MAX_RETRIES 3
+
 
 /**
  * Type of the "cls" argument given to each of the functions in
@@ -2631,8 +2636,13 @@ postgres_enable_tip_reserve (void *cls,
   enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_TIME_Absolute new_expiration;
   struct TALER_Amount new_balance;
+  unsigned int retries;
 
+  retries = 0;
   check_connection (pg);
+ RETRY:
+  if (MAX_RETRIES < ++retries)
+    return GNUNET_DB_STATUS_SOFT_ERROR;
   if (GNUNET_OK !=
       postgres_start (pg))
   {
@@ -2659,6 +2669,8 @@ postgres_enable_tip_reserve (void *cls,
     {
       GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
       postgres_rollback (pg);
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+        goto RETRY;
       return qs;
     }
     /* UUID already exists, we are done! */
@@ -2692,6 +2704,8 @@ postgres_enable_tip_reserve (void *cls,
   {
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
     postgres_rollback (pg);
+    if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+      goto RETRY;
     return qs;
   }
   if ( (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs) &&
@@ -2741,6 +2755,8 @@ postgres_enable_tip_reserve (void *cls,
     {
       GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
       postgres_rollback (pg);
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+        goto RETRY;
       return qs;
     }
   }
@@ -2748,6 +2764,8 @@ postgres_enable_tip_reserve (void *cls,
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     return GNUNET_DB_STATUS_SUCCESS_ONE_RESULT;
   GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
+  if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+    goto RETRY;
   return qs;
 }
 
@@ -2797,8 +2815,13 @@ postgres_authorize_tip (void *cls,
   };
   enum GNUNET_DB_QueryStatus qs;
   struct TALER_Amount new_balance;
+  unsigned int retries;
 
+  retries = 0;
   check_connection (pg);
+ RETRY:
+  if (MAX_RETRIES < ++retries)
+    return TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
   if (GNUNET_OK !=
       postgres_start (pg))
   {
@@ -2813,11 +2836,11 @@ postgres_authorize_tip (void *cls,
   {
     /* reserve unknown */
     postgres_rollback (pg);
+    if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+      goto RETRY;
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
       return TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED;
-    return (GNUNET_DB_STATUS_HARD_ERROR == qs)
-      ? TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR
-      : TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
+    return TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR;
   }
   if (0 == GNUNET_TIME_absolute_get_remaining (old_expiration).rel_value_us)
   {
@@ -2849,9 +2872,9 @@ postgres_authorize_tip (void *cls,
     if (0 > qs)
     {
       postgres_rollback (pg);
-      return (GNUNET_DB_STATUS_HARD_ERROR == qs)
-        ? TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR
-        : TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+        goto RETRY;
+      return TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR;
     }
   }
   /* Generate and store tip ID */
@@ -2878,17 +2901,17 @@ postgres_authorize_tip (void *cls,
     if (0 > qs)
     {
       postgres_rollback (pg);
-      return (GNUNET_DB_STATUS_HARD_ERROR == qs)
-        ? TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR
-        : TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+        goto RETRY;
+      return TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR;
     }
   }
   qs = postgres_commit (pg);
   if (0 <= qs)
     return TALER_EC_NONE; /* success! */
-  return (GNUNET_DB_STATUS_HARD_ERROR == qs)
-    ? TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR
-    : TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
+  if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+    goto RETRY;
+  return TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR;
 }
 
 
@@ -2970,8 +2993,13 @@ postgres_pickup_tip (void *cls,
     GNUNET_PQ_result_spec_end
   };
   enum GNUNET_DB_QueryStatus qs;
+  unsigned int retries;
 
+  retries = 0;
   check_connection (pg);
+ RETRY:
+  if (MAX_RETRIES < ++retries)
+    return GNUNET_DB_STATUS_SOFT_ERROR;
   if (GNUNET_OK !=
       postgres_start (pg))
   {
@@ -2991,9 +3019,9 @@ postgres_pickup_tip (void *cls,
     postgres_rollback (pg);
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
       return TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN;
-    return (GNUNET_DB_STATUS_HARD_ERROR == qs)
-      ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
-      : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+    if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+      goto RETRY;
+    return TALER_EC_TIP_PICKUP_DB_ERROR_HARD;
   }
 
   /* Check if pickup_id already exists */
@@ -3021,9 +3049,9 @@ postgres_pickup_tip (void *cls,
               0,
               sizeof (*reserve_priv));
       postgres_rollback (pg);
-      return (GNUNET_DB_STATUS_HARD_ERROR == qs)
-        ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
-        : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+        goto RETRY;
+      return TALER_EC_TIP_PICKUP_DB_ERROR_HARD;
     }
     if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
     {
@@ -3074,9 +3102,9 @@ postgres_pickup_tip (void *cls,
         memset (reserve_priv,
                 0,
                 sizeof (*reserve_priv));
-        return (GNUNET_DB_STATUS_HARD_ERROR == qs)
-          ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
-          : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+        if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+          goto RETRY;
+        return TALER_EC_TIP_PICKUP_DB_ERROR_HARD;
       }
     }
 
@@ -3098,18 +3126,18 @@ postgres_pickup_tip (void *cls,
         memset (reserve_priv,
                 0,
                 sizeof (*reserve_priv));
-        return (GNUNET_DB_STATUS_HARD_ERROR == qs)
-          ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
-          : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+        if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+          goto RETRY;
+        return TALER_EC_TIP_PICKUP_DB_ERROR_HARD;
       }
     }
   }
   qs = postgres_commit (pg);
   if (0 <= qs)
     return TALER_EC_NONE; /* success  */
-  return (GNUNET_DB_STATUS_HARD_ERROR == qs)
-    ? TALER_EC_TIP_PICKUP_DB_ERROR_HARD
-    : TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+  if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+    goto RETRY;
+  return TALER_EC_TIP_PICKUP_DB_ERROR_HARD;
 }
 
 
