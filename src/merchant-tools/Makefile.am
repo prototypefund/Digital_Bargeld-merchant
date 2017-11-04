@@ -3,7 +3,8 @@ AM_CPPFLAGS = -I$(top_srcdir)/src/include
 
 bin_PROGRAMS = \
   taler-merchant-dbinit \
-  taler-merchant-generate-payments
+  taler-merchant-generate-payments \
+  taler-merchant-tip-enable
 
 taler_merchant_dbinit_SOURCES = \
   taler-merchant-dbinit.c
@@ -14,6 +15,16 @@ taler_merchant_dbinit_LDADD = \
   -lgnunetutil \
   -ltalerutil \
   -ltalerpq
+
+taler_merchant_tip_enable_SOURCES = \
+  taler-merchant-tip-enable.c
+
+taler_merchant_tip_enable_LDADD = \
+  $(LIBGCRYPT_LIBS) \
+  $(top_builddir)/src/lib/libtalermerchant.la \
+  -lgnunetcurl \
+  -lgnunetutil \
+  -ltalerutil
 
 taler_merchant_generate_payments_SOURCES = \
   taler-merchant-generate-payments.c
@@ -30,4 +41,3 @@ taler_merchant_generate_payments_LDADD = \
   -lgnunetcurl \
   -lgnunetutil \
   -ljansson
-

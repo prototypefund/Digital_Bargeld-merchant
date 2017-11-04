@@ -11,13 +11,26 @@ arch.jpg: arch.dot
 
 AM_MAKEINFOHTMLFLAGS = --no-split --css-ref=docstyle.css --css-ref=brown-paper.css
 
+man_MANS = \
+  taler-merchant-tip-enable.1 \
+  taler-merchant-httpd.1
+
 info_TEXINFOS = manual.texi
+
 manual_TEXINFOS = version.texi
+
+extra_TEXINFOS = \
+  fdl-1.3.texi \
+  agpl.texi \
+  syntax.texi
 
 EXTRA_DIST = \
   arch.dot \
-  lgpl.texi \
-  agpl.texi \
-  fdl-1.3.texi \
+  $(extra_TEXINFOS) \
   docstyle.css \
-  brown-paper.css
+  brown-paper.css \
+  $(man_MANS)
+
+DISTCLEANFILES = \
+  manual.cps \
+  manual.dvi

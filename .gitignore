@@ -36,6 +36,7 @@ taler_merchant_config.h.in
 doc/*
 !doc/*.texi
 !doc/*.css
+!doc/*.1
 doc/version.texi
 !doc/*.am
 !doc/*.sh
@@ -46,3 +47,4 @@ src/merchant-tools/mitm/taler-merchant-mitm
 src/merchant-tools/mitm/merchant-mitm.wsgi
 doxygen-doc/
 contrib/taler-merchant.tag
+src/merchant-tools/taler-merchant-tip-enable
