@@ -203,11 +203,18 @@ struct TALER_MERCHANTDB_Plugin
 
   /**
    * Mark contract terms as payed.  Needed by /history as only payed
-   * contracts must be shown.  NOTE: we can't get the list of (payed)
-   * contracts from the transactions table because it lacks contract_terms
-   * plain JSON.  In facts, the protocol doesn't allow to store contract_terms
-   * in transactions table, as /pay handler doesn't receive this data
+   * contracts must be shown.
+   *
+   * NOTE: we can't get the list of (payed) contracts from the
+   * transactions table because it lacks contract_terms plain JSON.
+   * In facts, the protocol doesn't allow to store contract_terms in
+   * transactions table, as /pay handler doesn't receive this data
    * (only /proposal does).
+   *
+   * @param cls closure
+   * @param h_contract_terms hash of the contract that is now paid
+   * @param merchant_pub merchant's public key
+   * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
   (*mark_proposal_paid) (void *cls,
@@ -691,7 +698,7 @@ struct TALER_MERCHANTDB_Plugin
   (*lookup_exchange_by_tip)(void *cls,
 			    const struct GNUNET_HashCode *tip_id,
 			    char **exchange_uri);
-  
+
 
   /**
    * Pickup a tip over @a amount using pickup id @a pickup_id.
