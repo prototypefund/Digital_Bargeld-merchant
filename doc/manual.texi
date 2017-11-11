@@ -853,6 +853,7 @@ $ taler-merchant-dbinit -r
 * Using taler-config::      Introduction to the taler-config tool
 * Key management::          Managing the merchant's cryptographic keys
 * SEPA configuration::      Configuring a SEPA bank account
+* Tipping visitors::        Giving money to Web site visitors with Taler
 @end menu
 
 @node Configuration in Taler
@@ -1028,6 +1029,195 @@ auditors that support SEPA.  However, we cannot explain how to do this
 yet as such entities do not yet exist.  Once such entities do exist,
 we expect future versions of the Taler backend to ship with
 pre-configured exchanges and auditors for common denominations.
+
+
+
+@node Tipping visitors
+@section Tipping visitors
+@cindex tipping
+
+Taler can also be used to tip Web site visitors.  For example, you may
+be running an online survey, and you want to reward those people that have
+dutifully completed the survey.  If they have installed a Taler wallet,
+you can provide them with a tip for their deeds.  This section describes
+how to setup the Taler merchant backend for tipping.
+
+There are four basic steps that must happen to tip a visitor.
+
+@subsection Configure a reserve and exchange for tipping
+@cindex gnunet-ecc
+@cindex reserve key
+
+@c TODO: We should probably create a tool that automates the
+@c configuration process and simply outputs the wire transfer
+@c subject of the reserve.
+
+To tip users, you first need to create a reserve.  A reserve is a pool
+of money held in escrow at the Taler exchange.  This is the source of
+the funds for the tips.  Tipping will fail (resulting in disappointed
+visitors) if you do not have enough funds in your reserve! To create a
+reserve for tipping, you need to first create a tipping key.  Use
+
+@example
+$ gnunet-ecc -g 1 tip.priv
+@end example
+
+to create a file with the private key that will be used to identify the
+reserve.  Then, run
+
+@example
+$ gnunet-ecc --print-private-key tip.priv
+@end example
+
+to print out the corresponding private key.  It will looks like
+this:
+
+@example
+QPE24X8PBX3BZ6E7GQ5VAVHV32FWTTCADR0TRQ183MSSJD2CHNEG
+@end example
+
+Now you can configure your backend.  You need to enable tipping for
+each instance separately, or you can use an instance only for
+tipping.  To configure the ``default'' instance for tipping, use
+the following configuration:
+
+@example
+[merchant-instance-default]
+# this is NOT the tip.priv
+KEYFILE = signing_key.priv
+# replace the URL with the URL of the exchange you will use
+TIP_EXCHANGE = https://exchange:443/
+# here put the output of gnunet-ecc -P tip.priv
+TIP_RESERVE_PRIV = ENK9E0GYJ5EJEEC0QN3GY7KJRMNXW3B2SSWQDNJ3F1CEMFGC0970
+@end example
+
+Note that the KEYFILE option should have already been present for
+the instance. It has nothing to do with the ``tip.priv'' file we
+created above, and you should probably use a different file here.
+
+Instead of manually editing the configuration, you could also run:
+
+@example
+$ taler-config -s merchant-instance-default \
+    -o TIP_RESERVE_PRIV \
+    -V `gnunet-ecc -P tip.priv`
+$ taler-config -s merchant-instance-default \
+    -o TIP_EXCHANGE \
+    -V https://exchange:443/
+@end example
+
+Now you can (re)start the backend with the new configuration.
+
+@subsection Fund the reserve
+@cindex reserve
+@cindex close
+
+To fund the reserve, you must first extract the public key from ``tip.priv'':
+
+@example
+$ gnunet-ecc --print-public-key tip.priv
+@end example
+
+The result will look very much like the private key, so be
+very careful to not confuse the two!  In our example, the
+output for the public key is:
+
+@example
+QPE24X8PBX3BZ6E7GQ5VAVHV32FWTTCADR0TRQ183MSSJD2CHNEG
+@end example
+
+You now need to make a wire transfer to the exchange's bank account
+using the public key as the wire transfer subject.  The exchange's
+bank account details can be found in JSON format at
+``https://exchange:443//wire/METHOD'' where METHOD is the respective
+wire method (i.e. ``sepa'').  Depending on the exchange's operator,
+you may also be able to find the bank details in a human-readable
+format on the main page of the exchange.
+
+Make your wire transfer and (optionally) check at
+``https://exchange:443/reserve/status/reserve_pub=QPE24X...''
+whether your transfer has arrived at the exchange.
+@c FIXME: we should create a nicer tool to do this check!
+Once the funds have arrived, you can now enable tipping using:
+
+@example
+$ taler-merchant-tip-enable \
+    --amount=AMOUNT \
+    --backend=BACKEND_URI \
+    --credit-uuid=CREDIT_UUID \
+    --instance=INSTANCE \
+    --expiration=EXPIRATION
+@end example
+For ``AMOUNT'', specify the amount you transferred in the usual Taler
+format of ``CURRENCY:VALUE[.FRACTION]'', i.e. ``EUR:50''.  The
+``BACKEND_URI'' should be the URI where your Taler merchant backend is
+running.  For ``CREDIT_UUID'', you need to specify a unique number
+that identifies your wire transfer.  You may have gotten one from your
+bank, or you can just make one up! The important thing is that you
+must never use the same UUID twice, except to repeat a failed command.
+For INSTANCE, specify the backend instance (i.e. ``default'').
+Finally, for EXPIRATION, pick a date two weeks after the wire
+transfer, unless you know that the exchange that is being used has a
+different period for closing reserves.
+
+Note that an exchange will typically close a reserve after two weeks,
+wiring all remaining funds back to the sender's account.  Thus, you
+should plan to wire funds corresponding to a campaign of about two
+weeks to the exchange initially. If your campaign runs longer, you
+should wire further funds to the reserve every week to prevent it from
+expiring.  You need to run the ``taler-merchant-tip-enable'' command
+each time after you wire more funds to the reserve.
+
+
+@subsection Authorize a tip
+
+When your front end has reached the point where a client is supposed
+to receive a tip, it needs to first authorize the tip. For this,
+the frontend must use the ``/tip-authorize'' API of the backend.
+To authorize a tip, the frontend has to provide the amount to
+authorize, the name of the instance, and a justification.  The
+justification is just a string that is stored in the database with
+the transaction.  It is not meaningful for Taler.
+
+In response to this triplet, the backend will return a tip identifier,
+an expiration time and the exchange URI.  The expiration time will
+indicate how long the tip is valid (when the reserve expires).  The
+tip identifier allows the client's wallet to pick up the tip.  The
+frontend must now send the tip identifier, expiration time, EXCHANGE
+URI and the total amount to the exchange in a special ``402 Payment Required''
+response with the following headers:
+
+@example
+X-Taler-Tipping-Url: PICKUP URL with tip ID
+X-Taler-Tipping-Exchange: EXCHANGE URL
+X-Taler-Tipping-Amount: AMOUNT
+X-Taler-Tipping-Deadline: EXPIRATION
+@end example
+
+The first header line must include a Web URL for picking up the tip.
+It should include the tip ID (or at least some information that the
+frontend can use to lookup the tip ID).  For example, it might be
+``https://shop/tip-pickup?tip_id=ID'' where ``ID'' is the tip ID
+that was returned from the backend.  Finally, the frontend must
+implement this ``/tip-pickup'' handler, as described in the next
+section.
+
+The frontend should handle errors returned by the backend, such
+as missconfigured instances or a lack of remaining funds for tipping.
+
+
+@subsection Picking up of the tip
+
+The wallet will POST a JSON object with a single member ``planchets''
+to the shop's ``/tip-pickup'' handler.  The frontend must then add the
+``tip_id'' field to this JSON body and forward it to the
+``/tip-pickup'' handler of the backend.  The response generated by the
+backend can then be forwarded directly to the wallet.  However, the
+frontend may want to add a field ``next_url'' to provide a suggestion
+as to where the wallet should navigate after picking up the tip.  A
+common value for ``next_url'' would be the home page of the shop.
+
+@c FIXME: document ``next_url'' somewhere in the API specs?
 
 
 @c **********************************************************
