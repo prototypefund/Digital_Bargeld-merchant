@@ -1069,7 +1069,7 @@ reserve.  Then, run
 $ gnunet-ecc --print-private-key tip.priv
 @end example
 
-to print out the corresponding private key.  It will looks like
+to print out the corresponding private key.  It will look like
 this:
 
 @example
