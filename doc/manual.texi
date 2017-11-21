@@ -1158,7 +1158,8 @@ must never use the same UUID twice, except to repeat a failed command.
 For INSTANCE, specify the backend instance (i.e. ``default'').
 Finally, for EXPIRATION, pick a date two weeks after the wire
 transfer, unless you know that the exchange that is being used has a
-different period for closing reserves.
+different period for closing reserves.  The format @code{YYYY-MM-DD}
+is accepted.
 
 Note that an exchange will typically close a reserve after two weeks,
 wiring all remaining funds back to the sender's account.  Thus, you
