@@ -1185,7 +1185,7 @@ an expiration time and the exchange URI.  The expiration time will
 indicate how long the tip is valid (when the reserve expires).  The
 tip identifier allows the client's wallet to pick up the tip.  The
 frontend must now send the tip identifier, expiration time, EXCHANGE
-URI and the total amount to the exchange in a special ``402 Payment Required''
+URI and the total amount to the browser in a special ``402 Payment Required''
 response with the following headers:
 
 @example
