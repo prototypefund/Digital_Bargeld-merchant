@@ -685,19 +685,23 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Find out which exchange was associated with @a tip_id
+   * Find out tip authorization details associated with @a tip_id
    *
    * @param cls closure, typically a connection to the d
    * @param tip_id the unique ID for the tip
-   * @param[out] exchange_uri set to the URI of the exchange
+   * @param[out] exchange_uri set to the URI of the exchange (unless NULL)
+   * @param[out] amount set to the authorized amount (unless NULL)
+   * @param[out] timestamp set to the timestamp of the tip authorization (unless NULL)
    * @return transaction status, usually
    *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT for success
    *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if @a credit_uuid already known
    */
   enum GNUNET_DB_QueryStatus
-  (*lookup_exchange_by_tip)(void *cls,
-			    const struct GNUNET_HashCode *tip_id,
-			    char **exchange_uri);
+  (*lookup_tip_by_id)(void *cls,
+                      const struct GNUNET_HashCode *tip_id,
+                      char **exchange_uri,
+                      struct TALER_Amount *amount,
+                      struct GNUNET_TIME_Absolute *timestamp);
 
 
   /**

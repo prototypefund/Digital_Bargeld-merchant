@@ -373,9 +373,10 @@ prepare_pickup (struct PickupContext *pc)
 {
   enum GNUNET_DB_QueryStatus qs;
 
-  qs = db->lookup_exchange_by_tip (db->cls,
-				   &pc->tip_id,
-				   &pc->exchange_uri);
+  qs = db->lookup_tip_by_id (db->cls,
+                             &pc->tip_id,
+                             &pc->exchange_uri,
+                             NULL, NULL);
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
   {
     unsigned int response_code;

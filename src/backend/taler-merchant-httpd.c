@@ -42,6 +42,7 @@
 #include "taler-merchant-httpd_tip-authorize.h"
 #include "taler-merchant-httpd_tip-enable.h"
 #include "taler-merchant-httpd_tip-pickup.h"
+#include "taler-merchant-httpd_tip-query.h"
 #include "taler-merchant-httpd_history.h"
 #include "taler-merchant-httpd_refund.h"
 
@@ -248,6 +249,9 @@ url_handler (void *cls,
       { "/tip-enable", NULL, "application/json",
         "Only POST is allowed", 0,
         &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+      { "/tip-query", MHD_HTTP_METHOD_GET, "text/plain",
+        NULL, 0,
+        &MH_handler_tip_query, MHD_HTTP_OK},
       {NULL, NULL, NULL, NULL, 0, 0 }
     };
   static struct TMH_RequestHandler h404 =

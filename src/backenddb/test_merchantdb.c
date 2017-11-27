@@ -638,9 +638,10 @@ test_tipping ()
     return GNUNET_SYSERR;
   }
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-      plugin->lookup_exchange_by_tip (plugin->cls,
+      plugin->lookup_tip_by_id (plugin->cls,
 				      &tip_id,
-				      &uri))
+				      &uri,
+                                      NULL, NULL))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;

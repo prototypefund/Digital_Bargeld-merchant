@@ -584,9 +584,13 @@ postgres_initialize (void *cls)
                             " WHERE pickup_id=$1"
                             " AND tip_id=$2",
                             2),
-    GNUNET_PQ_make_prepare ("find_exchange_by_tip",
+    GNUNET_PQ_make_prepare ("find_tip_by_id",
                             "SELECT"
                             " exchange_uri"
+                            ",timestamp"
+                            ",amount_val"
+                            ",amount_frac"
+                            ",amount_curr"
                             " FROM merchant_tips"
                             " WHERE tip_id=$1",
                             1),
@@ -2913,20 +2917,28 @@ postgres_authorize_tip (void *cls,
 
 
 /**
- * Find out which exchange was associated with @a tip_id
+ * Find out tip authorization details associated with @a tip_id
  *
  * @param cls closure, typically a connection to the d
  * @param tip_id the unique ID for the tip
- * @param[out] exchange_uri set to the URI of the exchange
+ * @param[out] exchange_uri set to the URI of the exchange (unless NULL)
+ * @param[out] amount set to the authorized amount (unless NULL)
+ * @param[out] timestamp set to the timestamp of the tip authorization (unless NULL)
  * @return transaction status, usually
  *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT for success
  *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if @a credit_uuid already known
  */
 static enum GNUNET_DB_QueryStatus
-postgres_lookup_exchange_by_tip (void *cls,
-				 const struct GNUNET_HashCode *tip_id,
-				 char **exchange_uri)
+postgres_lookup_tip_by_id (void *cls,
+                           const struct GNUNET_HashCode *tip_id,
+                           char **exchange_uri,
+                           struct TALER_Amount *amount,
+                           struct GNUNET_TIME_Absolute *timestamp)
 {
+  char *res_exchange_uri;
+  struct TALER_Amount res_amount;
+  struct GNUNET_TIME_Absolute res_timestamp;
+
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (tip_id),
@@ -2934,20 +2946,32 @@ postgres_lookup_exchange_by_tip (void *cls,
   };
   struct GNUNET_PQ_ResultSpec rs[] = {
     GNUNET_PQ_result_spec_string ("exchange_uri",
-				  exchange_uri),
+				  &res_exchange_uri),
+    GNUNET_PQ_result_spec_absolute_time ("timestamp",
+                                         &res_timestamp),
+    TALER_PQ_result_spec_amount ("amount",
+				  &res_amount),
     GNUNET_PQ_result_spec_end
   };
   enum GNUNET_DB_QueryStatus qs;
 
   qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-						 "find_exchange_by_tip",
+						 "find_tip_by_id",
 						 params,
 						 rs);
   if (0 >= qs)
   {
-    *exchange_uri = NULL;
+    if (NULL != exchange_uri)
+      *exchange_uri = NULL;
     return qs;
   }
+  if (NULL != exchange_uri)
+    *exchange_uri = strdup (res_exchange_uri);
+  if (NULL != amount)
+    *amount = res_amount;
+  if (NULL != timestamp)
+    *timestamp = res_timestamp;
+  GNUNET_PQ_cleanup_result (rs);
   return qs;
 }
 
@@ -3209,7 +3233,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->mark_proposal_paid = &postgres_mark_proposal_paid;
   plugin->enable_tip_reserve = &postgres_enable_tip_reserve;
   plugin->authorize_tip = &postgres_authorize_tip;
-  plugin->lookup_exchange_by_tip = &postgres_lookup_exchange_by_tip;
+  plugin->lookup_tip_by_id = &postgres_lookup_tip_by_id;
   plugin->pickup_tip = &postgres_pickup_tip;
   plugin->start = postgres_start;
   plugin->commit = postgres_commit;
