@@ -200,7 +200,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                                   TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS,
                                   "Insufficient funds for tip");
   }
-  json_t *tip_token = json_pack ("{s:o, s:o, s:s, s:s}"
+  json_t *tip_token = json_pack ("{s:o, s:o, s:s, s:s}",
                                  "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
                                  "expiration", GNUNET_JSON_from_time_abs (expiration),
                                  "exchange_url", mi->tip_exchange,
