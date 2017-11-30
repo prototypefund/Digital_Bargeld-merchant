@@ -266,7 +266,9 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 
   confirmation.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK);
   confirmation.purpose.size = htonl (sizeof (struct TALER_MerchantRefundConfirmationPS));
-
+  GNUNET_CRYPTO_hash (order_id,
+                      strlen (order_id),
+                      &confirmation.h_order_id);
   if (GNUNET_OK !=
       GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
 				&confirmation.purpose,
