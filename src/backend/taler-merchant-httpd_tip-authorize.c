@@ -86,10 +86,12 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   struct TALER_Amount amount;
   const char *instance;
   const char *justification;
+  const char *pickup_url;
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &amount),
     GNUNET_JSON_spec_string ("instance", &instance),
     GNUNET_JSON_spec_string ("justification", &justification),
+    GNUNET_JSON_spec_string ("pickup_url", &pickup_url),
     GNUNET_JSON_spec_end()
   };
   json_t *root;
@@ -198,13 +200,23 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                                   TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS,
                                   "Insufficient funds for tip");
   }
+  json_t *tip_token = json_pack ("{s:o, s:o, s:s, s:s}"
+                                 "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
+                                 "expiration", GNUNET_JSON_from_time_abs (expiration),
+                                 "exchange_url", mi->tip_exchange,
+                                 "pickup_url", pickup_url);
+  char *tip_token_str = json_dumps (tip_token,  JSON_ENSURE_ASCII | JSON_COMPACT);
+  json_decref (tip_token);
   json_decref (root);
-  return TMH_RESPONSE_reply_json_pack (connection,
-                                       MHD_HTTP_OK,
-                                       "{s:o, s:o, s:s}",
-                                       "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
-                                       "expiration", GNUNET_JSON_from_time_abs (expiration),
-                                       "exchange_uri", mi->tip_exchange);
+  int ret = TMH_RESPONSE_reply_json_pack (connection,
+                                          MHD_HTTP_OK,
+                                          "{s:o, s:o, s:s, s:s}",
+                                          "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
+                                          "expiration", GNUNET_JSON_from_time_abs (expiration),
+                                          "exchange_url", mi->tip_exchange,
+                                          "tip_token", tip_token_str);
+  GNUNET_free (tip_token_str);
+  return ret;
 }
 
 /* end of taler-merchant-httpd_tip-authorize.c */
