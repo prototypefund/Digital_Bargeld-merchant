@@ -205,10 +205,12 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
                       " s:o," /* amount */
                       " s:s," /* instance */
                       " s:s," /* justification */
+                      " s:s," /* pickup_url */
                       "}",
                       "amount", TALER_JSON_from_amount (amount),
                       "instance", instance,
-                      "justification", justification);
+                      "justification", justification,
+                      "pickup_url", "https://example.com");
   if (NULL == te_obj)
   {
     GNUNET_break (0);
