@@ -89,7 +89,7 @@ check_ok (struct TALER_MERCHANT_TipAuthorizeOperation *tao,
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_absolute_time ("expiration", &tip_expiration),
     GNUNET_JSON_spec_fixed_auto ("tip_id", &tip_id),
-    GNUNET_JSON_spec_string ("exchange_uri", &exchange_uri),
+    GNUNET_JSON_spec_string ("exchange_url", &exchange_uri),
     GNUNET_JSON_spec_end()
   };
 
