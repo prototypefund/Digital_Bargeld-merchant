@@ -2346,37 +2346,39 @@ interpreter_run (void *cls)
     {
       char *section;
       char *keys;
-
+      struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
+    
       GNUNET_asprintf (&section,
                        "merchant-instance-%s",
                        cmd->details.admin_add_incoming.instance);
       if (GNUNET_OK !=
           GNUNET_CONFIGURATION_get_value_string (cfg,
                                                  section,
-                                                 "TIP_RESERVE_PRIV",
+                                                 "TIP_RESERVE_PRIV_FILENAME",
                                                  &keys))
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Configuration fails to specify reserve private key in section %s\n",
+                    "Configuration fails to specify reserve private key filename in section %s\n",
                     section);
         GNUNET_free (section);
         fail (is);
         return;
       }
-      if (GNUNET_OK !=
-          GNUNET_STRINGS_string_to_data (keys,
-                                         strlen (keys),
-                                         &cmd->details.admin_add_incoming.reserve_priv,
-                                         sizeof (struct TALER_ReservePrivateKeyP)))
+      pk = GNUNET_CRYPTO_eddsa_key_create_from_file (keys);
+      if (NULL == pk)
       {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Reserve private key in section %s fails to decode to EdDSA key\n",
-                    section);
-        GNUNET_free (keys);
-        GNUNET_free (section);
-        fail (is);
-        return;
+	GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+				   section,
+				   "TIP_RESERVE_PRIV_FILENAME",
+				   "Failed to read private key");
+	GNUNET_free (keys);
+	GNUNET_free (section);
+	fail (is);
+	return;
       }
+
+      cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *pk;
+      GNUNET_free (pk);
       GNUNET_free (keys);
       GNUNET_free (section);
     }

@@ -1063,18 +1063,7 @@ $ gnunet-ecc -g 1 tip.priv
 @end example
 
 to create a file with the private key that will be used to identify the
-reserve.  Then, run
-
-@example
-$ gnunet-ecc --print-private-key tip.priv
-@end example
-
-to print out the corresponding private key.  It will look like
-this:
-
-@example
-QPE24X8PBX3BZ6E7GQ5VAVHV32FWTTCADR0TRQ183MSSJD2CHNEG
-@end example
+reserve.
 
 Now you can configure your backend.  You need to enable tipping for
 each instance separately, or you can use an instance only for
@@ -1087,8 +1076,8 @@ the following configuration:
 KEYFILE = signing_key.priv
 # replace the URL with the URL of the exchange you will use
 TIP_EXCHANGE = https://exchange:443/
-# here put the output of gnunet-ecc -P tip.priv
-TIP_RESERVE_PRIV = ENK9E0GYJ5EJEEC0QN3GY7KJRMNXW3B2SSWQDNJ3F1CEMFGC0970
+# here put the path to the file created with "gnunet-ecc -g1 tip.priv"
+TIP_RESERVE_PRIV_FILENAME = tip.priv
 @end example
 
 Note that the KEYFILE option should have already been present for
@@ -1099,8 +1088,8 @@ Instead of manually editing the configuration, you could also run:
 
 @example
 $ taler-config -s merchant-instance-default \
-    -o TIP_RESERVE_PRIV \
-    -V `gnunet-ecc -P tip.priv`
+    -o TIP_RESERVE_PRIV_FILENAME \
+    -V tip.priv
 $ taler-config -s merchant-instance-default \
     -o TIP_EXCHANGE \
     -V https://exchange:443/
@@ -1118,9 +1107,7 @@ To fund the reserve, you must first extract the public key from ``tip.priv'':
 $ gnunet-ecc --print-public-key tip.priv
 @end example
 
-The result will look very much like the private key, so be
-very careful to not confuse the two!  In our example, the
-output for the public key is:
+In our example, the output for the public key is:
 
 @example
 QPE24X8PBX3BZ6E7GQ5VAVHV32FWTTCADR0TRQ183MSSJD2CHNEG

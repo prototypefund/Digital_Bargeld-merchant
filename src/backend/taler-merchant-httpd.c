@@ -551,35 +551,35 @@ instances_iterator_cb (void *cls,
                                              &mi->tip_exchange))
   {
     char *tip_reserves;
+    struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
 
     if (GNUNET_OK !=
         GNUNET_CONFIGURATION_get_value_string (iic->config,
                                                section,
-                                               "TIP_RESERVE_PRIV",
+                                               "TIP_RESERVE_PRIV_FILENAME",
                                                &tip_reserves))
     {
       GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                  section,
-                                 "TIP_RESERVE_PRIV");
+                                 "TIP_RESERVE_PRIV_FILENAME");
       GNUNET_free (mi);
       GNUNET_SCHEDULER_shutdown ();
       return;
     }
-    if (GNUNET_OK !=
-        GNUNET_STRINGS_string_to_data (tip_reserves,
-                                       strlen (tip_reserves),
-                                       &mi->tip_reserve,
-                                       sizeof (struct TALER_ReservePrivateKeyP)))
+    pk = GNUNET_CRYPTO_eddsa_key_create_from_file (tip_reserves);
+    if (NULL == pk)
     {
       GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
                                  section,
-                                 "TIP_RESERVE_PRIV",
-                                 "Must decode to private EdDSA key");
+                                 "TIP_RESERVE_PRIV_FILENAME",
+                                 "Failed to read private key");
       GNUNET_free (tip_reserves);
       GNUNET_free (mi);
       GNUNET_SCHEDULER_shutdown ();
       return;
     }
+    mi->tip_reserve.eddsa_priv = *pk;
+    GNUNET_free (pk);
     GNUNET_free (tip_reserves);
   }
 
