@@ -3021,12 +3021,12 @@ postgres_pickup_tip (void *cls,
   check_connection (pg);
  RETRY:
   if (MAX_RETRIES < ++retries)
-    return GNUNET_DB_STATUS_SOFT_ERROR;
+    return TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
   if (GNUNET_OK !=
       postgres_start (pg))
   {
     GNUNET_break (0);
-    return GNUNET_DB_STATUS_HARD_ERROR;
+    return TALER_EC_TIP_PICKUP_DB_ERROR_HARD;
   }
   qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
 						 "lookup_reserve_by_tip_id",

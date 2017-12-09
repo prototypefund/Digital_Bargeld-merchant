@@ -735,6 +735,7 @@ process_pay_with_exchange (void *cls,
   }
 
   /* Total up the fees and the value of the deposited coins! */
+  GNUNET_assert (0 != pc->coins_cnt);
   for (unsigned int i=0;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
