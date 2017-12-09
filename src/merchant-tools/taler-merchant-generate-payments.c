@@ -762,14 +762,15 @@ find_pk (const struct TALER_EXCHANGE_Keys *keys,
  * Allocates and return a string representing a order.
  * In this process, this function gives the order those
  * prices specified by the user. Please NOTE that any amount
- * must be given in the form "XX.YY".
+ * must be given in the form "CUR:XX.YY".
  *
  * @param max_fee merchant's allowed max_fee
  * @param amount total amount for this order
+ * @return JSON string for the order, NULL on errors
  */
 static json_t *
-make_order (char *maxfee,
-            char *total)
+make_order (const char *maxfee,
+            const char *total)
 {
   struct TALER_Amount tmp_amount;
   json_t *total_j;
@@ -779,12 +780,26 @@ make_order (char *maxfee,
   struct GNUNET_TIME_Absolute now;
   char *timestamp;
 
-  TALER_string_to_amount (maxfee, &tmp_amount);
+  if (GNUNET_OK !=
+      TALER_string_to_amount (maxfee,
+                              &tmp_amount))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   maxfee_j = TALER_JSON_from_amount (&tmp_amount);
-  TALER_string_to_amount (total, &tmp_amount);
+  GNUNET_assert (NULL != maxfee_j);
+  if (GNUNET_OK !=
+      TALER_string_to_amount (total,
+                              &tmp_amount))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   total_j = TALER_JSON_from_amount (&tmp_amount);
+  GNUNET_assert (NULL != total_j);
   now = GNUNET_TIME_absolute_get ();
-
+  GNUNET_TIME_round_abs (&now);
   GNUNET_asprintf (&timestamp,
                    "/Date(%u)/",
                    now.abs_value_us / 1000LL / 1000LL);
