@@ -392,7 +392,7 @@ test_wire_fee ()
   RND_BLK (&h_wire_method);
   RND_BLK (&exchange_sig);
   date1 = GNUNET_TIME_absolute_get ();
-  (void) GNUNET_TIME_abs_round (&date1);
+  (void) GNUNET_TIME_round_abs (&date1);
   date2 = GNUNET_TIME_absolute_add (date1,
 				    GNUNET_TIME_UNIT_DAYS);
   date3 = GNUNET_TIME_absolute_add (date2,
