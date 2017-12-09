@@ -171,7 +171,12 @@ proposal_put (struct MHD_Connection *connection,
 
     time (&timer);
     tm_info = localtime (&timer);
-
+    if (NULL == tm_info)
+    {
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_PROPOSAL_NO_LOCALTIME,
+                                                "failed to determine local time");
+    }
     off = strftime (buf,
                     sizeof (buf),
                     "%H:%M:%S",
@@ -254,7 +259,7 @@ proposal_put (struct MHD_Connection *connection,
   if (GNUNET_SYSERR == res)
   {
     return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_NONE,
+					      TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
 					      "Impossible to parse the order");
   }
 
