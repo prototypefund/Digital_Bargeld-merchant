@@ -469,6 +469,7 @@ deposit_cb (void *cls,
   enum GNUNET_DB_QueryStatus qs;
 
   dc->dh = NULL;
+  GNUNET_assert (GNUNET_YES == pc->suspended);
   pc->pending--;
   if (MHD_HTTP_OK != http_status)
   {
@@ -551,17 +552,25 @@ deposit_cb (void *cls,
                                &pc->h_contract_terms,
                                &pc->mi->pubkey);
   if (0 > qs)
+  {
+    abort_deposit (pc);
+    db->rollback (db->cls);
     resume_pay_with_response (pc,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
                               TMH_RESPONSE_make_internal_error (TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
                                                                 "Merchant database error: could not mark proposal as 'paid'"));
+    return;
+  }
   qs = db->commit (db->cls);
   if (0 > qs)
+  {
+    abort_deposit (pc);
     resume_pay_with_response (pc,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
                               TMH_RESPONSE_make_internal_error (TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
                                                                 "Merchant database error: could not commit"));
-
+    return;
+  }
   resume_pay_with_response (pc,
                             MHD_HTTP_OK,
                             sign_success_response (pc));
@@ -701,6 +710,7 @@ process_pay_with_exchange (void *cls,
   enum GNUNET_DB_QueryStatus qs;
 
   pc->fo = NULL;
+  GNUNET_assert (GNUNET_YES == pc->suspended);
   if (NULL == mh)
   {
     /* The exchange on offer is not in the set of our (trusted)
@@ -1115,6 +1125,7 @@ handle_pay_timeout (void *cls)
   struct PayContext *pc = cls;
 
   pc->timeout_task = NULL;
+  GNUNET_assert (GNUNET_YES == pc->suspended);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming /pay with error after timeout\n");
   if (NULL != pc->fo)
