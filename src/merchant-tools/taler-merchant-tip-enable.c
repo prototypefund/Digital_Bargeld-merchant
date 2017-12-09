@@ -141,8 +141,9 @@ run (void *cls,
      const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
   struct TALER_ReservePrivateKeyP reserve_priv;
+  struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
   char *section;
-  char *res_str;
+  char *tip_reserves;
   struct GNUNET_HashCode hcredit_uuid;
   struct GNUNET_CURL_Context *ctx;
 
@@ -152,32 +153,29 @@ run (void *cls,
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
-                                             "TIP_RESERVE_PRIV",
-                                             &res_str))
+                                             "TIP_RESERVE_PRIV_FILENAME",
+                                             &tip_reserves))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "TIP_RESERVE_PRIV");
+                               "TIP_RESERVE_PRIV_FILENAME");
     GNUNET_free (section);
     global_ret = 1;
     return;
   }
-  if (GNUNET_OK !=
-      GNUNET_STRINGS_string_to_data (res_str,
-                                     strlen (res_str),
-                                     &reserve_priv,
-                                     sizeof (struct TALER_ReservePrivateKeyP)))
+  pk = GNUNET_CRYPTO_eddsa_key_create_from_file (tip_reserves);
+  if (NULL == pk)
   {
     GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "TIP_RESERVE_PRIV",
-                               "Must decode to private EdDSA key");
+                               "TIP_RESERVE_PRIV_FILENAME",
+                               "Failed to read private key");
     GNUNET_free (section);
-    GNUNET_free (res_str);
+    GNUNET_free (tip_reserves);
     global_ret = 1;
     return;
   }
-  GNUNET_free (res_str);
+  GNUNET_free (tip_reserves);
   GNUNET_free (section);
 
   GNUNET_CRYPTO_hash (credit_uuid,
@@ -193,6 +191,8 @@ run (void *cls,
     return;
   }
   rc = GNUNET_CURL_gnunet_rc_create (ctx);
+  reserve_priv.eddsa_priv = *pk;
+  GNUNET_free (pk);
   teo = TALER_MERCHANT_tip_enable (ctx,
                                    backend_uri,
                                    &amount,
