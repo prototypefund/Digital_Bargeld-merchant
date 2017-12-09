@@ -65,26 +65,6 @@ struct TALER_MERCHANT_TrackTransactionHandle
   struct GNUNET_CURL_Context *ctx;
 };
 
-/**
- * Handle #MHD_HTTP_OK response to /track/transaction.
- * Parse @a json and if successful call the callback in @a tdo.
- *
- * @param tdo handle of the operation
- * @param json json to parse
- * @return #GNUNET_OK on success, #GNUNET_SYSERR on error
- */
-static int
-parse_track_transaction_ok (struct TALER_MERCHANT_TrackTransactionHandle *tdo,
-                            const json_t *json)
-{
-  tdo->cb (tdo->cb_cls,
-           MHD_HTTP_OK,
-	   TALER_EC_NONE,
-           json);
-
-  return GNUNET_OK;
-}
-
 
 /**
  * Function called when we're done processing the
@@ -107,14 +87,11 @@ handle_track_transaction_finished (void *cls,
   case 0:
     break;
   case MHD_HTTP_OK:
-    if (GNUNET_OK ==
-        parse_track_transaction_ok (tdo,
-                                    json))
-    {
-      TALER_MERCHANT_track_transaction_cancel (tdo);
-      return;
-    }
-    response_code = 0;
+    tdo->cb (tdo->cb_cls,
+             MHD_HTTP_OK,
+             TALER_EC_NONE,
+             json);
+    TALER_MERCHANT_track_transaction_cancel (tdo);
     break;
   case MHD_HTTP_ACCEPTED:
     {
