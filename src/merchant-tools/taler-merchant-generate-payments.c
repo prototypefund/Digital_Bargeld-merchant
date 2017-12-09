@@ -1043,10 +1043,11 @@ interpreter_run (void *cls)
 
         {
           const struct Command *coin_ref;
+
           memset (&pc, 0, sizeof (pc));
           coin_ref = find_command (is,
                                    cmd->details.pay.coin_ref);
-          GNUNET_assert (NULL != ref);
+          GNUNET_assert (NULL != coin_ref);
           switch (coin_ref->oc)
           {
           case OC_WITHDRAW_SIGN:
