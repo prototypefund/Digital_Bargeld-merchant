@@ -789,6 +789,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
 {
   struct Exchange *exchange;
   struct TMH_EXCHANGES_FindOperation *fo;
+  struct GNUNET_TIME_Absolute now;
 
   if (NULL == merchant_curl_ctx)
   {
@@ -840,11 +841,12 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   GNUNET_CONTAINER_DLL_insert (exchange->fo_head,
                                exchange->fo_tail,
                                fo);
-
+  now = GNUNET_TIME_absolute_get ();
+  (void) GNUNET_TIME_round_abs (&now);
   if ( (GNUNET_YES != exchange->pending) &&
        ( (NULL == fo->wire_method) ||
          (NULL != get_wire_fees (exchange,
-                                 GNUNET_TIME_absolute_get (),
+                                 now,
                                  fo->wire_method)) ) )
   {
     /* We are not currently waiting for a reply, immediately

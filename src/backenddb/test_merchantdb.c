@@ -392,6 +392,7 @@ test_wire_fee ()
   RND_BLK (&h_wire_method);
   RND_BLK (&exchange_sig);
   date1 = GNUNET_TIME_absolute_get ();
+  (void) GNUNET_TIME_abs_round (&date1);
   date2 = GNUNET_TIME_absolute_add (date1,
 				    GNUNET_TIME_UNIT_DAYS);
   date3 = GNUNET_TIME_absolute_add (date2,
@@ -799,11 +800,11 @@ run (void *cls)
   RND_BLK (&merchant_pub);
   RND_BLK (&wtid);
   timestamp = GNUNET_TIME_absolute_get ();
-  GNUNET_TIME_round_abs (&timestamp);
+  (void) GNUNET_TIME_round_abs (&timestamp);
   delta = GNUNET_TIME_UNIT_MINUTES;
   fake_now = GNUNET_TIME_absolute_add (timestamp, delta);
   refund_deadline = GNUNET_TIME_absolute_get();
-  GNUNET_TIME_round_abs (&refund_deadline);
+  (void) GNUNET_TIME_round_abs (&refund_deadline);
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":5",
                                          &amount_with_fee));
@@ -894,7 +895,7 @@ run (void *cls)
 							 &pd_cb,
 							 NULL));
   timestamp = GNUNET_TIME_absolute_get ();
-  GNUNET_TIME_round_abs (&timestamp);
+  (void) GNUNET_TIME_round_abs (&timestamp);
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->insert_contract_terms (plugin->cls,

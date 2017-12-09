@@ -137,7 +137,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                      MHD_GET_ARGUMENT_KIND,
                                      "date");
   date = GNUNET_TIME_absolute_get ();
-
+  (void) GNUNET_TIME_round_abs (&date);
   if (NULL != str)
   {
     if (1 != sscanf (str,

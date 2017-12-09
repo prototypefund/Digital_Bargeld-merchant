@@ -2663,6 +2663,7 @@ postgres_enable_tip_reserve (void *cls,
     };
 
     now = GNUNET_TIME_absolute_get ();
+    (void) GNUNET_TIME_round_abs (&now);
     qs = GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "insert_tip_credit_uuid",
                                              params);
@@ -2895,7 +2896,7 @@ postgres_authorize_tip (void *cls,
       GNUNET_PQ_query_param_end
     };
 
-    GNUNET_TIME_round_abs (&now);
+    (void) GNUNET_TIME_round_abs (&now);
     qs = GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "insert_tip_justification",
                                              params);
