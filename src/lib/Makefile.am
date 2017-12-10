@@ -58,6 +58,7 @@ test_merchant_api_LDADD = \
   libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
   -ltalerfakebank \
+  -ltalerbank \
   -ltalerexchange \
   -ltalerjson \
   -ltalerutil \

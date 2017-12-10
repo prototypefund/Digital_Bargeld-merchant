@@ -310,10 +310,6 @@ struct TALER_MERCHANT_PayCoin
    */
   struct TALER_Amount amount_without_fee;
 
-  /**
-   * Next coin used to pay
-   */
-  struct TALER_MERCHANT_PayCoin *next;
 };
 
 

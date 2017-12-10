@@ -24,6 +24,7 @@
  */
 #include "platform.h"
 #include <taler/taler_exchange_service.h>
+#include <taler/taler_bank_service.h>
 #include <taler/taler_fakebank_lib.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_util.h>
@@ -35,19 +36,24 @@
 #include <microhttpd.h>
 
 /**
- * URI under which the merchant is reachable during the testcase.
+ * URL under which the merchant is reachable during the testcase.
  */
-#define MERCHANT_URI "http://localhost:8082"
+#define MERCHANT_URL "http://localhost:8082"
 
 /**
- * URI under which the exchange is reachable during the testcase.
+ * URL under which the exchange is reachable during the testcase.
  */
-#define EXCHANGE_URI "http://localhost:8084/"
+#define EXCHANGE_URL "http://localhost:8084/"
 
 /**
- * URI of the bank.
+ * Account number of the exchange at the bank.
  */
-#define BANK_URI "http://localhost:8083/"
+#define EXCHANGE_ACCOUNT_NO 2
+
+/**
+ * URL of the bank.
+ */
+#define BANK_URL "http://localhost:8083/"
 
 /**
  * On which port do we run the (fake) bank?
@@ -337,26 +343,47 @@ struct Command
       const char *amount;
 
       /**
-       * Sender's bank account details (JSON).
+       * Wire transfer subject. NULL to use public key corresponding
+       * to @e reserve_priv or @e reserve_reference.  Should only be
+       * set manually to test invalid wire transfer subjects.
        */
-      const char *sender_details;
+      const char *subject;
 
       /**
-       * Transfer details (JSON)
+       * Sender (debit) account number.
        */
-      const char *transfer_details;
+      uint64_t debit_account_no;
 
       /**
-       * Usually set (by the interpreter) to the reserve's private key
-       * we used to fill the reserve.  Read from the configuration if
-       * "instance" is non-NULL.
+       * Receiver (credit) account number.
+       */
+      uint64_t credit_account_no;
+
+      /**
+       * Username to use for authentication.
+       */
+      const char *auth_username;
+
+      /**
+       * Password to use for authentication.
+       */
+      const char *auth_password;
+
+      /**
+       * Set (by the interpreter) to the reserve's private key
+       * we used to fill the reserve.
        */
       struct TALER_ReservePrivateKeyP reserve_priv;
 
       /**
        * Set to the API's handle during the operation.
        */
-      struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
+      struct TALER_BANK_AdminAddIncomingHandle *aih;
+
+      /**
+       * Set to the wire transfer's unique ID.
+       */
+      uint64_t serial_id;
 
     } admin_add_incoming;
 
@@ -908,9 +935,8 @@ get_instance_priv (struct GNUNET_CONFIGURATION_Handle *config,
   struct GNUNET_CRYPTO_EddsaPrivateKey *ret;
 
   (void) GNUNET_asprintf (&config_section,
-                      "merchant-instance-%s",
-                      instance);
-
+                          "merchant-instance-%s",
+                          instance);
   if (GNUNET_OK !=
     GNUNET_CONFIGURATION_get_value_filename (config,
                                              config_section,
@@ -918,12 +944,14 @@ get_instance_priv (struct GNUNET_CONFIGURATION_Handle *config,
                                              &filename))
   {
     GNUNET_break (0);
+    GNUNET_free (config_section);
     return NULL;
   }
+  GNUNET_free (config_section);
   if (NULL ==
-   (ret = GNUNET_CRYPTO_eddsa_key_create_from_file (filename)))
+      (ret = GNUNET_CRYPTO_eddsa_key_create_from_file (filename)))
     GNUNET_break (0);
-
+  GNUNET_free (filename);
   return ret;
 }
 
@@ -1007,18 +1035,21 @@ next_command (struct InterpreterState *is)
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param serial_id unique ID of the wire transfer
  * @param full_response full response from the exchange (for logging, in case of errors)
  */
 static void
 add_incoming_cb (void *cls,
                  unsigned int http_status,
 		 enum TALER_ErrorCode ec,
+                 uint64_t serial_id,
                  const json_t *full_response)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
 
   cmd->details.admin_add_incoming.aih = NULL;
+  cmd->details.admin_add_incoming.serial_id = serial_id;
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_break (0);
@@ -1533,7 +1564,7 @@ refund_lookup_cb (void *cls,
                                      &acc,
                                      iamount));
   }
-
+  GNUNET_free (icoin_refs);
   /* Check if refund has been 100% covered */
   GNUNET_assert (increase =
                  find_command (is,
@@ -1858,10 +1889,10 @@ tip_authorize_cb (void *cls,
        (TALER_EC_NONE == ec) )
   {
     if (0 != strcmp (exchange_uri,
-                     EXCHANGE_URI))
+                     EXCHANGE_URL))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Unexpected exchange URI %s to command %s\n",
+                  "Unexpected exchange URL %s to command %s\n",
                   exchange_uri,
                   cmd->label);
       fail (is);
@@ -2104,7 +2135,7 @@ cleanup_state (struct InterpreterState *is)
                     "Command %u (%s) did not complete\n",
                     i,
                     cmd->label);
-        TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
+        TALER_BANK_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
         cmd->details.admin_add_incoming.aih = NULL;
       }
       break;
@@ -2318,9 +2349,6 @@ interpreter_run (void *cls)
   const struct Command *ref;
   struct TALER_ReservePublicKeyP reserve_pub;
   struct TALER_Amount amount;
-  struct GNUNET_TIME_Absolute execution_date;
-  json_t *sender_details;
-  json_t *transfer_details;
 
   is->task = NULL;
   tc = GNUNET_SCHEDULER_get_task_context ();
@@ -2349,6 +2377,7 @@ interpreter_run (void *cls)
     is->ip = 0;
     instance_idx++;
     instance = instances[instance_idx];
+    GNUNET_free_non_null (instance_priv);
     instance_priv = get_instance_priv (cfg, instance);
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Switching instance: `%s'\n",
@@ -2370,7 +2399,7 @@ interpreter_run (void *cls)
                                                      "order_id"));
       if (NULL == (cmd->details.proposal_lookup.plo
                    = TALER_MERCHANT_proposal_lookup (ctx,
-                                                     MERCHANT_URI,
+                                                     MERCHANT_URL,
                                                      order_id,
                                                      instance,
                                                      proposal_lookup_cb,
@@ -2382,99 +2411,109 @@ interpreter_run (void *cls)
     }
     break;
   case OC_ADMIN_ADD_INCOMING:
-    if (NULL !=
-        cmd->details.admin_add_incoming.reserve_reference)
     {
-      GNUNET_assert (NULL != (ref
-        = find_command (is,
-			cmd->details.admin_add_incoming.reserve_reference)));
-      GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
-      cmd->details.admin_add_incoming.reserve_priv
-        = ref->details.admin_add_incoming.reserve_priv;
-    }
-    else if (NULL !=
-             cmd->details.admin_add_incoming.instance)
-    {
-      char *section;
-      char *keys;
-      struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
+      char *subject;
+      struct TALER_BANK_AuthenticationData auth;
 
-      GNUNET_asprintf (&section,
-                       "merchant-instance-%s",
-                       cmd->details.admin_add_incoming.instance);
-      if (GNUNET_OK !=
-          GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                 section,
-                                                 "TIP_RESERVE_PRIV_FILENAME",
-                                                 &keys))
+      if (NULL !=
+          cmd->details.admin_add_incoming.subject)
       {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Configuration fails to specify reserve private key filename in section %s\n",
-                    section);
-        GNUNET_free (section);
+        subject = GNUNET_strdup (cmd->details.admin_add_incoming.subject);
+      }
+      else
+      {
+        /* Use reserve public key as subject */
+        if (NULL !=
+            cmd->details.admin_add_incoming.reserve_reference)
+        {
+          GNUNET_assert (NULL != (ref
+                                  = find_command (is,
+                                                  cmd->details.admin_add_incoming.reserve_reference)));
+          GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
+          cmd->details.admin_add_incoming.reserve_priv
+            = ref->details.admin_add_incoming.reserve_priv;
+        }
+        else if (NULL !=
+                 cmd->details.admin_add_incoming.instance)
+        {
+          char *section;
+          char *keys;
+          struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
+
+          GNUNET_asprintf (&section,
+                           "merchant-instance-%s",
+                           cmd->details.admin_add_incoming.instance);
+          if (GNUNET_OK !=
+              GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                     section,
+                                                     "TIP_RESERVE_PRIV_FILENAME",
+                                                     &keys))
+          {
+            GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                        "Configuration fails to specify reserve private key filename in section %s\n",
+                        section);
+            GNUNET_free (section);
+            fail (is);
+            return;
+          }
+          pk = GNUNET_CRYPTO_eddsa_key_create_from_file (keys);
+          if (NULL == pk)
+          {
+            GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                       section,
+                                       "TIP_RESERVE_PRIV_FILENAME",
+                                       "Failed to read private key");
+            GNUNET_free (keys);
+            GNUNET_free (section);
+            fail (is);
+            return;
+          }
+          cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *pk;
+          GNUNET_free (pk);
+          GNUNET_free (keys);
+          GNUNET_free (section);
+        }
+        else
+        {
+          struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
+
+          priv = GNUNET_CRYPTO_eddsa_key_create ();
+          cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
+          GNUNET_free (priv);
+        }
+        GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
+                                            &reserve_pub.eddsa_pub);
+        subject = GNUNET_STRINGS_data_to_string_alloc (&reserve_pub,
+                                                       sizeof (reserve_pub));
+      }
+
+      GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
+                                          &reserve_pub.eddsa_pub);
+      GNUNET_assert (GNUNET_OK ==
+                     TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
+                                             &amount));
+      auth.method = TALER_BANK_AUTH_BASIC;
+      auth.details.basic.username = (char *) cmd->details.admin_add_incoming.auth_username;
+      auth.details.basic.password = (char *) cmd->details.admin_add_incoming.auth_password;
+      cmd->details.admin_add_incoming.aih
+        = TALER_BANK_admin_add_incoming (ctx,
+                                         BANK_URL,
+                                         &auth,
+                                         EXCHANGE_URL,
+                                         subject,
+                                         &amount,
+                                         cmd->details.admin_add_incoming.debit_account_no,
+                                         cmd->details.admin_add_incoming.credit_account_no,
+                                         &add_incoming_cb,
+                                         is);
+      GNUNET_free (subject);
+      if (NULL == cmd->details.admin_add_incoming.aih)
+      {
+        GNUNET_break (0);
         fail (is);
-        return;
       }
-      pk = GNUNET_CRYPTO_eddsa_key_create_from_file (keys);
-      if (NULL == pk)
-      {
-	GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
-				   section,
-				   "TIP_RESERVE_PRIV_FILENAME",
-				   "Failed to read private key");
-	GNUNET_free (keys);
-	GNUNET_free (section);
-	fail (is);
-	return;
-      }
-
-      cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *pk;
-      GNUNET_free (pk);
-      GNUNET_free (keys);
-      GNUNET_free (section);
+      break;
     }
-    else
-    {
-      struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-
-      priv = GNUNET_CRYPTO_eddsa_key_create ();
-      cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
-      GNUNET_free (priv);
-    }
-    GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
-                                        &reserve_pub.eddsa_pub);
-    GNUNET_assert (GNUNET_OK ==
-      TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
-                              &amount));
-    execution_date = GNUNET_TIME_absolute_get ();
-    GNUNET_TIME_round_abs (&execution_date);
-    GNUNET_assert (NULL != (sender_details
-      = json_loads (cmd->details.admin_add_incoming.sender_details,
-                    JSON_REJECT_DUPLICATES,
-                    NULL)));
-    GNUNET_assert (NULL != (transfer_details
-      = json_loads (cmd->details.admin_add_incoming.transfer_details,
-                    JSON_REJECT_DUPLICATES,
-                    NULL)));
-
-    cmd->details.admin_add_incoming.aih
-      = TALER_EXCHANGE_admin_add_incoming (exchange,
-                                           "http://localhost:18080/",
-                                           &reserve_pub,
-                                           &amount,
-                                           execution_date,
-                                           sender_details,
-                                           transfer_details,
-                                           &add_incoming_cb,
-                                           is);
-    json_decref (sender_details);
-    json_decref (transfer_details);
-    if (NULL == cmd->details.admin_add_incoming.aih)
-    {
-      GNUNET_break (0);
-      fail (is);
-    }
-    break;
   case OC_WITHDRAW_STATUS:
     GNUNET_assert (NULL !=
                    cmd->details.reserve_status.reserve_reference);
@@ -2544,7 +2583,7 @@ interpreter_run (void *cls)
                              merchant);
       }
       cmd->details.proposal.po = TALER_MERCHANT_order_put (ctx,
-                                                           MERCHANT_URI,
+                                                           MERCHANT_URL,
                                                            order,
                                                            &proposal_cb,
                                                            is);
@@ -2559,9 +2598,8 @@ interpreter_run (void *cls)
   case OC_PAY:
     {
       struct TALER_MERCHANT_PayCoin *pc;
-      struct TALER_MERCHANT_PayCoin *icoin;
-      char *coins;
       unsigned int npc;
+      char *coins;
       const char *order_id;
       struct GNUNET_TIME_Absolute refund_deadline;
       struct GNUNET_TIME_Absolute pay_deadline;
@@ -2617,15 +2655,17 @@ interpreter_run (void *cls)
       }
       /* strtok loop here */
       coins = GNUNET_strdup (cmd->details.pay.coin_ref);
-      GNUNET_assert (NULL != (token = strtok (coins, ";")));
-      pc = GNUNET_new (struct TALER_MERCHANT_PayCoin);
-      icoin = pc;
-      npc = 1;
-      do
+
+      pc = NULL;
+      npc = 0;
+      for (token = strtok (coins, ";");
+           NULL != token;
+           token = strtok (NULL, ";"))
       {
         const struct Command *coin_ref;
         char *ctok;
         unsigned int ci;
+        struct TALER_MERCHANT_PayCoin *icoin;
 
         /* Token syntax is "LABEL[/NUMBER]" */
         ctok = strchr (token, '/');
@@ -2645,6 +2685,10 @@ interpreter_run (void *cls)
 	}
         GNUNET_assert (coin_ref = find_command (is,
                                                 token));
+        GNUNET_array_grow (pc,
+                           npc,
+                           npc + 1);
+        icoin = &pc[npc-1];
         switch (coin_ref->oc)
         {
         case OC_WITHDRAW_SIGN:
@@ -2669,17 +2713,12 @@ interpreter_run (void *cls)
         GNUNET_assert (GNUNET_OK ==
                        TALER_string_to_amount (cmd->details.pay.amount_with_fee,
                                                &icoin->amount_with_fee));
-        token = strtok (NULL, ";");
-        if (NULL == token)
-          break;
-        icoin->next = GNUNET_new (struct TALER_MERCHANT_PayCoin);
-        icoin = icoin->next;
-      } while (1);
+      }
+      GNUNET_free (coins);
 
-      icoin->next = NULL;
       cmd->details.pay.ph = TALER_MERCHANT_pay_wallet
         (ctx,
-         MERCHANT_URI,
+         MERCHANT_URL,
          instance,
          &ref->details.proposal.hash,
          &total_amount,
@@ -2690,12 +2729,15 @@ interpreter_run (void *cls)
          refund_deadline,
          pay_deadline,
          &h_wire,
-         EXCHANGE_URI,
+         EXCHANGE_URL,
          order_id,
          npc /* num_coins */,
          pc /* coins */,
          &pay_cb,
          is);
+      GNUNET_array_grow (pc,
+                         npc,
+                         0);
     }
     if (NULL == cmd->details.pay.ph)
     {
@@ -2726,6 +2768,7 @@ interpreter_run (void *cls)
   case OC_RUN_WIREWATCH:
     {
       const struct GNUNET_DISK_FileHandle *pr;
+      static int once;
 
       cmd->details.run_wirewatch.wirewatch_proc
         = GNUNET_OS_start_process (GNUNET_NO,
@@ -2733,9 +2776,10 @@ interpreter_run (void *cls)
                                    NULL, NULL, NULL,
                                    "taler-exchange-wirewatch",
                                    "taler-exchange-wirewatch",
-                                   "-c", "test_exchange_api.conf",
+                                   "-c", "test_merchant_api.conf",
                                    "-t", "test", /* use Taler's bank/fakebank */
                                    "-T", /* exit when done */
+                                   (0 == once ? "-r" : NULL),
                                    NULL);
       if (NULL == cmd->details.run_wirewatch.wirewatch_proc)
       {
@@ -2743,6 +2787,7 @@ interpreter_run (void *cls)
         fail (is);
         return;
       }
+      once = 1;
       pr = GNUNET_DISK_pipe_handle (sigpipe,
                                     GNUNET_DISK_PIPE_END_READ);
       cmd->details.run_wirewatch.child_death_task
@@ -2761,7 +2806,7 @@ interpreter_run (void *cls)
             &amount,
             cmd->details.check_bank_transfer.account_debit,
             cmd->details.check_bank_transfer.account_credit,
-            EXCHANGE_URI,
+            EXCHANGE_URL,
             &cmd->details.check_bank_transfer.subject))
       {
         GNUNET_break (0);
@@ -2798,11 +2843,11 @@ interpreter_run (void *cls)
          sizeof (wtid)));
       if (NULL == (cmd->details.track_transfer.tdo
           = TALER_MERCHANT_track_transfer (ctx,
-                                           MERCHANT_URI,
+                                           MERCHANT_URL,
                                            instance,
 					   "test",
                                            &wtid,
-                                           EXCHANGE_URI,
+                                           EXCHANGE_URL,
                                            &track_transfer_cb,
                                            is)))
       {
@@ -2828,7 +2873,7 @@ interpreter_run (void *cls)
 
     if (NULL == (cmd->details.track_transaction.tth
         = TALER_MERCHANT_track_transaction (ctx,
-                                            MERCHANT_URI,
+                                            MERCHANT_URL,
                                             instance,
                                             order_id,
                                             &track_transaction_cb,
@@ -2849,7 +2894,7 @@ interpreter_run (void *cls)
     }
     if (NULL == (cmd->details.history.ho
         = TALER_MERCHANT_history (ctx,
-    	                          MERCHANT_URI,
+    	                          MERCHANT_URL,
                                   instance,
                                   cmd->details.history.start,
                                   cmd->details.history.nrows,
@@ -2872,7 +2917,7 @@ interpreter_run (void *cls)
       if (NULL == (cmd->details.refund_increase.rio
                    = TALER_MERCHANT_refund_increase
                    (ctx,
-                    MERCHANT_URI,
+                    MERCHANT_URL,
                     cmd->details.refund_increase.order_id,
                     &refund_amount,
                     cmd->details.refund_increase.reason,
@@ -2890,7 +2935,7 @@ interpreter_run (void *cls)
       if (NULL == (cmd->details.refund_lookup.rlo
                    = TALER_MERCHANT_refund_lookup
                    (ctx,
-                    MERCHANT_URI,
+                    MERCHANT_URL,
                     cmd->details.refund_lookup.order_id,
                     instance,
                     refund_lookup_cb,
@@ -2965,7 +3010,7 @@ interpreter_run (void *cls)
       if (NULL == (cmd->details.tip_enable.teo
                    = TALER_MERCHANT_tip_enable
                    (ctx,
-                    MERCHANT_URI,
+                    MERCHANT_URL,
                     &amount,
                     expiration,
                     (ref != NULL) ? &ref->details.admin_add_incoming.reserve_priv : &reserve_priv,
@@ -2987,7 +3032,7 @@ interpreter_run (void *cls)
       if (NULL == (cmd->details.tip_authorize.tao
                    = TALER_MERCHANT_tip_authorize
                    (ctx,
-                    MERCHANT_URI,
+                    MERCHANT_URL,
                     &amount,
                     cmd->details.tip_authorize.instance,
                     cmd->details.tip_authorize.justification,
@@ -3047,7 +3092,7 @@ interpreter_run (void *cls)
         if (NULL == (cmd->details.tip_pickup.tpo
                      = TALER_MERCHANT_tip_pickup
                      (ctx,
-                      MERCHANT_URI,
+                      MERCHANT_URL,
                       &ref->details.tip_authorize.tip_id,
                       num_planchets,
                       planchets,
@@ -3057,6 +3102,8 @@ interpreter_run (void *cls)
           GNUNET_break (0);
           fail (is);
         }
+        for (unsigned int i=0;i<num_planchets;i++)
+          GNUNET_free (planchets[i].coin_ev);
       }
       break;
     }
@@ -3104,7 +3151,11 @@ do_shutdown (void *cls)
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Shutdown executing\n");
   cleanup_state (is);
-
+  if (NULL != instance_priv)
+  {
+    GNUNET_free (instance_priv);
+    instance_priv = NULL;
+  }
   if (NULL != is->task)
   {
     GNUNET_SCHEDULER_cancel (is->task);
@@ -3213,12 +3264,20 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details
-      = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \
-        \"account_number\":62, \"uuid\":1 }",
-      .details.admin_add_incoming.transfer_details
-        = "{ \"uuid\": 1}",
+      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
+      .details.admin_add_incoming.auth_username = "user62",
+      .details.admin_add_incoming.auth_password = "pass62",
       .details.admin_add_incoming.amount = "EUR:10.02" },
+    /* Run wirewatch to observe /admin/add/incoming */
+    { .oc = OC_RUN_WIREWATCH,
+      .label = "wirewatch-1" },
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-1",
+      .details.check_bank_transfer.amount = "EUR:10.02",
+      .details.check_bank_transfer.account_debit = 62,
+      .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
+    },
 
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
@@ -3271,7 +3330,7 @@ run (void *cls)
       .label = "deposit-simple",
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-1",
-      .details.pay.coin_ref = "withdraw-coin-1;withdraw-coin-2",
+      .details.pay.coin_ref = "withdraw-coin-1",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
@@ -3339,29 +3398,37 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details
-        = "{ \"type\":\"test\",\
-          \"bank_uri\":\"" BANK_URI "\",\
-          \"account_number\":63,\
-          \"uuid\":2 }",
-      .details.admin_add_incoming.transfer_details
-        = "{ \"uuid\": 2}",
+      .details.admin_add_incoming.debit_account_no = 63,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
+      .details.admin_add_incoming.auth_username = "user63",
+      .details.admin_add_incoming.auth_password = "pass63",
       .details.admin_add_incoming.amount = "EUR:1" },
 
     /* Add another 4.01 EUR to reserve #2 */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2b",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.reserve_reference
-        = "create-reserve-2",
-      .details.admin_add_incoming.sender_details
-        = "{ \"type\":\"test\",\
-          \"bank_uri\":\"" BANK_URI "\",\
-          \"account_number\":63,\
-          \"uuid\":3  }",
-      .details.admin_add_incoming.transfer_details
-        = "{ \"uuid\": 3}",
+      .details.admin_add_incoming.reserve_reference = "create-reserve-2",
+      .details.admin_add_incoming.debit_account_no = 63,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
+      .details.admin_add_incoming.auth_username = "user63",
+      .details.admin_add_incoming.auth_password = "pass63",
       .details.admin_add_incoming.amount = "EUR:4.01" },
+    /* Run wirewatch to observe /admin/add/incoming */
+    { .oc = OC_RUN_WIREWATCH,
+      .label = "wirewatch-2" },
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-2",
+      .details.check_bank_transfer.amount = "EUR:1",
+      .details.check_bank_transfer.account_debit = 63,
+      .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
+    },
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-2",
+      .details.check_bank_transfer.amount = "EUR:4.01",
+      .details.check_bank_transfer.account_debit = 63,
+      .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
+    },
 
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
@@ -3523,16 +3590,24 @@ run (void *cls)
       .label = "create-reserve-tip-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.instance = "tip",
-      .details.admin_add_incoming.sender_details
-      = "{ \"type\":\"test\", \"bank_uri\":\"" BANK_URI "\", \
-        \"account_number\":62, \"uuid\":100 }",
-      .details.admin_add_incoming.transfer_details
-        = "{ \"uuid\": 100}",
+      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
+      .details.admin_add_incoming.auth_username = "user62",
+      .details.admin_add_incoming.auth_password = "pass62",
       /* we run *two* instances, but only this first call will
          actually fill the reserve, as the second one will be seen as
          a duplicate. Hence fill with twice the require amount per
          round. */
       .details.admin_add_incoming.amount = "EUR:20.04" },
+    /* Run wirewatch to observe /admin/add/incoming */
+    { .oc = OC_RUN_WIREWATCH,
+      .label = "wirewatch-3" },
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-tip-1",
+      .details.check_bank_transfer.amount = "EUR:20.04",
+      .details.check_bank_transfer.account_debit = 62,
+      .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
+    },
     { .oc = OC_TIP_ENABLE,
       .label = "enable-tip-1",
       .expected_response_code = MHD_HTTP_OK,
@@ -3670,7 +3745,7 @@ run (void *cls)
   rc = GNUNET_CURL_gnunet_rc_create (ctx);
   GNUNET_assert (NULL != (exchange
     = TALER_EXCHANGE_connect (ctx,
-                              EXCHANGE_URI,
+                              EXCHANGE_URL,
                               &cert_cb, is,
                               TALER_EXCHANGE_OPTION_END)));
   timeout_task
@@ -3805,7 +3880,7 @@ main (int argc,
       return 77;
     }
   }
-  while (0 != system ("wget -q -t 1 -T 1 " EXCHANGE_URI "keys -o /dev/null -O /dev/null"));
+  while (0 != system ("wget -q -t 1 -T 1 " EXCHANGE_URL "keys -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
   if (NULL == (merchantd = GNUNET_OS_start_process
        (GNUNET_NO,
@@ -3849,7 +3924,7 @@ main (int argc,
       return 77;
     }
   }
-  while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URI " -o /dev/null -O /dev/null"));
+  while (0 != system ("wget -q -t 1 -T 1 " MERCHANT_URL " -o /dev/null -O /dev/null"));
   fprintf (stderr, "\n");
 
   result = GNUNET_SYSERR;
