@@ -42,7 +42,7 @@
 /**
  * URI under which the exchange is reachable during the testcase.
  */
-#define EXCHANGE_URI "http://localhost:8081/"
+#define EXCHANGE_URI "http://localhost:8084/"
 
 /**
  * URI of the bank.
