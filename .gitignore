@@ -48,3 +48,5 @@ src/merchant-tools/mitm/merchant-mitm.wsgi
 doxygen-doc/
 contrib/taler-merchant.tag
 src/merchant-tools/taler-merchant-tip-enable
+src/lib/reserve_dkey.priv
+src/lib/reserve_key.priv
