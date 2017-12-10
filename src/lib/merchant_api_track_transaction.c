@@ -92,7 +92,7 @@ handle_track_transaction_finished (void *cls,
              TALER_EC_NONE,
              json);
     TALER_MERCHANT_track_transaction_cancel (tdo);
-    break;
+    return;
   case MHD_HTTP_ACCEPTED:
     {
       /* Expect time stamp of when the transfer is supposed to happen */
