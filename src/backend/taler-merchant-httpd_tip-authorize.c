@@ -87,11 +87,13 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   const char *instance;
   const char *justification;
   const char *pickup_url;
+  const char *next_url;
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &amount),
     GNUNET_JSON_spec_string ("instance", &instance),
     GNUNET_JSON_spec_string ("justification", &justification),
     GNUNET_JSON_spec_string ("pickup_url", &pickup_url),
+    GNUNET_JSON_spec_string ("next_url", &next_url),
     GNUNET_JSON_spec_end()
   };
   json_t *root;
@@ -200,15 +202,13 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                                   TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS,
                                   "Insufficient funds for tip");
   }
-  json_t *tip_token = json_pack ("{s:o, s:o, s:o, s:s, s:s}",
+  json_t *tip_token = json_pack ("{s:o, s:o, s:o, s:s, s:s, s:s}",
                                  "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
                                  "expiration", GNUNET_JSON_from_time_abs (expiration),
                                  "amount", TALER_JSON_from_amount (&amount),
                                  "exchange_url", mi->tip_exchange,
+                                 "next_url", next_url,
                                  "pickup_url", pickup_url);
-  json_t *next_url = json_object_get (root, "next_url");
-  if (json_is_string (next_url))
-    json_object_set (tip_token, "next_url", next_url);
   char *tip_token_str = json_dumps (tip_token,  JSON_ENSURE_ASCII | JSON_COMPACT);
   json_decref (tip_token);
   json_decref (root);
