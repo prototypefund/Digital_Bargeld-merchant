@@ -206,6 +206,9 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                                  "amount", TALER_JSON_from_amount (&amount),
                                  "exchange_url", mi->tip_exchange,
                                  "pickup_url", pickup_url);
+  json_t *next_url = json_object_get (root, "next_url");
+  if (json_is_string (next_url))
+    json_object_set (tip_token, "next_url", next_url);
   char *tip_token_str = json_dumps (tip_token,  JSON_ENSURE_ASCII | JSON_COMPACT);
   json_decref (tip_token);
   json_decref (root);
