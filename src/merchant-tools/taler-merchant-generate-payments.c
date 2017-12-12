@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
+  Copyright (C) 2014-2017 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -13,9 +13,18 @@
   You should have received a copy of the GNU Lesser General Public License along with
   TALER; see the file COPYING.LGPL.  If not, see <http://www.gnu.org/licenses/>
 */
-
+/**
+ * @file taler-merchant-generate-payments.c
+ * @brief tool to use (or test) the taler backend by running some transactions
+ * @author Christian Grothoff
+ * @author Marcello Stanisci
+ *
+ * TODO:
+ * - trigger wirewatch after /admin/add/incoming!
+ */ 
 #include "platform.h"
 #include <taler/taler_exchange_service.h>
+#include <taler/taler_bank_service.h>
 #include <taler/taler_fakebank_lib.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_util.h>
@@ -25,6 +34,11 @@
 #include <gnunet/gnunet_util_lib.h>
 #include <gnunet/gnunet_curl_lib.h>
 #include <microhttpd.h>
+
+/**
+ * Number of the account the exchange has at the bank.
+ */
+#define EXCHANGE_ACCOUNT_NO 2
 
 /**
  * The exchange process launched by the generator
@@ -60,25 +74,25 @@ static int remote_exchange = 0;
 static int remote_merchant = 0;
 
 /**
- * Exchange URI to withdraw from and deposit to.
+ * Exchange URL to withdraw from and deposit to.
  */
-static char *exchange_uri;
+static char *exchange_url;
 
 /**
  * Base URL of exchange's admin interface.
  */
-static char *exchange_uri_admin;
+static char *exchange_url_admin;
 
 /**
  * Merchant backend to get proposals from and pay.
  */
-static char *merchant_uri;
+static char *merchant_url;
 
 /**
- * Customer's bank URI, communicated at withdrawal time
+ * Customer's bank URL, communicated at withdrawal time
  * to the exchange; must be the same as the exchange's bank.
  */
-static char *bank_uri;
+static char *bank_url;
 
 /**
  * Which merchant instance we use.
@@ -281,14 +295,14 @@ struct Command
       char *amount;
 
       /**
-       * Sender's bank account details (JSON).
+       * Sender's bank account number.
        */
-      const char *sender_details;
+      uint64_t debit_account_no;
 
       /**
-       * Transfer details (JSON)
+       * Receiver's bank account number.
        */
-       const char *transfer_details;
+      uint64_t credit_account_no;
 
       /**
        * Set (by the interpreter) to the reserve's private key
@@ -299,8 +313,13 @@ struct Command
       /**
        * Set to the API's handle during the operation.
        */
-      struct TALER_EXCHANGE_AdminAddIncomingHandle *aih;
+      struct TALER_BANK_AdminAddIncomingHandle *aih;
 
+      /**
+       * Set to bank's identifier for the wire transfer.
+       */
+      uint64_t serial_id;
+      
     } admin_add_incoming;
 
     /**
@@ -593,24 +612,28 @@ pay_cb (void *cls,
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param serial_id unique ID of for the transfer at the bank
  * @param full_response full response from the exchange (for logging, in case of errors)
  */
 static void
 add_incoming_cb (void *cls,
                  unsigned int http_status,
 		 enum TALER_ErrorCode ec,
+		 uint64_t serial_id,
                  const json_t *full_response)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
 
   cmd->details.admin_add_incoming.aih = NULL;
+  cmd->details.admin_add_incoming.serial_id = serial_id;
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_break (0);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "%s",
-                json_dumps (full_response, JSON_INDENT (2)));
+                json_dumps (full_response,
+			    JSON_INDENT (2)));
     fail (is);
     return;
   }
@@ -823,7 +846,7 @@ make_order (const char *maxfee,
 
 
 /**
- * Free amount stringsin interpreter state.
+ * Free amount strings in interpreter state.
  *
  * @param is state to reset
  */
@@ -933,7 +956,7 @@ reset_interpreter (struct InterpreterState *is)
                     "Command %u (%s) did not complete\n",
                     i,
                     cmd->label);
-        TALER_EXCHANGE_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
+        TALER_BANK_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
         cmd->details.admin_add_incoming.aih = NULL;
       }
       break;
@@ -960,11 +983,7 @@ interpreter_run (void *cls)
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
   const struct Command *ref;
-  struct TALER_ReservePublicKeyP reserve_pub;
   struct TALER_Amount amount;
-  struct GNUNET_TIME_Absolute execution_date;
-  json_t *sender_details;
-  json_t *transfer_details;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
 	      "Interpreter runs command %u/%s(%u)\n",
@@ -1101,7 +1120,7 @@ interpreter_run (void *cls)
         }
         cmd->details.pay.ph
           = TALER_MERCHANT_pay_wallet (ctx,
-                                       merchant_uri,
+                                       merchant_url,
                                        instance,
                                        &ref->details.proposal.hash,
                                        &total_amount,
@@ -1112,7 +1131,7 @@ interpreter_run (void *cls)
                                        refund_deadline,
                                        pay_deadline,
                                        &h_wire,
-                                       exchange_uri,
+                                       exchange_url,
                                        order_id,
                                        1 /* num_coins */,
                                        &pc /* coins */,
@@ -1155,7 +1174,7 @@ interpreter_run (void *cls)
         json_decref (merchant_obj);
         cmd->details.proposal.po
           = TALER_MERCHANT_order_put (ctx,
-                                      merchant_uri,
+                                      merchant_url,
                                       order,
                                       &proposal_cb,
                                       is);
@@ -1170,89 +1189,69 @@ interpreter_run (void *cls)
       }
 
     case OC_ADMIN_ADD_INCOMING:
-      if (NULL !=
-          cmd->details.admin_add_incoming.reserve_reference)
       {
-        ref = find_command (is,
-                            cmd->details.admin_add_incoming.reserve_reference);
-        GNUNET_assert (NULL != ref);
-        GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
-        cmd->details.admin_add_incoming.reserve_priv
-          = ref->details.admin_add_incoming.reserve_priv;
-      }
-      else
-      {
-        struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
+	char *subject;
+	struct TALER_BANK_AuthenticationData auth;
+	struct TALER_ReservePublicKeyP reserve_pub;
+	  
+	if (NULL !=
+	    cmd->details.admin_add_incoming.reserve_reference)
+	{
+	  ref = find_command (is,
+			      cmd->details.admin_add_incoming.reserve_reference);
+	  GNUNET_assert (NULL != ref);
+	  GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
+	  cmd->details.admin_add_incoming.reserve_priv
+	    = ref->details.admin_add_incoming.reserve_priv;
+	}
+	else
+	{
+	  struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
+	  
+	  priv = GNUNET_CRYPTO_eddsa_key_create ();
+	  cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
+	  GNUNET_free (priv);
+	}
+	GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
+					    &reserve_pub.eddsa_pub);
+	if (GNUNET_OK !=
+	    TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
+				    &amount))
+	{
+	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		      "Failed to parse amount `%s' at %u\n",
+		      cmd->details.admin_add_incoming.amount,
+		      is->ip);
+	  fail (is);
+	  return;
+	}
 
-        priv = GNUNET_CRYPTO_eddsa_key_create ();
-        cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
-        GNUNET_free (priv);
+	subject
+	  = GNUNET_STRINGS_data_to_string_alloc (&reserve_pub,
+						 sizeof (reserve_pub));
+	auth.method = TALER_BANK_AUTH_BASIC;
+	auth.details.basic.username = "admin";
+	auth.details.basic.password = "x";
+	cmd->details.admin_add_incoming.aih
+	  = TALER_BANK_admin_add_incoming (ctx,
+					   bank_url,
+					   &auth,
+					   exchange_url,
+					   subject,
+					   &amount,
+					   cmd->details.admin_add_incoming.debit_account_no,
+					   cmd->details.admin_add_incoming.credit_account_no,
+					   &add_incoming_cb,
+					   is);
+	GNUNET_free (subject);
+	if (NULL == cmd->details.admin_add_incoming.aih)
+	{
+	  GNUNET_break (0);
+	  fail (is);
+	  return;
+	}
+	return;
       }
-      GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
-                                          &reserve_pub.eddsa_pub);
-      if (GNUNET_OK !=
-          TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
-                                  &amount))
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse amount `%s' at %u\n",
-                    cmd->details.admin_add_incoming.amount,
-                    is->ip);
-        fail (is);
-        return;
-      }
-
-      execution_date = GNUNET_TIME_absolute_get ();
-      GNUNET_TIME_round_abs (&execution_date);
-      sender_details = json_loads (cmd->details.admin_add_incoming.sender_details,
-                                   JSON_REJECT_DUPLICATES,
-                                   NULL);
-      if (NULL == sender_details)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse sender details `%s' at %u\n",
-                    cmd->details.admin_add_incoming.sender_details,
-                    is->ip);
-        fail (is);
-        return;
-      }
-      json_object_set_new (sender_details,
-                           "bank_uri",
-                           json_string (bank_uri));
-
-      transfer_details = json_loads (cmd->details.admin_add_incoming.transfer_details,
-                                     JSON_REJECT_DUPLICATES,
-                                     NULL);
-
-      if (NULL == transfer_details)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to parse transfer details `%s' at %u\n",
-                    cmd->details.admin_add_incoming.transfer_details,
-                    is->ip);
-        fail (is);
-        return;
-      }
-      cmd->details.admin_add_incoming.aih
-        = TALER_EXCHANGE_admin_add_incoming (exchange,
-                                             exchange_uri_admin,
-                                             &reserve_pub,
-                                             &amount,
-                                             execution_date,
-                                             sender_details,
-                                             transfer_details,
-                                             &add_incoming_cb,
-                                             is);
-      json_decref (sender_details);
-      json_decref (transfer_details);
-      if (NULL == cmd->details.admin_add_incoming.aih)
-      {
-        GNUNET_break (0);
-        fail (is);
-        return;
-      }
-      return;
-
     case OC_WITHDRAW_SIGN:
       GNUNET_assert (NULL !=
                      cmd->details.reserve_withdraw.reserve_reference);
@@ -1445,23 +1444,23 @@ run_test ()
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-1",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
-      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
+      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
       .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
 
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-2",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
-      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
+      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
       .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
     /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-3",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.sender_details = "{ \"type\":\"test\", \"account_number\":62, \"uuid\":1 }",
-      .details.admin_add_incoming.transfer_details = "{ \"uuid\": 1}",
+      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
       .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
 
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
@@ -1544,7 +1543,7 @@ run_test ()
   GNUNET_assert (NULL != ctx);
   rc = GNUNET_CURL_gnunet_rc_create (ctx);
   exchange = TALER_EXCHANGE_connect (ctx,
-                                     exchange_uri,
+                                     exchange_url,
                                      &cert_cb,
                                      is,
                                      TALER_EXCHANGE_OPTION_END);
@@ -1575,7 +1574,7 @@ run (void *cls,
   if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
                                                               "payments-generator",
                                                               "exchange",
-                                                              &exchange_uri))
+                                                              &exchange_url))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "payments-generator",
@@ -1586,7 +1585,7 @@ run (void *cls,
   if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
                                                               "payments-generator",
                                                               "exchange_admin",
-                                                              &exchange_uri_admin))
+                                                              &exchange_url_admin))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "payments-generator",
@@ -1598,7 +1597,7 @@ run (void *cls,
   if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
                                                               "payments-generator",
                                                               "merchant",
-                                                              &merchant_uri))
+                                                              &merchant_url))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "payments-generator",
@@ -1610,7 +1609,7 @@ run (void *cls,
   if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
                                                               "payments-generator",
                                                               "bank",
-                                                              &bank_uri))
+                                                              &bank_url))
   {
 
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
@@ -1665,7 +1664,7 @@ run (void *cls,
              "Waiting for taler-exchange-httpd to be ready\n");
     cnt = 0;
 
-    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null", exchange_uri);
+    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null", exchange_url);
 
     do
       {
@@ -1715,7 +1714,7 @@ run (void *cls,
     fprintf (stderr,
              "Waiting for taler-merchant-httpd to be ready\n");
     cnt = 0;
-    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null", merchant_uri);
+    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null", merchant_url);
 
     do
       {

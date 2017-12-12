@@ -33,6 +33,7 @@ taler_merchant_generate_payments_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   $(top_srcdir)/src/lib/libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
+  -ltalerbank \
   -ltalerfakebank \
   -ltalerexchange \
   -ltalerjson \
