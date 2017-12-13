@@ -3033,6 +3033,8 @@ interpreter_run (void *cls)
                    = TALER_MERCHANT_tip_authorize
                    (ctx,
                     MERCHANT_URL,
+                    "http://merchant.com/pickup",
+                    "http://merchant.com/continue",
                     &amount,
                     cmd->details.tip_authorize.instance,
                     cmd->details.tip_authorize.justification,

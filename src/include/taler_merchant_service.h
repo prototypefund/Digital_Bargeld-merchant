@@ -808,7 +808,9 @@ typedef void
  * that a tip should be created.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
+ * @param pickup_url frontend URL for where the tip can be picked up
+ * @param next_url where the browser should proceed after picking up the tip
  * @param amount amount to be handed out as a tip
  * @param instance which backend instance should create the tip (identifies the reserve and exchange)
  * @param justification which justification should be stored (human-readable reason for the tip)
@@ -818,7 +820,9 @@ typedef void
  */
 struct TALER_MERCHANT_TipAuthorizeOperation *
 TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
-                              const char *backend_uri,
+                              const char *backend_url,
+                              const char *pickup_url,
+                              const char *next_url,
                               const struct TALER_Amount *amount,
                               const char *instance,
                               const char *justification,
