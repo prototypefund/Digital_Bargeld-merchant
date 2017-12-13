@@ -64,6 +64,12 @@ static unsigned int j = 0;
  * Indicates whether we use an external exchange.
  * By default, the generator forks a local exchange.
  */
+static int remote_bank = 0;
+
+/**
+ * Indicates whether we use an external exchange.
+ * By default, the generator forks a local exchange.
+ */
 static int remote_exchange = 0;
 
 /**
@@ -105,6 +111,11 @@ static char *instance;
 static char *currency;
 
 /**
+ * Handle to our fakebank.
+ */
+static struct TALER_FAKEBANK_Handle *fakebank;
+
+/**
  * Task run on timeout.
  */
 static struct GNUNET_SCHEDULER_Task *timeout_task;
@@ -133,6 +144,12 @@ static int result;
  * Pipe used to communicate child death via signal.
  */
 static struct GNUNET_DISK_PipeHandle *sigpipe;
+
+/**
+ * Name of the configuration file we are using.
+ */
+static char *cfgfilename;
+
 
 /**
  * State of the interpreter loop.
@@ -181,6 +198,11 @@ enum OpCode
    * Add funds to a reserve by (faking) incoming wire transfer.
    */
   OC_ADMIN_ADD_INCOMING,
+
+  /**
+   * Run the wirewatcher to check for incoming transactions.
+   */
+  OC_RUN_WIREWATCH,
 
   /**
    * Check status of a reserve.
@@ -321,6 +343,20 @@ struct Command
       uint64_t serial_id;
       
     } admin_add_incoming;
+
+    struct {
+
+      /**
+       * Process for the wirewatcher.
+       */
+      struct GNUNET_OS_Process *wirewatch_proc;
+
+      /**
+       * ID of task called whenever we get a SIGCHILD.
+       */
+      struct GNUNET_SCHEDULER_Task *child_death_task;
+
+    } run_wirewatch;
 
     /**
      * Information for an #OC_PROPOSAL command.
@@ -875,6 +911,8 @@ free_interpreter_amounts (struct InterpreterState *is)
     case OC_ADMIN_ADD_INCOMING:
       GNUNET_free (cmd->details.admin_add_incoming.amount);
       break;
+    case OC_RUN_WIREWATCH:
+      break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -960,6 +998,22 @@ reset_interpreter (struct InterpreterState *is)
         cmd->details.admin_add_incoming.aih = NULL;
       }
       break;
+    case OC_RUN_WIREWATCH:
+      if (NULL != cmd->details.run_wirewatch.wirewatch_proc)
+      {
+        GNUNET_break (0 ==
+                      GNUNET_OS_process_kill (cmd->details.run_wirewatch.wirewatch_proc,
+                                              SIGKILL));
+        GNUNET_OS_process_wait (cmd->details.run_wirewatch.wirewatch_proc);
+        GNUNET_OS_process_destroy (cmd->details.run_wirewatch.wirewatch_proc);
+        cmd->details.run_wirewatch.wirewatch_proc = NULL;
+      }
+      if (NULL != cmd->details.run_wirewatch.child_death_task)
+      {
+        GNUNET_SCHEDULER_cancel (cmd->details.run_wirewatch.child_death_task);
+        cmd->details.run_wirewatch.child_death_task = NULL;
+      }
+      break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -968,6 +1022,30 @@ reset_interpreter (struct InterpreterState *is)
                   cmd->label);
       break;
     }
+}
+
+
+/**
+ * Task triggered whenever we receive a SIGCHLD (child
+ * process died).
+ *
+ * @param cls closure, NULL if we need to self-restart
+ */
+static void
+maint_child_death (void *cls)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  const struct GNUNET_DISK_FileHandle *pr;
+  char c[16];
+
+  cmd->details.run_wirewatch.child_death_task = NULL;
+  pr = GNUNET_DISK_pipe_handle (sigpipe, GNUNET_DISK_PIPE_END_READ);
+  GNUNET_break (0 < GNUNET_DISK_file_read (pr, &c, sizeof (c)));
+  GNUNET_OS_process_wait (cmd->details.run_wirewatch.wirewatch_proc);
+  GNUNET_OS_process_destroy (cmd->details.run_wirewatch.wirewatch_proc);
+  cmd->details.run_wirewatch.wirewatch_proc = NULL;
+  next_command (is);
 }
 
 
@@ -1230,6 +1308,7 @@ interpreter_run (void *cls)
 	  = GNUNET_STRINGS_data_to_string_alloc (&reserve_pub,
 						 sizeof (reserve_pub));
 	auth.method = TALER_BANK_AUTH_BASIC;
+	/* TODO: obtain authentication details from configuration */
 	auth.details.basic.username = "admin";
 	auth.details.basic.password = "x";
 	cmd->details.admin_add_incoming.aih
@@ -1252,9 +1331,37 @@ interpreter_run (void *cls)
 	}
 	return;
       }
+    case OC_RUN_WIREWATCH:
+      {
+	const struct GNUNET_DISK_FileHandle *pr;
+	
+	cmd->details.run_wirewatch.wirewatch_proc
+	  = GNUNET_OS_start_process (GNUNET_NO,
+				     GNUNET_OS_INHERIT_STD_ALL,
+				     NULL, NULL, NULL,
+				     "taler-exchange-wirewatch",
+				     "taler-exchange-wirewatch",
+				     "-c", cfgfilename,
+				     "-t", "test", /* use Taler's bank/fakebank */
+				     "-T", /* exit when done */
+				     NULL);
+	if (NULL == cmd->details.run_wirewatch.wirewatch_proc)
+	{
+	  GNUNET_break (0);
+	  fail (is);
+	  return;
+	}
+	pr = GNUNET_DISK_pipe_handle (sigpipe,
+				      GNUNET_DISK_PIPE_END_READ);
+	cmd->details.run_wirewatch.child_death_task
+	  = GNUNET_SCHEDULER_add_read_file (GNUNET_TIME_UNIT_FOREVER_REL,
+					    pr,
+					    &maint_child_death, is);
+	return;
+      }
     case OC_WITHDRAW_SIGN:
       GNUNET_assert (NULL !=
-                     cmd->details.reserve_withdraw.reserve_reference);
+		     cmd->details.reserve_withdraw.reserve_reference);
       ref = find_command (is,
                           cmd->details.reserve_withdraw.reserve_reference);
       GNUNET_assert (NULL != ref);
@@ -1407,6 +1514,11 @@ do_shutdown (void *cls)
     GNUNET_CURL_gnunet_rc_destroy (rc);
     rc = NULL;
   }
+  if (NULL != fakebank)
+  {
+    TALER_FAKEBANK_stop (fakebank);
+    fakebank = NULL;
+  }
 }
 
 
@@ -1421,12 +1533,15 @@ do_shutdown (void *cls)
  * formatted string.
  */
 static char *
-concat_amount (char *currency, char *rpart)
+concat_amount (const char *currency,
+	       const char *rpart)
 {
   char *str;
 
-  GNUNET_asprintf (&str, "%s:%s",
-                   currency, rpart);
+  GNUNET_asprintf (&str,
+		   "%s:%s",
+                   currency,
+		   rpart);
   return str;
 }
 
@@ -1462,7 +1577,9 @@ run_test ()
       .details.admin_add_incoming.debit_account_no = 62,
       .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
       .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
-
+    { .oc = OC_RUN_WIREWATCH,
+      .label = "run-wirewatch-1"
+    },
     /* Withdraw a 5 EUR coin, at fee of 1 ct */
     { .oc = OC_WITHDRAW_SIGN,
       .label = "withdraw-coin-1",
@@ -1571,10 +1688,23 @@ run (void *cls,
   unsigned int cnt;
   char *wget_cmd;
 
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
-                                                              "payments-generator",
-                                                              "exchange",
-                                                              &exchange_url))
+  cfgfilename = GNUNET_strdup (cfgfile);
+  if (! remote_bank)
+  {
+    /* TODO: do not hard-code port, find in cfg */
+    fakebank = TALER_FAKEBANK_start (8082);
+    if (NULL == fakebank)
+    {
+      fprintf (stderr,	       
+	       "Failed to launch fakebank\n");
+      GNUNET_SCHEDULER_shutdown ();
+    }
+  }
+  if (GNUNET_SYSERR == 
+      GNUNET_CONFIGURATION_get_value_string (config,
+					     "payments-generator",
+					     "exchange",
+					     &exchange_url))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "payments-generator",
@@ -1582,10 +1712,11 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
-                                                              "payments-generator",
-                                                              "exchange_admin",
-                                                              &exchange_url_admin))
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_string (config,
+					     "payments-generator",
+					     "exchange_admin",
+					     &exchange_url_admin))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "payments-generator",
@@ -1594,10 +1725,11 @@ run (void *cls,
     return;
   }
 
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
-                                                              "payments-generator",
-                                                              "merchant",
-                                                              &merchant_url))
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_string (config,
+					     "payments-generator",
+					     "merchant",
+					     &merchant_url))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "payments-generator",
@@ -1606,12 +1738,12 @@ run (void *cls,
     return;
   }
 
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
-                                                              "payments-generator",
-                                                              "bank",
-                                                              &bank_url))
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_string (config,
+					     "payments-generator",
+					     "bank",
+					     &bank_url))
   {
-
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "payments-generator",
                                "bank");
@@ -1619,10 +1751,11 @@ run (void *cls,
     return;
   }
 
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
-                                                              "payments-generator",
-                                                              "instance",
-                                                              &instance))
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_string (config,
+					     "payments-generator",
+					     "instance",
+					     &instance))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "payments-generator",
@@ -1631,12 +1764,12 @@ run (void *cls,
     return;
   }
 
-  if (GNUNET_SYSERR == GNUNET_CONFIGURATION_get_value_string (config,
-                                                              "payments-generator",
-                                                              "currency",
-                                                              &currency))
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_string (config,
+					     "payments-generator",
+					     "currency",
+					     &currency))
   {
-
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "payments-generator",
                                "currency");
@@ -1664,7 +1797,9 @@ run (void *cls,
              "Waiting for taler-exchange-httpd to be ready\n");
     cnt = 0;
 
-    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null", exchange_url);
+    GNUNET_asprintf (&wget_cmd,
+		     "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null",
+		     exchange_url);
 
     do
       {
@@ -1766,6 +1901,10 @@ main (int argc,
                                "TIMES",
                                "How many times the commands should be run.",
                                &times),
+    GNUNET_GETOPT_option_flag ('b',
+                               "remote-bank",
+                               "Do not start fakebank",
+                               &remote_bank),
     GNUNET_GETOPT_option_flag ('e',
                                "remote-exchange",
                                "Do not fork any exchange",
