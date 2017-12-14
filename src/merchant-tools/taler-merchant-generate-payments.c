@@ -21,7 +21,7 @@
  *
  * TODO:
  * - trigger wirewatch after /admin/add/incoming!
- */ 
+ */
 #include "platform.h"
 #include <taler/taler_exchange_service.h>
 #include <taler/taler_bank_service.h>
@@ -144,6 +144,11 @@ static int result;
  * Pipe used to communicate child death via signal.
  */
 static struct GNUNET_DISK_PipeHandle *sigpipe;
+
+/**
+ * Signal handler we overrode.
+ */
+static struct GNUNET_SIGNAL_Context *shc_chld;
 
 /**
  * Name of the configuration file we are using.
@@ -341,7 +346,7 @@ struct Command
        * Set to bank's identifier for the wire transfer.
        */
       uint64_t serial_id;
-      
+
     } admin_add_incoming;
 
     struct {
@@ -1082,25 +1087,20 @@ interpreter_run (void *cls)
   switch (cmd->oc)
   {
     case OC_END:
-
       j++;
-
       if (j < times)
       {
         reset_interpreter (is);
         is->ip = 0;
         GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                     "Rewinding the interpreter.\n");
-
         GNUNET_SCHEDULER_add_now (&interpreter_run,
                                   is);
         return;
       }
       result = GNUNET_OK;
       GNUNET_SCHEDULER_shutdown ();
-
       return;
-
     case OC_PAY:
       {
         struct TALER_MERCHANT_PayCoin pc;
@@ -1271,7 +1271,7 @@ interpreter_run (void *cls)
 	char *subject;
 	struct TALER_BANK_AuthenticationData auth;
 	struct TALER_ReservePublicKeyP reserve_pub;
-	  
+
 	if (NULL !=
 	    cmd->details.admin_add_incoming.reserve_reference)
 	{
@@ -1285,7 +1285,7 @@ interpreter_run (void *cls)
 	else
 	{
 	  struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-	  
+
 	  priv = GNUNET_CRYPTO_eddsa_key_create ();
 	  cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
 	  GNUNET_free (priv);
@@ -1334,7 +1334,7 @@ interpreter_run (void *cls)
     case OC_RUN_WIREWATCH:
       {
 	const struct GNUNET_DISK_FileHandle *pr;
-	
+
 	cmd->details.run_wirewatch.wirewatch_proc
 	  = GNUNET_OS_start_process (GNUNET_NO,
 				     GNUNET_OS_INHERIT_STD_ALL,
@@ -1356,7 +1356,8 @@ interpreter_run (void *cls)
 	cmd->details.run_wirewatch.child_death_task
 	  = GNUNET_SCHEDULER_add_read_file (GNUNET_TIME_UNIT_FOREVER_REL,
 					    pr,
-					    &maint_child_death, is);
+					    &maint_child_death,
+                                            is);
 	return;
       }
     case OC_WITHDRAW_SIGN:
@@ -1692,15 +1693,15 @@ run (void *cls,
   if (! remote_bank)
   {
     /* TODO: do not hard-code port, find in cfg */
-    fakebank = TALER_FAKEBANK_start (8082);
+    fakebank = TALER_FAKEBANK_start (8888);
     if (NULL == fakebank)
     {
-      fprintf (stderr,	       
+      fprintf (stderr,
 	       "Failed to launch fakebank\n");
       GNUNET_SCHEDULER_shutdown ();
     }
   }
-  if (GNUNET_SYSERR == 
+  if (GNUNET_SYSERR ==
       GNUNET_CONFIGURATION_get_value_string (config,
 					     "payments-generator",
 					     "exchange",
@@ -1777,7 +1778,7 @@ run (void *cls,
     return;
   }
 
-  if (!remote_exchange)
+  if (! remote_exchange)
   {
     exchanged = GNUNET_OS_start_process (GNUNET_NO,
                                          GNUNET_OS_INHERIT_STD_ALL,
@@ -1841,7 +1842,6 @@ run (void *cls,
                               SIGKILL);
       GNUNET_OS_process_wait (exchanged);
       GNUNET_OS_process_destroy (exchanged);
-
       GNUNET_SCHEDULER_shutdown ();
       return;
     }
@@ -1849,7 +1849,9 @@ run (void *cls,
     fprintf (stderr,
              "Waiting for taler-merchant-httpd to be ready\n");
     cnt = 0;
-    GNUNET_asprintf (&wget_cmd, "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null", merchant_url);
+    GNUNET_asprintf (&wget_cmd,
+                     "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null",
+                     merchant_url);
 
     do
       {
@@ -1868,7 +1870,6 @@ run (void *cls,
                                   SIGKILL);
           GNUNET_OS_process_wait (exchanged);
           GNUNET_OS_process_destroy (exchanged);
-
           GNUNET_SCHEDULER_shutdown ();
           return;
         }
@@ -1877,6 +1878,10 @@ run (void *cls,
     fprintf (stderr, "\n");
     GNUNET_free (wget_cmd);
   }
+
+  shc_chld = GNUNET_SIGNAL_handler_install (GNUNET_SIGCHLD,
+                                            &sighandler_child_death);
+
   /* timeout, given 60s + 5s per command, which should be more
      than enough */
   timeout_task
@@ -1894,7 +1899,6 @@ int
 main (int argc,
       char *argv[])
 {
-  struct GNUNET_SIGNAL_Context *shc_chld;
   struct GNUNET_GETOPT_CommandLineOption options[] = {
     GNUNET_GETOPT_option_uint ('n',
                                "times",
@@ -1922,11 +1926,11 @@ main (int argc,
                     "DEBUG",
                     NULL);
   result = GNUNET_SYSERR;
+
   sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO,
                               GNUNET_NO, GNUNET_NO);
   GNUNET_assert (NULL != sigpipe);
-  shc_chld = GNUNET_SIGNAL_handler_install (GNUNET_SIGCHLD,
-                                            &sighandler_child_death);
+
   if (GNUNET_OK !=
       GNUNET_PROGRAM_run (argc, argv,
                           "taler-merchant-generate-payments",
@@ -1935,9 +1939,11 @@ main (int argc,
                           &run, NULL))
     return 77;
 
-
-  GNUNET_SIGNAL_handler_uninstall (shc_chld);
-  shc_chld = NULL;
+  if (NULL != shc_chld)
+  {
+    GNUNET_SIGNAL_handler_uninstall (shc_chld);
+    shc_chld = NULL;
+  }
   GNUNET_DISK_pipe_close (sigpipe);
   if (!remote_merchant && NULL != merchantd)
   {
