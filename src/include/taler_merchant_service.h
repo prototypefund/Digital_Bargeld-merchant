@@ -578,40 +578,6 @@ struct TALER_MERCHANT_CoinWireTransfer
 
 };
 
-/**
- * Information about a wire transfer for a /track/transaction response.
- */
-struct TALER_MERCHANT_TransactionWireTransfer
-{
-
-  /**
-   * Wire transfer identifier this struct is about.
-   */
-  struct TALER_WireTransferIdentifierRawP wtid;
-
-  /**
-   * When was this wire transfer executed?
-   */
-  struct GNUNET_TIME_Absolute execution_time;
-
-  /**
-   * Number of coins of the selected transaction that
-   * is covered by this wire transfer.
-   */
-  unsigned int num_coins;
-
-  /**
-   * Information about the coins of the selected transaction
-   * that are part of the wire transfer.
-   */
-  struct TALER_MERCHANT_CoinWireTransfer *coins;
-
-  /**
-   * URL of the exchange that executed the wire transfer.
-   */
-  char *exchange_url;
-};
-
 
 /**
  * Callbacks of this type are used to work the result of submitting a
