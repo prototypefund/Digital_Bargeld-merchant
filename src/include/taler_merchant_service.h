@@ -55,7 +55,7 @@ typedef void
  * Does a GET /refund.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
  * @param order_id order id used to perform the lookup
  * @param cb callback which will work the response gotten from the backend
  * @param cb_cls closure to pass to the callback
@@ -63,7 +63,7 @@ typedef void
  */
 struct TALER_MERCHANT_RefundLookupOperation *
 TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
-                              const char *backend_uri,
+                              const char *backend_url,
                               const char *order_id,
                               const char *instance,
                               TALER_MERCHANT_RefundLookupCallback cb,
@@ -103,7 +103,7 @@ typedef void
  * Increase the refund associated to a order
  *
  * @param ctx the CURL context used to connect to the backend
- * @param backend_uri backend's base URL, including final "/"
+ * @param backend_url backend's base URL, including final "/"
  * @param order_id id of the order whose refund is to be increased
  * @param refund amount to which increase the refund
  * @param reason human-readable reason justifying the refund
@@ -113,7 +113,7 @@ typedef void
  */
 struct TALER_MERCHANT_RefundIncreaseOperation *
 TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
-                                const char *backend_uri,
+                                const char *backend_url,
                                 const char *order_id,
                                 const struct TALER_Amount *refund,
                                 const char *reason,
@@ -165,7 +165,7 @@ typedef void
  * PUT an order to the backend and receives the related proposal.
  *
  * @param ctx execution context
- * @param backend_uri URI of the backend
+ * @param backend_url URL of the backend
  * @param order basic information about this purchase, to be extended by the
  * backend
  * @param proposal_cb the callback to call when a reply for this request is available
@@ -174,7 +174,7 @@ typedef void
  */
 struct TALER_MERCHANT_ProposalOperation *
 TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
-                          const char *backend_uri,
+                          const char *backend_url,
                           const json_t *order,
                           TALER_MERCHANT_ProposalCallback proposal_cb,
                           void *proposal_cb_cls);
@@ -215,7 +215,7 @@ typedef void
  * retrieve a proposal data by providing its transaction id.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
  * @param transaction_id transaction id used to perform the lookup
  * @param plo_cb callback which will work the response gotten from the backend
  * @param plo_cb_cls closure to pass to @a history_cb
@@ -223,7 +223,7 @@ typedef void
  */
 struct TALER_MERCHANT_ProposalLookupOperation *
 TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
-                                const char *backend_uri,
+                                const char *backend_url,
                                 const char *transaction_id,
                                 const char *instance,
                                 TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
@@ -249,7 +249,7 @@ TALER_MERCHANT_proposal_lookup_cancel (struct TALER_MERCHANT_ProposalLookupOpera
  * or backends (API for frontends).  The difference is that for the
  * frontend API, we need the private keys of the coins, while for
  * the backend API we need the public keys and signatures received
- * from the wallet.  Also, the frontend returns a redirect URI on
+ * from the wallet.  Also, the frontend returns a redirect URL on
  * success, while the backend just returns a success status code.
  */
 struct TALER_MERCHANT_Pay;
@@ -310,6 +310,11 @@ struct TALER_MERCHANT_PayCoin
    */
   struct TALER_Amount amount_without_fee;
 
+  /**
+   * URL of the exchange that issued @e coin_priv.
+   */ 
+  const char *exchange_url;
+
 };
 
 
@@ -317,7 +322,7 @@ struct TALER_MERCHANT_PayCoin
  * Pay a merchant.  API for wallets that have the coin's private keys.
  *
  * @param ctx execution context
- * @param merchant_uri base URI of the merchant
+ * @param merchant_url base URL of the merchant
  * @param instance which merchant instance will receive this payment
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
@@ -329,7 +334,6 @@ struct TALER_MERCHANT_PayCoin
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
  * @param pay_deadline maximum time limit to pay for this contract
- * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -339,7 +343,7 @@ struct TALER_MERCHANT_PayCoin
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
-			   const char *merchant_uri,
+			   const char *merchant_url,
 			   const char *instance,
                            const struct GNUNET_HashCode *h_contract,
                            const struct TALER_Amount *amount,
@@ -350,7 +354,6 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
                            struct GNUNET_TIME_Absolute refund_deadline,
                            struct GNUNET_TIME_Absolute pay_deadline,
                            const struct GNUNET_HashCode *h_wire,
-			   const char *exchange_uri,
                            const char *order_id,
                            unsigned int num_coins,
                            const struct TALER_MERCHANT_PayCoin *coins,
@@ -399,6 +402,11 @@ struct TALER_MERCHANT_PaidCoin
    */
   struct TALER_Amount amount_without_fee;
 
+  /**
+   * What is the URL of the exchange that issued @a coin_pub?
+   */
+  const char *exchange_url;
+
 };
 
 
@@ -409,7 +417,7 @@ struct TALER_MERCHANT_PaidCoin
  * in the type of @a coins compared to #TALER_MERCHANT_pay().
  *
  * @param ctx execution context
- * @param merchant_uri base URI of the merchant
+ * @param merchant_url base URL of the merchant
  * @param instance which merchant instance will receive this payment
  * @param h_contract hash of the contact of the merchant with the customer
  * @param amount total value of the contract to be paid to the merchant
@@ -420,7 +428,6 @@ struct TALER_MERCHANT_PaidCoin
  * @param pay_deadline maximum time limit to pay for this contract
  * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
  * @param wire_transfer_deadline date by which the merchant would like the exchange to execute the wire transfer (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
- * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
@@ -430,10 +437,9 @@ struct TALER_MERCHANT_PaidCoin
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
-			     const char *merchant_uri,
+			     const char *merchant_url,
                              const struct TALER_MerchantPublicKeyP *merchant_pub,
 			     const char *order_id,
-			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
                              TALER_MERCHANT_PayCallback pay_cb,
@@ -517,7 +523,7 @@ typedef void
  * Request backend to return deposits associated with a given wtid.
  *
  * @param ctx execution context
- * @param backend_uri base URI of the backend
+ * @param backend_url base URL of the backend
  * @param instance which merchant instance is going to be tracked
  * @param wire_method wire method used for the wire transfer
  * @param wtid base32 string indicating a wtid
@@ -528,11 +534,11 @@ typedef void
  */
 struct TALER_MERCHANT_TrackTransferHandle *
 TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
-                               const char *backend_uri,
+                               const char *backend_url,
                                const char *instance,
 			       const char *wire_method,
                                const struct TALER_WireTransferIdentifierRawP *wtid,
-                               const char *exchange_uri,
+                               const char *exchange_url,
                                TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
                                void *track_transfer_cb_cls);
 
@@ -601,7 +607,7 @@ typedef void
  * Request backend to return deposits associated with a given wtid.
  *
  * @param ctx execution context
- * @param backend_uri base URI of the backend
+ * @param backend_url base URL of the backend
  * @param instance which merchant instance is going to be tracked
  * @param transaction_id which transaction should we trace
  * @param track_transaction_cb the callback to call when a reply for this request is available
@@ -610,7 +616,7 @@ typedef void
  */
 struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
-                                  const char *backend_uri,
+                                  const char *backend_url,
                                   const char *instance,
                                   const char *order_id,
                                   TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
@@ -650,7 +656,7 @@ typedef void
  * Issue a /history request to the backend.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
  * @param instance which merchant instance is performing this call
  * @param start return @a delta records starting from position @a start
  * @param delta return @a delta records starting from position @a start
@@ -661,7 +667,7 @@ typedef void
  */
 struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
-                        const char *backend_uri,
+                        const char *backend_url,
                         const char *instance,
                         unsigned int start,
                         unsigned int delta,
@@ -707,7 +713,7 @@ typedef void
  * Issue a /tip-enable request to the backend.  Informs the backend
  * that a reserve is now available for tipping.  Note that the
  * respective @a reserve_priv must also be bound to one or more
- * instances (together with the URI of the exchange) via the backend's
+ * instances (together with the URL of the exchange) via the backend's
  * configuration file before it can be used.  Usually, the process
  * is that one first configures an exchange and a @a reserve_priv for
  * an instance, and then enables (or re-enables) the reserve by
@@ -715,7 +721,7 @@ typedef void
  * this API.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
  * @param amount amount that was credited to the reserve
  * @param expiration when will the reserve expire
  * @param reserve_priv private key of the reserve
@@ -726,7 +732,7 @@ typedef void
  */
 struct TALER_MERCHANT_TipEnableOperation *
 TALER_MERCHANT_tip_enable (struct GNUNET_CURL_Context *ctx,
-                           const char *backend_uri,
+                           const char *backend_url,
                            const struct TALER_Amount *amount,
                            struct GNUNET_TIME_Absolute expiration,
                            const struct TALER_ReservePrivateKeyP *reserve_priv,
@@ -762,7 +768,7 @@ struct TALER_MERCHANT_TipAuthorizeOperation;
  * @param ec taler-specific error code
  * @param tip_id which tip ID should be used to pickup the tip
  * @param tip_expiration when does the tip expire (needs to be picked up before this time)
- * @param exchange_uri at what exchange can the tip be picked up
+ * @param exchange_url at what exchange can the tip be picked up
  */
 typedef void
 (*TALER_MERCHANT_TipAuthorizeCallback) (void *cls,
@@ -770,7 +776,7 @@ typedef void
                                         enum TALER_ErrorCode ec,
                                         const struct GNUNET_HashCode *tip_id,
                                         struct GNUNET_TIME_Absolute tip_expiration,
-                                        const char *exchange_uri);
+                                        const char *exchange_url);
 
 
 /**
@@ -845,7 +851,7 @@ typedef void
  * that a customer wants to pick up a tip.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
  * @param tip_id unique identifier for the tip
  * @param num_planches number of planchets provided in @a planchets
  * @param planchets array of planchets to be signed into existence for the tip
@@ -855,7 +861,7 @@ typedef void
  */
 struct TALER_MERCHANT_TipPickupOperation *
 TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
-                           const char *backend_uri,
+                           const char *backend_url,
                            const struct GNUNET_HashCode *tip_id,
                            unsigned int num_planchets,
                            struct TALER_PlanchetDetail *planchets,

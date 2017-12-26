@@ -750,8 +750,8 @@ wire_transfer_cb (void *cls,
     resume_track_transfer_with_response
       (rctx,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
-       TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
-                                         "Fail to elaborate the response."));
+       TMH_RESPONSE_make_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
+				"Fail to elaborate the response."));
     return;
   }
 
@@ -818,7 +818,7 @@ handle_track_transfer_timeout (void *cls)
   }
   resume_track_transfer_with_response (rctx,
                                        MHD_HTTP_SERVICE_UNAVAILABLE,
-                                       TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_EXCHANGE_TIMEOUT,
+                                       TMH_RESPONSE_make_error (TALER_EC_TRACK_TRANSFER_EXCHANGE_TIMEOUT,
 									 "exchange not reachable"));
 }
 
@@ -845,8 +845,8 @@ proof_cb (void *cls,
   {
     rctx->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
     rctx->response
-      = TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
-					  "Fail to elaborate response.");
+      = TMH_RESPONSE_make_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
+				 "Fail to elaborate response.");
     return;
   }
 

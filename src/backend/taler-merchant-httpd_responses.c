@@ -181,11 +181,10 @@ TMH_RESPONSE_reply_json_pack (struct MHD_Connection *connection,
  * @return a MHD response object
  */
 struct MHD_Response *
-TMH_RESPONSE_make_internal_error (enum TALER_ErrorCode ec,
-				  const char *hint)
+TMH_RESPONSE_make_error (enum TALER_ErrorCode ec,
+			 const char *hint)
 {
-  return TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:s}",
-                                      "error", "internal error",
+  return TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
 				      "code", (json_int_t) ec,
                                       "hint", hint);
 }
@@ -206,8 +205,7 @@ TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       "{s:s, s:I, s:s}",
-                                       "error", "internal error",
+                                       "{s:I, s:s}",
 				       "code", (json_int_t) ec,
                                        "hint", hint);
 }
@@ -354,28 +352,9 @@ TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
-                                       "{s:s, s:I, s:s}",
-                                       "error", "client error",
+                                       "{s:I, s:s}",
 				       "code", (json_int_t) ec,
                                        "hint", hint);
-}
-
-
-/**
- * Create a response indicating an external error.
- *
- * @param ec error code to return
- * @param hint hint about the internal error's nature
- * @return a MHD response object
- */
-struct MHD_Response *
-TMH_RESPONSE_make_external_error (enum TALER_ErrorCode ec,
-				  const char *hint)
-{
-  return TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:s}",
-                                      "error", "client error",
-				      "code", (json_int_t) ec,
-                                      "hint", hint);
 }
 
 
@@ -394,7 +373,7 @@ TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
-                                       "{ s:s, s:I, s:s}",
+                                       "{s:s, s:I, s:s}",
                                        "error", "missing parameter",
 				       "code", (json_int_t) ec,
                                        "parameter", param_name);

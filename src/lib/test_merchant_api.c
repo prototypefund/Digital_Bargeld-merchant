@@ -2696,12 +2696,14 @@ interpreter_run (void *cls)
           icoin->denom_pub = coin_ref->details.reserve_withdraw.pk->key;
           icoin->denom_sig = coin_ref->details.reserve_withdraw.sig;
           icoin->denom_value = coin_ref->details.reserve_withdraw.pk->value;
+	  icoin->exchange_url = EXCHANGE_URL;
           break;
         case OC_TIP_PICKUP:
           icoin->coin_priv = coin_ref->details.tip_pickup.psa[ci].coin_priv;
           icoin->denom_pub = coin_ref->details.tip_pickup.dks[ci]->key;
           icoin->denom_sig = coin_ref->details.tip_pickup.sigs[ci];
           icoin->denom_value = coin_ref->details.tip_pickup.dks[ci]->value;
+	  icoin->exchange_url = EXCHANGE_URL;
           break;
         default:
           GNUNET_assert (0);
@@ -2729,7 +2731,6 @@ interpreter_run (void *cls)
          refund_deadline,
          pay_deadline,
          &h_wire,
-         EXCHANGE_URL,
          order_id,
          npc /* num_coins */,
          pc /* coins */,

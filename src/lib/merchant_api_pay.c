@@ -265,7 +265,6 @@ handle_pay_finished (void *cls,
  * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
  * @param pay_deadline maximum time limit to pay for this contract
  * @param h_wire hash of the merchant’s account details
- * @param exchange_uri URI of the exchange that the coins belong to
  * @param order_id order id of the proposal being paid
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
@@ -286,14 +285,12 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
                            struct GNUNET_TIME_Absolute refund_deadline,
                            struct GNUNET_TIME_Absolute pay_deadline,
                            const struct GNUNET_HashCode *h_wire,
-			   const char *exchange_uri,
                            const char *order_id,
                            unsigned int num_coins,
                            const struct TALER_MERCHANT_PayCoin *coins,
                            TALER_MERCHANT_PayCallback pay_cb,
                            void *pay_cb_cls)
 {
-  unsigned int i;
   struct TALER_DepositRequestPS dr;
   struct TALER_MERCHANT_PaidCoin pc[num_coins];
 
@@ -316,7 +313,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
   dr.timestamp = GNUNET_TIME_absolute_hton (timestamp);
   dr.refund_deadline = GNUNET_TIME_absolute_hton (refund_deadline);
   dr.merchant = *merchant_pub;
-  for (i=0;i<num_coins;i++)
+  for (unsigned int i=0;i<num_coins;i++)
   {
     const struct TALER_MERCHANT_PayCoin *coin = &coins[i];
     struct TALER_MERCHANT_PaidCoin *p = &pc[i];
@@ -355,12 +352,12 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
     p->coin_pub = dr.coin_pub;
     p->amount_with_fee = coin->amount_with_fee;
     p->amount_without_fee = coin->amount_without_fee;
+    p->exchange_url = coin->exchange_url;
   }
   return TALER_MERCHANT_pay_frontend (ctx,
 				      merchant_uri,
                                       merchant_pub,
                                       order_id,
-				      exchange_uri,
 				      num_coins,
 				      pc,
 				      pay_cb,
@@ -377,7 +374,6 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  * @param ctx the execution loop context
  * @param merchant_uri base URI of the merchant's backend
  * @param merchant_pub public key of the merchant
- * @param exchange_uri URI of the exchange that the coins belong to
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param pay_cb the callback to call when a reply for this request is available
@@ -389,7 +385,6 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
 			     const char *merchant_uri,
                              const struct TALER_MerchantPublicKeyP *merchant_pub,
                              const char *order_id,
-			     const char *exchange_uri,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
                              TALER_MERCHANT_PayCallback pay_cb,
@@ -449,11 +444,12 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
     }
 
     /* create JSON for this coin */
-    j_coin = json_pack ("{s:o, s:o," /* f/coin_pub */
-			" s:o, s:o," /* denom_pub / ub_sig */
-			" s:o}",     /* coin_sig */
-			"f", TALER_JSON_from_amount (&pc->amount_with_fee),
+    j_coin = json_pack ("{s:o, s:o," /* contribution/coin_pub */
+			" s:s, s:o," /* exchange_url / denom_pub */
+			" s:o, s:o}", /* ub_sig / coin_sig */
+			"contribution", TALER_JSON_from_amount (&pc->amount_with_fee),
 			"coin_pub", GNUNET_JSON_from_data_auto (&pc->coin_pub),
+			"exchange_url", pc->exchange_url,
 			"denom_pub", GNUNET_JSON_from_rsa_public_key (pc->denom_pub.rsa_public_key),
 			"ub_sig", GNUNET_JSON_from_rsa_signature (pc->denom_sig.rsa_signature),
 			"coin_sig", GNUNET_JSON_from_data_auto (&pc->coin_sig)
@@ -469,12 +465,10 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
   }
 
   pay_obj = json_pack ("{"
-                       " s:s," /* exchange */
                        " s:o," /* coins */
                        " s:s," /* order_id */
                        " s:o," /* merchant_pub */
                        "}",
-		       "exchange", exchange_uri,
 		       "coins", j_coins,
                        "order_id", order_id,
                        "merchant_pub", GNUNET_JSON_from_data_auto (merchant_pub));

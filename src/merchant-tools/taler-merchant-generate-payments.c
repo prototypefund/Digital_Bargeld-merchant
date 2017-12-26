@@ -1167,6 +1167,7 @@ interpreter_run (void *cls)
             pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
             pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
             pc.denom_value = coin_ref->details.reserve_withdraw.pk->value;
+	    pc.exchange_url = exchange_url;
             break;
           default:
             GNUNET_assert (0);
@@ -1209,7 +1210,6 @@ interpreter_run (void *cls)
                                        refund_deadline,
                                        pay_deadline,
                                        &h_wire,
-                                       exchange_url,
                                        order_id,
                                        1 /* num_coins */,
                                        &pc /* coins */,

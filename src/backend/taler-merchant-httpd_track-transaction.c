@@ -640,8 +640,8 @@ wtid_cb (void *cls,
     resume_track_transaction_with_response
       (tcc->tctx,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
-       TMH_RESPONSE_make_internal_error (TALER_EC_TRACK_TRANSACTION_DB_FETCH_FAILED,
-					 "Fail to query database about proofs"));
+       TMH_RESPONSE_make_error (TALER_EC_TRACK_TRANSACTION_DB_FETCH_FAILED,
+				"Fail to query database about proofs"));
     return;
   }
   /* WARNING: if two transactions got aggregated under the same
@@ -878,7 +878,7 @@ handle_track_transaction_timeout (void *cls)
   }
   resume_track_transaction_with_response (tctx,
                                           MHD_HTTP_SERVICE_UNAVAILABLE,
-                                          TMH_RESPONSE_make_internal_error (TALER_EC_PAY_EXCHANGE_TIMEOUT,
+                                          TMH_RESPONSE_make_error (TALER_EC_PAY_EXCHANGE_TIMEOUT,
 									    "exchange not reachable"));
 }
 

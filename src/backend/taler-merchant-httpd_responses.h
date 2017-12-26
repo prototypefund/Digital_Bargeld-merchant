@@ -143,20 +143,6 @@ TMH_RESPONSE_reply_bad_request (struct MHD_Connection *connection,
 
 
 /**
- * Send a response indicating an internal error.
- *
- * @param connection the MHD connection to use
- * @param ec error code to return
- * @param hint hint about the internal error's nature
- * @return a MHD result code
- */
-int
-TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
-				   enum TALER_ErrorCode ec,
-                                   const char *hint);
-
-
-/**
  * Create a response indicating an internal error.
  *
  * @param ec error code to return
@@ -183,15 +169,29 @@ TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
 
 
 /**
- * Create a response indicating an external error.
+ * Send a response indicating an internal error.
+ *
+ * @param connection the MHD connection to use
+ * @param ec error code to return
+ * @param hint hint about the internal error's nature
+ * @return a MHD result code
+ */
+int
+TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
+				   enum TALER_ErrorCode ec,
+                                   const char *hint);
+
+
+/**
+ * Create a response indicating an error.
  *
  * @param ec error code to return
  * @param hint hint about the internal error's nature
  * @return a MHD response object
  */
 struct MHD_Response *
-TMH_RESPONSE_make_external_error (enum TALER_ErrorCode ec,
-				  const char *hint);
+TMH_RESPONSE_make_error (enum TALER_ErrorCode ec,
+			 const char *hint);
 
 
 /**
