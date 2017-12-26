@@ -107,10 +107,9 @@ postgres_initialize (void *cls)
                             ",PRIMARY KEY (order_id, merchant_pub)"
 			    ",UNIQUE (h_contract_terms, merchant_pub)"
                             ");"),
-    /* Contracts that were paid via some exchange (or attempted to be paid???) */
+    /* Contracts that were paid */
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transactions ("
                             " h_contract_terms BYTEA NOT NULL CHECK (LENGTH(h_contract_terms)=64)"
-                            ",exchange_uri VARCHAR NOT NULL"
                             ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
                             ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
                             ",timestamp INT8 NOT NULL"
@@ -126,6 +125,7 @@ postgres_initialize (void *cls)
                             " h_contract_terms BYTEA NOT NULL"
                             ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
                             ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                            ",exchange_url VARCHAR NOT NULL"
                             ",amount_with_fee_val INT8 NOT NULL"
                             ",amount_with_fee_frac INT4 NOT NULL"
                             ",amount_with_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
@@ -141,12 +141,12 @@ postgres_initialize (void *cls)
                             ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_transactions (h_contract_terms, merchant_pub)"
                             ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
-                            " exchange_uri VARCHAR NOT NULL"
+                            " exchange_url VARCHAR NOT NULL"
                             ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
                             ",execution_time INT8 NOT NULL"
                             ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
                             ",proof BYTEA NOT NULL"
-                            ",PRIMARY KEY (wtid, exchange_uri)"
+                            ",PRIMARY KEY (wtid, exchange_url)"
                             ");"),
     /* Note that h_contract_terms + coin_pub may actually be unknown to
        us, e.g. someone else deposits something for us at the exchange.
@@ -211,7 +211,7 @@ postgres_initialize (void *cls)
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tips ("
                             " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
                             ",tip_id BYTEA NOT NULL CHECK (LENGTH(tip_id)=64)"
-			    ",exchange_uri VARCHAR NOT NULL"
+			    ",exchange_url VARCHAR NOT NULL"
                             ",justification VARCHAR NOT NULL"
                             ",timestamp INT8 NOT NULL"
                             ",amount_val INT8 NOT NULL" /* overall tip amount */
@@ -237,7 +237,6 @@ postgres_initialize (void *cls)
     GNUNET_PQ_make_prepare ("insert_transaction",
                             "INSERT INTO merchant_transactions"
                             "(h_contract_terms"
-                            ",exchange_uri"
                             ",merchant_pub"
                             ",h_wire"
                             ",timestamp"
@@ -246,13 +245,14 @@ postgres_initialize (void *cls)
                             ",total_amount_frac"
                             ",total_amount_curr"
                             ") VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-                            9),
+                            "($1, $2, $3, $4, $5, $6, $7, $8)",
+                            8),
     GNUNET_PQ_make_prepare ("insert_deposit",
                             "INSERT INTO merchant_deposits"
                             "(h_contract_terms"
                             ",merchant_pub"
                             ",coin_pub"
+                            ",exchange_url"
                             ",amount_with_fee_val"
                             ",amount_with_fee_frac"
                             ",amount_with_fee_curr"
@@ -264,8 +264,8 @@ postgres_initialize (void *cls)
                             ",refund_fee_curr"
                             ",signkey_pub"
                             ",exchange_proof) VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
-                            14),
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+                            15),
     GNUNET_PQ_make_prepare ("insert_transfer",
                             "INSERT INTO merchant_transfers"
                             "(h_contract_terms"
@@ -290,7 +290,7 @@ postgres_initialize (void *cls)
                             10),
     GNUNET_PQ_make_prepare ("insert_proof",
                             "INSERT INTO merchant_proofs"
-                            "(exchange_uri"
+                            "(exchange_url"
                             ",wtid"
                             ",execution_time"
                             ",signkey_pub"
@@ -440,8 +440,7 @@ postgres_initialize (void *cls)
                             4),
     GNUNET_PQ_make_prepare ("find_transaction",
                             "SELECT"
-                            " exchange_uri"
-                            ",h_wire"
+                            " h_wire"
                             ",timestamp"
                             ",refund_deadline"
                             ",total_amount_val"
@@ -454,6 +453,7 @@ postgres_initialize (void *cls)
     GNUNET_PQ_make_prepare ("find_deposits",
                             "SELECT"
                             " coin_pub"
+			    ",exchange_url"
                             ",amount_with_fee_val"
                             ",amount_with_fee_frac"
                             ",amount_with_fee_curr"
@@ -479,6 +479,7 @@ postgres_initialize (void *cls)
                             ",refund_fee_val"
                             ",refund_fee_frac"
                             ",refund_fee_curr"
+			    ",exchange_url"
                             ",exchange_proof"
                             " FROM merchant_deposits"
                             " WHERE h_contract_terms=$1"
@@ -508,6 +509,7 @@ postgres_initialize (void *cls)
                             ",merchant_deposits.refund_fee_val"
                             ",merchant_deposits.refund_fee_frac"
                             ",merchant_deposits.refund_fee_curr"
+                            ",merchant_deposits.exchange_url"
                             ",merchant_deposits.exchange_proof"
                             " FROM merchant_transfers"
                             "   JOIN merchant_deposits"
@@ -521,7 +523,7 @@ postgres_initialize (void *cls)
                             " proof"
                             " FROM merchant_proofs"
                             " WHERE wtid=$1"
-                            "  AND exchange_uri=$2",
+                            "  AND exchange_url=$2",
                             2),
     GNUNET_PQ_make_prepare ("lookup_tip_reserve_balance",
                             "SELECT"
@@ -554,7 +556,7 @@ postgres_initialize (void *cls)
                             "INSERT INTO merchant_tips"
                             "(reserve_priv"
                             ",tip_id"
-			    ",exchange_uri"
+			    ",exchange_url"
                             ",justification"
                             ",timestamp"
                             ",amount_val"
@@ -586,7 +588,7 @@ postgres_initialize (void *cls)
                             2),
     GNUNET_PQ_make_prepare ("find_tip_by_id",
                             "SELECT"
-                            " exchange_uri"
+                            " exchange_url"
                             ",timestamp"
                             ",amount_val"
                             ",amount_frac"
@@ -907,7 +909,7 @@ postgres_mark_proposal_paid (void *cls,
  * @param h_contract_terms hashcode of the proposal data associated with the
  * transaction being stored
  * @param merchant_pub merchant's public key
- * @param exchange_uri URI of the exchange
+ * @param exchange_url URL of the exchange
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
  * @param refund refund deadline
@@ -918,7 +920,6 @@ static enum GNUNET_DB_QueryStatus
 postgres_store_transaction (void *cls,
                             const struct GNUNET_HashCode *h_contract_terms,
 			    const struct TALER_MerchantPublicKeyP *merchant_pub,
-                            const char *exchange_uri,
                             const struct GNUNET_HashCode *h_wire,
                             struct GNUNET_TIME_Absolute timestamp,
                             struct GNUNET_TIME_Absolute refund,
@@ -927,7 +928,6 @@ postgres_store_transaction (void *cls,
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
-    GNUNET_PQ_query_param_string (exchange_uri),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (h_wire),
     GNUNET_PQ_query_param_absolute_time (&timestamp),
@@ -966,6 +966,7 @@ postgres_store_deposit (void *cls,
                         const struct GNUNET_HashCode *h_contract_terms,
                         const struct TALER_MerchantPublicKeyP *merchant_pub,
                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
+			const char *exchange_url,
                         const struct TALER_Amount *amount_with_fee,
                         const struct TALER_Amount *deposit_fee,
                         const struct TALER_Amount *refund_fee,
@@ -977,6 +978,7 @@ postgres_store_deposit (void *cls,
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
+    GNUNET_PQ_query_param_string (exchange_url),
     TALER_PQ_query_param_amount (amount_with_fee),
     TALER_PQ_query_param_amount (deposit_fee),
     TALER_PQ_query_param_amount (refund_fee),
@@ -1036,7 +1038,7 @@ postgres_store_coin_to_transfer (void *cls,
  * Insert wire transfer confirmation from the exchange into the database.
  *
  * @param cls closure
- * @param exchange_uri URI of the exchange
+ * @param exchange_url URL of the exchange
  * @param wtid identifier of the wire transfer
  * @param execution_time when was @a wtid executed
  * @param signkey_pub public key used by the exchange for @a exchange_proof
@@ -1045,7 +1047,7 @@ postgres_store_coin_to_transfer (void *cls,
  */
 static enum GNUNET_DB_QueryStatus
 postgres_store_transfer_to_proof (void *cls,
-                                  const char *exchange_uri,
+                                  const char *exchange_url,
                                   const struct TALER_WireTransferIdentifierRawP *wtid,
                                   struct GNUNET_TIME_Absolute execution_time,
                                   const struct TALER_ExchangePublicKeyP *signkey_pub,
@@ -1053,7 +1055,7 @@ postgres_store_transfer_to_proof (void *cls,
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (exchange_uri),
+    GNUNET_PQ_query_param_string (exchange_url),
     GNUNET_PQ_query_param_auto_from_type (wtid),
     GNUNET_PQ_query_param_absolute_time (&execution_time),
     GNUNET_PQ_query_param_auto_from_type (signkey_pub),
@@ -1306,16 +1308,20 @@ postgres_find_contract_terms_by_date (void *cls,
  * @param cls our plugin handle
  * @param h_contract_terms value used to perform the lookup
  * @param merchant_pub merchant's public key
- * @param cb function to call with transaction data
- * @param cb_cls closure for @a cb
+ * @param[out] h_wire set to hash of wire details
+ * @param[out] timestamp set to timestamp
+ * @param[out] refund_deadline set to refund deadline
+ * @param[out] total_amount set to total amount
  * @return transaction status
  */
 static enum GNUNET_DB_QueryStatus
 postgres_find_transaction (void *cls,
                            const struct GNUNET_HashCode *h_contract_terms,
 			   const struct TALER_MerchantPublicKeyP *merchant_pub,
-                           TALER_MERCHANTDB_TransactionCallback cb,
-                           void *cb_cls)
+			   struct GNUNET_HashCode *h_wire,
+			   struct GNUNET_TIME_Absolute *timestamp,
+			   struct GNUNET_TIME_Absolute *refund_deadline,
+			   struct TALER_Amount *total_amount)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -1323,25 +1329,17 @@ postgres_find_transaction (void *cls,
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
-  char *exchange_uri;
-  struct GNUNET_HashCode h_wire;
-  struct GNUNET_TIME_Absolute timestamp;
-  struct GNUNET_TIME_Absolute refund_deadline;
-  struct TALER_Amount total_amount;
   struct GNUNET_PQ_ResultSpec rs[] = {
-    GNUNET_PQ_result_spec_string ("exchange_uri",
-				  &exchange_uri),
     GNUNET_PQ_result_spec_auto_from_type ("h_wire",
-					  &h_wire),
+					  h_wire),
     GNUNET_PQ_result_spec_absolute_time ("timestamp",
-					 &timestamp),
+					 timestamp),
     GNUNET_PQ_result_spec_absolute_time ("refund_deadline",
-					 &refund_deadline),
+					 refund_deadline),
     TALER_PQ_result_spec_amount ("total_amount",
-				 &total_amount),
+				 total_amount),
     GNUNET_PQ_result_spec_end
   };
-  enum GNUNET_DB_QueryStatus qs;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Finding transaction for h_contract_terms '%s', merchant_pub: '%s'.\n",
@@ -1349,23 +1347,10 @@ postgres_find_transaction (void *cls,
               TALER_B2S (merchant_pub));
 
   check_connection (pg);
-  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-						 "find_transaction",
-						 params,
-						 rs);
-  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
-  {
-    cb (cb_cls,
-	merchant_pub,
-        exchange_uri,
-        h_contract_terms,
-        &h_wire,
-        timestamp,
-        refund_deadline,
-        &total_amount);
-    GNUNET_PQ_cleanup_result (rs);
-  }
-  return qs;
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						   "find_transaction",
+						   params,
+						   rs);
 }
 
 
@@ -1418,9 +1403,12 @@ find_payments_cb (void *cls,
     struct TALER_Amount deposit_fee;
     struct TALER_Amount refund_fee;
     json_t *exchange_proof;
+    char *exchange_url;
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
+      GNUNET_PQ_result_spec_string ("exchange_url",
+				    &exchange_url),
       TALER_PQ_result_spec_amount ("amount_with_fee",
                                    &amount_with_fee),
       TALER_PQ_result_spec_amount ("deposit_fee",
@@ -1445,6 +1433,7 @@ find_payments_cb (void *cls,
     fpc->cb (fpc->cb_cls,
 	     fpc->h_contract_terms,
 	     &coin_pub,
+	     exchange_url,
 	     &amount_with_fee,
 	     &deposit_fee,
 	     &refund_fee,
@@ -1552,6 +1541,7 @@ find_payments_by_coin_cb (void *cls,
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
     struct TALER_Amount refund_fee;
+    char *exchange_url;
     json_t *exchange_proof;
     struct GNUNET_PQ_ResultSpec rs[] = {
       TALER_PQ_result_spec_amount ("amount_with_fee",
@@ -1560,6 +1550,8 @@ find_payments_by_coin_cb (void *cls,
                                    &deposit_fee),
       TALER_PQ_result_spec_amount ("refund_fee",
                                    &refund_fee),
+      GNUNET_PQ_result_spec_string ("exchange_url",
+				    &exchange_url),
       TALER_PQ_result_spec_json ("exchange_proof",
                                  &exchange_proof),
       GNUNET_PQ_result_spec_end
@@ -1578,6 +1570,7 @@ find_payments_by_coin_cb (void *cls,
     fpc->cb (fpc->cb_cls,
 	     fpc->h_contract_terms,
 	     fpc->coin_pub,
+	     exchange_url,
 	     &amount_with_fee,
 	     &deposit_fee,
 	     &refund_fee,
@@ -1803,6 +1796,7 @@ find_deposits_cb (void *cls,
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
     struct TALER_Amount refund_fee;
+    char *exchange_url;
     json_t *exchange_proof;
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("h_contract_terms",
@@ -1815,6 +1809,8 @@ find_deposits_cb (void *cls,
                                    &deposit_fee),
       TALER_PQ_result_spec_amount ("refund_fee",
                                    &refund_fee),
+      GNUNET_PQ_result_spec_string ("exchange_url",
+				    &exchange_url),
       TALER_PQ_result_spec_json ("exchange_proof",
                                  &exchange_proof),
       GNUNET_PQ_result_spec_end
@@ -1833,6 +1829,7 @@ find_deposits_cb (void *cls,
     fdc->cb (fdc->cb_cls,
 	     &h_contract_terms,
 	     &coin_pub,
+	     exchange_url,
 	     &amount_with_fee,
 	     &deposit_fee,
 	     &refund_fee,
@@ -2566,7 +2563,7 @@ postgres_increase_refund_for_contract (void *cls,
  * Lookup proof information about a wire transfer.
  *
  * @param cls closure
- * @param exchange_uri from which exchange are we looking for proof
+ * @param exchange_url from which exchange are we looking for proof
  * @param wtid wire transfer identifier for the search
  * @param cb function to call with proof data
  * @param cb_cls closure for @a cb
@@ -2574,7 +2571,7 @@ postgres_increase_refund_for_contract (void *cls,
  */
 static enum GNUNET_DB_QueryStatus
 postgres_find_proof_by_wtid (void *cls,
-                             const char *exchange_uri,
+                             const char *exchange_url,
                              const struct TALER_WireTransferIdentifierRawP *wtid,
                              TALER_MERCHANTDB_ProofCallback cb,
                              void *cb_cls)
@@ -2582,7 +2579,7 @@ postgres_find_proof_by_wtid (void *cls,
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (wtid),
-    GNUNET_PQ_query_param_string (exchange_uri),
+    GNUNET_PQ_query_param_string (exchange_url),
     GNUNET_PQ_query_param_end
   };
   json_t *proof;
@@ -2781,7 +2778,7 @@ postgres_enable_tip_reserve (void *cls,
  * @param justification why was the tip approved
  * @param amount how high is the tip (with fees)
  * @param reserve_priv which reserve is debited
- * @param exchange_uri which exchange manages the tip
+ * @param exchange_url which exchange manages the tip
  * @param[out] expiration set to when the tip expires
  * @param[out] tip_id set to the unique ID for the tip
  * @return taler error code
@@ -2797,7 +2794,7 @@ postgres_authorize_tip (void *cls,
                         const char *justification,
                         const struct TALER_Amount *amount,
                         const struct TALER_ReservePrivateKeyP *reserve_priv,
-			const char *exchange_uri,
+			const char *exchange_url,
                         struct GNUNET_TIME_Absolute *expiration,
                         struct GNUNET_HashCode *tip_id)
 {
@@ -2888,7 +2885,7 @@ postgres_authorize_tip (void *cls,
     struct GNUNET_PQ_QueryParam params[] = {
       GNUNET_PQ_query_param_auto_from_type (reserve_priv),
       GNUNET_PQ_query_param_auto_from_type (tip_id),
-      GNUNET_PQ_query_param_string (exchange_uri),
+      GNUNET_PQ_query_param_string (exchange_url),
       GNUNET_PQ_query_param_string (justification),
       GNUNET_PQ_query_param_absolute_time (&now),
       TALER_PQ_query_param_amount (amount), /* overall amount */
@@ -2922,7 +2919,7 @@ postgres_authorize_tip (void *cls,
  *
  * @param cls closure, typically a connection to the d
  * @param tip_id the unique ID for the tip
- * @param[out] exchange_uri set to the URI of the exchange (unless NULL)
+ * @param[out] exchange_url set to the URL of the exchange (unless NULL)
  * @param[out] amount set to the authorized amount (unless NULL)
  * @param[out] timestamp set to the timestamp of the tip authorization (unless NULL)
  * @return transaction status, usually
@@ -2932,11 +2929,11 @@ postgres_authorize_tip (void *cls,
 static enum GNUNET_DB_QueryStatus
 postgres_lookup_tip_by_id (void *cls,
                            const struct GNUNET_HashCode *tip_id,
-                           char **exchange_uri,
+                           char **exchange_url,
                            struct TALER_Amount *amount,
                            struct GNUNET_TIME_Absolute *timestamp)
 {
-  char *res_exchange_uri;
+  char *res_exchange_url;
   struct TALER_Amount res_amount;
   struct GNUNET_TIME_Absolute res_timestamp;
 
@@ -2946,8 +2943,8 @@ postgres_lookup_tip_by_id (void *cls,
     GNUNET_PQ_query_param_end
   };
   struct GNUNET_PQ_ResultSpec rs[] = {
-    GNUNET_PQ_result_spec_string ("exchange_uri",
-				  &res_exchange_uri),
+    GNUNET_PQ_result_spec_string ("exchange_url",
+				  &res_exchange_url),
     GNUNET_PQ_result_spec_absolute_time ("timestamp",
                                          &res_timestamp),
     TALER_PQ_result_spec_amount ("amount",
@@ -2962,12 +2959,12 @@ postgres_lookup_tip_by_id (void *cls,
 						 rs);
   if (0 >= qs)
   {
-    if (NULL != exchange_uri)
-      *exchange_uri = NULL;
+    if (NULL != exchange_url)
+      *exchange_url = NULL;
     return qs;
   }
-  if (NULL != exchange_uri)
-    *exchange_uri = strdup (res_exchange_uri);
+  if (NULL != exchange_url)
+    *exchange_url = strdup (res_exchange_url);
   if (NULL != amount)
     *amount = res_amount;
   if (NULL != timestamp)

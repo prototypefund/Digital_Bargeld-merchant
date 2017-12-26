@@ -606,6 +606,10 @@ struct TALER_MERCHANT_TransactionWireTransfer
    */
   struct TALER_MERCHANT_CoinWireTransfer *coins;
 
+  /**
+   * URL of the exchange that executed the wire transfer.
+   */
+  char *exchange_url;
 };
 
 

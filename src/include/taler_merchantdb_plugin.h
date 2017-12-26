@@ -51,7 +51,6 @@ struct TALER_MERCHANTDB_Plugin;
  *
  * @param cls closure
  * @param merchant_pub merchant's public key
- * @param exchange_uri URI of the exchange
  * @param h_contract_terms proposal data's hashcode
  * @param h_wire hash of our wire details
  * @param timestamp time of the confirmation
@@ -61,7 +60,6 @@ struct TALER_MERCHANTDB_Plugin;
 typedef void
 (*TALER_MERCHANTDB_TransactionCallback)(void *cls,
 					const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                        const char *exchange_uri,
                                         const struct GNUNET_HashCode *h_contract_terms,
                                         const struct GNUNET_HashCode *h_wire,
                                         struct GNUNET_TIME_Absolute timestamp,
@@ -75,6 +73,7 @@ typedef void
  * @param cls closure
  * @param h_contract_terms proposal data's hashcode
  * @param coin_pub public key of the coin
+ * @param exchange_url URL of the exchange that issued the coin
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
  * @param refund_fee fee the exchange will charge for refunding this coin
@@ -85,6 +84,7 @@ typedef void
 (*TALER_MERCHANTDB_CoinDepositCallback)(void *cls,
                                         const struct GNUNET_HashCode *h_contract_terms,
                                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
+					const char *exchange_url,
                                         const struct TALER_Amount *amount_with_fee,
                                         const struct TALER_Amount *deposit_fee,
                                         const struct TALER_Amount *refund_fee,
@@ -329,7 +329,6 @@ struct TALER_MERCHANTDB_Plugin
    * @param cls closure
    * @param h_contract_terms proposal data's hashcode
    * @param merchant_pub merchant's public key
-   * @param exchange_uri URI of the exchange
    * @param h_wire hash of our wire details
    * @param timestamp time of the confirmation
    * @param refund refund deadline
@@ -340,7 +339,6 @@ struct TALER_MERCHANTDB_Plugin
   (*store_transaction) (void *cls,
                         const struct GNUNET_HashCode *h_contract_terms,
 			const struct TALER_MerchantPublicKeyP *merchant_pub,
-                        const char *exchange_uri,
                         const struct GNUNET_HashCode *h_wire,
                         struct GNUNET_TIME_Absolute timestamp,
                         struct GNUNET_TIME_Absolute refund,
@@ -354,6 +352,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param h_contract_terms proposal data's hashcode
    * @param merchant_pub merchant's public key
    * @param coin_pub public key of the coin
+   * @param exchange_url URL of the exchange that issued @a coin_pub
    * @param amount_with_fee amount the exchange will deposit for this coin
    * @param deposit_fee fee the exchange will charge for this coin
    * @param signkey_pub public key used by the exchange for @a exchange_proof
@@ -365,6 +364,7 @@ struct TALER_MERCHANTDB_Plugin
                     const struct GNUNET_HashCode *h_contract_terms,
                     const struct TALER_MerchantPublicKeyP *merchant_pub,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
+		    const char *exchange_url,
                     const struct TALER_Amount *amount_with_fee,
                     const struct TALER_Amount *deposit_fee,
                     const struct TALER_Amount *refund_fee,
@@ -394,7 +394,7 @@ struct TALER_MERCHANTDB_Plugin
    * Insert wire transfer confirmation from the exchange into the database.
    *
    * @param cls closure
-   * @param exchange_uri from which exchange did we get the @a exchange_proof
+   * @param exchange_url from which exchange did we get the @a exchange_proof
    * @param wtid identifier of the wire transfer
    * @param execution_time when was @a wtid executed
    * @param signkey_pub public key used by the exchange for @a exchange_proof
@@ -403,7 +403,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*store_transfer_to_proof) (void *cls,
-                              const char *exchange_uri,
+                              const char *exchange_url,
                               const struct TALER_WireTransferIdentifierRawP *wtid,
                               struct GNUNET_TIME_Absolute execution_time,
                               const struct TALER_ExchangePublicKeyP *signkey_pub,
@@ -458,16 +458,20 @@ struct TALER_MERCHANTDB_Plugin
    * @param cls our plugin handle
    * @param h_contract_terms proposal data's hashcode
    * @param merchant_pub merchant's public key.
-   * @param cb function to call with transaction data
-   * @param cb_cls closure for @a cb
+   * @param[out] h_wire set to hash of wire details
+   * @param[out] timestamp set to timestamp
+   * @param[out] refund_deadline set to refund deadline
+   * @param[out] total_amount set to total amount
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
   (*find_transaction) (void *cls,
                        const struct GNUNET_HashCode *h_contract_terms,
 		       const struct TALER_MerchantPublicKeyP *merchant_pub,
-                       TALER_MERCHANTDB_TransactionCallback cb,
-                       void *cb_cls);
+		       struct GNUNET_HashCode *h_wire,
+		       struct GNUNET_TIME_Absolute *timestamp,
+		       struct GNUNET_TIME_Absolute *refund_deadline,
+		       struct TALER_Amount *total_amount);
 
 
   /**
@@ -550,7 +554,7 @@ struct TALER_MERCHANTDB_Plugin
    * Lookup proof information about a wire transfer.
    *
    * @param cls closure
-   * @param exchange_uri from which exchange are we looking for proof
+   * @param exchange_url from which exchange are we looking for proof
    * @param wtid wire transfer identifier for the search
    * @param cb function to call with proof data
    * @param cb_cls closure for @a cb
@@ -558,7 +562,7 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*find_proof_by_wtid) (void *cls,
-                         const char *exchange_uri,
+                         const char *exchange_url,
                          const struct TALER_WireTransferIdentifierRawP *wtid,
                          TALER_MERCHANTDB_ProofCallback cb,
                          void *cb_cls);
@@ -663,7 +667,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param justification why was the tip approved
    * @param amount how high is the tip (with fees)
    * @param reserve_priv which reserve is debited
-   * @param exchange_uri which exchange manages the tip
+   * @param exchange_url which exchange manages the tip
    * @param[out] expiration set to when the tip expires
    * @param[out] tip_id set to the unique ID for the tip
    * @return transaction status,
@@ -679,7 +683,7 @@ struct TALER_MERCHANTDB_Plugin
                    const char *justification,
                    const struct TALER_Amount *amount,
                    const struct TALER_ReservePrivateKeyP *reserve_priv,
-		   const char *exchange_uri,
+		   const char *exchange_url,
                    struct GNUNET_TIME_Absolute *expiration,
                    struct GNUNET_HashCode *tip_id);
 
@@ -689,7 +693,7 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls closure, typically a connection to the d
    * @param tip_id the unique ID for the tip
-   * @param[out] exchange_uri set to the URI of the exchange (unless NULL)
+   * @param[out] exchange_url set to the URL of the exchange (unless NULL)
    * @param[out] amount set to the authorized amount (unless NULL)
    * @param[out] timestamp set to the timestamp of the tip authorization (unless NULL)
    * @return transaction status, usually
@@ -699,7 +703,7 @@ struct TALER_MERCHANTDB_Plugin
   enum GNUNET_DB_QueryStatus
   (*lookup_tip_by_id)(void *cls,
                       const struct GNUNET_HashCode *tip_id,
-                      char **exchange_uri,
+                      char **exchange_url,
                       struct TALER_Amount *amount,
                       struct GNUNET_TIME_Absolute *timestamp);
 

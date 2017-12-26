@@ -14,7 +14,7 @@
   TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file merchant/test_merchantdb_postgres.c
+ * @file merchant/test_merchantdb.c
  * @brief testcase for merchant's postgres db plugin
  * @author Marcello Stanisci
  * @author Christian Grothoff
@@ -44,11 +44,11 @@
 #define CURRENCY "EUR"
 
 /**
- * URI we use for the exchange in the database.
+ * URL we use for the exchange in the database.
  * Note that an exchange does not actually have
  * to run at this address.
  */
-#define EXCHANGE_URI "http://localhost:8888/"
+#define EXCHANGE_URL "http://localhost:8888/"
 
 /**
  * Global return value for the test.  Initially -1, set to 0 upon
@@ -190,47 +190,6 @@ static json_t *contract_terms_future;
 
 
 /**
- * Function called with information about a transaction.
- *
- * @param cls closure
- * @param transaction_id of the contract
- * @param merchant_pub public key of the merchant
- * @param exchange_uri URI of the exchange
- * @param h_wire hash of our wire details
- * @param timestamp time of the confirmation
- * @param refund_deadline refund deadline
- * @param total_amount total amount we receive for the contract after fees
- */
-static void
-transaction_cb (void *cls,
-		const struct TALER_MerchantPublicKeyP *amerchant_pub,
-                const char *aexchange_uri,
-                const struct GNUNET_HashCode *ah_contract_terms,
-                const struct GNUNET_HashCode *ah_wire,
-                struct GNUNET_TIME_Absolute atimestamp,
-                struct GNUNET_TIME_Absolute arefund_deadline,
-                const struct TALER_Amount *atotal_amount)
-{
-#define CHECK(a) do { if (! (a)) { GNUNET_break (0); result = 3; } } while (0)
-  CHECK (0 == memcmp (amerchant_pub,
-                      &merchant_pub,
-		      sizeof (struct TALER_MerchantPublicKeyP)));
-  CHECK (0 == memcmp (ah_contract_terms,
-                      &h_contract_terms,
-                      sizeof (struct GNUNET_HashCode)));
-  CHECK (0 == strcmp (aexchange_uri,
-                      EXCHANGE_URI));
-  CHECK (0 == memcmp (ah_wire,
-                      &h_wire,
-                      sizeof (struct GNUNET_HashCode)));
-  CHECK (atimestamp.abs_value_us == timestamp.abs_value_us);
-  CHECK (arefund_deadline.abs_value_us == refund_deadline.abs_value_us);
-  CHECK (0 == TALER_amount_cmp (atotal_amount,
-                                &amount_with_fee));
-}
-
-
-/**
  * Function called with information about a refund.
  *
  * @param cls closure
@@ -272,12 +231,16 @@ pd_cb (void *cls,
 }
 
 
+#define CHECK(a) do { if (! (a)) { GNUNET_break (0); result = 3; } } while (0)
+
+
 /**
  * Function called with information about a coin that was deposited.
  *
  * @param cls closure
  * @param transaction_id of the contract
- * @param coin_pub public key of the coin
+ * @param acoin_pub public key of the coin
+ * @param aexchange_url exchange associated with @a acoin_pub in DB
  * @param aamount_with_fee amount the exchange will deposit for this coin
  * @param adeposit_fee fee the exchange will charge for this coin
  * @param adeposit_fee fee the exchange will charge for refunding this coin
@@ -287,6 +250,7 @@ static void
 deposit_cb (void *cls,
             const struct GNUNET_HashCode *ah_contract_terms,
             const struct TALER_CoinSpendPublicKeyP *acoin_pub,
+	    const char *aexchange_url,
             const struct TALER_Amount *aamount_with_fee,
             const struct TALER_Amount *adeposit_fee,
             const struct TALER_Amount *arefund_fee,
@@ -298,6 +262,8 @@ deposit_cb (void *cls,
   CHECK (0 == memcmp (acoin_pub,
                       &coin_pub,
                       sizeof (struct TALER_CoinSpendPublicKeyP)));
+  CHECK (0 == strcmp (aexchange_url,
+                      EXCHANGE_URL));
   CHECK (0 == TALER_amount_cmp (aamount_with_fee,
                                 &amount_with_fee));
   CHECK (0 == TALER_amount_cmp (adeposit_fee,
@@ -529,7 +495,7 @@ test_tipping ()
   struct TALER_Amount total;
   struct TALER_Amount amount;
   struct TALER_Amount inc;
-  char *uri;
+  char *url;
 
   RND_BLK (&tip_reserve_priv);
   if (TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED !=
@@ -641,20 +607,20 @@ test_tipping ()
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
       plugin->lookup_tip_by_id (plugin->cls,
 				      &tip_id,
-				      &uri,
+				      &url,
                                       NULL, NULL))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
   if (0 != strcmp ("http://localhost:8081/",
-		   uri))
+		   url))
   {
-    GNUNET_free (uri);
+    GNUNET_free (url);
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
-  GNUNET_free (uri);
+  GNUNET_free (url);
   if (TALER_EC_NONE !=
       plugin->authorize_tip (plugin->cls,
                              "testing tips more",
@@ -935,8 +901,7 @@ run (void *cls)
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->store_transaction (plugin->cls,
                                      &h_contract_terms,
-				     &merchant_pub,
-                                     EXCHANGE_URI,
+				     &merchant_pub,                                    
                                      &h_wire,
                                      timestamp,
                                      refund_deadline,
@@ -946,6 +911,7 @@ run (void *cls)
                                  &h_contract_terms,
 				 &merchant_pub,
                                  &coin_pub,
+				 EXCHANGE_URL,
                                  &amount_with_fee,
                                  &deposit_fee,
                                  &refund_fee,
@@ -958,18 +924,35 @@ run (void *cls)
                                           &wtid));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->store_transfer_to_proof (plugin->cls,
-                                           EXCHANGE_URI,
+                                           EXCHANGE_URL,
                                            &wtid,
                                            GNUNET_TIME_UNIT_ZERO_ABS,
                                            &signkey_pub,
                                            transfer_proof));
-  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-          plugin->find_transaction (plugin->cls,
-                                    &h_contract_terms,
-				    &merchant_pub,
-                                    &transaction_cb,
-                                    NULL));
+  {
+    struct GNUNET_HashCode ah_wire;
+    struct GNUNET_TIME_Absolute atimestamp;
+    struct GNUNET_TIME_Absolute arefund_deadline;
+    struct TALER_Amount atotal_amount;
 
+    FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+	    plugin->find_transaction (plugin->cls,
+				      &h_contract_terms,
+				      &merchant_pub,
+				      &ah_wire,
+				      &atimestamp,
+				      &arefund_deadline,
+				      &atotal_amount));
+    FAILIF (0 != memcmp (&ah_wire,
+			 &h_wire,
+			 sizeof (struct GNUNET_HashCode)));
+    FAILIF (atimestamp.abs_value_us != timestamp.abs_value_us);
+    FAILIF (arefund_deadline.abs_value_us != refund_deadline.abs_value_us);
+    FAILIF (0 != TALER_amount_cmp (&atotal_amount,
+				   &amount_with_fee));
+  }
+
+  
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_payments (plugin->cls,
                                  &h_contract_terms,
@@ -988,7 +971,7 @@ run (void *cls)
                                          NULL));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_proof_by_wtid (plugin->cls,
-                                      EXCHANGE_URI,
+                                      EXCHANGE_URL,
                                       &wtid,
                                       &proof_cb,
                                       NULL));

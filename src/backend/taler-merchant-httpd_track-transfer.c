@@ -433,6 +433,7 @@ track_transfer_cleanup (struct TM_HandlerContext *hc)
  * @param cls closure with our `struct TrackTransferContext *`
  * @param transaction_id of the contract
  * @param coin_pub public key of the coin
+ * @param exchange_url URL of the exchange that issued @a coin_pub
  * @param amount_with_fee amount the exchange will transfer for this coin
  * @param deposit_fee fee the exchange will charge for this coin
  * @param refund_fee fee the exchange will charge for refunding this coin
@@ -442,6 +443,7 @@ static void
 check_transfer (void *cls,
                 const struct GNUNET_HashCode *h_contract_terms,
                 const struct TALER_CoinSpendPublicKeyP *coin_pub,
+		const char *exchange_url,
                 const struct TALER_Amount *amount_with_fee,
                 const struct TALER_Amount *deposit_fee,
                 const struct TALER_Amount *refund_fee,

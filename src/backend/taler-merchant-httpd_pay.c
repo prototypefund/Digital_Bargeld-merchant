@@ -520,6 +520,7 @@ deposit_cb (void *cls,
 			    &pc->h_contract_terms,
 			    &pc->mi->pubkey,
 			    &dc->coin_pub,
+			    pc->chosen_exchange,
 			    &dc->amount_with_fee,
 			    &dc->deposit_fee,
 			    &dc->refund_fee,
@@ -638,52 +639,6 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
                                pc_tail,
                                pc);
   GNUNET_free (pc);
-}
-
-
-/**
- * Check if the existing transaction matches our transaction.
- * Update `transaction_exists` accordingly.
- *
- * @param cls closure with the `struct PayContext`
- * @param merchant_pub merchant's public key
- * @param exchange_uri URI of the exchange
- * @param h_contract_terms hashed proposal data
- * @param h_xwire hash of our wire details
- * @param timestamp time of the confirmation
- * @param refund refund deadline
- * @param total_amount total amount we receive for the contract after fees
- */
-static void
-check_transaction_exists (void *cls,
-			  const struct TALER_MerchantPublicKeyP *merchant_pub,
-			  const char *exchange_uri,
-			  const struct GNUNET_HashCode *h_contract_terms,
-			  const struct GNUNET_HashCode *h_xwire,
-			  struct GNUNET_TIME_Absolute timestamp,
-			  struct GNUNET_TIME_Absolute refund,
-			  const struct TALER_Amount *total_amount)
-{
-  struct PayContext *pc = cls;
-
-  if ( (0 == memcmp (h_contract_terms,
-		     &pc->h_contract_terms,
-                     sizeof (struct GNUNET_HashCode))) &&
-       (0 == memcmp (h_xwire,
-		     &pc->mi->h_wire,
-		     sizeof (struct GNUNET_HashCode))) &&
-       (timestamp.abs_value_us == pc->timestamp.abs_value_us) &&
-       (refund.abs_value_us == pc->refund_deadline.abs_value_us) &&
-       (0 == TALER_amount_cmp (total_amount,
-			       &pc->amount) ) )
-  {
-    pc->transaction_exists = GNUNET_YES;
-  }
-  else
-  {
-    GNUNET_break_op (0);
-    pc->transaction_exists = GNUNET_SYSERR;
-  }
 }
 
 
@@ -953,40 +908,55 @@ process_pay_with_exchange (void *cls,
   }
 
   /* Check if transaction is already known, if not store it. */
-  /* FIXME: What if transaction exists, with a failed payment at
-     a different exchange? */
-  qs = db->find_transaction (db->cls,
-			     &pc->h_contract_terms,
-			     &pc->mi->pubkey,
-			     &check_transaction_exists,
-			     pc);
-  if (0 > qs)
   {
-    /* single, read-only SQL statements should never cause
-       serialization problems */
-    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
-    /* Always report on hard error as well to enable diagnostics */
-    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    /* FIXME: factor common logic of these calls into a function! */
-    resume_pay_with_response (pc,
-                              MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-                                                           "code", (json_int_t) TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
-                                                           "hint", "Merchant database error"));
-    return;
+    struct GNUNET_HashCode h_xwire;
+    struct GNUNET_TIME_Absolute xtimestamp;
+    struct GNUNET_TIME_Absolute xrefund;
+    struct TALER_Amount xtotal_amount;
+    
+    qs = db->find_transaction (db->cls,
+			       &pc->h_contract_terms,
+			       &pc->mi->pubkey,
+			       &h_xwire,
+			       &xtimestamp,
+			       &xrefund,
+			       &xtotal_amount);
+    if (0 > qs)
+    {
+      /* single, read-only SQL statements should never cause
+	 serialization problems */
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+      /* FIXME: factor common logic of these calls into a function! */
+      resume_pay_with_response (pc,
+				MHD_HTTP_INTERNAL_SERVER_ERROR,
+				TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+							     "code", (json_int_t) TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
+							     "hint", "Merchant database error"));
+      return;
+    }
+    if ( (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == pc->transaction_exists) &&
+	 ( (0 != memcmp (&h_xwire,
+			 &pc->mi->h_wire,
+			 sizeof (struct GNUNET_HashCode))) ||
+	   (xtimestamp.abs_value_us != pc->timestamp.abs_value_us) ||
+	   (xrefund.abs_value_us != pc->refund_deadline.abs_value_us) ||
+	   (0 != TALER_amount_cmp (&xtotal_amount,
+				   &pc->amount) ) ) )
+    {
+      GNUNET_break (0);
+      /* FIXME: factor common logic of these calls into a function! */
+      resume_pay_with_response (pc,
+				MHD_HTTP_BAD_REQUEST,
+				TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
+							     "code", (json_int_t) TALER_EC_PAY_DB_TRANSACTION_ID_CONFLICT,
+							     "hint", "Transaction ID reused with different transaction details"));
+      return;
+    }
   }
-  if (GNUNET_SYSERR == pc->transaction_exists)
-  {
-    GNUNET_break (0);
-    /* FIXME: factor common logic of these calls into a function! */
-    resume_pay_with_response (pc,
-                              MHD_HTTP_BAD_REQUEST,
-                              TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-                                                           "code", (json_int_t) TALER_EC_PAY_DB_TRANSACTION_ID_CONFLICT,
-                                                           "hint", "Transaction ID reused with different transaction details"));
-    return;
-  }
-  if (GNUNET_NO == pc->transaction_exists)
+  
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == pc->transaction_exists)
   {
     struct GNUNET_TIME_Absolute now;
     enum GNUNET_DB_QueryStatus qs_st;
@@ -1016,7 +986,6 @@ process_pay_with_exchange (void *cls,
     qs_st = db->store_transaction (db->cls,
                                    &pc->h_contract_terms,
                                    &pc->mi->pubkey,
-                                   pc->chosen_exchange,
                                    &pc->mi->h_wire,
                                    pc->timestamp,
                                    pc->refund_deadline,
@@ -1061,7 +1030,7 @@ process_pay_with_exchange (void *cls,
                                                              "hint", "Merchant database error: failed to store transaction"));
       return;
     }
-  } /* end of if (GNUNET_NO == pc->transaction_esists) */
+  } /* end of if (GNUNET_NO == pc->transaction_exists) */
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Found transaction data for proposal `%s' of merchant `%s', initiating deposits\n",
@@ -1147,6 +1116,7 @@ handle_pay_timeout (void *cls)
  * @param cls closure
  * @param h_contract_terms hashed proposal data
  * @param coin_pub public key of the coin
+ * @param exchange_url URL of the exchange that issued @a coin_pub
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
  * @param refund_fee fee the exchange will charge for refunding this coin
@@ -1156,6 +1126,7 @@ static void
 check_coin_paid (void *cls,
                  const struct GNUNET_HashCode *h_contract_terms,
                  const struct TALER_CoinSpendPublicKeyP *coin_pub,
+		 const char *exchange_url,
                  const struct TALER_Amount *amount_with_fee,
                  const struct TALER_Amount *deposit_fee,
                  const struct TALER_Amount *refund_fee,

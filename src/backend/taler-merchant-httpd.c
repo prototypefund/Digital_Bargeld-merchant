@@ -404,6 +404,12 @@ prepare_daemon (void);
 
 
 /**
+ * Set if we should immediately #MHD_run again.
+ */
+static int triggered;
+
+
+/**
  * Call MHD to process pending requests and then go back
  * and schedule the next run.
  *
@@ -413,7 +419,10 @@ static void
 run_daemon (void *cls)
 {
   mhd_task = NULL;
-  GNUNET_assert (MHD_YES == MHD_run (mhd));
+  do {
+    triggered = 0;
+    GNUNET_assert (MHD_YES == MHD_run (mhd));
+  } while (0 != triggered);
   mhd_task = prepare_daemon ();
 }
 
@@ -427,8 +436,16 @@ run_daemon (void *cls)
 void
 TMH_trigger_daemon ()
 {
-  GNUNET_SCHEDULER_cancel (mhd_task);
-  run_daemon (NULL);
+  if (NULL != mhd_task)
+  {
+    GNUNET_SCHEDULER_cancel (mhd_task);
+    mhd_task = NULL;
+    run_daemon (NULL);
+  }
+  else
+  {
+    triggered = 1;
+  }
 }
 
 
@@ -801,6 +818,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   GNUNET_free (iic);
   return GNUNET_SYSERR;
 }
+
 
 /**
  * Main function that will be run by the scheduler.
@@ -1217,7 +1235,8 @@ run (void *cls,
  * @return 0 ok, 1 on error
  */
 int
-main (int argc, char *const *argv)
+main (int argc,
+      char *const *argv)
 {
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 

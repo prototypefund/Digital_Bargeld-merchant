@@ -33,6 +33,41 @@
 
 
 /**
+ * Information about a wire transfer for a /track/transaction response.
+ */
+struct TransactionWireTransfer
+{
+
+  /**
+   * Wire transfer identifier this struct is about.
+   */
+  struct TALER_WireTransferIdentifierRawP wtid;
+
+  /**
+   * When was this wire transfer executed?
+   */
+  struct GNUNET_TIME_Absolute execution_time;
+
+  /**
+   * Number of coins of the selected transaction that
+   * is covered by this wire transfer.
+   */
+  unsigned int num_coins;
+
+  /**
+   * Information about the coins of the selected transaction
+   * that are part of the wire transfer.
+   */
+  struct TALER_MERCHANT_CoinWireTransfer *coins;
+
+  /**
+   * URL of the exchange that executed the wire transfer.
+   */
+  char *exchange_url;
+};
+
+
+/**
  * Map containing all the known merchant instances
  */
 extern struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
@@ -53,13 +88,11 @@ extern struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
  *
  * @param num_transfers how many wire transfers make up the transaction
  * @param transfers data on each wire transfer
- * @param exchange_uri URI of the exchange that made the transfer
  * @return MHD response object
  */
 static struct MHD_Response *
 make_track_transaction_ok (unsigned int num_transfers,
-			   const struct TALER_MERCHANT_TransactionWireTransfer *transfers,
-			   const char *exchange_uri)
+			   const struct TransactionWireTransfer *transfers)
 {
   struct MHD_Response *ret;
   json_t *j_transfers;
@@ -68,7 +101,7 @@ make_track_transaction_ok (unsigned int num_transfers,
   j_transfers = json_array ();
   for (unsigned int i=0;i<num_transfers;i++)
   {
-    const struct TALER_MERCHANT_TransactionWireTransfer *transfer = &transfers[i];
+    const struct TransactionWireTransfer *transfer = &transfers[i];
 
     sum = transfer->coins[0].amount_with_fee;
     for (unsigned int j=1;j<transfer->num_coins;j++)
@@ -84,7 +117,7 @@ make_track_transaction_ok (unsigned int num_transfers,
     GNUNET_assert (0 ==
                    json_array_append_new (j_transfers,
                                           json_pack ("{s:s, s:o, s:o, s:o}",
-                                                     "exchange", exchange_uri,
+                                                     "exchange", transfer->exchange_url,
                                                      "wtid", GNUNET_JSON_from_data_auto (&transfer->wtid),
                                                      "execution_time", GNUNET_JSON_from_time_abs (transfer->execution_time),
                                                      "amount", TALER_JSON_from_amount (&sum))));
@@ -121,7 +154,7 @@ struct TrackCoinContext
   struct TrackCoinContext *prev;
 
   /**
-   * Our Context for a /track/transaction operation.
+   * Our context for a /track/transaction operation.
    */
   struct TrackTransactionContext *tctx;
 
@@ -129,6 +162,11 @@ struct TrackCoinContext
    * Public key of the coin.
    */
   struct TALER_CoinSpendPublicKeyP coin_pub;
+
+  /**
+   * Exchange that was used for the transaction.
+   */
+  char *exchange_url;
 
   /**
    * Handle for the request to resolve the WTID for this coin.
@@ -190,11 +228,6 @@ struct TrackTransactionContext
   struct TrackCoinContext *tcc_tail;
 
   /**
-   * Exchange that was used for the transaction.
-   */
-  char *exchange_uri;
-
-  /**
    * Task run on timeout.
    */
   struct GNUNET_SCHEDULER_Task *timeout_task;
@@ -211,6 +244,11 @@ struct TrackTransactionContext
    */
   struct TALER_EXCHANGE_Handle *eh;
 
+  /**
+   * URL of the exchange we currently have in @e eh.
+   */
+  const char *current_exchange;
+  
   /**
    * Handle we use to resolve transactions for a given WTID.
    */
@@ -300,6 +338,11 @@ free_tctx (struct TrackTransactionContext *tctx)
       TALER_EXCHANGE_track_transaction_cancel (tcc->dwh);
       tcc->dwh = NULL;
     }
+    if (NULL != tcc->exchange_url)
+    {
+      GNUNET_free (tcc->exchange_url);
+      tcc->exchange_url = NULL;
+    }
     GNUNET_free (tcc);
   }
   if (NULL != tctx->wdh)
@@ -316,11 +359,6 @@ free_tctx (struct TrackTransactionContext *tctx)
   {
     GNUNET_SCHEDULER_cancel (tctx->timeout_task);
     tctx->timeout_task = NULL;
-  }
-  if (NULL != tctx->exchange_uri)
-  {
-    GNUNET_free (tctx->exchange_uri);
-    tctx->exchange_uri = NULL;
   }
   GNUNET_free (tctx);
 }
@@ -435,7 +473,7 @@ wire_deposits_cb (void *cls,
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
     qs = db->store_transfer_to_proof (db->cls,
-				      tctx->exchange_uri,
+				      tctx->current_exchange,
 				      &tctx->current_wtid,
 				      tctx->current_execution_time,
 				      exchange_pub,
@@ -587,8 +625,9 @@ wtid_cb (void *cls,
   tctx->current_wtid = *wtid;
   tctx->current_execution_time = execution_time;
   pcc.p_ret = NULL;
+  /* FIXME: change to avoid using callback! */
   qs = db->find_proof_by_wtid (db->cls,
-			       tctx->exchange_uri,
+			       tctx->current_exchange,
 			       wtid,
 			       &proof_cb,
 			       &pcc);
@@ -630,35 +669,16 @@ wtid_cb (void *cls,
 
 
 /**
- * This function is called to trace the wire transfers for
- * all of the coins of the transaction of the @a tctx.  Once
- * we have traced all coins, we build the response.
+ * We have obtained all WTIDs, now prepare the response 
  *
- * @param tctx track context with established connection to exchange
+ * @param tctx handle for the operation 
  */
 static void
-trace_coins (struct TrackTransactionContext *tctx)
+generate_response (struct TrackTransactionContext *tctx)
 {
   struct TrackCoinContext *tcc;
   unsigned int num_wtid;
 
-  GNUNET_assert (NULL != tctx->eh);
-  for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
-    if (GNUNET_YES != tcc->have_wtid)
-      break;
-  if (NULL != tcc)
-  {
-    /* we are not done requesting WTIDs, do the next one */
-    tcc->dwh = TALER_EXCHANGE_track_transaction (tctx->eh,
-                                                 &tctx->mi->privkey,
-                                                 &tctx->h_wire,
-                                                 &tctx->h_contract_terms,
-                                                 &tcc->coin_pub,
-                                                 &wtid_cb,
-                                                 tcc);
-    return;
-  }
-  /* We have obtained all WTIDs, now prepare the response */
   num_wtid = 0;
   /* count how many disjoint wire transfer identifiers there are;
      note that there should only usually be one, so while this
@@ -687,7 +707,7 @@ trace_coins (struct TrackTransactionContext *tctx)
     /* on-stack allocation is fine, as the number of coins and the
        number of wire-transfers per-transaction is expected to be tiny. */
     struct MHD_Response *resp;
-    struct TALER_MERCHANT_TransactionWireTransfer wts[num_wtid];
+    struct TransactionWireTransfer wts[num_wtid];
     unsigned int wtid_off;
 
     wtid_off = 0;
@@ -710,10 +730,11 @@ trace_coins (struct TrackTransactionContext *tctx)
       if (GNUNET_NO == found)
       {
         unsigned int num_coins;
-        struct TALER_MERCHANT_TransactionWireTransfer *wt;
+        struct TransactionWireTransfer *wt;
 
         wt = &wts[wtid_off++];
         wt->wtid = tcc->wtid;
+	wt->exchange_url = tcc->exchange_url;
         wt->execution_time = tcc->execution_time;
         /* count number of coins with this wtid */
         num_coins = 0;
@@ -751,14 +772,66 @@ trace_coins (struct TrackTransactionContext *tctx)
     GNUNET_assert (wtid_off == num_wtid);
 
     resp = make_track_transaction_ok (num_wtid,
-				      wts,
-				      tctx->exchange_uri);
+				      wts);
     for (wtid_off=0;wtid_off < num_wtid; wtid_off++)
       GNUNET_free (wts[wtid_off].coins);
     resume_track_transaction_with_response (tctx,
                                             MHD_HTTP_OK,
                                             resp);
   } /* end of scope for 'wts' and 'resp' */
+}
+
+
+/**
+ * Find the exchange to trace the next coin(s).
+ *
+ * @param tctx operation context
+ */ 
+static void
+find_exchange (struct TrackTransactionContext *tctx);
+
+
+/**
+ * This function is called to trace the wire transfers for
+ * all of the coins of the transaction of the @a tctx.  Once
+ * we have traced all coins, we build the response.
+ *
+ * @param tctx track context with established connection to exchange
+ */
+static void
+trace_coins (struct TrackTransactionContext *tctx)
+{
+  struct TrackCoinContext *tcc;
+
+  GNUNET_assert (NULL != tctx->eh);
+  for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
+    if (GNUNET_YES != tcc->have_wtid)
+      break;
+  if (NULL != tcc)
+  {
+    if (0 != strcmp (tcc->exchange_url,
+		     tctx->current_exchange))
+    {
+      /* exchange changed, find matching one first! */
+      tctx->eh = NULL;
+      tctx->current_exchange = NULL;
+      find_exchange (tctx);
+      return;
+    }
+    /* we are not done requesting WTIDs from the current
+       exchange; do the next one */
+    tcc->dwh = TALER_EXCHANGE_track_transaction (tctx->eh,
+                                                 &tctx->mi->privkey,
+                                                 &tctx->h_wire,
+                                                 &tctx->h_contract_terms,
+                                                 &tcc->coin_pub,
+                                                 &wtid_cb,
+                                                 tcc);
+    return;
+  }
+  tctx->current_exchange = NULL;
+  tctx->eh = NULL;
+  generate_response (tctx);
 }
 
 
@@ -811,42 +884,6 @@ handle_track_transaction_timeout (void *cls)
 
 
 /**
- * Function called with information about a transaction.
- * Responsible to fill up the "context" for the whole
- * tracking operation.
- *
- * @param cls closure
- * @param transaction_id of the contract
- * @param merchant's public key
- * @param exchange_uri URI of the exchange
- * @param h_contract hash of the contract
- * @param h_wire hash of our wire details
- * @param timestamp time of the confirmation
- * @param refund refund deadline
- * @param total_amount total amount we receive for the contract after fees
- */
-static void
-transaction_cb (void *cls,
-		const struct TALER_MerchantPublicKeyP *merchant_pub,
-                const char *exchange_uri,
-                const struct GNUNET_HashCode *h_contract_terms,
-                const struct GNUNET_HashCode *h_wire,
-                struct GNUNET_TIME_Absolute timestamp,
-                struct GNUNET_TIME_Absolute refund,
-                const struct TALER_Amount *total_amount)
-{
-  struct TrackTransactionContext *tctx = cls;
-
-  tctx->h_contract_terms = *h_contract_terms;
-  tctx->exchange_uri = GNUNET_strdup (exchange_uri);
-  tctx->h_wire = *h_wire;
-  tctx->timestamp = timestamp;
-  tctx->refund_deadline = refund;
-  tctx->total_amount = *total_amount;
-}
-
-
-/**
  * Information about the wire transfer corresponding to
  * a deposit operation.  Note that it is in theory possible
  * that we have a @a transaction_id and @a coin_pub in the
@@ -865,7 +902,7 @@ transaction_cb (void *cls,
  */
 static void
 transfer_cb (void *cls,
-             const struct GNUNET_HashCode *h_contract_terms,
+	     const struct GNUNET_HashCode *h_contract_terms,
              const struct TALER_CoinSpendPublicKeyP *coin_pub,
              const struct TALER_WireTransferIdentifierRawP *wtid,
              struct GNUNET_TIME_Absolute execution_time,
@@ -889,6 +926,7 @@ transfer_cb (void *cls,
  * @param cls closure
  * @param transaction_id of the contract
  * @param coin_pub public key of the coin
+ * @param exchange_url URL of exchange that issued @a coin_pub
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
  * @param refund_fee fee the exchange will charge for refunding this coin
@@ -898,6 +936,7 @@ static void
 coin_cb (void *cls,
          const struct GNUNET_HashCode *h_contract_terms,
          const struct TALER_CoinSpendPublicKeyP *coin_pub,
+	 const char *exchange_url,
          const struct TALER_Amount *amount_with_fee,
          const struct TALER_Amount *deposit_fee,
          const struct TALER_Amount *refund_fee,
@@ -910,6 +949,7 @@ coin_cb (void *cls,
   tcc = GNUNET_new (struct TrackCoinContext);
   tcc->tctx = tctx;
   tcc->coin_pub = *coin_pub;
+  tcc->exchange_url = GNUNET_strdup (exchange_url);
 
   tcc->amount_with_fee = *amount_with_fee;
   tcc->deposit_fee = *deposit_fee;
@@ -924,6 +964,35 @@ coin_cb (void *cls,
   {
     GNUNET_break (0);
     tctx->qs = qs;
+  }
+}
+
+
+/**
+ * Find the exchange to trace the next coin(s).
+ *
+ * @param tctx operation context
+ */ 
+static void
+find_exchange (struct TrackTransactionContext *tctx)
+{
+  struct TrackCoinContext *tcc = tctx->tcc_head;
+
+  while ( (NULL != tcc) &&
+	  (GNUNET_YES == tcc->have_wtid) )
+    tcc = tcc->next;
+  if (NULL != tcc)
+  {
+    tctx->current_exchange = tcc->exchange_url;
+    tctx->fo = TMH_EXCHANGES_find_exchange (tctx->current_exchange,
+					    NULL,
+					    &process_track_transaction_with_exchange,
+					    tctx);
+    
+  }
+  else
+  {
+    generate_response (tctx);
   }
 }
 
@@ -951,7 +1020,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   int ret;
   enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_HashCode h_instance;
-  struct GNUNET_HashCode h_contract_terms;
   struct json_t *contract_terms;
 
   if (NULL == *connection_cls)
@@ -1042,7 +1110,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 					 "Given order_id doesn't map to any proposal");
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
-                       &h_contract_terms))
+                       &tctx->h_contract_terms))
   {
     json_decref (contract_terms);
     return TMH_RESPONSE_reply_internal_error (connection,
@@ -1053,14 +1121,15 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Trying to track h_contract_terms '%s'\n",
-              GNUNET_h2s (&h_contract_terms));
-
+              GNUNET_h2s (&tctx->h_contract_terms));
   qs = db->find_transaction (db->cls,
-			     &h_contract_terms,
+			     &tctx->h_contract_terms,
 			     &tctx->mi->pubkey,
-			     &transaction_cb,
-			     tctx);
-  if (0 > qs)
+			     &tctx->h_wire,
+			     &tctx->timestamp,
+			     &tctx->refund_deadline,
+			     &tctx->total_amount);
+   if (0 > qs)
   {
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     return TMH_RESPONSE_reply_internal_error (connection,
@@ -1075,19 +1144,9 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 					 TALER_EC_TRACK_TRANSACTION_TRANSACTION_UNKNOWN,
                                          "h_contract_terms is unknown");
   }
-  if ( (0 != memcmp (&tctx->h_contract_terms,
-                     &h_contract_terms,
-                     sizeof (struct GNUNET_HashCode))) ||
-       (NULL == tctx->exchange_uri) )
-  {
-    GNUNET_break (0);
-    return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
-                                              "Database error: failed to obtain correct data from database");
-  }
   tctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
   qs = db->find_payments (db->cls,
-			  &h_contract_terms,
+			  &tctx->h_contract_terms,
 			  &tctx->mi->pubkey,
 			  &coin_cb,
 			  tctx);
@@ -1111,16 +1170,13 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Suspending /track/transaction handling while working with the exchange\n");
   MHD_suspend_connection (connection);
-  tctx->fo = TMH_EXCHANGES_find_exchange (tctx->exchange_uri,
-                                          NULL,
-                                          &process_track_transaction_with_exchange,
-                                          tctx);
-
   tctx->timeout_task
     = GNUNET_SCHEDULER_add_delayed (TRACK_TIMEOUT,
 				    &handle_track_transaction_timeout,
 				    tctx);
+  find_exchange (tctx);
   return MHD_YES;
 }
+
 
 /* end of taler-merchant-httpd_track-transaction.c */
