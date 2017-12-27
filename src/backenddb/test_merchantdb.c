@@ -113,6 +113,11 @@ static struct TALER_Amount amount_with_fee;
 static struct TALER_Amount deposit_fee;
 
 /**
+ * Wire fee of the exchange.
+ */
+static struct TALER_Amount wire_fee;
+
+/**
  * Refund fee for the coin.
  */
 static struct TALER_Amount refund_fee;
@@ -254,6 +259,7 @@ deposit_cb (void *cls,
             const struct TALER_Amount *aamount_with_fee,
             const struct TALER_Amount *adeposit_fee,
             const struct TALER_Amount *arefund_fee,
+            const struct TALER_Amount *awire_fee,
             const json_t *aexchange_proof)
 {
   CHECK ((0 == memcmp (ah_contract_terms,
@@ -268,6 +274,8 @@ deposit_cb (void *cls,
                                 &amount_with_fee));
   CHECK (0 == TALER_amount_cmp (adeposit_fee,
                                 &deposit_fee));
+  CHECK (0 == TALER_amount_cmp (awire_fee,
+                                &wire_fee));
   CHECK (1 == json_equal ((json_t *) aexchange_proof,
                           deposit_proof));
 }
@@ -778,6 +786,9 @@ run (void *cls)
                  TALER_string_to_amount (CURRENCY ":0.000010",
                                          &deposit_fee));
   GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (CURRENCY ":0.000001",
+                                         &wire_fee));
+  GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":0.000010",
                                          &refund_fee));
   GNUNET_assert (GNUNET_OK ==
@@ -915,6 +926,7 @@ run (void *cls)
                                  &amount_with_fee,
                                  &deposit_fee,
                                  &refund_fee,
+				 &wire_fee,
                                  &signkey_pub,
                                  deposit_proof));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=

@@ -135,6 +135,9 @@ postgres_initialize (void *cls)
                             ",refund_fee_val INT8 NOT NULL"
                             ",refund_fee_frac INT4 NOT NULL"
                             ",refund_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
+                            ",wire_fee_val INT8 NOT NULL"
+                            ",wire_fee_frac INT4 NOT NULL"
+                            ",wire_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
                             ",exchange_proof BYTEA NOT NULL"
                             ",PRIMARY KEY (h_contract_terms, coin_pub)"
@@ -262,10 +265,13 @@ postgres_initialize (void *cls)
                             ",refund_fee_val"
                             ",refund_fee_frac"
                             ",refund_fee_curr"
+                            ",wire_fee_val"
+                            ",wire_fee_frac"
+                            ",wire_fee_curr"
                             ",signkey_pub"
                             ",exchange_proof) VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
-                            15),
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
+                            18),
     GNUNET_PQ_make_prepare ("insert_transfer",
                             "INSERT INTO merchant_transfers"
                             "(h_contract_terms"
@@ -463,6 +469,9 @@ postgres_initialize (void *cls)
                             ",refund_fee_val"
                             ",refund_fee_frac"
                             ",refund_fee_curr"
+                            ",wire_fee_val"
+                            ",wire_fee_frac"
+                            ",wire_fee_curr"
                             ",exchange_proof"
                             " FROM merchant_deposits"
                             " WHERE h_contract_terms=$1"
@@ -479,6 +488,9 @@ postgres_initialize (void *cls)
                             ",refund_fee_val"
                             ",refund_fee_frac"
                             ",refund_fee_curr"
+                            ",wire_fee_val"
+                            ",wire_fee_frac"
+                            ",wire_fee_curr"
 			    ",exchange_url"
                             ",exchange_proof"
                             " FROM merchant_deposits"
@@ -509,6 +521,9 @@ postgres_initialize (void *cls)
                             ",merchant_deposits.refund_fee_val"
                             ",merchant_deposits.refund_fee_frac"
                             ",merchant_deposits.refund_fee_curr"
+                            ",merchant_deposits.wire_fee_val"
+                            ",merchant_deposits.wire_fee_frac"
+                            ",merchant_deposits.wire_fee_curr"
                             ",merchant_deposits.exchange_url"
                             ",merchant_deposits.exchange_proof"
                             " FROM merchant_transfers"
@@ -957,6 +972,7 @@ postgres_store_transaction (void *cls,
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
  * @param refund_fee fee the exchange will charge for refunding this coin
+ * @param wire_fee wire fee changed by the exchange
  * @param signkey_pub public key used by the exchange for @a exchange_proof
  * @param exchange_proof proof from exchange that coin was accepted
  * @return transaction status
@@ -970,6 +986,7 @@ postgres_store_deposit (void *cls,
                         const struct TALER_Amount *amount_with_fee,
                         const struct TALER_Amount *deposit_fee,
                         const struct TALER_Amount *refund_fee,
+			const struct TALER_Amount *wire_fee,
                         const struct TALER_ExchangePublicKeyP *signkey_pub,
                         const json_t *exchange_proof)
 {
@@ -982,6 +999,7 @@ postgres_store_deposit (void *cls,
     TALER_PQ_query_param_amount (amount_with_fee),
     TALER_PQ_query_param_amount (deposit_fee),
     TALER_PQ_query_param_amount (refund_fee),
+    TALER_PQ_query_param_amount (wire_fee),
     GNUNET_PQ_query_param_auto_from_type (signkey_pub),
     TALER_PQ_query_param_json (exchange_proof),
     GNUNET_PQ_query_param_end
@@ -1402,6 +1420,7 @@ find_payments_cb (void *cls,
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
     struct TALER_Amount refund_fee;
+    struct TALER_Amount wire_fee;
     json_t *exchange_proof;
     char *exchange_url;
     struct GNUNET_PQ_ResultSpec rs[] = {
@@ -1415,6 +1434,8 @@ find_payments_cb (void *cls,
                                    &deposit_fee),
       TALER_PQ_result_spec_amount ("refund_fee",
                                    &refund_fee),
+      TALER_PQ_result_spec_amount ("wire_fee",
+                                   &wire_fee),
       TALER_PQ_result_spec_json ("exchange_proof",
                                  &exchange_proof),
       GNUNET_PQ_result_spec_end
@@ -1437,6 +1458,7 @@ find_payments_cb (void *cls,
 	     &amount_with_fee,
 	     &deposit_fee,
 	     &refund_fee,
+	     &wire_fee,
 	     exchange_proof);
     GNUNET_PQ_cleanup_result (rs);
   }
@@ -1541,6 +1563,7 @@ find_payments_by_coin_cb (void *cls,
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
     struct TALER_Amount refund_fee;
+    struct TALER_Amount wire_fee;
     char *exchange_url;
     json_t *exchange_proof;
     struct GNUNET_PQ_ResultSpec rs[] = {
@@ -1550,6 +1573,8 @@ find_payments_by_coin_cb (void *cls,
                                    &deposit_fee),
       TALER_PQ_result_spec_amount ("refund_fee",
                                    &refund_fee),
+      TALER_PQ_result_spec_amount ("wire_fee",
+                                   &wire_fee),
       GNUNET_PQ_result_spec_string ("exchange_url",
 				    &exchange_url),
       TALER_PQ_result_spec_json ("exchange_proof",
@@ -1574,6 +1599,7 @@ find_payments_by_coin_cb (void *cls,
 	     &amount_with_fee,
 	     &deposit_fee,
 	     &refund_fee,
+	     &wire_fee,
 	     exchange_proof);
     GNUNET_PQ_cleanup_result (rs);
   }
@@ -1796,6 +1822,7 @@ find_deposits_cb (void *cls,
     struct TALER_Amount amount_with_fee;
     struct TALER_Amount deposit_fee;
     struct TALER_Amount refund_fee;
+    struct TALER_Amount wire_fee;
     char *exchange_url;
     json_t *exchange_proof;
     struct GNUNET_PQ_ResultSpec rs[] = {
@@ -1809,6 +1836,8 @@ find_deposits_cb (void *cls,
                                    &deposit_fee),
       TALER_PQ_result_spec_amount ("refund_fee",
                                    &refund_fee),
+      TALER_PQ_result_spec_amount ("wire_fee",
+                                   &wire_fee),
       GNUNET_PQ_result_spec_string ("exchange_url",
 				    &exchange_url),
       TALER_PQ_result_spec_json ("exchange_proof",
@@ -1833,6 +1862,7 @@ find_deposits_cb (void *cls,
 	     &amount_with_fee,
 	     &deposit_fee,
 	     &refund_fee,
+	     &wire_fee,
 	     exchange_proof);
     GNUNET_PQ_cleanup_result (rs);
   }

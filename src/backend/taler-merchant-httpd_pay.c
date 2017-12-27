@@ -21,7 +21,6 @@
  * @author Florian Dold
  *
  * TODO:
- * - persist wire fee per coin (as exchange is per coin now)
  * - fix wire fee check
  * - add API to allow wallet to request refunds
  * - write testcase for new logic
@@ -897,6 +896,7 @@ deposit_cb (void *cls,
 			  &dc->amount_with_fee,
 			  &dc->deposit_fee,
 			  &dc->refund_fee,
+			  &dc->wire_fee,
 			  sign_key,
 			  proof);
   if (0 > qs)
@@ -1144,6 +1144,7 @@ handle_pay_timeout (void *cls)
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
  * @param refund_fee fee the exchange will charge for refunding this coin
+ * @param wire_fee wire fee the exchange of this coin charges
  * @param exchange_proof proof from exchange that coin was accepted
  */
 static void
@@ -1154,7 +1155,7 @@ check_coin_paid (void *cls,
                  const struct TALER_Amount *amount_with_fee,
                  const struct TALER_Amount *deposit_fee,
                  const struct TALER_Amount *refund_fee,
-		 // FIXME: also store AND fetch wire fee!
+		 const struct TALER_Amount *wire_fee,
                  const json_t *exchange_proof)
 {
   struct PayContext *pc = cls;
@@ -1205,7 +1206,7 @@ check_coin_paid (void *cls,
     }
     dc->deposit_fee = *deposit_fee;
     dc->refund_fee = *refund_fee;
-    // dc->wire_fee = *wire_fee; // TBD...
+    dc->wire_fee = *wire_fee; 
     dc->amount_with_fee = *amount_with_fee;
     dc->found_in_db = GNUNET_YES;
     pc->pending--;

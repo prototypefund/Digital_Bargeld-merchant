@@ -77,6 +77,7 @@ typedef void
  * @param amount_with_fee amount the exchange will deposit for this coin
  * @param deposit_fee fee the exchange will charge for this coin
  * @param refund_fee fee the exchange will charge for refunding this coin
+ * @param wire_fee wire fee the exchange charges
  * @param exchange_proof proof from exchange that coin was accepted,
  *        matches the `interface DepositSuccess` of the documentation.
  */
@@ -88,6 +89,7 @@ typedef void
                                         const struct TALER_Amount *amount_with_fee,
                                         const struct TALER_Amount *deposit_fee,
                                         const struct TALER_Amount *refund_fee,
+					const struct TALER_Amount *wire_fee,
                                         const json_t *exchange_proof);
 
 
@@ -355,6 +357,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param exchange_url URL of the exchange that issued @a coin_pub
    * @param amount_with_fee amount the exchange will deposit for this coin
    * @param deposit_fee fee the exchange will charge for this coin
+   * @param wire_fee wire fee the exchange charges
    * @param signkey_pub public key used by the exchange for @a exchange_proof
    * @param exchange_proof proof from exchange that coin was accepted
    * @return transaction status
@@ -368,6 +371,7 @@ struct TALER_MERCHANTDB_Plugin
                     const struct TALER_Amount *amount_with_fee,
                     const struct TALER_Amount *deposit_fee,
                     const struct TALER_Amount *refund_fee,
+                    const struct TALER_Amount *wire_fee,
                     const struct TALER_ExchangePublicKeyP *signkey_pub,
                     const json_t *exchange_proof);
 
