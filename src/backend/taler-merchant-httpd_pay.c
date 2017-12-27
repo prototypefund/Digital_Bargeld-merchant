@@ -21,7 +21,6 @@
  * @author Florian Dold
  *
  * TODO:
- * - fix wire fee check
  * - add API to allow wallet to request refunds
  * - write testcase for new logic
  */
