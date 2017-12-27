@@ -19,6 +19,12 @@
  * @author Marcello Stanisci
  * @author Christian Grothoff
  * @author Florian Dold
+ *
+ * TODO:
+ * - persist wire fee per coin (as exchange is per coin now)
+ * - fix wire fee check
+ * - add API to allow wallet to request refunds
+ * - write testcase for new logic
  */
 #include "platform.h"
 #include <jansson.h>
@@ -123,6 +129,11 @@ struct DepositConfirmation
    */
   int found_in_db;
 
+  /**
+   * #GNUNET_YES if this coin was refunded.
+   */
+  int refunded;
+  
 };
 
 
@@ -584,31 +595,25 @@ check_payment_sufficient (struct PayContext *pc)
   struct TALER_Amount wire_fee_customer_contribution;
 
   GNUNET_assert (0 != pc->coins_cnt);
-  for (unsigned int i=0;i<pc->coins_cnt;i++)
+  acc_fee = pc->dc[0].deposit_fee;
+  acc_amount = pc->dc[0].amount_with_fee;
+  for (unsigned int i=1;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
 
     GNUNET_assert (GNUNET_YES == dc->found_in_db);
-    if (0 == i)
+    if ( (GNUNET_OK !=
+	  TALER_amount_add (&acc_fee,
+			    &dc->deposit_fee,
+			    &acc_fee)) ||
+	 (GNUNET_OK !=
+	  TALER_amount_add (&acc_amount,
+			    &dc->amount_with_fee,
+			    &acc_amount)) )
     {
-      acc_fee = dc->deposit_fee;
-      acc_amount = dc->amount_with_fee;
-    }
-    else
-    {
-      if ( (GNUNET_OK !=
-	    TALER_amount_add (&acc_fee,
-			      &dc->deposit_fee,
-			      &acc_fee)) ||
-	   (GNUNET_OK !=
-	    TALER_amount_add (&acc_amount,
-			      &dc->amount_with_fee,
-			      &acc_amount)) )
-      {
-	GNUNET_break_op (0);
-	/* Overflow in these amounts? Very strange. */
-	return TALER_EC_PAY_AMOUNT_OVERFLOW;
-      }
+      GNUNET_break_op (0);
+      /* Overflow in these amounts? Very strange. */
+      return TALER_EC_PAY_AMOUNT_OVERFLOW;
     }
     if (1 ==
 	TALER_amount_cmp (&dc->deposit_fee,
@@ -620,7 +625,8 @@ check_payment_sufficient (struct PayContext *pc)
     }
   }
 
-  /* Now compare exchange wire fee compared to what we are willing to pay */
+  /* Now compare exchange wire fee compared to what we are willing to
+     pay */
   if (GNUNET_YES !=
       TALER_amount_cmp_currency (&pc->total_wire_fee,  
                                  &pc->max_wire_fee))
@@ -648,6 +654,12 @@ check_payment_sufficient (struct PayContext *pc)
 
   }
 
+  /* Do not count any refunds towards the payment */
+  GNUNET_assert (GNUNET_OK ==
+		 TALER_amount_subtract (&acc_amount,
+					&acc_amount,
+					&pc->total_refunded));
+  
   /* Now check that the customer paid enough for the full contract */
   if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
@@ -1518,8 +1530,22 @@ check_coin_refunded (void *cls,
 {
   struct PayContext *pc = cls;
 
-  /* FIXME: to be implemented (#5158) */
-  (void) pc;
+  for (unsigned int i=0;i<pc->coins_cnt;i++)
+  {
+    struct DepositConfirmation *dc = &pc->dc[i];
+    
+    /* Get matching coin from results*/
+    if (0 != memcmp (coin_pub,
+		     &dc->coin_pub,
+		     sizeof (struct TALER_CoinSpendPublicKeyP)))
+    {
+      dc->refunded = GNUNET_YES;
+      GNUNET_break (GNUNET_OK ==
+		    TALER_amount_add (&pc->total_refunded,
+				      &pc->total_refunded,
+				      refund_amount));
+    }
+  }  
 }
 
 
