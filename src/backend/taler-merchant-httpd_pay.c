@@ -231,16 +231,6 @@ struct PayContext
   struct GNUNET_HashCode h_wire;
 
   /**
-   * Total wire fees charged by all exchanges involved.  Note: there
-   * is a sublte issue with this value not being correctly calculated
-   * if /pay is called a second time, as then some deposits that are
-   * already in the DB are no longer mapped to an exchange (and thus
-   * no fee is looked up).  Fixing this would be rather complicated,
-   * and is likely simply no worth it.
-   */
-  struct TALER_Amount total_wire_fee;
-  
-  /**
    * Maximum fee the merchant is willing to pay, from @e root.
    * Note that IF the total fee of the exchange is higher, that is
    * acceptable to the merchant if the customer is willing to
@@ -592,9 +582,11 @@ check_payment_sufficient (struct PayContext *pc)
   struct TALER_Amount acc_amount;
   struct TALER_Amount wire_fee_delta;
   struct TALER_Amount wire_fee_customer_contribution;
+  struct TALER_Amount total_wire_fee;
 
   GNUNET_assert (0 != pc->coins_cnt);
   acc_fee = pc->dc[0].deposit_fee;
+  total_wire_fee = pc->dc[0].wire_fee;
   acc_amount = pc->dc[0].amount_with_fee;
   for (unsigned int i=1;i<pc->coins_cnt;i++)
   {
@@ -622,12 +614,38 @@ check_payment_sufficient (struct PayContext *pc)
       /* fee higher than residual coin value, makes no sense. */
       return TALER_EC_PAY_FEES_EXCEED_PAYMENT;
     }
+
+    /* If exchange differs, add wire fee */
+    {
+      int new_exchange = GNUNET_YES;
+
+      for (unsigned int j=0;j<i;j++)
+	if (0 == strcasecmp (dc->exchange_url,
+			     pc->dc[j].exchange_url))
+	{
+	  new_exchange = GNUNET_NO;
+	  break;
+	}
+      if (GNUNET_YES == new_exchange)
+      {
+	if (GNUNET_OK !=
+	    TALER_amount_add (&total_wire_fee,
+			      &total_wire_fee,
+			      &dc->wire_fee))
+	{
+	  GNUNET_break_op (0);
+	  return TALER_EC_PAY_EXCHANGE_REJECTED;
+	}
+      }
+    }
   }
 
+
+  
   /* Now compare exchange wire fee compared to what we are willing to
      pay */
   if (GNUNET_YES !=
-      TALER_amount_cmp_currency (&pc->total_wire_fee,  
+      TALER_amount_cmp_currency (&total_wire_fee,  
                                  &pc->max_wire_fee))
   {
     GNUNET_break (0);
@@ -636,7 +654,7 @@ check_payment_sufficient (struct PayContext *pc)
 
   if (GNUNET_OK ==
       TALER_amount_subtract (&wire_fee_delta,
-                             &pc->total_wire_fee, 
+                             &total_wire_fee, 
                              &pc->max_wire_fee))
   {
     /* Actual wire fee is indeed higher than our maximum, compute
@@ -648,7 +666,7 @@ check_payment_sufficient (struct PayContext *pc)
   else
   {
     GNUNET_assert (GNUNET_OK ==
-                   TALER_amount_get_zero (pc->total_wire_fee.currency,
+                   TALER_amount_get_zero (total_wire_fee.currency,
                                           &wire_fee_customer_contribution));
 
   }
@@ -779,6 +797,12 @@ generate_error_response (struct PayContext *pc,
 			   MHD_HTTP_INTERNAL_SERVER_ERROR,
 			   ec,
 			   "wire_fee currency does not match");
+    break;
+  case TALER_EC_PAY_EXCHANGE_REJECTED:
+    resume_pay_with_error (pc,
+			   MHD_HTTP_PRECONDITION_FAILED,
+			   ec,
+			   "exchange charges incompatible wire fee");
     break;
   default:
     resume_pay_with_error (pc,
@@ -954,18 +978,6 @@ process_pay_with_exchange (void *cls,
 			   MHD_HTTP_PRECONDITION_FAILED,
 			   TALER_EC_PAY_EXCHANGE_REJECTED,
 			   "exchange not supported");
-    return;
-  }
-  if (GNUNET_OK !=
-      TALER_amount_add (&pc->total_wire_fee,
-			&pc->total_wire_fee,
-			wire_fee))
-  {
-    GNUNET_break_op (0);
-    resume_pay_with_error (pc,
-			   MHD_HTTP_PRECONDITION_FAILED,
-			   TALER_EC_PAY_EXCHANGE_REJECTED,
-			   "exchange charges incompatible wire fee");
     return;
   }
   pc->mh = mh;
@@ -1427,10 +1439,6 @@ parse_pay (struct MHD_Connection *connection,
                    TALER_amount_get_zero (pc->max_fee.currency,
                                           &pc->max_wire_fee));
   }
-  /* Initialize wire fee total */
-  GNUNET_assert (GNUNET_OK ==
-		 TALER_amount_get_zero (pc->max_fee.currency,
-					&pc->total_wire_fee));
   if (NULL != json_object_get (pc->contract_terms,
                                "wire_fee_amortization"))
   {
