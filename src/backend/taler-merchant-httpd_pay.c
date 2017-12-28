@@ -353,6 +353,11 @@ struct PayContext
    * part of #MH_force_pc_resume during shutdown.
    */
   int suspended;
+
+  /**
+   * Which operational mode is the /pay request made in?
+   */
+  enum { PC_MODE_PAY, PC_MODE_ABORT_REFUND } mode;
 };
 
 
@@ -1247,9 +1252,12 @@ parse_pay (struct MHD_Connection *connection,
   json_t *merchant;
   unsigned int coins_index;
   const char *order_id;
+  const char *mode;
   struct TALER_MerchantPublicKeyP merchant_pub;
   int res;
   struct GNUNET_JSON_Specification spec[] = {
+    GNUNET_JSON_spec_string ("mode",
+			     &mode),			   
     GNUNET_JSON_spec_json ("coins",
 			   &coins),
     GNUNET_JSON_spec_string ("order_id",
@@ -1332,6 +1340,11 @@ parse_pay (struct MHD_Connection *connection,
     }
     return GNUNET_NO;
   }
+  if (0 != strcasecmp ("abort-refund",
+		       mode))
+    pc->mode = PC_MODE_PAY;
+  else
+    pc->mode = PC_MODE_ABORT_REFUND;
   pc->mi = TMH_lookup_instance_json (merchant);
   if (NULL == pc->mi)
   {
@@ -1649,9 +1662,18 @@ begin_transaction (struct PayContext *pc)
     return;
   }
 
-  /* FIXME: check if wallet is going for a refund,
-     (on aborted operation), or for a payment! #5158 */
-
+  if (PC_MODE_ABORT_REFUND == pc->mode)
+  {
+    /* The wallet is going for a refund,
+       (on aborted operation)!
+       FIXME: implement #5158 */
+    resume_pay_with_error (pc,
+			   MHD_HTTP_INTERNAL_SERVER_ERROR,
+			   TALER_EC_NOT_IMPLEMENTED,
+			   "#5158 is still open");
+    return;
+  }
+  /* Default PC_MODE_PAY mode */
 
   /* Final termination case: all coins already known, just 
      generate ultimate outcome. */

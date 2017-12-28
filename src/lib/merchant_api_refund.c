@@ -297,6 +297,7 @@ handle_refund_lookup_finished (void *cls,
   }
 }
 
+
 /**
  * Does a GET /refund.
  *

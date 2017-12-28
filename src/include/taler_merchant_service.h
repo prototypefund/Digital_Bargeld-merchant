@@ -362,6 +362,73 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 
 
 /**
+ * Callbacks of this type are used to serve the result of submitting a
+ * /pay request to a merchant.
+ *
+ * @param cls closure
+ * @param http_status HTTP response code, 200 or 300-level response codes
+ *                    can indicate success, depending on whether the interaction
+ *                    was with a merchant frontend or backend;
+ *                    0 if the merchant's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code
+ * @param num_refunds size of the @a merchant_sigs array, 0 on errors
+ * @param merchant_sigs merchant signatures refunding coins, NULL on errors
+ * @param obj the received JSON reply, with error details if the request failed
+ */
+typedef void
+(*TALER_MERCHANT_PayRefundCallback) (void *cls,
+				     unsigned int http_status,
+				     enum TALER_ErrorCode ec,
+				     unsigned int num_refunds,
+				     const struct TALER_MerchantSignatureP *merchant_sigs,
+				     const json_t *obj);
+
+
+/**
+ * Run a payment abort operation, asking for refunds for coins
+ * that were previously spend on a /pay that failed to go through.
+ *
+ * @param ctx execution context
+ * @param merchant_url base URL of the merchant
+ * @param instance which merchant instance will receive this payment
+ * @param h_wire hash of the merchant’s account details
+ * @param h_contract hash of the contact of the merchant with the customer
+ * @param transaction_id transaction id for the transaction between merchant and customer
+ * @param amount total value of the contract to be paid to the merchant
+ * @param max_fee maximum fee covered by the merchant (according to the contract)
+ * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
+ * @param merchant_sig signature from the merchant over the original contract
+ * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
+ * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
+ * @param pay_deadline maximum time limit to pay for this contract
+ * @param num_coins number of coins used to pay
+ * @param coins array of coins we use to pay
+ * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
+ * @param payref_cb the callback to call when a reply for this request is available
+ * @param payref_cb_cls closure for @a pay_cb
+ * @return a handle for this request
+ */
+struct TALER_MERCHANT_Pay *
+TALER_MERCHANT_pay_abort (struct GNUNET_CURL_Context *ctx,
+			  const char *merchant_url,
+			  const char *instance,
+			  const struct GNUNET_HashCode *h_contract,
+			  const struct TALER_Amount *amount,
+			  const struct TALER_Amount *max_fee,
+			  const struct TALER_MerchantPublicKeyP *merchant_pub,
+			  const struct TALER_MerchantSignatureP *merchant_sig,
+			  struct GNUNET_TIME_Absolute timestamp,
+			  struct GNUNET_TIME_Absolute refund_deadline,
+			  struct GNUNET_TIME_Absolute pay_deadline,
+			  const struct GNUNET_HashCode *h_wire,
+			  const char *order_id,
+			  unsigned int num_coins,
+			  const struct TALER_MERCHANT_PayCoin *coins,
+			  TALER_MERCHANT_PayRefundCallback payref_cb,
+			  void *payref_cb_cls);
+
+
+/**
  * Information we need from the frontend (ok, the frontend sends just JSON)
  * when forwarding a payment to the backend.
  */
