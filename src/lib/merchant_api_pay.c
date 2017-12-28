@@ -84,15 +84,20 @@ struct TALER_MERCHANT_Pay
   struct GNUNET_CURL_Context *ctx;
 
   /**
+   * The coins we are paying with.
+   */
+  struct TALER_MERCHANT_PaidCoin *coins;
+
+  /**
    * Number of @e coins we are paying with.
    */
   unsigned int num_coins;
 
   /**
-   * The coins we are paying with.
+   * Hash of the contract, only available in "abort-refund" mode.
    */
-  struct TALER_MERCHANT_PaidCoin *coins;
-
+  struct GNUNET_HashCode h_contract_terms;
+  
 };
 
 
@@ -111,8 +116,10 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
 {
   json_t *refunds;
   unsigned int num_refunds;
+  struct TALER_MerchantPublicKeyP merchant_pub;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_json ("refunds", &refunds),
+    GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
     GNUNET_JSON_spec_end()
   };
 
@@ -133,15 +140,19 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
   }
   {
     struct TALER_MerchantSignatureP sigs[num_refunds];
+    uint64_t rtids[num_refunds];
 
     for (unsigned int i=0;i<num_refunds;i++)
     {
       struct TALER_MerchantSignatureP *sig = &sigs[i];
       json_t *deposit = json_array_get (refunds, i);
+      uint64_t rtransaction_id;
       struct GNUNET_JSON_Specification spec_detail[] = {
         GNUNET_JSON_spec_fixed_auto ("sig", sig),
+	GNUNET_JSON_spec_uint64 ("rtransaction_id", &rtransaction_id),
         GNUNET_JSON_spec_end()
       };
+      struct TALER_RefundRequestPS rr;
 
       if (GNUNET_OK !=
           GNUNET_JSON_parse (deposit,
@@ -152,13 +163,36 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
 	GNUNET_JSON_parse_free (spec);
         return GNUNET_SYSERR;
       }
+
+      rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
+      rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
+      rr.h_contract_terms = ph->h_contract_terms;
+      rr.coin_pub = ph->coins[i].coin_pub;
+      rr.merchant = merchant_pub;      
+      rr.rtransaction_id = GNUNET_htonll (rtransaction_id);
+      TALER_amount_hton (&rr.refund_amount,
+			 &ph->coins[i].amount_with_fee);
+      TALER_amount_hton (&rr.refund_fee,
+			 &ph->coins[i].refund_fee);
+      if (GNUNET_OK !=
+	  GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_REFUND,
+				      &rr.purpose,
+				      &sig->eddsa_sig,
+				      &merchant_pub.eddsa_pub))
+      {
+	GNUNET_break_op (0);
+	return GNUNET_SYSERR;
+      }
+      rtids[i] = rtransaction_id;     
     }
-    /* FIXME: check that signature is valid! */
     ph->abort_cb (ph->abort_cb_cls,
 		  MHD_HTTP_OK,
 		  TALER_EC_NONE,
+		  &merchant_pub,
+		  &ph->h_contract_terms,
 		  num_refunds,
 		  sigs,
+		  rtids,
 		  json);
     ph->abort_cb = NULL;
   }
@@ -383,7 +417,10 @@ handle_pay_finished (void *cls,
     ph->abort_cb (ph->abort_cb_cls,
 		  response_code,
 		  TALER_JSON_get_error_code (json),
+		  NULL,
+		  NULL,
 		  0,
+		  NULL,
 		  NULL,
 		  json);
   }
@@ -613,7 +650,7 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
     GNUNET_break (0);
     return NULL;
   }
-
+  
   dr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_COIN_DEPOSIT);
   dr.purpose.size = htonl (sizeof (struct TALER_DepositRequestPS));
   dr.h_contract_terms = *h_contract_terms;
@@ -786,26 +823,30 @@ TALER_MERCHANT_pay_abort (struct GNUNET_CURL_Context *ctx,
 			  TALER_MERCHANT_PayRefundCallback payref_cb,
 			  void *payref_cb_cls)
 {
-  return prepare_pay_generic (ctx,
-			      merchant_url,
-			      instance,
-			      h_contract,
-			      amount,
-			      max_fee,
-			      merchant_pub,
-			      merchant_sig,
-			      timestamp,
-			      refund_deadline,
-			      pay_deadline,
-			      h_wire,
-			      order_id,
-			      num_coins,
-			      coins,
-			      "abort-refund",
-			      NULL,
-			      NULL,
-			      payref_cb,
-			      payref_cb_cls);
+  struct TALER_MERCHANT_Pay *ph;
+
+  ph = prepare_pay_generic (ctx,
+			    merchant_url,
+			    instance,
+			    h_contract,
+			    amount,
+			    max_fee,
+			    merchant_pub,
+			    merchant_sig,
+			    timestamp,
+			    refund_deadline,
+			    pay_deadline,
+			    h_wire,
+			    order_id,
+			    num_coins,
+			    coins,
+			    "abort-refund",
+			    NULL,
+			    NULL,
+			    payref_cb,
+			    payref_cb_cls);
+  ph->h_contract_terms = *h_contract;
+  return ph;
 }
 
 

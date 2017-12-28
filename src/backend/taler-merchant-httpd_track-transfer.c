@@ -447,6 +447,7 @@ check_transfer (void *cls,
                 const struct TALER_Amount *amount_with_fee,
                 const struct TALER_Amount *deposit_fee,
                 const struct TALER_Amount *refund_fee,
+                const struct TALER_Amount *wire_fee,
                 const json_t *exchange_proof)
 {
   struct TrackTransferContext *rctx = cls;

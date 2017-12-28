@@ -309,7 +309,7 @@ struct TALER_MERCHANT_PayCoin
    * Amount this coin is to contribute (without fee).
    */
   struct TALER_Amount amount_without_fee;
-
+  
   /**
    * URL of the exchange that issued @e coin_priv.
    */ 
@@ -371,16 +371,22 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  *                    was with a merchant frontend or backend;
  *                    0 if the merchant's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code
+ * @param merchant_pub public key of the merchant
+ * @param h_contract hash of the contract
  * @param num_refunds size of the @a merchant_sigs array, 0 on errors
  * @param merchant_sigs merchant signatures refunding coins, NULL on errors
+ * @param rtids refund transaction IDs (array of length @a num_refunds) 
  * @param obj the received JSON reply, with error details if the request failed
  */
 typedef void
 (*TALER_MERCHANT_PayRefundCallback) (void *cls,
 				     unsigned int http_status,
 				     enum TALER_ErrorCode ec,
+				     const struct TALER_MerchantPublicKeyP *merchant_pub,
+				     const struct GNUNET_HashCode *h_contract,
 				     unsigned int num_refunds,
 				     const struct TALER_MerchantSignatureP *merchant_sigs,
+				     const uint64_t *rtids,
 				     const json_t *obj);
 
 
@@ -468,6 +474,11 @@ struct TALER_MERCHANT_PaidCoin
    * Amount this coin is to contribute (without fee).
    */
   struct TALER_Amount amount_without_fee;
+
+  /**
+   * Fee the exchange charges for refunds of this coin.
+   */
+  struct TALER_Amount refund_fee;
 
   /**
    * What is the URL of the exchange that issued @a coin_pub?
