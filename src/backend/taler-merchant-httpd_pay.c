@@ -1665,12 +1665,88 @@ begin_transaction (struct PayContext *pc)
   if (PC_MODE_ABORT_REFUND == pc->mode)
   {
     /* The wallet is going for a refund,
-       (on aborted operation)!
-       FIXME: implement #5158 */
-    resume_pay_with_error (pc,
-			   MHD_HTTP_INTERNAL_SERVER_ERROR,
-			   TALER_EC_NOT_IMPLEMENTED,
-			   "#5158 is still open");
+       (on aborted operation)! */
+    /* Store refund in DB */
+    qs = db->increase_refund_for_contract (db->cls,
+					   &pc->h_contract_terms,
+					   &pc->mi->pubkey,
+					   &pc->total_paid,
+					   "incomplete payment aborted");
+    if (0 > qs)
+    {
+      db->rollback (db->cls);
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+      {
+	begin_transaction (pc);
+	return;
+      }
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+      resume_pay_with_error (pc,
+			     MHD_HTTP_INTERNAL_SERVER_ERROR,
+			     TALER_EC_PAY_DB_STORE_PAY_ERROR,
+			     "Merchant database error");
+      return;
+    }
+    qs = db->commit (db->cls);
+    if (0 > qs)
+    {
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+      {
+	db->rollback (db->cls);
+	begin_transaction (pc);
+	return;
+      }
+      resume_pay_with_error (pc,
+			     MHD_HTTP_INTERNAL_SERVER_ERROR,
+			     TALER_EC_PAY_DB_STORE_PAY_ERROR,
+			     "Merchant database error: could not commit");
+      return;
+    }
+    
+    {
+      json_t *refunds;
+
+      refunds = json_array ();
+      for (unsigned int i=0;i<pc->coins_cnt;i++)
+      {
+	struct TALER_RefundRequestPS rr;
+	struct TALER_MerchantSignatureP msig;
+	uint64_t rtransactionid;
+
+	rtransactionid = 0;
+        rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
+	rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
+	rr.h_contract_terms = pc->h_contract_terms;
+	rr.coin_pub = pc->dc[i].coin_pub;
+	rr.merchant = pc->mi->pubkey;
+	rr.rtransaction_id = GNUNET_htonll (rtransactionid);
+
+	if (GNUNET_OK !=
+	    GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
+				      &rr.purpose,
+				      &msig.eddsa_sig))
+	{
+	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		      "Failed to sign successful refund confirmation\n");
+	  json_decref (refunds);
+	  resume_pay_with_error (pc,
+				 MHD_HTTP_INTERNAL_SERVER_ERROR,
+				 TALER_EC_NONE, /* FIXME! */
+				 "Refund approved, but failed to sign confirmation");
+	  return;
+	}
+	json_array_append_new (refunds,
+			       json_pack ("{s:I, s:o}",
+					  "rtransaction_id", (json_int_t) rtransactionid,
+					  "merchant_sig", GNUNET_JSON_from_data_auto (&msig)));			   
+      }
+      resume_pay_with_response (pc,
+				MHD_HTTP_OK,
+				TMH_RESPONSE_make_json_pack ("{s:o, s:o}",
+							     "refunds", refunds,
+							     "merchant_pub", GNUNET_JSON_from_data_auto (&pc->mi->pubkey)));
+    }
     return;
   }
   /* Default PC_MODE_PAY mode */

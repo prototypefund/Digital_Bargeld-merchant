@@ -277,7 +277,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to sign successful refund confirmation\n");
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_NONE,
+                                              TALER_EC_NONE, /* FIXME! */
                                               "Refund done, but failed to sign confirmation");
 
   }
