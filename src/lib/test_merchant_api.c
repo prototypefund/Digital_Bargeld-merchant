@@ -20,7 +20,7 @@
  * @author Marcello Stanisci
  *
  * TODO:
- * - add test logic for tips to main test interpreter
+ * - add test logic for pay-abort-refund
  */
 #include "platform.h"
 #include <taler/taler_exchange_service.h>
@@ -175,6 +175,16 @@ enum OpCode
    * Pay with coins.
    */
   OC_PAY,
+
+  /**
+   * Resume pay operation with additional coins.
+   */ 
+  OC_PAY_AGAIN,
+  
+  /**
+   * Abort payment with coins, requesting refund.
+   */
+  OC_PAY_ABORT,
 
   /**
    * Run the aggregator to execute deposits.
@@ -508,7 +518,6 @@ struct Command
 
     /**
      * Information for a #OC_PAY command.
-     * FIXME: support tests where we pay with multiple coins at once.
      */
     struct
     {
@@ -541,7 +550,7 @@ struct Command
       const char *amount_without_fee;
 
       /**
-       * Deposit handle while operation is running.
+       * Pay handle while operation is running.
        */
       struct TALER_MERCHANT_Pay *ph;
 
@@ -556,6 +565,44 @@ struct Command
       struct TALER_MerchantPublicKeyP merchant_pub;
 
     } pay;
+
+    struct {
+
+      /**
+       * Reference to the (incomplete) pay operation that is to be
+       * resumed.
+       */
+      char *pay_ref;
+
+      /**
+       * ";"-separated list of references to additional withdrawn
+       * coins to be used in the payment.  Each reference has the
+       * syntax "LABEL[/NUMBER]" where NUMBER refers to a particular
+       * coin (in case multiple coins were created in a step).
+       */
+      char *coin_ref;
+
+      /**
+       * Pay handle while operation is running.
+       */
+      struct TALER_MERCHANT_Pay *ph;
+      
+    } pay_again;
+
+    struct {
+
+      /**
+       * Reference to the pay operation that is to be aborted.
+       */
+      char *pay_ref;
+
+      /**
+       * Pay handle while operation is running.
+       */
+      struct TALER_MERCHANT_Pay *ph;
+      
+    } pay_abort;
+    
 
     struct {
 
@@ -1656,6 +1703,88 @@ pay_cb (void *cls,
 
 
 /**
+ * Function called with the result of a /pay again operation.
+ *
+ * @param cls closure with the interpreter state
+ * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error object
+ * @param obj the received JSON reply, should be kept as proof (and, in case of errors,
+ *            be forwarded to the customer)
+ */
+static void
+pay_again_cb (void *cls,
+	      unsigned int http_status,
+	      enum TALER_ErrorCode ec,
+	      const json_t *obj)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  struct PaymentResponsePS mr;
+  struct GNUNET_CRYPTO_EddsaSignature sig;
+  const char *error_name;
+  unsigned int error_line;
+  const struct Command *pref;
+
+  cmd->details.pay_again.ph = NULL;
+  if (cmd->expected_response_code != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u to command %s\n",
+                http_status,
+                cmd->label);
+    fail (is);
+    return;
+  }
+  GNUNET_assert (NULL != (pref = find_command
+			  (is,
+			   cmd->details.pay_again.pay_ref)));    
+  if (MHD_HTTP_OK == http_status)
+  {
+    struct GNUNET_HashCode hcontract;
+    /* Check signature */
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_fixed_auto ("sig",
+				   &sig),
+      GNUNET_JSON_spec_fixed_auto ("h_contract_terms",
+				   &hcontract),
+      GNUNET_JSON_spec_end ()
+    };
+    
+    GNUNET_assert (GNUNET_OK ==
+        GNUNET_JSON_parse (obj,
+                           spec,
+                           &error_name,
+                           &error_line));
+    mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
+    mr.purpose.size = htonl (sizeof (mr));
+    mr.h_contract_terms = pref->details.pay.h_contract_terms;
+    if (0 != memcmp (&pref->details.pay.h_contract_terms,
+		     &hcontract,
+		     sizeof (hcontract)))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Contract changed in /pay again\n");
+      fail (is);
+      return;
+    }
+    if (GNUNET_OK !=
+        GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
+                                    &mr.purpose,
+                                    &sig,
+                                    &pref->details.pay.merchant_pub.eddsa_pub))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Merchant signature given in response to /pay invalid\n");
+      fail (is);
+      return;
+    }
+  }
+  next_command (is);
+}
+
+
+/**
  * Task triggered whenever we receive a SIGCHLD (child
  * process died).
  *
@@ -2193,6 +2322,28 @@ cleanup_state (struct InterpreterState *is)
         cmd->details.pay.ph = NULL;
       }
       break;
+    case OC_PAY_AGAIN:
+      if (NULL != cmd->details.pay_again.ph)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_pay_cancel (cmd->details.pay_again.ph);
+        cmd->details.pay_again.ph = NULL;
+      }
+      break;
+    case OC_PAY_ABORT:
+      if (NULL != cmd->details.pay_abort.ph)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_pay_cancel (cmd->details.pay_abort.ph);
+        cmd->details.pay_abort.ph = NULL;
+      }
+      break;
     case OC_RUN_AGGREGATOR:
       if (NULL != cmd->details.run_aggregator.aggregator_proc)
       {
@@ -2332,6 +2483,122 @@ cleanup_state (struct InterpreterState *is)
       break;
     }
   }
+}
+
+
+/**
+ * Parse the @a coins specification and grow the @a pc
+ * array with the coins found, updating @a npc.
+ *
+ * @param[in,out] pc pointer to array of coins found 
+ * @param[in,out] npc length of array at @a pc
+ * @param[in] coins string specifying coins to add to @a pc,
+ *            clobbered in the process
+ * @param is interpreter state
+ * @return #GNUNET_OK on success
+ */
+static int
+build_coins (struct TALER_MERCHANT_PayCoin **pc,
+	     unsigned int *npc,
+	     char *coins,
+	     struct InterpreterState *is)
+{
+  struct Command *cmd = &is->commands[is->ip];
+  char *token;
+
+  for (token = strtok (coins, ";");
+       NULL != token;
+       token = strtok (NULL, ";"))
+  {
+    const struct Command *coin_ref;
+    char *ctok;
+    unsigned int ci;
+    struct TALER_MERCHANT_PayCoin *icoin;
+    
+    /* Token syntax is "LABEL[/NUMBER]" */
+    ctok = strchr (token, '/');
+    ci = 0;
+    if (NULL != ctok)
+    {
+      *ctok = '\0';
+      ctok++;
+      if (1 != sscanf (ctok,
+		       "%u",
+		       &ci))
+      {
+	GNUNET_break (0);
+	return GNUNET_SYSERR;
+      }
+    }
+    GNUNET_assert (coin_ref = find_command (is,
+					    token));
+    GNUNET_array_grow (*pc,
+		       *npc,
+		       (*npc) + 1);
+    icoin = &(*pc)[(*npc)-1];
+    switch (coin_ref->oc)
+    {
+    case OC_WITHDRAW_SIGN:
+      icoin->coin_priv = coin_ref->details.reserve_withdraw.ps.coin_priv;
+      icoin->denom_pub = coin_ref->details.reserve_withdraw.pk->key;
+      icoin->denom_sig = coin_ref->details.reserve_withdraw.sig;
+      icoin->denom_value = coin_ref->details.reserve_withdraw.pk->value;
+      icoin->exchange_url = EXCHANGE_URL;
+      break;
+    case OC_TIP_PICKUP:
+      icoin->coin_priv = coin_ref->details.tip_pickup.psa[ci].coin_priv;
+      icoin->denom_pub = coin_ref->details.tip_pickup.dks[ci]->key;
+      icoin->denom_sig = coin_ref->details.tip_pickup.sigs[ci];
+      icoin->denom_value = coin_ref->details.tip_pickup.dks[ci]->value;
+      icoin->exchange_url = EXCHANGE_URL;
+      break;
+    default:
+      GNUNET_assert (0);
+    }
+    
+    GNUNET_assert (GNUNET_OK ==
+		   TALER_string_to_amount (cmd->details.pay.amount_without_fee,
+					   &icoin->amount_without_fee));
+    GNUNET_assert (GNUNET_OK ==
+		   TALER_string_to_amount (cmd->details.pay.amount_with_fee,
+					   &icoin->amount_with_fee));
+  }
+  return GNUNET_OK;
+}
+
+
+/**
+ * Callbacks of this type are used to serve the result of submitting a
+ * /pay request to a merchant.
+ *
+ * @param cls closure
+ * @param http_status HTTP response code, 200 or 300-level response codes
+ *                    can indicate success, depending on whether the interaction
+ *                    was with a merchant frontend or backend;
+ *                    0 if the merchant's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code
+ * @param merchant_pub public key of the merchant
+ * @param h_contract hash of the contract
+ * @param num_refunds size of the @a merchant_sigs array, 0 on errors
+ * @param merchant_sigs merchant signatures refunding coins, NULL on errors
+ * @param rtids refund transaction IDs (array of length @a num_refunds) 
+ * @param obj the received JSON reply, with error details if the request failed
+ */
+static void
+pay_refund_cb (void *cls,
+	       unsigned int http_status,
+	       enum TALER_ErrorCode ec,
+	       const struct TALER_MerchantPublicKeyP *merchant_pub,
+	       const struct GNUNET_HashCode *h_contract,
+	       unsigned int num_refunds,
+	       const struct TALER_MerchantSignatureP *merchant_sigs,
+	       const uint64_t *rtids,
+	       const json_t *obj)
+{
+  struct InterpreterState *is = cls;
+    
+  GNUNET_break (0);
+  fail (is); // FIXME: not implemented!
 }
 
 
@@ -2609,7 +2876,6 @@ interpreter_run (void *cls)
       struct TALER_MerchantSignatureP merchant_sig;
       struct TALER_Amount total_amount;
       struct TALER_Amount max_fee;
-      char *token;
       const char *error_name;
       unsigned int error_line;
 
@@ -2622,14 +2888,22 @@ interpreter_run (void *cls)
       {
         /* Get information that needs to be replied in the deposit permission */
         struct GNUNET_JSON_Specification spec[] = {
-          GNUNET_JSON_spec_string ("order_id", &order_id),
-          GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
-          GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
-          GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
-          GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
-          GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
-          TALER_JSON_spec_amount ("amount", &total_amount),
-          TALER_JSON_spec_amount ("max_fee", &max_fee),
+          GNUNET_JSON_spec_string ("order_id",
+				   &order_id),
+          GNUNET_JSON_spec_absolute_time ("refund_deadline",
+					  &refund_deadline),
+          GNUNET_JSON_spec_absolute_time ("pay_deadline",
+					  &pay_deadline),
+          GNUNET_JSON_spec_absolute_time ("timestamp",
+					  &timestamp),
+          GNUNET_JSON_spec_fixed_auto ("merchant_pub",
+				       &merchant_pub),
+          GNUNET_JSON_spec_fixed_auto ("H_wire",
+				       &h_wire),
+          TALER_JSON_spec_amount ("amount",
+				  &total_amount),
+          TALER_JSON_spec_amount ("max_fee",
+				  &max_fee),
           GNUNET_JSON_spec_end()
         };
 
@@ -2655,66 +2929,20 @@ interpreter_run (void *cls)
       }
       /* strtok loop here */
       coins = GNUNET_strdup (cmd->details.pay.coin_ref);
-
       pc = NULL;
       npc = 0;
-      for (token = strtok (coins, ";");
-           NULL != token;
-           token = strtok (NULL, ";"))
+      if (GNUNET_OK !=
+	  build_coins (&pc,
+		       &npc,
+		       coins,
+		       is))
       {
-        const struct Command *coin_ref;
-        char *ctok;
-        unsigned int ci;
-        struct TALER_MERCHANT_PayCoin *icoin;
-
-        /* Token syntax is "LABEL[/NUMBER]" */
-        ctok = strchr (token, '/');
-	ci = 0;
-        if (NULL != ctok)
-        {
-          *ctok = '\0';
-          ctok++;
-	  if (1 != sscanf (ctok,
-			   "%u",
-			   &ci))
-	  {
-	    GNUNET_break (0);
-	    fail (is);
-	    return;
-	  }
-	}
-        GNUNET_assert (coin_ref = find_command (is,
-                                                token));
-        GNUNET_array_grow (pc,
-                           npc,
-                           npc + 1);
-        icoin = &pc[npc-1];
-        switch (coin_ref->oc)
-        {
-        case OC_WITHDRAW_SIGN:
-          icoin->coin_priv = coin_ref->details.reserve_withdraw.ps.coin_priv;
-          icoin->denom_pub = coin_ref->details.reserve_withdraw.pk->key;
-          icoin->denom_sig = coin_ref->details.reserve_withdraw.sig;
-          icoin->denom_value = coin_ref->details.reserve_withdraw.pk->value;
-	  icoin->exchange_url = EXCHANGE_URL;
-          break;
-        case OC_TIP_PICKUP:
-          icoin->coin_priv = coin_ref->details.tip_pickup.psa[ci].coin_priv;
-          icoin->denom_pub = coin_ref->details.tip_pickup.dks[ci]->key;
-          icoin->denom_sig = coin_ref->details.tip_pickup.sigs[ci];
-          icoin->denom_value = coin_ref->details.tip_pickup.dks[ci]->value;
-	  icoin->exchange_url = EXCHANGE_URL;
-          break;
-        default:
-          GNUNET_assert (0);
-        }
-
-        GNUNET_assert (GNUNET_OK ==
-                       TALER_string_to_amount (cmd->details.pay.amount_without_fee,
-                                               &icoin->amount_without_fee));
-        GNUNET_assert (GNUNET_OK ==
-                       TALER_string_to_amount (cmd->details.pay.amount_with_fee,
-                                               &icoin->amount_with_fee));
+	fail (is);
+	GNUNET_array_grow (pc,
+			   npc,
+			   0);
+	GNUNET_free (coins);
+	return;
       }
       GNUNET_free (coins);
 
@@ -2741,6 +2969,255 @@ interpreter_run (void *cls)
                          0);
     }
     if (NULL == cmd->details.pay.ph)
+    {
+      GNUNET_break (0);
+      fail (is);
+    }
+    break;
+
+  case OC_PAY_AGAIN:
+    {
+      struct TALER_MERCHANT_PayCoin *pc;
+      const struct Command *pref;
+      unsigned int npc;
+      char *coins;
+      const char *order_id;
+      struct GNUNET_TIME_Absolute refund_deadline;
+      struct GNUNET_TIME_Absolute pay_deadline;
+      struct GNUNET_TIME_Absolute timestamp;
+      struct GNUNET_HashCode h_wire;
+      struct TALER_MerchantPublicKeyP merchant_pub;
+      struct TALER_MerchantSignatureP merchant_sig;
+      struct TALER_Amount total_amount;
+      struct TALER_Amount max_fee;
+      const char *error_name;
+      unsigned int error_line;
+
+      /* Get original /pay command */
+      GNUNET_assert (NULL != (pref = find_command
+                              (is,
+                               cmd->details.pay_again.pay_ref)));
+      /* get proposal */
+      GNUNET_assert (NULL != (ref = find_command
+                              (is,
+                               pref->details.pay.contract_ref)));
+      merchant_sig = ref->details.proposal.merchant_sig;
+      GNUNET_assert (NULL != ref->details.proposal.contract_terms);
+      {
+        /* Get information that needs to be replied in the deposit permission */
+        struct GNUNET_JSON_Specification spec[] = {
+          GNUNET_JSON_spec_string ("order_id",
+				   &order_id),
+          GNUNET_JSON_spec_absolute_time ("refund_deadline",
+					  &refund_deadline),
+          GNUNET_JSON_spec_absolute_time ("pay_deadline",
+					  &pay_deadline),
+          GNUNET_JSON_spec_absolute_time ("timestamp",
+					  &timestamp),
+          GNUNET_JSON_spec_fixed_auto ("merchant_pub",
+				       &merchant_pub),
+          GNUNET_JSON_spec_fixed_auto ("H_wire",
+				       &h_wire),
+          TALER_JSON_spec_amount ("amount",
+				  &total_amount),
+          TALER_JSON_spec_amount ("max_fee",
+				  &max_fee),
+          GNUNET_JSON_spec_end()
+        };
+
+        if (GNUNET_OK !=
+            GNUNET_JSON_parse (ref->details.proposal.contract_terms,
+                               spec,
+                               &error_name,
+                               &error_line))
+        {
+          GNUNET_break_op (0);
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Parser failed on %s:%u\n",
+                      error_name,
+                      error_line);
+          /**
+           * Let's use fail() here, as the proposal might be broken
+           * because of backend's fault.
+           */
+          fail (is);
+          return;
+        }
+      }
+      /* strtok loop over original coins here */
+      pc = NULL;
+      npc = 0;
+      coins = GNUNET_strdup (pref->details.pay.coin_ref);
+      if (GNUNET_OK !=
+	  build_coins (&pc,
+		       &npc,
+		       coins,
+		       is))
+      {
+	fail (is);
+	GNUNET_array_grow (pc,
+			   npc,
+			   0);
+	GNUNET_free (coins);
+	return;
+      }
+      GNUNET_free (coins);
+      /* Now loop over additional coins from pay again */
+      coins = GNUNET_strdup (cmd->details.pay_again.coin_ref);
+      if (GNUNET_OK !=
+	  build_coins (&pc,
+		       &npc,
+		       coins,
+		       is))
+      {
+	fail (is);
+	GNUNET_array_grow (pc,
+			   npc,
+			   0);
+	GNUNET_free (coins);
+	return;
+      }
+      GNUNET_free (coins);
+      /* then repeat payment attempt */
+      cmd->details.pay_again.ph = TALER_MERCHANT_pay_wallet
+        (ctx,
+         MERCHANT_URL,
+         instance,
+         &ref->details.proposal.hash,
+         &total_amount,
+         &max_fee,
+         &merchant_pub,
+         &merchant_sig,
+         timestamp,
+         refund_deadline,
+         pay_deadline,
+         &h_wire,
+         order_id,
+         npc /* num_coins */,
+         pc /* coins */,
+         &pay_again_cb,
+         is);
+      GNUNET_array_grow (pc,
+                         npc,
+                         0);
+    }
+    if (NULL == cmd->details.pay_again.ph)
+    {
+      GNUNET_break (0);
+      fail (is);
+    }
+    break;    
+  case OC_PAY_ABORT:
+    {
+      struct TALER_MERCHANT_PayCoin *pc;
+      const struct Command *pref;
+      unsigned int npc;
+      char *coins;
+      const char *order_id;
+      struct GNUNET_TIME_Absolute refund_deadline;
+      struct GNUNET_TIME_Absolute pay_deadline;
+      struct GNUNET_TIME_Absolute timestamp;
+      struct GNUNET_HashCode h_wire;
+      struct TALER_MerchantPublicKeyP merchant_pub;
+      struct TALER_MerchantSignatureP merchant_sig;
+      struct TALER_Amount total_amount;
+      struct TALER_Amount max_fee;
+      const char *error_name;
+      unsigned int error_line;
+
+      /* Get original /pay command */
+      GNUNET_assert (NULL != (pref = find_command
+                              (is,
+                               cmd->details.pay_abort.pay_ref)));
+      /* get proposal */
+      GNUNET_assert (NULL != (ref = find_command
+                              (is,
+                               pref->details.pay.contract_ref)));
+      merchant_sig = ref->details.proposal.merchant_sig;
+      GNUNET_assert (NULL != ref->details.proposal.contract_terms);
+      {
+        /* Get information that needs to be replied in the deposit permission */
+        struct GNUNET_JSON_Specification spec[] = {
+          GNUNET_JSON_spec_string ("order_id",
+				   &order_id),
+          GNUNET_JSON_spec_absolute_time ("refund_deadline",
+					  &refund_deadline),
+          GNUNET_JSON_spec_absolute_time ("pay_deadline",
+					  &pay_deadline),
+          GNUNET_JSON_spec_absolute_time ("timestamp",
+					  &timestamp),
+          GNUNET_JSON_spec_fixed_auto ("merchant_pub",
+				       &merchant_pub),
+          GNUNET_JSON_spec_fixed_auto ("H_wire",
+				       &h_wire),
+          TALER_JSON_spec_amount ("amount",
+				  &total_amount),
+          TALER_JSON_spec_amount ("max_fee",
+				  &max_fee),
+          GNUNET_JSON_spec_end()
+        };
+
+        if (GNUNET_OK !=
+            GNUNET_JSON_parse (ref->details.proposal.contract_terms,
+                               spec,
+                               &error_name,
+                               &error_line))
+        {
+          GNUNET_break_op (0);
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Parser failed on %s:%u\n",
+                      error_name,
+                      error_line);
+          /**
+           * Let's use fail() here, as the proposal might be broken
+           * because of backend's fault.
+           */
+          fail (is);
+          return;
+        }
+      }
+      /* strtok loop over original coins here */
+      pc = NULL;
+      npc = 0;
+      coins = GNUNET_strdup (pref->details.pay.coin_ref);
+      if (GNUNET_OK !=
+	  build_coins (&pc,
+		       &npc,
+		       coins,
+		       is))
+      {
+	fail (is);
+	GNUNET_array_grow (pc,
+			   npc,
+			   0);
+	GNUNET_free (coins);
+	return;
+      }
+      GNUNET_free (coins);
+      /* then trigger abort-refund operation */
+      cmd->details.pay_abort.ph = TALER_MERCHANT_pay_abort
+        (ctx,
+         MERCHANT_URL,
+         instance,
+         &ref->details.proposal.hash,
+         &total_amount,
+         &max_fee,
+         &merchant_pub,
+         &merchant_sig,
+         timestamp,
+         refund_deadline,
+         pay_deadline,
+         &h_wire,
+         order_id,
+         npc /* num_coins */,
+         pc /* coins */,
+         &pay_refund_cb,
+         is);
+      GNUNET_array_grow (pc,
+                         npc,
+                         0);
+    }
+    if (NULL == cmd->details.pay_abort.ph)
     {
       GNUNET_break (0);
       fail (is);
@@ -2838,10 +3315,11 @@ interpreter_run (void *cls)
         (is,
          cmd->details.track_transfer.check_bank_ref)));
       subject = ref->details.check_bank_transfer.subject;
-      GNUNET_assert (GNUNET_OK == GNUNET_STRINGS_string_to_data (subject,
-         strlen (subject),
-         &wtid,
-         sizeof (wtid)));
+      GNUNET_assert (GNUNET_OK ==
+		     GNUNET_STRINGS_string_to_data (subject,
+						    strlen (subject),
+						    &wtid,
+						    sizeof (wtid)));
       if (NULL == (cmd->details.track_transfer.tdo
           = TALER_MERCHANT_track_transfer (ctx,
                                            MERCHANT_URL,

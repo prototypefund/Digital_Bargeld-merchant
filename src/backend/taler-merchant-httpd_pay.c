@@ -19,10 +19,6 @@
  * @author Marcello Stanisci
  * @author Christian Grothoff
  * @author Florian Dold
- *
- * TODO:
- * - add API to allow wallet to request refunds
- * - write testcase for new logic
  */
 #include "platform.h"
 #include <jansson.h>
