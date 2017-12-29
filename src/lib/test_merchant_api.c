@@ -2596,9 +2596,25 @@ pay_refund_cb (void *cls,
 	       const json_t *obj)
 {
   struct InterpreterState *is = cls;
-    
-  GNUNET_break (0);
-  fail (is); // FIXME: not implemented!
+  struct Command *cmd = &is->commands[is->ip];
+  
+  cmd->details.pay_abort.ph = NULL;
+  if (cmd->expected_response_code != http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Unexpected response code %u to command %s\n",
+                http_status,
+                cmd->label);
+    fail (is);
+    return;
+  }
+  if ( (MHD_HTTP_OK == http_status) &&
+       (TALER_EC_NONE == ec) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		"TODO: implement check of returned data\n");
+  }
+  next_command (is);
 }
 
 
