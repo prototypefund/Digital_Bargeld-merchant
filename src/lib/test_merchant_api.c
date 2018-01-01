@@ -1655,7 +1655,6 @@ pay_cb (void *cls,
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
-  struct PaymentResponsePS mr;
   struct GNUNET_CRYPTO_EddsaSignature sig;
   const char *error_name;
   unsigned int error_line;
@@ -1673,9 +1672,11 @@ pay_cb (void *cls,
   if (MHD_HTTP_OK == http_status)
   {
     /* Check signature */
+    struct PaymentResponsePS mr;
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_fixed_auto ("sig", &sig),
-      GNUNET_JSON_spec_fixed_auto ("h_contract_terms", &cmd->details.pay.h_contract_terms),
+      GNUNET_JSON_spec_fixed_auto ("h_contract_terms",
+				   &cmd->details.pay.h_contract_terms),
       GNUNET_JSON_spec_end ()
     };
     GNUNET_assert (GNUNET_OK ==
@@ -1720,7 +1721,6 @@ pay_again_cb (void *cls,
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
-  struct PaymentResponsePS mr;
   struct GNUNET_CRYPTO_EddsaSignature sig;
   const char *error_name;
   unsigned int error_line;
@@ -1741,13 +1741,13 @@ pay_again_cb (void *cls,
 			   cmd->details.pay_again.pay_ref)));    
   if (MHD_HTTP_OK == http_status)
   {
-    struct GNUNET_HashCode hcontract;
+    struct PaymentResponsePS mr;
     /* Check signature */
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_fixed_auto ("sig",
 				   &sig),
       GNUNET_JSON_spec_fixed_auto ("h_contract_terms",
-				   &hcontract),
+				   &mr.h_contract_terms),
       GNUNET_JSON_spec_end ()
     };
     
@@ -1758,16 +1758,6 @@ pay_again_cb (void *cls,
                            &error_line));
     mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
-    mr.h_contract_terms = pref->details.pay.h_contract_terms;
-    if (0 != memcmp (&pref->details.pay.h_contract_terms,
-		     &hcontract,
-		     sizeof (hcontract)))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Contract changed in /pay again\n");
-      fail (is);
-      return;
-    }
     if (GNUNET_OK !=
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
                                     &mr.purpose,
@@ -2495,17 +2485,18 @@ cleanup_state (struct InterpreterState *is)
  * @param[in] coins string specifying coins to add to @a pc,
  *            clobbered in the process
  * @param is interpreter state
+ * @param pref reference to the #OC_PAY command
  * @return #GNUNET_OK on success
  */
 static int
 build_coins (struct TALER_MERCHANT_PayCoin **pc,
 	     unsigned int *npc,
 	     char *coins,
-	     struct InterpreterState *is)
+	     struct InterpreterState *is,
+	     const struct Command *pref)
 {
-  struct Command *cmd = &is->commands[is->ip];
-  char *token;
-
+  char *token;  
+  
   for (token = strtok (coins, ";");
        NULL != token;
        token = strtok (NULL, ";"))
@@ -2557,11 +2548,11 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
     }
     
     GNUNET_assert (GNUNET_OK ==
-		   TALER_string_to_amount (cmd->details.pay.amount_without_fee,
-					   &icoin->amount_without_fee));
-    GNUNET_assert (GNUNET_OK ==
-		   TALER_string_to_amount (cmd->details.pay.amount_with_fee,
+		   TALER_string_to_amount (pref->details.pay.amount_with_fee,
 					   &icoin->amount_with_fee));
+    GNUNET_assert (GNUNET_OK ==
+		   TALER_string_to_amount (pref->details.pay.amount_without_fee,
+					   &icoin->amount_without_fee));
   }
   return GNUNET_OK;
 }
@@ -2951,7 +2942,8 @@ interpreter_run (void *cls)
 	  build_coins (&pc,
 		       &npc,
 		       coins,
-		       is))
+		       is,
+		       cmd))
       {
 	fail (is);
 	GNUNET_array_grow (pc,
@@ -3060,31 +3052,16 @@ interpreter_run (void *cls)
           return;
         }
       }
-      /* strtok loop over original coins here */
       pc = NULL;
       npc = 0;
-      coins = GNUNET_strdup (pref->details.pay.coin_ref);
-      if (GNUNET_OK !=
-	  build_coins (&pc,
-		       &npc,
-		       coins,
-		       is))
-      {
-	fail (is);
-	GNUNET_array_grow (pc,
-			   npc,
-			   0);
-	GNUNET_free (coins);
-	return;
-      }
-      GNUNET_free (coins);
-      /* Now loop over additional coins from pay again */
+      /* Loop over coins from pay again */
       coins = GNUNET_strdup (cmd->details.pay_again.coin_ref);
       if (GNUNET_OK !=
 	  build_coins (&pc,
 		       &npc,
 		       coins,
-		       is))
+		       is,
+		       pref))
       {
 	fail (is);
 	GNUNET_array_grow (pc,
@@ -3200,7 +3177,8 @@ interpreter_run (void *cls)
 	  build_coins (&pc,
 		       &npc,
 		       coins,
-		       is))
+		       is,
+		       pref))
       {
 	fail (is);
 	GNUNET_array_grow (pc,
@@ -4218,6 +4196,115 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty" },
 
+
+
+
+
+
+    /* Fill reserve with EUR:10.02, as withdraw fee is 1 ct per
+       config */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-10",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
+      .details.admin_add_incoming.auth_username = "user62",
+      .details.admin_add_incoming.auth_password = "pass62",
+      .details.admin_add_incoming.amount = "EUR:10.02" },
+    /* Run wirewatch to observe /admin/add/incoming */
+    { .oc = OC_RUN_WIREWATCH,
+      .label = "wirewatch-1" },
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-10",
+      .details.check_bank_transfer.amount = "EUR:10.02",
+      .details.check_bank_transfer.account_debit = 62,
+      .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
+    },
+
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-10a",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference
+        = "create-reserve-10",
+      .details.reserve_withdraw.amount = "EUR:5" },
+
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-10b",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference
+        = "create-reserve-10",
+      .details.reserve_withdraw.amount = "EUR:5" },
+
+    /* Check that deposit and withdraw operation are in history,
+       and that the balance is now at zero */
+    { .oc = OC_WITHDRAW_STATUS,
+      .label = "withdraw-status-10",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_status.reserve_reference
+        = "create-reserve-10",
+      .details.reserve_status.expected_balance = "EUR:0" },
+
+    /* Create proposal */
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-10",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.proposal.order = "{\
+        \"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"10\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":10,\
+           \"fraction\":0},\
+    	\"summary\": \"merchant-lib testcase\",\
+        \"products\":\
+          [ {\"description\":\"ice cream\",\
+             \"value\":\"{EUR:10}\"} ] }"},
+
+    /* execute simple payment, re-using one ancient coin */
+    { .oc = OC_PAY,
+      .label = "pay-fail-partial-double",
+      .expected_response_code = MHD_HTTP_FORBIDDEN,
+      .details.pay.contract_ref = "create-proposal-10",
+      .details.pay.coin_ref = "withdraw-coin-10a;withdraw-coin-1",
+      /* These amounts are given per coin! */
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99" },
+
+    /* Try to replay payment reusing coin */
+    { .oc = OC_PAY_AGAIN,
+      .label = "pay-again",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay_again.pay_ref = "pay-fail-partial-double",
+      .details.pay_again.coin_ref = "withdraw-coin-10a;withdraw-coin-10b" },
+
+
+
+    /* Run transfers. */
+    { .oc = OC_RUN_AGGREGATOR,
+      .label = "run-aggregator-10" },
+
+    /* Obtain WTID of the transfer */
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-9.97-10",
+      .details.check_bank_transfer.amount = "EUR:9.97",
+      /* exchange-outgoing */
+      .details.check_bank_transfer.account_debit = 2,
+      /* merchant */
+      .details.check_bank_transfer.account_credit = 62
+    },
+
+    /* Check that there are no other unusual transfers */
+    { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
+      .label = "check_bank_empty-10" },
+
+    
 
     /* end of testcase */
     { .oc = OC_END }

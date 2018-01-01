@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
+  Copyright (C) 2014, 2015, 2016, 2017 GNUnet e.V. and INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -688,6 +688,15 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
                        TALER_amount2s (&fee));
     }
 
+    fprintf (stderr,
+	     "Signing DP %s/%s/%s/%llu/%llu/%s with coin %s\n",
+	     GNUNET_h2s (&dr.h_contract_terms),
+	     GNUNET_h2s2 (&dr.h_wire),
+	     TALER_amount2s (&coin->amount_without_fee),
+	     (unsigned long long) timestamp.abs_value_us,
+	     (unsigned long long) refund_deadline.abs_value_us,	     
+	     TALER_B2S (&dr),
+	     GNUNET_i2s ((const struct GNUNET_PeerIdentity *)&dr.coin_pub));
     GNUNET_CRYPTO_eddsa_sign (&coin->coin_priv.eddsa_priv,
 			      &dr.purpose,
 			      &p->coin_sig.eddsa_signature);
