@@ -1710,6 +1710,8 @@ begin_transaction (struct PayContext *pc)
 	struct TALER_MerchantSignatureP msig;
 	uint64_t rtransactionid;
 
+	if (GNUNET_YES != pc->dc[i].found_in_db)
+	  continue;
 	rtransactionid = 0;
         rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
 	rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
@@ -1717,7 +1719,11 @@ begin_transaction (struct PayContext *pc)
 	rr.coin_pub = pc->dc[i].coin_pub;
 	rr.merchant = pc->mi->pubkey;
 	rr.rtransaction_id = GNUNET_htonll (rtransactionid);
-
+	TALER_amount_hton (&rr.refund_amount,
+			   &pc->dc[i].amount_with_fee);
+	TALER_amount_hton (&rr.refund_fee,
+			   &pc->dc[i].refund_fee);
+	
 	if (GNUNET_OK !=
 	    GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
 				      &rr.purpose,
@@ -1733,8 +1739,9 @@ begin_transaction (struct PayContext *pc)
 	  return;
 	}
 	json_array_append_new (refunds,
-			       json_pack ("{s:I, s:o}",
+			       json_pack ("{s:I, s:o, s:o}",
 					  "rtransaction_id", (json_int_t) rtransactionid,
+					  "coin_pub", GNUNET_JSON_from_data_auto (&rr.coin_pub),
 					  "merchant_sig", GNUNET_JSON_from_data_auto (&msig)));			   
       }
       resume_pay_with_response (pc,

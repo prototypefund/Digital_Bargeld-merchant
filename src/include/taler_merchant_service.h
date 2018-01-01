@@ -311,6 +311,11 @@ struct TALER_MERCHANT_PayCoin
   struct TALER_Amount amount_without_fee;
   
   /**
+   * Fee the exchange charges for refunds of this coin.
+   */
+  struct TALER_Amount refund_fee;
+
+  /**
    * URL of the exchange that issued @e coin_priv.
    */ 
   const char *exchange_url;
@@ -362,6 +367,28 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 
 
 /**
+ * Entry in the array of refunded coins.
+ */
+struct TALER_MERCHANT_RefundEntry
+{
+  /**
+   * Merchant signature affirming the refund.
+   */ 
+  struct TALER_MerchantSignatureP merchant_sig;
+
+  /**
+   * Public key of the refunded coin.
+   */ 
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+
+  /**
+   * Refund transaction ID.
+   */
+  uint64_t rtransaction_id;
+};
+
+
+/**
  * Callbacks of this type are used to serve the result of submitting a
  * /pay request to a merchant.
  *
@@ -373,9 +400,8 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  * @param ec taler-specific error code
  * @param merchant_pub public key of the merchant
  * @param h_contract hash of the contract
- * @param num_refunds size of the @a merchant_sigs array, 0 on errors
- * @param merchant_sigs merchant signatures refunding coins, NULL on errors
- * @param rtids refund transaction IDs (array of length @a num_refunds) 
+ * @param num_refunds size of the @a res array, 0 on errors
+ * @param res merchant signatures refunding coins, NULL on errors
  * @param obj the received JSON reply, with error details if the request failed
  */
 typedef void
@@ -385,8 +411,7 @@ typedef void
 				     const struct TALER_MerchantPublicKeyP *merchant_pub,
 				     const struct GNUNET_HashCode *h_contract,
 				     unsigned int num_refunds,
-				     const struct TALER_MerchantSignatureP *merchant_sigs,
-				     const uint64_t *rtids,
+				     const struct TALER_MERCHANT_RefundEntry *res,
 				     const json_t *obj);
 
 

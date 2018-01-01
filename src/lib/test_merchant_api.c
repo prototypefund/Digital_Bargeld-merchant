@@ -185,6 +185,11 @@ enum OpCode
    * Abort payment with coins, requesting refund.
    */
   OC_PAY_ABORT,
+  
+  /**
+   * Abort payment with coins, executing refund.
+   */
+  OC_PAY_ABORT_REFUND,
 
   /**
    * Run the aggregator to execute deposits.
@@ -549,6 +554,12 @@ struct Command
        */
       const char *amount_without_fee;
 
+      /** 
+       * Refund fee to use for each coin (only relevant if we
+       * exercise /pay's abort functionality).
+       */
+      const char *refund_fee;
+      
       /**
        * Pay handle while operation is running.
        */
@@ -600,9 +611,57 @@ struct Command
        * Pay handle while operation is running.
        */
       struct TALER_MERCHANT_Pay *ph;
-      
+
+      /** 
+       * Set in #pay_refund_cb to number of refunds obtained.
+       */
+      unsigned int num_refunds;
+
+      /**
+       * Array of @e num_refund refunds obtained.
+       */
+      struct TALER_MERCHANT_RefundEntry *res;
+
+      /**
+       * Set to the hash of the original contract.
+       */ 
+      struct GNUNET_HashCode h_contract;      
+
+      /**
+       * Set to the merchant's public key.
+       */ 
+      struct TALER_MerchantPublicKeyP merchant_pub;
+
     } pay_abort;
-    
+
+    struct {
+
+      /**
+       * Reference to the pay_abort command to be refunded.
+       */ 
+      const char *abort_ref;
+
+      /**
+       * Number of the coin of @e abort_ref to be refunded.
+       */
+      unsigned int num_coin;
+
+      /**
+       * Refund amount to use.
+       */
+      const char *refund_amount;
+
+      /**
+       * Refund fee to expect.
+       */
+      const char *refund_fee;
+      
+      /**
+       * Handle to the refund operation.
+       */
+      struct TALER_EXCHANGE_RefundHandle *rh;
+
+    } pay_abort_refund;
 
     struct {
 
@@ -2333,6 +2392,20 @@ cleanup_state (struct InterpreterState *is)
         TALER_MERCHANT_pay_cancel (cmd->details.pay_abort.ph);
         cmd->details.pay_abort.ph = NULL;
       }
+      GNUNET_array_grow (cmd->details.pay_abort.res,
+			 cmd->details.pay_abort.num_refunds,
+			 0);
+      break;
+    case OC_PAY_ABORT_REFUND:
+      if (NULL != cmd->details.pay_abort_refund.rh)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+	TALER_EXCHANGE_refund_cancel (cmd->details.pay_abort_refund.rh);
+	cmd->details.pay_abort_refund.rh = NULL;
+      }
       break;
     case OC_RUN_AGGREGATOR:
       if (NULL != cmd->details.run_aggregator.aggregator_proc)
@@ -2553,6 +2626,9 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
     GNUNET_assert (GNUNET_OK ==
 		   TALER_string_to_amount (pref->details.pay.amount_without_fee,
 					   &icoin->amount_without_fee));
+    GNUNET_assert (GNUNET_OK ==
+		   TALER_string_to_amount (pref->details.pay.refund_fee,
+					   &icoin->refund_fee));
   }
   return GNUNET_OK;
 }
@@ -2571,8 +2647,7 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
  * @param merchant_pub public key of the merchant
  * @param h_contract hash of the contract
  * @param num_refunds size of the @a merchant_sigs array, 0 on errors
- * @param merchant_sigs merchant signatures refunding coins, NULL on errors
- * @param rtids refund transaction IDs (array of length @a num_refunds) 
+ * @param res merchant signatures refunding coins, NULL on errors
  * @param obj the received JSON reply, with error details if the request failed
  */
 static void
@@ -2582,8 +2657,7 @@ pay_refund_cb (void *cls,
 	       const struct TALER_MerchantPublicKeyP *merchant_pub,
 	       const struct GNUNET_HashCode *h_contract,
 	       unsigned int num_refunds,
-	       const struct TALER_MerchantSignatureP *merchant_sigs,
-	       const uint64_t *rtids,
+	       const struct TALER_MERCHANT_RefundEntry *res,
 	       const json_t *obj)
 {
   struct InterpreterState *is = cls;
@@ -2602,8 +2676,51 @@ pay_refund_cb (void *cls,
   if ( (MHD_HTTP_OK == http_status) &&
        (TALER_EC_NONE == ec) )
   {
+    cmd->details.pay_abort.num_refunds = num_refunds;
+    cmd->details.pay_abort.res
+      = GNUNET_new_array (num_refunds,
+			  struct TALER_MERCHANT_RefundEntry);
+    memcpy (cmd->details.pay_abort.res,
+	    res,
+	    num_refunds * sizeof (struct TALER_MERCHANT_RefundEntry));
+    cmd->details.pay_abort.h_contract = *h_contract;
+    cmd->details.pay_abort.merchant_pub = *merchant_pub;
+  }
+  next_command (is);
+}
+
+
+/**
+ * Callbacks of this type are used to serve the result of submitting a
+ * refund request to an exchange.
+ *
+ * @param cls closure
+ * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
+ *                    0 if the exchange's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param sign_key exchange key used to sign @a obj, or NULL
+ * @param obj the received JSON reply, should be kept as proof (and, in particular,
+ *            be forwarded to the customer)
+ */
+static void
+abort_refund_cb (void *cls,
+		 unsigned int http_status,
+		 enum TALER_ErrorCode ec,
+		 const struct TALER_ExchangePublicKeyP *sign_key,
+		 const json_t *obj)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  
+  cmd->details.pay_abort_refund.rh = NULL;
+  if (cmd->expected_response_code != http_status)
+  {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		"TODO: implement check of returned data\n");
+                "Unexpected response code %u to command %s\n",
+                http_status,
+                cmd->label);
+    fail (is);
+    return;
   }
   next_command (is);
 }
@@ -3217,6 +3334,46 @@ interpreter_run (void *cls)
       fail (is);
     }
     break;
+  case OC_PAY_ABORT_REFUND:
+    {
+      struct TALER_Amount refund_fee;
+      const struct TALER_MERCHANT_RefundEntry *re;
+
+      /* Get original /pay command */
+      GNUNET_assert (NULL != (ref = find_command
+                              (is,
+                               cmd->details.pay_abort_refund.abort_ref)));
+      GNUNET_assert (OC_PAY_ABORT == ref->oc);
+      GNUNET_assert (ref->details.pay_abort.num_refunds >
+		     cmd->details.pay_abort_refund.num_coin);
+      re = &ref->details.pay_abort.res[cmd->details.pay_abort_refund.num_coin];
+		     
+      GNUNET_assert (GNUNET_OK ==
+		     TALER_string_to_amount
+		     (cmd->details.pay_abort_refund.refund_amount,
+		      &amount));
+      GNUNET_assert (GNUNET_OK ==
+		     TALER_string_to_amount
+		     (cmd->details.pay_abort_refund.refund_fee,
+		      &refund_fee));
+      cmd->details.pay_abort_refund.rh
+	= TALER_EXCHANGE_refund2 (exchange,
+				  &amount,
+				  &refund_fee,
+				  &ref->details.pay_abort.h_contract,
+				  &re->coin_pub,
+				  re->rtransaction_id,
+				  &ref->details.pay_abort.merchant_pub,
+				  &re->merchant_sig,
+				  &abort_refund_cb,
+				  is);
+      if (NULL == cmd->details.pay_abort_refund.rh)
+      {
+	GNUNET_break (0);
+	fail (is);
+      }
+    }
+    break;
   case OC_RUN_AGGREGATOR:
     {
       const struct GNUNET_DISK_FileHandle *pr;
@@ -3270,9 +3427,10 @@ interpreter_run (void *cls)
     }
   case OC_CHECK_BANK_TRANSFER:
     {
-      GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-        (cmd->details.check_bank_transfer.amount,
-         &amount));
+      GNUNET_assert (GNUNET_OK ==
+		     TALER_string_to_amount
+		     (cmd->details.check_bank_transfer.amount,
+		      &amount));
       if (GNUNET_OK != TALER_FAKEBANK_check
            (fakebank,
             &amount,
@@ -3806,6 +3964,7 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-1",
       .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.refund_fee = "EUR:0.01",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
@@ -3815,6 +3974,7 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-1",
       .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.refund_fee = "EUR:0.01",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
@@ -3847,6 +4007,7 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_FORBIDDEN,
       .details.pay.contract_ref = "create-proposal-2",
       .details.pay.coin_ref = "withdraw-coin-1",
+      .details.pay.refund_fee = "EUR:0.01",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
@@ -3974,6 +4135,7 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-2",
       .details.pay.coin_ref = "withdraw-coin-2",
+      .details.pay.refund_fee = "EUR:0.01",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
@@ -4178,6 +4340,7 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.pay.contract_ref = "create-proposal-tip-1",
       .details.pay.coin_ref = "pickup-tip-1",
+      .details.pay.refund_fee = "EUR:0.01",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
     /* Run transfers. */
@@ -4197,9 +4360,7 @@ run (void *cls)
       .label = "check_bank_empty" },
 
 
-
-
-
+    /* ****************** /pay again logic ************* */
 
     /* Fill reserve with EUR:10.02, as withdraw fee is 1 ct per
        config */
@@ -4213,7 +4374,7 @@ run (void *cls)
       .details.admin_add_incoming.amount = "EUR:10.02" },
     /* Run wirewatch to observe /admin/add/incoming */
     { .oc = OC_RUN_WIREWATCH,
-      .label = "wirewatch-1" },
+      .label = "wirewatch-10" },
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-10",
       .details.check_bank_transfer.amount = "EUR:10.02",
@@ -4269,23 +4430,23 @@ run (void *cls)
 
     /* execute simple payment, re-using one ancient coin */
     { .oc = OC_PAY,
-      .label = "pay-fail-partial-double",
+      .label = "pay-fail-partial-double-10",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
       .details.pay.contract_ref = "create-proposal-10",
       .details.pay.coin_ref = "withdraw-coin-10a;withdraw-coin-1",
       /* These amounts are given per coin! */
+      .details.pay.refund_fee = "EUR:0.01",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
     /* Try to replay payment reusing coin */
     { .oc = OC_PAY_AGAIN,
-      .label = "pay-again",
+      .label = "pay-again-10",
       .expected_response_code = MHD_HTTP_OK,
-      .details.pay_again.pay_ref = "pay-fail-partial-double",
+      .details.pay.refund_fee = "EUR:0.01",
+      .details.pay_again.pay_ref = "pay-fail-partial-double-10",
       .details.pay_again.coin_ref = "withdraw-coin-10a;withdraw-coin-10b" },
-
-
-
+    
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator-10" },
@@ -4304,8 +4465,110 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty-10" },
 
-    
 
+#if FIXED5158
+    /* ****************** /pay abort logic ************* */
+
+    /* Fill reserve with EUR:10.02, as withdraw fee is 1 ct per
+       config */
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-reserve-11",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
+      .details.admin_add_incoming.auth_username = "user62",
+      .details.admin_add_incoming.auth_password = "pass62",
+      .details.admin_add_incoming.amount = "EUR:10.02" },
+    /* Run wirewatch to observe /admin/add/incoming */
+    { .oc = OC_RUN_WIREWATCH,
+      .label = "wirewatch-11" },
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-11",
+      .details.check_bank_transfer.amount = "EUR:10.02",
+      .details.check_bank_transfer.account_debit = 62,
+      .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
+    },
+
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-11a",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference
+        = "create-reserve-11",
+      .details.reserve_withdraw.amount = "EUR:5" },
+
+    /* Withdraw a 5 EUR coin, at fee of 1 ct */
+    { .oc = OC_WITHDRAW_SIGN,
+      .label = "withdraw-coin-11b",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_withdraw.reserve_reference
+        = "create-reserve-11",
+      .details.reserve_withdraw.amount = "EUR:5" },
+
+    /* Check that deposit and withdraw operation are in history,
+       and that the balance is now at zero */
+    { .oc = OC_WITHDRAW_STATUS,
+      .label = "withdraw-status-11",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.reserve_status.reserve_reference
+        = "create-reserve-11",
+      .details.reserve_status.expected_balance = "EUR:0" },
+
+    /* Create proposal */
+    { .oc = OC_PROPOSAL,
+      .label = "create-proposal-11",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.proposal.order = "{\
+        \"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"11\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":10,\
+           \"fraction\":0},\
+    	\"summary\": \"merchant-lib testcase\",\
+        \"products\":\
+          [ {\"description\":\"ice cream\",\
+             \"value\":\"{EUR:10}\"} ] }"},
+
+    /* execute simple payment, re-using one ancient coin */
+    { .oc = OC_PAY,
+      .label = "pay-fail-partial-double-11",
+      .expected_response_code = MHD_HTTP_FORBIDDEN,
+      .details.pay.contract_ref = "create-proposal-11",
+      .details.pay.coin_ref = "withdraw-coin-11a;withdraw-coin-1",
+      /* These amounts are given per coin! */
+      .details.pay.refund_fee = "EUR:0.01",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99" },
+
+    /* Try to replay payment reusing coin */
+    { .oc = OC_PAY_ABORT,
+      .label = "pay-abort-11",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay_abort.pay_ref = "pay-fail-partial-double-11",
+    },
+
+    { .oc = OC_PAY_ABORT_REFUND,
+      .label = "pay-abort-refund-11",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.pay_abort_refund.abort_ref = "pay-abort-11",
+      .details.pay_abort_refund.num_coin = 0,
+      .details.pay_abort_refund.refund_amount = "EUR:5",
+      .details.pay_abort_refund.refund_fee = "EUR:0.01" },
+    
+    /* Run transfers. */
+    { .oc = OC_RUN_AGGREGATOR,
+      .label = "run-aggregator-11" },
+    /* Check that there are no other unusual transfers */
+    { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
+      .label = "check_bank_empty-11" },
+#endif
+    
     /* end of testcase */
     { .oc = OC_END }
   };

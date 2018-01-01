@@ -132,30 +132,27 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
     return GNUNET_SYSERR;
   }
   num_refunds = json_array_size (refunds);
-  if (num_refunds != ph->num_coins)
   {
-    GNUNET_break_op (0);
-    GNUNET_JSON_parse_free (spec);
-    return GNUNET_SYSERR;
-  }
-  {
-    struct TALER_MerchantSignatureP sigs[num_refunds];
-    uint64_t rtids[num_refunds];
+    struct TALER_MERCHANT_RefundEntry res[num_refunds];
 
     for (unsigned int i=0;i<num_refunds;i++)
     {
-      struct TALER_MerchantSignatureP *sig = &sigs[i];
-      json_t *deposit = json_array_get (refunds, i);
-      uint64_t rtransaction_id;
+      struct TALER_MerchantSignatureP *sig = &res[i].merchant_sig;
+      json_t *refund = json_array_get (refunds, i);
       struct GNUNET_JSON_Specification spec_detail[] = {
-        GNUNET_JSON_spec_fixed_auto ("sig", sig),
-	GNUNET_JSON_spec_uint64 ("rtransaction_id", &rtransaction_id),
+        GNUNET_JSON_spec_fixed_auto ("merchant_sig",
+				     sig),
+        GNUNET_JSON_spec_fixed_auto ("coin_pub",
+				     &res[i].coin_pub),
+	GNUNET_JSON_spec_uint64 ("rtransaction_id",
+				 &res[i].rtransaction_id),
         GNUNET_JSON_spec_end()
       };
       struct TALER_RefundRequestPS rr;
+      int found;
 
       if (GNUNET_OK !=
-          GNUNET_JSON_parse (deposit,
+          GNUNET_JSON_parse (refund,
                              spec_detail,
                              NULL, NULL))
       {
@@ -167,13 +164,29 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
       rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
       rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
       rr.h_contract_terms = ph->h_contract_terms;
-      rr.coin_pub = ph->coins[i].coin_pub;
+      rr.coin_pub = res[i].coin_pub;
       rr.merchant = merchant_pub;      
-      rr.rtransaction_id = GNUNET_htonll (rtransaction_id);
-      TALER_amount_hton (&rr.refund_amount,
-			 &ph->coins[i].amount_with_fee);
-      TALER_amount_hton (&rr.refund_fee,
-			 &ph->coins[i].refund_fee);
+      rr.rtransaction_id = GNUNET_htonll (res[i].rtransaction_id);
+      found = -1;
+      for (unsigned int j=0;j<ph->num_coins;j++)
+      {
+	if (0 == memcmp (&ph->coins[j].coin_pub,
+			 &res[i].coin_pub,
+			 sizeof (struct TALER_CoinSpendPublicKeyP)))
+	{
+	  TALER_amount_hton (&rr.refund_amount,
+			     &ph->coins[j].amount_with_fee);
+	  TALER_amount_hton (&rr.refund_fee,
+			     &ph->coins[j].refund_fee);
+	  found = j;
+	}
+      }
+      if (-1 == found)
+      {
+	GNUNET_break_op (0);
+	return GNUNET_SYSERR;
+      }
+
       if (GNUNET_OK !=
 	  GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_REFUND,
 				      &rr.purpose,
@@ -183,7 +196,6 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
 	GNUNET_break_op (0);
 	return GNUNET_SYSERR;
       }
-      rtids[i] = rtransaction_id;     
     }
     ph->abort_cb (ph->abort_cb_cls,
 		  MHD_HTTP_OK,
@@ -191,8 +203,7 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
 		  &merchant_pub,
 		  &ph->h_contract_terms,
 		  num_refunds,
-		  sigs,
-		  rtids,
+		  res,
 		  json);
     ph->abort_cb = NULL;
   }
@@ -420,7 +431,6 @@ handle_pay_finished (void *cls,
 		  NULL,
 		  NULL,
 		  0,
-		  NULL,
 		  NULL,
 		  json);
   }
@@ -688,15 +698,6 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
                        TALER_amount2s (&fee));
     }
 
-    fprintf (stderr,
-	     "Signing DP %s/%s/%s/%llu/%llu/%s with coin %s\n",
-	     GNUNET_h2s (&dr.h_contract_terms),
-	     GNUNET_h2s2 (&dr.h_wire),
-	     TALER_amount2s (&coin->amount_without_fee),
-	     (unsigned long long) timestamp.abs_value_us,
-	     (unsigned long long) refund_deadline.abs_value_us,	     
-	     TALER_B2S (&dr),
-	     GNUNET_i2s ((const struct GNUNET_PeerIdentity *)&dr.coin_pub));
     GNUNET_CRYPTO_eddsa_sign (&coin->coin_priv.eddsa_priv,
 			      &dr.purpose,
 			      &p->coin_sig.eddsa_signature);
@@ -706,6 +707,7 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
     p->coin_pub = dr.coin_pub;
     p->amount_with_fee = coin->amount_with_fee;
     p->amount_without_fee = coin->amount_without_fee;
+    p->refund_fee = coin->refund_fee;
     p->exchange_url = coin->exchange_url;
   }
   return request_pay_generic (ctx,
