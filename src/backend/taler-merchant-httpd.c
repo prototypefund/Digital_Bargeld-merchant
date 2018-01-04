@@ -45,6 +45,7 @@
 #include "taler-merchant-httpd_tip-query.h"
 #include "taler-merchant-httpd_history.h"
 #include "taler-merchant-httpd_refund.h"
+#include "taler-merchant-httpd_check-payment.h"
 
 /**
  * Backlog for listen operation on unix-domain sockets.
@@ -252,6 +253,9 @@ url_handler (void *cls,
       { "/tip-query", MHD_HTTP_METHOD_GET, "text/plain",
         NULL, 0,
         &MH_handler_tip_query, MHD_HTTP_OK},
+      { "/check-payment", MHD_HTTP_METHOD_GET, "text/plain",
+        NULL, 0,
+        &MH_handler_check_payment, MHD_HTTP_OK},
       {NULL, NULL, NULL, NULL, 0, 0 }
     };
   static struct TMH_RequestHandler h404 =
