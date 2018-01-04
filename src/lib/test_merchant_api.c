@@ -18,9 +18,6 @@
  * @brief testcase to test merchant's HTTP API interface
  * @author Christian Grothoff
  * @author Marcello Stanisci
- *
- * TODO:
- * - add test logic for pay-abort-refund
  */
 #include "platform.h"
 #include <taler/taler_exchange_service.h>
@@ -4466,7 +4463,6 @@ run (void *cls)
       .label = "check_bank_empty-10" },
 
 
-#if FIXED5158
     /* ****************** /pay abort logic ************* */
 
     /* Fill reserve with EUR:10.02, as withdraw fee is 1 ct per
@@ -4567,7 +4563,6 @@ run (void *cls)
     /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty-11" },
-#endif
     
     /* end of testcase */
     { .oc = OC_END }
