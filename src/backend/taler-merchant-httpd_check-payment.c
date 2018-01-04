@@ -297,7 +297,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
 do_pay:
   {
-    char *url = make_absolute_backend_url (connection, "show-contract", "contract_url", contract_url, "session_id", session_id, NULL);
+    char *url = make_absolute_backend_url (connection, "trigger-pay", "contract_url", contract_url, "session_id", session_id, NULL);
     int ret = TMH_RESPONSE_reply_json_pack (connection,
                                             MHD_HTTP_OK,
                                             "{s:s}",
