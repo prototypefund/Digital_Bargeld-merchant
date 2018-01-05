@@ -1162,6 +1162,54 @@ add_incoming_cb (void *cls,
   next_command (is);
 }
 
+/**
+ * Parse given JSON object to absolute time.
+ *
+ * @param root the json object representing data
+ * @param[out] ret where to write the data
+ * @return #GNUNET_OK upon successful parsing; #GNUNET_SYSERR upon error
+ */
+static int
+parse_abs_time (json_t *root,
+                struct GNUNET_TIME_Absolute *ret)
+{
+  const char *val;
+  unsigned long long int tval;
+
+  val = json_string_value (root);
+  if (NULL == val)
+  {
+    GNUNET_break_op (0);
+    return GNUNET_SYSERR;
+  }
+  if ( (0 == strcasecmp (val,
+                         "/forever/")) ||
+       (0 == strcasecmp (val,
+                         "/end of time/")) ||
+       (0 == strcasecmp (val,
+                         "/never/")) )
+  {
+    *ret = GNUNET_TIME_UNIT_FOREVER_ABS;
+    return GNUNET_OK;
+  }
+  if (1 != sscanf (val,
+                   "/Date(%llu)/",
+                   &tval))
+  {
+    GNUNET_break_op (0);
+    return GNUNET_SYSERR;
+  }
+  /* Time is in seconds in JSON, but in microseconds in GNUNET_TIME_Absolute */
+  ret->abs_value_us = tval * 1000LL * 1000LL;
+  if ( (ret->abs_value_us) / 1000LL / 1000LL != tval)
+  {
+    /* Integer overflow */
+    GNUNET_break_op (0);
+    return GNUNET_SYSERR;
+  }
+  return GNUNET_OK;
+}
+
 
 /**
  * Callback for a /history request. It's up to this function how
@@ -1182,6 +1230,8 @@ history_cb (void *cls,
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
   unsigned int nresult;
+  struct GNUNET_TIME_Absolute last_timestamp;
+  struct GNUNET_TIME_Absolute entry_timestamp;
 
   cmd->details.history.ho = NULL;
   if (MHD_HTTP_OK != http_status)
@@ -1199,6 +1249,32 @@ history_cb (void *cls,
     fail (is);
     return;
   }
+
+  last_timestamp = GNUNET_TIME_absolute_get ();
+  last_timestamp = GNUNET_TIME_absolute_add (last_timestamp,
+                                             GNUNET_TIME_UNIT_DAYS);
+  json_t *entry;
+  json_t *timestamp;
+  size_t index;
+  json_array_foreach (json, index, entry)
+  {
+    timestamp = json_object_get (entry, "timestamp");
+    if (GNUNET_OK != parse_abs_time (timestamp, &entry_timestamp))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "Bad timestamp given\n");
+        fail (is);
+        return;
+      }
+    entry_timestamp = GNUNET_TIME_absolute_max (last_timestamp, entry_timestamp);
+    if (last_timestamp.abs_value_us != entry_timestamp.abs_value_us)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "History entries are NOT sorted from younger to older\n");
+      fail (is);
+      return;
+    }
+  }
+
   next_command (is);
 }
 

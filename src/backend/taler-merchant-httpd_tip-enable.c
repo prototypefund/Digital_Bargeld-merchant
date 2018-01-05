@@ -76,10 +76,10 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
  */
 int
 MH_handler_tip_enable (struct TMH_RequestHandler *rh,
-                          struct MHD_Connection *connection,
-                          void **connection_cls,
-                          const char *upload_data,
-                          size_t *upload_data_size)
+                       struct MHD_Connection *connection,
+                       void **connection_cls,
+                       const char *upload_data,
+                       size_t *upload_data_size)
 {
   enum GNUNET_DB_QueryStatus qs;
   int res;
