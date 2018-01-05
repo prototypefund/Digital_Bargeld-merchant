@@ -51,5 +51,44 @@ MH_handler_trigger_pay (struct TMH_RequestHandler *rh,
                         const char *upload_data,
                         size_t *upload_data_size)
 {
-  return 0;
+  struct MHD_Response *response;
+
+  const char *contract_url;
+  const char *h_contract_terms_str;
+  const char *confirm_url;
+  const char *session_id;
+
+  session_id = MHD_lookup_connection_value (connection,
+                                            MHD_GET_ARGUMENT_KIND,
+                                            "session_id");
+
+  confirm_url = MHD_lookup_connection_value (connection,
+                                             MHD_GET_ARGUMENT_KIND,
+                                             "confirm_url");
+
+  contract_url = MHD_lookup_connection_value (connection,
+                                              MHD_GET_ARGUMENT_KIND,
+                                              "contract_url");
+
+  h_contract_terms_str = MHD_lookup_connection_value (connection,
+                                                      MHD_GET_ARGUMENT_KIND,
+                                                      "h_contract_terms");
+
+
+  // FIXME: Taler wallet detection!
+  char *data = "<html><body><p>Processing payment ...</p></body></html>";
+
+  response = MHD_create_response_from_buffer (strlen (data), data, MHD_RESPMEM_PERSISTENT);
+  if (NULL != session_id)
+    MHD_add_response_header (response, "X-Taler-Session-Id", session_id);
+  if (NULL != contract_url)
+    MHD_add_response_header (response, "X-Taler-Contract-Url", contract_url);
+  if (NULL != h_contract_terms_str)
+    MHD_add_response_header (response, "X-Taler-Contract-Hash", h_contract_terms_str);
+  if (NULL != confirm_url)
+    MHD_add_response_header (response, "X-Taler-Confirm-Url", confirm_url);
+  MHD_queue_response (connection, 402, response);
+  MHD_destroy_response (response);
+
+  return MHD_YES;
 }

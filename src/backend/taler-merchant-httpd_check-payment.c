@@ -146,6 +146,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   const char *session_id;
   const char *session_sig_str;
   const char *instance_str;
+  const char *confirm_url;
 
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -153,6 +154,9 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   contract_url = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,
                                               "contract_url");
+  confirm_url = MHD_lookup_connection_value (connection,
+                                             MHD_GET_ARGUMENT_KIND,
+                                             "confirm_url");
   session_id = MHD_lookup_connection_value (connection,
                                                 MHD_GET_ARGUMENT_KIND,
                                                 "session_id");
@@ -165,6 +169,9 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   if (NULL == instance_str)
     instance_str = "default";
+
+  // Will only be set if we actually have a contract!
+  char *h_contract_terms_str = NULL;
 
   struct MerchantInstance *mi = TMH_lookup_instance (instance_str);
   if (NULL == mi)
@@ -259,6 +266,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                               "Failed to hash proposal");
   }
 
+  h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
+                                                              sizeof (struct GNUNET_HashCode));
+
+
   /* Check if transaction is already known, if not store it. */
   {
     struct GNUNET_HashCode h_xwire;
@@ -277,6 +288,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     {
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+      GNUNET_free_non_null (h_contract_terms_str);
       return TMH_RESPONSE_reply_internal_error (connection,
                                          TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
                                          "Merchant database error");
@@ -289,6 +301,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs);
   }
 
+  GNUNET_free_non_null (h_contract_terms_str);
+
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_OK,
                                        "{s:b}",
@@ -297,12 +311,18 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
 do_pay:
   {
-    char *url = make_absolute_backend_url (connection, "trigger-pay", "contract_url", contract_url, "session_id", session_id, NULL);
+    char *url = make_absolute_backend_url (connection, "trigger-pay",
+                                           "contract_url", contract_url,
+                                           "session_id", session_id,
+                                           "h_contract_terms", h_contract_terms_str,
+                                           "confirm_url", confirm_url,
+                                           NULL);
     int ret = TMH_RESPONSE_reply_json_pack (connection,
                                             MHD_HTTP_OK,
                                             "{s:s}",
                                             "payment_redirect_url",
                                             url);
+    GNUNET_free_non_null (h_contract_terms_str);
     GNUNET_free (url);
     return ret;
   }
