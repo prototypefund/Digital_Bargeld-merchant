@@ -76,6 +76,8 @@ make_absolute_backend_url (struct MHD_Connection *connection, char *path, ...)
   const char *host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
   const char *forwarded_host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "X-Forwarded-Host");
 
+  const char *forwarded_prefix = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "X-Forwarded-Prefix");
+
   if (NULL != forwarded_host)
     host = forwarded_host;
 
@@ -90,6 +92,8 @@ make_absolute_backend_url (struct MHD_Connection *connection, char *path, ...)
   STR_CAT_GROW (res, "://", n);
   STR_CAT_GROW (res, host, n);
   STR_CAT_GROW (res, "/", n);
+  if (NULL != forwarded_prefix)
+    STR_CAT_GROW (res, forwarded_prefix, n);
   STR_CAT_GROW (res, path, n);
 
   va_list args;
