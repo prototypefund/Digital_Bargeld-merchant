@@ -55,21 +55,14 @@ MH_handler_trigger_pay (struct TMH_RequestHandler *rh,
 
   const char *contract_url;
   const char *h_contract_terms_str;
-  const char *confirm_url;
   const char *session_id;
 
   session_id = MHD_lookup_connection_value (connection,
                                             MHD_GET_ARGUMENT_KIND,
                                             "session_id");
-
-  confirm_url = MHD_lookup_connection_value (connection,
-                                             MHD_GET_ARGUMENT_KIND,
-                                             "confirm_url");
-
   contract_url = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,
                                               "contract_url");
-
   h_contract_terms_str = MHD_lookup_connection_value (connection,
                                                       MHD_GET_ARGUMENT_KIND,
                                                       "h_contract_terms");
@@ -85,8 +78,6 @@ MH_handler_trigger_pay (struct TMH_RequestHandler *rh,
     MHD_add_response_header (response, "X-Taler-Contract-Url", contract_url);
   if (NULL != h_contract_terms_str)
     MHD_add_response_header (response, "X-Taler-Contract-Hash", h_contract_terms_str);
-  if (NULL != confirm_url)
-    MHD_add_response_header (response, "X-Taler-Confirm-Url", confirm_url);
   MHD_queue_response (connection, 402, response);
   MHD_destroy_response (response);
 

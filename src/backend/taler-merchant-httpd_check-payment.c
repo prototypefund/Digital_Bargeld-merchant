@@ -150,7 +150,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   const char *session_id;
   const char *session_sig_str;
   const char *instance_str;
-  const char *confirm_url;
 
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -158,9 +157,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   contract_url = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,
                                               "contract_url");
-  confirm_url = MHD_lookup_connection_value (connection,
-                                             MHD_GET_ARGUMENT_KIND,
-                                             "confirm_url");
   session_id = MHD_lookup_connection_value (connection,
                                                 MHD_GET_ARGUMENT_KIND,
                                                 "session_id");
@@ -319,7 +315,6 @@ do_pay:
                                            "contract_url", contract_url,
                                            "session_id", session_id,
                                            "h_contract_terms", h_contract_terms_str,
-                                           "confirm_url", confirm_url,
                                            NULL);
     int ret = TMH_RESPONSE_reply_json_pack (connection,
                                             MHD_HTTP_OK,
