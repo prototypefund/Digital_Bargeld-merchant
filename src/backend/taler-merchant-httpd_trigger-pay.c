@@ -14,8 +14,8 @@
   TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_check-payment.c
- * @brief implementation of /check-payment handler
+ * @file backend/taler-merchant-httpd_trigger-pay.c
+ * @brief implementation of /trigger-pay handler
  * @author Florian Dold
  */
 #include "platform.h"
@@ -30,6 +30,29 @@
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_trigger-pay.h"
+
+
+/**
+ * Add a header to the response from a query parameter.
+ *
+ *
+ * @param connection connection to take query parameters from
+ * @param arg_name name of query parameter
+ * @param response response that receives the header
+ * @param header_name name of the header to set
+ */
+void
+add_header_from_arg (struct MHD_Connection *connection, const char *arg_name,
+                     struct MHD_Response *response, const char *header_name)
+{
+  const char *arg = MHD_lookup_connection_value (connection,
+                                                 MHD_GET_ARGUMENT_KIND,
+                                                 arg_name);
+  if (NULL == arg)
+    return;
+
+  MHD_add_response_header (response, header_name, arg);
+}
 
 
 /**
@@ -53,31 +76,18 @@ MH_handler_trigger_pay (struct TMH_RequestHandler *rh,
 {
   struct MHD_Response *response;
 
-  const char *contract_url;
-  const char *h_contract_terms_str;
-  const char *session_id;
-
-  session_id = MHD_lookup_connection_value (connection,
-                                            MHD_GET_ARGUMENT_KIND,
-                                            "session_id");
-  contract_url = MHD_lookup_connection_value (connection,
-                                              MHD_GET_ARGUMENT_KIND,
-                                              "contract_url");
-  h_contract_terms_str = MHD_lookup_connection_value (connection,
-                                                      MHD_GET_ARGUMENT_KIND,
-                                                      "h_contract_terms");
-
 
   // FIXME: Taler wallet detection!
   char *data = "<html><body><p>Processing payment ...</p></body></html>";
 
   response = MHD_create_response_from_buffer (strlen (data), data, MHD_RESPMEM_PERSISTENT);
-  if (NULL != session_id)
-    MHD_add_response_header (response, "X-Taler-Session-Id", session_id);
-  if (NULL != contract_url)
-    MHD_add_response_header (response, "X-Taler-Contract-Url", contract_url);
-  if (NULL != h_contract_terms_str)
-    MHD_add_response_header (response, "X-Taler-Contract-Hash", h_contract_terms_str);
+
+  add_header_from_arg (connection, "session_id", response, "X-Taler-Session-Id");
+  add_header_from_arg (connection, "contract_url", response, "X-Taler-Contract-Url");
+  add_header_from_arg (connection, "h_contract_terms", response, "X-Taler-Contract-Hash");
+  add_header_from_arg (connection, "tip_token", response, "X-Taler-Tip");
+  add_header_from_arg (connection, "refund_url", response, "X-Taler-Refund-Url");
+
   MHD_queue_response (connection, 402, response);
   MHD_destroy_response (response);
 

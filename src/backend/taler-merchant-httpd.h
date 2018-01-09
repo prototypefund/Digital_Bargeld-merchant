@@ -329,4 +329,16 @@ struct MerchantInstance *
 TMH_lookup_instance_json (struct json_t *json);
 
 
+/**
+ * Make an absolute URL to the backend.
+ *
+ * @param connection MHD connection to take header values from
+ * @param path path of the url
+ * @param ... NULL-terminated key-value pairs (char *) for query parameters
+ * @returns the URL, must be freed with #GNUNET_free
+ */
+char *
+TMH_make_absolute_backend_url (struct MHD_Connection *connection, char *path, ...);
+
+
 #endif

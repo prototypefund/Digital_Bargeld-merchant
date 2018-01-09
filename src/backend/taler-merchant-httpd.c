@@ -1264,3 +1264,98 @@ main (int argc,
     return 3;
   return (GNUNET_OK == result) ? 0 : 1;
 }
+
+
+/**
+ * Concatenate two strings and grow the first buffer (of size n)
+ * if necessary.
+ */
+#define STR_CAT_GROW(s, p, n) do { \
+    for (; strlen (s) + strlen (p) >= n; (n) = (n) * 2); \
+    (s) = GNUNET_realloc ((s), (n)); \
+    GNUNET_assert (NULL != (s)); \
+    strncat (s, p, n); \
+  } while (0)
+
+
+/**
+ * Make an absolute URL to the backend.
+ *
+ * @param connection MHD connection to take header values from
+ * @param path path of the url
+ * @param ... NULL-terminated key-value pairs (char *) for query parameters
+ * @returns the URL, must be freed with #GNUNET_free
+ */
+char *
+TMH_make_absolute_backend_url (struct MHD_Connection *connection, char *path, ...)
+{
+  static CURL *curl = NULL;
+  if (NULL == curl)
+  {
+    curl = curl_easy_init();
+    GNUNET_assert (NULL != curl);
+  }
+
+  size_t n = 256;
+  char *res = GNUNET_malloc (n);
+
+  GNUNET_assert (NULL != res);
+
+  // By default we assume we're running under HTTP
+  const char *proto = "http";
+  const char *forwarded_proto = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "X-Forwarded-Proto");
+
+  if (NULL != forwarded_proto)
+    proto = forwarded_proto;
+
+  const char *host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
+  const char *forwarded_host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "X-Forwarded-Host");
+
+  const char *forwarded_prefix = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "X-Forwarded-Prefix");
+
+  if (NULL != forwarded_host)
+    host = forwarded_host;
+
+  if (NULL == host)
+  {
+    // Should never happen, at last the host header should be defined
+    GNUNET_break (0);
+    return NULL;
+  }
+
+  STR_CAT_GROW (res, proto, n);
+  STR_CAT_GROW (res, "://", n);
+  STR_CAT_GROW (res, host, n);
+  STR_CAT_GROW (res, "/", n);
+  if (NULL != forwarded_prefix)
+    STR_CAT_GROW (res, forwarded_prefix, n);
+  STR_CAT_GROW (res, path, n);
+
+  va_list args;
+  va_start (args, path);
+
+  unsigned int iparam = 0;
+
+  while (1) {
+    char *key = va_arg (args, char *);
+    if (NULL == key)
+      break;
+    char *value = va_arg (args, char *);
+    if (NULL == value)
+      continue;
+    if (0 == iparam)
+      STR_CAT_GROW (res, "?", n);
+    else
+      STR_CAT_GROW (res, "&", n);
+    iparam++;
+    char *urlencoded_value = curl_easy_escape (curl, value, strlen (value));
+    STR_CAT_GROW (res, key, n);
+    STR_CAT_GROW (res, "=", n);
+    STR_CAT_GROW (res, urlencoded_value, n);
+    curl_free (urlencoded_value);
+  }
+
+  va_end (args);
+
+  return res;
+}
