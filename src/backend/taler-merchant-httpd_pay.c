@@ -210,11 +210,6 @@ struct PayContext
   void *json_parse_context;
 
   /**
-   * Transaction ID given in @e root.
-   */
-  const char *order_id;
-
-  /**
    * Hashed proposal.
    */
   struct GNUNET_HashCode h_contract_terms;
@@ -354,6 +349,17 @@ struct PayContext
    * Which operational mode is the /pay request made in?
    */
   enum { PC_MODE_PAY, PC_MODE_ABORT_REFUND } mode;
+
+  /**
+   * Optional session id given in @e root.
+   * NULL if not given.
+   */
+  const char *session_id;
+
+  /**
+   * Transaction ID given in @e root.
+   */
+  const char *order_id;
 };
 
 
@@ -457,6 +463,7 @@ sign_success_response (struct PayContext *pc)
   struct GNUNET_CRYPTO_EddsaSignature sig;
   struct PaymentResponsePS mr;
 
+
   refunds = TM_get_refund_json (pc->mi,
 				&pc->h_contract_terms,
 				&ec,
@@ -474,16 +481,37 @@ sign_success_response (struct PayContext *pc)
                             &mr.purpose,
 			    &sig);
 
-  return TMH_RESPONSE_make_json_pack ("{s:O, s:o, s:o, s:o}",
-                                      "contract_terms",
-                                      pc->contract_terms,
-                                      "sig",
-                                      GNUNET_JSON_from_data_auto (&sig),
-                                      "h_contract_terms",
-                                      GNUNET_JSON_from_data (&pc->h_contract_terms,
-                                                             sizeof (struct GNUNET_HashCode)),
-                                      "refund_permissions",
-                                      refunds);
+  json_t *resp = json_pack ("{s:O, s:o, s:o, s:o}",
+                           "contract_terms",
+                           pc->contract_terms,
+                           "sig",
+                           GNUNET_JSON_from_data_auto (&sig),
+                           "h_contract_terms",
+                           GNUNET_JSON_from_data (&pc->h_contract_terms,
+                                                  sizeof (struct GNUNET_HashCode)),
+                           "refund_permissions",
+                           refunds);
+
+
+  if (NULL != pc->session_id) {
+    struct GNUNET_CRYPTO_EddsaSignature session_sig;
+    struct TALER_MerchantPaySessionSigPS mps;
+
+    GNUNET_assert (NULL != pc->order_id);
+
+    mps.purpose.size = htonl (sizeof (struct TALER_MerchantPaySessionSigPS));
+    mps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAY_SESSION);
+    GNUNET_CRYPTO_hash (pc->order_id, strlen (pc->order_id), &mps.h_order_id);
+    GNUNET_CRYPTO_hash (pc->session_id, strlen (pc->session_id), &mps.h_session_id);
+
+    GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
+                              &mps.purpose,
+                              &session_sig);
+
+    json_object_set (resp, "session_sig", GNUNET_JSON_from_data_auto (&session_sig));
+  }
+
+  return TMH_RESPONSE_make_json (resp);
 }
 
 
@@ -1272,6 +1300,10 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_break (0);
     return res;
   }
+
+  pc->session_id = json_string_value (json_object_get (root, "session_id"));
+  pc->order_id = order_id;
+
   qs = db->find_contract_terms (db->cls,
                                 &pc->contract_terms,
                                 order_id,

@@ -218,10 +218,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 do_pay:
   {
     char *url = TMH_make_absolute_backend_url (connection, "trigger-pay",
-                                           "contract_url", contract_url,
-                                           "session_id", session_id,
-                                           "h_contract_terms", h_contract_terms_str,
-                                           NULL);
+                                               "contract_url", contract_url,
+                                               "session_id", session_id,
+                                               "h_contract_terms", h_contract_terms_str,
+                                               NULL);
     int ret = TMH_RESPONSE_reply_json_pack (connection,
                                             MHD_HTTP_OK,
                                             "{s:s}",
