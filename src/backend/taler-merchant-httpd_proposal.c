@@ -357,11 +357,11 @@ proposal_put (struct MHD_Connection *connection,
 
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
-    qs = db->insert_contract_terms (db->cls,
-				    order_id,
-				    &mi->pubkey,
-				    timestamp,
-				    order);
+    qs = db->insert_order (db->cls,
+                           order_id,
+                           &mi->pubkey,
+                           timestamp,
+                           order);
     if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
       break;
   }
@@ -377,12 +377,9 @@ proposal_put (struct MHD_Connection *connection,
                                               "db error: could not store this proposal's data into db");
   }
 
-  res = TMH_RESPONSE_reply_json_pack (connection,
-                                      MHD_HTTP_OK,
-                                      "{s:O, s:o s:o}",
-                                      "data", order,
-                                      "sig", GNUNET_JSON_from_data_auto (&merchant_sig),
-                                      "hash", GNUNET_JSON_from_data_auto (&pdps.hash));
+  res = TMH_RESPONSE_reply_json (connection,
+                                 json_object (),
+                                 MHD_HTTP_OK);
   GNUNET_JSON_parse_free (spec);
   return res;
 }
@@ -458,6 +455,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
  * proposal's data related to the transaction id given as the URL's
  * parameter.
  *
+ * Binds the proposal to a nonce.
+ *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
  * @param[in,out] connection_cls the connection's closure (can be updated)
@@ -474,6 +473,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 {
   const char *order_id;
   const char *instance;
+  const char *nonce;
   int res;
   enum GNUNET_DB_QueryStatus qs;
   json_t *contract_terms;
@@ -500,6 +500,14 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 					   TALER_EC_PARAMETER_MISSING,
                                            "order_id");
 
+  nonce = MHD_lookup_connection_value (connection,
+                                       MHD_GET_ARGUMENT_KIND,
+                                       "nonce");
+  if (NULL == nonce)
+    return TMH_RESPONSE_reply_arg_missing (connection,
+					   TALER_EC_PARAMETER_MISSING,
+                                           "nonce");
+
   qs = db->find_contract_terms (db->cls,
 				&contract_terms,
 				order_id,
@@ -516,9 +524,77 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                               "An error occurred while retrieving proposal data from db");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
-                                         "unknown transaction id");
+  {
+    qs = db->find_orders (db->cls,
+                          &contract_terms,
+                          order_id,
+                          &mi->pubkey);
+    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+    {
+      return TMH_RESPONSE_reply_not_found (connection,
+                                           TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
+                                           "unknown order id");
+    }
+    GNUNET_assert (NULL != contract_terms);
+    // FIXME:  now we can delete (merchant_pub, order_id) from the merchant_orders table
+    json_object_set_new (contract_terms, "nonce", json_string (nonce));
+
+    struct GNUNET_TIME_Absolute timestamp;
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
+      GNUNET_JSON_spec_end ()
+    };
+    /* extract fields we need to sign separately */
+    res = TMH_PARSE_json_data (connection, contract_terms, spec);
+    if (GNUNET_NO == res)
+    {
+      return MHD_YES;
+    }
+    if (GNUNET_SYSERR == res)
+    {
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
+                                                "Impossible to parse the order");
+    }
+
+    for (unsigned int i=0;i<MAX_RETRIES;i++)
+    {
+      qs = db->insert_contract_terms (db->cls,
+                                      order_id,
+                                      &mi->pubkey,
+                                      timestamp,
+                                      contract_terms);
+      if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+        break;
+    }
+    if (0 > qs)
+    {
+      /* Special report if retries insufficient */
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_PROPOSAL_STORE_DB_ERROR,
+                                                "db error: could not store this proposal's data into db");
+    }
+  }
+
+  const char *stored_nonce = json_string_value (json_object_get(contract_terms, "nonce"));
+
+  if (NULL == stored_nonce)
+  {
+    GNUNET_break (0);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
+                                              "existing proposal has non nonce");
+  }
+
+  if (0 != strcmp (stored_nonce, nonce))
+  {
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
+                                           "mismatched nonce");
+  }
 
   res = TMH_RESPONSE_reply_json (connection,
                                  contract_terms,

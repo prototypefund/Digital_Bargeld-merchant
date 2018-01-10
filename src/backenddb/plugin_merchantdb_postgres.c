@@ -95,6 +95,16 @@ postgres_initialize (void *cls)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_ExecuteStatement es[] = {
+    /* Orders created by the frontend, not signed or given a nonce yet.
+       The contract terms will change (nonce will be added) when moved to the
+       contract terms table */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_orders ("
+                            "order_id VARCHAR NOT NULL"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+                            ",contract_terms BYTEA NOT NULL"
+                            ",timestamp INT8 NOT NULL"
+                            ",PRIMARY KEY (order_id, merchant_pub)"
+                            ");"),
     /* Offers we made to customers */
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_contract_terms ("
                             "order_id VARCHAR NOT NULL"
@@ -313,6 +323,15 @@ postgres_initialize (void *cls)
                             " VALUES "
                             "($1, $2, $3, $4, $5)",
                             5),
+    GNUNET_PQ_make_prepare ("insert_order",
+                            "INSERT INTO merchant_orders"
+                            "(order_id"
+                            ",merchant_pub"
+                            ",timestamp"
+                            ",contract_terms"
+                            " VALUES "
+                            "($1, $2, $3, $4)",
+                            4),
     GNUNET_PQ_make_prepare ("mark_proposal_paid",
                             "UPDATE merchant_contract_terms SET"
                             " paid=TRUE WHERE h_contract_terms=$1"
@@ -384,6 +403,14 @@ postgres_initialize (void *cls)
                             "SELECT"
                             " contract_terms"
                             " FROM merchant_contract_terms"
+                            " WHERE"
+                            " order_id=$1"
+                            " AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_orders",
+                            "SELECT"
+                            " contract_terms"
+                            " FROM merchant_orders"
                             " WHERE"
                             " order_id=$1"
                             " AND merchant_pub=$2",
@@ -834,6 +861,47 @@ postgres_find_contract_terms (void *cls,
 
 
 /**
+ * Retrieve order given its order id and the instance's merchant public key.
+ *
+ * @param cls closure
+ * @param[out] contract_terms where to store the retrieved contract terms
+ * @param order id order id used to perform the lookup
+ * @param merchant_pub merchant public key that identifies the instance
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_find_orders (void *cls,
+                      json_t **contract_terms,
+                      const char *order_id,
+                      const struct TALER_MerchantPublicKeyP *merchant_pub)
+{
+  struct PostgresClosure *pg = cls;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (order_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_json ("contract_terms",
+                               contract_terms),
+    GNUNET_PQ_result_spec_end
+  };
+
+  *contract_terms = NULL;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Finding contract term, order_id: '%s', merchant_pub: '%s'.\n",
+              order_id,
+              TALER_B2S (merchant_pub));
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						   "find_orders",
+						   params,
+						   rs);
+}
+
+
+/**
  * Insert proposal data and its hashcode into db
  *
  * @param cls closure
@@ -876,6 +944,43 @@ postgres_insert_contract_terms (void *cls,
   check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
 					     "insert_contract_terms",
+					     params);
+}
+
+
+/**
+ * Insert order into the DB.
+ *
+ * @param cls closure
+ * @param order_id identificator of the proposal being stored
+ * @param merchant_pub merchant's public key
+ * @param timestamp timestamp of this proposal data
+ * @param contract_terms proposal data to store
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_insert_order (void *cls,
+                       const char *order_id,
+                       const struct TALER_MerchantPublicKeyP *merchant_pub,
+                       struct GNUNET_TIME_Absolute timestamp,
+                       const json_t *contract_terms)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (order_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_absolute_time (&timestamp),
+    TALER_PQ_query_param_json (contract_terms),
+    GNUNET_PQ_query_param_end
+  };
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "inserting order: order_id: %s, merchant_pub: %s.\n",
+              order_id,
+              TALER_B2S (merchant_pub));
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+					     "insert_order",
 					     params);
 }
 
@@ -3250,6 +3355,8 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
   plugin->insert_contract_terms = &postgres_insert_contract_terms;
+  plugin->insert_order = &postgres_insert_order;
+  plugin->find_orders = &postgres_find_orders;
   plugin->find_contract_terms = &postgres_find_contract_terms;
   plugin->find_contract_terms_history = &postgres_find_contract_terms_history;
   plugin->find_contract_terms_by_date = &postgres_find_contract_terms_by_date;

@@ -184,6 +184,23 @@ struct TALER_MERCHANTDB_Plugin
   int
   (*initialize) (void *cls);
 
+  /**
+   * Insert order into db.
+   *
+   * @param cls closure
+   * @param order_id alphanumeric string that uniquely identifies the proposal
+   * @param merchant_pub merchant's public key
+   * @param timestamp timestamp of this proposal data
+   * @param contract_terms proposal data to store
+   * @return transaction status
+   */
+  enum GNUNET_DB_QueryStatus
+  (*insert_order) (void *cls,
+                   const char *order_id,
+                   const struct TALER_MerchantPublicKeyP *merchant_pub,
+                   struct GNUNET_TIME_Absolute timestamp,
+                   const json_t *contract_terms);
+
 
   /**
    * Insert proposal data into db; the routine will internally hash and
@@ -237,6 +254,22 @@ struct TALER_MERCHANTDB_Plugin
                          json_t **contract_terms,
                          const char *order_id,
                          const struct TALER_MerchantPublicKeyP *merchant_pub);
+
+  /**
+   * Retrieve order given its order id and the instance's merchant public key.
+   *
+   * @param cls closure
+   * @param[out] contract_terms where to store the retrieved contract terms
+   * @param order id order id used to perform the lookup
+   * @param merchant_pub merchant public key that identifies the instance
+   * @return transaction status
+   */
+  enum GNUNET_DB_QueryStatus
+  (*find_orders) (void *cls,
+                  json_t **contract_terms,
+                  const char *order_id,
+                  const struct TALER_MerchantPublicKeyP *merchant_pub);
+
 
 
   /**
