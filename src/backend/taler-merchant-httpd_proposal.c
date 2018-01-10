@@ -248,6 +248,41 @@ proposal_put (struct MHD_Connection *connection,
                          json_integer ((json_int_t) default_wire_fee_amortization));
   }
 
+  if (NULL == json_object_get (order, "pay_url"))
+  {
+    char *url;
+    url = TMH_make_absolute_backend_url (connection, "pay", NULL);
+    json_object_set_new (order, "pay_url", json_string (url));
+  }
+
+  if (NULL == json_object_get (order, "products"))
+  {
+    // FIXME:  When there is no explicit product,
+    // should we create a singleton product list?
+    json_object_set_new (order, "products", json_object ());
+  }
+
+  const char *instance = json_string_value (json_object_get (order, "instance"));
+  if (NULL != instance)
+  {
+    // The frontend either fully specifieds the "merchant" field, or just gives
+    // the backend the "instance" name and lets it fill out.
+    struct MerchantInstance *mi = TMH_lookup_instance (instance);
+    if (NULL == mi)
+    {
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
+                                                "merchant instance not found");
+    }
+    json_t *merchant = json_object ();
+    json_object_set_new (merchant, "instance", json_string (instance));
+    json_object_set_new (merchant, "name", json_string (mi->name));
+    json_object_set_new (merchant, "jurisdiction", json_string ("none"));
+    json_object_set_new (merchant, "address", json_string ("none"));
+    json_object_set_new (order, "merchant", merchant);
+    json_object_del (order, "instance");
+  }
+
   /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection,
                              order,

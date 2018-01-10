@@ -557,6 +557,17 @@ instances_iterator_cb (void *cls,
   mi = GNUNET_new (struct MerchantInstance);
 
   if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (iic->config, section, "NAME", &mi->name))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               section,
+                               "NAME");
+    GNUNET_free (mi);
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_filename (iic->config,
                                                section,
                                                "KEYFILE",

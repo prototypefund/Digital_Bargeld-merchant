@@ -87,6 +87,11 @@ struct MerchantInstance
   char *id;
 
   /**
+   * Legal name of the merchant.
+   */
+  char *name;
+
+  /**
    * File holding the merchant's private key
    */
   char *keyfile;
@@ -130,7 +135,6 @@ struct MerchantInstance
    * Only valid if @e tip_exchange is non-null.
    */
   struct TALER_ReservePrivateKeyP tip_reserve;
-
 };
 
 
