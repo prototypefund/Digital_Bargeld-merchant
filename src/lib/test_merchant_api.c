@@ -175,14 +175,14 @@ enum OpCode
 
   /**
    * Resume pay operation with additional coins.
-   */ 
+   */
   OC_PAY_AGAIN,
-  
+
   /**
    * Abort payment with coins, requesting refund.
    */
   OC_PAY_ABORT,
-  
+
   /**
    * Abort payment with coins, executing refund.
    */
@@ -232,11 +232,6 @@ enum OpCode
    * Test refund lookup
    */
   OC_REFUND_LOOKUP,
-
-  /**
-   * Start a reserve for tipping.
-   */
-  OC_TIP_ENABLE,
 
   /**
    * Authorize a tip.
@@ -562,12 +557,12 @@ struct Command
        */
       const char *amount_without_fee;
 
-      /** 
+      /**
        * Refund fee to use for each coin (only relevant if we
        * exercise /pay's abort functionality).
        */
       const char *refund_fee;
-      
+
       /**
        * Pay handle while operation is running.
        */
@@ -605,7 +600,7 @@ struct Command
        * Pay handle while operation is running.
        */
       struct TALER_MERCHANT_Pay *ph;
-      
+
     } pay_again;
 
     struct {
@@ -620,7 +615,7 @@ struct Command
        */
       struct TALER_MERCHANT_Pay *ph;
 
-      /** 
+      /**
        * Set in #pay_refund_cb to number of refunds obtained.
        */
       unsigned int num_refunds;
@@ -632,12 +627,12 @@ struct Command
 
       /**
        * Set to the hash of the original contract.
-       */ 
-      struct GNUNET_HashCode h_contract;      
+       */
+      struct GNUNET_HashCode h_contract;
 
       /**
        * Set to the merchant's public key.
-       */ 
+       */
       struct TALER_MerchantPublicKeyP merchant_pub;
 
     } pay_abort;
@@ -646,7 +641,7 @@ struct Command
 
       /**
        * Reference to the pay_abort command to be refunded.
-       */ 
+       */
       const char *abort_ref;
 
       /**
@@ -663,7 +658,7 @@ struct Command
        * Refund fee to expect.
        */
       const char *refund_fee;
-      
+
       /**
        * Handle to the refund operation.
        */
@@ -1922,7 +1917,7 @@ pay_again_cb (void *cls,
   }
   GNUNET_assert (NULL != (pref = find_command
 			  (is,
-			   cmd->details.pay_again.pay_ref)));    
+			   cmd->details.pay_again.pay_ref)));
   if (MHD_HTTP_OK == http_status)
   {
     struct PaymentResponsePS mr;
@@ -1934,7 +1929,7 @@ pay_again_cb (void *cls,
 				   &mr.h_contract_terms),
       GNUNET_JSON_spec_end ()
     };
-    
+
     GNUNET_assert (GNUNET_OK ==
         GNUNET_JSON_parse (obj,
                            spec,
@@ -2107,45 +2102,6 @@ track_transaction_cb (void *cls,
   }
   if (MHD_HTTP_OK != http_status)
     fail (is);
-  next_command (is);
-}
-
-
-/**
- * Callback for a /tip-enable request.  Returns the result of
- * the operation.
- *
- * @param cls closure
- * @param http_status HTTP status returned by the merchant backend
- * @param ec taler-specific error code
- */
-static void
-tip_enable_cb (void *cls,
-               unsigned int http_status,
-               enum TALER_ErrorCode ec)
-{
-  struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-
-  cmd->details.tip_enable.teo = NULL;
-  if (cmd->expected_response_code != http_status)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
-                http_status,
-                cmd->label);
-    fail (is);
-    return;
-  }
-  if (cmd->details.tip_enable.expected_ec != ec)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected error code %u to command %s\n",
-                ec,
-                cmd->label);
-    fail (is);
-    return;
-  }
   next_command (is);
 }
 
@@ -2616,13 +2572,6 @@ cleanup_state (struct InterpreterState *is)
         cmd->details.refund_lookup.rlo = NULL;
       }
       break;
-    case OC_TIP_ENABLE:
-      if (NULL != cmd->details.tip_enable.teo)
-      {
-        TALER_MERCHANT_tip_enable_cancel (cmd->details.tip_enable.teo);
-        cmd->details.tip_enable.teo = NULL;
-      }
-      break;
     case OC_TIP_AUTHORIZE:
       if (NULL != cmd->details.tip_authorize.tao)
       {
@@ -2689,7 +2638,7 @@ cleanup_state (struct InterpreterState *is)
  * Parse the @a coins specification and grow the @a pc
  * array with the coins found, updating @a npc.
  *
- * @param[in,out] pc pointer to array of coins found 
+ * @param[in,out] pc pointer to array of coins found
  * @param[in,out] npc length of array at @a pc
  * @param[in] coins string specifying coins to add to @a pc,
  *            clobbered in the process
@@ -2704,8 +2653,8 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
 	     struct InterpreterState *is,
 	     const struct Command *pref)
 {
-  char *token;  
-  
+  char *token;
+
   for (token = strtok (coins, ";");
        NULL != token;
        token = strtok (NULL, ";"))
@@ -2714,7 +2663,7 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
     char *ctok;
     unsigned int ci;
     struct TALER_MERCHANT_PayCoin *icoin;
-    
+
     /* Token syntax is "LABEL[/NUMBER]" */
     ctok = strchr (token, '/');
     ci = 0;
@@ -2755,7 +2704,7 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
     default:
       GNUNET_assert (0);
     }
-    
+
     GNUNET_assert (GNUNET_OK ==
 		   TALER_string_to_amount (pref->details.pay.amount_with_fee,
 					   &icoin->amount_with_fee));
@@ -2798,7 +2747,7 @@ pay_refund_cb (void *cls,
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
-  
+
   cmd->details.pay_abort.ph = NULL;
   if (cmd->expected_response_code != http_status)
   {
@@ -2847,7 +2796,7 @@ abort_refund_cb (void *cls,
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
-  
+
   cmd->details.pay_abort_refund.rh = NULL;
   if (cmd->expected_response_code != http_status)
   {
@@ -3358,7 +3307,7 @@ interpreter_run (void *cls)
       GNUNET_break (0);
       fail (is);
     }
-    break;    
+    break;
   case OC_PAY_ABORT:
     {
       struct TALER_MERCHANT_PayCoin *pc;
@@ -3489,7 +3438,7 @@ interpreter_run (void *cls)
       GNUNET_assert (ref->details.pay_abort.num_refunds >
 		     cmd->details.pay_abort_refund.num_coin);
       re = &ref->details.pay_abort.res[cmd->details.pay_abort_refund.num_coin];
-		     
+
       GNUNET_assert (GNUNET_OK ==
 		     TALER_string_to_amount
 		     (cmd->details.pay_abort_refund.refund_amount,
@@ -3712,83 +3661,6 @@ interpreter_run (void *cls)
                     cmd->details.refund_lookup.order_id,
                     instance,
                     refund_lookup_cb,
-                    is)))
-      {
-        GNUNET_break (0);
-        fail (is);
-      }
-      break;
-    }
-  case OC_TIP_ENABLE:
-    {
-      const struct Command *uuid_ref;
-      struct TALER_ReservePrivateKeyP reserve_priv;
-      struct GNUNET_TIME_Absolute expiration;
-
-      if (NULL != cmd->details.tip_enable.admin_add_incoming_ref)
-      {
-        ref = find_command (is,
-                            cmd->details.tip_enable.admin_add_incoming_ref);
-        GNUNET_assert (NULL != ref);
-        GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
-      }
-      else
-      {
-        ref = NULL;
-      }
-
-      /* Initialize 'credit_uuid' */
-      if (NULL != cmd->details.tip_enable.uuid_ref)
-      {
-        uuid_ref = find_command (is,
-                                 cmd->details.tip_enable.uuid_ref);
-        GNUNET_assert (NULL != uuid_ref);
-        GNUNET_assert (OC_TIP_ENABLE == uuid_ref->oc);
-        cmd->details.tip_enable.credit_uuid
-          = uuid_ref->details.tip_enable.credit_uuid;
-      }
-      else
-      {
-        uuid_ref = NULL;
-        GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
-                                    &cmd->details.tip_enable.credit_uuid,
-                                    sizeof (cmd->details.tip_enable.credit_uuid));
-      }
-
-      /* Initialize 'amount' */
-      if ( (NULL != ref) &&
-           (NULL == cmd->details.tip_enable.amount) )
-      {
-        GNUNET_assert (GNUNET_OK ==
-                       TALER_string_to_amount (ref->details.admin_add_incoming.amount,
-                                               &amount));
-      }
-      else
-      {
-        GNUNET_assert (NULL != cmd->details.tip_enable.amount);
-        GNUNET_assert (GNUNET_OK ==
-                       TALER_string_to_amount (cmd->details.tip_enable.amount,
-                                               &amount));
-      }
-      if (NULL == ref)
-        GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
-                                    &reserve_priv,
-                                    sizeof (reserve_priv));
-      /* Simply picked long enough for the test (we do not test expiration
-         behavior for now), should be short enough so that the reserve
-	 expires before the test is run again, so that we avoid old
-	 state messing up fresh runs. */
-      expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_MINUTES);
-
-      if (NULL == (cmd->details.tip_enable.teo
-                   = TALER_MERCHANT_tip_enable
-                   (ctx,
-                    MERCHANT_URL,
-                    &amount,
-                    expiration,
-                    (ref != NULL) ? &ref->details.admin_add_incoming.reserve_priv : &reserve_priv,
-                    &cmd->details.tip_enable.credit_uuid,
-                    &tip_enable_cb,
                     is)))
       {
         GNUNET_break (0);
@@ -4387,17 +4259,6 @@ run (void *cls)
       .details.check_bank_transfer.account_debit = 62,
       .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
     },
-    { .oc = OC_TIP_ENABLE,
-      .label = "enable-tip-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
-      .details.tip_enable.amount = "EUR:5.01" },
-    /* Test incrementing active reserve balance */
-    { .oc = OC_TIP_ENABLE,
-      .label = "enable-tip-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.tip_enable.admin_add_incoming_ref = "create-reserve-tip-1",
-      .details.tip_enable.amount = "EUR:5.01" },
     /* Authorize two tips */
     { .oc = OC_TIP_AUTHORIZE,
       .label = "authorize-tip-1",
@@ -4411,11 +4272,22 @@ run (void *cls)
       .details.tip_authorize.instance = "tip",
       .details.tip_authorize.justification = "tip 2",
       .details.tip_authorize.amount = "EUR:5.01" },
+    /* Withdraw tip */
+    { .oc = OC_TIP_PICKUP,
+      .label = "pickup-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_pickup.authorize_ref = "authorize-tip-1",
+      .details.tip_pickup.amounts = pickup_amounts_1 },
+    { .oc = OC_TIP_PICKUP,
+      .label = "pickup-tip-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_pickup.authorize_ref = "authorize-tip-2",
+      .details.tip_pickup.amounts = pickup_amounts_1 },
     /* Test authorization failure modes */
     { .oc = OC_TIP_AUTHORIZE,
       .label = "authorize-tip-3-insufficient-funds",
       .expected_response_code = MHD_HTTP_PRECONDITION_FAILED,
-      .details.tip_authorize.instance = "tip",
+      .details.tip_authorize.instance = "dtip",
       .details.tip_authorize.justification = "tip 3",
       .details.tip_authorize.amount = "EUR:5.01",
       .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS },
@@ -4433,24 +4305,6 @@ run (void *cls)
       .details.tip_authorize.justification = "tip 5",
       .details.tip_authorize.amount = "EUR:5.01",
       .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP },
-    { .oc = OC_TIP_AUTHORIZE,
-      .label = "authorize-tip-6-not-enabled-instance",
-      .expected_response_code = MHD_HTTP_NOT_FOUND,
-      .details.tip_authorize.instance = "dtip",
-      .details.tip_authorize.justification = "tip 6",
-      .details.tip_authorize.amount = "EUR:5.01",
-      .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED },
-    /* Withdraw tip */
-    { .oc = OC_TIP_PICKUP,
-      .label = "pickup-tip-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.tip_pickup.authorize_ref = "authorize-tip-1",
-      .details.tip_pickup.amounts = pickup_amounts_1 },
-    { .oc = OC_TIP_PICKUP,
-      .label = "pickup-tip-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.tip_pickup.authorize_ref = "authorize-tip-2",
-      .details.tip_pickup.amounts = pickup_amounts_1 },
     { .oc = OC_TIP_PICKUP,
       .label = "pickup-tip-3-too-much",
       .expected_response_code = MHD_HTTP_SERVICE_UNAVAILABLE,
@@ -4588,7 +4442,7 @@ run (void *cls)
       .details.pay.refund_fee = "EUR:0.01",
       .details.pay_again.pay_ref = "pay-fail-partial-double-10",
       .details.pay_again.coin_ref = "withdraw-coin-10a;withdraw-coin-10b" },
-    
+
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator-10" },
@@ -4701,14 +4555,14 @@ run (void *cls)
       .details.pay_abort_refund.num_coin = 0,
       .details.pay_abort_refund.refund_amount = "EUR:5",
       .details.pay_abort_refund.refund_fee = "EUR:0.01" },
-    
+
     /* Run transfers. */
     { .oc = OC_RUN_AGGREGATOR,
       .label = "run-aggregator-11" },
     /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty-11" },
-    
+
     /* end of testcase */
     { .oc = OC_END }
   };

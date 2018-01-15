@@ -1125,36 +1125,16 @@ Make your wire transfer and (optionally) check at
 ``https://exchange:443/reserve/status/reserve_pub=QPE24X...''
 whether your transfer has arrived at the exchange.
 @c FIXME: we should create a nicer tool to do this check!
-Once the funds have arrived, you can now enable tipping using:
 
-@example
-$ taler-merchant-tip-enable \
-    --amount=AMOUNT \
-    --backend=BACKEND_URI \
-    --credit-uuid=CREDIT_UUID \
-    --instance=INSTANCE \
-    --expiration=EXPIRATION
-@end example
-For ``AMOUNT'', specify the amount you transferred in the usual Taler
-format of ``CURRENCY:VALUE[.FRACTION]'', i.e. ``EUR:50''.  The
-``BACKEND_URI'' should be the URI where your Taler merchant backend is
-running.  For ``CREDIT_UUID'', you need to specify a unique number
-that identifies your wire transfer.  You may have gotten one from your
-bank, or you can just make one up! The important thing is that you
-must never use the same UUID twice, except to repeat a failed command.
-For INSTANCE, specify the backend instance (i.e. ``default'').
-Finally, for EXPIRATION, pick a date two weeks after the wire
-transfer, unless you know that the exchange that is being used has a
-different period for closing reserves.  The format @code{YYYY-MM-DD}
-is accepted.
+Once the funds have arrived, you can start to use the reserve
+for tipping.
 
-Note that an exchange will typically close a reserve after two weeks,
+Note that an exchange will typically close a reserve after four weeks,
 wiring all remaining funds back to the sender's account.  Thus, you
 should plan to wire funds corresponding to a campaign of about two
 weeks to the exchange initially. If your campaign runs longer, you
-should wire further funds to the reserve every week to prevent it from
-expiring.  You need to run the ``taler-merchant-tip-enable'' command
-each time after you wire more funds to the reserve.
+should wire further funds to the reserve every other week to prevent
+it from expiring.
 
 
 @subsection Authorize a tip

@@ -12,7 +12,6 @@ arch.jpg: arch.dot
 AM_MAKEINFOHTMLFLAGS = --no-split --css-ref=docstyle.css --css-ref=brown-paper.css
 
 man_MANS = \
-  taler-merchant-tip-enable.1 \
   taler-merchant-generate-payments.1 \
   taler-merchant-httpd.1
 

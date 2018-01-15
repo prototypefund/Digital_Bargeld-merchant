@@ -506,7 +506,7 @@ test_tipping ()
   char *url;
 
   RND_BLK (&tip_reserve_priv);
-  if (TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED !=
+  if (TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS !=
       plugin->authorize_tip (plugin->cls,
                              "testing tips reserve unknown",
                              &amount,
@@ -912,7 +912,7 @@ run (void *cls)
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->store_transaction (plugin->cls,
                                      &h_contract_terms,
-				     &merchant_pub,                                    
+				     &merchant_pub,
                                      &h_wire,
                                      timestamp,
                                      refund_deadline,
@@ -964,7 +964,7 @@ run (void *cls)
 				   &amount_with_fee));
   }
 
-  
+
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_payments (plugin->cls,
                                  &h_contract_terms,

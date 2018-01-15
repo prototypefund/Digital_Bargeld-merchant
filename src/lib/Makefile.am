@@ -18,7 +18,6 @@ libtalermerchant_la_SOURCES = \
   merchant_api_proposal.c \
   merchant_api_pay.c \
   merchant_api_tip_authorize.c \
-  merchant_api_tip_enable.c \
   merchant_api_tip_pickup.c \
   merchant_api_track_transaction.c \
   merchant_api_track_transfer.c \

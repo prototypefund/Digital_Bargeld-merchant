@@ -2974,7 +2974,7 @@ postgres_authorize_tip (void *cls,
     if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
       goto RETRY;
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
-      return TALER_EC_TIP_AUTHORIZE_RESERVE_NOT_ENABLED;
+      return TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS;
     return TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR;
   }
   if (0 == GNUNET_TIME_absolute_get_remaining (old_expiration).rel_value_us)

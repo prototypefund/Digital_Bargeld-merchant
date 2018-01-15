@@ -311,7 +311,7 @@ struct TALER_MERCHANT_PayCoin
    * Amount this coin is to contribute (without fee).
    */
   struct TALER_Amount amount_without_fee;
-  
+
   /**
    * Fee the exchange charges for refunds of this coin.
    */
@@ -319,7 +319,7 @@ struct TALER_MERCHANT_PayCoin
 
   /**
    * URL of the exchange that issued @e coin_priv.
-   */ 
+   */
   const char *exchange_url;
 
 };
@@ -375,12 +375,12 @@ struct TALER_MERCHANT_RefundEntry
 {
   /**
    * Merchant signature affirming the refund.
-   */ 
+   */
   struct TALER_MerchantSignatureP merchant_sig;
 
   /**
    * Public key of the refunded coin.
-   */ 
+   */
   struct TALER_CoinSpendPublicKeyP coin_pub;
 
   /**
@@ -789,71 +789,6 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
  */
 void
 TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *ho);
-
-
-/* ********************** /tip-enable ************************* */
-
-
-/**
- * Handle for a /tip-enable operation.
- */
-struct TALER_MERCHANT_TipEnableOperation;
-
-
-/**
- * Callback for a /tip-enable request.  Returns the result of
- * the operation.
- *
- * @param cls closure
- * @param http_status HTTP status returned by the merchant backend
- * @param ec taler-specific error code
- */
-typedef void
-(*TALER_MERCHANT_TipEnableCallback) (void *cls,
-                                     unsigned int http_status,
-                                     enum TALER_ErrorCode ec);
-
-
-/**
- * Issue a /tip-enable request to the backend.  Informs the backend
- * that a reserve is now available for tipping.  Note that the
- * respective @a reserve_priv must also be bound to one or more
- * instances (together with the URL of the exchange) via the backend's
- * configuration file before it can be used.  Usually, the process
- * is that one first configures an exchange and a @a reserve_priv for
- * an instance, and then enables (or re-enables) the reserve by
- * performing wire transfers and informs the backend about it using
- * this API.
- *
- * @param ctx execution context
- * @param backend_url base URL of the merchant backend
- * @param amount amount that was credited to the reserve
- * @param expiration when will the reserve expire
- * @param reserve_priv private key of the reserve
- * @param credit_uuid unique ID of the wire transfer
- * @param enable_cb callback which will work the response gotten from the backend
- * @param enable_cb_cls closure to pass to @a enable_cb
- * @return handle for this operation, NULL upon errors
- */
-struct TALER_MERCHANT_TipEnableOperation *
-TALER_MERCHANT_tip_enable (struct GNUNET_CURL_Context *ctx,
-                           const char *backend_url,
-                           const struct TALER_Amount *amount,
-                           struct GNUNET_TIME_Absolute expiration,
-                           const struct TALER_ReservePrivateKeyP *reserve_priv,
-                           const struct GNUNET_HashCode *credit_uuid,
-                           TALER_MERCHANT_TipEnableCallback enable_cb,
-                           void *enable_cb_cls);
-
-
-
-/**
- * Cancel a pending /tip-enable request
- *
- * @param teo handle from the operation to cancel
- */
-void
-TALER_MERCHANT_tip_enable_cancel (struct TALER_MERCHANT_TipEnableOperation *teo);
 
 
 /* ********************** /tip-authorize ********************** */
