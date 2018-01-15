@@ -328,7 +328,7 @@ postgres_initialize (void *cls)
                             "(order_id"
                             ",merchant_pub"
                             ",timestamp"
-                            ",contract_terms"
+                            ",contract_terms)"
                             " VALUES "
                             "($1, $2, $3, $4)",
                             4),
