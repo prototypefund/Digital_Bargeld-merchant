@@ -1,0 +1,50 @@
+.TH TALER\-MERCHANT\-GENERATE\-PAYMENTS 1 "Nov 4, 2017" "GNU Taler"
+
+.SH NAME
+taler\-merchant\-generate\-payments \- Generate Taler\-style fake payments.
+
+.SH SYNOPSIS
+.B taler\-merchant\-httpd
+.RI [ options ]
+.br
+
+.SH DESCRIPTION
+\fBtaler\-merchant\-generate\-payments\fP is a command line tool to populate your merchant database with fake Taler\-style payments.
+
+.SH OPTIONS
+.B
+.IP "\-n TIMES,  \-\-times TIMES"
+Generate TIMES payments.
+
+.B
+.IP "\-b,  \-\-remote\-bank"
+If given, use the bank specified in the configuration.  Without this option, the "fake bank" will be started on port 8888.
+
+.B
+.IP "\-e,  \-\-remote\-exchange"
+Do not fork any exchange, so the payments will be executed against the exchange specified in the configuration.
+
+.B
+.IP "\-m, \-\-remote\-merchant"
+Do not fork any merchant.  All the payments will be executed against the merchant backend specified in the configuration.
+
+.B
+.IP "\-c FILENAME,  \-\-config=FILENAME"
+Use the configuration and other resources for the merchant to operate from FILENAME.
+.B
+.IP "\-h, \-\-help"
+Print short help on options.
+.B
+.IP "\-v, \-\-version"
+Print version information.
+
+.SH SIGNALS
+.B
+.IP SIGTERM
+Sending a SIGTERM to the process will cause it to shutdown cleanly.
+
+.SH BUGS
+Report bugs by using Mantis <https://gnunet.org/bugs/> or by sending electronic mail to <taler@gnu.org>
+
+.SH "SEE ALSO"
+\fBtaler\-merchant\-dbinit\fP(1), \fBtaler\-merchant\-tip\-enable\fP(1), \fBtaler.conf\fP(5)

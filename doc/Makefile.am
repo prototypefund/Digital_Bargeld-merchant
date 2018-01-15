@@ -13,6 +13,7 @@ AM_MAKEINFOHTMLFLAGS = --no-split --css-ref=docstyle.css --css-ref=brown-paper.c
 
 man_MANS = \
   taler-merchant-tip-enable.1 \
+  taler-merchant-generate-payments.1 \
   taler-merchant-httpd.1
 
 info_TEXINFOS = manual.texi
