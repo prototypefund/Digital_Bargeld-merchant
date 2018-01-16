@@ -257,7 +257,7 @@ proposal_put (struct MHD_Connection *connection,
   {
     // FIXME:  When there is no explicit product,
     // should we create a singleton product list?
-    json_object_set_new (order, "products", json_object ());
+    json_object_set_new (order, "products", json_array ());
   }
 
   const char *instance = json_string_value (json_object_get (order, "instance"));
