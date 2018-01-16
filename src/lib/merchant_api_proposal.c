@@ -99,6 +99,16 @@ struct TALER_MERCHANT_ProposalLookupOperation
    */
   struct GNUNET_CURL_Context *ctx;
 
+  /**
+   * Should we send the lookup operation with a nonce?
+   */
+  int has_nonce;
+
+  /**
+   * Nonce, only initialized if has_nonce is GNUNET_YES.
+   */
+  struct GNUNET_CRYPTO_EddsaPublicKey nonce;
+
 };
 
 
@@ -116,29 +126,19 @@ handle_proposal_finished (void *cls,
                           const json_t *json)
 {
   struct TALER_MERCHANT_ProposalOperation *po = cls;
-  json_t *contract_terms;
-  const struct TALER_MerchantSignatureP *sigp;
-  const struct GNUNET_HashCode *hashp;
-  struct TALER_MerchantSignatureP sig;
-  struct GNUNET_HashCode hash;
+  const char *order_id;
+  struct GNUNET_JSON_Specification spec[] = {
+    GNUNET_JSON_spec_string ("order_id", &order_id),
+    GNUNET_JSON_spec_end()
+  };
 
   po->job = NULL;
-  contract_terms = NULL;
-  sigp = NULL;
-  hashp = NULL;
   switch (response_code)
   {
   case 0:
     break;
   case MHD_HTTP_OK:
     {
-      struct GNUNET_JSON_Specification spec[] = {
-        GNUNET_JSON_spec_json ("data", &contract_terms),
-        GNUNET_JSON_spec_fixed_auto ("sig", &sig),
-        GNUNET_JSON_spec_fixed_auto ("hash", &hash),
-        GNUNET_JSON_spec_end()
-      };
-
       if (GNUNET_OK !=
           GNUNET_JSON_parse (json,
                              spec,
@@ -148,8 +148,6 @@ handle_proposal_finished (void *cls,
         response_code = 0;
         break;
       }
-      hashp = &hash;
-      sigp = &sig;
     }
     break;
   case MHD_HTTP_BAD_REQUEST:
@@ -183,11 +181,8 @@ handle_proposal_finished (void *cls,
           response_code,
 	  TALER_JSON_get_error_code (json),
           json,
-          contract_terms,
-          sigp,
-          hashp);
-  if (NULL != contract_terms)
-    json_decref (contract_terms);
+          order_id);
+  GNUNET_JSON_parse_free (spec);
   TALER_MERCHANT_proposal_cancel (po);
 }
 
@@ -267,6 +262,70 @@ handle_proposal_lookup_finished (void *cls,
                                  const json_t *json)
 {
   struct TALER_MERCHANT_ProposalLookupOperation *plo = cls;
+  json_t *contract_terms;
+  struct TALER_MerchantSignatureP sig;
+  struct GNUNET_HashCode hash;
+  struct GNUNET_JSON_Specification spec[] = {
+    GNUNET_JSON_spec_json ("contract_terms", &contract_terms),
+    GNUNET_JSON_spec_fixed_auto ("sig", &sig),
+    GNUNET_JSON_spec_end()
+  };
+
+  if (MHD_HTTP_OK != response_code)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "proposal lookup failed with HTTP status code %u\n",
+                (unsigned int) response_code);
+    char *s = json_dumps (json, JSON_COMPACT);
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "error json: %s\n",
+                s);
+    GNUNET_free_non_null (s);
+    GNUNET_break_op (0);
+    plo->cb (plo->cb_cls,
+             response_code,
+             json,
+             NULL,
+             NULL,
+             NULL);
+    return;
+  }
+
+  if (GNUNET_OK !=
+      GNUNET_JSON_parse (json,
+                         spec,
+                         NULL, NULL))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "proposal lookup failed to parse JSON\n");
+    char *s = json_dumps (json, JSON_COMPACT);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "proposal json was: %s\n",
+                s);
+    GNUNET_free_non_null (s);
+    GNUNET_break_op (0);
+    plo->cb (plo->cb_cls,
+             0,
+             json,
+             NULL,
+             NULL,
+             NULL);
+    return;
+  }
+
+  if (GNUNET_OK != TALER_JSON_hash (contract_terms, &hash))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "proposal lookup failed to hash proposal JSON\n");
+    GNUNET_break (0);
+    plo->cb (plo->cb_cls,
+             0,
+             json,
+             NULL,
+             NULL,
+             NULL);
+    return;
+  }
 
   plo->job = NULL;
   /**
@@ -275,7 +334,10 @@ handle_proposal_lookup_finished (void *cls,
    */
   plo->cb (plo->cb_cls,
            response_code,
-           json);
+           json,
+           contract_terms,
+           &sig,
+           &hash);
   TALER_MERCHANT_proposal_lookup_cancel (plo);
 }
 
@@ -286,7 +348,8 @@ handle_proposal_lookup_finished (void *cls,
  *
  * @param ctx execution context
  * @param backend_uri base URL of the merchant backend
- * @param transaction_id transaction id used to perform the lookup
+ * @param order_id order id used to perform the lookup
+ * @param nonce nonce used to perform the lookup
  * @param plo_cb callback which will work the response gotten from the backend
  * @param plo_cb_cls closure to pass to @a history_cb
  * @return handle for this operation, NULL upon errors
@@ -296,6 +359,7 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                                 const char *backend_uri,
                                 const char *order_id,
                                 const char *instance,
+                                const struct GNUNET_CRYPTO_EddsaPublicKey *nonce,
                                 TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
                                 void *plo_cb_cls)
 {
@@ -309,11 +373,29 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
   plo->cb_cls = plo_cb_cls;
   base = MAH_path_to_url_ (backend_uri,
 			   "/proposal");
-  GNUNET_asprintf (&plo->url,
-                   "%s?order_id=%s&instance=%s",
-                   base,
-                   order_id,
-                   instance);
+  if (NULL != nonce)
+  {
+    char *nonce_str;
+    plo->has_nonce = GNUNET_YES;
+    plo->nonce = *nonce;
+    nonce_str = GNUNET_STRINGS_data_to_string_alloc (nonce, sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
+    GNUNET_assert (NULL != nonce_str);
+    GNUNET_asprintf (&plo->url,
+                     "%s?order_id=%s&instance=%s&nonce=%s",
+                     base,
+                     order_id,
+                     instance,
+                     nonce_str);
+    GNUNET_free (nonce_str);
+  }
+  else
+  {
+    GNUNET_asprintf (&plo->url,
+                     "%s?order_id=%s&instance=%s",
+                     base,
+                     order_id,
+                     instance);
+  }
   GNUNET_free (base);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
@@ -323,6 +405,10 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
     GNUNET_break (0);
     return NULL;
   }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "looking up proposal from %s\n",
+              plo->url);
 
   if (NULL == (plo->job = GNUNET_CURL_job_add (ctx,
                                                eh,

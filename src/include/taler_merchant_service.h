@@ -147,18 +147,14 @@ struct TALER_MERCHANT_ProposalOperation;
  *                    0 if the backend's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code
  * @param obj raw JSON reply, or error details if the request failed
- * @param contract_terms completed contract, NULL on error
- * @param sig merchant's signature over the contract, NULL on error
- * @param hash proposal data's hashcode, NULL on error
+ * @param order_id order id of the newly created order
  */
 typedef void
 (*TALER_MERCHANT_ProposalCallback) (void *cls,
                                     unsigned int http_status,
 				    enum TALER_ErrorCode ec,
                                     const json_t *obj,
-                                    const json_t *contract_terms,
-                                    const struct TALER_MerchantSignatureP *sig,
-                                    const struct GNUNET_HashCode *hash);
+                                    const char *order_id);
 
 
 /**
@@ -207,7 +203,10 @@ struct TALER_MERCHANT_ProposalLookupOperation;
 typedef void
 (*TALER_MERCHANT_ProposalLookupOperationCallback) (void *cls,
                                                    unsigned int http_status,
-                                                   const json_t *body);
+                                                   const json_t *body,
+                                                   const json_t *contract_terms,
+                                                   const struct TALER_MerchantSignatureP *sig,
+                                                   const struct GNUNET_HashCode *hash);
 
 
 /**
@@ -216,7 +215,9 @@ typedef void
  *
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
- * @param transaction_id transaction id used to perform the lookup
+ * @param order_id order id used to perform the lookup
+ * @param nonce nonce to use, only used when requesting the proposal the first time,
+ *              can be NULL to omit the nonce (after the first request)
  * @param plo_cb callback which will work the response gotten from the backend
  * @param plo_cb_cls closure to pass to @a history_cb
  * @return handle for this operation, NULL upon errors
@@ -224,8 +225,9 @@ typedef void
 struct TALER_MERCHANT_ProposalLookupOperation *
 TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                                 const char *backend_url,
-                                const char *transaction_id,
+                                const char *order_id,
                                 const char *instance,
+                                const struct GNUNET_CRYPTO_EddsaPublicKey *nonce,
                                 TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
                                 void *plo_cb_cls);
 

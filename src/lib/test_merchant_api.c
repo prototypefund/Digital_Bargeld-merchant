@@ -500,6 +500,11 @@ struct Command
       struct TALER_MERCHANT_ProposalOperation *po;
 
       /**
+       * Handle to the active GET /proposal operation, or NULL.
+       */
+      struct TALER_MERCHANT_ProposalLookupOperation *plo;
+
+      /**
        * Full contract in JSON, set by the /contract operation.
        * FIXME: verify in the code that this bit is actually proposal
        * data and not the whole proposal.
@@ -515,6 +520,12 @@ struct Command
        * Proposal data's hashcode.
        */
       struct GNUNET_HashCode hash;
+
+      /**
+       * The nonce set by the customer looking up the contract
+       * the first time.
+       */
+      struct GNUNET_CRYPTO_EddsaPublicKey nonce;
 
     } proposal;
 
@@ -1538,6 +1549,39 @@ reserve_withdraw_cb (void *cls,
 
 
 /**
+ * Callback for GET /proposal issued at backend.
+ * Used to initialize the proposal after it was created.
+ *
+ * @param cls closure
+ * @param http_status HTTP status code we got
+ * @param json full response we got
+ */
+static void
+proposal_lookup_initial_cb (void *cls,
+                            unsigned int http_status,
+                            const json_t *json,
+                            const json_t *contract_terms,
+                            const struct TALER_MerchantSignatureP *sig,
+                            const struct GNUNET_HashCode *hash)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  if (cmd->expected_response_code != http_status)
+  {
+    fail (is);
+  }
+
+  cmd->details.proposal.hash = *hash;
+  cmd->details.proposal.merchant_sig = *sig;
+  cmd->details.proposal.contract_terms = json_deep_copy (contract_terms);
+
+  cmd->details.proposal.plo = NULL;
+  next_command (is);
+}
+
+
+/**
  * Callback that works POST /proposal's output.
  *
  * @param cls closure
@@ -1556,9 +1600,7 @@ proposal_cb (void *cls,
              unsigned int http_status,
 	     enum TALER_ErrorCode ec,
              const json_t *obj,
-             const json_t *contract_terms,
-             const struct TALER_MerchantSignatureP *sig,
-             const struct GNUNET_HashCode *hash)
+             const char *order_id)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -1567,22 +1609,32 @@ proposal_cb (void *cls,
   switch (http_status)
   {
   case MHD_HTTP_OK:
-    cmd->details.proposal.contract_terms = json_incref ((json_t *) contract_terms);
-    cmd->details.proposal.merchant_sig = *sig;
-    cmd->details.proposal.hash = *hash;
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Hashed proposal is `%s'\n",
-                GNUNET_h2s (hash));
     break;
-  default:
+  default: {
+    char *s = json_dumps (obj, JSON_COMPACT);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected status code from /proposal: %u. Step %u\n",
+                "Unexpected status code from /proposal: %u. Step %u, response: %s\n",
                 http_status,
-                is->ip);
+                is->ip,
+                s);
+    GNUNET_free_non_null (s);
     fail (is);
+    }
     return;
   }
-  next_command (is);
+
+  if (NULL == (cmd->details.proposal.plo
+               = TALER_MERCHANT_proposal_lookup (ctx,
+                                                 MERCHANT_URL,
+                                                 order_id,
+                                                 instance,
+                                                 &cmd->details.proposal.nonce,
+                                                 proposal_lookup_initial_cb,
+                                                 is)))
+  {
+    GNUNET_break (0);
+    fail (is);
+  }
 }
 
 
@@ -2011,7 +2063,10 @@ track_transfer_cb (void *cls,
 static void
 proposal_lookup_cb (void *cls,
                     unsigned int http_status,
-                    const json_t *json)
+                    const json_t *json,
+                    const json_t *contract_terms,
+                    const struct TALER_MerchantSignatureP *sig,
+                    const struct GNUNET_HashCode *hash)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -2421,11 +2476,19 @@ cleanup_state (struct InterpreterState *is)
       if (NULL != cmd->details.proposal.po)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
+                    "Command %u (%s) did not complete (proposal put)\n",
                     i,
                     cmd->label);
         TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
         cmd->details.proposal.po = NULL;
+      }
+      if (NULL != cmd->details.proposal.plo)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete (proposal lookup)\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_proposal_lookup_cancel (cmd->details.proposal.plo);
       }
       if (NULL != cmd->details.proposal.contract_terms)
       {
@@ -2861,11 +2924,13 @@ interpreter_run (void *cls)
 
       order_id = json_string_value (json_object_get (ref->details.proposal.contract_terms,
                                                      "order_id"));
+
       if (NULL == (cmd->details.proposal_lookup.plo
                    = TALER_MERCHANT_proposal_lookup (ctx,
                                                      MERCHANT_URL,
                                                      order_id,
                                                      instance,
+                                                     &ref->details.proposal.nonce,
                                                      proposal_lookup_cb,
                                                      is)))
       {
@@ -3034,6 +3099,10 @@ interpreter_run (void *cls)
       GNUNET_assert (NULL != (order = json_loads (cmd->details.proposal.order,
                                                   JSON_REJECT_DUPLICATES,
                                                   &error)));
+      GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                                  &cmd->details.proposal.nonce,
+                                  sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
+
       if (NULL != instance)
       {
         json_t *merchant;

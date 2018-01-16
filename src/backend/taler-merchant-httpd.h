@@ -72,7 +72,7 @@ struct IterateInstancesCls
 
 
 /**
- * Information that defines a merchant "instance". That way, a single
+ * Information that defines a merchant "instance". Tha4673t way, a single
  * backend can account for several merchants, as used to do in donation
  * shops
  */

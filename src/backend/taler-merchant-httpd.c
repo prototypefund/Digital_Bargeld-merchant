@@ -269,7 +269,8 @@ url_handler (void *cls,
       &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
     };
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Handling request for URL `%s'\n",
+              "Handling request (%s) for URL `%s'\n",
+              method,
               url);
   for (unsigned int i=0;NULL != handlers[i].url;i++)
   {
@@ -856,6 +857,8 @@ run (void *cls,
 {
   char *wireformat;
   int fh;
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "running taler-merchant-httpd\n");
 
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_add_shutdown (&do_shutdown,

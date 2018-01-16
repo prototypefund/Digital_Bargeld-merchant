@@ -135,8 +135,6 @@ proposal_put (struct MHD_Connection *connection,
 {
   int res;
   struct MerchantInstance *mi;
-  struct TALER_ProposalDataPS pdps;
-  struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
   struct TALER_Amount total;
   const char *order_id;
   json_t *products;
@@ -317,9 +315,6 @@ proposal_put (struct MHD_Connection *connection,
 					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
 					 "Unknown instance given");
   }
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Signing contract on behalf of instance '%s'\n",
-              mi->id);
   /* add fields to the contract that the backend should provide */
   json_object_set (order,
                    "exchanges",
@@ -337,23 +332,31 @@ proposal_put (struct MHD_Connection *connection,
                        "merchant_pub",
 		       GNUNET_JSON_from_data_auto (&mi->pubkey));
 
-  /* create proposal signature */
-  pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
-  pdps.purpose.size = htonl (sizeof (pdps));
-  if (GNUNET_OK !=
-      TALER_JSON_hash (order,
-                       &pdps.hash))
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Inserting order '%s' for instance '%s'\n",
+              order_id,
+              mi->id);
+
+  json_t *dummy_contract_terms;
+  qs = db->find_orders (db->cls,
+                        &dummy_contract_terms,
+                        order_id,
+                        &mi->pubkey);
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS != qs)
   {
-    GNUNET_break (0);
-    GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_INTERNAL_LOGIC_ERROR,
-                                              "Could not hash order");
+    if ( (GNUNET_DB_STATUS_SOFT_ERROR == qs) ||
+         (GNUNET_DB_STATUS_HARD_ERROR == qs) )
+    {
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_PROPOSAL_STORE_DB_ERROR,
+                                                "db error: could not check for existing order");
+    }
+    return TMH_RESPONSE_reply_external_error (connection,
+                                              TALER_EC_PROPOSAL_STORE_DB_ERROR,
+                                              "proposal already exists");
   }
 
-  GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
-                            &pdps.purpose,
-                            &merchant_sig);
+
 
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
@@ -377,9 +380,11 @@ proposal_put (struct MHD_Connection *connection,
                                               "db error: could not store this proposal's data into db");
   }
 
-  res = TMH_RESPONSE_reply_json (connection,
-                                 json_object (),
-                                 MHD_HTTP_OK);
+  res = TMH_RESPONSE_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
+                                      "{s:s}",
+                                      "order_id",
+                                      order_id);
   GNUNET_JSON_parse_free (spec);
   return res;
 }
@@ -579,7 +584,9 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
     }
   }
 
-  const char *stored_nonce = json_string_value (json_object_get(contract_terms, "nonce"));
+  GNUNET_assert (NULL != contract_terms);
+
+  const char *stored_nonce = json_string_value (json_object_get (contract_terms, "nonce"));
 
   if (NULL == stored_nonce)
   {
@@ -596,10 +603,33 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                            "mismatched nonce");
   }
 
-  res = TMH_RESPONSE_reply_json (connection,
-                                 contract_terms,
-                                 MHD_HTTP_OK);
-  json_decref (contract_terms);
+  struct TALER_ProposalDataPS pdps;
+  struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
+
+  /* create proposal signature */
+  pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
+  pdps.purpose.size = htonl (sizeof (pdps));
+  if (GNUNET_OK !=
+      TALER_JSON_hash (contract_terms,
+                       &pdps.hash))
+  {
+    GNUNET_break (0);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_INTERNAL_LOGIC_ERROR,
+                                              "Could not hash order");
+  }
+
+  GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
+                            &pdps.purpose,
+                            &merchant_sig);
+
+  res = TMH_RESPONSE_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
+                                      "{ s:o, s:o }",
+                                      "contract_terms",
+                                      contract_terms,
+                                      "sig",
+                                      GNUNET_JSON_from_data_auto (&merchant_sig));
   return res;
 }
 

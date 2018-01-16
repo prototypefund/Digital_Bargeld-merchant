@@ -387,6 +387,11 @@ struct Command
       struct TALER_MERCHANT_ProposalOperation *po;
 
       /**
+       * Handle to the active GET /proposal operation, or NULL
+       */
+      struct TALER_MERCHANT_ProposalLookupOperation *plo;
+
+      /**
        * Full contract in JSON, set by the /contract operation.
        * FIXME: verify in the code that this bit is actually proposal
        * data and not the whole proposal.
@@ -519,7 +524,7 @@ next_command (struct InterpreterState *is)
 
 
 /**
- * Callback that works PUT /proposal's output.
+ * Callback that processes GET /proposal's output.
  *
  * @param cls closure
  * @param http_status HTTP response code, 200 indicates success;
@@ -533,18 +538,17 @@ next_command (struct InterpreterState *is)
  * @param h_contract hash of the contract, NULL on error
  */
 static void
-proposal_cb (void *cls,
-             unsigned int http_status,
-	     enum TALER_ErrorCode ec,
-             const json_t *obj,
-             const json_t *contract_terms,
-             const struct TALER_MerchantSignatureP *sig,
-             const struct GNUNET_HashCode *hash)
+proposal_lookup_cb (void *cls,
+                    unsigned int http_status,
+                    const json_t *obj,
+                    const json_t *contract_terms,
+                    const struct TALER_MerchantSignatureP *sig,
+                    const struct GNUNET_HashCode *hash)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
 
-  cmd->details.proposal.po = NULL;
+  cmd->details.proposal.plo = NULL;
   switch (http_status)
   {
   case MHD_HTTP_OK:
@@ -566,6 +570,59 @@ proposal_cb (void *cls,
     return;
   }
   next_command (is);
+}
+
+/**
+ * Callback that works PUT /proposal's output.
+ *
+ * @param cls closure
+ * @param http_status HTTP response code, 200 indicates success;
+ *                    0 if the backend's reply is bogus (fails to follow the protocol)
+ * @param ec taler-specific error code
+ * @param obj the full received JSON reply, or
+ *            error details if the request failed
+ */
+static void
+proposal_cb (void *cls,
+             unsigned int http_status,
+	     enum TALER_ErrorCode ec,
+             const json_t *obj,
+             const char *order_id)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  cmd->details.proposal.po = NULL;
+  switch (http_status)
+  {
+  case MHD_HTTP_OK: {
+    struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
+    struct GNUNET_CRYPTO_EddsaPublicKey pub;
+
+    priv = GNUNET_CRYPTO_eddsa_key_create ();
+    GNUNET_CRYPTO_eddsa_key_get_public (priv, &pub);
+    GNUNET_free (priv);
+
+    cmd->details.proposal.plo
+        = TALER_MERCHANT_proposal_lookup (ctx,
+                                          merchant_url,
+                                          order_id,
+                                          instance,
+                                          &pub,
+                                          &proposal_lookup_cb,
+                                          is);
+    }
+    break;
+  default:
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "unexpected status code from /proposal: %u. Step %u\n",
+                http_status,
+                is->ip);
+    json_dumpf (obj, stderr, 0);
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
 }
 
 
