@@ -70,7 +70,7 @@ struct DepositConfirmation
    * URL of the exchange that issued this coin.
    */
   char *exchange_url;
-  
+
   /**
    * Denomination of this coin.
    */
@@ -127,7 +127,7 @@ struct DepositConfirmation
    * #GNUNET_YES if this coin was refunded.
    */
   int refunded;
-  
+
 };
 
 
@@ -203,7 +203,7 @@ struct PayContext
    * URL of the exchange used for the last @e fo.
    */
   const char *current_exchange;
-  
+
   /**
    * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
    */
@@ -272,7 +272,7 @@ struct PayContext
    * set, what is the total amount we already refunded?
    */
   struct TALER_Amount total_refunded;
-  
+
   /**
    * Wire transfer deadline. How soon would the merchant like the
    * wire transfer to be executed? (Can be given by the frontend
@@ -314,7 +314,7 @@ struct PayContext
    * How often have we retried the 'main' transaction?
    */
   unsigned int retry_counter;
-  
+
   /**
    * Number of transactions still pending.  Initially set to
    * @e coins_cnt, decremented on each transaction that
@@ -462,56 +462,61 @@ sign_success_response (struct PayContext *pc)
   const char *errmsg;
   struct GNUNET_CRYPTO_EddsaSignature sig;
   struct PaymentResponsePS mr;
-
+  json_t *resp;
+  struct MHD_Response *mret;
 
   refunds = TM_get_refund_json (pc->mi,
 				&pc->h_contract_terms,
 				&ec,
 				&errmsg);
 
-  if (NULL == refunds) 
+  if (NULL == refunds)
     return TMH_RESPONSE_make_error (ec,
 				    errmsg);
-  
+
   mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
   mr.purpose.size = htonl (sizeof (mr));
   mr.h_contract_terms = pc->h_contract_terms;
-
   GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
                             &mr.purpose,
 			    &sig);
+  resp = json_pack ("{s:O, s:o, s:o, s:o}",
+                    "contract_terms",
+                    pc->contract_terms,
+                    "sig",
+                    GNUNET_JSON_from_data_auto (&sig),
+                    "h_contract_terms",
+                    GNUNET_JSON_from_data (&pc->h_contract_terms,
+                                           sizeof (struct GNUNET_HashCode)),
+                    "refund_permissions",
+                    refunds);
 
-  json_t *resp = json_pack ("{s:O, s:o, s:o, s:o}",
-                           "contract_terms",
-                           pc->contract_terms,
-                           "sig",
-                           GNUNET_JSON_from_data_auto (&sig),
-                           "h_contract_terms",
-                           GNUNET_JSON_from_data (&pc->h_contract_terms,
-                                                  sizeof (struct GNUNET_HashCode)),
-                           "refund_permissions",
-                           refunds);
-
-
-  if (NULL != pc->session_id) {
+  if (NULL != pc->session_id)
+  {
     struct GNUNET_CRYPTO_EddsaSignature session_sig;
     struct TALER_MerchantPaySessionSigPS mps;
 
     GNUNET_assert (NULL != pc->order_id);
-
     mps.purpose.size = htonl (sizeof (struct TALER_MerchantPaySessionSigPS));
     mps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAY_SESSION);
-    GNUNET_CRYPTO_hash (pc->order_id, strlen (pc->order_id), &mps.h_order_id);
-    GNUNET_CRYPTO_hash (pc->session_id, strlen (pc->session_id), &mps.h_session_id);
+    GNUNET_CRYPTO_hash (pc->order_id,
+                        strlen (pc->order_id),
+                        &mps.h_order_id);
+    GNUNET_CRYPTO_hash (pc->session_id,
+                        strlen (pc->session_id),
+                        &mps.h_session_id);
 
     GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
                               &mps.purpose,
                               &session_sig);
-
-    json_object_set (resp, "session_sig", GNUNET_JSON_from_data_auto (&session_sig));
+    json_object_set (resp,
+                     "session_sig",
+                     GNUNET_JSON_from_data_auto (&session_sig));
   }
 
-  return TMH_RESPONSE_make_json (resp);
+  mret = TMH_RESPONSE_make_json (resp);
+  json_decref (resp);
+  return mret;
 }
 
 
@@ -522,7 +527,7 @@ sign_success_response (struct PayContext *pc)
  * @param http_status http status code to return
  * @param ec taler error code to return
  * @param msg human readable error message
- */ 
+ */
 static void
 resume_pay_with_error (struct PayContext *pc,
 		       unsigned int http_status,
@@ -669,11 +674,11 @@ check_payment_sufficient (struct PayContext *pc)
   }
 
 
-  
+
   /* Now compare exchange wire fee compared to what we are willing to
      pay */
   if (GNUNET_YES !=
-      TALER_amount_cmp_currency (&total_wire_fee,  
+      TALER_amount_cmp_currency (&total_wire_fee,
                                  &pc->max_wire_fee))
   {
     GNUNET_break (0);
@@ -682,7 +687,7 @@ check_payment_sufficient (struct PayContext *pc)
 
   if (GNUNET_OK ==
       TALER_amount_subtract (&wire_fee_delta,
-                             &total_wire_fee, 
+                             &total_wire_fee,
                              &pc->max_wire_fee))
   {
     /* Actual wire fee is indeed higher than our maximum, compute
@@ -704,7 +709,7 @@ check_payment_sufficient (struct PayContext *pc)
 		 TALER_amount_subtract (&acc_amount,
 					&acc_amount,
 					&pc->total_refunded));
-  
+
   /* Now check that the customer paid enough for the full contract */
   if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
@@ -1070,7 +1075,7 @@ process_pay_with_exchange (void *cls,
     dc->deposit_fee = denom_details->fee_deposit;
     dc->refund_fee = denom_details->fee_refund;
     dc->wire_fee = *wire_fee;
-    
+
     GNUNET_assert (NULL != pc->mi->j_wire);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Timing for this payment, wire_deadline: %llu, refund_deadline: %llu\n",
@@ -1210,7 +1215,7 @@ check_coin_paid (void *cls,
   for (unsigned int i=0;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
-    
+
     if (GNUNET_YES == dc->found_in_db)
       continue; /* processed earlier */
     /* Get matching coin from results*/
@@ -1246,7 +1251,7 @@ check_coin_paid (void *cls,
     }
     dc->deposit_fee = *deposit_fee;
     dc->refund_fee = *refund_fee;
-    dc->wire_fee = *wire_fee; 
+    dc->wire_fee = *wire_fee;
     dc->amount_with_fee = *amount_with_fee;
     dc->found_in_db = GNUNET_YES;
     pc->pending--;
@@ -1281,7 +1286,7 @@ parse_pay (struct MHD_Connection *connection,
   int res;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_string ("mode",
-			     &mode),			   
+			     &mode),
     GNUNET_JSON_spec_json ("coins",
 			   &coins),
     GNUNET_JSON_spec_string ("order_id",
@@ -1301,9 +1306,10 @@ parse_pay (struct MHD_Connection *connection,
     return res;
   }
 
-  pc->session_id = json_string_value (json_object_get (root, "session_id"));
+  pc->session_id = json_string_value (json_object_get (root,
+                                                       "session_id"));
   pc->order_id = order_id;
-
+  GNUNET_assert (NULL == pc->contract_terms);
   qs = db->find_contract_terms (db->cls,
                                 &pc->contract_terms,
                                 order_id,
@@ -1391,10 +1397,8 @@ parse_pay (struct MHD_Connection *connection,
   }
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "/pay: picked instance %s with key %s\n",
-              pc->mi->id,
-              GNUNET_STRINGS_data_to_string_alloc (&pc->mi->pubkey,
-                                                   sizeof (pc->mi->pubkey)));
+              "/pay: picked instance %s\n",
+              pc->mi->id);
 
   {
     struct GNUNET_JSON_Specification espec[] = {
@@ -1582,7 +1586,7 @@ check_coin_refunded (void *cls,
   for (unsigned int i=0;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
-    
+
     /* Get matching coin from results*/
     if (0 != memcmp (coin_pub,
 		     &dc->coin_pub,
@@ -1594,7 +1598,7 @@ check_coin_refunded (void *cls,
 				      &pc->total_refunded,
 				      refund_amount));
     }
-  }  
+  }
 }
 
 
@@ -1607,7 +1611,7 @@ check_coin_refunded (void *cls,
  */
 static void
 begin_transaction (struct PayContext *pc)
-{  
+{
   enum GNUNET_DB_QueryStatus qs;
 
   /* Avoid re-trying transactions on soft errors forever! */
@@ -1621,7 +1625,7 @@ begin_transaction (struct PayContext *pc)
 							   "hint", "Soft merchant database error: retry counter exceeded"));
     return;
   }
-  
+
   GNUNET_assert (GNUNET_YES == pc->suspended);
 
   /* First, try to see if we have all we need already done */
@@ -1643,7 +1647,7 @@ begin_transaction (struct PayContext *pc)
   GNUNET_break (GNUNET_OK ==
 		TALER_amount_get_zero (pc->amount.currency,
 				       &pc->total_refunded));
-			 
+
   /* Check if some of these coins already succeeded */
   qs = db->find_payments (db->cls,
 			  &pc->h_contract_terms,
@@ -1731,7 +1735,7 @@ begin_transaction (struct PayContext *pc)
 			     "Merchant database error: could not commit");
       return;
     }
-    
+
     {
       json_t *refunds;
 
@@ -1755,7 +1759,7 @@ begin_transaction (struct PayContext *pc)
 			   &pc->dc[i].amount_with_fee);
 	TALER_amount_hton (&rr.refund_fee,
 			   &pc->dc[i].refund_fee);
-	
+
 	if (GNUNET_OK !=
 	    GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
 				      &rr.purpose,
@@ -1774,7 +1778,7 @@ begin_transaction (struct PayContext *pc)
 			       json_pack ("{s:I, s:o, s:o}",
 					  "rtransaction_id", (json_int_t) rtransactionid,
 					  "coin_pub", GNUNET_JSON_from_data_auto (&rr.coin_pub),
-					  "merchant_sig", GNUNET_JSON_from_data_auto (&msig)));			   
+					  "merchant_sig", GNUNET_JSON_from_data_auto (&msig)));
       }
       resume_pay_with_response (pc,
 				MHD_HTTP_OK,
@@ -1786,7 +1790,7 @@ begin_transaction (struct PayContext *pc)
   }
   /* Default PC_MODE_PAY mode */
 
-  /* Final termination case: all coins already known, just 
+  /* Final termination case: all coins already known, just
      generate ultimate outcome. */
   if (0 == pc->pending)
   {
@@ -1802,7 +1806,7 @@ begin_transaction (struct PayContext *pc)
       if (0 <= qs)
 	qs = db->commit (db->cls);
       if (0 > qs)
-      {    
+      {
 	if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
 	{
 	  begin_transaction (pc);
@@ -1824,14 +1828,14 @@ begin_transaction (struct PayContext *pc)
     return;
   }
 
-  
+
   /* Check if transaction is already known, if not store it. */
   {
     struct GNUNET_HashCode h_xwire;
     struct GNUNET_TIME_Absolute xtimestamp;
     struct GNUNET_TIME_Absolute xrefund;
     struct TALER_Amount xtotal_amount;
-    
+
     qs = db->find_transaction (db->cls,
 			       &pc->h_contract_terms,
 			       &pc->mi->pubkey,
@@ -1876,7 +1880,7 @@ begin_transaction (struct PayContext *pc)
       return;
     }
   }
-  
+
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     struct GNUNET_TIME_Absolute now;
@@ -1971,8 +1975,8 @@ begin_transaction (struct PayContext *pc)
        so we can just rollback */
     db->rollback (db->cls);
   }
-  
-  /* Ok, we need to first go to the network. 
+
+  /* Ok, we need to first go to the network.
      Do that interaction in *tiny* transactions. */
   find_next_exchange (pc);
 }

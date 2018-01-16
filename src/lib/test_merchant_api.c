@@ -2218,6 +2218,7 @@ pickup_withdraw_cb (void *cls,
   if (NULL == cmd->details.tip_pickup.sigs)
     cmd->details.tip_pickup.sigs = GNUNET_new_array (cmd->details.tip_pickup.num_coins,
                                                      struct TALER_DenominationSignature);
+  GNUNET_assert (NULL == cmd->details.tip_pickup.sigs[wh->off].rsa_signature);
   cmd->details.tip_pickup.sigs[wh->off].rsa_signature
     = GNUNET_CRYPTO_rsa_signature_dup (sig->rsa_signature);
   for (unsigned int i=0;i<cmd->details.tip_pickup.num_coins;i++)

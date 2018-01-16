@@ -429,6 +429,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   }
 
   /* Convert order id to h_contract_terms */
+  contract_terms = NULL;
   qs = db->find_contract_terms (db->cls,
 				&contract_terms,
 				order_id,
@@ -462,25 +463,32 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
     GNUNET_break (0);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not hash contract terms\n");
+    json_decref (contract_terms);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_INTERNAL_LOGIC_ERROR,
                                               "Could not hash contract terms");
   }
+  json_decref (contract_terms);
 
-  json_t *response;
-  enum TALER_ErrorCode ec;
-  const char *errmsg;
+  {
+    json_t *response;
+    enum TALER_ErrorCode ec;
+    const char *errmsg;
 
-  response = TM_get_refund_json (mi, &h_contract_terms, &ec, &errmsg);
-
-  if (NULL == response) {
-    return TMH_RESPONSE_reply_internal_error (connection, ec, errmsg);
+    response = TM_get_refund_json (mi,
+                                   &h_contract_terms,
+                                   &ec,
+                                   &errmsg);
+    if (NULL == response)
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                ec,
+                                                errmsg);
+    return TMH_RESPONSE_reply_json_pack (connection,
+                                         MHD_HTTP_OK,
+                                         "{s:o}",
+                                         "refund_permissions",
+                                         response);
   }
-
-  return TMH_RESPONSE_reply_json_pack (connection,
-                                       MHD_HTTP_OK,
-                                       "{s:o}",
-                                       "refund_permissions", response);
 }
 
 

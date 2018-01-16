@@ -1115,7 +1115,7 @@ postgres_store_deposit (void *cls,
               "Storing payment for h_contract_terms `%s', coin_pub: `%s', amount_with_fee: %s\n",
               GNUNET_h2s (h_contract_terms),
               TALER_B2S (coin_pub),
-              TALER_amount_to_string (amount_with_fee));
+              TALER_amount2s (amount_with_fee));
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Merchant pub is `%s'\n",
               TALER_B2S (merchant_pub));

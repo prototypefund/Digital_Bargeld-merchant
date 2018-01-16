@@ -315,6 +315,7 @@ hashmap_free (void *cls,
   json_decref (mi->j_wire);
   GNUNET_free (mi->id);
   GNUNET_free (mi->keyfile);
+  GNUNET_free (mi->name);
   GNUNET_free_non_null (mi->tip_exchange);
   GNUNET_free (mi);
   return GNUNET_YES;
@@ -552,7 +553,10 @@ instances_iterator_cb (void *cls,
   mi = GNUNET_new (struct MerchantInstance);
 
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_string (iic->config, section, "NAME", &mi->name))
+      GNUNET_CONFIGURATION_get_value_string (iic->config,
+                                             section,
+                                             "NAME",
+                                             &mi->name))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
@@ -571,6 +575,7 @@ instances_iterator_cb (void *cls,
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
                                "KEYFILE");
+    GNUNET_free (mi->name);
     GNUNET_free (mi);
     GNUNET_SCHEDULER_shutdown ();
     return;
@@ -593,6 +598,8 @@ instances_iterator_cb (void *cls,
       GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                  section,
                                  "TIP_RESERVE_PRIV_FILENAME");
+      GNUNET_free (mi->keyfile);
+      GNUNET_free (mi->name);
       GNUNET_free (mi);
       GNUNET_SCHEDULER_shutdown ();
       return;
@@ -605,6 +612,8 @@ instances_iterator_cb (void *cls,
                                  "TIP_RESERVE_PRIV_FILENAME",
                                  "Failed to read private key");
       GNUNET_free (tip_reserves);
+      GNUNET_free (mi->keyfile);
+      GNUNET_free (mi->name);
       GNUNET_free (mi);
       GNUNET_SCHEDULER_shutdown ();
       return;
@@ -624,6 +633,7 @@ instances_iterator_cb (void *cls,
   {
     GNUNET_break (0);
     GNUNET_free (mi->keyfile);
+    GNUNET_free (mi->name);
     GNUNET_free (mi);
     GNUNET_SCHEDULER_shutdown ();
     return;
@@ -1295,7 +1305,9 @@ main (int argc,
  * @returns the URL, must be freed with #GNUNET_free
  */
 char *
-TMH_make_absolute_backend_url (struct MHD_Connection *connection, char *path, ...)
+TMH_make_absolute_backend_url (struct MHD_Connection *connection,
+                               char *path,
+                               ...)
 {
   static CURL *curl = NULL;
   if (NULL == curl)
