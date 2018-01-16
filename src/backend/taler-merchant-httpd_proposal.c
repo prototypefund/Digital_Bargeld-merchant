@@ -203,7 +203,7 @@ proposal_put (struct MHD_Connection *connection,
     }
     off = strftime (buf,
                     sizeof (buf),
-                    "%H:%M:%S",
+                    "%H.%M.%S",
                     tm_info);
     snprintf (buf + off,
 	      sizeof (buf) - off,
