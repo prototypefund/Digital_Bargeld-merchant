@@ -56,6 +56,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   const char *session_id;
   const char *session_sig_str;
   const char *instance_str;
+  char *final_contract_url = NULL;
+
 
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -94,6 +96,18 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     goto do_pay;
     // No order_id given, redirect to a page that gives the wallet a new
     // contract.
+  }
+
+  if (NULL == contract_url)
+  {
+    final_contract_url = TMH_make_absolute_backend_url (connection, "proposal",
+                                                        "instance", instance_str,
+                                                        "order_id", order_id,
+                                                        NULL);
+  }
+  else
+  {
+    final_contract_url = GNUNET_strdup (contract_url);
   }
 
   if (NULL != session_id)
@@ -218,7 +232,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 do_pay:
   {
     char *url = TMH_make_absolute_backend_url (connection, "trigger-pay",
-                                               "contract_url", contract_url,
+                                               "contract_url", final_contract_url,
                                                "session_id", session_id,
                                                "h_contract_terms", h_contract_terms_str,
                                                NULL);
@@ -228,6 +242,7 @@ do_pay:
                                             "payment_redirect_url",
                                             url);
     GNUNET_free_non_null (h_contract_terms_str);
+    GNUNET_free_non_null (final_contract_url);
     GNUNET_free (url);
     return ret;
   }
