@@ -509,9 +509,9 @@ sign_success_response (struct PayContext *pc)
     GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
                               &mps.purpose,
                               &session_sig);
-    json_object_set (resp,
-                     "session_sig",
-                     GNUNET_JSON_from_data_auto (&session_sig));
+    json_object_set_new (resp,
+                         "session_sig",
+                         GNUNET_JSON_from_data_auto (&session_sig));
   }
 
   mret = TMH_RESPONSE_make_json (resp);
