@@ -1384,8 +1384,9 @@ reserve_status_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
+                ec,
                 cmd->label);
     GNUNET_break (0);
     json_dumpf (json, stderr, 0);
@@ -1508,8 +1509,9 @@ reserve_withdraw_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
+                ec,
                 cmd->label);
     fail (is);
     return;
@@ -1608,8 +1610,9 @@ proposal_cb (void *cls,
   default: {
     char *s = json_dumps (obj, JSON_COMPACT);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected status code from /proposal: %u. Step %u, response: %s\n",
+                "Unexpected status code from /proposal: %u (%d). Step %u, response: %s\n",
                 http_status,
+                ec,
                 is->ip,
                 s);
     GNUNET_free_non_null (s);
@@ -1842,8 +1845,9 @@ pay_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
+                ec,
                 cmd->label);
     fail (is);
     return;
@@ -1909,8 +1913,9 @@ pay_again_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
+                ec,
                 cmd->label);
     fail (is);
     return;
@@ -2029,8 +2034,9 @@ track_transfer_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
+                ec,
                 cmd->label);
     fail (is);
     return;
@@ -2094,8 +2100,9 @@ track_transaction_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
+                ec,
                 cmd->label);
     fail (is);
     return;
@@ -2132,8 +2139,9 @@ tip_authorize_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
+                ec,
                 cmd->label);
     fail (is);
     return;
@@ -2141,8 +2149,9 @@ tip_authorize_cb (void *cls,
   if (cmd->details.tip_authorize.expected_ec != ec)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected error code %u to command %s\n",
+                "Unexpected error code %d (%u) to command %s\n",
                 ec,
+                http_status,
                 cmd->label);
     fail (is);
     return;
@@ -2199,7 +2208,7 @@ pickup_withdraw_cb (void *cls,
        (TALER_EC_NONE != ec) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u/%u to command %s when withdrawing\n",
+                "Unexpected response code %u (%d) to command %s when withdrawing\n",
                 http_status,
                 ec,
                 cmd->label);
@@ -2248,7 +2257,7 @@ pickup_cb (void *cls,
   if (http_status != cmd->expected_response_code)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u/%u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
                 ec,
                 cmd->label);
@@ -2752,8 +2761,9 @@ pay_refund_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
+                ec,
                 cmd->label);
     fail (is);
     return;
@@ -2801,8 +2811,9 @@ abort_refund_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
+                "Unexpected response code %u (%d) to command %s\n",
                 http_status,
+                ec,
                 cmd->label);
     fail (is);
     return;
