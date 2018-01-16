@@ -56,6 +56,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   const char *session_id;
   const char *session_sig_str;
   const char *instance_str;
+  const char *resource_url;
   char *final_contract_url = NULL;
 
 
@@ -74,6 +75,9 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   instance_str = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,
                                               "instance");
+  resource_url = MHD_lookup_connection_value (connection,
+                                              MHD_GET_ARGUMENT_KIND,
+                                              "resource_url");
 
   if (NULL == instance_str)
     instance_str = "default";
@@ -234,6 +238,7 @@ do_pay:
     char *url = TMH_make_absolute_backend_url (connection, "trigger-pay",
                                                "contract_url", final_contract_url,
                                                "session_id", session_id,
+                                               "resource_url", resource_url,
                                                "h_contract_terms", h_contract_terms_str,
                                                NULL);
     int ret = TMH_RESPONSE_reply_json_pack (connection,
