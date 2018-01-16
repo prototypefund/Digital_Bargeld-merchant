@@ -203,13 +203,14 @@ proposal_put (struct MHD_Connection *connection,
     }
     off = strftime (buf,
                     sizeof (buf),
-                    "%H.%M.%S",
+                    "%Y.%j.%H.%M.%S",
                     tm_info);
-    snprintf (buf + off,
-	      sizeof (buf) - off,
-              "-%llX",
-              (long long unsigned) GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK,
-                                                             UINT64_MAX));
+    buf[off++] = '-';
+    uint64_t rand = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK,
+                                              UINT64_MAX);
+    char *last = GNUNET_STRINGS_data_to_string (&rand, sizeof (uint64_t),
+                                                &buf[off], sizeof (buf) - off);
+    *last = '\0';
     json_object_set_new (order,
                          "order_id",
                          json_string (buf));
