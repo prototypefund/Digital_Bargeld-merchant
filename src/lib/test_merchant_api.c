@@ -3968,7 +3968,6 @@ run (void *cls)
       .details.reserve_status.reserve_reference
         = "create-reserve-1",
       .details.reserve_status.expected_balance = "EUR:0" },
-
     /* Create proposal */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-1",
@@ -3989,7 +3988,6 @@ run (void *cls)
         \"products\":\
           [ {\"description\":\"ice cream\",\
              \"value\":\"{EUR:5}\"} ] }"},
-
     /* execute simple payment */
     { .oc = OC_PAY,
       .label = "deposit-simple",
@@ -4580,7 +4578,6 @@ run (void *cls)
     /* Check that there are no other unusual transfers */
     { .oc = OC_CHECK_BANK_TRANSFERS_EMPTY,
       .label = "check_bank_empty-11" },
-
     /* end of testcase */
     { .oc = OC_END }
   };

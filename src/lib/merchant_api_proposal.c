@@ -128,7 +128,8 @@ handle_proposal_finished (void *cls,
   struct TALER_MERCHANT_ProposalOperation *po = cls;
   const char *order_id;
   struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_string ("order_id", &order_id),
+    GNUNET_JSON_spec_string ("order_id",
+                             &order_id),
     GNUNET_JSON_spec_end()
   };
 
@@ -266,21 +267,25 @@ handle_proposal_lookup_finished (void *cls,
   struct TALER_MerchantSignatureP sig;
   struct GNUNET_HashCode hash;
   struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_json ("contract_terms", &contract_terms),
-    GNUNET_JSON_spec_fixed_auto ("sig", &sig),
+    GNUNET_JSON_spec_json ("contract_terms",
+                           &contract_terms),
+    GNUNET_JSON_spec_fixed_auto ("sig",
+                                 &sig),
     GNUNET_JSON_spec_end()
   };
 
   if (MHD_HTTP_OK != response_code)
   {
+    char *s;
+
+    s = json_dumps (json,
+                    JSON_COMPACT);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "proposal lookup failed with HTTP status code %u\n",
-                (unsigned int) response_code);
-    char *s = json_dumps (json, JSON_COMPACT);
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "error json: %s\n",
+                "Proposal lookup failed with HTTP status code %u on input `%s'\n",
+                (unsigned int) response_code,
                 s);
-    GNUNET_free_non_null (s);
+    if (NULL != s)
+      free (s);
     GNUNET_break_op (0);
     plo->cb (plo->cb_cls,
              response_code,
@@ -298,11 +303,6 @@ handle_proposal_lookup_finished (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "proposal lookup failed to parse JSON\n");
-    char *s = json_dumps (json, JSON_COMPACT);
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "proposal json was: %s\n",
-                s);
-    GNUNET_free_non_null (s);
     GNUNET_break_op (0);
     plo->cb (plo->cb_cls,
              0,
@@ -313,11 +313,12 @@ handle_proposal_lookup_finished (void *cls,
     return;
   }
 
-  if (GNUNET_OK != TALER_JSON_hash (contract_terms, &hash))
+  if (GNUNET_OK !=
+      TALER_JSON_hash (contract_terms,
+                       &hash))
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "proposal lookup failed to hash proposal JSON\n");
     GNUNET_break (0);
+    GNUNET_JSON_parse_free (spec);
     plo->cb (plo->cb_cls,
              0,
              json,
@@ -338,6 +339,7 @@ handle_proposal_lookup_finished (void *cls,
            contract_terms,
            &sig,
            &hash);
+  GNUNET_JSON_parse_free (spec);
   TALER_MERCHANT_proposal_lookup_cancel (plo);
 }
 
