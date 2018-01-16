@@ -189,6 +189,7 @@ handle_tip_pickup_finished (void *cls,
     break;
   }
   if (NULL != tpo->cb)
+  {
     tpo->cb (tpo->cb_cls,
              response_code,
              TALER_JSON_get_error_code (json),
@@ -196,6 +197,8 @@ handle_tip_pickup_finished (void *cls,
              0,
              NULL,
              json);
+    tpo->cb = NULL;
+  }
   TALER_MERCHANT_tip_pickup_cancel (tpo);
 }
 

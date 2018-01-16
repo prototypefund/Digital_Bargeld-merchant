@@ -2200,7 +2200,8 @@ pickup_withdraw_cb (void *cls,
 
   wh->wsh = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Withdraw operation completed with %u/%u\n",
+              "Withdraw operation %u completed with %u (%d)\n",
+              wh->off,
               http_status,
               ec);
   GNUNET_assert (wh->off < cmd->details.tip_pickup.num_coins);
@@ -2289,6 +2290,7 @@ pickup_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Obtained %u signatures for withdrawal from picking up a tip\n",
               num_reserve_sigs);
+  GNUNET_assert (NULL == cmd->details.tip_pickup.withdraws);
   cmd->details.tip_pickup.withdraws
     = GNUNET_new_array (num_reserve_sigs,
                         struct WithdrawHandle);
@@ -2298,6 +2300,9 @@ pickup_cb (void *cls,
 
     wh->off = i;
     wh->is = is;
+    GNUNET_assert ( (NULL == wh->wsh) &&
+                    ( (NULL == cmd->details.tip_pickup.sigs) ||
+                      (NULL == cmd->details.tip_pickup.sigs[wh->off].rsa_signature) ) );
     wh->wsh = TALER_EXCHANGE_reserve_withdraw2 (exchange,
                                                 cmd->details.tip_pickup.dks[i],
                                                 &reserve_sigs[i],
@@ -2624,12 +2629,14 @@ cleanup_state (struct InterpreterState *is)
       {
         for (unsigned int j=0;j<cmd->details.tip_pickup.num_coins;j++)
         {
-          if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
+          if (NULL != cmd->details.tip_pickup.sigs[j].rsa_signature)
           {
             GNUNET_CRYPTO_rsa_signature_free (cmd->details.tip_pickup.sigs[j].rsa_signature);
             cmd->details.tip_pickup.sigs[j].rsa_signature = NULL;
           }
         }
+        GNUNET_free (cmd->details.tip_pickup.sigs);
+        cmd->details.tip_pickup.sigs = NULL;
       }
       break;
     default:
@@ -3749,14 +3756,13 @@ interpreter_run (void *cls)
           }
         }
         if (NULL == (cmd->details.tip_pickup.tpo
-                     = TALER_MERCHANT_tip_pickup
-                     (ctx,
-                      MERCHANT_URL,
-                      &ref->details.tip_authorize.tip_id,
-                      num_planchets,
-                      planchets,
-                      &pickup_cb,
-                      is)))
+                     = TALER_MERCHANT_tip_pickup (ctx,
+                                                  MERCHANT_URL,
+                                                  &ref->details.tip_authorize.tip_id,
+                                                  num_planchets,
+                                                  planchets,
+                                                  &pickup_cb,
+                                                  is)))
         {
           GNUNET_break (0);
           fail (is);
