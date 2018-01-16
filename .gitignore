@@ -1,3 +1,4 @@
+.vscode
 *~
 *Makefile.in
 !src/mitm/*.in
