@@ -87,7 +87,7 @@ MH_handler_trigger_pay (struct TMH_RequestHandler *rh,
   add_header_from_arg (connection, "h_contract_terms", response, "X-Taler-Contract-Hash");
   add_header_from_arg (connection, "tip_token", response, "X-Taler-Tip");
   add_header_from_arg (connection, "refund_url", response, "X-Taler-Refund-Url");
-  add_header_from_arg (connection, "resource_url", response, "X-Taler-Resoure-Url");
+  add_header_from_arg (connection, "resource_url", response, "X-Taler-Resource-Url");
 
   MHD_queue_response (connection, 402, response);
   MHD_destroy_response (response);
