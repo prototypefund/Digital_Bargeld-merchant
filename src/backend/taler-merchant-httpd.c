@@ -1455,3 +1455,28 @@ TMH_make_absolute_backend_url (struct MHD_Connection *connection,
 
   return res;
 }
+
+
+/**
+ * Convert an amount in a JSON object from the string amount format to the JSON
+ * amount format.  Does nothing if the field is missing or already a JSON
+ * object.
+ *
+ * @param json json with the amount to convert
+ * @param field_name name of the field to convert
+ * @returns #GNUNET_OK on success, #GNUNET_SYSERR on invalid format
+ */
+int
+TMH_convert_amount (json_t *json, char *field_name)
+{
+  if (! json_is_string (json_object_get (json, field_name)))
+    return GNUNET_OK;
+  const char *amount_str = json_string_value (json_object_get (json, field_name));
+  GNUNET_assert (NULL != amount_str);
+  struct TALER_Amount amount;
+  if (GNUNET_OK != TALER_string_to_amount (amount_str, &amount))
+    return GNUNET_SYSERR;
+  json_object_del (json, field_name);
+  json_object_set_new (json, field_name, TALER_JSON_from_amount (&amount));
+  return GNUNET_OK;
+}
