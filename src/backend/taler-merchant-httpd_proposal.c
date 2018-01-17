@@ -311,6 +311,9 @@ proposal_put (struct MHD_Connection *connection,
     // the backend the "instance" name and lets it fill out.
     struct MerchantInstance *mi = TMH_lookup_instance (instance);
     json_t *merchant;
+    json_t *locations;
+    json_t *loc;
+    char *label;
 
     if (NULL == mi)
     {
@@ -329,15 +332,47 @@ proposal_put (struct MHD_Connection *connection,
                          json_string (mi->name));
     json_object_set_new (merchant,
                          "jurisdiction",
-                         json_string ("none"));
+                         json_string ("_mj"));
     json_object_set_new (merchant,
                          "address",
-                         json_string ("none"));
+                         json_string ("_ma"));
     json_object_set_new (order,
                          "merchant",
                          merchant);
     json_object_del (order,
                      "instance");
+
+    locations = json_object_get (order,
+                                 "locations");
+    if (NULL == locations)
+    {
+      locations = json_object ();
+      json_object_set_new (order,
+                           "locations",
+                           locations);
+    }
+
+    GNUNET_assert (0 < GNUNET_asprintf (&label,
+                                        "merchant-location-%s-address",
+                                        mi->id));
+    loc = json_object_get (default_locations, label);
+    if (NULL == loc)
+      loc = json_object ();
+    else
+      loc = json_deep_copy (loc);
+    json_object_set_new (locations, "_ma", loc);
+    GNUNET_free (label);
+
+    GNUNET_assert (0 < GNUNET_asprintf (&label,
+                                        "merchant-location-%s-jurisdiction",
+                                        mi->id));
+    loc = json_object_get (default_locations, label);
+    if (NULL == loc)
+      loc = json_object ();
+    else
+      loc = json_deep_copy (loc);
+    json_object_set_new (locations, "_mj", loc);
+    GNUNET_free (label);
   }
 
   /* extract fields we need to sign separately */
