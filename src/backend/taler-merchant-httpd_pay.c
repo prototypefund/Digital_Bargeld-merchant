@@ -354,12 +354,12 @@ struct PayContext
    * Optional session id given in @e root.
    * NULL if not given.
    */
-  const char *session_id;
+  char *session_id;
 
   /**
    * Transaction ID given in @e root.
    */
-  const char *order_id;
+  char *order_id;
 };
 
 
@@ -594,6 +594,8 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
     json_decref (pc->contract_terms);
     pc->contract_terms = NULL;
   }
+  GNUNET_free_non_null (pc->order_id);
+  GNUNET_free_non_null (pc->session_id);
   GNUNET_CONTAINER_DLL_remove (pc_head,
                                pc_tail,
                                pc);
@@ -1306,9 +1308,12 @@ parse_pay (struct MHD_Connection *connection,
     return res;
   }
 
-  pc->session_id = json_string_value (json_object_get (root,
-                                                       "session_id"));
-  pc->order_id = order_id;
+  const char *session_id = json_string_value (json_object_get (root,
+                                                               "session_id"));
+  if (NULL != session_id) {
+    pc->session_id = GNUNET_strdup (session_id);
+  }
+  pc->order_id = GNUNET_strdup (order_id);
   GNUNET_assert (NULL == pc->contract_terms);
   qs = db->find_contract_terms (db->cls,
                                 &pc->contract_terms,
