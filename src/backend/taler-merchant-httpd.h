@@ -236,11 +236,6 @@ struct TM_HandlerContext
 
 
 /**
- * Our wire format details in JSON format (with salt).
- */
-extern json_t *j_wire;
-
-/**
  * Locations from the configuration.  Mapping from
  * label to location data.
  */
