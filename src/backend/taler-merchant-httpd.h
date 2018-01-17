@@ -241,6 +241,12 @@ struct TM_HandlerContext
 extern json_t *j_wire;
 
 /**
+ * Locations from the configuration.  Mapping from
+ * label to location data.
+ */
+extern json_t *default_locations;
+
+/**
  * Default maximum wire fee to assume, unless stated differently in the proposal
  * already.
  */

@@ -79,6 +79,12 @@ static long long unsigned port;
 struct GNUNET_TIME_Relative wire_transfer_delay;
 
 /**
+ * Locations from the configuration.  Mapping from
+ * label to location data.
+ */
+json_t *default_locations;
+
+/**
  * If the frontend does NOT specify a payment deadline, how long should
  * offers we make be valid by default?
  */
@@ -507,6 +513,57 @@ prepare_daemon ()
 
 
 /**
+ * Callback that looks for 'merchant-location-*' sections,
+ * and populates @a default_locations.
+ *
+ * @param cls closure
+ * @section section name this callback gets
+ */
+static void
+locations_iterator_cb (void *cls,
+                       const char *section)
+{
+  struct GNUNET_CONFIGURATION_Handle *cfg = cls;
+  const char *prefix = "merchant-location-";
+  const char *substr = strstr (section, prefix);
+  const char *locname;
+  json_t *loc;
+
+  if ( (NULL == substr) || (substr != section) )
+    return;
+
+  locname = section + strlen (prefix);
+  if (0 == strlen (locname))
+    return;
+
+  GNUNET_assert (json_is_object (default_locations));
+
+  loc = json_object ();
+  json_object_set_new (default_locations, locname, loc);
+
+  char *keys[] = {
+    "country", "city", "state", "region", "province",
+    "zip_code", "street", "street_number",
+    NULL,
+  };
+
+  for (unsigned int pos = 0; NULL != keys[pos]; pos++)
+  {
+    char *val;
+    (void) GNUNET_CONFIGURATION_get_value_string (cfg,
+                                                  section,
+                                                  keys[pos],
+                                                  &val);
+    if (NULL != val)
+    {
+      json_object_set_new (loc, keys[pos], json_string (val));
+      GNUNET_free (val);
+    }
+  }
+}
+
+
+/**
  * Callback that looks for 'merchant-instance-*' sections,
  * and populates accordingly each instance's data
  *
@@ -775,6 +832,23 @@ TMH_lookup_instance_json (struct json_t *json)
 
 
 /**
+ * Iterate over locations in config in order to populate
+ * the location data.
+ *
+ * @param config configuration handle
+ * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
+ */
+static void
+iterate_locations (const struct GNUNET_CONFIGURATION_Handle *config)
+{
+  GNUNET_assert (NULL == default_locations);
+  default_locations = json_object ();
+  GNUNET_CONFIGURATION_iterate_sections (config,
+                                         &locations_iterator_cb,
+                                         (void *) config);
+}
+
+/**
  * Iterate over each merchant instance, in order to populate
  * each instance's own data
  *
@@ -985,6 +1059,8 @@ run (void *cls,
     return;
   }
   GNUNET_free (wireformat);
+
+  iterate_locations (config);
 
   if (NULL ==
       (db = TALER_MERCHANTDB_plugin_load (config)))
