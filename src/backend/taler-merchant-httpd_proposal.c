@@ -352,9 +352,7 @@ proposal_put (struct MHD_Connection *connection,
                            locations);
     }
 
-    GNUNET_assert (0 < GNUNET_asprintf (&label,
-                                        "merchant-location-%s-address",
-                                        mi->id));
+    GNUNET_assert (0 < GNUNET_asprintf (&label, "%s-address", mi->id));
     loc = json_object_get (default_locations, label);
     if (NULL == loc)
       loc = json_object ();
@@ -363,9 +361,7 @@ proposal_put (struct MHD_Connection *connection,
     json_object_set_new (locations, "_ma", loc);
     GNUNET_free (label);
 
-    GNUNET_assert (0 < GNUNET_asprintf (&label,
-                                        "merchant-location-%s-jurisdiction",
-                                        mi->id));
+    GNUNET_assert (0 < GNUNET_asprintf (&label, "%s-jurisdiction", mi->id));
     loc = json_object_get (default_locations, label);
     if (NULL == loc)
       loc = json_object ();
