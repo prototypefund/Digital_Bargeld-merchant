@@ -48,11 +48,6 @@ struct TipAuthContext
   struct MHD_Connection *connection;
 
   /**
-   * Tip amount requested.
-   */
-  struct TALER_Amount amount;
-
-  /**
    * Merchant instance to use.
    */
   const char *instance;
@@ -86,6 +81,17 @@ struct TipAuthContext
    * Handle for operation to obtain exchange handle.
    */
   struct TMH_EXCHANGES_FindOperation *fo;
+
+  /**
+   * Reserve expiration time as provided by the exchange.
+   * Set in #exchange_cont.
+   */
+  struct GNUNET_TIME_Relative idle_reserve_expiration_time;
+
+  /**
+   * Tip amount requested.
+   */
+  struct TALER_Amount amount;
 
   /**
    * Private key used by this merchant for the tipping reserve.
@@ -159,7 +165,6 @@ handle_status (void *cls,
                const struct TALER_EXCHANGE_ReserveHistory *history)
 {
   struct TipAuthContext *tac = cls;
-  struct GNUNET_TIME_Relative idle_reserve_expiration_time;
 
   tac->rsh = NULL;
   if (MHD_HTTP_OK != http_status)
@@ -173,10 +178,6 @@ handle_status (void *cls,
     return;
   }
 
-  /* TODO: get this from the exchange! (See #5254.) */
-  idle_reserve_expiration_time = GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_WEEKS,
-                                                                4);
-
   /* Update DB based on status! */
   for (unsigned int i=0;i<history_length;i++)
   {
@@ -189,7 +190,7 @@ handle_status (void *cls,
         struct GNUNET_TIME_Absolute expiration;
 
         expiration = GNUNET_TIME_absolute_add (history[i].details.in_details.timestamp,
-                                               idle_reserve_expiration_time);
+                                               tac->idle_reserve_expiration_time);
         GNUNET_CRYPTO_hash (history[i].details.in_details.wire_reference,
                             history[i].details.in_details.wire_reference_size,
                             &uuid);
@@ -243,6 +244,7 @@ exchange_cont (void *cls,
 {
   struct TipAuthContext *tac = cls;
   struct TALER_ReservePublicKeyP reserve_pub;
+  const struct TALER_EXCHANGE_Keys *keys;
 
   tac->fo = NULL;
   if (NULL == eh)
@@ -253,6 +255,10 @@ exchange_cont (void *cls,
     TMH_trigger_daemon ();
     return;
   }
+  keys = TALER_EXCHANGE_get_keys (eh);
+  GNUNET_assert (NULL != keys);
+  tac->idle_reserve_expiration_time
+    = keys->reserve_closing_delay;
   GNUNET_CRYPTO_eddsa_key_get_public (&tac->reserve_priv.eddsa_priv,
                                       &reserve_pub.eddsa_pub);
   tac->rsh = TALER_EXCHANGE_reserve_status (eh,
