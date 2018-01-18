@@ -288,10 +288,32 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 
   }
 
-  return TMH_RESPONSE_reply_json_pack (connection,
-                                       MHD_HTTP_OK,
-                                       "{s:o}",
-                                       "sig", GNUNET_JSON_from_data_auto (&sig));
+  {
+    int ret;
+    char *refund_pickup_url;
+    char *refund_redirect_url;
+
+    refund_pickup_url = TMH_make_absolute_backend_url (connection,
+                                                       "refund",
+                                                       NULL);
+    GNUNET_assert (NULL != refund_pickup_url);
+    refund_redirect_url = TMH_make_absolute_backend_url (connection,
+                                                         "trigger-pay",
+                                                         "refund_url",
+                                                         refund_pickup_url,
+                                                         NULL);
+    GNUNET_assert (NULL != refund_redirect_url);
+    ret = TMH_RESPONSE_reply_json_pack (connection,
+                                        MHD_HTTP_OK,
+                                        "{s:o, s:s}",
+                                        "sig",
+                                        GNUNET_JSON_from_data_auto (&sig),
+                                        "refund_redirect_url",
+                                        refund_redirect_url);
+    GNUNET_free (refund_pickup_url);
+    GNUNET_free (refund_redirect_url);
+    return ret;
+  }
 }
 
 
