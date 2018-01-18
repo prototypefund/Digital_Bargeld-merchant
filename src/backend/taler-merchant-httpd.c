@@ -523,6 +523,17 @@ static void
 locations_iterator_cb (void *cls,
                        const char *section)
 {
+  static const char *keys[] = {
+    "country",
+    "city",
+    "state",
+    "region",
+    "province",
+    "zip_code",
+    "street",
+    "street_number",
+    NULL,
+  };
   struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   const char *prefix = "merchant-location-";
   const char *substr = strstr (section, prefix);
@@ -531,32 +542,28 @@ locations_iterator_cb (void *cls,
 
   if ( (NULL == substr) || (substr != section) )
     return;
-
   locname = section + strlen (prefix);
   if (0 == strlen (locname))
     return;
-
   GNUNET_assert (json_is_object (default_locations));
 
   loc = json_object ();
-  json_object_set_new (default_locations, locname, loc);
-
-  char *keys[] = {
-    "country", "city", "state", "region", "province",
-    "zip_code", "street", "street_number",
-    NULL,
-  };
-
+  json_object_set_new (default_locations,
+                       locname,
+                       loc);
   for (unsigned int pos = 0; NULL != keys[pos]; pos++)
   {
     char *val;
-    (void) GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                  section,
-                                                  keys[pos],
-                                                  &val);
-    if (NULL != val)
+
+    if (GNUNET_OK ==
+        GNUNET_CONFIGURATION_get_value_string (cfg,
+                                               section,
+                                               keys[pos],
+                                               &val))
     {
-      json_object_set_new (loc, keys[pos], json_string (val));
+      json_object_set_new (loc,
+                           keys[pos],
+                           json_string (val));
       GNUNET_free (val);
     }
   }
@@ -587,7 +594,8 @@ instances_iterator_cb (void *cls,
   char *emsg;
 
   iic = cls;
-  substr = strstr (section, "merchant-instance-");
+  substr = strstr (section,
+                   "merchant-instance-");
 
   if ( (NULL == substr) ||
        (NULL != strstr (section,
