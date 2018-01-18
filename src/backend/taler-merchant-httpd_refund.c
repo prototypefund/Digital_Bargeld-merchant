@@ -271,10 +271,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                       strlen (order_id),
                       &confirmation.h_order_id);
 
-  json_decref (contract_terms);
-  json_decref (root);
-  GNUNET_JSON_parse_free (spec);
-
   if (GNUNET_OK !=
       GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
 				&confirmation.purpose,
@@ -282,6 +278,9 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to sign successful refund confirmation\n");
+    json_decref (contract_terms);
+    json_decref (root);
+    GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_NONE, /* FIXME! */
                                               "Refund done, but failed to sign confirmation");
@@ -316,6 +315,9 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                                         refund_redirect_url);
     GNUNET_free (refund_pickup_url);
     GNUNET_free (refund_redirect_url);
+    json_decref (contract_terms);
+    json_decref (root);
+    GNUNET_JSON_parse_free (spec);
     return ret;
   }
 }
