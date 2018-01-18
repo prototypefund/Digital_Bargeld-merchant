@@ -326,6 +326,17 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     if ( (GNUNET_NO == res) ||
          (NULL == tac->root) )
       return MHD_YES;
+
+    if (NULL == json_object_get (tac->root, "pickup_url"))
+    {
+      char *pickup_url = TMH_make_absolute_backend_url (connection,
+                                                         "tip-pickup",
+                                                         NULL);
+      GNUNET_assert (NULL != pickup_url);
+      json_object_set_new (tac->root, "pickup_url", json_string (pickup_url));
+      GNUNET_free (pickup_url);
+    }
+
     res = TMH_PARSE_json_data (connection,
                                tac->root,
                                spec);
@@ -408,6 +419,8 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   /* generate success response */
   {
     json_t *tip_token;
+    char *tip_token_str;
+    char *tip_redirect_url;
 
     tip_token = json_pack ("{s:o, s:o, s:o, s:s, s:s, s:s}",
                            "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
@@ -416,13 +429,26 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                            "exchange_url", mi->tip_exchange,
                            "next_url", tac->next_url,
                            "pickup_url", tac->pickup_url);
-    return TMH_RESPONSE_reply_json_pack (connection,
-                                         MHD_HTTP_OK,
-                                         "{s:o, s:o, s:s, s:o}",
-                                         "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
-                                         "expiration", GNUNET_JSON_from_time_abs (expiration),
-                                         "exchange_url", mi->tip_exchange,
-                                         "tip_token", tip_token);
+    tip_token_str = json_dumps (tip_token, JSON_COMPACT);
+    GNUNET_assert (NULL != tip_token_str);
+    tip_redirect_url = TMH_make_absolute_backend_url (connection, "trigger-pay",
+                                                      "tip_token", tip_token_str,
+                                                      NULL);
+    GNUNET_assert (NULL != tip_redirect_url);
+    /* FIXME:  This is pretty redundant, but we want to support some older
+     * merchant implementations.  Newer ones should only get the
+     * tip_redirect_url. */
+    res = TMH_RESPONSE_reply_json_pack (connection,
+                                        MHD_HTTP_OK,
+                                        "{s:o, s:o, s:s, s:o}",
+                                        "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
+                                        "expiration", GNUNET_JSON_from_time_abs (expiration),
+                                        "exchange_url", mi->tip_exchange,
+                                        "tip_token", tip_token,
+                                        "tip_redirect_url", tip_redirect_url);
+    GNUNET_free (tip_token_str);
+    GNUNET_free (tip_redirect_url);
+    return res;
   }
 }
 
