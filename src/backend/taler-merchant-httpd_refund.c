@@ -295,6 +295,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 
     refund_pickup_url = TMH_make_absolute_backend_url (connection,
                                                        "refund",
+                                                       "instance",
+                                                       mi->id,
+                                                       "order_id",
+                                                       order_id,
                                                        NULL);
     GNUNET_assert (NULL != refund_pickup_url);
     refund_redirect_url = TMH_make_absolute_backend_url (connection,
