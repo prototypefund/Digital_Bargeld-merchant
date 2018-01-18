@@ -445,7 +445,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
      * tip_redirect_url. */
     res = TMH_RESPONSE_reply_json_pack (connection,
                                         MHD_HTTP_OK,
-                                        "{s:o, s:o, s:s, s:o}",
+                                        "{s:o, s:o, s:s, s:o, s:s}",
                                         "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
                                         "expiration", GNUNET_JSON_from_time_abs (expiration),
                                         "exchange_url", mi->tip_exchange,
