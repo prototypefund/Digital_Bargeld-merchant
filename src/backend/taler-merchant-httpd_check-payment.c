@@ -280,12 +280,15 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   {
     int refunded = 0 != refund_amount.value || 0 != refund_amount.fraction;
-    return TMH_RESPONSE_reply_json_pack (connection,
-                                         MHD_HTTP_OK,
-                                         "{s:b, s:b, s:o}",
-                                         "paid", 1,
-                                         "refunded", refunded,
-                                         "refund_amount", TALER_JSON_from_amount (&refund_amount));
+    int res;
+    res = TMH_RESPONSE_reply_json_pack (connection,
+                                        MHD_HTTP_OK,
+                                        "{s:o s:b, s:b, s:o}",
+                                        "contract_terms", contract_terms,
+                                        "paid", 1,
+                                        "refunded", refunded,
+                                        "refund_amount", TALER_JSON_from_amount (&refund_amount));
+    return res;
   }
 
 do_pay:

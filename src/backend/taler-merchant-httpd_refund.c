@@ -308,14 +308,15 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_assert (NULL != refund_redirect_url);
     ret = TMH_RESPONSE_reply_json_pack (connection,
                                         MHD_HTTP_OK,
-                                        "{s:o, s:s}",
+                                        "{s:o, s:s, s:o}",
                                         "sig",
                                         GNUNET_JSON_from_data_auto (&sig),
                                         "refund_redirect_url",
-                                        refund_redirect_url);
+                                        refund_redirect_url,
+                                        "contract_terms",
+                                        contract_terms);
     GNUNET_free (refund_pickup_url);
     GNUNET_free (refund_redirect_url);
-    json_decref (contract_terms);
     json_decref (root);
     GNUNET_JSON_parse_free (spec);
     return ret;
