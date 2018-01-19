@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014-2017 INRIA
+  (C) 2014-2018 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -317,8 +317,17 @@ hashmap_free (void *cls,
               void *value)
 {
   struct MerchantInstance *mi = value;
+  struct WireMethod *wm;
 
-  json_decref (mi->j_wire);
+  while (NULL != (wm = (mi->wm_head)))
+  {
+    GNUNET_CONTAINER_DLL_remove (mi->wm_head,
+                                 mi->wm_tail,
+                                 wm);
+    json_decref (wm->j_wire);
+    GNUNET_free (wm);
+  }
+
   GNUNET_free (mi->id);
   GNUNET_free (mi->keyfile);
   GNUNET_free (mi->name);
@@ -571,29 +580,127 @@ locations_iterator_cb (void *cls,
 
 
 /**
+ * Closure for the #wireformat_iterator_cb().
+ */
+struct WireFormatIteratorContext
+{
+  /**
+   * The global iteration context.
+   */
+  struct IterateInstancesCls *iic;
+
+  /**
+   * The merchant instance we are currently building.
+   */
+  struct MerchantInstance *mi;
+};
+
+
+/**
+ * Callback that looks for 'merchant-instance-wireformat-*' sections,
+ * and populates our wire method according to the data
+ *
+ * @param cls closure with a `struct WireFormatIteratorContext *`
+ * @section section name this callback gets
+ */
+static void
+wireformat_iterator_cb (void *cls,
+                        const char *section)
+{
+  struct WireFormatIteratorContext *wfic = cls;
+  struct MerchantInstance *mi = wfic->mi;
+  struct IterateInstancesCls *iic = wfic->iic;
+  char *instance_wiresection;
+  struct WireMethod *wm;
+  json_t *type;
+  char *emsg;
+
+  GNUNET_asprintf (&instance_wiresection,
+                   "merchant-instance-wireformat-%s",
+                   mi->id);
+  if (0 != strncmp (section,
+                    instance_wiresection,
+                    strlen (instance_wiresection)))
+  {
+    GNUNET_free (instance_wiresection);
+    return;
+  }
+  GNUNET_free (instance_wiresection);
+
+  wm = GNUNET_new (struct WireMethod);
+  /* FIXME: maybe use sorting to address #4939-12806? */
+  GNUNET_CONTAINER_DLL_insert (mi->wm_head,
+                               mi->wm_tail,
+                               wm);
+  wm->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
+                                              iic->config,
+                                              section);
+  if ( (NULL == (type = json_object_get (wm->j_wire,
+                                         "type"))) ||
+       (! json_is_string (type)) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Malformed wireformat: lacks type\n");
+    iic->ret |= GNUNET_SYSERR;
+    return;
+  }
+  wm->wire_method = json_string_value (type);
+
+  if (TALER_EC_NONE !=
+      iic->plugin->wire_validate (iic->plugin->cls,
+                                  wm->j_wire,
+                                  NULL,
+                                  &emsg))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Malformed wireformat: %s\n",
+                emsg);
+    GNUNET_free (emsg);
+    iic->ret |= GNUNET_SYSERR;
+    return;
+  }
+
+  if (GNUNET_OK !=
+      TALER_JSON_hash (wm->j_wire,
+                       &wm->h_wire))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to hash wireformat\n");
+    iic->ret |= GNUNET_SYSERR;
+  }
+
+#define EXTRADEBUG
+#ifdef EXTRADEBUGG
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Found wireformat instance:\n");
+  json_dumpf (wm->j_wire,
+              stdout,
+              0);
+  printf ("\n");
+#endif
+}
+
+
+/**
  * Callback that looks for 'merchant-instance-*' sections,
  * and populates accordingly each instance's data
  *
- * @param cls closure
+ * @param cls closure of type `struct IterateInstancesCls`
  * @section section name this callback gets
  */
 static void
 instances_iterator_cb (void *cls,
                        const char *section)
 {
-  char *substr;
+  struct IterateInstancesCls *iic = cls;
   char *token;
-  char *instance_wiresection;
   struct MerchantInstance *mi;
-  struct IterateInstancesCls *iic;
   struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
   /* used as hashmap keys */
   struct GNUNET_HashCode h_pk;
   struct GNUNET_HashCode h_id;
-  json_t *type;
-  char *emsg;
+  const char *substr;
 
-  iic = cls;
   substr = strstr (section,
                    "merchant-instance-");
 
@@ -616,7 +723,6 @@ instances_iterator_cb (void *cls,
               "Extracted token: %s\n",
               token + 1);
   mi = GNUNET_new (struct MerchantInstance);
-
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (iic->config,
                                              section,
@@ -709,61 +815,33 @@ instances_iterator_cb (void *cls,
   GNUNET_free (pk);
 
   mi->id = GNUNET_strdup (token + 1);
-  if (0 == strcmp ("default", mi->id))
+  if (0 == strcasecmp ("default",
+                       mi->id))
     iic->default_instance = GNUNET_YES;
 
-  GNUNET_asprintf (&instance_wiresection,
-                   "merchant-instance-wireformat-%s",
-                   mi->id);
-  mi->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
-                                              iic->config,
-                                              instance_wiresection);
-  GNUNET_free (instance_wiresection);
-  if ( (NULL == (type = json_object_get (mi->j_wire,
-                                         "type"))) ||
-       (! json_is_string (type)) )
+  /* Initialize wireformats */
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Malformed wireformat: lacks type\n");
-    iic->ret |= GNUNET_SYSERR;
-  }
-  mi->wire_method = json_string_value (type);
+    struct WireFormatIteratorContext wfic = {
+      .iic = iic,
+      .mi = mi
+    };
 
-  if (TALER_EC_NONE !=
-      iic->plugin->wire_validate (iic->plugin->cls,
-                                  mi->j_wire,
-                                  NULL,
-                                  &emsg))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Malformed wireformat: %s\n",
-                emsg);
-    GNUNET_free (emsg);
-    iic->ret |= GNUNET_SYSERR;
+    GNUNET_CONFIGURATION_iterate_sections (iic->config,
+                                           &wireformat_iterator_cb,
+                                           &wfic);
   }
 
-  if (GNUNET_OK !=
-      TALER_JSON_hash (mi->j_wire,
-                       &mi->h_wire))
+  if (NULL == mi->wm_head)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to hash wireformat\n");
+                "Failed to load wire formats for instance `%s'\n",
+                mi->id);
     iic->ret |= GNUNET_SYSERR;
   }
-#define EXTRADEBUG
-#ifdef EXTRADEBUGG
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Found wireformat instance:\n");
-              json_dumpf (mi->j_wire, stdout, 0);
-              printf ("\n");
-#endif
 
   GNUNET_CRYPTO_hash (mi->id,
                       strlen (mi->id),
                       &h_id);
-  GNUNET_CRYPTO_hash (&mi->pubkey.eddsa_pub,
-                      sizeof (struct GNUNET_CRYPTO_EddsaPublicKey),
-                      &h_pk);
   if (GNUNET_OK !=
       GNUNET_CONTAINER_multihashmap_put (by_id_map,
                                          &h_id,
@@ -774,6 +852,9 @@ instances_iterator_cb (void *cls,
                 "Failed to put an entry into the 'by_id' hashmap\n");
     iic->ret |= GNUNET_SYSERR;
   }
+  GNUNET_CRYPTO_hash (&mi->pubkey.eddsa_pub,
+                      sizeof (struct GNUNET_CRYPTO_EddsaPublicKey),
+                      &h_pk);
   if (GNUNET_OK !=
       GNUNET_CONTAINER_multihashmap_put (by_kpub_map,
                                          &h_pk,
@@ -892,7 +973,7 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
   iic->plugin->library_name = lib_name;
   GNUNET_CONFIGURATION_iterate_sections (config,
                                          &instances_iterator_cb,
-                                         (void *) iic);
+                                         iic);
 
   if (GNUNET_NO == iic->default_instance)
   {

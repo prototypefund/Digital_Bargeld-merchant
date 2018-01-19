@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015 INRIA
+  Copyright (C) 2014-2018 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -72,6 +72,39 @@ struct IterateInstancesCls
 
 
 /**
+ * Supported wire method.  Kept in a DLL.
+ */
+struct WireMethod
+{
+  /**
+   * Next entry in DLL.
+   */
+  struct WireMethod *next;
+
+  /**
+   * Previous entry in DLL.
+   */
+  struct WireMethod *prev;
+
+  /**
+   * Which wire method is @e j_wire using?  Points into @e j_wire.
+   */
+  const char *wire_method;
+
+  /**
+   * Wire details for this instance
+   */
+  struct json_t *j_wire;
+
+  /**
+   * Hash of our wire format details as given in #j_wire.
+   */
+  struct GNUNET_HashCode h_wire;
+
+};
+
+
+/**
  * Information that defines a merchant "instance". Tha4673t way, a single
  * backend can account for several merchants, as used to do in donation
  * shops
@@ -96,23 +129,15 @@ struct MerchantInstance
    */
   char *keyfile;
 
-  /* NOTE: the *_wire-fields should eventually be moved into a DLL
-     once we implement #4939 */
+  /**
+   * Next entry in DLL.
+   */
+  struct WireMethod *wm_head;
 
   /**
-   * Which wire method is @e j_wire using?
+   * Previous entry in DLL.
    */
-  const char *wire_method;
-
-  /**
-   * Wire details for this instance
-   */
-  struct json_t *j_wire;
-
-  /**
-   * Hash of our wire format details as given in #j_wire.
-   */
-  struct GNUNET_HashCode h_wire;
+  struct WireMethod *wm_tail;
 
   /**
    * Merchant's private key

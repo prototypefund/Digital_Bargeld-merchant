@@ -169,6 +169,12 @@ struct PayContext
   struct MerchantInstance *mi;
 
   /**
+   * What wire method (of the @e mi) was selected by the wallet?
+   * Set in #parse_pay().
+   */
+  struct WireMethod *wm;
+
+  /**
    * Proposal data for the proposal that is being
    * payed for in this context.
    */
@@ -1078,7 +1084,8 @@ process_pay_with_exchange (void *cls,
     dc->refund_fee = denom_details->fee_refund;
     dc->wire_fee = *wire_fee;
 
-    GNUNET_assert (NULL != pc->mi->j_wire);
+    GNUNET_assert (NULL != pc->wm);
+    GNUNET_assert (NULL != pc->wm->j_wire);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Timing for this payment, wire_deadline: %llu, refund_deadline: %llu\n",
                 (unsigned long long) pc->wire_transfer_deadline.abs_value_us,
@@ -1086,7 +1093,7 @@ process_pay_with_exchange (void *cls,
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
-                                     pc->mi->j_wire,
+                                     pc->wm->j_wire,
                                      &pc->h_contract_terms,
                                      &dc->coin_pub,
                                      &dc->ub_sig,
@@ -1133,7 +1140,7 @@ find_next_exchange (struct PayContext *pc)
     {
       pc->current_exchange = dc->exchange_url;
       pc->fo = TMH_EXCHANGES_find_exchange (pc->current_exchange,
-					    pc->mi->wire_method,
+					    pc->wm->wire_method,
 					    &process_pay_with_exchange,
 					    pc);
       if (NULL == pc->fo)
@@ -1298,6 +1305,7 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_JSON_spec_end()
   };
   enum GNUNET_DB_QueryStatus qs;
+  const char *session_id;
 
   res = TMH_PARSE_json_data (connection,
                              root,
@@ -1308,11 +1316,10 @@ parse_pay (struct MHD_Connection *connection,
     return res;
   }
 
-  const char *session_id = json_string_value (json_object_get (root,
-                                                               "session_id"));
-  if (NULL != session_id) {
+  session_id = json_string_value (json_object_get (root,
+                                                   "session_id"));
+  if (NULL != session_id)
     pc->session_id = GNUNET_strdup (session_id);
-  }
   pc->order_id = GNUNET_strdup (order_id);
   GNUNET_assert (NULL == pc->contract_terms);
   qs = db->find_contract_terms (db->cls,
@@ -1446,17 +1453,24 @@ parse_pay (struct MHD_Connection *connection,
     }
   }
 
-  /* NOTE: In the future, iterate over all wire hashes
-     available to a given instance here! (#4939) */
-  if (0 != memcmp (&pc->h_wire,
-                   &pc->mi->h_wire,
-                   sizeof (struct GNUNET_HashCode)))
+  /* find wire method */
   {
-    GNUNET_break (0);
-    GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_PAY_WIRE_HASH_UNKNOWN,
-                                              "Did not find matching wire details");
+    struct WireMethod *wm;
+
+    wm = pc->mi->wm_head;
+    while (0 != memcmp (&pc->h_wire,
+                        &wm->h_wire,
+                        sizeof (struct GNUNET_HashCode)))
+      wm = wm->next;
+    if (NULL == wm)
+    {
+      GNUNET_break (0);
+      GNUNET_JSON_parse_free (spec);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_PAY_WIRE_HASH_UNKNOWN,
+                                                "Did not find matching wire details");
+    }
+    pc->wm = wm;
   }
 
   /* parse optional details */
@@ -1866,12 +1880,13 @@ begin_transaction (struct PayContext *pc)
 							     "hint", "Merchant database error"));
       return;
     }
+
     if ( (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs) &&
-	 ( (0 != memcmp (&h_xwire,
-			 &pc->mi->h_wire,
-			 sizeof (struct GNUNET_HashCode))) ||
-	   (xtimestamp.abs_value_us != pc->timestamp.abs_value_us) ||
+	 ( (xtimestamp.abs_value_us != pc->timestamp.abs_value_us) ||
 	   (xrefund.abs_value_us != pc->refund_deadline.abs_value_us) ||
+           (0 != memcmp (&h_xwire,
+                         &pc->h_wire,
+                         sizeof (struct GNUNET_HashCode))) ||
 	   (0 != TALER_amount_cmp (&xtotal_amount,
 				   &pc->amount) ) ) )
     {
@@ -1917,7 +1932,7 @@ begin_transaction (struct PayContext *pc)
     qs_st = db->store_transaction (db->cls,
                                    &pc->h_contract_terms,
                                    &pc->mi->pubkey,
-                                   &pc->mi->h_wire,
+                                   &pc->h_wire,
                                    pc->timestamp,
                                    pc->refund_deadline,
                                    &pc->amount);

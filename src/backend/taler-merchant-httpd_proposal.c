@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016, 2017 INRIA
+  (C) 2014, 2015, 2016, 2018 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -157,6 +157,7 @@ proposal_put (struct MHD_Connection *connection,
   };
   enum GNUNET_DB_QueryStatus qs;
   const char *instance;
+  struct WireMethod *wm;
 
   /* Add order_id if it doesn't exist. */
   if (NULL ==
@@ -387,12 +388,24 @@ proposal_put (struct MHD_Connection *connection,
   json_object_set (order,
                    "auditors",
                    j_auditors);
+  /* TODO (#4939-12806): add proper mechanism for selection of wire method(s) by merchant! */
+  wm = mi->wm_head;
+
+  if (NULL == wm)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "No wire method available for specified instance\n");
+    GNUNET_JSON_parse_free (spec);
+    return TMH_RESPONSE_reply_not_found (connection,
+					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
+					 "No wire method configured for instance");
+  }
   json_object_set_new (order,
                        "H_wire",
-		       GNUNET_JSON_from_data_auto (&mi->h_wire));
+		       GNUNET_JSON_from_data_auto (&wm->h_wire));
   json_object_set_new (order,
                        "wire_method",
-		       json_string (mi->wire_method));
+		       json_string (wm->wire_method));
   json_object_set_new (order,
                        "merchant_pub",
 		       GNUNET_JSON_from_data_auto (&mi->pubkey));
