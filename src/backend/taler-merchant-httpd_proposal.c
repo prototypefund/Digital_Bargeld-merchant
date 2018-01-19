@@ -415,11 +415,17 @@ proposal_put (struct MHD_Connection *connection,
               order_id,
               mi->id);
 
-  json_t *dummy_contract_terms;
-  qs = db->find_orders (db->cls,
-                        &dummy_contract_terms,
-                        order_id,
-                        &mi->pubkey);
+  {
+    json_t *dummy_contract_terms;
+
+    dummy_contract_terms = NULL;
+    qs = db->find_orders (db->cls,
+                          &dummy_contract_terms,
+                          order_id,
+                          &mi->pubkey);
+    if (NULL != dummy_contract_terms)
+      json_decref (dummy_contract_terms);
+  }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS != qs)
   {
     if ( (GNUNET_DB_STATUS_SOFT_ERROR == qs) ||
@@ -433,8 +439,6 @@ proposal_put (struct MHD_Connection *connection,
                                               TALER_EC_PROPOSAL_STORE_DB_ERROR,
                                               "proposal already exists");
   }
-
-
 
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
