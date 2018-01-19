@@ -203,23 +203,27 @@ run_pickup (struct MHD_Connection *connection,
   if (TALER_EC_NONE != ec)
   {
     unsigned int response_code;
+    const char *human;
 
     switch (ec)
     {
     case TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN:
       response_code = MHD_HTTP_NOT_FOUND;
+      human = "tip identifier not known to this service";
       break;
     case TALER_EC_TIP_PICKUP_NO_FUNDS:
       response_code = MHD_HTTP_SERVICE_UNAVAILABLE;
+      human = "withdrawn funds exceed amounts approved for tip";
       break;
     default:
       response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      human = "database failure";
       break;
     }
     return TMH_RESPONSE_reply_rc (connection,
 				  response_code,
 				  ec,
-				  "Database error approving tip");
+				  human);
   }
   sigs = json_array ();
   GNUNET_CRYPTO_eddsa_key_get_public (&reserve_priv.eddsa_priv,
