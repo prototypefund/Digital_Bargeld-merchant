@@ -945,6 +945,12 @@ struct Command
       const char *authorize_ref;
 
       /**
+       * Set to non-NULL to a label of another pick up operation
+       * that we should replay.
+       */
+      const char *replay_ref;
+
+      /**
        * Number of coins we pick up.
        */
       unsigned int num_coins;
@@ -3713,38 +3719,60 @@ interpreter_run (void *cls)
   case OC_TIP_PICKUP:
     {
       unsigned int num_planchets;
+      const struct Command *rr;
 
-      for (num_planchets=0;
-           NULL != cmd->details.tip_pickup.amounts[num_planchets];
-           num_planchets++);
-      cmd->details.tip_pickup.num_coins = num_planchets;
+      if (NULL == cmd->details.tip_pickup.replay_ref)
       {
-        struct TALER_PlanchetDetail planchets[num_planchets];
-
+        rr = NULL;
+        for (num_planchets=0;
+             NULL != cmd->details.tip_pickup.amounts[num_planchets];
+             num_planchets++);
         ref = find_command (is,
                             cmd->details.tip_pickup.authorize_ref);
         GNUNET_assert (NULL != ref);
         GNUNET_assert (OC_TIP_AUTHORIZE == ref->oc);
+      }
+      else
+      {
+        rr = find_command (is,
+                           cmd->details.tip_pickup.replay_ref);
+        GNUNET_assert (NULL != rr);
+        GNUNET_assert (OC_TIP_PICKUP == rr->oc);
+        num_planchets = rr->details.tip_pickup.num_coins;
+      }
+      cmd->details.tip_pickup.num_coins = num_planchets;
+      {
+        struct TALER_PlanchetDetail planchets[num_planchets];
+
         cmd->details.tip_pickup.psa = GNUNET_new_array (num_planchets,
                                                         struct TALER_PlanchetSecretsP);
         cmd->details.tip_pickup.dks = GNUNET_new_array (num_planchets,
                                                         const struct TALER_EXCHANGE_DenomPublicKey *);
         for (unsigned int i=0;i<num_planchets;i++)
         {
-          GNUNET_assert (GNUNET_OK ==
-                         TALER_string_to_amount (cmd->details.tip_pickup.amounts[i],
-                                                 &amount));
-
-          cmd->details.tip_pickup.dks[i]
-            = find_pk (is->keys,
-                       &amount);
-          if (NULL == cmd->details.tip_pickup.dks[i])
+          if (NULL == rr)
           {
-            GNUNET_break (0);
-            fail (is);
-            return;
+            GNUNET_assert (GNUNET_OK ==
+                           TALER_string_to_amount (cmd->details.tip_pickup.amounts[i],
+                                                   &amount));
+            cmd->details.tip_pickup.dks[i]
+              = find_pk (is->keys,
+                         &amount);
+            if (NULL == cmd->details.tip_pickup.dks[i])
+            {
+              GNUNET_break (0);
+              fail (is);
+              return;
+            }
+            TALER_planchet_setup_random (&cmd->details.tip_pickup.psa[i]);
           }
-          TALER_planchet_setup_random (&cmd->details.tip_pickup.psa[i]);
+          else
+          {
+            cmd->details.tip_pickup.dks[i]
+              = rr->details.tip_pickup.dks[i];
+            cmd->details.tip_pickup.psa[i]
+              = rr->details.tip_pickup.psa[i];
+          }
           if (GNUNET_OK !=
               TALER_planchet_prepare (&cmd->details.tip_pickup.dks[i]->key,
                                       &cmd->details.tip_pickup.psa[i],
@@ -4299,6 +4327,14 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.tip_pickup.authorize_ref = "authorize-tip-2",
       .details.tip_pickup.amounts = pickup_amounts_1 },
+#if B5258
+    { .oc = OC_TIP_PICKUP,
+      .label = "pickup-tip-2b",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_pickup.replay_ref = "pickup-tip-2",
+      .details.tip_pickup.authorize_ref = "authorize-tip-2",
+      .details.tip_pickup.amounts = pickup_amounts_1 },
+#endif
     /* Test authorization failure modes */
     { .oc = OC_TIP_AUTHORIZE,
       .label = "authorize-tip-3-insufficient-funds",
