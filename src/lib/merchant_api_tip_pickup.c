@@ -179,6 +179,9 @@ handle_tip_pickup_finished (void *cls,
   case MHD_HTTP_SERVICE_UNAVAILABLE:
     /* legal, can happen if we pickup a tip twice... */
     break;
+  case MHD_HTTP_NOT_FOUND:
+    /* legal, can happen if tip ID is unknown */
+    break;
   default:
     /* unexpected response code */
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
