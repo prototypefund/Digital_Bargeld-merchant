@@ -31,6 +31,36 @@
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_check-payment.h"
 
+/**
+ * Maximum number of retries for database operations.
+ */
+#define MAX_RETRIES 5
+
+
+/**
+ * Function called with information about a refund.
+ * It is responsible for summing up the refund amount.
+ *
+ * @param cls closure
+ * @param coin_pub public coin from which the refund comes from
+ * @param rtransaction_id identificator of the refund
+ * @param reason human-readable explaination of the refund
+ * @param refund_amount refund amount which is being taken from coin_pub
+ * @param refund_fee cost of this refund operation
+ */
+static void
+process_refunds_cb (void *cls,
+                    const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                    uint64_t rtransaction_id,
+                    const char *reason,
+                    const struct TALER_Amount *refund_amount,
+                    const struct TALER_Amount *refund_fee)
+{
+  struct TALER_Amount *acc_amount = cls;
+
+  GNUNET_assert (TALER_amount_add (acc_amount, acc_amount, refund_amount));
+}
+
 
 /**
  * Manages a /check-payment call, checking the status
@@ -58,7 +88,12 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   const char *instance_str;
   const char *resource_url;
   char *final_contract_url = NULL;
-
+  char *h_contract_terms_str = NULL;
+  struct MerchantInstance *mi;
+  enum GNUNET_DB_QueryStatus qs;
+  json_t *contract_terms;
+  struct GNUNET_HashCode h_contract_terms;
+  struct TALER_Amount refund_amount;
 
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -82,10 +117,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   if (NULL == instance_str)
     instance_str = "default";
 
-  // Will only be set if we actually have a contract!
-  char *h_contract_terms_str = NULL;
-
-  struct MerchantInstance *mi = TMH_lookup_instance (instance_str);
+  mi = TMH_lookup_instance (instance_str);
   if (NULL == mi)
     return TMH_RESPONSE_reply_bad_request (connection,
                                            TALER_EC_PAY_INSTANCE_UNKNOWN,
@@ -116,6 +148,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   if (NULL != session_id)
   {
+    struct GNUNET_CRYPTO_EddsaSignature sig;
+    struct TALER_MerchantPaySessionSigPS mps;
     // If the session id is given, the frontend wants us
     // to verify the session signature.
     if (NULL == session_sig_str)
@@ -124,7 +158,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       goto do_pay;
     }
 
-    struct GNUNET_CRYPTO_EddsaSignature sig;
     if (GNUNET_OK !=
         GNUNET_STRINGS_string_to_data (session_sig_str,
                                        strlen (session_sig_str),
@@ -134,7 +167,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "pay session signature malformed\n");
       goto do_pay;
     }
-    struct TALER_MerchantPaySessionSigPS mps;
     mps.purpose.size = htonl (sizeof (struct TALER_MerchantPaySessionSigPS));
     mps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAY_SESSION);
     GNUNET_assert (NULL != order_id);
@@ -152,10 +184,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   }
 
   GNUNET_assert (NULL != order_id);
-
-  enum GNUNET_DB_QueryStatus qs;
-  json_t *contract_terms;
-  struct GNUNET_HashCode h_contract_terms;
 
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
@@ -194,7 +222,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                                               sizeof (struct GNUNET_HashCode));
 
 
-  /* Check if transaction is already known, if not store it. */
+  /* Check if transaction is already known */
   {
     struct GNUNET_HashCode h_xwire;
     struct GNUNET_TIME_Absolute xtimestamp;
@@ -214,8 +242,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
       GNUNET_free_non_null (h_contract_terms_str);
       return TMH_RESPONSE_reply_internal_error (connection,
-                                         TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
-                                         "Merchant database error");
+                                                TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
+                                                "Merchant database error");
     }
     if (0 == qs)
     {
@@ -223,15 +251,42 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       goto do_pay;
     }
     GNUNET_break (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs);
+
+    TALER_amount_get_zero (xtotal_amount.currency, &refund_amount);
+  }
+
+
+  for (unsigned int i=0;i<MAX_RETRIES;i++)
+  {
+    qs = db->get_refunds_from_contract_terms_hash (db->cls,
+						   &mi->pubkey,
+						   &h_contract_terms,
+						   &process_refunds_cb,
+						   &refund_amount);
+    if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+      break;
+  }
+  if (0 > qs)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Database hard error on refunds_from_contract_terms_hash lookup: %s\n",
+                GNUNET_h2s (&h_contract_terms));
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
+                                              "Merchant database error");
   }
 
   GNUNET_free_non_null (h_contract_terms_str);
 
-  return TMH_RESPONSE_reply_json_pack (connection,
-                                       MHD_HTTP_OK,
-                                       "{s:b}",
-                                       "paid",
-                                       1);
+  {
+    int refunded = 0 != refund_amount.value || 0 != refund_amount.fraction;
+    return TMH_RESPONSE_reply_json_pack (connection,
+                                         MHD_HTTP_OK,
+                                         "{s:b, s:b, s:o}",
+                                         "paid", 1,
+                                         "refunded", refunded,
+                                         "refund_amount", TALER_JSON_from_amount (&refund_amount));
+  }
 
 do_pay:
   {
