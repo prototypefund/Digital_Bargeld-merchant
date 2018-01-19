@@ -4359,7 +4359,7 @@ run (void *cls)
       .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP },
     { .oc = OC_TIP_PICKUP,
       .label = "pickup-tip-3-too-much",
-      .expected_response_code = MHD_HTTP_SERVICE_UNAVAILABLE,
+      .expected_response_code = MHD_HTTP_CONFLICT,
       .details.tip_pickup.expected_ec = TALER_EC_TIP_PICKUP_NO_FUNDS,
       .details.tip_pickup.authorize_ref = "authorize-tip-1",
       .details.tip_pickup.amounts = pickup_amounts_1 },

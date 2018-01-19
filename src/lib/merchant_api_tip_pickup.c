@@ -176,7 +176,7 @@ handle_tip_pickup_finished (void *cls,
     /* Server had an internal issue; we should retry, but this API
        leaves this to the application */
     break;
-  case MHD_HTTP_SERVICE_UNAVAILABLE:
+  case MHD_HTTP_CONFLICT:
     /* legal, can happen if we pickup a tip twice... */
     break;
   case MHD_HTTP_NOT_FOUND:
