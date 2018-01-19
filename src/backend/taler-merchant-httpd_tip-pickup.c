@@ -212,7 +212,7 @@ run_pickup (struct MHD_Connection *connection,
       human = "tip identifier not known to this service";
       break;
     case TALER_EC_TIP_PICKUP_NO_FUNDS:
-      response_code = MHD_HTTP_SERVICE_UNAVAILABLE;
+      response_code = MHD_HTTP_CONFLICT;
       human = "withdrawn funds exceed amounts approved for tip";
       break;
     default:
