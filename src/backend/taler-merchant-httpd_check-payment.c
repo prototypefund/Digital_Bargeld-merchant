@@ -120,7 +120,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   mi = TMH_lookup_instance (instance_str);
   if (NULL == mi)
     return TMH_RESPONSE_reply_bad_request (connection,
-                                           TALER_EC_PAY_INSTANCE_UNKNOWN,
+                                           TALER_EC_CHECK_PAYMENT_INSTANCE_UNKNOWN,
                                            "merchant instance unknown");
 
   if (NULL == order_id)
@@ -185,6 +185,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   GNUNET_assert (NULL != order_id);
 
+
+
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
                                 order_id,
@@ -197,15 +199,34 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_PAY_DB_FETCH_PAY_ERROR,
-					      "db error to previous /pay data");
-
+					      TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
+					      "db error fetching contract terms");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_PAY_DB_STORE_PAY_ERROR,
-                                         "Proposal not found");
+    qs = db->find_orders (db->cls,
+                          &contract_terms,
+                          order_id,
+                          &mi->pubkey);
+    if (0 > qs)
+    {
+      /* single, read-only SQL statements should never cause
+         serialization problems */
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
+                                                "db error fetching order");
+    }
+    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+    {
+      return TMH_RESPONSE_reply_not_found (connection,
+                                           TALER_EC_CHECK_PAYMENT_ORDER_ID_UNKNOWN,
+                                           "unknown order id");
+    }
+    /* Offer was not picked up yet, but we ensured that it exists */
+    goto do_pay;
   }
 
   if (GNUNET_OK !=
@@ -214,7 +235,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   {
     GNUNET_break (0);
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_PAY_FAILED_COMPUTE_PROPOSAL_HASH,
+                                              TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
                                               "Failed to hash proposal");
   }
 
