@@ -241,7 +241,12 @@ enum OpCode
   /**
    * Pickup a tip.
    */
-  OC_TIP_PICKUP
+  OC_TIP_PICKUP,
+
+  /**
+   * Check pay status.
+   */
+  OC_CHECK_PAYMENT,
 
 };
 
@@ -994,6 +999,32 @@ struct Command
       enum TALER_ErrorCode expected_ec;
 
     } tip_pickup;
+
+    struct {
+
+      /**
+       * Reference for the contract we want to check.
+       */
+      const char *contract_ref;
+
+      /**
+       * The text case fails if this field is not here, and it is
+       * very uncleary why.
+       */
+      uint64_t layout_dummy;
+
+      /**
+       * Whether to expect the payment to be settled or not.
+       */
+      int expect_paid;
+
+      /**
+       * Operation handle for the /check-payment request,
+       * NULL if operation is not running.
+       */
+      struct TALER_MERCHANT_CheckPaymentOperation *cpo;
+
+    } check_payment;
 
   } details;
 
@@ -2086,6 +2117,49 @@ proposal_lookup_cb (void *cls,
 
 
 /**
+ * Callback for GET /proposal issued at backend. Just check
+ * whether response code is as expected.
+ *
+ * @param cls closure
+ * @param http_status HTTP status code we got
+ * @param json full response we got
+ */
+static void
+check_payment_cb (void *cls,
+                  unsigned int http_status,
+                  const json_t *obj,
+                  int paid,
+                  int refunded,
+                  struct TALER_Amount *refund_amount,
+                  const char *payment_redirect_url)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "check payment: expected paid: %s: %d\n",
+              cmd->label,
+              cmd->details.check_payment.expect_paid);
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "check payment: paid: %d\n",
+              paid);
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "check payment: url: %s\n",
+              payment_redirect_url);
+
+  cmd->details.check_payment.cpo = NULL;
+  if (paid != cmd->details.check_payment.expect_paid)
+  {
+    GNUNET_break (0);
+    fail (is);
+    return;
+  }
+
+  cmd->details.proposal_lookup.plo = NULL;
+  if (cmd->expected_response_code != http_status)
+    fail (is);
+  next_command (is);
+}
+
+
+/**
  * Function called with detailed wire transfer data.
  *
  * @param cls closure
@@ -2645,6 +2719,17 @@ cleanup_state (struct InterpreterState *is)
         cmd->details.tip_pickup.sigs = NULL;
       }
       break;
+    case OC_CHECK_PAYMENT:
+      if (NULL != cmd->details.check_payment.cpo)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_check_payment_cancel (cmd->details.check_payment.cpo);
+        cmd->details.check_payment.cpo = NULL;
+      }
+      break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -2907,6 +2992,36 @@ interpreter_run (void *cls)
                                                      &ref->details.proposal.nonce,
                                                      proposal_lookup_cb,
                                                      is)))
+      {
+        GNUNET_break (0);
+        fail (is);
+      }
+    }
+    break;
+  case OC_CHECK_PAYMENT:
+    {
+      const char *order_id;
+
+      GNUNET_assert (NULL != cmd->details.check_payment.contract_ref);
+      GNUNET_assert (NULL != (ref =
+                              find_command (is,
+                                            cmd->details.check_payment.contract_ref)));
+
+      order_id = json_string_value (json_object_get (ref->details.proposal.contract_terms,
+                                                     "order_id"));
+
+      GNUNET_assert (NULL != order_id);
+
+      if (NULL == (cmd->details.check_payment.cpo
+                   = TALER_MERCHANT_check_payment (ctx,
+                                                   MERCHANT_URL,
+                                                   instance,
+                                                   order_id,
+                                                   NULL,
+                                                   NULL,
+                                                   NULL,
+                                                   check_payment_cb,
+                                                   is)))
       {
         GNUNET_break (0);
         fail (is);
@@ -4016,6 +4131,14 @@ run (void *cls)
         \"products\":\
           [ {\"description\":\"ice cream\",\
              \"value\":\"{EUR:5}\"} ] }"},
+
+    /* check payment before we pay */
+    { .oc = OC_CHECK_PAYMENT,
+      .label = "check-payment-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.check_payment.contract_ref = "create-proposal-1",
+      .details.check_payment.expect_paid = GNUNET_NO },
+
     /* execute simple payment */
     { .oc = OC_PAY,
       .label = "deposit-simple",
@@ -4025,6 +4148,13 @@ run (void *cls)
       .details.pay.refund_fee = "EUR:0.01",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
+
+    /* check payment after we've paid */
+    { .oc = OC_CHECK_PAYMENT,
+      .label = "check-payment-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.check_payment.contract_ref = "create-proposal-1",
+      .details.check_payment.expect_paid = GNUNET_YES },
 
     /* Try to replay payment reusing coin */
     { .oc = OC_PAY,
