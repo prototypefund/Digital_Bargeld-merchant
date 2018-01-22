@@ -1008,12 +1008,6 @@ struct Command
       const char *contract_ref;
 
       /**
-       * The text case fails if this field is not here, and it is
-       * very uncleary why.
-       */
-      //uint64_t layout_dummy;
-
-      /**
        * Whether to expect the payment to be settled or not.
        */
       int expect_paid;
@@ -2152,7 +2146,6 @@ check_payment_cb (void *cls,
     return;
   }
 
-  cmd->details.proposal_lookup.plo = NULL;
   if (cmd->expected_response_code != http_status)
     fail (is);
   next_command (is);
