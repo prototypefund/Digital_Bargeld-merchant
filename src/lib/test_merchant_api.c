@@ -3847,6 +3847,10 @@ interpreter_run (void *cls)
         GNUNET_assert (NULL != rr);
         GNUNET_assert (OC_TIP_PICKUP == rr->oc);
         num_planchets = rr->details.tip_pickup.num_coins;
+        ref = find_command (is,
+                            rr->details.tip_pickup.authorize_ref);
+        GNUNET_assert (NULL != ref);
+        GNUNET_assert (OC_TIP_AUTHORIZE == ref->oc);
       }
       cmd->details.tip_pickup.num_coins = num_planchets;
       {
@@ -4450,14 +4454,12 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.tip_pickup.authorize_ref = "authorize-tip-2",
       .details.tip_pickup.amounts = pickup_amounts_1 },
-#if B5258
     { .oc = OC_TIP_PICKUP,
       .label = "pickup-tip-2b",
       .expected_response_code = MHD_HTTP_OK,
       .details.tip_pickup.replay_ref = "pickup-tip-2",
       .details.tip_pickup.authorize_ref = "authorize-tip-2",
       .details.tip_pickup.amounts = pickup_amounts_1 },
-#endif
     /* Test authorization failure modes */
     { .oc = OC_TIP_AUTHORIZE,
       .label = "authorize-tip-3-insufficient-funds",
