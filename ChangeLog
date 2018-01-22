@@ -1,3 +1,18 @@
+Mon Jan 22 21:54:42 CET 2018
+	Address #5262. -CG
+
+Tue Jan 2 00:27:29 2018
+	Implement #5158 (proper handling of aborted payments). -CG
+
+Wed Dec 27 11:21:43 2017
+	Complete logic to allow /pay to span coins from multiple exchanges. -CG
+
+Wed Dec 13 21:50:59 2017
+	Use new wire transfer logic in payments generator. -CG
+
+Thu Dec 7 07:42:40 2017
+	Implemented new tipping feature (now with private keys in files). -CG
+
 Wed Oct 18 15:33:23 CEST 2017
 	Releasing taler-merchant 0.4.0. -CG
 

@@ -271,7 +271,6 @@ struct TALER_MERCHANTDB_Plugin
                  const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
-
   /**
    * Retrieve proposal data given its hashcode
    *
@@ -287,6 +286,21 @@ struct TALER_MERCHANTDB_Plugin
                                    const struct GNUNET_HashCode *h_contract_terms,
                                    const struct TALER_MerchantPublicKeyP *merchant_pub);
 
+
+  /**
+   * Retrieve paid contract terms data given its hashcode.
+   *
+   * @param cls closure
+   * @param[out] contract_terms where to store the result
+   * @param h_contract_terms hashcode used to lookup.
+   * @param merchant_pub instance's public key.
+   * @return transaction status
+   */
+  enum GNUNET_DB_QueryStatus
+  (*find_paid_contract_terms_from_hash) (void *cls,
+                                         json_t **contract_terms,
+                                         const struct GNUNET_HashCode *h_contract_terms,
+                                         const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
   /**

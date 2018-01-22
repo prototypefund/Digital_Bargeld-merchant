@@ -681,8 +681,6 @@ check_payment_sufficient (struct PayContext *pc)
     }
   }
 
-
-
   /* Now compare exchange wire fee compared to what we are willing to
      pay */
   if (GNUNET_YES !=
@@ -1032,7 +1030,6 @@ process_pay_with_exchange (void *cls,
 			   "no keys");
     return;
   }
-
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Found transaction data for proposal `%s' of merchant `%s', initiating deposits\n",
@@ -1715,8 +1712,43 @@ begin_transaction (struct PayContext *pc)
 
   if (PC_MODE_ABORT_REFUND == pc->mode)
   {
+    json_t *terms;
+
     /* The wallet is going for a refund,
        (on aborted operation)! */
+    /* check payment was indeed incomplete */
+    qs = db->find_paid_contract_terms_from_hash (db->cls,
+                                                 &terms,
+                                                 &pc->h_contract_terms,
+                                                 &pc->mi->pubkey);
+    if (0 > qs)
+    {
+      db->rollback (db->cls);
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+      {
+	begin_transaction (pc);
+	return;
+      }
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+      resume_pay_with_error (pc,
+			     MHD_HTTP_INTERNAL_SERVER_ERROR,
+			     TALER_EC_PAY_DB_STORE_PAY_ERROR,
+			     "Merchant database error");
+      return;
+    }
+    if (0 < qs)
+    {
+      /* Payment had been complete! */
+      json_decref (terms);
+      db->rollback (db->cls);
+      resume_pay_with_error (pc,
+			     MHD_HTTP_FORBIDDEN,
+			     TALER_EC_PAY_ABORT_REFUND_REFUSED_PAYMENT_COMPLETE,
+			     "Payment complete, refusing to abort");
+      return;
+    }
+
     /* Store refund in DB */
     qs = db->increase_refund_for_contract (db->cls,
 					   &pc->h_contract_terms,

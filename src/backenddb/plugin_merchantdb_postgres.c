@@ -378,6 +378,14 @@ postgres_initialize (void *cls)
                             " WHERE h_contract_terms=$1"
                             "   AND merchant_pub=$2",
                             2),
+    GNUNET_PQ_make_prepare ("find_paid_contract_terms_from_hash",
+                            "SELECT"
+                            " contract_terms"
+                            " FROM merchant_contract_terms"
+                            " WHERE h_contract_terms=$1"
+                            "   AND merchant_pub=$2"
+                            "   AND paid=TRUE",
+                            2),
     GNUNET_PQ_make_prepare ("end_transaction",
                             "COMMIT",
                             0),
@@ -796,9 +804,9 @@ postgres_commit (void *cls)
  */
 static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms_from_hash (void *cls,
-                                       json_t **contract_terms,
-                                       const struct GNUNET_HashCode *h_contract_terms,
-                                       const struct TALER_MerchantPublicKeyP *merchant_pub)
+                                        json_t **contract_terms,
+                                        const struct GNUNET_HashCode *h_contract_terms,
+                                        const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -815,6 +823,41 @@ postgres_find_contract_terms_from_hash (void *cls,
   check_connection (pg);
   return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
 						   "find_contract_terms_from_hash",
+						   params,
+						   rs);
+}
+
+
+/**
+ * Retrieve proposal data given its proposal data's hashcode
+ *
+ * @param cls closure
+ * @param contract_terms where to store the retrieved proposal data
+ * @param h_contract_terms proposal data's hashcode that will be used to
+ * perform the lookup
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_find_paid_contract_terms_from_hash (void *cls,
+                                             json_t **contract_terms,
+                                             const struct GNUNET_HashCode *h_contract_terms,
+                                             const struct TALER_MerchantPublicKeyP *merchant_pub)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_json ("contract_terms",
+                               contract_terms),
+    GNUNET_PQ_result_spec_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+						   "find_paid_contract_terms_from_hash",
 						   params,
 						   rs);
 }
@@ -1232,10 +1275,11 @@ postgres_find_contract_terms_history (void *cls,
 						 rs);
   if (qs <= 0)
     return qs;
-  cb (cb_cls,
-      order_id,
-      0,
-      contract_terms);
+  if (NULL != cb)
+    cb (cb_cls,
+        order_id,
+        0,
+        contract_terms);
   GNUNET_PQ_cleanup_result (rs);
   return qs;
 }
@@ -3363,6 +3407,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_contract_terms_by_date = &postgres_find_contract_terms_by_date;
   plugin->find_contract_terms_by_date_and_range = &postgres_find_contract_terms_by_date_and_range;
   plugin->find_contract_terms_from_hash = &postgres_find_contract_terms_from_hash;
+  plugin->find_paid_contract_terms_from_hash = &postgres_find_paid_contract_terms_from_hash;
   plugin->get_refunds_from_contract_terms_hash = &postgres_get_refunds_from_contract_terms_hash;
   plugin->lookup_wire_fee = &postgres_lookup_wire_fee;
   plugin->increase_refund_for_contract = &postgres_increase_refund_for_contract;

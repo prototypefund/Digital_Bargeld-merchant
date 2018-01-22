@@ -2863,6 +2863,9 @@ pay_refund_cb (void *cls,
   if ( (MHD_HTTP_OK == http_status) &&
        (TALER_EC_NONE == ec) )
   {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Received %u refunds\n",
+                num_refunds);
     cmd->details.pay_abort.num_refunds = num_refunds;
     cmd->details.pay_abort.res
       = GNUNET_new_array (num_refunds,
@@ -4152,6 +4155,13 @@ run (void *cls)
       .expected_response_code = MHD_HTTP_OK,
       .details.check_payment.contract_ref = "create-proposal-1",
       .details.check_payment.expect_paid = GNUNET_YES },
+
+    /* Test for #5262: abort after full payment */
+    { .oc = OC_PAY_ABORT,
+      .label = "pay-abort-2",
+      .expected_response_code = MHD_HTTP_FORBIDDEN,
+      .details.pay_abort.pay_ref = "deposit-simple",
+    },
 
     /* Try to replay payment reusing coin */
     { .oc = OC_PAY,

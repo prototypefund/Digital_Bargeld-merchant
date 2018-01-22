@@ -838,6 +838,11 @@ run (void *cls)
 					 timestamp,
 					 contract_terms));
 
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
+          plugin->find_paid_contract_terms_from_hash (plugin->cls,
+                                                      &out,
+                                                      &h_contract_terms,
+                                                      &merchant_pub));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->mark_proposal_paid (plugin->cls,
                                       &h_contract_terms,
@@ -857,6 +862,11 @@ run (void *cls)
 					       &pd_cb,
 					       NULL));
 
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+          plugin->find_paid_contract_terms_from_hash (plugin->cls,
+                                                      &out,
+                                                      &h_contract_terms,
+                                                      &merchant_pub));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_contract_terms_from_hash (plugin->cls,
 						 &out,
