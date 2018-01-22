@@ -368,7 +368,7 @@ TMH_lookup_instance_json (struct json_t *json);
  * @returns the URL, must be freed with #GNUNET_free
  */
 char *
-TMH_make_absolute_backend_url (struct MHD_Connection *connection, char *path, ...);
+TMH_make_absolute_backend_url (struct MHD_Connection *connection, const char *path, ...);
 
 
 /**
@@ -381,6 +381,6 @@ TMH_make_absolute_backend_url (struct MHD_Connection *connection, char *path, ..
  * @returns #GNUNET_OK on success, #GNUNET_SYSERR on invalid format
  */
 int
-TMH_convert_amount (json_t *json, char *field_name);
+TMH_convert_amount (json_t *json, const char *field_name);
 
 #endif

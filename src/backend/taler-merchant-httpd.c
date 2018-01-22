@@ -1471,7 +1471,7 @@ main (int argc,
  */
 char *
 TMH_make_absolute_backend_url (struct MHD_Connection *connection,
-                               char *path,
+                               const char *path,
                                ...)
 {
   static CURL *curl = NULL;
@@ -1556,7 +1556,7 @@ TMH_make_absolute_backend_url (struct MHD_Connection *connection,
  * @returns #GNUNET_OK on success, #GNUNET_SYSERR on invalid format
  */
 int
-TMH_convert_amount (json_t *json, char *field_name)
+TMH_convert_amount (json_t *json, const char *field_name)
 {
   if (! json_is_string (json_object_get (json, field_name)))
     return GNUNET_OK;
