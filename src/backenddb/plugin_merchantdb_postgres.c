@@ -408,7 +408,7 @@ postgres_initialize (void *cls)
                             " order_id=$1"
                             " AND merchant_pub=$2",
                             2),
-    GNUNET_PQ_make_prepare ("find_orders",
+    GNUNET_PQ_make_prepare ("find_order",
                             "SELECT"
                             " contract_terms"
                             " FROM merchant_orders"
@@ -871,10 +871,10 @@ postgres_find_contract_terms (void *cls,
  * @return transaction status
  */
 static enum GNUNET_DB_QueryStatus
-postgres_find_orders (void *cls,
-                      json_t **contract_terms,
-                      const char *order_id,
-                      const struct TALER_MerchantPublicKeyP *merchant_pub)
+postgres_find_order (void *cls,
+                     json_t **contract_terms,
+                     const char *order_id,
+                     const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
 
@@ -896,7 +896,7 @@ postgres_find_orders (void *cls,
               TALER_B2S (merchant_pub));
   check_connection (pg);
   return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-						   "find_orders",
+						   "find_order",
 						   params,
 						   rs);
 }
@@ -3357,7 +3357,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
   plugin->insert_contract_terms = &postgres_insert_contract_terms;
   plugin->insert_order = &postgres_insert_order;
-  plugin->find_orders = &postgres_find_orders;
+  plugin->find_order = &postgres_find_order;
   plugin->find_contract_terms = &postgres_find_contract_terms;
   plugin->find_contract_terms_history = &postgres_find_contract_terms_history;
   plugin->find_contract_terms_by_date = &postgres_find_contract_terms_by_date;

@@ -204,10 +204,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    qs = db->find_orders (db->cls,
-                          &contract_terms,
-                          order_id,
-                          &mi->pubkey);
+    qs = db->find_order (db->cls,
+                         &contract_terms,
+                         order_id,
+                         &mi->pubkey);
     if (0 > qs)
     {
       /* single, read-only SQL statements should never cause

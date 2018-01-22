@@ -265,10 +265,10 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_orders) (void *cls,
-                  json_t **contract_terms,
-                  const char *order_id,
-                  const struct TALER_MerchantPublicKeyP *merchant_pub);
+  (*find_order) (void *cls,
+                 json_t **contract_terms,
+                 const char *order_id,
+                 const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
 

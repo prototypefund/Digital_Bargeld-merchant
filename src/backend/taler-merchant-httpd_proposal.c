@@ -419,10 +419,10 @@ proposal_put (struct MHD_Connection *connection,
     json_t *dummy_contract_terms;
 
     dummy_contract_terms = NULL;
-    qs = db->find_orders (db->cls,
-                          &dummy_contract_terms,
-                          order_id,
-                          &mi->pubkey);
+    qs = db->find_order (db->cls,
+                         &dummy_contract_terms,
+                         order_id,
+                         &mi->pubkey);
     if (NULL != dummy_contract_terms)
       json_decref (dummy_contract_terms);
   }
@@ -612,10 +612,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    qs = db->find_orders (db->cls,
-                          &contract_terms,
-                          order_id,
-                          &mi->pubkey);
+    qs = db->find_order (db->cls,
+                         &contract_terms,
+                         order_id,
+                         &mi->pubkey);
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     {
       return TMH_RESPONSE_reply_not_found (connection,
