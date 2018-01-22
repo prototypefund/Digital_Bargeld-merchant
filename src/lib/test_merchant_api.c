@@ -1011,7 +1011,7 @@ struct Command
        * The text case fails if this field is not here, and it is
        * very uncleary why.
        */
-      uint64_t layout_dummy;
+      //uint64_t layout_dummy;
 
       /**
        * Whether to expect the payment to be settled or not.
