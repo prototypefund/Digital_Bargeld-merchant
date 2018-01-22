@@ -33,4 +33,17 @@ char *
 MAH_path_to_url_ (const char *base_url,
 		  const char *path);
 
+/**
+ * Make an absolute URL with query parameters.
+ *
+ * @param base_url absolute base URL to use
+ * @param path path of the url
+ * @param ... NULL-terminated key-value pairs (char *) for query parameters
+ * @returns the URL, must be freed with #GNUNET_free
+ */
+char *
+MAH_make_url (const char *base_url,
+              const char *path,
+              ...);
+
 #endif

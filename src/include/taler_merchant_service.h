@@ -918,4 +918,76 @@ void
 TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tp);
 
 
+/* ********************** /check-payment ************************* */
+
+
+/**
+ * Handle for a /tip-pickup operation.
+ */
+struct TALER_MERCHANT_CheckPaymentOperation;
+
+
+/**
+ * Callback to process a GET /check-payment request
+ *
+ * @param cls closure
+ * @param http_status HTTP status code for this request
+ * @param obj raw response body
+ * @param paid #GNUNET_YES if the payment is settled, #GNUNET_NO if not
+ *        settled, $GNUNET_SYSERR on error
+ *        (note that refunded payments are returned as paid!)
+ * @param refunded #GNUNET_YES if there is at least on refund on this payment,
+ *        #GNUNET_NO if refunded, #GNUNET_SYSERR or error
+ * @param refunded_amount amount that was refunded, NULL if there
+ *        was no refund
+ * @param payment_redirect_url URL to redirect the browser to in order to
+ *        execute or re-play the payment (NULL if not applicable)
+ */
+typedef void
+(*TALER_MERCHANT_CheckPaymentCallback) (void *cls,
+					unsigned int http_status,
+					const json_t *obj,
+                                        int paid,
+                                        int refunded,
+                                        struct TALER_Amount *refund_amount,
+                                        const char *payment_redirect_url);
+
+
+/**
+ * Issue a /check-payment request to the backend.  Checks the status
+ * of a payment.
+ *
+ * @param ctx execution context
+ * @param backend_url base URL of the merchant backend
+ * @param instance instance used for the transaction
+ * @param order_id order id to identify the payment
+ * @parem resource_url resource URL to identify duplicate payments (can be NULL)
+ * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session) 
+ * @parem session_id sesion signature for the payment (or NULL if the payment
+ *        is not bound to a session or the session is not signed yet) 
+ * @param check_payment_cb callback which will work the response gotten from the backend
+ * @param check_payment_cb_cls closure to pass to @a check_payment_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_CheckPaymentOperation *
+TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
+                              const char *backend_url,
+                              const char *instance,
+                              const char *order_id,
+                              const char *resource_url,
+                              const char *session_id,
+                              const char *session_sig,
+                              TALER_MERCHANT_CheckPaymentCallback check_payment_cb,
+                              void *check_payment_cls);
+
+
+/**
+ * Cancel a GET /check-payment request.
+ *
+ * @param cph handle to the request to be canceled
+ */
+void
+TALER_MERCHANT_check_payment_cancel (struct TALER_MERCHANT_CheckPaymentOperation *cph);
+
+
 #endif  /* _TALER_MERCHANT_SERVICE_H */
