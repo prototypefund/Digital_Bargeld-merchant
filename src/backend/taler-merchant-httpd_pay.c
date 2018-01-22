@@ -713,7 +713,7 @@ check_payment_sufficient (struct PayContext *pc)
   }
 
   /* Do not count any refunds towards the payment */
-  GNUNET_assert (GNUNET_OK ==
+  GNUNET_assert (GNUNET_SYSERR !=
 		 TALER_amount_subtract (&acc_amount,
 					&acc_amount,
 					&pc->total_refunded));
