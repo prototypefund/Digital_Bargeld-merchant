@@ -625,7 +625,9 @@ check_payment_sufficient (struct PayContext *pc)
   struct TALER_Amount wire_fee_customer_contribution;
   struct TALER_Amount total_wire_fee;
 
-  GNUNET_assert (0 != pc->coins_cnt);
+  if (0 == pc->coins_cnt)
+    return TALER_EC_PAY_PAYMENT_INSUFFICIENT;
+
   acc_fee = pc->dc[0].deposit_fee;
   total_wire_fee = pc->dc[0].wire_fee;
   acc_amount = pc->dc[0].amount_with_fee;
