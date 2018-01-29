@@ -375,13 +375,11 @@ process_refunds_cb (void *cls,
     return;
   }
 
-  element = json_pack ("{s:o, s:o, s:o, s:o, s:I, s:o, s:o}",
+  element = json_pack ("{s:o, s:o, s:o, s:I, s:o}",
                        "refund_amount", TALER_JSON_from_amount (refund_amount),
                        "refund_fee", TALER_JSON_from_amount (refund_fee),
-                       "h_contract_terms", GNUNET_JSON_from_data_auto (prd->h_contract_terms),
                        "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
                        "rtransaction_id", (json_int_t) rtransaction_id,
-                       "merchant_pub", GNUNET_JSON_from_data_auto (&prd->merchant->pubkey),
                        "merchant_sig", GNUNET_JSON_from_data_auto (&sig));
   if (NULL == element)
   {
@@ -517,11 +515,14 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
       return TMH_RESPONSE_reply_internal_error (connection,
                                                 ec,
                                                 errmsg);
-    return TMH_RESPONSE_reply_json_pack (connection,
-                                         MHD_HTTP_OK,
-                                         "{s:o}",
+    return TMH_RESPONSE_reply_json_pack (connection, MHD_HTTP_OK,
+                                         "{s:o, s:o, s:o}",
                                          "refund_permissions",
-                                         response);
+                                         response,
+                                         "merchant_pub",
+                                         GNUNET_JSON_from_data_auto (&mi->pubkey),
+                                         "h_contract_terms",
+                                         GNUNET_JSON_from_data_auto (&h_contract_terms));
   }
 }
 

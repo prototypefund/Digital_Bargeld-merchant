@@ -118,7 +118,7 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
   unsigned int num_refunds;
   struct TALER_MerchantPublicKeyP merchant_pub;
   struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_json ("refunds", &refunds),
+    GNUNET_JSON_spec_json ("refund_permissions", &refunds),
     GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
     GNUNET_JSON_spec_end()
   };

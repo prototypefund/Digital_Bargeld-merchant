@@ -1828,16 +1828,19 @@ begin_transaction (struct PayContext *pc)
 	  return;
 	}
 	json_array_append_new (refunds,
-			       json_pack ("{s:I, s:o, s:o}",
+			       json_pack ("{s:I, s:o, s:o s:o s:o}",
 					  "rtransaction_id", (json_int_t) rtransactionid,
 					  "coin_pub", GNUNET_JSON_from_data_auto (&rr.coin_pub),
-					  "merchant_sig", GNUNET_JSON_from_data_auto (&msig)));
+					  "merchant_sig", GNUNET_JSON_from_data_auto (&msig),
+                                          "refund_amount", TALER_JSON_from_amount_nbo (&rr.refund_amount),
+                                          "refund_fee", TALER_JSON_from_amount_nbo (&rr.refund_fee)));
       }
       resume_pay_with_response (pc,
 				MHD_HTTP_OK,
-				TMH_RESPONSE_make_json_pack ("{s:o, s:o}",
-							     "refunds", refunds,
-							     "merchant_pub", GNUNET_JSON_from_data_auto (&pc->mi->pubkey)));
+				TMH_RESPONSE_make_json_pack ("{s:o, s:o, s:o}",
+							     "refund_permissions", refunds,
+							     "merchant_pub", GNUNET_JSON_from_data_auto (&pc->mi->pubkey),
+                                                             "h_contract_terms", GNUNET_JSON_from_data_auto (&pc->h_contract_terms)));
     }
     return;
   }
