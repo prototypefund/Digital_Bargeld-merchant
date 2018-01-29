@@ -153,11 +153,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
        (NULL == root) )
     return MHD_YES;
 
-  if (GNUNET_OK != TMH_convert_amount (root, "refund"))
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-                                           TALER_EC_PARAMETER_MALFORMED,
-                                           "refund");
-
   res = TMH_PARSE_json_data (connection,
                              root,
                              spec);

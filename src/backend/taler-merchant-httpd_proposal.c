@@ -192,11 +192,6 @@ proposal_put (struct MHD_Connection *connection,
                          json_string (buf));
   }
 
-  if (GNUNET_OK != TMH_convert_amount (order, "amount"))
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-                                           TALER_EC_PARAMETER_MALFORMED,
-                                           "amount");
-
   /* Add timestamp if it doesn't exist */
   if (NULL == json_object_get (order,
                                "timestamp"))

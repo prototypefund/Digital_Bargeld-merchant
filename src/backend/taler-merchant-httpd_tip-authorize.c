@@ -337,11 +337,6 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
       GNUNET_free (pickup_url);
     }
 
-    if (GNUNET_OK != TMH_convert_amount (tac->root, "amount"))
-      return TMH_RESPONSE_reply_arg_invalid (connection,
-                                             TALER_EC_PARAMETER_MALFORMED,
-                                             "amount");
-
     res = TMH_PARSE_json_data (connection,
                                tac->root,
                                spec);

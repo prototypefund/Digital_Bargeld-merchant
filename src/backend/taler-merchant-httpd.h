@@ -370,17 +370,4 @@ TMH_lookup_instance_json (struct json_t *json);
 char *
 TMH_make_absolute_backend_url (struct MHD_Connection *connection, const char *path, ...);
 
-
-/**
- * Convert an amount in a JSON object from the string amount format to the JSON
- * amount format.  Does nothing if the field is missing or already a JSON
- * object.
- *
- * @param json json with the amount to convert
- * @param field_name name of the field to convert
- * @returns #GNUNET_OK on success, #GNUNET_SYSERR on invalid format
- */
-int
-TMH_convert_amount (json_t *json, const char *field_name);
-
 #endif
