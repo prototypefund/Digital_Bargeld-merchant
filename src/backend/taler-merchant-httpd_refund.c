@@ -301,7 +301,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                                                        NULL);
     GNUNET_assert (NULL != refund_pickup_url);
     refund_redirect_url = TMH_make_absolute_backend_url (connection,
-                                                         "trigger-pay",
+                                                         "public/trigger-pay",
                                                          "refund_url",
                                                          refund_pickup_url,
                                                          NULL);

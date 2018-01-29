@@ -314,7 +314,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
 do_pay:
   {
-    char *url = TMH_make_absolute_backend_url (connection, "trigger-pay",
+    char *url = TMH_make_absolute_backend_url (connection, "public/trigger-pay",
                                                "contract_url", final_contract_url,
                                                "session_id", session_id,
                                                "resource_url", resource_url,

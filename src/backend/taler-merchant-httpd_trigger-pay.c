@@ -15,7 +15,7 @@
 */
 /**
  * @file backend/taler-merchant-httpd_trigger-pay.c
- * @brief implementation of /trigger-pay handler
+ * @brief implementation of /public/trigger-pay handler
  * @author Florian Dold
  */
 #include "platform.h"

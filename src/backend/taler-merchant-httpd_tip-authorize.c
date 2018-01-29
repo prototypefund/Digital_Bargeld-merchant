@@ -436,7 +436,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                            "pickup_url", tac->pickup_url);
     tip_token_str = json_dumps (tip_token, JSON_COMPACT);
     GNUNET_assert (NULL != tip_token_str);
-    tip_redirect_url = TMH_make_absolute_backend_url (connection, "trigger-pay",
+    tip_redirect_url = TMH_make_absolute_backend_url (connection, "public/trigger-pay",
                                                       "tip_token", tip_token_str,
                                                       NULL);
     GNUNET_assert (NULL != tip_redirect_url);

@@ -565,7 +565,7 @@ request_pay_generic (struct GNUNET_CURL_Context *ctx,
   ph->pay_cb = pay_cb;
   ph->pay_cb_cls = pay_cb_cls;
   ph->url = MAH_path_to_url_ (merchant_url,
-			      "/pay");
+			      "/public/pay");
   ph->num_coins = num_coins;
   ph->coins = GNUNET_new_array (num_coins,
                                 struct TALER_MERCHANT_PaidCoin);

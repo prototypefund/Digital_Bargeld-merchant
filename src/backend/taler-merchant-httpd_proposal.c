@@ -261,7 +261,7 @@ proposal_put (struct MHD_Connection *connection,
     char *url;
 
     url = TMH_make_absolute_backend_url (connection,
-                                         "pay",
+                                         "/public/pay",
                                          NULL);
     json_object_set_new (order,
                          "pay_url",

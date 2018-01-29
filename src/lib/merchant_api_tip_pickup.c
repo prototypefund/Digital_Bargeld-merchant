@@ -283,7 +283,7 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
   tpo->cb = pickup_cb;
   tpo->cb_cls = pickup_cb_cls;
   tpo->url = MAH_path_to_url_ (backend_uri,
-                               "/tip-pickup");
+                               "/public/tip-pickup");
   if (NULL == (tpo->json_enc =
                json_dumps (tp_obj,
                            JSON_COMPACT)))

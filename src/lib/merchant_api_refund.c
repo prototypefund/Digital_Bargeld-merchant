@@ -325,7 +325,7 @@ TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
   rlo->cb_cls = cb_cls;
 
   GNUNET_asprintf (&rlo->url,
-                   "%s/refund?instance=%s&order_id=%s",
+                   "%s/public/refund?instance=%s&order_id=%s",
                    backend_uri,
                    instance,
                    order_id);

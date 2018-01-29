@@ -216,7 +216,7 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
   po->cb = proposal_cb;
   po->cb_cls = proposal_cb_cls;
   po->url = MAH_path_to_url_ (backend_uri,
-			      "/proposal");
+			      "/order");
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
   eh = curl_easy_init ();
@@ -374,7 +374,7 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
   plo->cb = plo_cb;
   plo->cb_cls = plo_cb_cls;
   base = MAH_path_to_url_ (backend_uri,
-			   "/proposal");
+			   "/public/proposal");
   if (NULL != nonce)
   {
     char *nonce_str;
