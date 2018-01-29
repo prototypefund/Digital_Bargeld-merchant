@@ -136,7 +136,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   if (NULL == contract_url)
   {
-    final_contract_url = TMH_make_absolute_backend_url (connection, "proposal",
+    final_contract_url = TMH_make_absolute_backend_url (connection, "/public/proposal",
                                                         "instance", instance_str,
                                                         "order_id", order_id,
                                                         NULL);
