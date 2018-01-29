@@ -322,9 +322,11 @@ do_pay:
                                                NULL);
     int ret = TMH_RESPONSE_reply_json_pack (connection,
                                             MHD_HTTP_OK,
-                                            "{s:s}",
+                                            "{s:s, s:b}",
                                             "payment_redirect_url",
-                                            url);
+                                            url,
+                                            "paid",
+                                            0);
     GNUNET_free_non_null (h_contract_terms_str);
     GNUNET_free_non_null (final_contract_url);
     GNUNET_free (url);
