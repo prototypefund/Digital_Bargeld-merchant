@@ -28,7 +28,7 @@ exchange = http://localexchange/
 # where on this machine the merchant listens
 merchant = http://localshop/
 
-# bank's URI of the customer who withdraws coins.
+# bank's URL of the customer who withdraws coins.
 # Must be known by the exchange.
 bank = http://localbank/
 

@@ -211,7 +211,7 @@ handle_tip_pickup_finished (void *cls,
  * that a customer wants to pick up a tip.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
  * @param tip_id unique identifier for the tip
  * @param num_planches number of planchets provided in @a planchets
  * @param planchets array of planchets to be signed into existence for the tip
@@ -221,7 +221,7 @@ handle_tip_pickup_finished (void *cls,
  */
 struct TALER_MERCHANT_TipPickupOperation *
 TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
-                           const char *backend_uri,
+                           const char *backend_url,
                            const struct GNUNET_HashCode *tip_id,
                            unsigned int num_planchets,
                            struct TALER_PlanchetDetail *planchets,
@@ -282,7 +282,7 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
   tpo->ctx = ctx;
   tpo->cb = pickup_cb;
   tpo->cb_cls = pickup_cb_cls;
-  tpo->url = MAH_path_to_url_ (backend_uri,
+  tpo->url = MAH_path_to_url_ (backend_url,
                                "/public/tip-pickup");
   if (NULL == (tpo->json_enc =
                json_dumps (tp_obj,
@@ -296,7 +296,7 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
   }
   json_decref (tp_obj);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Requesting URI '%s'\n",
+              "Requesting URL '%s'\n",
               tpo->url);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==

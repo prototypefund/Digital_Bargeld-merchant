@@ -2195,7 +2195,7 @@ track_transaction_cb (void *cls,
  * @param ec taler-specific error code
  * @param tip_id which tip ID should be used to pickup the tip
  * @param tip_expiration when does the tip expire (needs to be picked up before this time)
- * @param exchange_uri at what exchange can the tip be picked up
+ * @param exchange_url at what exchange can the tip be picked up
  */
 static void
 tip_authorize_cb (void *cls,
@@ -2203,7 +2203,7 @@ tip_authorize_cb (void *cls,
                   enum TALER_ErrorCode ec,
                   const struct GNUNET_HashCode *tip_id,
                   struct GNUNET_TIME_Absolute tip_expiration,
-                  const char *exchange_uri)
+                  const char *exchange_url)
 {
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
@@ -2232,12 +2232,12 @@ tip_authorize_cb (void *cls,
   if ( (MHD_HTTP_OK == http_status) &&
        (TALER_EC_NONE == ec) )
   {
-    if (0 != strcmp (exchange_uri,
+    if (0 != strcmp (exchange_url,
                      EXCHANGE_URL))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Unexpected exchange URL %s to command %s\n",
-                  exchange_uri,
+                  exchange_url,
                   cmd->label);
       fail (is);
       return;

@@ -129,7 +129,7 @@ handle_track_transaction_finished (void *cls,
  * Request backend to return transactions associated with a given wtid.
  *
  * @param ctx execution context
- * @param backend_uri base URI of the backend
+ * @param backend_url base URL of the backend
  * @param instance which merchant instance is going to be tracked
  * @param order_id order id pointing to the transaction being tracked
  * @param track_transaction_cb the callback to call when a reply for this request is available
@@ -138,7 +138,7 @@ handle_track_transaction_finished (void *cls,
  */
 struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
-                                  const char *backend_uri,
+                                  const char *backend_url,
                                   const char *instance,
                                   const char *order_id,
                                   TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
@@ -152,7 +152,7 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
   tdo->ctx = ctx;
   tdo->cb = track_transaction_cb;
   tdo->cb_cls = track_transaction_cb_cls;
-  base = MAH_path_to_url_ (backend_uri,
+  base = MAH_path_to_url_ (backend_url,
 			   "/track/transaction");
   GNUNET_asprintf (&tdo->url,
                    "%s?order_id=%s&instance=%s",
@@ -161,7 +161,7 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                    instance);
   GNUNET_free (base);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Requesting URI '%s'\n",
+              "Requesting URL '%s'\n",
               tdo->url);
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==

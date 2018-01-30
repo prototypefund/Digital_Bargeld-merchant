@@ -81,7 +81,7 @@ struct TMH_EXCHANGES_FindOperation;
  * to the exchange, or if it is not acceptable, @a fc is called with
  * NULL for the exchange.
  *
- * @param chosen_exchange URI of the exchange we would like to talk to
+ * @param chosen_exchange URL of the exchange we would like to talk to
  * @param wire_method the wire method we will use with @a chosen_exchange, NULL for none
  * @param fc function to call with the handles for the exchange
  * @param fc_cls closure for @a fc

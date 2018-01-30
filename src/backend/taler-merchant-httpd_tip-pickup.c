@@ -79,9 +79,9 @@ struct PickupContext
   void *json_parse_context;
 
   /**
-   * URI of the exchange this tip uses.
+   * URL of the exchange this tip uses.
    */
-  char *exchange_uri;
+  char *exchange_url;
 
   /**
    * Operation we run to find the exchange (and get its /keys).
@@ -162,7 +162,7 @@ pickup_cleanup (struct TM_HandlerContext *hc)
     pc->fo = NULL;
   }
   TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
-  GNUNET_free_non_null (pc->exchange_uri);
+  GNUNET_free_non_null (pc->exchange_url);
   GNUNET_free (pc);
 }
 
@@ -379,7 +379,7 @@ prepare_pickup (struct PickupContext *pc)
 
   qs = db->lookup_tip_by_id (db->cls,
                              &pc->tip_id,
-                             &pc->exchange_uri,
+                             &pc->exchange_url,
                              NULL, NULL);
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
   {
@@ -409,10 +409,10 @@ prepare_pickup (struct PickupContext *pc)
     return TMH_RESPONSE_reply_rc (pc->connection,
 				  response_code,
 				  ec,
-				  "Could not determine exchange URI for the given tip id");
+				  "Could not determine exchange URL for the given tip id");
 
   }
-  pc->fo = TMH_EXCHANGES_find_exchange (pc->exchange_uri,
+  pc->fo = TMH_EXCHANGES_find_exchange (pc->exchange_url,
 					NULL,
 					&exchange_found_cb,
 					pc);

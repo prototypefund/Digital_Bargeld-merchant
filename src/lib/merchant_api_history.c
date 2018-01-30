@@ -110,7 +110,7 @@ history_raw_cb (void *cls,
     return;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-		"/history URI not found\n");
+		"/history URL not found\n");
     break;
   case MHD_HTTP_BAD_REQUEST:
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
@@ -137,7 +137,7 @@ history_raw_cb (void *cls,
  * Issue a /history request to the backend.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
  * @param instance which merchant instance is performing this call
  * @param start return `delta` records starting from position `start`.
  * If given as zero, then no initial skip of `start` records is done.
@@ -149,7 +149,7 @@ history_raw_cb (void *cls,
  */
 struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
-                        const char *backend_uri,
+                        const char *backend_url,
                         const char *instance,
                         unsigned int start,
                         unsigned int delta,
@@ -167,7 +167,7 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
   ho->cb = history_cb;
   ho->cb_cls = history_cb_cls;
   seconds = date.abs_value_us / 1000LL / 1000LL;
-  base = MAH_path_to_url_ (backend_uri,
+  base = MAH_path_to_url_ (backend_url,
 			   "/history");
   GNUNET_asprintf (&ho->url,
                    "%s?date=%llu&instance=%s&start=%d&delta=%d",

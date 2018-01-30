@@ -153,9 +153,9 @@ struct Exchange
   struct TMH_EXCHANGES_FindOperation *fo_tail;
 
   /**
-   * (base) URI of the exchange.
+   * (base) URL of the exchange.
    */
-  char *uri;
+  char *url;
 
   /**
    * A connection to this exchange
@@ -279,14 +279,14 @@ retry_exchange (void *cls)
   exchange->retry_task = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Connecting to exchange exchange %s in retry_exchange\n",
-              exchange->uri);
+              exchange->url);
   if (NULL != exchange->conn)
   {
     TALER_EXCHANGE_disconnect (exchange->conn);
     exchange->conn = NULL;
   }
   exchange->conn = TALER_EXCHANGE_connect (merchant_curl_ctx,
-                                           exchange->uri,
+                                           exchange->url,
                                            &keys_mgmt_cb,
                                            exchange,
                                            TALER_EXCHANGE_OPTION_END);
@@ -565,7 +565,7 @@ handle_wire_data (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Failed to obtain /wire details from `%s': %d\n",
-                exchange->uri,
+                exchange->url,
                 ec);
     return;
   }
@@ -685,13 +685,13 @@ keys_mgmt_cb (void *cls,
       /* Give up, log hard error. */
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
 		  "Exchange `%s' runs an incompatible more recent version of the Taler protocol. Will not retry. This client may need to be updated.\n",
-		  exchange->uri);
+		  exchange->url);
       return;
     }
     exchange->retry_delay = RETRY_BACKOFF (exchange->retry_delay);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Failed to fetch /keys from `%s', retrying in %s\n",
-                exchange->uri,
+                exchange->url,
                 GNUNET_STRINGS_relative_time_to_string (exchange->retry_delay,
                                                         GNUNET_YES));
     GNUNET_assert (NULL == exchange->retry_task);
@@ -710,7 +710,7 @@ keys_mgmt_cb (void *cls,
       once = 1;
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
 		  "Exchange `%s' runs a more recent version of the Taler protocol. You may want to update this client.\n",
-		  exchange->uri);
+		  exchange->url);
     }
   }
   expire = TALER_EXCHANGE_check_keys_current (exchange->conn,
@@ -775,7 +775,7 @@ return_result (void *cls)
  * to the exchange, or if it is not acceptable, @a fc is called with
  * NULL for the exchange.
  *
- * @param chosen_exchange URI of the exchange we would like to talk to
+ * @param chosen_exchange URL of the exchange we would like to talk to
  * @param wire_method the wire method we will use with @a chosen_exchange, NULL for none
  * @param fc function to call with the handles for the exchange
  * @param fc_cls closure for @a fc
@@ -804,9 +804,9 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   /* Check if the exchange is known */
   for (exchange = exchange_head; NULL != exchange; exchange = exchange->next)
     /* test it by checking public key --- FIXME: hostname or public key!?
-       Should probably be URI, not hostname anyway! */
+       Should probably be URL, not hostname anyway! */
   {
-    if (0 == strcmp (exchange->uri,
+    if (0 == strcmp (exchange->url,
                      chosen_exchange))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -816,13 +816,13 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
     }
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Comparing chosen exchange url '%s' with known url '%s'.\n",
-                chosen_exchange, exchange->uri);
+                chosen_exchange, exchange->url);
   }
   if (NULL == exchange)
   {
     /* This is a new exchange */
     exchange = GNUNET_new (struct Exchange);
-    exchange->uri = GNUNET_strdup (chosen_exchange);
+    exchange->url = GNUNET_strdup (chosen_exchange);
     exchange->pending = GNUNET_YES;
     GNUNET_CONTAINER_DLL_insert (exchange_head,
                                  exchange_tail,
@@ -916,7 +916,7 @@ accept_exchanges (void *cls,
                   const char *section)
 {
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
-  char *uri;
+  char *url;
   char *mks;
   struct Exchange *exchange;
 
@@ -927,16 +927,16 @@ accept_exchanges (void *cls,
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
-                                             "URI",
-                                             &uri))
+                                             "URL",
+                                             &url))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "URI");
+                               "URL");
     return;
   }
   exchange = GNUNET_new (struct Exchange);
-  exchange->uri = uri;
+  exchange->url = url;
   if (GNUNET_OK ==
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
@@ -1010,7 +1010,7 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     if (GNUNET_YES != exchange->trusted)
       continue;
     j_exchange = json_pack ("{s:s, s:o}",
-                            "url", exchange->uri,
+                            "url", exchange->url,
                             "master_pub", GNUNET_JSON_from_data_auto (&exchange->master_pub));
     GNUNET_assert (0 ==
                    json_array_append_new (trusted_exchanges,
@@ -1070,7 +1070,7 @@ TMH_EXCHANGES_done ()
       GNUNET_SCHEDULER_cancel (exchange->retry_task);
       exchange->retry_task = NULL;
     }
-    GNUNET_free (exchange->uri);
+    GNUNET_free (exchange->url);
     GNUNET_free (exchange);
   }
   GNUNET_CURL_fini (merchant_curl_ctx);

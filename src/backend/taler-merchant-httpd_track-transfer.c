@@ -91,9 +91,9 @@ struct TrackTransferContext
   struct GNUNET_SCHEDULER_Task *timeout_task;
 
   /**
-   * URI of the exchange.
+   * URL of the exchange.
    */
-  char *uri;
+  char *url;
 
   /**
    * Wire method used for the transfer.
@@ -183,10 +183,10 @@ free_transfer_track_context (struct TrackTransferContext *rctx)
     TALER_EXCHANGE_track_transfer_cancel (rctx->wdh);
     rctx->wdh = NULL;
   }
-  if (NULL != rctx->uri)
+  if (NULL != rctx->url)
   {
-    GNUNET_free (rctx->uri);
-    rctx->uri = NULL;
+    GNUNET_free (rctx->url);
+    rctx->url = NULL;
   }
   if (NULL != rctx->wire_method)
   {
@@ -620,7 +620,7 @@ wire_transfer_cb (void *cls,
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
     qs = db->store_transfer_to_proof (db->cls,
-				      rctx->uri,
+				      rctx->url,
 				      &rctx->wtid,
 				      execution_time,
 				      exchange_pub,
@@ -878,7 +878,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
 {
   struct TrackTransferContext *rctx;
   const char *str;
-  const char *uri;
+  const char *url;
   const char *instance_str;
   const char *wire_method;
   int ret;
@@ -928,14 +928,14 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
     return MHD_YES; /* still work in progress */
   }
 
-  uri = MHD_lookup_connection_value (connection,
+  url = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "exchange");
-  if (NULL == uri)
+  if (NULL == url)
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
                                            "exchange");
-  rctx->uri = GNUNET_strdup (uri);
+  rctx->url = GNUNET_strdup (url);
 
   wire_method = MHD_lookup_connection_value (connection,
 					     MHD_GET_ARGUMENT_KIND,
@@ -988,7 +988,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
 
   /* Check if reply is already in database! */
   qs = db->find_proof_by_wtid (db->cls,
-			       rctx->uri,
+			       rctx->url,
 			       &rctx->wtid,
 			       &proof_cb,
 			       rctx);
@@ -1022,7 +1022,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Suspending /track/transfer handling while working with the exchange\n");
   MHD_suspend_connection (connection);
-  rctx->fo = TMH_EXCHANGES_find_exchange (uri,
+  rctx->fo = TMH_EXCHANGES_find_exchange (url,
                                           NULL,
                                           &process_track_transfer_with_exchange,
                                           rctx);

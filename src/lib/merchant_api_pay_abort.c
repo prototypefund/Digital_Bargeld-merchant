@@ -254,7 +254,7 @@ handle_pay_finished (void *cls,
  * by the logic using this library.
  *
  * @param ctx the execution loop context
- * @param merchant_uri base URI of the merchant's backend
+ * @param merchant_url base URL of the merchant's backend
  * @param instance which merchant instance will receive this payment
  * @param h_contract_terms hashcode of the proposal being paid
  * @param amount total value of the contract to be paid to the merchant
@@ -274,7 +274,7 @@ handle_pay_finished (void *cls,
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
-			   const char *merchant_uri,
+			   const char *merchant_url,
 			   const char *instance,
                            const struct GNUNET_HashCode *h_contract_terms,
 			   const struct TALER_Amount *amount,
@@ -440,7 +440,7 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
   ph->ctx = ctx;
   ph->cb = pay_cb;
   ph->cb_cls = pay_cb_cls;
-  ph->url = MAH_path_to_url_ (merchant_uri,
+  ph->url = MAH_path_to_url_ (merchant_url,
 			      "/pay");
   ph->num_coins = num_coins;
   ph->coins = GNUNET_new_array (num_coins,

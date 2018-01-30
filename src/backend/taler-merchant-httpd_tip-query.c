@@ -71,11 +71,11 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
   enum GNUNET_DB_QueryStatus qs;
   struct TALER_Amount tip_amount;
   struct GNUNET_TIME_Absolute tip_timestamp;
-  char *tip_exchange_uri;
+  char *tip_exchange_url;
 
   qs = db->lookup_tip_by_id (db->cls,
                              &tip_id,
-                             &tip_exchange_uri,
+                             &tip_exchange_url,
                              &tip_amount,
                              &tip_timestamp);
 
@@ -91,7 +91,7 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
       return TMH_RESPONSE_reply_json_pack (connection,
                                            MHD_HTTP_OK,
                                            "{s:s, s:s}",
-                                           "exchange", tip_exchange_uri,
+                                           "exchange", tip_exchange_url,
                                            "timestamp", GNUNET_JSON_from_time_abs (tip_timestamp),
                                            "amount", TALER_JSON_from_amount (&tip_amount));
   }

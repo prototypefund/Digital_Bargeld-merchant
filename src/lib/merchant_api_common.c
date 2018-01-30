@@ -29,7 +29,7 @@
  *
  * @param base_url base URL of the exchange (i.e. "http://exchange/")
  * @param path Taler API path (i.e. "/reserve/withdraw")
- * @return the full URI to use with cURL
+ * @return the full URL to use with cURL
  */
 char *
 MAH_path_to_url_ (const char *base_url,

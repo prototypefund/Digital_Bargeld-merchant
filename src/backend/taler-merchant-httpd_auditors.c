@@ -34,9 +34,9 @@ struct Auditor
   char *name;
 
   /**
-   * Auditor's URI.
+   * Auditor's URL.
    */
-  char *uri;
+  char *url;
 
   /**
    * Public key of the auditor.
@@ -156,12 +156,12 @@ parse_auditors (void *cls,
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
-                                             "URI",
-                                             &auditor.uri))
+                                             "URL",
+                                             &auditor.url))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "URI");
+                               "URL");
     GNUNET_free (auditor.name);
     return;
   }
@@ -175,7 +175,7 @@ parse_auditors (void *cls,
                                section,
                                "PUBLIC_KEY");
     GNUNET_free (auditor.name);
-    GNUNET_free (auditor.uri);
+    GNUNET_free (auditor.url);
     return;
   }
   if (GNUNET_OK !=
@@ -188,7 +188,7 @@ parse_auditors (void *cls,
                                "PUBLIC_KEY",
                                "valid public key");
     GNUNET_free (auditor.name);
-    GNUNET_free (auditor.uri);
+    GNUNET_free (auditor.url);
     GNUNET_free (pks);
     return;
   }
@@ -225,7 +225,7 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
                                           json_pack ("{s:s, s:o, s:s}",
                                                      "name", auditors[cnt].name,
                                                      "auditor_pub", GNUNET_JSON_from_data_auto (&auditors[cnt].public_key),
-                                                     "uri", auditors[cnt].uri)));
+                                                     "url", auditors[cnt].url)));
   return nauditors;
 }
 
@@ -241,7 +241,7 @@ TMH_AUDITORS_done ()
   for (unsigned int i=0;i<nauditors;i++)
   {
     GNUNET_free (auditors[i].name);
-    GNUNET_free (auditors[i].uri);
+    GNUNET_free (auditors[i].url);
   }
   GNUNET_free_non_null (auditors);
   auditors = NULL;

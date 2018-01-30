@@ -170,7 +170,7 @@ TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOpera
  * Increase the refund associated to a order
  *
  * @param ctx the CURL context used to connect to the backend
- * @param backend_uri backend's base URL, including final "/"
+ * @param backend_url backend's base URL, including final "/"
  * @param order_id id of the order whose refund is to be increased
  * @param refund amount to which increase the refund
  * @param reason human-readable reason justifying the refund
@@ -180,7 +180,7 @@ TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOpera
  */
 struct TALER_MERCHANT_RefundIncreaseOperation *
 TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
-                                const char *backend_uri,
+                                const char *backend_url,
                                 const char *order_id,
                                 const struct TALER_Amount *refund,
                                 const char *reason,
@@ -196,7 +196,7 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
   rio->ctx = ctx;
   rio->cb = cb;
   rio->cb_cls = cb_cls;
-  rio->url = MAH_path_to_url_ (backend_uri,
+  rio->url = MAH_path_to_url_ (backend_url,
 			       "/refund");
   req = json_pack ("{s:o, s:s, s:s, s:s}",
                    "refund", TALER_JSON_from_amount (refund),
@@ -302,7 +302,7 @@ handle_refund_lookup_finished (void *cls,
  * Does a GET /refund.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
  * @param order_id order id used to perform the lookup
  * @param cb callback which will work the response gotten from the backend
  * @param cb_cls closure to pass to the callback
@@ -310,7 +310,7 @@ handle_refund_lookup_finished (void *cls,
  */
 struct TALER_MERCHANT_RefundLookupOperation *
 TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
-                              const char *backend_uri,
+                              const char *backend_url,
                               const char *order_id,
                               const char *instance,
                               TALER_MERCHANT_RefundLookupCallback cb,
@@ -326,7 +326,7 @@ TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
 
   GNUNET_asprintf (&rlo->url,
                    "%s/public/refund?instance=%s&order_id=%s",
-                   backend_uri,
+                   backend_url,
                    instance,
                    order_id);
   eh = curl_easy_init ();

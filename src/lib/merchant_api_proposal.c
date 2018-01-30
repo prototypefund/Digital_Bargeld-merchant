@@ -75,7 +75,7 @@ struct TALER_MERCHANT_ProposalOperation
 struct TALER_MERCHANT_ProposalLookupOperation
 {
   /**
-   * Full URI, includes "/proposal".
+   * Full URL, includes "/proposal".
    */
   char *url;
 
@@ -192,7 +192,7 @@ handle_proposal_finished (void *cls,
  * POST an order to the backend and receives the related proposal.
  *
  * @param ctx execution context
- * @param backend_uri URI of the backend
+ * @param backend_url URL of the backend
  * @param order basic information about this purchase, to be extended by the
  * backend
  * @param proposal_cb the callback to call when a reply for this request is
@@ -202,7 +202,7 @@ handle_proposal_finished (void *cls,
  */
 struct TALER_MERCHANT_ProposalOperation *
 TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
-                          const char *backend_uri,
+                          const char *backend_url,
                           const json_t *order,
                           TALER_MERCHANT_ProposalCallback proposal_cb,
                           void *proposal_cb_cls)
@@ -215,7 +215,7 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
   po->ctx = ctx;
   po->cb = proposal_cb;
   po->cb_cls = proposal_cb_cls;
-  po->url = MAH_path_to_url_ (backend_uri,
+  po->url = MAH_path_to_url_ (backend_url,
 			      "/order");
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
@@ -349,7 +349,7 @@ handle_proposal_lookup_finished (void *cls,
  * retrieve a proposal data by providing its transaction id.
  *
  * @param ctx execution context
- * @param backend_uri base URL of the merchant backend
+ * @param backend_url base URL of the merchant backend
  * @param order_id order id used to perform the lookup
  * @param nonce nonce used to perform the lookup
  * @param plo_cb callback which will work the response gotten from the backend
@@ -358,7 +358,7 @@ handle_proposal_lookup_finished (void *cls,
  */
 struct TALER_MERCHANT_ProposalLookupOperation *
 TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
-                                const char *backend_uri,
+                                const char *backend_url,
                                 const char *order_id,
                                 const char *instance,
                                 const struct GNUNET_CRYPTO_EddsaPublicKey *nonce,
@@ -373,7 +373,7 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
   plo->ctx = ctx;
   plo->cb = plo_cb;
   plo->cb_cls = plo_cb_cls;
-  base = MAH_path_to_url_ (backend_uri,
+  base = MAH_path_to_url_ (backend_url,
 			   "/public/proposal");
   if (NULL != nonce)
   {

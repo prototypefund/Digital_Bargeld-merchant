@@ -214,22 +214,22 @@ handle_track_transfer_finished (void *cls,
  * Request backend to return transfers associated with a given wtid.
  *
  * @param ctx execution context
- * @param backend_uri base URI of the backend
+ * @param backend_url base URL of the backend
  * @param instance which merchant instance is going to be tracked
  * @param wire_method wire method used for the wire transfer
  * @param wtid base32 string indicating a wtid
- * @param exchange_uri base URL of the exchange in charge of returning the wanted information
+ * @param exchange_url base URL of the exchange in charge of returning the wanted information
  * @param track_transfer_cb the callback to call when a reply for this request is available
  * @param track_transfer_cb_cls closure for @a contract_cb
  * @return a handle for this request
  */
 struct TALER_MERCHANT_TrackTransferHandle *
 TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
-                               const char *backend_uri,
+                               const char *backend_url,
                                const char *instance,
 			       const char *wire_method,
                                const struct TALER_WireTransferIdentifierRawP *wtid,
-                               const char *exchange_uri,
+                               const char *exchange_url,
                                TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
                                void *track_transfer_cb_cls)
 {
@@ -244,14 +244,14 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   tdo->ctx = ctx;
   tdo->cb = track_transfer_cb; // very last to be called
   tdo->cb_cls = track_transfer_cb_cls;
-  /* TODO: do we need to escape 'exchange_uri' here? */
-  base = MAH_path_to_url_ (backend_uri,
+  /* TODO: do we need to escape 'exchange_url' here? */
+  base = MAH_path_to_url_ (backend_url,
 			   "/track/transfer");
   GNUNET_asprintf (&tdo->url,
                    "%s?wtid=%s&exchange=%s&instance=%s&wire_method=%s",
                    base,
                    wtid_str,
-                   exchange_uri,
+                   exchange_url,
 		   instance,
 		   wire_method);
   GNUNET_free (base);
