@@ -575,11 +575,11 @@ In that section, the following options need to be configured:
 @itemize
 
 @item
-The ``uri'' option specifies the exchange's base URL.  For example,
+The ``url'' option specifies the exchange's base URL.  For example,
 to use the Taler demonstrator use:
 
 @example
-$ taler-config -s merchant-exchange-demo -o URI \
+$ taler-config -s merchant-exchange-demo -o URL \
   -V https://exchange.demo.taler.net/
 @end example
 
@@ -639,7 +639,7 @@ For the @code{test} wire format, a sample specification looks as follows:
 @verbatim
 {
   "type": "test",
-  "bank_uri": "https://bank.demo.taler.net/",
+  "bank_url": "https://bank.demo.taler.net/",
   "account_number": 5,
   "salt": "RANDOMSALT"
 }
@@ -695,7 +695,7 @@ TEST_RESPONSE_FILE = $DATADIR/test.json
 config = postgres:///donations
 
 [merchant-demoexchange]
-uri = https://exchange.demo.taler.net/
+url = https://exchange.demo.taler.net/
 master_key = CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
 @end smallexample
 
@@ -785,7 +785,7 @@ currency = KUDOS
 Run the test in the following way:
 
 @example
-$ taler-merchant-generate-payments [-c config] [-e EURI] [-m MURI]
+$ taler-merchant-generate-payments [-c config] [-e EURL] [-m MURL]
 @end example
 
 the argument @code{config} given to @code{-c} points to the configuration
@@ -794,7 +794,7 @@ By default, the tool forks two processes: one for the merchant backend, and one
 for the exchange.
 The option @code{-e} (@code{-m}) avoids any exchange (merchant backend) fork,
 and just runs the generator against the exchange (merchant backend) running
-at @code{EURI} (@code{MURI}).
+at @code{EURL} (@code{MURL}).
 
 Please NOTE that the generator contains @emph{hardcoded} values, as for deposit
 fees of the coins it uses.  In order to work against the used exchange, those values
@@ -1156,7 +1156,7 @@ in the body of the POST request:
 @end itemize
 
 In response to this request, the backend will return a tip token, an expiration
-time and the exchange URI.  The expiration time will indicate how long the tip
+time and the exchange URL.  The expiration time will indicate how long the tip
 is valid (when the reserve expires).  The tip token is an opaque string that
 contains all the information needed by the wallet to process the tip.  The
 frontend must send this tip token to the browser in a  a special ``402 Payment
