@@ -863,45 +863,6 @@ struct Command
     struct {
 
       /**
-       * Reference to the operation that provisioned the reserve.
-       * Used to determine the reserve private key and the instance.
-       */
-      const char *admin_add_incoming_ref;
-
-      /**
-       * Reference to another enable operation, usually NULL. Can
-       * be set to a non-NULL value to call enable again with the
-       * same @e credit_uuid that was previously used.
-       */
-      const char *uuid_ref;
-
-      /**
-       * How much should be put into the tipping reserve? If
-       * NULL, the amount is taken from the @e admin_add_incoming_ref.
-       */
-      const char *amount;
-
-      /**
-       * Handle to the ongoing operation.
-       */
-      struct TALER_MERCHANT_TipEnableOperation *teo;
-
-      /**
-       * UUID used for the enable operation, set by the interpreter to
-       * a random value UNLESS @e uuid_ref is non-NULL.
-       */
-      struct GNUNET_HashCode credit_uuid;
-
-      /**
-       * EC expected for the operation.
-       */
-      enum TALER_ErrorCode expected_ec;
-
-    } tip_enable;
-
-    struct {
-
-      /**
        * Specify the instance (to succeed, this must match a prior
        * enable action and the respective wire transfer's instance).
        */

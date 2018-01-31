@@ -40,7 +40,6 @@
 #include "taler-merchant-httpd_track-transaction.h"
 #include "taler-merchant-httpd_track-transfer.h"
 #include "taler-merchant-httpd_tip-authorize.h"
-#include "taler-merchant-httpd_tip-enable.h"
 #include "taler-merchant-httpd_tip-pickup.h"
 #include "taler-merchant-httpd_tip-query.h"
 #include "taler-merchant-httpd_history.h"
