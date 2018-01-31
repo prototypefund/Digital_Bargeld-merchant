@@ -20,6 +20,7 @@
  */
 #include "platform.h"
 #include <jansson.h>
+#include <taler/taler_util.h>
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
@@ -329,9 +330,9 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
 
     if (NULL == json_object_get (tac->root, "pickup_url"))
     {
-      char *pickup_url = TMH_make_absolute_backend_url (connection,
-                                                         "tip-pickup",
-                                                         NULL);
+      char *pickup_url = TALER_url_absolute_mhd (connection,
+                                                 "tip-pickup",
+                                                 NULL);
       GNUNET_assert (NULL != pickup_url);
       json_object_set_new (tac->root, "pickup_url", json_string (pickup_url));
       GNUNET_free (pickup_url);
@@ -431,9 +432,9 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                            "pickup_url", tac->pickup_url);
     tip_token_str = json_dumps (tip_token, JSON_COMPACT);
     GNUNET_assert (NULL != tip_token_str);
-    tip_redirect_url = TMH_make_absolute_backend_url (connection, "public/trigger-pay",
-                                                      "tip_token", tip_token_str,
-                                                      NULL);
+    tip_redirect_url = TALER_url_absolute_mhd (connection, "public/trigger-pay",
+                                               "tip_token", tip_token_str,
+                                               NULL);
     GNUNET_assert (NULL != tip_redirect_url);
     /* FIXME:  This is pretty redundant, but we want to support some older
      * merchant implementations.  Newer ones should only get the

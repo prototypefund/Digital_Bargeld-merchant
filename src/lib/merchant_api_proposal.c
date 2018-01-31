@@ -29,7 +29,6 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
-#include "merchant_api_common.h"
 
 
 /**
@@ -215,8 +214,7 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
   po->ctx = ctx;
   po->cb = proposal_cb;
   po->cb_cls = proposal_cb_cls;
-  po->url = MAH_path_to_url_ (backend_url,
-			      "/order");
+  po->url = TALER_url_join (backend_url, "/order", NULL);
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
   eh = curl_easy_init ();
@@ -373,8 +371,7 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
   plo->ctx = ctx;
   plo->cb = plo_cb;
   plo->cb_cls = plo_cb_cls;
-  base = MAH_path_to_url_ (backend_url,
-			   "/public/proposal");
+  base = TALER_url_join (backend_url, "/public/proposal", NULL);
   if (NULL != nonce)
   {
     char *nonce_str;

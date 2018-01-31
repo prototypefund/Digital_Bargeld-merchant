@@ -136,10 +136,11 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   if (NULL == contract_url)
   {
-    final_contract_url = TMH_make_absolute_backend_url (connection, "/public/proposal",
-                                                        "instance", instance_str,
-                                                        "order_id", order_id,
-                                                        NULL);
+    final_contract_url = TALER_url_absolute_mhd (connection, "/public/proposal",
+                                                 "instance", instance_str,
+                                                 "order_id", order_id,
+                                                 NULL);
+    GNUNET_assert (NULL != final_contract_url);
   }
   else
   {
@@ -314,12 +315,13 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
 do_pay:
   {
-    char *url = TMH_make_absolute_backend_url (connection, "public/trigger-pay",
-                                               "contract_url", final_contract_url,
-                                               "session_id", session_id,
-                                               "resource_url", resource_url,
-                                               "h_contract_terms", h_contract_terms_str,
-                                               NULL);
+    char *url = TALER_url_absolute_mhd (connection, "public/trigger-pay",
+                                        "contract_url", final_contract_url,
+                                        "session_id", session_id,
+                                        "resource_url", resource_url,
+                                        "h_contract_terms", h_contract_terms_str,
+                                        NULL);
+    GNUNET_assert (NULL != url);
     int ret = TMH_RESPONSE_reply_json_pack (connection,
                                             MHD_HTTP_OK,
                                             "{s:s, s:b}",

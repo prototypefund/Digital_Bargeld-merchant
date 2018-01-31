@@ -30,7 +30,6 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
-#include "merchant_api_common.h"
 
 
 /**
@@ -206,13 +205,13 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
   cpo->ctx = ctx;
   cpo->cb = check_payment_cb;
   cpo->cb_cls = check_payment_cb_cls;
-  cpo->url = MAH_make_url (backend_url, "/check-payment",
-                           "instance", instance,
-                           "order_id", order_id,
-                           "resource_url", resource_url,
-                           "session_id", session_id,
-                           "session_sig", session_sig,
-                           NULL);
+  cpo->url = TALER_url_join (backend_url, "/check-payment",
+                             "instance", instance,
+                             "order_id", order_id,
+                             "resource_url", resource_url,
+                             "session_id", session_id,
+                             "session_sig", session_sig,
+                             NULL);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,

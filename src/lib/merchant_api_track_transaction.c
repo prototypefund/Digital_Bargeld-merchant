@@ -30,7 +30,6 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
-#include "merchant_api_common.h"
 
 
 /**
@@ -152,8 +151,7 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
   tdo->ctx = ctx;
   tdo->cb = track_transaction_cb;
   tdo->cb_cls = track_transaction_cb_cls;
-  base = MAH_path_to_url_ (backend_url,
-			   "/track/transaction");
+  base = TALER_url_join (backend_url, "/track/transaction", NULL);
   GNUNET_asprintf (&tdo->url,
                    "%s?order_id=%s&instance=%s",
                    base,

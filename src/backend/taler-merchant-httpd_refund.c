@@ -287,19 +287,19 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     char *refund_pickup_url;
     char *refund_redirect_url;
 
-    refund_pickup_url = TMH_make_absolute_backend_url (connection,
-                                                       "/public/refund",
-                                                       "instance",
-                                                       mi->id,
-                                                       "order_id",
-                                                       order_id,
-                                                       NULL);
+    refund_pickup_url = TALER_url_absolute_mhd (connection,
+                                                "/public/refund",
+                                                "instance",
+                                                mi->id,
+                                                "order_id",
+                                                order_id,
+                                                NULL);
     GNUNET_assert (NULL != refund_pickup_url);
-    refund_redirect_url = TMH_make_absolute_backend_url (connection,
-                                                         "public/trigger-pay",
-                                                         "refund_url",
-                                                         refund_pickup_url,
-                                                         NULL);
+    refund_redirect_url = TALER_url_absolute_mhd (connection,
+                                                  "public/trigger-pay",
+                                                  "refund_url",
+                                                  refund_pickup_url,
+                                                  NULL);
     GNUNET_assert (NULL != refund_redirect_url);
     ret = TMH_RESPONSE_reply_json_pack (connection,
                                         MHD_HTTP_OK,

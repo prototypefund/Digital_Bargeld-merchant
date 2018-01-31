@@ -27,7 +27,6 @@
 #include <gnunet/gnunet_curl_lib.h>
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
-#include "merchant_api_common.h"
 
 
 /**
@@ -167,8 +166,7 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
   ho->cb = history_cb;
   ho->cb_cls = history_cb_cls;
   seconds = date.abs_value_us / 1000LL / 1000LL;
-  base = MAH_path_to_url_ (backend_url,
-			   "/history");
+  base = TALER_url_join (backend_url, "/history", NULL);
   GNUNET_asprintf (&ho->url,
                    "%s?date=%llu&instance=%s&start=%d&delta=%d",
                    base,

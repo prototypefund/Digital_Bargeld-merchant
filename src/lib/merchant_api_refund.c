@@ -30,7 +30,6 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
-#include "merchant_api_common.h"
 
 
 struct TALER_MERCHANT_RefundLookupOperation
@@ -196,8 +195,7 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
   rio->ctx = ctx;
   rio->cb = cb;
   rio->cb_cls = cb_cls;
-  rio->url = MAH_path_to_url_ (backend_url,
-			       "/refund");
+  rio->url = TALER_url_join (backend_url, "/refund", NULL);
   req = json_pack ("{s:o, s:s, s:s, s:s}",
                    "refund", TALER_JSON_from_amount (refund),
                    "order_id", order_id,

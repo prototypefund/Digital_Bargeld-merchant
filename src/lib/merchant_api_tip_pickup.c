@@ -29,7 +29,6 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
-#include "merchant_api_common.h"
 
 
 /**
@@ -282,8 +281,7 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
   tpo->ctx = ctx;
   tpo->cb = pickup_cb;
   tpo->cb_cls = pickup_cb_cls;
-  tpo->url = MAH_path_to_url_ (backend_url,
-                               "/public/tip-pickup");
+  tpo->url = TALER_url_join (backend_url, "/public/tip-pickup", NULL);
   if (NULL == (tpo->json_enc =
                json_dumps (tp_obj,
                            JSON_COMPACT)))

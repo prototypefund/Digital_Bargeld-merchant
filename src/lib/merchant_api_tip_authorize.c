@@ -29,7 +29,6 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
-#include "merchant_api_common.h"
 
 
 /**
@@ -203,8 +202,7 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
   tao->ctx = ctx;
   tao->cb = authorize_cb;
   tao->cb_cls = authorize_cb_cls;
-  tao->url = MAH_path_to_url_ (backend_url,
-                               "/tip-authorize");
+  tao->url = TALER_url_join (backend_url, "/tip-authorize", NULL);
   te_obj = json_pack ("{"
                       " s:o," /* amount */
                       " s:s," /* instance */

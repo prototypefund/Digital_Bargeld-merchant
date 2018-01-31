@@ -29,7 +29,6 @@
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
 #include <taler/taler_exchange_service.h>
-#include "merchant_api_common.h"
 
 
 /**
@@ -564,8 +563,7 @@ request_pay_generic (struct GNUNET_CURL_Context *ctx,
   ph->abort_cb_cls = abort_cb_cls;
   ph->pay_cb = pay_cb;
   ph->pay_cb_cls = pay_cb_cls;
-  ph->url = MAH_path_to_url_ (merchant_url,
-			      "/public/pay");
+  ph->url = TALER_url_join (merchant_url, "/public/pay", NULL);
   ph->num_coins = num_coins;
   ph->coins = GNUNET_new_array (num_coins,
                                 struct TALER_MERCHANT_PaidCoin);

@@ -14,7 +14,6 @@ libtalermerchant_la_LDFLAGS = \
   -no-undefined
 
 libtalermerchant_la_SOURCES = \
-  merchant_api_common.c merchant_api_common.h \
   merchant_api_proposal.c \
   merchant_api_pay.c \
   merchant_api_tip_authorize.c \
