@@ -395,26 +395,31 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   if (TALER_EC_NONE != ec)
   {
     unsigned int rc;
+    const char *msg;
 
     switch (ec)
     {
     case TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS:
       rc = MHD_HTTP_PRECONDITION_FAILED;
+      msg = "Failed to approve tip: merchant has insufficient tipping funds";
       break;
     case TALER_EC_TIP_AUTHORIZE_RESERVE_EXPIRED:
+      msg = "Failed to approve tip: merchant's tipping reserve expired";
       rc = MHD_HTTP_PRECONDITION_FAILED;
       break;
     case TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN:
+      msg = "Failed to approve tip: merchant's tipping reserve does not exist";
       rc = MHD_HTTP_NOT_FOUND;
       break;
     default:
       rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      msg = "Failed to approve tip: internal server error";
       break;
     }
     return TMH_RESPONSE_reply_rc (connection,
                                   rc,
                                   ec,
-                                  "Database error approving tip");
+                                  msg);
   }
 
   /* generate success response */
