@@ -332,7 +332,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     if (NULL == json_object_get (tac->root, "pickup_url"))
     {
       char *pickup_url = TALER_url_absolute_mhd (connection,
-                                                 "tip-pickup",
+                                                 "/public/tip-pickup",
                                                  NULL);
       GNUNET_assert (NULL != pickup_url);
       json_object_set_new (tac->root, "pickup_url", json_string (pickup_url));
