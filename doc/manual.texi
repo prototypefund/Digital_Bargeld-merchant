@@ -4,6 +4,8 @@
 @include version.texi
 @settitle The GNU Taler merchant backend operator tutorial @value{VERSION}
 
+@include syntax.texi
+
 @c Define a new index for options.
 @defcodeindex op
 @c Combine everything into one index (arbitrarily chosen to be the
@@ -159,7 +161,7 @@ The Taler software stack for a merchant consists of four main components:
 The following image illustrates the various interactions of these
 key components:
 
-@center @image{arch, 3in, 4in}
+@center @image{arch, 3in}
 
 @cindex RESTful
 Basically, the backend provides the cryptographic protocol support,

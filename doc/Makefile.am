@@ -1,13 +1,12 @@
 all: manual.pdf manual.html
 
 manual.pdf: arch.pdf manual.texi
-	texi2pdf manual.texi
-manual.html: arch.jpg manual.texi
-	makeinfo --html --no-split manual.texi
+manual.html: arch.png manual.texi
+
 arch.pdf: arch.dot
 	dot -Tpdf arch.dot > arch.pdf
-arch.jpg: arch.dot
-	dot -Tjpg arch.dot > arch.jpg
+arch.png: arch.dot
+	dot -Tpng arch.dot > arch.png
 
 AM_MAKEINFOHTMLFLAGS = --no-split --css-ref=docstyle.css --css-ref=brown-paper.css
 
