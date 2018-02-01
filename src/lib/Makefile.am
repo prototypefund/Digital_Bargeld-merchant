@@ -22,7 +22,8 @@ libtalermerchant_la_SOURCES = \
   merchant_api_track_transfer.c \
   merchant_api_history.c \
   merchant_api_refund.c \
-  merchant_api_check_payment.c
+  merchant_api_check_payment.c \
+  merchant_api_tip_query.c
 
 libtalermerchant_la_LIBADD = \
   -ltalerexchange \

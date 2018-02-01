@@ -922,7 +922,7 @@ TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tp);
 
 
 /**
- * Handle for a /tip-pickup operation.
+ * Handle for a /check-payment operation.
  */
 struct TALER_MERCHANT_CheckPaymentOperation;
 
@@ -980,14 +980,76 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                               TALER_MERCHANT_CheckPaymentCallback check_payment_cb,
                               void *check_payment_cls);
 
-
 /**
  * Cancel a GET /check-payment request.
+ *
+ * @param cpo handle to the request to be canceled
+ */
+void
+TALER_MERCHANT_check_payment_cancel (struct TALER_MERCHANT_CheckPaymentOperation *cpo);
+
+
+/* ********************** /tip-query ************************* */
+
+/**
+ * Handle for a /tip-query operation.
+ */
+struct TALER_MERCHANT_TipQueryOperation;
+
+
+/**
+ * Callback to process a GET /tip-query request
+ *
+ * @param cls closure
+ * @param http_status HTTP status code for this request
+ * @param ec Taler-specific error code
+ * @param raw raw response body
+ */
+typedef void
+(*TALER_MERCHANT_TipQueryCallback) (void *cls,
+                                    unsigned int http_status,
+                                    enum TALER_ErrorCode ec,
+                                    const json_t *raw,
+                                    struct GNUNET_TIME_Absolute reserve_expiration,
+                                    struct TALER_ReservePublicKeyP *reserve_pub,
+                                    struct TALER_Amount *amount_authorized,
+                                    struct TALER_Amount *amount_available,
+                                    struct TALER_Amount *amount_picked_up);
+
+
+/**
+ * Cancel a GET /tip-query request.
  *
  * @param cph handle to the request to be canceled
  */
 void
-TALER_MERCHANT_check_payment_cancel (struct TALER_MERCHANT_CheckPaymentOperation *cph);
+TALER_MERCHANT_tip_query_cancel (struct TALER_MERCHANT_TipQueryOperation *tqo);
+
+
+/**
+ * Issue a /tip-query request to the backend.  Informs the backend
+ * that a customer wants to pick up a tip.
+ *
+ * @param ctx execution context
+ * @param backend_url base URL of the merchant backend
+ * @param instance instance to query
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_TipQueryOperation *
+TALER_MERCHANT_tip_query (struct GNUNET_CURL_Context *ctx,
+                          const char *backend_url,
+                          const char *instance,
+                          TALER_MERCHANT_TipQueryCallback query_cb,
+                          void *query_cb_cls);
+
+
+/**
+ * Cancel a GET /tip-query request.
+ *
+ * @param tqo handle to the request to be canceled
+ */
+void
+TALER_MERCHANT_tip_query_cancel (struct TALER_MERCHANT_TipQueryOperation *tqh);
 
 
 #endif  /* _TALER_MERCHANT_SERVICE_H */

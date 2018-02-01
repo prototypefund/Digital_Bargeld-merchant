@@ -16,7 +16,6 @@
 /**
  * @file backend/taler-merchant-httpd_tip-query.h
  * @brief headers for /tip-query handler
- * @author Christian Grothoff
  * @author Florian Dold
  */
 #ifndef TALER_MERCHANT_HTTPD_TIP_QUERY_H
@@ -25,8 +24,7 @@
 #include "taler-merchant-httpd.h"
 
 /**
- * Manages a /tip-query call, checking if a tip authorization
- * exists and, if so, returning its details.
+ * Manages a /tip-query call.
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle

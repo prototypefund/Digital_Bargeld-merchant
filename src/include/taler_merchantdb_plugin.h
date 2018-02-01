@@ -738,6 +738,22 @@ struct TALER_MERCHANTDB_Plugin
                    struct GNUNET_TIME_Absolute *expiration,
                    struct GNUNET_HashCode *tip_id);
 
+  /**
+   * Get the total amount of authorized tips for a tipping reserve.
+   *
+   * @param cls closure, typically a connection to the db
+   * @param reserve_priv which reserve to check
+   * @param[out] authorzed_amount amount we've authorized so far for tips
+   * @return transaction status, usually
+   *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT for success
+   *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if the reserve_priv
+   *      does not identify a known tipping reserve
+   */
+  enum GNUNET_DB_QueryStatus
+  (*get_authorized_tip_amount)(void *cls,
+                               const struct TALER_ReservePrivateKeyP *reserve_priv,
+                               struct TALER_Amount *authorized_amount);
+
 
   /**
    * Find out tip authorization details associated with @a tip_id

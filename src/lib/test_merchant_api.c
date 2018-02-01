@@ -248,6 +248,11 @@ enum OpCode
    */
   OC_CHECK_PAYMENT,
 
+  /**
+   * Query tip stats.
+   */
+  OC_TIP_QUERY,
+
 };
 
 
@@ -960,6 +965,37 @@ struct Command
       enum TALER_ErrorCode expected_ec;
 
     } tip_pickup;
+
+    struct {
+      /**
+       * Expected available amount (in string format).
+       * NULL to skip check.
+       */
+      char *expected_amount_available;
+
+      /**
+       * Expected picked up amount (in string format).
+       * NULL to skip check.
+       */
+      char *expected_amount_picked_up;
+
+      /**
+       * Expected authorized amount (in string format).
+       * NULL to skip check.
+       */
+      char *expected_amount_authorized;
+
+      /**
+       * Handle for the ongoing operation.
+       */
+      struct TALER_MERCHANT_TipQueryOperation *tqo;
+
+      /**
+       * Merchant instance to use for tipping.
+       */
+      char *instance;
+
+    } tip_query;
 
     struct {
 
@@ -2114,6 +2150,77 @@ check_payment_cb (void *cls,
 
 
 /**
+ * Callback to process a GET /tip-query request
+ *
+ * @param cls closure
+ * @param http_status HTTP status code for this request
+ * @param ec Taler-specific error code
+ * @param raw raw response body
+ */
+static void
+tip_query_cb (void *cls,
+              unsigned int http_status,
+              enum TALER_ErrorCode ec,
+              const json_t *raw,
+              struct GNUNET_TIME_Absolute reserve_expiration,
+              struct TALER_ReservePublicKeyP *reserve_pub,
+              struct TALER_Amount *amount_authorized,
+              struct TALER_Amount *amount_available,
+              struct TALER_Amount *amount_picked_up)
+{
+  struct InterpreterState *is = cls;
+  struct Command *cmd = &is->commands[is->ip];
+  struct TALER_Amount a;
+
+  cmd->details.tip_query.tqo = NULL;
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Tip query callback at command %u/%s(%u)\n",
+              is->ip,
+              cmd->label,
+              cmd->oc);
+
+  GNUNET_assert (NULL != reserve_pub);
+  GNUNET_assert (NULL != amount_authorized);
+  GNUNET_assert (NULL != amount_available);
+  GNUNET_assert (NULL != amount_picked_up);
+
+  if (cmd->details.tip_query.expected_amount_available)
+  {
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_string_to_amount (cmd->details.tip_query.expected_amount_available, &a));
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "expected available %s, actual %s\n",
+                TALER_amount_to_string (&a),
+                TALER_amount_to_string (amount_available));
+    GNUNET_assert (0 == TALER_amount_cmp (amount_available, &a));
+  }
+
+  if (cmd->details.tip_query.expected_amount_authorized)
+  {
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_string_to_amount (cmd->details.tip_query.expected_amount_authorized, &a));
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "expected authorized %s, actual %s\n",
+                TALER_amount_to_string (&a),
+                TALER_amount_to_string (amount_authorized));
+    GNUNET_assert (0 == TALER_amount_cmp (amount_authorized, &a));
+  }
+
+  if (cmd->details.tip_query.expected_amount_picked_up)
+  {
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_string_to_amount (cmd->details.tip_query.expected_amount_picked_up, &a));
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "expected picked_up %s, actual %s\n",
+                TALER_amount_to_string (&a),
+                TALER_amount_to_string (amount_picked_up));
+    GNUNET_assert (0 == TALER_amount_cmp (amount_picked_up, &a));
+  }
+
+  if (cmd->expected_response_code != http_status)
+    fail (is);
+  next_command (is);
+}
+
+
+/**
  * Function called with detailed wire transfer data.
  *
  * @param cls closure
@@ -2684,6 +2791,17 @@ cleanup_state (struct InterpreterState *is)
         cmd->details.check_payment.cpo = NULL;
       }
       break;
+    case OC_TIP_QUERY:
+      if (NULL != cmd->details.tip_query.tqo)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Command %u (%s) did not complete\n",
+                    i,
+                    cmd->label);
+        TALER_MERCHANT_tip_query_cancel (cmd->details.tip_query.tqo);
+        cmd->details.tip_query.tqo = NULL;
+      }
+      break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Shutdown: unknown instruction %d at %u (%s)\n",
@@ -2902,7 +3020,7 @@ interpreter_run (void *cls)
     fail (is);
     return;
   }
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Interpreter runs command %u/%s(%u)\n",
               is->ip,
               cmd->label,
@@ -2979,6 +3097,29 @@ interpreter_run (void *cls)
                                                    NULL,
                                                    check_payment_cb,
                                                    is)))
+      {
+        GNUNET_break (0);
+        fail (is);
+      }
+    }
+    break;
+  case OC_TIP_QUERY:
+    {
+      if (instance_idx !=  0)
+      {
+        // We check /tip-query only for the first instance,
+        // since for tipping we use a dedicated instance.
+        // On repeated runs, the expected authorized amounts wouldn't
+        // match up (they would all accumulate!)
+        next_command (is);
+        break;
+      }
+      if (NULL == (cmd->details.tip_query.tqo
+                   = TALER_MERCHANT_tip_query (ctx,
+                                               MERCHANT_URL,
+                                               cmd->details.tip_query.instance,
+                                               tip_query_cb,
+                                               is)))
       {
         GNUNET_break (0);
         fail (is);
@@ -4414,17 +4555,43 @@ run (void *cls)
       .details.tip_authorize.instance = "tip",
       .details.tip_authorize.justification = "tip 2",
       .details.tip_authorize.amount = "EUR:5.01" },
+    /* Check tip status */
+    { .oc = OC_TIP_QUERY,
+      .label = "query-tip-1",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_query.instance = "tip" },
+    { .oc = OC_TIP_QUERY,
+      .label = "query-tip-2",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_query.instance = "tip",
+      .details.tip_query.expected_amount_authorized = "EUR:10.02",
+      .details.tip_query.expected_amount_picked_up = "EUR:0.0",
+      .details.tip_query.expected_amount_available = "EUR:20.04" },
     /* Withdraw tip */
     { .oc = OC_TIP_PICKUP,
       .label = "pickup-tip-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.tip_pickup.authorize_ref = "authorize-tip-1",
       .details.tip_pickup.amounts = pickup_amounts_1 },
+    /* Check tip status again */
+    { .oc = OC_TIP_QUERY,
+      .label = "query-tip-3",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_query.instance = "tip",
+      .details.tip_query.expected_amount_picked_up = "EUR:5.01",
+      .details.tip_query.expected_amount_available = "EUR:15.03" },
     { .oc = OC_TIP_PICKUP,
       .label = "pickup-tip-2",
       .expected_response_code = MHD_HTTP_OK,
       .details.tip_pickup.authorize_ref = "authorize-tip-2",
       .details.tip_pickup.amounts = pickup_amounts_1 },
+    { .oc = OC_TIP_QUERY,
+      .label = "query-tip-4",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.tip_query.instance = "tip",
+      .details.tip_query.expected_amount_picked_up = "EUR:10.02",
+      .details.tip_query.expected_amount_available = "EUR:10.02",
+      .details.tip_query.expected_amount_authorized = "EUR:10.02" },
     { .oc = OC_TIP_PICKUP,
       .label = "pickup-tip-2b",
       .expected_response_code = MHD_HTTP_OK,

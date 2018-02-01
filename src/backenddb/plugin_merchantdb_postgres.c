@@ -214,7 +214,7 @@ postgres_initialize (void *cls)
     /* table where we remember when tipping reserves where established / enabled */
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_reserve_credits ("
                             " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
-                            ",credit_uuid BYTEA NOT NULL CHECK (LENGTH(credit_uuid)=64)"
+                            ",credit_uuid BYTEA UNIQUE NOT NULL CHECK (LENGTH(credit_uuid)=64)"
                             ",timestamp INT8 NOT NULL"
                             ",amount_val INT8 NOT NULL"
                             ",amount_frac INT4 NOT NULL"
@@ -585,6 +585,16 @@ postgres_initialize (void *cls)
                             " FROM merchant_tip_reserves"
                             " WHERE reserve_priv=$1",
                             1),
+    GNUNET_PQ_make_prepare ("find_tip_authorizations",
+                            "SELECT"
+                            " amount_val"
+                            ",amount_frac"
+                            ",amount_curr"
+                            ",justification"
+                            ",tip_id"
+                            " FROM merchant_tips"
+                            " WHERE reserve_priv=$1",
+                            1),
     GNUNET_PQ_make_prepare ("update_tip_reserve_balance",
                             "UPDATE merchant_tip_reserves SET"
                             " expiration=$2"
@@ -675,6 +685,11 @@ postgres_initialize (void *cls)
                             " VALUES "
                             "($1, $2, $3, $4, $5, $6)",
                             6),
+    GNUNET_PQ_make_prepare ("lookup_tip_credit_uuid",
+                            "SELECT 1 "
+                            "FROM merchant_tip_reserve_credits "
+                            "WHERE credit_uuid=$1 AND reserve_priv=$2",
+                            2),
     GNUNET_PQ_PREPARED_STATEMENT_END
   };
 
@@ -1421,6 +1436,128 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
   if (0 >= qs)
     return qs;
   return fcctx.qs;
+}
+
+
+/**
+ * Closure for #find_tip_authorizations_cb().
+ */
+struct GetAuthorizedTipAmountContext
+{
+  /**
+   * Total authorized amount.
+   */
+  struct TALER_Amount authorized_amount;
+
+  /**
+   * Transaction status code to set.
+   */
+  enum GNUNET_DB_QueryStatus qs;
+
+};
+
+
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results.
+ *
+ * @param cls of type `struct GetAuthorizedTipAmountContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+find_tip_authorizations_cb (void *cls,
+                            PGresult *result,
+                            unsigned int num_results)
+{
+  struct GetAuthorizedTipAmountContext *ctx = cls;
+  unsigned int i;
+
+  for (i = 0; i < num_results; i++)
+  {
+    struct TALER_Amount amount;
+    char *just;
+    struct GNUNET_HashCode h;
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_string ("justification", &just),
+      GNUNET_PQ_result_spec_auto_from_type ("tip_id", &h),
+      TALER_PQ_result_spec_amount ("amount",
+                                    &amount),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
+    }
+
+    if (0 == i)
+    {
+      memcpy (&ctx->authorized_amount, &amount, sizeof (struct TALER_Amount));
+    }
+    else if (GNUNET_OK !=
+             TALER_amount_add (&ctx->authorized_amount,
+                               &ctx->authorized_amount, &amount))
+    {
+      GNUNET_break (0);
+      ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
+    }
+  }
+
+  if (0 == i)
+  {
+    ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
+  }
+  else
+  {
+    /* one aggregated result */
+    ctx->qs = GNUNET_DB_STATUS_SUCCESS_ONE_RESULT;
+  }
+}
+
+
+/**
+ * Get the total amount of authorized tips for a tipping reserve.
+ *
+ * @param cls closure, typically a connection to the db
+ * @param reserve_priv which reserve to check
+ * @param[out] authorzed_amount amount we've authorized so far for tips
+ * @return transaction status, usually
+ *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT for success
+ *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if the reserve_priv
+ *      does not identify a known tipping reserve
+ */
+enum GNUNET_DB_QueryStatus
+postgres_get_authorized_tip_amount (void *cls,
+                                    const struct TALER_ReservePrivateKeyP *reserve_priv,
+                                    struct TALER_Amount *authorized_amount)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (reserve_priv),
+    GNUNET_PQ_query_param_end
+  };
+  enum GNUNET_DB_QueryStatus qs;
+  struct GetAuthorizedTipAmountContext ctx = { 0 };
+
+  check_connection (pg);
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+					     "find_tip_authorizations",
+					     params,
+					     &find_tip_authorizations_cb,
+					     &ctx);
+  if (0 >= qs)
+    return qs;
+  memcpy (authorized_amount, &ctx.authorized_amount, sizeof (struct TALER_Amount));
+  return ctx.qs;
 }
 
 
@@ -2830,6 +2967,35 @@ postgres_enable_tip_reserve (void *cls,
 
   /* ensure that credit_uuid is new/unique */
   {
+    struct GNUNET_PQ_QueryParam params[] = {
+      GNUNET_PQ_query_param_auto_from_type (credit_uuid),
+      GNUNET_PQ_query_param_auto_from_type (reserve_priv),
+      GNUNET_PQ_query_param_end
+    };
+
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_end
+    };
+    qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                   "lookup_tip_credit_uuid",
+                                                   params,
+                                                   rs);
+    if (0 > qs)
+    {
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
+      postgres_rollback (pg);
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+        goto RETRY;
+      return qs;
+    }
+    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS != qs)
+    {
+      /* UUID already exists, we are done! */
+      return qs;
+    }
+  }
+
+  {
     struct GNUNET_TIME_Absolute now;
     struct GNUNET_PQ_QueryParam params[] = {
       GNUNET_PQ_query_param_auto_from_type (reserve_priv),
@@ -2850,12 +3016,6 @@ postgres_enable_tip_reserve (void *cls,
       postgres_rollback (pg);
       if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
         goto RETRY;
-      return qs;
-    }
-    /* UUID already exists, we are done! */
-    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
-    {
-      postgres_rollback (pg);
       return qs;
     }
   }
@@ -3405,6 +3565,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_contract_terms = &postgres_find_contract_terms;
   plugin->find_contract_terms_history = &postgres_find_contract_terms_history;
   plugin->find_contract_terms_by_date = &postgres_find_contract_terms_by_date;
+  plugin->get_authorized_tip_amount = &postgres_get_authorized_tip_amount;
   plugin->find_contract_terms_by_date_and_range = &postgres_find_contract_terms_by_date_and_range;
   plugin->find_contract_terms_from_hash = &postgres_find_contract_terms_from_hash;
   plugin->find_paid_contract_terms_from_hash = &postgres_find_paid_contract_terms_from_hash;

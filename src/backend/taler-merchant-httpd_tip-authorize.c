@@ -207,6 +207,7 @@ handle_status (void *cls,
                       qs);
         }
       }
+      break;
     case TALER_EXCHANGE_RTT_WITHDRAWAL:
       /* expected */
       break;
