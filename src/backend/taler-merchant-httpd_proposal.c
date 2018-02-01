@@ -274,7 +274,10 @@ proposal_put (struct MHD_Connection *connection,
 
   instance = json_string_value (json_object_get (order,
                                                  "instance"));
-  if (NULL != instance)
+
+  if (NULL == instance)
+    instance = "default";
+
   {
     // The frontend either fully specifieds the "merchant" field, or just gives
     // the backend the "instance" name and lets it fill out.
