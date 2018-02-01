@@ -2991,7 +2991,7 @@ postgres_enable_tip_reserve (void *cls,
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS != qs)
     {
       /* UUID already exists, we are done! */
-      return qs;
+      return GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
     }
   }
 
