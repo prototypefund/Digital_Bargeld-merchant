@@ -1595,6 +1595,7 @@ proposal_lookup_initial_cb (void *cls,
   if (cmd->expected_response_code != http_status)
   {
     fail (is);
+    return;
   }
 
   cmd->details.proposal.hash = *hash;

@@ -567,7 +567,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   enum GNUNET_DB_QueryStatus qs;
   json_t *contract_terms;
   struct MerchantInstance *mi;
-  char *last_session_id;
+  char *last_session_id = NULL;
 
   instance = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
