@@ -117,6 +117,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   const char *order_id;
   const char *reason;
   const char *merchant;
+  char *last_session_id;
   struct MerchantInstance *mi;
   struct GNUNET_HashCode h_contract_terms;
   struct TALER_MerchantRefundConfirmationPS confirmation;
@@ -183,6 +184,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   /* Convert order id to h_contract_terms */
   qs = db->find_contract_terms (db->cls,
 				&contract_terms,
+                                &last_session_id,
 				order_id,
 				&mi->pubkey);
   if (0 > qs)
@@ -205,6 +207,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                                          TALER_EC_REFUND_ORDER_ID_UNKNOWN,
                                          "Order id not found in database");
   }
+
+  GNUNET_free (last_session_id);
 
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
@@ -418,6 +422,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   json_t *contract_terms;
   struct MerchantInstance *mi;
   enum GNUNET_DB_QueryStatus qs;
+  char *last_session_id;
 
   instance = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -459,6 +464,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   contract_terms = NULL;
   qs = db->find_contract_terms (db->cls,
 				&contract_terms,
+                                &last_session_id,
 				order_id,
 				&mi->pubkey);
   if (0 > qs)
@@ -482,6 +488,8 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                          TALER_EC_REFUND_ORDER_ID_UNKNOWN,
                                          "Order id not found in database");
   }
+
+  GNUNET_free (last_session_id);
 
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,

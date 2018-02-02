@@ -846,14 +846,40 @@ run (void *cls)
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->mark_proposal_paid (plugin->cls,
                                       &h_contract_terms,
-                                      &merchant_pub));
+                                      &merchant_pub,
+                                      "my-session-123"));
 
+
+  {
+    char *last_session_id;
+    FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+            plugin->find_contract_terms (plugin->cls,
+                                         &out,
+                                         &last_session_id,
+                                         order_id,
+                                         &merchant_pub));
+    FAILIF (0 != strcmp (last_session_id, "my-session-123"));
+    GNUNET_free (last_session_id);
+  }
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-          plugin->find_contract_terms (plugin->cls,
-				       &out,
-				       order_id,
-				       &merchant_pub));
+          plugin->mark_proposal_paid (plugin->cls,
+                                      &h_contract_terms,
+                                      &merchant_pub,
+                                      NULL));
+
+
+  {
+    char *last_session_id;
+    FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
+            plugin->find_contract_terms (plugin->cls,
+                                         &out,
+                                         &last_session_id,
+                                         order_id,
+                                         &merchant_pub));
+    FAILIF (0 != strcmp (last_session_id, ""));
+    GNUNET_free (last_session_id);
+  }
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
 	  plugin->find_contract_terms_history (plugin->cls,
@@ -900,7 +926,8 @@ run (void *cls)
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->mark_proposal_paid (plugin->cls,
                                       &h_contract_terms_future,
-                                      &merchant_pub));
+                                      &merchant_pub,
+                                      "hello"));
   FAILIF (2 !=
           plugin->find_contract_terms_by_date_and_range (plugin->cls,
 							 fake_now,
@@ -919,14 +946,6 @@ run (void *cls)
 					       &pd_cb,
 					       NULL));
 
-  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-          plugin->store_transaction (plugin->cls,
-                                     &h_contract_terms,
-				     &merchant_pub,
-                                     &h_wire,
-                                     timestamp,
-                                     refund_deadline,
-                                     &amount_with_fee));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->store_deposit (plugin->cls,
                                  &h_contract_terms,
@@ -951,29 +970,6 @@ run (void *cls)
                                            GNUNET_TIME_UNIT_ZERO_ABS,
                                            &signkey_pub,
                                            transfer_proof));
-  {
-    struct GNUNET_HashCode ah_wire;
-    struct GNUNET_TIME_Absolute atimestamp;
-    struct GNUNET_TIME_Absolute arefund_deadline;
-    struct TALER_Amount atotal_amount;
-
-    FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-	    plugin->find_transaction (plugin->cls,
-				      &h_contract_terms,
-				      &merchant_pub,
-				      &ah_wire,
-				      &atimestamp,
-				      &arefund_deadline,
-				      &atotal_amount));
-    FAILIF (0 != memcmp (&ah_wire,
-			 &h_wire,
-			 sizeof (struct GNUNET_HashCode)));
-    FAILIF (atimestamp.abs_value_us != timestamp.abs_value_us);
-    FAILIF (arefund_deadline.abs_value_us != refund_deadline.abs_value_us);
-    FAILIF (0 != TALER_amount_cmp (&atotal_amount,
-				   &amount_with_fee));
-  }
-
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_payments (plugin->cls,

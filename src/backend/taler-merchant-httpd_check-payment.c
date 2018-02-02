@@ -94,6 +94,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   json_t *contract_terms;
   struct GNUNET_HashCode h_contract_terms;
   struct TALER_Amount refund_amount;
+  char *last_session_id;
 
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -186,10 +187,9 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   GNUNET_assert (NULL != order_id);
 
-
-
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
+                                &last_session_id,
                                 order_id,
                                 &mi->pubkey);
   if (0 > qs)
@@ -230,6 +230,9 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     goto do_pay;
   }
 
+  GNUNET_assert (NULL != contract_terms);
+  GNUNET_assert (NULL != last_session_id);
+
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
                        &h_contract_terms))
@@ -244,20 +247,14 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                                               sizeof (struct GNUNET_HashCode));
 
 
-  /* Check if transaction is already known */
+  /* Check if paid */
   {
-    struct GNUNET_HashCode h_xwire;
-    struct GNUNET_TIME_Absolute xtimestamp;
-    struct GNUNET_TIME_Absolute xrefund;
-    struct TALER_Amount xtotal_amount;
+    json_t *xcontract_terms = NULL;
     
-    qs = db->find_transaction (db->cls,
-			       &h_contract_terms,
-			       &mi->pubkey,
-			       &h_xwire,
-			       &xtimestamp,
-			       &xrefund,
-			       &xtotal_amount);
+    qs = db->find_paid_contract_terms_from_hash (db->cls,
+                                                 &xcontract_terms,
+                                                 &h_contract_terms,
+                                                 &mi->pubkey);
     if (0 > qs)
     {
       /* Always report on hard error as well to enable diagnostics */
@@ -273,10 +270,22 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       goto do_pay;
     }
     GNUNET_break (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs);
-
-    TALER_amount_get_zero (xtotal_amount.currency, &refund_amount);
+    GNUNET_assert (NULL != xcontract_terms);
+    json_decref (xcontract_terms);
   }
 
+  {
+    struct TALER_Amount amount;
+    struct GNUNET_JSON_Specification spec[] = {
+      TALER_JSON_spec_amount ("amount", &amount),
+      GNUNET_JSON_spec_end ()
+    };
+    if (GNUNET_OK != GNUNET_JSON_parse (contract_terms, spec, NULL, NULL))
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
+                                                "Merchant database error (contract terms corrupted)");
+    TALER_amount_get_zero (amount.currency, &refund_amount);
+  }
 
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
@@ -301,15 +310,16 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   GNUNET_free_non_null (h_contract_terms_str);
 
   {
-    int refunded = 0 != refund_amount.value || 0 != refund_amount.fraction;
+    int refunded = (0 != refund_amount.value) || (0 != refund_amount.fraction);
     int res;
     res = TMH_RESPONSE_reply_json_pack (connection,
                                         MHD_HTTP_OK,
-                                        "{s:o s:b, s:b, s:o}",
+                                        "{s:o s:b, s:b, s:o, s:s}",
                                         "contract_terms", contract_terms,
                                         "paid", 1,
                                         "refunded", refunded,
-                                        "refund_amount", TALER_JSON_from_amount (&refund_amount));
+                                        "refund_amount", TALER_JSON_from_amount (&refund_amount),
+                                        "last_session_id", last_session_id);
     return res;
   }
 
@@ -331,6 +341,7 @@ do_pay:
                                             0);
     GNUNET_free_non_null (h_contract_terms_str);
     GNUNET_free_non_null (final_contract_url);
+    json_decref (contract_terms);
     GNUNET_free (url);
     return ret;
   }

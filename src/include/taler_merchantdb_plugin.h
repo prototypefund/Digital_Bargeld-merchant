@@ -233,18 +233,22 @@ struct TALER_MERCHANTDB_Plugin
    * @param cls closure
    * @param h_contract_terms hash of the contract that is now paid
    * @param merchant_pub merchant's public key
+   * @param last_session_id session id used for the payment, NULL
+   *        if payment was not session-bound
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
   (*mark_proposal_paid) (void *cls,
                          const struct GNUNET_HashCode *h_contract_terms,
-                         const struct TALER_MerchantPublicKeyP *merchant_pub);
+                         const struct TALER_MerchantPublicKeyP *merchant_pub,
+                         const char *last_session_id);
 
   /**
    * Retrieve proposal data given its order ID.
    *
    * @param cls closure
    * @param[out] contract_terms where to store the result
+   * @param[out] last_session_id where to store the result
    * @param order_id order_id used to lookup.
    * @param merchant_pub instance's public key.
    * @return transaction status
@@ -252,6 +256,7 @@ struct TALER_MERCHANTDB_Plugin
   enum GNUNET_DB_QueryStatus
   (*find_contract_terms) (void *cls,
                          json_t **contract_terms,
+                         char **last_session_id,
                          const char *order_id,
                          const struct TALER_MerchantPublicKeyP *merchant_pub);
 
@@ -373,28 +378,6 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Insert transaction data into the database.
-   *
-   * @param cls closure
-   * @param h_contract_terms proposal data's hashcode
-   * @param merchant_pub merchant's public key
-   * @param h_wire hash of our wire details
-   * @param timestamp time of the confirmation
-   * @param refund refund deadline
-   * @param total_amount total amount we receive for the contract after fees
-   * @return transaction status
-   */
-  enum GNUNET_DB_QueryStatus
-  (*store_transaction) (void *cls,
-                        const struct GNUNET_HashCode *h_contract_terms,
-			const struct TALER_MerchantPublicKeyP *merchant_pub,
-                        const struct GNUNET_HashCode *h_wire,
-                        struct GNUNET_TIME_Absolute timestamp,
-                        struct GNUNET_TIME_Absolute refund,
-                        const struct TALER_Amount *total_amount);
-
-
-  /**
    * Insert payment confirmation from the exchange into the database.
    *
    * @param cls closure
@@ -486,43 +469,6 @@ struct TALER_MERCHANTDB_Plugin
 				 struct GNUNET_TIME_Absolute end_date,
 				 const struct TALER_MasterSignatureP *exchange_sig);
 
-
-  /**
-   * Find information about a transaction.
-   *
-   * @param cls our plugin handle
-   * @param date limit to transactions' age
-   * @param cb function to call with transaction data
-   * @param cb_cls closure for @a cb
-   * @return transaction status
-   */
-  enum GNUNET_DB_QueryStatus
-  (*find_transactions_by_date) (void *cls,
-                                struct GNUNET_TIME_Absolute date,
-                                TALER_MERCHANTDB_TransactionCallback cb,
-                                void *cb_cls);
-
-
-  /**
-   * Find information about a transaction.
-   *
-   * @param cls our plugin handle
-   * @param h_contract_terms proposal data's hashcode
-   * @param merchant_pub merchant's public key.
-   * @param[out] h_wire set to hash of wire details
-   * @param[out] timestamp set to timestamp
-   * @param[out] refund_deadline set to refund deadline
-   * @param[out] total_amount set to total amount
-   * @return transaction status
-   */
-  enum GNUNET_DB_QueryStatus
-  (*find_transaction) (void *cls,
-                       const struct GNUNET_HashCode *h_contract_terms,
-		       const struct TALER_MerchantPublicKeyP *merchant_pub,
-		       struct GNUNET_HashCode *h_wire,
-		       struct GNUNET_TIME_Absolute *timestamp,
-		       struct GNUNET_TIME_Absolute *refund_deadline,
-		       struct TALER_Amount *total_amount);
 
 
   /**

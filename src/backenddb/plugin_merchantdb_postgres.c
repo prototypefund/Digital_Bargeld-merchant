@@ -115,21 +115,9 @@ postgres_initialize (void *cls)
                             ",timestamp INT8 NOT NULL"
                             ",row_id BIGSERIAL UNIQUE"
                             ",paid boolean DEFAULT FALSE NOT NULL"
+                            ",last_session_id VARCHAR DEFAULT '' NOT NULL"
                             ",PRIMARY KEY (order_id, merchant_pub)"
 			    ",UNIQUE (h_contract_terms, merchant_pub)"
-                            ");"),
-    /* Contracts that were paid */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transactions ("
-                            " h_contract_terms BYTEA NOT NULL CHECK (LENGTH(h_contract_terms)=64)"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)"
-                            ",timestamp INT8 NOT NULL"
-                            ",refund_deadline INT8 NOT NULL"
-                            ",total_amount_val INT8 NOT NULL"
-                            ",total_amount_frac INT4 NOT NULL"
-                            ",total_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
-                            ",PRIMARY KEY (h_contract_terms, merchant_pub)"
-                            ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)"
                             ");"),
     /* Table with the proofs for each coin we deposited at the exchange */
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_deposits ("
@@ -152,7 +140,7 @@ postgres_initialize (void *cls)
                             ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
                             ",exchange_proof BYTEA NOT NULL"
                             ",PRIMARY KEY (h_contract_terms, coin_pub)"
-                            ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_transactions (h_contract_terms, merchant_pub)"
+                            ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)"
                             ");"),
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
                             " exchange_url VARCHAR NOT NULL"
@@ -248,19 +236,6 @@ postgres_initialize (void *cls)
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
   struct GNUNET_PQ_PreparedStatement ps[] = {
-    GNUNET_PQ_make_prepare ("insert_transaction",
-                            "INSERT INTO merchant_transactions"
-                            "(h_contract_terms"
-                            ",merchant_pub"
-                            ",h_wire"
-                            ",timestamp"
-                            ",refund_deadline"
-                            ",total_amount_val"
-                            ",total_amount_frac"
-                            ",total_amount_curr"
-                            ") VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8)",
-                            8),
     GNUNET_PQ_make_prepare ("insert_deposit",
                             "INSERT INTO merchant_deposits"
                             "(h_contract_terms"
@@ -335,7 +310,8 @@ postgres_initialize (void *cls)
                             4),
     GNUNET_PQ_make_prepare ("mark_proposal_paid",
                             "UPDATE merchant_contract_terms SET"
-                            " paid=TRUE WHERE h_contract_terms=$1"
+                            " paid=TRUE, last_session_id=$3"
+                            " WHERE h_contract_terms=$1"
                             " AND merchant_pub=$2",
                             2),
     GNUNET_PQ_make_prepare ("insert_wire_fee",
@@ -411,6 +387,7 @@ postgres_initialize (void *cls)
     GNUNET_PQ_make_prepare ("find_contract_terms",
                             "SELECT"
                             " contract_terms"
+                            ",last_session_id"
                             " FROM merchant_contract_terms"
                             " WHERE"
                             " order_id=$1"
@@ -480,18 +457,6 @@ postgres_initialize (void *cls)
                             " ORDER BY row_id DESC, timestamp DESC"
                             " LIMIT $4",
                             4),
-    GNUNET_PQ_make_prepare ("find_transaction",
-                            "SELECT"
-                            " h_wire"
-                            ",timestamp"
-                            ",refund_deadline"
-                            ",total_amount_val"
-                            ",total_amount_frac"
-                            ",total_amount_curr"
-                            " FROM merchant_transactions"
-                            " WHERE h_contract_terms=$1"
-                            " AND merchant_pub=$2",
-                            2),
     GNUNET_PQ_make_prepare ("find_deposits",
                             "SELECT"
                             " coin_pub"
@@ -884,12 +849,14 @@ postgres_find_paid_contract_terms_from_hash (void *cls,
  *
  * @param cls closure
  * @param[out] contract_terms where to store the retrieved contract terms
+ * @param[out] last_session_id where to store the result
  * @param order id order id used to perform the lookup
  * @return transaction status
  */
 static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms (void *cls,
                               json_t **contract_terms,
+                              char **last_session_id,
                               const char *order_id,
                               const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
@@ -903,6 +870,8 @@ postgres_find_contract_terms (void *cls,
   struct GNUNET_PQ_ResultSpec rs[] = {
     TALER_PQ_result_spec_json ("contract_terms",
                                contract_terms),
+    GNUNET_PQ_result_spec_string ("last_session_id",
+                                  last_session_id),
     GNUNET_PQ_result_spec_end
   };
 
@@ -1057,17 +1026,21 @@ postgres_insert_order (void *cls,
  * @param cls closure
  * @param h_contract_terms hash of the contract that is now paid
  * @param merchant_pub merchant's public key
+ * @param last_session_id session id used for the payment, NULL
+ *        if payment was not session-bound
  * @return transaction status
  */
 enum GNUNET_DB_QueryStatus
 postgres_mark_proposal_paid (void *cls,
                              const struct GNUNET_HashCode *h_contract_terms,
-                             const struct TALER_MerchantPublicKeyP *merchant_pub)
+                             const struct TALER_MerchantPublicKeyP *merchant_pub,
+                             const char *last_session_id)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_string ((last_session_id == NULL) ? "" : last_session_id),
     GNUNET_PQ_query_param_end
   };
 
@@ -1078,51 +1051,6 @@ postgres_mark_proposal_paid (void *cls,
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "mark_proposal_paid",
                                              params);
-}
-
-
-/**
- * Insert transaction data into the database.
- *
- * @param cls closure
- * @param h_contract_terms hashcode of the proposal data associated with the
- * transaction being stored
- * @param merchant_pub merchant's public key
- * @param exchange_url URL of the exchange
- * @param h_wire hash of our wire details
- * @param timestamp time of the confirmation
- * @param refund refund deadline
- * @param total_amount total amount we receive for the contract after fees
- * @return transaction status
- */
-static enum GNUNET_DB_QueryStatus
-postgres_store_transaction (void *cls,
-                            const struct GNUNET_HashCode *h_contract_terms,
-			    const struct TALER_MerchantPublicKeyP *merchant_pub,
-                            const struct GNUNET_HashCode *h_wire,
-                            struct GNUNET_TIME_Absolute timestamp,
-                            struct GNUNET_TIME_Absolute refund,
-                            const struct TALER_Amount *total_amount)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_auto_from_type (h_wire),
-    GNUNET_PQ_query_param_absolute_time (&timestamp),
-    GNUNET_PQ_query_param_absolute_time (&refund),
-    TALER_PQ_query_param_amount (total_amount),
-    GNUNET_PQ_query_param_end
-  };
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Storing transaction with h_contract_terms '%s', merchant_pub '%s'.\n",
-              GNUNET_h2s (h_contract_terms),
-              TALER_B2S (merchant_pub));
-  check_connection (pg);
-  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
-					     "insert_transaction",
-					     params);
 }
 
 
@@ -1604,58 +1532,6 @@ postgres_find_contract_terms_by_date (void *cls,
   if (0 >= qs)
     return qs;
   return fcctx.qs;
-}
-
-
-/**
- * Find information about a transaction.
- *
- * @param cls our plugin handle
- * @param h_contract_terms value used to perform the lookup
- * @param merchant_pub merchant's public key
- * @param[out] h_wire set to hash of wire details
- * @param[out] timestamp set to timestamp
- * @param[out] refund_deadline set to refund deadline
- * @param[out] total_amount set to total amount
- * @return transaction status
- */
-static enum GNUNET_DB_QueryStatus
-postgres_find_transaction (void *cls,
-                           const struct GNUNET_HashCode *h_contract_terms,
-			   const struct TALER_MerchantPublicKeyP *merchant_pub,
-			   struct GNUNET_HashCode *h_wire,
-			   struct GNUNET_TIME_Absolute *timestamp,
-			   struct GNUNET_TIME_Absolute *refund_deadline,
-			   struct TALER_Amount *total_amount)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_end
-  };
-  struct GNUNET_PQ_ResultSpec rs[] = {
-    GNUNET_PQ_result_spec_auto_from_type ("h_wire",
-					  h_wire),
-    GNUNET_PQ_result_spec_absolute_time ("timestamp",
-					 timestamp),
-    GNUNET_PQ_result_spec_absolute_time ("refund_deadline",
-					 refund_deadline),
-    TALER_PQ_result_spec_amount ("total_amount",
-				 total_amount),
-    GNUNET_PQ_result_spec_end
-  };
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Finding transaction for h_contract_terms '%s', merchant_pub: '%s'.\n",
-              GNUNET_h2s (h_contract_terms),
-              TALER_B2S (merchant_pub));
-
-  check_connection (pg);
-  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-						   "find_transaction",
-						   params,
-						   rs);
 }
 
 
@@ -3548,12 +3424,10 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->cls = pg;
   plugin->drop_tables = &postgres_drop_tables;
   plugin->initialize = &postgres_initialize;
-  plugin->store_transaction = &postgres_store_transaction;
   plugin->store_deposit = &postgres_store_deposit;
   plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
   plugin->store_wire_fee_by_exchange = &postgres_store_wire_fee_by_exchange;
-  plugin->find_transaction = &postgres_find_transaction;
   plugin->find_payments_by_hash_and_coin = &postgres_find_payments_by_hash_and_coin;
   plugin->find_payments = &postgres_find_payments;
   plugin->find_transfers_by_hash = &postgres_find_transfers_by_hash;

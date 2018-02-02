@@ -1022,6 +1022,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_HashCode h_instance;
   struct json_t *contract_terms;
+  char *last_session_id;
 
   if (NULL == *connection_cls)
   {
@@ -1096,6 +1097,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 
   qs = db->find_contract_terms (db->cls,
 				&contract_terms,
+                                &last_session_id,
 				order_id,
 				&tctx->mi->pubkey);
   if (0 > qs)
@@ -1109,6 +1111,9 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
 					 "Given order_id doesn't map to any proposal");
+
+  GNUNET_free (last_session_id);
+
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
                        &tctx->h_contract_terms))
@@ -1118,33 +1123,34 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 					      TALER_EC_INTERNAL_LOGIC_ERROR,
                                               "Failed to hash contract terms");
   }
-  json_decref (contract_terms);
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Trying to track h_contract_terms '%s'\n",
-              GNUNET_h2s (&tctx->h_contract_terms));
-  qs = db->find_transaction (db->cls,
-			     &tctx->h_contract_terms,
-			     &tctx->mi->pubkey,
-			     &tctx->h_wire,
-			     &tctx->timestamp,
-			     &tctx->refund_deadline,
-			     &tctx->total_amount);
-   if (0 > qs)
   {
-    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
-    return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
-                                              "Database error finding transaction");
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_absolute_time ("refund_deadline",
+                                      &tctx->refund_deadline),
+      GNUNET_JSON_spec_absolute_time ("timestamp",
+                                      &tctx->timestamp),
+      TALER_JSON_spec_amount ("amount",
+                              &tctx->total_amount),
+      GNUNET_JSON_spec_fixed_auto ("H_wire",
+                                   &tctx->h_wire),
+      GNUNET_JSON_spec_end()
+    };
+
+    if (GNUNET_YES != GNUNET_JSON_parse (contract_terms,
+                                         spec,
+                                         NULL, NULL))
+    {
+      GNUNET_break (0);
+      GNUNET_JSON_parse_free (spec);
+      json_decref (contract_terms);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_INTERNAL_LOGIC_ERROR,
+                                                "Failed to parse contract terms from DB");
+    }
+    json_decref (contract_terms);
   }
-  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "h_contract_terms not found\n");
-    return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_TRACK_TRANSACTION_TRANSACTION_UNKNOWN,
-                                         "h_contract_terms is unknown");
-  }
+
   tctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
   qs = db->find_payments (db->cls,
 			  &tctx->h_contract_terms,
