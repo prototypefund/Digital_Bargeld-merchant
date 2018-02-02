@@ -276,8 +276,11 @@ proposal_put (struct MHD_Connection *connection,
                                                  "instance"));
 
   if (NULL == instance)
+  {
     instance = "default";
+  }
 
+  // Fill in merchant information if necessary
   {
     // The frontend either fully specifieds the "merchant" field, or just gives
     // the backend the "instance" name and lets it fill out.
@@ -293,54 +296,57 @@ proposal_put (struct MHD_Connection *connection,
                                                 TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
                                                 "merchant instance not found");
     }
-    merchant = json_object ();
-    /* FIXME: should the 'instance' field really be included in the
-       contract? This is really internal to the business! */
-    json_object_set_new (merchant,
-                         "instance",
-                         json_string (instance));
-    json_object_set_new (merchant,
-                         "name",
-                         json_string (mi->name));
-    json_object_set_new (merchant,
-                         "jurisdiction",
-                         json_string ("_mj"));
-    json_object_set_new (merchant,
-                         "address",
-                         json_string ("_ma"));
-    json_object_set_new (order,
-                         "merchant",
-                         merchant);
-    json_object_del (order,
-                     "instance");
-
-    locations = json_object_get (order,
-                                 "locations");
-    if (NULL == locations)
+    if (NULL == json_object_get (order, "merchant"))
     {
-      locations = json_object ();
+      merchant = json_object ();
+      /* FIXME: should the 'instance' field really be included in the
+         contract? This is really internal to the business! */
+      json_object_set_new (merchant,
+                           "instance",
+                           json_string (instance));
+      json_object_set_new (merchant,
+                           "name",
+                           json_string (mi->name));
+      json_object_set_new (merchant,
+                           "jurisdiction",
+                           json_string ("_mj"));
+      json_object_set_new (merchant,
+                           "address",
+                           json_string ("_ma"));
       json_object_set_new (order,
-                           "locations",
-                           locations);
+                           "merchant",
+                           merchant);
+      json_object_del (order,
+                       "instance");
+
+      locations = json_object_get (order,
+                                   "locations");
+      if (NULL == locations)
+      {
+        locations = json_object ();
+        json_object_set_new (order,
+                             "locations",
+                             locations);
+      }
+
+      GNUNET_assert (0 < GNUNET_asprintf (&label, "%s-address", mi->id));
+      loc = json_object_get (default_locations, label);
+      if (NULL == loc)
+        loc = json_object ();
+      else
+        loc = json_deep_copy (loc);
+      json_object_set_new (locations, "_ma", loc);
+      GNUNET_free (label);
+
+      GNUNET_assert (0 < GNUNET_asprintf (&label, "%s-jurisdiction", mi->id));
+      loc = json_object_get (default_locations, label);
+      if (NULL == loc)
+        loc = json_object ();
+      else
+        loc = json_deep_copy (loc);
+      json_object_set_new (locations, "_mj", loc);
+      GNUNET_free (label);
     }
-
-    GNUNET_assert (0 < GNUNET_asprintf (&label, "%s-address", mi->id));
-    loc = json_object_get (default_locations, label);
-    if (NULL == loc)
-      loc = json_object ();
-    else
-      loc = json_deep_copy (loc);
-    json_object_set_new (locations, "_ma", loc);
-    GNUNET_free (label);
-
-    GNUNET_assert (0 < GNUNET_asprintf (&label, "%s-jurisdiction", mi->id));
-    loc = json_object_get (default_locations, label);
-    if (NULL == loc)
-      loc = json_object ();
-    else
-      loc = json_deep_copy (loc);
-    json_object_set_new (locations, "_mj", loc);
-    GNUNET_free (label);
   }
 
   /* extract fields we need to sign separately */
