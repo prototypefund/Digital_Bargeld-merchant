@@ -316,17 +316,20 @@ TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
 {
   struct TALER_MERCHANT_RefundLookupOperation *rlo;
   CURL *eh;
+  char *base;
 
   rlo = GNUNET_new (struct TALER_MERCHANT_RefundLookupOperation);
   rlo->ctx = ctx;
   rlo->cb = cb;
   rlo->cb_cls = cb_cls;
-
+  
+  base = TALER_url_join (backend_url, "/public/refund", NULL);
   GNUNET_asprintf (&rlo->url,
-                   "%s/public/refund?instance=%s&order_id=%s",
-                   backend_url,
+                   "%s?instance=%s&order_id=%s",
+                   base,
                    instance,
                    order_id);
+  GNUNET_free (base);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,

@@ -30,6 +30,7 @@ GTAGS
 src/backend/taler-merchant-httpd
 src/merchant-tools/taler-merchant-dbinit
 src/lib/test_merchant_api
+src/lib/test_merchant_api_new
 src/lib/test_merchant_api_home/.local/share/taler/exchange/live-keys/
 src/lib/test_merchant_api_home/.local/share/taler/wirefees/
 taler_merchant_config.h

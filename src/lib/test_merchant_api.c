@@ -40,7 +40,7 @@
 /**
  * URL under which the exchange is reachable during the testcase.
  */
-#define EXCHANGE_URL "http://localhost:8084/"
+#define EXCHANGE_URL "http://localhost:8081/"
 
 /**
  * Account number of the exchange at the bank.
@@ -1299,6 +1299,7 @@ history_cb (void *cls,
         fail (is);
         return;
       }
+    /* entry_timestamp should always become last_timestamp */
     entry_timestamp = GNUNET_TIME_absolute_max (last_timestamp, entry_timestamp);
     if (last_timestamp.abs_value_us != entry_timestamp.abs_value_us)
     {
@@ -3822,6 +3823,7 @@ interpreter_run (void *cls)
     const struct Command *proposal_ref;
     const char *order_id;
 
+    /* get proposal reference, and order_id from it */
     GNUNET_assert(NULL != (ref = find_command
       (is,
        cmd->details.track_transaction.pay_ref)));

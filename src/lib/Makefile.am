@@ -7,9 +7,14 @@ if USE_COVERAGE
 endif
 
 lib_LTLIBRARIES = \
-  libtalermerchant.la
+  libtalermerchant.la \
+  libtalermerchanttesting.la
 
 libtalermerchant_la_LDFLAGS = \
+  -version-info 2:0:0 \
+  -no-undefined
+
+libtalermerchanttesting_la_LDFLAGS = \
   -version-info 2:0:0 \
   -no-undefined
 
@@ -35,6 +40,31 @@ libtalermerchant_la_LIBADD = \
   -ljansson \
   $(XLIB)
 
+libtalermerchanttesting_la_SOURCES = \
+  testing_api_cmd_proposal.c \
+  testing_api_cmd_pay.c \
+  testing_api_cmd_refund.c \
+  testing_api_cmd_tip.c \
+  testing_api_cmd_track.c \
+  testing_api_cmd_history.c \
+  testing_api_helpers.c \
+  testing_api_trait_merchant_sig.c \
+  testing_api_trait_string.c \
+  testing_api_trait_hash.c \
+  testing_api_trait_planchet.c \
+  testing_api_trait_refund_entry.c
+
+libtalermerchanttesting_la_LIBADD = \
+  -ltalerexchange \
+  -ltalerjson \
+  -ltalerutil \
+  -lgnunetcurl \
+  -lgnunetjson \
+  -lgnunetutil \
+  -ljansson \
+  -ltalertesting \
+  $(XLIB)
+
 if HAVE_LIBCURL
 libtalermerchant_la_LIBADD += -lcurl
 else
@@ -45,11 +75,30 @@ endif
 
 if HAVE_TALERFAKEBANK
 check_PROGRAMS = \
+  test_merchant_api_new \
   test_merchant_api
 endif
 
 TESTS = \
   $(check_PROGRAMS)
+
+test_merchant_api_new_SOURCES = \
+  test_merchant_api_new.c
+test_merchant_api_new_LDADD = \
+  $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
+  libtalermerchant.la \
+  $(LIBGCRYPT_LIBS) \
+  -ltalertesting \
+  -ltalermerchanttesting \
+  -ltalerfakebank \
+  -ltalerbank \
+  -ltalerexchange \
+  -ltalerjson \
+  -ltalerutil \
+  -lgnunetjson \
+  -lgnunetcurl \
+  -lgnunetutil \
+  -ljansson
 
 test_merchant_api_SOURCES = \
   test_merchant_api.c
