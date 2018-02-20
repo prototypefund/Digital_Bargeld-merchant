@@ -472,14 +472,9 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
     }
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     {
-      // We'll amount_authorized to zero later once
+      // We'll set amount_authorized to zero later once
       // we know the currency
       tqc->none_authorized = GNUNET_YES;
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "DB::::: authorized amount: NONE\n");
-    }
-    else
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "DB::::: authorized amount: %s\n", TALER_amount_to_string (&tqc->amount_authorized));
     }
   }
 
