@@ -2867,6 +2867,7 @@ postgres_enable_tip_reserve (void *cls,
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS != qs)
     {
       /* UUID already exists, we are done! */
+      postgres_rollback (pg);
       return GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
     }
   }
@@ -3298,6 +3299,7 @@ postgres_pickup_tip (void *cls,
         postgres_rollback (pg);
         return TALER_EC_TIP_PICKUP_AMOUNT_CHANGED;
       }
+      postgres_commit (pg);
       return TALER_EC_NONE; /* we are done! */
     }
   }
