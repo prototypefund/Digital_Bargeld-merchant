@@ -39,7 +39,7 @@ doc/*
 !doc/*.texi
 !doc/*.css
 !doc/*.1
-doc/version.texi
+doc/version-*.texi
 !doc/*.am
 !doc/*.sh
 !doc/*.js

@@ -1,7 +1,7 @@
 \input texinfo @c -*-texinfo-*-
 @c %**start of header
 @setfilename manual.info
-@include version.texi
+@include version-manual.texi
 @settitle The GNU Taler merchant backend operator tutorial @value{VERSION}
 
 @include syntax.texi

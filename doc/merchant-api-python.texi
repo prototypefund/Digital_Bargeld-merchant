@@ -1,0 +1,13 @@
+\input texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename merchant-api-python.info
+@include version-merchant-api-python.texi
+@include syntax.texi
+@settitle The GNU Taler Merchant API Tutorial @value{VERSION} for Python
+
+@set LANG_PYTHON 1
+@set LANGNAME Python
+
+@include merchant-api.content.texi
+
+@bye

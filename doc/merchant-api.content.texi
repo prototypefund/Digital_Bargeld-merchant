@@ -1,0 +1,684 @@
+@c *****************************************
+@c This file is supposed to be included from
+@c the language-specific tutorial.
+@c *****************************************
+
+@c Define a new index for options.
+@defcodeindex op
+@c Combine everything into one index (arbitrarily chosen to be the
+@c concept index).
+@syncodeindex op cp
+@c %**end of header
+
+@copying
+This document is a tutorial for the GNU Taler Merchant API (version @value{VERSION}, @value{UPDATED})
+
+Copyright @copyright{} 2018 Taler Systems SA
+
+@quotation
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.3 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+Texts.  A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
+@end quotation
+@end copying
+@c If your tutorial is published on paper by the FSF, it should include
+@c The standard FSF Front-Cover and Back-Cover Texts, as given in
+@c maintain.texi.
+@c
+@c Titlepage
+@c
+@titlepage
+@title The GNU Taler Merchant API tutorial 
+@subtitle Version @value{VERSION}
+@subtitle @value{UPDATED}
+@author Christian Grothoff (@email{christian@@grothoff.org})
+@author Marcello Stanisci (@email{marcello.stanisci@@inria.fr})
+@author Florian Dold (@email{florian.dold@@inria.fr})
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@summarycontents
+@contents
+
+@ifnottex
+@node Top
+@top The GNU Taler Merchant API Tutorial (Version for @value{LANGNAME})
+@insertcopying
+@end ifnottex
+
+
+@menu
+* Introduction::                                  What this tutorial is about
+* Accepting a Simple Payment::                    How to accept simple payments
+* Back-office-integration::                       How to integrate with the back office
+* Advanced topics::                               Detailed solutions to specific issues
+* Reference::                                     Merchant integration reference
+
+
+Appendices
+
+* GNU-LGPL::                     The GNU Lesser General Public License says how you
+                                 can use the code of libtalermerchant.so in your own projects.
+* GNU-FDL::                      The GNU Free Documentation License says how you
+                                 can copy and share the documentation of GNU Taler.
+
+Indices
+
+* Concept Index::               Index of concepts and programs.
+@end menu
+
+
+@node Introduction
+@chapter Introduction
+
+@section About GNU Taler
+
+GNU Taler is an open protocol for an electronic payment system with a
+free software reference implementation.  GNU Taler offers secure, fast
+and easy payment processing using well understood cryptographic
+techniques.  GNU Taler allows customers to remain anonymous, while
+ensuring that merchants can be held accountable by governments.
+Hence, GNU Taler is compatible with anti-money-laundering (AML) and
+know-your-customer (KYC) regulation, as well as data protection
+regulation (such as GDPR).
+
+
+@section About this tutorial
+
+This tutorial addresses how to integrate GNU Taler with Web shops. It describes
+how to create a Web shop that processes payments with the help of a GNU Taler
+merchant @emph{backend}.  In the second chapter, you will learn how to trigger
+the payment process from the Web site, how to communicate with the backend, how
+to generate a proposal and process the payment.
+
+@clear GOT_LANG
+@ifset LANG_PYTHON
+@set GOT_LANG 1
+This version of the tutorial has examples for Python3.
+It uses the requests library for HTTP requests.
+@end ifset
+@ifset LANG_CURL
+@set GOT_LANG 1
+This version of the tutorial has examples for the
+command line with cURL.
+@end ifset
+@c
+Versions for other languages/environments are available as well.
+
+@cindex examples
+@cindex git
+If you want to look at some simple, running examples, check out these:
+@itemize
+@item
+The @url{https://git.taler.net/blog.git/tree/talerblog/blog/blog.py, essay merchant} that
+sells single chapters of a book.
+@item
+The @url{https://git.taler.net/donations.git/tree/talerdonations/donations/donations.py, donation page} that
+accepts donations for software projects and gives donation receipts.
+@item
+The @url{https://git.taler.net/survey.git/tree/talersurvey/survey/survey.py,survey} that
+gives users who answer a question a small reward.
+@end itemize
+
+@section Architecture overview
+
+The Taler software stack for a merchant consists of the following
+main components:
+
+@itemize
+@cindex frontend
+@item A frontend which interacts with the customer's browser. The
+  frontend enables the customer to build a shopping cart and place
+  an order.  Upon payment, it triggers the respective business logic
+  to satisfy the order.  This component is not included with Taler,
+  but rather assumed to exist at the merchant. This tutorial
+  describes how to develop a Taler frontend.
+@cindex backend
+@item A Taler-specific payment backend which makes it easy for the
+  frontend to process financial transactions with Taler.  For this
+  tutorial, you will use a public sandbox backend.  For production
+  use, you must either set up your own backend or ask another person
+  to do so for you.
+@end itemize
+
+The following image illustrates the various interactions of these
+key components:
+
+@image{arch-api, 3in}
+
+The backend provides the cryptographic protocol support, stores Taler-specific
+financial information and communicates with the GNU Taler exchange over the
+Internet.  The frontend accesses the backend via a RESTful API.  As a result,
+the frontend never has to directly communicate with the exchange, and also does
+not deal with sensitive data.  In particular, the merchant's signing keys and
+bank account information are encapsulated within the Taler backend.
+
+Some functionality of the backend (the ``public interface``) is also exposed to the
+customer's browser directly.  In the HTTP API, all public endpoints are prefixed with @code{/public/}.
+
+@section Public Sandbox Backend and Authentication
+
+How the frontend authenticates with the Taler backend depends in the configuration. @xref{Top,,, manual, Taler Merchant Operating Manual}.
+
+The public sandbox backend @url{https://backend.demo.taler.net} uses an API key
+in the @code{Authorization} header.  The value of this header must be
+@code{ApiKey sandbox} for the public sandbox backend.
+
+@clear GOT_LANG
+@ifset LANG_CURL
+@set GOT_LANG 1
+@example
+$ curl -i 'https://backend.demo.taler.net/' --header "Authorization: ApiKey sandbox"
+# HTTP/1.1 200 OK
+# [...]
+#
+# Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.
+@end example
+@end ifset
+@ifset LANG_PYTHON
+@set GOT_LANG 1
+@example
+@verbatim
+>>> import requests
+>>> requests.get("https://backend.demo.taler.net", headers={"Authorization": "ApiKey sandbox"})
+<Response [200]>
+@end verbatim
+@end example
+@end ifset
+@ifclear GOT_LANG
+@example
+(example not available for this language)
+@end example
+@end ifclear
+
+If an HTTP status code other than 200 is returned, something went wrong. You
+should figure out what the problem is before continuing with this tutorial.
+
+The sandbox backend @url{https://backend.demo.taler.net} uses @code{KUDOS} as
+an imaginary currency.  Coins denominated with @code{KUDOS} can be withdrawn
+from @url{https://bank.demo.taler.net}.
+
+@section Merchant Instances
+The same Taler merchant backend server can be used by multiple separate
+merchants that are separate business entities.  Each of these separate business
+entities is called a @emph{merchant instance}, and is identified by an
+alphanumeric @emph{instance id}.  If the instance is omitted, the instance id
+@code{default} is assumed.
+
+The following merchant instances are configured on @url{https://backend.demo.taler.net}:
+@itemize
+@item @code{GNUnet} (The GNUnet project)
+@item @code{FSF} (The Free Software Foundation)
+@item @code{Tor} (The Tor Project)
+@item @code{default} (Kudos Inc.)
+@end itemize
+
+Note that these are fictional merchants and not necessarily affiliated with the
+respective project.
+
+
+@node Accepting a Simple Payment
+@chapter Accepting a Simple Payment
+
+@section Creating an Order for a Payment
+
+Payments in Taler revolve around an @emph{order}, which is a machine-readable
+description of the payment's details.  Before accepting a Taler payment as a merchant
+you must create an order.
+
+This is done by posting a JSON object to the backend's @code{/order} API endpoint.  At least the
+following fields must be given:
+
+@itemize
+@item @var{amount}: The amount to be paid, as a string in the format
+@code{CURRENCY:VALUE}, for example @code{EUR:10} for 10 Euros or
+@code{KUDOS:1.5} for 1.5 KUDOS.
+
+@item @var{summary}:  A human-readable summary for what the payment is about,
+should be short enough to fit into titles, though currently no hard limit is
+enforced.
+
+@item @var{fulfillment_url}:  A URL that will be displayed once the payment is
+completed.  For digital goods, this should be a page that displays the product
+that was purchased.
+@end itemize
+
+After successfully POSTing to @code{/order}, an @code{order_id} will be
+returned.  Together with the @code{instance id}, the order id uniquely
+identifies the order within a merchant backend.
+
+@clear GOT_LANG
+@ifset LANG_CURL
+@set GOT_LANG 1
+@example
+@verbatim
+$ ORDER='
+{"order": {
+  "amount": "KUDOS:10",
+  "summary": "Donation",
+  "fulfillment_url": "https://example.com/thanks.html"}}
+'
+
+$ curl -i -X POST 'https://backend.demo.taler.net/order' --header "Authorization: ApiKey sandbox" -d "$ORDER"
+# HTTP/1.1 200 OK
+# [...]
+#
+# {
+#   "order_id": "2018.058.21.46.06-024C85K189H8P"
+# }
+@end verbatim
+@end example
+@end ifset
+@ifset LANG_PYTHON
+@set GOT_LANG 1
+@example
+@verbatim
+>>> import requests
+>>> order = dict(order=dict(amount="KUDOS:10",
+...                         summary="Donation",
+...                         fulfillment_url="https://example.com/thanks.html"))
+>>> requests.get("https://backend.demo.taler.net", headers={"Authorization": "ApiKey sandbox"})
+<Response [200]>
+@end verbatim
+@end example
+@end ifset
+@ifclear GOT_LANG
+@example
+(example not available for this language)
+@end example
+@end ifclear
+
+The backend will fill in some details missing in the order, such as the address
+of the merchant instance.  The full details are often called the @emph{contract
+terms}.
+
+@section Checking Payment Status and Prompting for Payment
+The status of a payment can be checked with the @code{/check-payment} endpoint.  If the payment
+wasn't completed yet by the customer, @code{/check-payment} will give the frontend a URL (@var{payment_redirect_url})
+that will trigger the customer's wallet to trigger the payment.
+
+Note that the only way to obtain the @var{payment_redirect_url} is to check the status of the payment,
+even if you know that the user did not pay yet.
+
+@clear GOT_LANG
+@ifset LANG_CURL
+@set GOT_LANG 1
+@example
+@verbatim
+curl -i 'https://backend.demo.taler.net/check-payment?order_id=2018.058.21.46.06-024C85K189H8P' --header "Authorization: ApiKey sandbox"
+# HTTP/1.1 200 OK
+# [...]
+# 
+# {
+#   "payment_redirect_url": "https://backend.demo.taler.net/public/trigger-pay?[...]",
+#   "paid": false
+# }
+@end verbatim
+@end example
+@end ifset
+@ifset LANG_PYTHON
+@set GOT_LANG 1
+@example
+@verbatim
+>>> import requests
+>>> r = requests.get("https://backend.demo.taler.net/check-payment",
+...                  params=dict(order_id=order_id),
+...                  headers={"Authorization": "ApiKey sandbox"})
+>>> print(r.json())
+@end verbatim
+@end example
+@end ifset
+@ifclear GOT_LANG
+@example
+(example not available for this language)
+@end example
+@end ifclear
+
+Depending on the value of the @var{paid} field in the response, the other fields will be different.  Once the
+payment was completed by the user, the response will contain the following fields:
+
+@itemize
+@item @var{paid}: Set to @var{true}.
+@item @var{contract_terms}:  The full contract terms derived from the order.
+@item @var{refunded}:  Boolean that indicates whether any (partial) refund happened for this purchase.
+@item @var{refunded_amount}:  Amount that was refunded
+@item @var{last_session_id}:  Last session ID used by the customer's wallet.  Advanced feature, explained later.
+@end itemize
+
+
+@node Back-office-integration
+@chapter Integration with the back office
+Taler ships the back-office feature as a stand-alone Web application.
+See how to run it, on its own documentaion: @url{https://docs.taler.net/backoffice/html/manual.html}.
+
+@node Advanced topics
+@chapter Advanced topics
+
+@menu
+* Detecting the Presence of the Taler Wallet::  Detecting the Presence of the Taler Wallet
+* The Taler Order Format::                      The Taler Order Format
+@end menu
+
+@node Detecting the Presence of the Taler Wallet
+@section Detecting the Presence of the Taler Wallet
+@cindex wallet
+
+Taler offers the way to the frontend developer to detect whether
+a user has the wallet installed in their browser, and take actions
+accordingly.
+
+@subsection The no-JavaScript way
+The follwing example shows all that is needed to perform the detection
+without using JavaScript:
+
+@smallexample
+<!DOCTYPE html>
+<html data-taler-nojs="true">
+  <head>
+    <title>Tutorial</title>
+    <link rel="stylesheet"
+          type="text/css"
+          href="/web-common/taler-fallback.css"
+          id="taler-presence-stylesheet" />
+  </head>
+  <body>
+    <p class="taler-installed-hide">
+      No wallet found.
+    </p>
+    <p class="taler-installed-show">
+      Wallet found!
+    </p>
+  </body>
+</html>
+@end smallexample
+
+The @code{taler-fallback.css} is part of the Taler's @emph{web-common} repository,
+available at @code{https://git.taler.net/web-common.git}.  Please adjust the @code{href}
+attribute in order to make it work with your Web site.
+
+The detection works by @code{taler-fallback.css} hiding any tag from the
+@code{taler-installed-show} class, in case no wallet is installed.  If otherwise
+the wallet is installed, the wallet takes action by hiding any tag from the
+@code{taler-installed-hide} class and overriding @code{taler-fallback.css} logic
+by showing any tag from the @code{taler-installed-show} class.
+
+@subsection The JavaScript way
+
+@code{taler-wallet-lib.js} helps the frontend, by providing the way to register two
+callbacks: one to be executed if a wallet is present, the other if it is not.
+See the example below:
+
+@smallexample
+@end smallexample
+
+@code{taler-wallet-lib.js} exports the @code{taler} object that
+exposes the @code{onPresent} and the @code{onAbsent} functions needed
+to register the frontend's callbacks.  Thus the function @code{walletInstalled}
+will be executed whenever a wallet is installed, and @code{walletNotInstalled}
+if not.  Note that since now we can use JavaScript we can register
+callbacks that do more than just showing and hiding elements.
+
+
+@c Section describing the format of Taler contracts/proposals in detail
+
+@node The Taler Order Format
+@section The Taler Order Format
+@cindex contract
+
+A Taler order can specify many details about the payment.
+This section describes each of the fields in depth.
+
+@table @var
+@item amount
+@cindex amount
+Specifies the total amount to be paid to the merchant by the customer.
+
+@item max_fee
+@cindex fees
+@cindex maximum deposit fee
+This is the maximum total amount of deposit fees that the merchant is
+willing to pay.  If the deposit fees for the coins exceed this amount,
+the customer has to include it in the payment total.  The fee is
+specified using the same triplet used for @var{amount}.
+
+
+@item max_wire_fee
+@cindex fees
+@cindex maximum wire fee
+Maximum wire fee accepted by the merchant (customer share to be
+divided by the 'wire_fee_amortization' factor, and further reduced
+if deposit fees are below 'max_fee').  Default if missing is zero.
+
+
+@item wire_fee_amortization
+@cindex fees
+@cindex maximum fee amortization
+Over how many customer transactions does the merchant expect to
+amortize wire fees on average?  If the exchange's wire fee is
+above 'max_wire_fee', the difference is divided by this number
+to compute the expected customer's contribution to the wire fee.
+The customer's contribution may further be reduced by the difference
+between the 'max_fee' and the sum of the actual deposit fees.
+Optional, default value if missing is 1.  0 and negative values are
+invalid and also interpreted as 1.
+
+@item pay_url
+@cindex pay_url
+Which URL accepts payments. This is the URL where the wallet will POST
+coins.
+
+@item fulfillment_url
+@cindex fulfillment URL
+Which URL should the wallet go to for obtaining the fulfillment,
+for example the HTML or PDF of an article that was bought, or an
+order tracking system for shipments, or a simple human-readable
+Web page indicating the status of the contract.
+
+@item order_id
+@cindex order ID
+Alphanumeric identifier, freely definable by the merchant.
+Used by the merchant to uniquely identify the transaction.
+
+@item summary
+@cindex summary
+Short, human-readable summary of the contract. To be used when
+displaying the contract in just one line, for example in the
+transaction history of the customer.
+
+@item timestamp
+Time at which the offer was generated.
+@c FIXME: describe time format in detail here
+
+@item pay_deadline
+@cindex payment deadline
+Timestamp of the time by which the merchant wants the exchange
+to definitively wire the money due from this contract.  Once
+this deadline expires, the exchange will aggregate all
+deposits where the contracts are past the @var{refund_deadline}
+and execute one large wire payment for them.  Amounts will be
+rounded down to the wire transfer unit; if the total amount is
+still below the wire transfer unit, it will not be disbursed.
+
+@item refund_deadline
+@cindex refund deadline
+Timestamp until which the merchant willing (and able) to give refunds
+for the contract using Taler.  Note that the Taler exchange will hold
+the payment in escrow at least until this deadline.  Until this time,
+the merchant will be able to sign a message to trigger a refund to the
+customer.  After this time, it will no longer be possible to refund
+the customer.  Must be smaller than the @var{pay_deadline}.
+
+@item products
+@cindex product description
+Array of products that are being sold to the customer.  Each
+entry contains a tuple with the following values:
+
+@table @var
+@item description
+Description of the product.
+@item quantity
+Quantity of the items to be shipped. May specify a unit (@code{1 kg})
+or just the count.
+@item price
+Price for @var{quantity} units of this product shipped to the
+given @var{delivery_location}. Note that usually the sum of all
+of the prices should add up to the total amount of the contract,
+but it may be different due to discounts or because individual
+prices are unavailable.
+@item product_id
+Unique ID of the product in the merchant's catalog.  Can generally
+be chosen freely as it only has meaning for the merchant, but
+should be a number in the range @math{[0,2^{51})}.
+@item taxes
+Map of applicable taxes to be paid by the merchant.  The label is the
+name of the tax, i.e. @var{VAT}, @var{sales tax} or @var{income tax},
+and the value is the applicable tax amount.  Note that arbitrary
+labels are permitted, as long as they are used to identify the
+applicable tax regime.  Details may be specified by the regulator.
+This is used to declare to the customer which taxes the merchant
+intends to pay, and can be used by the customer as a receipt.
+@c FIXME: a receipt not including the item's price?
+The information is also likely to be used by tax audits of the merchant.
+@item delivery_date
+Time by which the product is to be delivered to the
+@var{delivery_location}.
+@item delivery_location
+This should give a label in the @var{locations} map, specifying
+where the item is to be delivered.
+@end table
+Values can be omitted if they are not applicable. For example, if a
+purchase is about a bundle of products that have no individual prices
+or product IDs, the @var{product_id} or @var{price} may not be
+specified in the contract.  Similarly, for virtual products delivered
+directly via the fulfillment URI, there is no delivery location.
+
+@item merchant
+@table @var
+@item address
+This should give a label in the @var{locations} map, specifying
+where the merchant is located.
+@item name
+This should give a human-readable name for the merchant's business.
+@item jurisdiction
+This should give a label in the @var{locations} map, specifying
+the jurisdiction under which this contract is to be arbitrated.
+@end table
+
+@item locations
+@cindex location
+Associative map of locations used in the contract. Labels for
+locations in this map can be freely chosen and used whenever
+a location is required in other parts of the contract.  This way,
+if the same location is required many times (such as the business
+address of the customer or the merchant), it only needs to be
+listed (and transmitted) once, and can otherwise be referred to
+via the label.  A non-exhaustive list of location attributes
+is the following:
+@table @var
+@item country
+Name of the country for delivery, as found on a postal package, i.e. ``France''.
+@item state
+Name of the state for delivery, as found on a postal package, i.e. ``NY''.
+@item region
+Name of the region for delivery, as found on a postal package.
+@item province
+Name of the province for delivery, as found on a postal package.
+@item city
+Name of the city for delivery, as found on a postal package.
+@item ZIP code
+ZIP code for delivery, as found on a postal package.
+@item street
+Street name for delivery, as found on a postal package.
+@item street number
+Street number (number of the house) for delivery, as found on a postal package.
+@item name receiver name for delivery, either business or person name.
+
+@end table
+
+Note that locations are not required to specify all of these fields,
+and it is also allowed to have additional fields.  Contract renderers
+must render at least the fields listed above, and should render fields
+that they do not understand as a key-value list.
+
+@end table
+
+
+@node Reference
+@chapter Reference
+
+@menu
+* JavaScript API::                       JavaScript API to communicate with the wallet
+* Stylesheet-based presence detection::  Presence detection using CSS style sheets and no JavaScript
+@end menu
+
+@node JavaScript API
+@section JavaScript API
+
+The following functions are defined in the @code{taler} namespace of the @code{taler-wallet-lib} helper library
+available at @url{https://git.taler.net/web-common.git/tree/taler-wallet-lib.js}.
+
+@table @code
+@item onPresent(callback: () => void)
+Add a callback to be called when support for Taler payments is detected.
+
+@item onAbsent(callback: () => void)
+Add a callback to be called when support for Taler payments is disabled.
+
+@item pay(@{contract_url: string, offer_url: string@})
+Results in the same action as a @code{402 Payment Required} with @code{contract_url} in
+the @code{X-Taler-Contract-Url} header and @code{offer_url} in the @code{X-Taler-Payment-Url} header.
+
+@item refund(refund_url: string)
+Results in the same action as a @code{402 Payment Required} with @code{refund_url} in
+the @code{X-Taler-Refund-Url} header.
+
+@end table
+
+@node Stylesheet-based presence detection
+@section Stylesheet-based presence detection
+
+Stylesheet-based presence detection will be applied on all pages that have the
+@code{data-taler-nojs} attribute of the @code{html} element set @code{true}.
+The default/fallback stylesheet, that will be taken over by the wallet once
+installed, must be included with the id @code{taler-presence-stylesheet}, like
+this:
+
+The following CSS classes can be used:
+@table @code
+@item taler-installed-hide
+A CSS rule will set the @code{display} property for this class to @code{none} once the Taler wallet is installed and enabled.
+If the wallet is not installed, @code{display} will be @code{inherit}.
+
+@item taler-installed-show
+A CSS rule will set the @code{display} property for this class to @code{inherit} once the Taler wallet is installed and enabled.
+If the wallet is not installed, @code{display} will be @code{none}.
+
+@end table
+
+
+
+@c **********************************************************
+@c *******************  Appendices  *************************
+@c **********************************************************
+
+@node GNU-LGPL
+@unnumbered GNU-LGPL
+@cindex license
+@cindex LGPL
+@include lgpl.texi
+
+@node GNU-FDL
+@unnumbered GNU-FDL
+@cindex license
+@cindex GNU Free Documentation License
+@include fdl-1.3.texi
+
+@node Concept Index
+@unnumbered Concept Index
+
+@printindex cp

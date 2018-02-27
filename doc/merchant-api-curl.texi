@@ -1,0 +1,13 @@
+\input texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename merchant-api-curl.info
+@include version-merchant-api-curl.texi
+@include syntax.texi
+@settitle The GNU Taler Merchant API Tutorial @value{VERSION} for sh/cURL
+
+@set LANG_CURL 1
+@set LANGNAME sh/cURL
+
+@include merchant-api.content.texi
+
+@bye

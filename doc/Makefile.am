@@ -3,10 +3,14 @@ all: manual.pdf manual.html
 manual.pdf: arch.pdf manual.texi
 manual.html: arch.png manual.texi
 
-arch.pdf: arch.dot
-	dot -Tpdf arch.dot > arch.pdf
-arch.png: arch.dot
-	dot -Tpng arch.dot > arch.png
+%.png: %.dot
+	dot -Tpng $< > $@
+%.pdf: %.dot
+	dot -Tpdf $< > $@
+
+merchant-api-%.%: merchant-api.content.texi
+merchant-api-%.pdf: arch-api.pdf
+html-local: arch-api.png
 
 AM_MAKEINFOHTMLFLAGS = --no-split --css-ref=docstyle.css --css-ref=brown-paper.css
 
@@ -14,14 +18,28 @@ man_MANS = \
   taler-merchant-generate-payments.1 \
   taler-merchant-httpd.1
 
-info_TEXINFOS = manual.texi
+info_TEXINFOS = \
+  manual.texi \
+  merchant-api-python.texi \
+  merchant-api-curl.texi
 
-manual_TEXINFOS = version.texi
+manual_TEXINFOS = \
+  version-manual.texi \
+  merchant-api.content.texi
+
+merchant_api_python_TEXINFOS = \
+  version-merchant-api-python.texi \
+  merchant-api.content.texi
+
+merchant_api_curl_TEXINFOS = \
+  version-merchant-api-curl.texi \
+  merchant-api.content.texi
 
 extra_TEXINFOS = \
   fdl-1.3.texi \
   agpl.texi \
-  syntax.texi
+  syntax.texi \
+  merchant-api.content.texi
 
 EXTRA_DIST = \
   arch.dot \
