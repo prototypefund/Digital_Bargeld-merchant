@@ -43,6 +43,7 @@ doc/version-*.texi
 !doc/*.am
 !doc/*.sh
 !doc/*.js
+!doc/*.dot
 !doc/examples/
 src/lib/test_merchant_api_home/.local/share/taler/exchange/wirefees/
 src/merchant-tools/taler-merchant-generate-payments
