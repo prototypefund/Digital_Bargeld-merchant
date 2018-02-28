@@ -486,10 +486,11 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
 
     icoin = &(*pc)[(*npc)-1];
 
+    /* FIXME: make the two following 'const'. */
     struct TALER_CoinSpendPrivateKeyP *coin_priv; 
-    const struct TALER_EXCHANGE_DenomPublicKey *denom_pub;
     struct TALER_DenominationSignature *denom_sig;
-    struct TALER_Amount *denom_value;
+    const struct TALER_Amount *denom_value;
+    const struct TALER_EXCHANGE_DenomPublicKey *denom_pub;
 
     GNUNET_assert
       (GNUNET_OK == TALER_TESTING_get_trait_coin_priv
