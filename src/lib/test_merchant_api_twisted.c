@@ -635,6 +635,19 @@ run (void *cls,
                                    fakebank_url);
 }
 
+/**
+ * Kill, wait, and destroy convenience function.
+ *
+ * @param process process to purge.
+ */
+static void
+purge_process (struct GNUNET_OS_Process *process)
+{
+  GNUNET_OS_process_kill (process, SIGKILL);
+  GNUNET_OS_process_wait (process);
+  GNUNET_OS_process_destroy (process);
+}
+
 int
 main (int argc,
       char * const *argv)
@@ -675,9 +688,7 @@ main (int argc,
     ret = TALER_TESTING_setup_with_exchange (&run,
                                              NULL,
                                              CONFIG_FILE);
-    GNUNET_OS_process_kill (merchantd, SIGKILL); 
-    GNUNET_OS_process_wait (merchantd); 
-    GNUNET_OS_process_destroy (merchantd); 
+    purge_process (merchantd);
     GNUNET_free (merchant_url);
 
     if (GNUNET_OK != ret)
