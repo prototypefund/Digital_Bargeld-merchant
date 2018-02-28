@@ -39,14 +39,6 @@
 #define CMD_NOT_FOUND "Command not found"
 #define TRAIT_NOT_FOUND "Trait not found"
 
-#define TALER_TESTING_FAIL(is) \
-  do \
-  {\
-    GNUNET_break (0); \
-    TALER_TESTING_interpreter_fail (is); \
-    return; \
-  } while (0)
-
 /**
  * Prepare the merchant execution.  Create tables and check if
  * the port is available.
