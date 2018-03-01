@@ -99,7 +99,8 @@ test_merchant_api_twisted_LDADD = \
   -lgnunetjson \
   -lgnunetcurl \
   -lgnunetutil \
-  -ljansson
+  -ljansson \
+  -ltalertwister
 
 test_merchant_api_new_SOURCES = \
   test_merchant_api_new.c

@@ -65,6 +65,11 @@ static char *merchant_url;
 static struct GNUNET_OS_Process *merchantd;
 
 /**
+ * Exchange base URL.
+ */
+static char *exchange_url;
+
+/**
  * Account number of the exchange at the bank.
  */
 #define EXCHANGE_ACCOUNT_NO 2
@@ -658,7 +663,8 @@ main (int argc,
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
 
-  switch (TALER_TESTING_prepare_exchange (CONFIG_FILE))
+  switch (TALER_TESTING_prepare_exchange (CONFIG_FILE,
+                                          &exchange_url))
   {
   case GNUNET_SYSERR:
     GNUNET_break (0);
