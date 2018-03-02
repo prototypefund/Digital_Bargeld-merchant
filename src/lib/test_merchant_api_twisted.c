@@ -157,9 +157,104 @@ run (void *cls,
 {
 
   struct TALER_TESTING_Command commands[] = {
+
+    /**
+     * Move money to the exchange's bank account.
+     */
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-1",
+                              "EUR:5.01"),
+    /**
+     * Make a reserve exist, according to the previous
+     * transfer.
+     */
+    CMD_EXEC_WIREWATCH ("wirewatch-1"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-2",
+       "http://localhost:8081/",
+       "EUR:5.01", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+
+    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-1",
+                                       is->exchange,
+                                       "create-reserve-1",
+                                       "EUR:5",
+                                       MHD_HTTP_OK),
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"1\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:5}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_check_payment ("check-payment-1",
+                                     merchant_url,
+                                     is->ctx,
+                                     MHD_HTTP_OK,
+                                     "create-proposal-1",
+                                     GNUNET_NO),
+
+    TALER_TESTING_cmd_pay ("deposit-simple",
+                           merchant_url,
+                           is->ctx,
+                           MHD_HTTP_OK,
+                           "create-proposal-1",
+                           "withdraw-coin-1",
+                           "EUR:5",
+                           "EUR:4.99",
+                           "EUR:0.01"),
+
+    TALER_TESTING_cmd_check_payment ("check-payment-2",
+                                     merchant_url,
+                                     is->ctx,
+                                     MHD_HTTP_OK,
+                                     "create-proposal-1",
+                                     GNUNET_YES),
+
+    CMD_EXEC_AGGREGATOR ("run-aggregator"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-1",
+       exchange_url,
+       "EUR:4.98", 2, 62),
+
+    #if 0
+    /* Should instead change the response body somehow! */
     TALER_TESTING_cmd_hack_response_code ("hack-1",
                                           CONFIG_FILE,
                                           MHD_HTTP_FORBIDDEN),
+    #endif
+
+    TALER_TESTING_cmd_merchant_track_transaction
+      ("track-transaction-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "check_bank_transfer-1",
+       "deposit-simple",
+       "EUR:0.01"), // ignored
+
+    TALER_TESTING_cmd_merchant_track_transfer
+      ("track-transfer-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "check_bank_transfer-1",
+       "deposit-simple"),
+
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
