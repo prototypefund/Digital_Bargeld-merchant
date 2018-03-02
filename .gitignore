@@ -33,6 +33,10 @@ src/lib/test_merchant_api
 src/lib/test_merchant_api_new
 src/lib/test_merchant_api_home/.local/share/taler/exchange/live-keys/
 src/lib/test_merchant_api_home/.local/share/taler/wirefees/
+src/lib/auditor.in
+src/lib/test_merchant_api_home/.local/share/taler/auditor/
+src/lib/test_merchant_api_home/.local/share/taler/auditors/
+src/lib/test_merchant_api_twisted
 taler_merchant_config.h
 taler_merchant_config.h.in
 doc/*
