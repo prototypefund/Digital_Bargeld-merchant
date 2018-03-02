@@ -36,6 +36,7 @@
 #include <taler/taler_fakebank_lib.h>
 #include <taler/taler_testing_lib.h>
 #include "taler_merchant_testing_lib.h"
+#include <taler/taler_twister_testing_lib.h>
 #include <taler/taler_twister_service.h>
 
 /**
@@ -156,7 +157,9 @@ run (void *cls,
 {
 
   struct TALER_TESTING_Command commands[] = {
-
+    TALER_TESTING_cmd_hack_response_code ("hack-1",
+                                          CONFIG_FILE,
+                                          MHD_HTTP_FORBIDDEN),
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.

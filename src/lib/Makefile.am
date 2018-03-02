@@ -91,6 +91,7 @@ test_merchant_api_twisted_LDADD = \
   $(LIBGCRYPT_LIBS) \
   -ltalertesting \
   -ltalermerchanttesting \
+  -ltalertwistertesting \
   -ltalerfakebank \
   -ltalerbank \
   -ltalerexchange \
