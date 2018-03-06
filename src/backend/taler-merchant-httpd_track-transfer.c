@@ -426,9 +426,9 @@ track_transfer_cleanup (struct TM_HandlerContext *hc)
 
 
 /**
- * Function called with information about a coin that was transfered.
- * Verify that it matches the information claimed by the exchange.
- * Update the `check_transfer_result` field accordingly.
+ * This function checks that the information about the coin which
+ * was paid back by _this_ wire transfer matches what _we_ (the merchant)
+ * knew about this coin.
  *
  * @param cls closure with our `struct TrackTransferContext *`
  * @param transaction_id of the contract
@@ -651,10 +651,19 @@ wire_transfer_cb (void *cls,
 		      wire_fee))
     return;
 
+  /* Now we want to double-check that any (Taler coin) deposit
+   * which is accounted into _this_ wire transfer, does exist
+   * into _our_ database.  This is the rationale: if the
+   * exchange paid us for it, we must have received it _beforehands_!
+   *
+   * details_length is how many (Taler coin) deposits have been
+   * aggregated into _this_ wire transfer.
+   */
   for (unsigned int i=0;i<details_length;i++)
   {
     rctx->current_offset = i;
     rctx->current_detail = &details[i];
+    /* Set the coin as "never seen" before. */
     rctx->check_transfer_result = GNUNET_NO;
     qs = db->find_payments_by_hash_and_coin (db->cls,
 					     &details[i].h_contract_terms,
@@ -680,8 +689,8 @@ wire_transfer_cb (void *cls,
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     {
       /* The exchange says we made this deposit, but WE do not
-         recall making it! Well, let's say thanks and accept the
-         money! */
+         recall making it (corrupted / unreliable database?)!
+         Well, let's say thanks and accept the money! */
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Failed to find payment data in DB\n");
       rctx->check_transfer_result = GNUNET_OK;
@@ -713,8 +722,8 @@ wire_transfer_cb (void *cls,
       rctx->response = NULL;
       return;
     }
-    /* Response is consistent with the /deposit we made, remember
-       it for future reference */
+    /* Response is consistent with the /deposit we made,
+       remember it for future reference */
     for (unsigned int i=0;i<MAX_RETRIES;i++)
     {
       qs = db->store_coin_to_transfer (db->cls,

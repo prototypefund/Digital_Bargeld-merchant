@@ -571,11 +571,11 @@ proof_cb (void *cls,
 
 
 /**
- * Function called with detailed wire transfer data.
- * We were trying to find out in which wire transfer one of the
- * coins was involved in. Now we know. What we do now is first
- * obtain the inverse: all other coins of that wire transfer,
- * which is what we prefer to store.
+ * This function takes the wtid from the coin being tracked
+ * and _track_ it against the exchange.  This way, we know
+ * all the other coins which were aggregated together with
+ * this one.  This way we save further HTTP requests to track
+ * the other coins.
  *
  * @param cls closure with a `struct TrackCoinContext`
  * @param http_status HTTP status code we got, 0 on exchange protocol violation
@@ -624,8 +624,10 @@ wtid_cb (void *cls,
   }
   tctx->current_wtid = *wtid;
   tctx->current_execution_time = execution_time;
+
   pcc.p_ret = NULL;
-  /* FIXME: change to avoid using callback! */
+  /* attempt to find this wtid's track from our database,
+     Will make pcc.p_ret point to a "proof", if one exists. */
   qs = db->find_proof_by_wtid (db->cls,
 			       tctx->current_exchange,
 			       wtid,
@@ -644,11 +646,13 @@ wtid_cb (void *cls,
 				"Fail to query database about proofs"));
     return;
   }
-  /* WARNING: if two transactions got aggregated under the same
-     WTID, then this branch is always taken (when attempting to
-     track the second transaction). */
+
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
   {
+    /* How come this wtid was already stored into the
+       database and _not all_ of its coins were already
+       tracked? Unconsistent state (! At least regarding
+       what the exchange tells us) */
     GNUNET_break_op (0);
     resume_track_transaction_with_response
       (tcc->tctx,
@@ -792,9 +796,9 @@ find_exchange (struct TrackTransactionContext *tctx);
 
 
 /**
- * This function is called to trace the wire transfers for
- * all of the coins of the transaction of the @a tctx.  Once
- * we have traced all coins, we build the response.
+ * This function is called to 'trace the wire transfers'
+ * (true?) for all of the coins of the transaction of the @a tctx.
+ * Once we have traced all coins, we build the response.
  *
  * @param tctx track context with established connection to exchange
  */
@@ -803,10 +807,15 @@ trace_coins (struct TrackTransactionContext *tctx)
 {
   struct TrackCoinContext *tcc;
 
+  /* Make sure we are connected to the exchange. */
   GNUNET_assert (NULL != tctx->eh);
+
   for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
+
+    /* How come one does't have wtid? */
     if (GNUNET_YES != tcc->have_wtid)
       break;
+
   if (NULL != tcc)
   {
     if (0 != strcmp (tcc->exchange_url,
@@ -837,6 +846,8 @@ trace_coins (struct TrackTransactionContext *tctx)
 
 /**
  * Function called with the result of our exchange lookup.
+ * Merely provide the execution context to the routine actually
+ * tracking the coin.
  *
  * @param cls the `struct TrackTransactionContext`
  * @param eh NULL if exchange was not found to be acceptable
@@ -921,7 +932,7 @@ transfer_cb (void *cls,
 
 
 /**
- * Function called with information about a coin that was deposited.
+ * Responsible to get the current coin wtid and store it into its state.
  *
  * @param cls closure
  * @param transaction_id of the contract
@@ -957,6 +968,11 @@ coin_cb (void *cls,
   GNUNET_CONTAINER_DLL_insert (tctx->tcc_head,
                                tctx->tcc_tail,
                                tcc);
+
+  /* find all those <coin, wtid> pairs associated to
+     this contract term's hash code.  The callback
+     will then set the wtid for the "current coin"
+     context. */
   qs = db->find_transfers_by_hash (db->cls,
 				   h_contract_terms,
 				   &transfer_cb,
@@ -1094,7 +1110,10 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
 					 "unknown instance");
-
+  
+  /* Map order id to contract terms; the objective is to get
+     the contract term's hashcode so as to retrieve all the
+     coins which have been deposited for it. */
   qs = db->find_contract_terms (db->cls,
 				&contract_terms,
                                 &last_session_id,
@@ -1154,6 +1173,9 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 
   tctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
   db->preflight (db->cls);
+
+  /* Find coins which have been deposited for this contract,
+     and retrieve the wtid for each one. */
   qs = db->find_payments (db->cls,
 			  &tctx->h_contract_terms,
 			  &tctx->mi->pubkey,
