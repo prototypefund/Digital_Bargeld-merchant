@@ -75,9 +75,13 @@ endif
 
 if HAVE_TALERFAKEBANK
 check_PROGRAMS = \
-  test_merchant_api_twisted \
   test_merchant_api_new \
   test_merchant_api
+
+if HAVE_TWISTER
+  check_PROGRAMS += test_merchant_api_twisted
+endif
+
 endif
 
 TESTS = \
