@@ -230,7 +230,6 @@ run (void *cls,
                            "EUR:1.99", // no sense now
                            "EUR:0.01"), // no sense now
 
-    #if 0
     TALER_TESTING_cmd_check_payment ("check-payment-2",
                                      merchant_url,
                                      is->ctx,
@@ -243,8 +242,12 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-1",
        exchange_url,
-       "EUR:5.98", 2, 62),
-    #endif
+       /* paid,         1.97 =
+          brutto        2.00 -
+          deposit fee   0.01 * 2 -
+          wire fee      0.01
+       */
+       "EUR:1.97", 2, 62),
 
     /* Should instead change the response body somehow! */
     #if 0
