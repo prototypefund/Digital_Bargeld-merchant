@@ -303,12 +303,12 @@ struct TALER_MERCHANT_PayCoin
   struct TALER_CoinSpendPrivateKeyP coin_priv;
 
   /**
-   * Amount this coin is to contribute (including fee).
+   * Amount this coin contributes to (including fee).
    */
   struct TALER_Amount amount_with_fee;
 
   /**
-   * Amount this coin is to contribute (without fee).
+   * Amount this coin contributes to (without fee).
    */
   struct TALER_Amount amount_without_fee;
 
@@ -493,12 +493,12 @@ struct TALER_MERCHANT_PaidCoin
   struct TALER_CoinSpendSignatureP coin_sig;
 
   /**
-   * Amount this coin is to contribute (including fee).
+   * Amount this coin contributes to (including fee).
    */
   struct TALER_Amount amount_with_fee;
 
   /**
-   * Amount this coin is to contribute (without fee).
+   * Amount this coin contributes to (without fee).
    */
   struct TALER_Amount amount_without_fee;
 

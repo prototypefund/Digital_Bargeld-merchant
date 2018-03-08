@@ -394,13 +394,12 @@ check_payment_run (void *cls,
  * @return the command
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_check_payment (
-  const char *label,
-  const char *merchant_url,
-  struct GNUNET_CURL_Context *ctx,
-  unsigned int http_status,
-  const char *proposal_reference,
-  unsigned int expect_paid)
+TALER_TESTING_cmd_check_payment (const char *label,
+                                 const char *merchant_url,
+                                 struct GNUNET_CURL_Context *ctx,
+                                 unsigned int http_status,
+                                 const char *proposal_reference,
+                                 unsigned int expect_paid)
 {
   struct CheckPaymentState *cps;
   struct TALER_TESTING_Command cmd;
@@ -430,9 +429,10 @@ TALER_TESTING_cmd_check_payment (
  * @param[in] coins string specifying coins to add to @a pc,
  *            clobbered in the process
  * @param is interpreter state
- * @param amount_with_fee
- * @param amount_without_fee
- * @param refund_fee
+ * @param amount_with_fee total amount to be paid for a contract.
+ * @param amount_without_fee to be removed, there is no
+ *        per-contract fee, only per-coin exists.
+ * @param refund_fee per-contract? per-coin?
  * @return #GNUNET_OK on success
  */
 static int
@@ -454,6 +454,7 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
     char *ctok;
     unsigned int ci;
     struct TALER_MERCHANT_PayCoin *icoin;
+    const struct TALER_EXCHANGE_DenomPublicKey *dpk;
 
     /* Token syntax is "LABEL[/NUMBER]" */
     ctok = strchr (token, '/');
@@ -512,18 +513,19 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
     icoin->denom_pub = denom_pub->key;
     icoin->denom_sig = *denom_sig;
     icoin->denom_value = *denom_value;
+    icoin->amount_with_fee = *denom_value;
+    
+    GNUNET_assert (NULL != (dpk = TALER_TESTING_find_pk
+      (is->keys, &icoin->denom_value)));
+
+    GNUNET_assert (GNUNET_SYSERR != TALER_amount_subtract
+      (&icoin->amount_without_fee,
+       &icoin->denom_value,
+       &dpk->fee_deposit));
 
     GNUNET_assert
       (GNUNET_OK == TALER_TESTING_get_trait_url
         (coin_cmd, 0, &icoin->exchange_url)); 
-
-    GNUNET_assert
-      (GNUNET_OK == TALER_string_to_amount
-        (amount_with_fee, &icoin->amount_with_fee));
-
-    GNUNET_assert
-      (GNUNET_OK == TALER_string_to_amount
-        (amount_without_fee, &icoin->amount_without_fee));
 
     GNUNET_assert
       (GNUNET_OK == TALER_string_to_amount
@@ -980,16 +982,15 @@ pay_traits (void *cls,
  * @return the command
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_pay (
-  const char *label,
-  const char *merchant_url,
-  struct GNUNET_CURL_Context *ctx,
-  unsigned int http_status,
-  const char *proposal_reference,
-  const char *coin_reference,
-  const char *amount_with_fee,
-  const char *amount_without_fee,
-  const char *refund_fee)
+TALER_TESTING_cmd_pay (const char *label,
+                       const char *merchant_url,
+                       struct GNUNET_CURL_Context *ctx,
+                       unsigned int http_status,
+                       const char *proposal_reference,
+                       const char *coin_reference,
+                       const char *amount_with_fee,
+                       const char *amount_without_fee,
+                       const char *refund_fee)
 {
   struct PayState *ps;
   struct TALER_TESTING_Command cmd;

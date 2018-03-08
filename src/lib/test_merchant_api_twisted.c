@@ -162,7 +162,7 @@ run (void *cls,
      * Move money to the exchange's bank account.
      */
     CMD_TRANSFER_TO_EXCHANGE ("create-reserve-1",
-                              "EUR:5.01"),
+                              "EUR:2.02"),
     /**
      * Make a reserve exist, according to the previous
      * transfer.
@@ -172,13 +172,25 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
        "http://localhost:8081/",
-       "EUR:5.01", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+       "EUR:2.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-1",
                                        is->exchange,
                                        "create-reserve-1",
-                                       "EUR:5",
+                                       "EUR:1",
                                        MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
+                                       is->exchange,
+                                       "create-reserve-1",
+                                       "EUR:1",
+                                       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_status ("withdraw-status",
+                              is->exchange,
+                              "create-reserve-1",
+                              "EUR:0",
+                              MHD_HTTP_OK),
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
        merchant_url,
@@ -193,11 +205,11 @@ run (void *cls,
         \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
-           \"value\":5,\
+           \"value\":2,\
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
+                         \"value\":\"{EUR:3}\"} ] }",
         NULL),
 
     TALER_TESTING_cmd_check_payment ("check-payment-1",
@@ -212,11 +224,13 @@ run (void *cls,
                            is->ctx,
                            MHD_HTTP_OK,
                            "create-proposal-1",
-                           "withdraw-coin-1",
-                           "EUR:5",
-                           "EUR:4.99",
-                           "EUR:0.01"),
+                           "withdraw-coin-1;" \
+                           "withdraw-coin-2",
+                           "EUR:2",
+                           "EUR:1.99", // no sense now
+                           "EUR:0.01"), // no sense now
 
+    #if 0
     TALER_TESTING_cmd_check_payment ("check-payment-2",
                                      merchant_url,
                                      is->ctx,
@@ -229,14 +243,14 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-1",
        exchange_url,
-       "EUR:4.98", 2, 62),
-
-    #if 0
-    /* Should instead change the response body somehow! */
-    TALER_TESTING_cmd_hack_response_code ("hack-1",
-                                          CONFIG_FILE,
-                                          MHD_HTTP_FORBIDDEN),
+       "EUR:5.98", 2, 62),
     #endif
+
+    /* Should instead change the response body somehow! */
+    #if 0
+    TALER_TESTING_cmd_empty_object ("hack-1",
+                                    CONFIG_FILE,
+                                    "deposits.0"),
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
@@ -247,6 +261,9 @@ run (void *cls,
        "deposit-simple",
        "EUR:0.01"), // ignored
 
+    #endif
+
+    #if 0
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-1",
        merchant_url,
@@ -254,6 +271,7 @@ run (void *cls,
        MHD_HTTP_OK,
        "check_bank_transfer-1",
        "deposit-simple"),
+    #endif
 
     /**
      * End the suite.  Fixme: better to have a label for this

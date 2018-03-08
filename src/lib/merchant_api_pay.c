@@ -666,10 +666,11 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
   dr.timestamp = GNUNET_TIME_absolute_hton (timestamp);
   dr.refund_deadline = GNUNET_TIME_absolute_hton (refund_deadline);
   dr.merchant = *merchant_pub;
+
   for (unsigned int i=0;i<num_coins;i++)
   {
-    const struct TALER_MERCHANT_PayCoin *coin = &coins[i];
-    struct TALER_MERCHANT_PaidCoin *p = &pc[i];
+    const struct TALER_MERCHANT_PayCoin *coin = &coins[i]; // coin priv.
+    struct TALER_MERCHANT_PaidCoin *p = &pc[i]; // coin pub.
     struct TALER_Amount fee;
 
     /* prepare 'dr' for this coin to generate coin signature */
