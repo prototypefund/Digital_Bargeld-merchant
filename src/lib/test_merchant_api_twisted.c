@@ -250,11 +250,9 @@ run (void *cls,
        "EUR:1.97", 2, 62),
 
     /* Should instead change the response body somehow! */
-    #if 0
-    TALER_TESTING_cmd_empty_object ("hack-1",
-                                    CONFIG_FILE,
-                                    "deposits.0"),
-
+    TALER_TESTING_cmd_delete_object ("hack-1",
+                                     CONFIG_FILE,
+                                     "deposits.0"),
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
        merchant_url,
@@ -264,7 +262,6 @@ run (void *cls,
        "deposit-simple",
        "EUR:0.01"), // ignored
 
-    #endif
 
     #if 0
     TALER_TESTING_cmd_merchant_track_transfer

@@ -665,6 +665,7 @@ wtid_cb (void *cls,
                                     "coin_pub", GNUNET_JSON_from_data_auto (&tcc->coin_pub)));
     return;
   }
+
   tctx->wdh = TALER_EXCHANGE_track_transfer (tctx->eh,
                                              wtid,
                                              &wire_deposits_cb,
