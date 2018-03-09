@@ -250,6 +250,12 @@ run (void *cls,
        "EUR:1.97", 2, 62),
 
     /* Should instead change the response body somehow! */
+
+    TALER_TESTING_cmd_modify_object ("hack-0",
+                                     CONFIG_FILE,
+                                     "amount",
+                                     "EUR:0.97"),
+
     TALER_TESTING_cmd_delete_object ("hack-1",
                                      CONFIG_FILE,
                                      "deposits.0"),
