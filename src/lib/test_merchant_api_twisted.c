@@ -264,7 +264,7 @@ run (void *cls,
       ("track-transaction-1",
        merchant_url,
        is->ctx,
-       MHD_HTTP_OK,
+       MHD_HTTP_FAILED_DEPENDENCY,
        "check_bank_transfer-1",
        "deposit-simple",
        "EUR:0.01"), // ignored

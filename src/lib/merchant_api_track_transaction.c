@@ -97,6 +97,10 @@ handle_track_transaction_finished (void *cls,
       /* Expect time stamp of when the transfer is supposed to happen */
     }
     break;
+  case MHD_HTTP_FAILED_DEPENDENCY:
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Exchange gave inconsistent response\n");
+    break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */

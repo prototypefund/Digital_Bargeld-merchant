@@ -101,9 +101,9 @@ track_transaction_cb (void *cls,
     TALER_TESTING_interpreter_fail (tts->is);
     return;
   }
-  if (MHD_HTTP_OK != http_status)
-    TALER_TESTING_FAIL (tts->is);
-
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "/track/transaction, response code: %u\n",
+              http_status);
   TALER_TESTING_interpreter_next (tts->is);
 }
 
