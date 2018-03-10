@@ -253,12 +253,13 @@ run (void *cls,
 
     TALER_TESTING_cmd_modify_object ("hack-0",
                                      CONFIG_FILE,
-                                     "amount",
-                                     "EUR:0.97"),
+                                     "total",
+                                     "EUR:0.98"),
 
     TALER_TESTING_cmd_delete_object ("hack-1",
                                      CONFIG_FILE,
                                      "deposits.0"),
+
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
        merchant_url,
