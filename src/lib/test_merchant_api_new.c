@@ -202,6 +202,7 @@ run (void *cls,
            \"value\":5,\
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:5}\"} ] }",
         NULL),
@@ -263,6 +264,7 @@ run (void *cls,
            \"value\":5,\
            \"fraction\":0},\
         \"summary\": \"useful product\",\
+        \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:5}\"} ] }",
         NULL),
@@ -516,6 +518,7 @@ run (void *cls,
            \"value\":10,\
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:10}\"} ] }",
         NULL),
@@ -595,6 +598,7 @@ run (void *cls,
            \"value\":10,\
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:10}\"} ] }",
         NULL),

@@ -4233,6 +4233,7 @@ run (void *cls)
            \"value\":5,\
            \"fraction\":0},\
     	\"summary\": \"merchant-lib testcase\",\
+    	\"fulfillment_url\": \"https://example.com/\",\
         \"products\":\
           [ {\"description\":\"ice cream\",\
              \"value\":\"{EUR:5}\"} ] }"},
@@ -4295,6 +4296,7 @@ run (void *cls)
            \"value\":5,\
            \"fraction\":0},\
         \"summary\":\"useful product\",\
+    	\"fulfillment_url\": \"https://example.com/\",\
         \"products\":\
           [ {\"description\":\"ice cream\",\
              \"value\":\"{EUR:5}\"} ] }" },
@@ -4646,6 +4648,7 @@ run (void *cls)
            \"value\":5,\
            \"fraction\":0},\
     	\"summary\": \"merchant-lib testcase\",\
+    	\"fulfillment_url\": \"https://example.com/\",\
         \"products\":\
           [ {\"description\":\"ice cream tip\",\
              \"value\":\"{EUR:5}\"} ] }"},
@@ -4738,6 +4741,7 @@ run (void *cls)
            \"value\":10,\
            \"fraction\":0},\
     	\"summary\": \"merchant-lib testcase\",\
+    	\"fulfillment_url\": \"https://example.com/\",\
         \"products\":\
           [ {\"description\":\"ice cream\",\
              \"value\":\"{EUR:10}\"} ] }"},
@@ -4844,6 +4848,7 @@ run (void *cls)
            \"value\":10,\
            \"fraction\":0},\
     	\"summary\": \"merchant-lib testcase\",\
+    	\"fulfillment_url\": \"https://example.com/\",\
         \"products\":\
           [ {\"description\":\"ice cream\",\
              \"value\":\"{EUR:10}\"} ] }"},
