@@ -631,14 +631,6 @@ Add a callback to be called when support for Taler payments is detected.
 @item onAbsent(callback: () => void)
 Add a callback to be called when support for Taler payments is disabled.
 
-@item pay(@{contract_url: string, offer_url: string@})
-Results in the same action as a @code{402 Payment Required} with @code{contract_url} in
-the @code{X-Taler-Contract-Url} header and @code{offer_url} in the @code{X-Taler-Payment-Url} header.
-
-@item refund(refund_url: string)
-Results in the same action as a @code{402 Payment Required} with @code{refund_url} in
-the @code{X-Taler-Refund-Url} header.
-
 @end table
 
 @node Stylesheet-based presence detection
