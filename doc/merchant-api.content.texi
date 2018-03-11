@@ -244,7 +244,9 @@ enforced.
 
 @item @var{fulfillment_url}:  A URL that will be displayed once the payment is
 completed.  For digital goods, this should be a page that displays the product
-that was purchased.
+that was purchased.  On successful payment, the wallet automatically appends
+the @code{order_id} as a query parameter, as well as the @code{session_sig} for
+session-bound payments (discussed later).
 @end itemize
 
 After successfully POSTing to @code{/order}, an @code{order_id} will be
@@ -624,7 +626,32 @@ See how to run it, on its own documentaion: @url{https://docs.taler.net/backoffi
 
 @node Session-Bound Payments
 @section Session-Bound Payments
-TODO
+Sometimes checking if an order has been paid for is not enough, but the
+merchant wants to checked if the ``payment receipt'' is available on the user's
+current device.  This prevents users from easily sharing digital goods by just
+sharing a link to the fulfillment page.  Of course advanced users can
+easily share these payment receipts, but it is not as easy as sharing a link.
+
+To use this feature, the merchant must first assign the user's current browser
+an ephemeral @code{session_id}, usually via a session cookie.  When executing
+or re-playing a payment, the wallet will receive a signature
+(@code{session_sig}) that certifies that in the current session, the wallet
+showed a payment receipt for the respective order.
+
+Session-bound payments are triggerd by passing the @code{session_id} parameter
+to the @code{/check-payment} endpoint.  The wallet will then redirect to the
+fulfillment page, but include an additional @code{session_sig} parameter.  The
+frontend can query @code{/check-payment} with both the @code{session_id} and
+the @code{session_sig} again to verify that the signature is correct.
+
+In some situations the user has paid for some digital good, but the frontend
+does not know the exact order ID, and thus can't instruct the wallet to show
+the existing payment receipt.  This is common for simple shops without a login
+system.  In this case, the user would be prompted for payment again, even
+though they already purchased the product.  To allow the wallet to instead show
+the existing payment receipt, the @code{resource_url} parameter must be given
+to @code{/check-payment}.  It should correspond to the fulfillment URL for the
+potentially existing payment for the same product.
 
 @c Section describing the format of Taler contracts/proposals in detail
 
