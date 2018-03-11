@@ -55,7 +55,8 @@ Texts.  A copy of the license is included in the section entitled
 @menu
 * Introduction::                                  What this tutorial is about
 * Accepting a Simple Payment::                    How to accept simple payments
-* Back-office-integration::                       How to integrate with the back office
+* Giving Refunds::                                How to give refunds to customers
+* Giving Customer Tips::                          How to reward customers with tips
 * Advanced topics::                               Detailed solutions to specific issues
 
 
@@ -77,23 +78,20 @@ Indices
 
 @section About GNU Taler
 
-GNU Taler is an open protocol for an electronic payment system with a
-free software reference implementation.  GNU Taler offers secure, fast
-and easy payment processing using well understood cryptographic
-techniques.  GNU Taler allows customers to remain anonymous, while
-ensuring that merchants can be held accountable by governments.
-Hence, GNU Taler is compatible with anti-money-laundering (AML) and
-know-your-customer (KYC) regulation, as well as data protection
-regulation (such as GDPR).
+GNU Taler is an open protocol for an electronic payment system with a free
+software reference implementation.  GNU Taler offers secure, fast and easy
+payment processing using well understood cryptographic techniques.  GNU Taler
+allows customers to remain anonymous, while ensuring that merchants can be held
+accountable by governments.  Hence, GNU Taler is compatible with
+anti-money-laundering (AML) and know-your-customer (KYC) regulation, as well as
+data protection regulation (such as GDPR).
 
 
 @section About this tutorial
 
-This tutorial addresses how to integrate GNU Taler with Web shops. It describes
-how to create a Web shop that processes payments with the help of a GNU Taler
-merchant @emph{backend}.  In the second chapter, you will learn how to trigger
-the payment process from the Web site, how to communicate with the backend, how
-to generate a proposal and process the payment.
+This tutorial addresses how to process payments using the GNU Taler merchant
+Backend. This chapter explains some basic concepts.  In the second chapter, you
+will learn how to do basic payments.
 
 @clear GOT_LANG
 @ifset LANG_PYTHON
@@ -172,8 +170,8 @@ in the @code{Authorization} header.  The value of this header must be
 @ifset LANG_CURL
 @set GOT_LANG 1
 @example
-$ curl -i 'https://backend.demo.taler.net/' \
-    --header "Authorization: ApiKey sandbox"
+curl -i 'https://backend.demo.taler.net/' \
+  --header "Authorization: ApiKey sandbox"
 # HTTP/1.1 200 OK
 # [...]
 #
@@ -250,7 +248,7 @@ that was purchased.
 @end itemize
 
 After successfully POSTing to @code{/order}, an @code{order_id} will be
-returned.  Together with the @code{instance id}, the order id uniquely
+returned.  Together with the merchant @code{instance}, the order id uniquely
 identifies the order within a merchant backend.
 
 @clear GOT_LANG
@@ -258,15 +256,15 @@ identifies the order within a merchant backend.
 @set GOT_LANG 1
 @example
 @verbatim
-$ ORDER='
+ORDER='
 {"order": {
   "amount": "KUDOS:10",
   "summary": "Donation",
   "fulfillment_url": "https://example.com/thanks.html"}}
 '
 
-$ curl -i -X POST 'https://backend.demo.taler.net/order' \
-    --header "Authorization: ApiKey sandbox" -d "$ORDER"
+curl -i -X POST 'https://backend.demo.taler.net/order' \
+     --header "Authorization: ApiKey sandbox" -d "$ORDER"
 # HTTP/1.1 200 OK
 # [...]
 #
@@ -284,8 +282,8 @@ $ curl -i -X POST 'https://backend.demo.taler.net/order' \
 >>> order = dict(order=dict(amount="KUDOS:10",
 ...                         summary="Donation",
 ...                         fulfillment_url="https://example.com/thanks.html"))
->>> requests.get("https://backend.demo.taler.net",
-...              headers={"Authorization": "ApiKey sandbox"})
+>>> requests.post("https://backend.demo.taler.net", data=order,
+...               headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
 @end verbatim
 @end example
@@ -356,17 +354,189 @@ payment was completed by the user, the response will contain the following field
 @item @var{last_session_id}:  Last session ID used by the customer's wallet.  Advanced feature, explained later.
 @end itemize
 
+@node Giving Refunds
+@chapter Giving Refunds
+A refund in GNU Taler is a way to ``undo'' a payment.  It needs to be
+authorized by the merchant at request of the customer.  Refunds can be full
+refunds, or only refund a fraction of the original amount paid.  Refunds are
+time-limited and can only happen while the exchange holds funds for a
+particular payment in escrow.  The time during which a refund is possible
+can be controlled by setting the @code{refund_deadline} in an order.  The default
+value for the refund deadline depends on the configuration of the backend.
 
-@node Back-office-integration
-@chapter Integration with the back office
-Taler ships the back-office feature as a stand-alone Web application.
-See how to run it, on its own documentaion: @url{https://docs.taler.net/backoffice/html/manual.html}.
+The frontend can instruct the merchant backend to authorize a refund by posting to the
+@code{/refund} endpoint.
+
+The refund request JSON object has the following fields:
+@itemize
+@item @var{order_id}: The ID that identifies the order to be refunded.
+@item @var{instrance}: The merchant instance to use (defaults to @code{default}).
+@item @var{refund}:  The amount to be refunded.  If a previous refund was
+authorized for the same order, the new amout must be higher.  Indicates the
+total amount refunded, @emph{not} an increase in the refund.
+@item @var{reason}:  Reason for the refund, only used for the Back Office and not directly shown to the customer.
+@end itemize
+
+If the request is successful (indicated by HTTP status code 200), the response
+includes a @code{refund_redirect_url}.  The frontend must navigate the
+customer's browser to allow the refund to be processed by the wallet.
+
+This code snipped illustrates giving a refund:
+@clear GOT_LANG
+@ifset LANG_CURL
+@set GOT_LANG 1
+@example
+@verbatim
+REFUND_REQ='
+{"order_id": "2018.058.21.46.06-024C85K189H8P",
+ "refund": "KUDOS:10",
+ "reason": "Customer did not like the product"}
+'
+
+curl -i -X POST 'https://backend.demo.taler.net/refund' \
+     --header "Authorization: ApiKey sandbox" -d "$REFUND_REQ"
+# HTTP/1.1 200 OK
+# [...]
+#
+# {
+#   [...]
+#   "refund_redirect_url": "[...]"
+# }
+@end verbatim
+@end example
+@end ifset
+@ifset LANG_PYTHON
+@set GOT_LANG 1
+@example
+@verbatim
+>>> import requests
+>>> refund_req = dict(order_id="2018.058.21.46.06-024C85K189H8P",
+...                   refund="KUDOS:10",
+...                   reason="Customer did not like the product")
+>>> requests.post("https://backend.demo.taler.net/refund", data=refund_req,
+...              headers={"Authorization": "ApiKey sandbox"})
+<Response [200]>
+@end verbatim
+@end example
+@end ifset
+@ifclear GOT_LANG
+@example
+(example not available for this language)
+@end example
+@end ifclear
+
+@node Giving Customer Tips
+@chapter Giving Customer Tips
+GNU Taler allows merchants to give small sums of money directly to the
+customer, for example to incentivize actions such as filling out a survey or
+trying a new feature.  The merchant backend must be properly configured for
+this, and enough funds must be made available for tipping @xref{Top,,, manual,
+Taler Merchant Operating Manual}.
+
+To check if tipping is configured properly and if there are enough funds available to tip,
+query the @code{/tip-query} endpoint:
+
+@clear GOT_LANG
+@ifset LANG_CURL
+@set GOT_LANG 1
+@example
+@verbatim
+curl -i 'https://backend.demo.taler.net/tip-query?instance=default' --header "Authorization: ApiKey sandbox"
+# HTTP/1.1 200 OK
+# [...]
+#
+# {
+#  [...]
+#  "amount_available": "KUDOS:153.47",
+#  "amount_authorized": "KUDOS:10"
+# }
+@end verbatim
+@end example
+@end ifset
+@ifset LANG_PYTHON
+@set GOT_LANG 1
+@example
+@verbatim
+>>> import requests
+>>> requests.get("https://backend.demo.taler.net",
+...              headers={"Authorization": "ApiKey sandbox"})
+<Response [200]>
+@end verbatim
+@end example
+@end ifset
+@ifclear GOT_LANG
+@example
+(example not available for this language)
+@end example
+@end ifclear
+
+To authorize a tip, post to @code{/tip-authorize}.  The following fields are recognized in the JSON
+request object:
+@itemize
+@item @var{amount}: Amount that should be given to the customer as a tip.
+@item @var{instance}: Merchant instance that gives the tip (each instance has
+their own independend tipping funds configured).
+@item @var{justification}: Description of why the tip was given.  Not given to the customer, but
+used from back office purposes.
+@item @var{next_url}: The URL that the user's browser will be redirected to by the wallet, once
+the tip has been processed.
+@end itemize
+
+The response contains a @code{tip_redirect_url}, the customer's browser must be
+redirected to this URL to accept the tip.
+
+This code snipped illustrates giving a tip:
+@clear GOT_LANG
+@ifset LANG_CURL
+@set GOT_LANG 1
+@example
+@verbatim
+TIP_REQ='
+{"amount: "KUDOS:0.5",
+ "instance": "default",
+ "justification": "User filled out survey"}
+'
+
+curl -i -X POST 'https://backend.demo.taler.net/tip-authorize' \
+     --header "Authorization: ApiKey sandbox" -d "$TIP_REQ"
+# HTTP/1.1 200 OK
+# [...]
+#
+# {
+#   [...]
+#   "tip_redirect_url": "[...]"
+# }
+@end verbatim
+@end example
+@end ifset
+@ifset LANG_PYTHON
+@set GOT_LANG 1
+@example
+@verbatim
+>>> import requests
+>>> tip_req = dict(amount="KUDOS:0.5",
+...                instance="default",
+...                justification="User filled out survey")
+>>> requests.post("https://backend.demo.taler.net/refund", data=tip_req,
+...              headers={"Authorization": "ApiKey sandbox"})
+<Response [200]>
+@end verbatim
+@end example
+@end ifset
+@ifclear GOT_LANG
+@example
+(example not available for this language)
+@end example
+@end ifclear
+
 
 @node Advanced topics
 @chapter Advanced topics
 
 @menu
 * Detecting the Presence of the Taler Wallet::  Detecting the Presence of the Taler Wallet
+* Integration with the Back Office::            Integration with the Back Office
+* Session-Bound Payments::                      Session-bound payments for digital goods
 * The Taler Order Format::                      The Taler Order Format
 @end menu
 
@@ -446,6 +616,15 @@ Add a callback to be called when support for Taler payments is disabled.
 Note that the registered callbacks can be called more than once, since a user
 can disable/enable the wallet in the browser's setting while a shop frontend
 page is open.
+
+@node Integration with the Back Office
+@section Integration with the Back Office
+Taler ships the back-office feature as a stand-alone Web application.
+See how to run it, on its own documentaion: @url{https://docs.taler.net/backoffice/html/manual.html}.
+
+@node Session-Bound Payments
+@section Session-Bound Payments
+TODO
 
 @c Section describing the format of Taler contracts/proposals in detail
 
