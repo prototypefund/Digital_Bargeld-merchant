@@ -31,7 +31,7 @@ Texts.  A copy of the license is included in the section entitled
 @c Titlepage
 @c
 @titlepage
-@title The GNU Taler Merchant API tutorial 
+@title The GNU Taler Merchant API tutorial
 @subtitle Version @value{VERSION}
 @subtitle @value{UPDATED}
 @author Christian Grothoff (@email{christian@@grothoff.org})
@@ -56,7 +56,7 @@ Texts.  A copy of the license is included in the section entitled
 * Introduction::                                  What this tutorial is about
 * Accepting a Simple Payment::                    How to accept simple payments
 * Giving Refunds::                                How to give refunds to customers
-* Giving Customer Tips::                          How to reward customers with tips
+* Giving Customers Tips::                         How to reward customers with tips
 * Advanced topics::                               Detailed solutions to specific issues
 
 
@@ -159,10 +159,12 @@ Some functionality of the backend (the ``public interface``) is also exposed to 
 customer's browser directly.  In the HTTP API, all public endpoints are prefixed with @code{/public/}.
 
 @section Public Sandbox Backend and Authentication
+@cindex sandbox
+@cindex authorization
 
-How the frontend authenticates with the Taler backend depends in the configuration. @xref{Top,,, manual, Taler Merchant Operating Manual}.
+How the frontend authenticates to the Taler backend depends on the configuration. @xref{Top,,, manual, Taler Merchant Operating Manual}.
 
-The public sandbox backend @url{https://backend.demo.taler.net} uses an API key
+The public sandbox backend @url{https://backend.demo.taler.net/} uses an API key
 in the @code{Authorization} header.  The value of this header must be
 @code{ApiKey sandbox} for the public sandbox backend.
 
@@ -198,18 +200,20 @@ curl -i 'https://backend.demo.taler.net/' \
 If an HTTP status code other than 200 is returned, something went wrong. You
 should figure out what the problem is before continuing with this tutorial.
 
-The sandbox backend @url{https://backend.demo.taler.net} uses @code{KUDOS} as
-an imaginary currency.  Coins denominated with @code{KUDOS} can be withdrawn
-from @url{https://bank.demo.taler.net}.
+The sandbox backend @url{https://backend.demo.taler.net/} uses @code{KUDOS} as
+an imaginary currency.  Coins denominated in @code{KUDOS} can be withdrawn
+from @url{https://bank.demo.taler.net/}.
 
 @section Merchant Instances
+@cindex instance
+
 The same Taler merchant backend server can be used by multiple separate
 merchants that are separate business entities.  Each of these separate business
 entities is called a @emph{merchant instance}, and is identified by an
 alphanumeric @emph{instance id}.  If the instance is omitted, the instance id
 @code{default} is assumed.
 
-The following merchant instances are configured on @url{https://backend.demo.taler.net}:
+The following merchant instances are configured on @url{https://backend.demo.taler.net/}:
 @itemize
 @item @code{GNUnet} (The GNUnet project)
 @item @code{FSF} (The Free Software Foundation)
@@ -217,18 +221,20 @@ The following merchant instances are configured on @url{https://backend.demo.tal
 @item @code{default} (Kudos Inc.)
 @end itemize
 
-Note that these are fictional merchants and not necessarily affiliated with the
-respective project.
+Note that these are fictional merchants used for our demonstrators and
+not affiliated with or officially approved by the respective projects.
 
 
 @node Accepting a Simple Payment
 @chapter Accepting a Simple Payment
 
 @section Creating an Order for a Payment
+@cindex order
 
 Payments in Taler revolve around an @emph{order}, which is a machine-readable
-description of the payment's details.  Before accepting a Taler payment as a merchant
-you must create an order.
+description of the business transaction for which the payment is to be made.
+Before accepting a Taler payment as a merchant
+you must create such an order.
 
 This is done by posting a JSON object to the backend's @code{/order} API endpoint.  At least the
 following fields must be given:
@@ -238,9 +244,9 @@ following fields must be given:
 @code{CURRENCY:DECIMAL_VALUE}, for example @code{EUR:10} for 10 Euros or
 @code{KUDOS:1.5} for 1.5 KUDOS.
 
-@item @var{summary}:  A human-readable summary for what the payment is about,
-should be short enough to fit into titles, though currently no hard limit is
-enforced.
+@item @var{summary}:  A human-readable summary for what the payment is about.
+The summary should be short enough to fit into titles, though no
+hard limit is enforced.
 
 @item @var{fulfillment_url}:  A URL that will be displayed once the payment is
 completed.  For digital goods, this should be a page that displays the product
@@ -249,7 +255,9 @@ the @code{order_id} as a query parameter, as well as the @code{session_sig} for
 session-bound payments (discussed later).
 @end itemize
 
-After successfully POSTing to @code{/order}, an @code{order_id} will be
+Orders can have many more fields, see @ref{The Taler Order Format}.
+
+After successfully @code{POST}ing to @code{/order}, an @code{order_id} will be
 returned.  Together with the merchant @code{instance}, the order id uniquely
 identifies the order within a merchant backend.
 
@@ -297,13 +305,15 @@ curl -i -X POST 'https://backend.demo.taler.net/order' \
 @end ifclear
 
 The backend will fill in some details missing in the order, such as the address
-of the merchant instance.  The full details are often called the @emph{contract
+of the merchant instance.  The full details are called the @emph{contract
 terms}.
+@cindex contract
+@cindex terms
 
 @section Checking Payment Status and Prompting for Payment
 The status of a payment can be checked with the @code{/check-payment} endpoint.  If the payment
-wasn't completed yet by the customer, @code{/check-payment} will give the frontend a URL (@var{payment_redirect_url})
-that will trigger the customer's wallet to trigger the payment.
+is yet to be completed by the customer, @code{/check-payment} will give the frontend a URL (the @var{payment_redirect_url})
+that will trigger the customer's wallet to execute the payment.
 
 Note that the only way to obtain the @var{payment_redirect_url} is to check the status of the payment,
 even if you know that the user did not pay yet.
@@ -318,7 +328,7 @@ curl -i "https://backend.demo.taler.net/check-payment?order_id=$ORDER_ID" \
   --header "Authorization: ApiKey sandbox"
 # HTTP/1.1 200 OK
 # [...]
-# 
+#
 # {
 #   "payment_redirect_url":
 #      "https://backend.demo.taler.net/public/trigger-pay?[...]",
@@ -345,43 +355,54 @@ curl -i "https://backend.demo.taler.net/check-payment?order_id=$ORDER_ID" \
 @end example
 @end ifclear
 
-Depending on the value of the @var{paid} field in the response, the other fields will be different.  Once the
-payment was completed by the user, the response will contain the following fields:
+If the @var{paid} field in the response is @code{true}, the other
+fields in the response will be different. Once the payment was
+completed by the user, the response will contain the following fields:
 
 @itemize
 @item @var{paid}: Set to @var{true}.
-@item @var{contract_terms}:  The full contract terms derived from the order.
-@item @var{refunded}:  Boolean that indicates whether any (partial) refund happened for this purchase.
+@item @var{contract_terms}:  The full contract terms of the order.
+@item @var{refunded}: @code{true} if a (possibly partial) refund was granted for this purchase.
 @item @var{refunded_amount}:  Amount that was refunded
-@item @var{last_session_id}:  Last session ID used by the customer's wallet.  Advanced feature, explained later.
+@item @var{last_session_id}:  Last session ID used by the customer's wallet. @xref{Session-Bound Payments}.
 @end itemize
+
+Once the frontend has confirmed that the payment was successful, it
+usually needs to trigger the business logic for the merchant to
+fulfill the merchant's obligations under the contract.
+
 
 @node Giving Refunds
 @chapter Giving Refunds
+@cindex refunds
+
 A refund in GNU Taler is a way to ``undo'' a payment.  It needs to be
-authorized by the merchant at request of the customer.  Refunds can be full
-refunds, or only refund a fraction of the original amount paid.  Refunds are
+authorized by the merchant.  Refunds can be for any fraction of the
+original amount paid, but they cannot exceed the original payment.
+Refunds are
 time-limited and can only happen while the exchange holds funds for a
 particular payment in escrow.  The time during which a refund is possible
 can be controlled by setting the @code{refund_deadline} in an order.  The default
-value for the refund deadline depends on the configuration of the backend.
+value for this refund deadline is specified in the configuration of the
+merchant's backend.
 
-The frontend can instruct the merchant backend to authorize a refund by posting to the
-@code{/refund} endpoint.
+The frontend can instruct the merchant backend to authorize a refund
+by @code{POST}ing to the @code{/refund} endpoint.
 
 The refund request JSON object has the following fields:
 @itemize
-@item @var{order_id}: The ID that identifies the order to be refunded.
-@item @var{instrance}: The merchant instance to use (defaults to @code{default}).
-@item @var{refund}:  The amount to be refunded.  If a previous refund was
-authorized for the same order, the new amout must be higher.  Indicates the
-total amount refunded, @emph{not} an increase in the refund.
-@item @var{reason}:  Reason for the refund, only used for the Back Office and not directly shown to the customer.
+@item @var{order_id}: Identifies for which order a customer should be refunded.
+@item @var{instrance}: Merchant instance to use (defaults to @code{default}).
+@item @var{refund}:  Amount to be refunded.  If a previous refund was
+authorized for the same order, the new amount must be higher, otherwise
+the operation has no effect. The value indicates the
+total amount to be refunded, @emph{not} an increase in the refund.
+@item @var{reason}:  Human-readable justification for the refund. The reason is only used by the Back Office and is not exposed to the customer.
 @end itemize
 
 If the request is successful (indicated by HTTP status code 200), the response
-includes a @code{refund_redirect_url}.  The frontend must navigate the
-customer's browser to allow the refund to be processed by the wallet.
+includes a @code{refund_redirect_url}.  The frontend must redirect the
+customer's browser to that URL to allow the refund to be processed by the wallet.
 
 This code snipped illustrates giving a refund:
 @clear GOT_LANG
@@ -427,16 +448,31 @@ curl -i -X POST 'https://backend.demo.taler.net/refund' \
 @end example
 @end ifclear
 
-@node Giving Customer Tips
-@chapter Giving Customer Tips
-GNU Taler allows merchants to give small sums of money directly to the
-customer, for example to incentivize actions such as filling out a survey or
-trying a new feature.  The merchant backend must be properly configured for
-this, and enough funds must be made available for tipping @xref{Top,,, manual,
+@node Giving Customers Tips
+@chapter Giving Customers Tips
+@cindex tips
+
+@c NOTE: Terminology should not be merchant/customer here, as
+@c the relationship is completely different. So I use
+@c ``site'' and ``visitor'', as that is right now the proper
+@c context. We may want to use more payment-ish terminology
+@c in the future, but ``donor'' and ``grantee'' sound excessive
+@c in the context of ``tips''.
+
+GNU Taler allows Web sites to grant small amounts directly to the
+visitor.  The idea is that some sites may want incentivize actions
+such as filling out a survey or trying a new feature.  It is important
+to note that tips are not enforcable for the visitor, as there is no
+contract. It is simply a voluntary gesture of appreciation of the site
+to its visitor.  However, once a tip has been granted, the visitor
+obtains full control over the funds provided by the site.
+
+The ``merchant'' backend of the site must be properly configured for
+tipping, and sufficient funds must be made available for tipping @xref{Top,,, manual,
 Taler Merchant Operating Manual}.
 
-To check if tipping is configured properly and if there are enough funds available to tip,
-query the @code{/tip-query} endpoint:
+To check if tipping is configured properly and if there are
+sufficient funds available for tipping, query the @code{/tip-query} endpoint:
 
 @clear GOT_LANG
 @ifset LANG_CURL
@@ -472,20 +508,20 @@ curl -i 'https://backend.demo.taler.net/tip-query?instance=default' --header "Au
 @end example
 @end ifclear
 
-To authorize a tip, post to @code{/tip-authorize}.  The following fields are recognized in the JSON
+@cindex authorize tip
+To authorize a tip, @code{POST} to @code{/tip-authorize}.  The following fields are recognized in the JSON
 request object:
+
 @itemize
-@item @var{amount}: Amount that should be given to the customer as a tip.
-@item @var{instance}: Merchant instance that gives the tip (each instance has
-their own independend tipping funds configured).
-@item @var{justification}: Description of why the tip was given.  Not given to the customer, but
-used from back office purposes.
-@item @var{next_url}: The URL that the user's browser will be redirected to by the wallet, once
-the tip has been processed.
+@item @var{amount}: Amount that should be given to the visitor as a tip.
+@item @var{instance}: Merchant instance that grants the tip (each instance may have its own independend tipping funds configured).
+@item @var{justification}: Description of why the tip was granted.  Human-readable text not exposed to the customer, but used by the Back Office.
+@item @var{next_url}: The URL that the user's browser should be redirected to by the wallet, once the tip has been processed.
 @end itemize
 
-The response contains a @code{tip_redirect_url}, the customer's browser must be
-redirected to this URL to accept the tip.
+The response from the backend contains a @code{tip_redirect_url}. The customer's browser must be
+redirected to this URL for the wallet to pick up the tip.
+@cindex pick up tip
 
 This code snipped illustrates giving a tip:
 @clear GOT_LANG
@@ -539,6 +575,7 @@ curl -i -X POST 'https://backend.demo.taler.net/tip-authorize' \
 * Detecting the Presence of the Taler Wallet::  Detecting the Presence of the Taler Wallet
 * Integration with the Back Office::            Integration with the Back Office
 * Session-Bound Payments::                      Session-bound payments for digital goods
+* Product Identification::                      Product Identification
 * The Taler Order Format::                      The Taler Order Format
 @end menu
 
@@ -546,10 +583,13 @@ curl -i -X POST 'https://backend.demo.taler.net/tip-authorize' \
 @section Detecting the Presence of the Taler Wallet
 @cindex wallet
 
-Taler offers ways to detect whether a user has the wallet installed in their
-browser, and take actions accordingly.  Note that not all platforms can do
-presence detection reliably.  Some platforms might have a Taler wallet installed,
-but the browser is not aware of its presence.
+Taler offers ways to detect whether a user has the wallet installed in
+their browser. This allows Web sites to adapt accordingly.  Note that
+not all platforms can do presence detection reliably.  Some platforms
+might have a Taler wallet installed as a separate App instead of using
+a Web extension.  In these cases, presence detection will fail. Thus,
+sites may want to allow users to request Taler payments even if a
+wallet could not be detected, especially for visitors using mobiles.
 
 @subsection Presence detection without JavaScript
 Presence detection without JavaScript is based on CSS classes.  You can hide or
@@ -598,8 +638,9 @@ The following is a complete example:
 @end smallexample
 
 The @code{taler-fallback.css} is part of the Taler's @emph{web-common} repository,
-available at @code{https://git.taler.net/web-common.git}.  Please adjust the @code{href}
-attribute in order to make it work with your Web site.
+available at @url{https://git.taler.net/web-common.git/tree/taler-fallback.css}.
+You may have to adjust the @code{href} attribute in the HTML code above to point
+to the correct location of the @code{taler-fallback.css} file on your Web site.
 
 @subsection Detection with JavaScript
 
@@ -608,60 +649,94 @@ available at @url{https://git.taler.net/web-common.git/tree/taler-wallet-lib.js}
 
 @table @code
 @item onPresent(callback: () => void)
-Add a callback to be called when support for Taler payments is detected.
+Adds a callback to be called when support for Taler payments is detected.
 
 @item onAbsent(callback: () => void)
-Add a callback to be called when support for Taler payments is disabled.
+Adds a callback to be called when support for Taler payments is disabled.
 
 @end table
 
-Note that the registered callbacks can be called more than once, since a user
-can disable/enable the wallet in the browser's setting while a shop frontend
-page is open.
+Note that the registered callbacks may be called more than once. This may
+happen if a user disables or enables the wallet in the browser's extension
+settings while a shop's frontend page is open.
+
+@c FIXME: include full example of Web site including taler-wallet-lib.js
+@c and using JS detection actions.  (alert()?)
 
 @node Integration with the Back Office
 @section Integration with the Back Office
-Taler ships the back-office feature as a stand-alone Web application.
-See how to run it, on its own documentaion: @url{https://docs.taler.net/backoffice/html/manual.html}.
+
+Taler ships a Back Office application as a stand-alone Web application.
+The Back Office has its own documentation at @url{https://docs.taler.net/backoffice/html/manual.html}.
+
+Developers wishing to tightly integrate back office support for
+Taler-based payments into an existing back office application should
+focus on the wire transfer tracking and transaction history sections
+of the Taler Backend API specification at
+@url{https://docs.taler.net/api/api-merchant.html}
 
 @node Session-Bound Payments
 @section Session-Bound Payments
-Sometimes checking if an order has been paid for is not enough, but the
-merchant wants to checked if the ``payment receipt'' is available on the user's
-current device.  This prevents users from easily sharing digital goods by just
-sharing a link to the fulfillment page.  Of course advanced users can
-easily share these payment receipts, but it is not as easy as sharing a link.
+@cindex session
+
+Sometimes checking if an order has been paid for is not enough. For
+example, when selling access to online media, the publisher may want
+to be paid for exactly the same product by each customer.  Taler
+supports this model by allowing the mechant to check whether the
+``payment receipt'' is available on the user's current device.  This
+prevents users from easily sharing media access by transmitting a link
+to the fulfillment page.  Of course sophisticated users could share
+payment receipts as well, but this is not as easy as sharing a link,
+and in this case they are more likely to just share the media
+directly.
 
 To use this feature, the merchant must first assign the user's current browser
 an ephemeral @code{session_id}, usually via a session cookie.  When executing
-or re-playing a payment, the wallet will receive a signature
-(@code{session_sig}) that certifies that in the current session, the wallet
-showed a payment receipt for the respective order.
+or re-playing a payment, the wallet will receive an additional signature
+(@code{session_sig}).  This signature certifies that the wallet
+showed a payment receipt for the respective order in the current session.
+@cindex cookie
 
 Session-bound payments are triggerd by passing the @code{session_id} parameter
 to the @code{/check-payment} endpoint.  The wallet will then redirect to the
 fulfillment page, but include an additional @code{session_sig} parameter.  The
 frontend can query @code{/check-payment} with both the @code{session_id} and
-the @code{session_sig} again to verify that the signature is correct.
+the @code{session_sig} to verify that the signature is correct.
 
 The last session ID that was successfuly used to prove that the payment
 receipt is in the user's wallet is also available as @code{last_session_id} in
 the response to @code{/check-payment}.
+@c FIXME: used for what?
 
-In some situations the user has paid for some digital good, but the frontend
-does not know the exact order ID, and thus can't instruct the wallet to show
+@node Product Identification
+@section Product Identification
+@cindex resource url
+
+In some situations the user may have paid for some digital good, but the frontend
+does not know the exact order ID, and thus cannot instruct the wallet to reveil
 the existing payment receipt.  This is common for simple shops without a login
 system.  In this case, the user would be prompted for payment again, even
-though they already purchased the product.  To allow the wallet to instead show
-the existing payment receipt, the @code{resource_url} parameter must be given
-to @code{/check-payment}.  It should correspond to the fulfillment URL for the
-potentially existing payment for the same product.
+though they already purchased the product.
+
+To allow the wallet to instead find the existing payment receipt, the
+shop must use a unique fulfillment URL for each product.  Then, the
+frontend must provide an additional @code{resource_url} parameter to
+to @code{/check-payment}.  It should identify this unique fulfillment
+URL for the product.  The wallet will then check whether it has paid
+for a contract with the same @code{resource_url} before, and if so
+replay the previous payment.
+@c FIXME: design question (!): why do we not simply set a flag (``unique fulfillment url'')
+@c instead of passing the fulfillment URL a *second* time to the backend?
+@c (and having to worry about it being the same as in the order on /order)?
+
 
 @c Section describing the format of Taler contracts/proposals in detail
 
 @node The Taler Order Format
 @section The Taler Order Format
 @cindex contract
+@cindex terms
+@cindex order
 
 A Taler order can specify many details about the payment.
 This section describes each of the fields in depth.
@@ -836,7 +911,7 @@ Street number (number of the house) for delivery, as found on a postal package.
 @end table
 
 Note that locations are not required to specify all of these fields,
-and it is also allowed to have additional fields.  Contract renderers
+and they is also allowed to have additional fields.  Contract renderers
 must render at least the fields listed above, and should render fields
 that they do not understand as a key-value list.
 
