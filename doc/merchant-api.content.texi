@@ -644,6 +644,10 @@ fulfillment page, but include an additional @code{session_sig} parameter.  The
 frontend can query @code{/check-payment} with both the @code{session_id} and
 the @code{session_sig} again to verify that the signature is correct.
 
+The last session ID that was successfuly used to prove that the payment
+receipt is in the user's wallet is also available as @code{last_session_id} in
+the response to @code{/check-payment}.
+
 In some situations the user has paid for some digital good, but the frontend
 does not know the exact order ID, and thus can't instruct the wallet to show
 the existing payment receipt.  This is common for simple shops without a login
