@@ -57,7 +57,6 @@ Texts.  A copy of the license is included in the section entitled
 * Accepting a Simple Payment::                    How to accept simple payments
 * Back-office-integration::                       How to integrate with the back office
 * Advanced topics::                               Detailed solutions to specific issues
-* Reference::                                     Merchant integration reference
 
 
 Appendices
@@ -375,13 +374,35 @@ See how to run it, on its own documentaion: @url{https://docs.taler.net/backoffi
 @section Detecting the Presence of the Taler Wallet
 @cindex wallet
 
-Taler offers the way to the frontend developer to detect whether
-a user has the wallet installed in their browser, and take actions
-accordingly.
+Taler offers ways to detect whether a user has the wallet installed in their
+browser, and take actions accordingly.  Note that not all platforms can do
+presence detection reliably.  Some platforms might have a Taler wallet installed,
+but the browser is not aware of its presence.
 
-@subsection The no-JavaScript way
-The follwing example shows all that is needed to perform the detection
-without using JavaScript:
+@subsection Presence detection without JavaScript
+Presence detection without JavaScript is based on CSS classes.  You can hide or
+show elements selectively depending on whether the wallet is detected or not.
+
+In order to work correctly, a special fallback stylesheet must be included that
+will be used when the wallet is not present.  The stylesheet can be put into
+any file, but must be included via a @code{link} tag with the @code{id}
+attribute set to @code{taler-presence-stylesheet}.  If a wallet is present, it
+will ``hijack'' this stylesheet to change how elements with the following
+classes are rendered:
+
+The following CSS classes can be used:
+@table @code
+@item taler-installed-hide
+A CSS rule will set the @code{display} property for this class to @code{none} once the Taler wallet is installed and enabled.
+If the wallet is not installed, @code{display} will be @code{inherit}.
+
+@item taler-installed-show
+A CSS rule will set the @code{display} property for this class to @code{inherit} once the Taler wallet is installed and enabled.
+If the wallet is not installed, @code{display} will be @code{none}.
+
+@end table
+
+The following is a complete example:
 
 @smallexample
 <!DOCTYPE html>
@@ -408,28 +429,23 @@ The @code{taler-fallback.css} is part of the Taler's @emph{web-common} repositor
 available at @code{https://git.taler.net/web-common.git}.  Please adjust the @code{href}
 attribute in order to make it work with your Web site.
 
-The detection works by @code{taler-fallback.css} hiding any tag from the
-@code{taler-installed-show} class, in case no wallet is installed.  If otherwise
-the wallet is installed, the wallet takes action by hiding any tag from the
-@code{taler-installed-hide} class and overriding @code{taler-fallback.css} logic
-by showing any tag from the @code{taler-installed-show} class.
+@subsection Detection with JavaScript
 
-@subsection The JavaScript way
+The following functions are defined in the @code{taler} namespace of the @code{taler-wallet-lib} helper library
+available at @url{https://git.taler.net/web-common.git/tree/taler-wallet-lib.js}.
 
-@code{taler-wallet-lib.js} helps the frontend, by providing the way to register two
-callbacks: one to be executed if a wallet is present, the other if it is not.
-See the example below:
+@table @code
+@item onPresent(callback: () => void)
+Add a callback to be called when support for Taler payments is detected.
 
-@smallexample
-@end smallexample
+@item onAbsent(callback: () => void)
+Add a callback to be called when support for Taler payments is disabled.
 
-@code{taler-wallet-lib.js} exports the @code{taler} object that
-exposes the @code{onPresent} and the @code{onAbsent} functions needed
-to register the frontend's callbacks.  Thus the function @code{walletInstalled}
-will be executed whenever a wallet is installed, and @code{walletNotInstalled}
-if not.  Note that since now we can use JavaScript we can register
-callbacks that do more than just showing and hiding elements.
+@end table
 
+Note that the registered callbacks can be called more than once, since a user
+can disable/enable the wallet in the browser's setting while a shop frontend
+page is open.
 
 @c Section describing the format of Taler contracts/proposals in detail
 
@@ -615,52 +631,6 @@ must render at least the fields listed above, and should render fields
 that they do not understand as a key-value list.
 
 @end table
-
-
-@node Reference
-@chapter Reference
-
-@menu
-* JavaScript API::                       JavaScript API to communicate with the wallet
-* Stylesheet-based presence detection::  Presence detection using CSS style sheets and no JavaScript
-@end menu
-
-@node JavaScript API
-@section JavaScript API
-
-The following functions are defined in the @code{taler} namespace of the @code{taler-wallet-lib} helper library
-available at @url{https://git.taler.net/web-common.git/tree/taler-wallet-lib.js}.
-
-@table @code
-@item onPresent(callback: () => void)
-Add a callback to be called when support for Taler payments is detected.
-
-@item onAbsent(callback: () => void)
-Add a callback to be called when support for Taler payments is disabled.
-
-@end table
-
-@node Stylesheet-based presence detection
-@section Stylesheet-based presence detection
-
-Stylesheet-based presence detection will be applied on all pages that have the
-@code{data-taler-nojs} attribute of the @code{html} element set @code{true}.
-The default/fallback stylesheet, that will be taken over by the wallet once
-installed, must be included with the id @code{taler-presence-stylesheet}, like
-this:
-
-The following CSS classes can be used:
-@table @code
-@item taler-installed-hide
-A CSS rule will set the @code{display} property for this class to @code{none} once the Taler wallet is installed and enabled.
-If the wallet is not installed, @code{display} will be @code{inherit}.
-
-@item taler-installed-show
-A CSS rule will set the @code{display} property for this class to @code{inherit} once the Taler wallet is installed and enabled.
-If the wallet is not installed, @code{display} will be @code{none}.
-
-@end table
-
 
 
 @c **********************************************************
