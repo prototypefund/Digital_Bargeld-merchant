@@ -173,7 +173,8 @@ in the @code{Authorization} header.  The value of this header must be
 @ifset LANG_CURL
 @set GOT_LANG 1
 @example
-$ curl -i 'https://backend.demo.taler.net/' --header "Authorization: ApiKey sandbox"
+$ curl -i 'https://backend.demo.taler.net/' \
+    --header "Authorization: ApiKey sandbox"
 # HTTP/1.1 200 OK
 # [...]
 #
@@ -185,7 +186,8 @@ $ curl -i 'https://backend.demo.taler.net/' --header "Authorization: ApiKey sand
 @example
 @verbatim
 >>> import requests
->>> requests.get("https://backend.demo.taler.net", headers={"Authorization": "ApiKey sandbox"})
+>>> requests.get("https://backend.demo.taler.net",
+...              headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
 @end verbatim
 @end example
@@ -264,7 +266,8 @@ $ ORDER='
   "fulfillment_url": "https://example.com/thanks.html"}}
 '
 
-$ curl -i -X POST 'https://backend.demo.taler.net/order' --header "Authorization: ApiKey sandbox" -d "$ORDER"
+$ curl -i -X POST 'https://backend.demo.taler.net/order' \
+    --header "Authorization: ApiKey sandbox" -d "$ORDER"
 # HTTP/1.1 200 OK
 # [...]
 #
@@ -282,7 +285,8 @@ $ curl -i -X POST 'https://backend.demo.taler.net/order' --header "Authorization
 >>> order = dict(order=dict(amount="KUDOS:10",
 ...                         summary="Donation",
 ...                         fulfillment_url="https://example.com/thanks.html"))
->>> requests.get("https://backend.demo.taler.net", headers={"Authorization": "ApiKey sandbox"})
+>>> requests.get("https://backend.demo.taler.net",
+...              headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
 @end verbatim
 @end example
@@ -310,12 +314,15 @@ even if you know that the user did not pay yet.
 @set GOT_LANG 1
 @example
 @verbatim
-curl -i 'https://backend.demo.taler.net/check-payment?order_id=2018.058.21.46.06-024C85K189H8P' --header "Authorization: ApiKey sandbox"
+ORDER_ID="2018.058.21.46.06-024C85K189H8P"
+curl -i "https://backend.demo.taler.net/check-payment?order_id=$ORDER_ID" \
+  --header "Authorization: ApiKey sandbox"
 # HTTP/1.1 200 OK
 # [...]
 # 
 # {
-#   "payment_redirect_url": "https://backend.demo.taler.net/public/trigger-pay?[...]",
+#   "payment_redirect_url":
+#      "https://backend.demo.taler.net/public/trigger-pay?[...]",
 #   "paid": false
 # }
 @end verbatim
