@@ -464,7 +464,7 @@ int
 TALER_TESTING_get_trait_h_contract_terms
   (const struct TALER_TESTING_Command *cmd,
    unsigned int index,
-   const const struct GNUNET_HashCode **h_contract_terms);
+   const struct GNUNET_HashCode **h_contract_terms);
 
 
 /**
