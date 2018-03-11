@@ -8,9 +8,13 @@ manual.html: arch.png manual.texi
 %.pdf: %.dot
 	dot -Tpdf $< > $@
 
-merchant-api-%.%: merchant-api.content.texi
-merchant-api-%.pdf: arch-api.pdf
-html-local: arch-api.png
+clean-local:
+	-rm -f arch.png arch.pdf arch-api.png arch-api.pdf
+
+merchant-api-curl.pdf: merchant-api.content.texi arch-api.pdf
+merchant-api-python.pdf: merchant-api.content.texi arch-api.pdf
+merchant-api-curl.html: merchant-api.content.texi arch-api.png
+merchant-api-python.html: merchant-api.content.texi arch-api.png
 
 AM_MAKEINFOHTMLFLAGS = --no-split --css-ref=docstyle.css --css-ref=brown-paper.css
 
