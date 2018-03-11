@@ -236,7 +236,7 @@ following fields must be given:
 
 @itemize
 @item @var{amount}: The amount to be paid, as a string in the format
-@code{CURRENCY:VALUE}, for example @code{EUR:10} for 10 Euros or
+@code{CURRENCY:DECIMAL_VALUE}, for example @code{EUR:10} for 10 Euros or
 @code{KUDOS:1.5} for 1.5 KUDOS.
 
 @item @var{summary}:  A human-readable summary for what the payment is about,
@@ -432,6 +432,8 @@ callbacks that do more than just showing and hiding elements.
 
 A Taler order can specify many details about the payment.
 This section describes each of the fields in depth.
+
+Financial amounts are always specified as a string in the format @code{"CURRENCY:DECIMAL_VALUE"}.
 
 @table @var
 @item amount
