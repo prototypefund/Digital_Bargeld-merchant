@@ -292,7 +292,7 @@ curl -i -X POST 'https://backend.demo.taler.net/order' \
 >>> order = dict(order=dict(amount="KUDOS:10",
 ...                         summary="Donation",
 ...                         fulfillment_url="https://example.com/thanks.html"))
->>> requests.post("https://backend.demo.taler.net", data=order,
+>>> requests.post("https://backend.demo.taler.net/order", json=order,
 ...               headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
 @end verbatim
@@ -436,7 +436,7 @@ curl -i -X POST 'https://backend.demo.taler.net/refund' \
 >>> refund_req = dict(order_id="2018.058.21.46.06-024C85K189H8P",
 ...                   refund="KUDOS:10",
 ...                   reason="Customer did not like the product")
->>> requests.post("https://backend.demo.taler.net/refund", data=refund_req,
+>>> requests.post("https://backend.demo.taler.net/refund", json=refund_req,
 ...              headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
 @end verbatim
@@ -555,7 +555,7 @@ curl -i -X POST 'https://backend.demo.taler.net/tip-authorize' \
 >>> tip_req = dict(amount="KUDOS:0.5",
 ...                instance="default",
 ...                justification="User filled out survey")
->>> requests.post("https://backend.demo.taler.net/refund", data=tip_req,
+>>> requests.post("https://backend.demo.taler.net/refund", json=tip_req,
 ...              headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
 @end verbatim
