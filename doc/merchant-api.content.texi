@@ -292,7 +292,7 @@ curl -i -X POST 'https://backend.demo.taler.net/order' \
 >>> order = dict(order=dict(amount="KUDOS:10",
 ...                         summary="Donation",
 ...                         fulfillment_url="https://example.com/thanks.html"))
->>> requests.post("https://backend.demo.taler.net/order", json=order,
+>>> order_resp = requests.post("https://backend.demo.taler.net/order", json=order,
 ...               headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
 @end verbatim
@@ -343,7 +343,7 @@ curl -i "https://backend.demo.taler.net/check-payment?order_id=$ORDER_ID" \
 @verbatim
 >>> import requests
 >>> r = requests.get("https://backend.demo.taler.net/check-payment",
-...                  params=dict(order_id=order_id),
+...                  params=dict(order_id=order_resp.json()["order_id"]),
 ...                  headers={"Authorization": "ApiKey sandbox"})
 >>> print(r.json())
 @end verbatim
