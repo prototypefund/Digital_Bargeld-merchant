@@ -181,6 +181,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 					 "Unknown instance given");
   }
 
+  db->preflight (db->cls);
+
   /* Convert order id to h_contract_terms */
   qs = db->find_contract_terms (db->cls,
 				&contract_terms,

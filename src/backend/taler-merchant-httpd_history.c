@@ -174,8 +174,9 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                          "instance");
   }
 
-  /* Here goes the cherry-picking logic */
+  db->preflight (db->cls);
 
+  /* Here goes the cherry-picking logic */
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "order_id");

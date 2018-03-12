@@ -58,7 +58,10 @@ process_refunds_cb (void *cls,
 {
   struct TALER_Amount *acc_amount = cls;
 
-  GNUNET_assert (TALER_amount_add (acc_amount, acc_amount, refund_amount));
+  GNUNET_assert (GNUNET_SYSERR !=
+                 TALER_amount_add (acc_amount,
+                                   acc_amount,
+                                   refund_amount));
 }
 
 
@@ -187,6 +190,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   GNUNET_assert (NULL != order_id);
 
+  db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
                                 &last_session_id,
@@ -250,7 +254,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   /* Check if paid */
   {
     json_t *xcontract_terms = NULL;
-    
+
     qs = db->find_paid_contract_terms_from_hash (db->cls,
                                                  &xcontract_terms,
                                                  &h_contract_terms,

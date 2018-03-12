@@ -758,10 +758,24 @@ struct TALER_MERCHANTDB_Plugin
    * Start a transaction.
    *
    * @param cls the `struct PostgresClosure` with the plugin-specific state
+   * @param name unique name identifying the transaction (for debugging),
+   *             must point to a constant
    * @return #GNUNET_OK on success
    */
   int
-  (*start) (void *cls);
+  (*start) (void *cls,
+            const char *name);
+
+
+  /**
+   * Do a pre-flight check that we are not in an uncommitted transaction.
+   * If we are, try to commit the previous transaction and output a warning.
+   * Does not return anything, as we will continue regardless of the outcome.
+   *
+   * @param cls the `struct PostgresClosure` with the plugin-specific state
+   */
+  void
+  (*preflight) (void *cls);
 
 
   /**

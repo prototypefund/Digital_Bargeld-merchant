@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016, 2017 INRIA
+  (C) 2014-2018 INRIA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -50,6 +50,11 @@ struct PostgresClosure
    * Underlying configuration.
    */
   const struct GNUNET_CONFIGURATION_Handle *cfg;
+
+  /**
+   * Name of the currently active transaction, NULL if none is active.
+   */
+  const char *transaction_name;
 
 };
 
@@ -700,10 +705,13 @@ check_connection (struct PostgresClosure *pg)
  * Start a transaction.
  *
  * @param cls the `struct PostgresClosure` with the plugin-specific state
+ * @param name unique name identifying the transaction (for debugging),
+ *             must point to a constant
  * @return #GNUNET_OK on success
  */
-int
-postgres_start (void *cls)
+static int
+postgres_start (void *cls,
+                const char *name)
 {
   struct PostgresClosure *pg = cls;
   PGresult *result;
@@ -725,6 +733,7 @@ postgres_start (void *cls)
     return GNUNET_SYSERR;
   }
   PQclear (result);
+  pg->transaction_name = name;
   return GNUNET_OK;
 }
 
@@ -748,6 +757,43 @@ postgres_rollback (void *cls)
   GNUNET_break (PGRES_COMMAND_OK ==
                 PQresultStatus (result));
   PQclear (result);
+  pg->transaction_name = NULL;
+}
+
+
+/**
+ * Do a pre-flight check that we are not in an uncommitted transaction.
+ * If we are, try to commit the previous transaction and output a warning.
+ * Does not return anything, as we will continue regardless of the outcome.
+ *
+ * @param cls the `struct PostgresClosure` with the plugin-specific state
+ */
+static void
+postgres_preflight (void *cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  ExecStatusType status;
+
+  if (NULL == pg->transaction_name)
+    return; /* all good */
+  result = PQexec (pg->conn,
+                   "COMMIT");
+  status = PQresultStatus (result);
+  if (PGRES_COMMAND_OK == status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "BUG: Preflight check committed transaction `%s'!\n",
+                pg->transaction_name);
+  }
+  else
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "BUG: Preflight check failed to commit transaction `%s'!\n",
+                pg->transaction_name);
+  }
+  pg->transaction_name = NULL;
+  PQclear (result);
 }
 
 
@@ -767,6 +813,7 @@ postgres_commit (void *cls)
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Committing merchant DB transaction\n");
+  pg->transaction_name = NULL;
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
 					     "end_transaction",
 					     params);
@@ -2181,7 +2228,6 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
   TALER_LOG_DEBUG ("Looking for refund %s + %s\n",
                    GNUNET_h2s (h_contract_terms),
                    TALER_B2S (merchant_pub));
-
   check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     "find_refunds_from_contract_terms_hash",
@@ -2702,7 +2748,8 @@ postgres_increase_refund_for_contract (void *cls,
               TALER_amount2s (refund),
               GNUNET_h2s (h_contract_terms));
   if (GNUNET_OK !=
-      postgres_start (cls))
+      postgres_start (cls,
+                      "increase refund"))
   {
     GNUNET_break (0);
     return GNUNET_DB_STATUS_HARD_ERROR;
@@ -2835,7 +2882,8 @@ postgres_enable_tip_reserve (void *cls,
   if (MAX_RETRIES < ++retries)
     return GNUNET_DB_STATUS_SOFT_ERROR;
   if (GNUNET_OK !=
-      postgres_start (pg))
+      postgres_start (pg,
+                      "enable tip reserve"))
   {
     GNUNET_break (0);
     return GNUNET_DB_STATUS_HARD_ERROR;
@@ -3039,7 +3087,8 @@ postgres_authorize_tip (void *cls,
   if (MAX_RETRIES < ++retries)
     return TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
   if (GNUNET_OK !=
-      postgres_start (pg))
+      postgres_start (pg,
+                      "authorize tip"))
   {
     GNUNET_break (0);
     return TALER_EC_TIP_AUTHORIZE_DB_HARD_ERROR;
@@ -3237,7 +3286,8 @@ postgres_pickup_tip (void *cls,
   if (MAX_RETRIES < ++retries)
     return TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
   if (GNUNET_OK !=
-      postgres_start (pg))
+      postgres_start (pg,
+                      "pickup tip"))
   {
     GNUNET_break (0);
     return TALER_EC_TIP_PICKUP_DB_ERROR_HARD;
@@ -3455,6 +3505,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->pickup_tip = &postgres_pickup_tip;
   plugin->start = postgres_start;
   plugin->commit = postgres_commit;
+  plugin->preflight = postgres_preflight;
   plugin->rollback = postgres_rollback;
 
   return plugin;

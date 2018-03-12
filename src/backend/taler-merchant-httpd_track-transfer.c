@@ -211,7 +211,7 @@ hashmap_free (void *cls,
               void *value)
 {
   struct TALER_Amount *amount = value;
-  
+
   GNUNET_free (amount);
   return GNUNET_YES;
 }
@@ -472,7 +472,7 @@ check_transfer (void *cls,
                                      "exchange_deposit_proof", exchange_proof,
                                      "conflict_offset", (json_int_t) rctx->current_offset,
                                      "exchange_transfer_proof", rctx->original_response,
-                                     "coin_pub", GNUNET_JSON_from_data_auto (coin_pub), 
+                                     "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
                                      "h_contract_terms", GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
                                      "amount_with_fee", TALER_JSON_from_amount (amount_with_fee),
                                      "deposit_fee", TALER_JSON_from_amount (deposit_fee));
@@ -483,7 +483,7 @@ check_transfer (void *cls,
 
 
 /**
- * Check that the given @a wire_fee is what the 
+ * Check that the given @a wire_fee is what the
  * @a exchange_pub should charge at the @a execution_time.
  * If the fee is correct (according to our database),
  * return #GNUNET_OK.  If we do not have the fee structure
@@ -546,7 +546,7 @@ check_wire_fee (struct TrackTransferContext *rctx,
   if (0 <= TALER_amount_cmp (&expected_fee,
 			     wire_fee))
     return GNUNET_OK; /* expected_fee >= wire_fee */
-  
+
   /* Wire fee check failed, export proof to client */
   resume_track_transfer_with_response
     (rctx,
@@ -987,6 +987,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   }
 
   /* Check if reply is already in database! */
+  db->preflight (db->cls);
   qs = db->find_proof_by_wtid (db->cls,
 			       rctx->url,
 			       &rctx->wtid,
@@ -1000,7 +1001,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     return TMH_RESPONSE_reply_internal_error (connection,
 					      TALER_EC_TRACK_TRANSFER_DB_FETCH_FAILED,
-					      "Fail to query database about proofs");   
+					      "Fail to query database about proofs");
   }
   if (0 != rctx->response_code)
   {

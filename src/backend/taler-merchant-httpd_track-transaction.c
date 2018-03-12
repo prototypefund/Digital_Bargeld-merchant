@@ -248,7 +248,7 @@ struct TrackTransactionContext
    * URL of the exchange we currently have in @e eh.
    */
   const char *current_exchange;
-  
+
   /**
    * Handle we use to resolve transactions for a given WTID.
    */
@@ -669,9 +669,9 @@ wtid_cb (void *cls,
 
 
 /**
- * We have obtained all WTIDs, now prepare the response 
+ * We have obtained all WTIDs, now prepare the response
  *
- * @param tctx handle for the operation 
+ * @param tctx handle for the operation
  */
 static void
 generate_response (struct TrackTransactionContext *tctx)
@@ -786,7 +786,7 @@ generate_response (struct TrackTransactionContext *tctx)
  * Find the exchange to trace the next coin(s).
  *
  * @param tctx operation context
- */ 
+ */
 static void
 find_exchange (struct TrackTransactionContext *tctx);
 
@@ -973,7 +973,7 @@ coin_cb (void *cls,
  * Find the exchange to trace the next coin(s).
  *
  * @param tctx operation context
- */ 
+ */
 static void
 find_exchange (struct TrackTransactionContext *tctx)
 {
@@ -989,7 +989,7 @@ find_exchange (struct TrackTransactionContext *tctx)
 					    NULL,
 					    &process_track_transaction_with_exchange,
 					    tctx);
-    
+
   }
   else
   {
@@ -1137,9 +1137,10 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
       GNUNET_JSON_spec_end()
     };
 
-    if (GNUNET_YES != GNUNET_JSON_parse (contract_terms,
-                                         spec,
-                                         NULL, NULL))
+    if (GNUNET_YES !=
+        GNUNET_JSON_parse (contract_terms,
+                           spec,
+                           NULL, NULL))
     {
       GNUNET_break (0);
       GNUNET_JSON_parse_free (spec);
@@ -1152,6 +1153,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   }
 
   tctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
+  db->preflight (db->cls);
   qs = db->find_payments (db->cls,
 			  &tctx->h_contract_terms,
 			  &tctx->mi->pubkey,

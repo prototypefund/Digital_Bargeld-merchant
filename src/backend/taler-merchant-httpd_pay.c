@@ -1651,7 +1651,10 @@ begin_transaction (struct PayContext *pc)
   GNUNET_assert (GNUNET_YES == pc->suspended);
 
   /* First, try to see if we have all we need already done */
-  if (GNUNET_OK != db->start (db->cls))
+  db->preflight (db->cls);
+  if (GNUNET_OK !=
+      db->start (db->cls,
+                 "run pay"))
   {
     GNUNET_break (0);
     resume_pay_with_error (pc,

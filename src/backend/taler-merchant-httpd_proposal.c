@@ -580,7 +580,6 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
                                            "instance");
-
   mi = TMH_lookup_instance (instance);
   if (NULL == mi)
     return TMH_RESPONSE_reply_not_found (connection,
@@ -593,7 +592,6 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
                                            "order_id");
-
   nonce = MHD_lookup_connection_value (connection,
                                        MHD_GET_ARGUMENT_KIND,
                                        "nonce");
@@ -601,7 +599,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_arg_missing (connection,
 					   TALER_EC_PARAMETER_MISSING,
                                            "nonce");
-
+  db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
 				&contract_terms,
                                 &last_session_id,

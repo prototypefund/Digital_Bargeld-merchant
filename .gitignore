@@ -58,3 +58,4 @@ contrib/taler-merchant.tag
 src/merchant-tools/taler-merchant-tip-enable
 src/lib/reserve_dkey.priv
 src/lib/reserve_key.priv
+doc/version.texi

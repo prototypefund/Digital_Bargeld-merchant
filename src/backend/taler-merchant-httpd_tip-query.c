@@ -222,7 +222,9 @@ handle_status (void *cls,
     return;
   }
 
-  if (GNUNET_OK != TALER_amount_get_zero (history[0].amount.currency, &tqc->amount_withdrawn))
+  if (GNUNET_OK !=
+      TALER_amount_get_zero (history[0].amount.currency,
+                             &tqc->amount_withdrawn))
   {
     GNUNET_break_op (0);
     resume_with_response (tqc, MHD_HTTP_SERVICE_UNAVAILABLE,
@@ -232,8 +234,8 @@ handle_status (void *cls,
   }
 
   if (GNUNET_YES == tqc->none_authorized)
-    memcpy (&tqc->amount_authorized, &tqc->amount_withdrawn, sizeof (struct TALER_Amount));
-  memcpy (&tqc->amount_deposited, &tqc->amount_withdrawn, sizeof (struct TALER_Amount));
+    tqc->amount_authorized = tqc->amount_withdrawn;
+  tqc->amount_deposited = tqc->amount_withdrawn;
 
   /* Update DB based on status! */
   for (unsigned int i=0;i<history_length;i++)
@@ -255,12 +257,14 @@ handle_status (void *cls,
                                      &uuid,
                                      &history[i].amount,
                                      expiration);
-        if (GNUNET_OK != TALER_amount_add (&tqc->amount_deposited,
-                                           &tqc->amount_deposited,
-                                           &history[i].amount))
+        if (GNUNET_OK !=
+            TALER_amount_add (&tqc->amount_deposited,
+                              &tqc->amount_deposited,
+                              &history[i].amount))
         {
           GNUNET_break_op (0);
-          resume_with_response (tqc, MHD_HTTP_SERVICE_UNAVAILABLE,
+          resume_with_response (tqc,
+                                MHD_HTTP_INTERNAL_SERVER_ERROR,
                                 TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
                                                          "Exchange returned invalid reserve history (amount overflow)"));
           return;
@@ -275,12 +279,14 @@ handle_status (void *cls,
       }
       break;
     case TALER_EXCHANGE_RTT_WITHDRAWAL:
-      if (GNUNET_OK != TALER_amount_add (&tqc->amount_withdrawn,
-                                         &tqc->amount_withdrawn,
-                                         &history[i].amount))
+      if (GNUNET_OK !=
+          TALER_amount_add (&tqc->amount_withdrawn,
+                            &tqc->amount_withdrawn,
+                            &history[i].amount))
       {
         GNUNET_break_op (0);
-        resume_with_response (tqc, MHD_HTTP_SERVICE_UNAVAILABLE,
+        resume_with_response (tqc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
                               TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
                                                        "Exchange returned invalid reserve history (amount overflow)"));
         return;
@@ -300,20 +306,27 @@ handle_status (void *cls,
   {
     struct GNUNET_CRYPTO_EddsaPublicKey reserve_pub;
     struct TALER_Amount amount_available;
+
     GNUNET_CRYPTO_eddsa_key_get_public (&tqc->reserve_priv.eddsa_priv,
                                         &reserve_pub);
-    if (GNUNET_SYSERR == TALER_amount_subtract (&amount_available, &tqc->amount_deposited, &tqc->amount_withdrawn))
+    if (GNUNET_SYSERR ==
+        TALER_amount_subtract (&amount_available,
+                               &tqc->amount_deposited,
+                               &tqc->amount_withdrawn))
     {
         GNUNET_break_op (0);
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR, "amount overflow, deposited %s but withdrawn %s\n",
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "amount overflow, deposited %s but withdrawn %s\n",
                     TALER_amount_to_string (&tqc->amount_deposited),
                     TALER_amount_to_string (&tqc->amount_withdrawn));
 
-        resume_with_response (tqc, MHD_HTTP_SERVICE_UNAVAILABLE,
+        resume_with_response (tqc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
                               TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
                                                        "Exchange returned invalid reserve history (amount overflow)"));
     }
-    resume_with_response (tqc, MHD_HTTP_OK,
+    resume_with_response (tqc,
+                          MHD_HTTP_OK,
                           TMH_RESPONSE_make_json_pack ("{s:o, s:o, s:o, s:o, s:o}",
                                                        "reserve_pub",
                                                        GNUNET_JSON_from_data_auto (&reserve_pub),
@@ -452,6 +465,7 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
   }
   tqc->reserve_priv = mi->tip_reserve;
 
+  db->preflight (db->cls);
   {
     int qs;
     for (unsigned int i=0;i<MAX_RETRIES;i++)

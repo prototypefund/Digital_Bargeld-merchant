@@ -554,6 +554,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
 				  TALER_EC_PARAMETER_MALFORMED,
 				  "no planchets specified");
   }
+  db->preflight (db->cls);
   pc->planchets = GNUNET_new_array (pc->planchets_len,
 				    struct PlanchetDetail);
   for (unsigned int i=0;i<pc->planchets_len;i++)

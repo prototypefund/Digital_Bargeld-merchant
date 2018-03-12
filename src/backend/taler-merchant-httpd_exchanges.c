@@ -360,8 +360,10 @@ process_wire_fees (void *cls,
 		wire_method,
 		GNUNET_STRINGS_absolute_time_to_string (af->start_date),
 		TALER_amount2s (&af->wire_fee));
+    db->preflight (db->cls);
     if (GNUNET_OK !=
-        db->start (db->cls))
+        db->start (db->cls,
+                   "store wire fee"))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
 		  "Failed to start database transaction!\n");
