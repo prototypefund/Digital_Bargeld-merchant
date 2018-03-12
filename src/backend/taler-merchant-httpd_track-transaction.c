@@ -651,7 +651,7 @@ wtid_cb (void *cls,
   {
     /* How come this wtid was already stored into the
        database and _not all_ of its coins were already
-       tracked? Unconsistent state (! At least regarding
+       tracked? Inconsistent state (! At least regarding
        what the exchange tells us) */
     GNUNET_break_op (0);
     resume_track_transaction_with_response
