@@ -1,0 +1,13 @@
+\input texinfo @c -*-texinfo-*-
+@c %**start of header
+@setfilename merchant-api-php.info
+@include version-merchant-api-php.texi
+@include syntax.texi
+@settitle The GNU Taler Merchant API Tutorial @value{VERSION} for PHP
+
+@set LANG_PHP 1
+@set LANGNAME PHP
+
+@include merchant-api.content.texi
+
+@bye

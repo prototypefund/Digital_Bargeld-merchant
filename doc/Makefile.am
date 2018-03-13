@@ -25,7 +25,8 @@ man_MANS = \
 info_TEXINFOS = \
   manual.texi \
   merchant-api-python.texi \
-  merchant-api-curl.texi
+  merchant-api-curl.texi \
+  merchant-api-php.texi
 
 manual_TEXINFOS = \
   version-manual.texi \
@@ -37,6 +38,10 @@ merchant_api_python_TEXINFOS = \
 
 merchant_api_curl_TEXINFOS = \
   version-merchant-api-curl.texi \
+  merchant-api.content.texi
+
+merchant_api_php_TEXINFOS = \
+  version-merchant-api-php.texi \
   merchant-api.content.texi
 
 extra_TEXINFOS = \
