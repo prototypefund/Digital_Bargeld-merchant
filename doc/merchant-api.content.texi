@@ -398,9 +398,9 @@ curl -i "https://backend.demo.taler.net/check-payment?order_id=$ORDER_ID" \
 @set GOT_LANG 1
 @example
 @verbatim
-$ORDER_ID = "2018.072.12.48.51-014DKDKBMHPDP";
+php > $ORDER_ID = "2018.072.12.48.51-014DKDKBMHPDP";
 php > curl_init ("https://backend.demo.taler.net/check-payment?order_id=$ORDER_ID");
-php >  $options = array(CURLOPT_RETURNTRANSFER=>true,
+php > $options = array(CURLOPT_RETURNTRANSFER=>true,
 php (                   CURLOPT_CUSTOMREQUEST=>"GET",
 php (                   CURLOPT_HTTPHEADER=>array(
 php (                     "Authorization: ApiKey sandbox"));
@@ -506,6 +506,29 @@ curl -i -X POST 'https://backend.demo.taler.net/refund' \
 @end verbatim
 @end example
 @end ifset
+
+@ifset LANG_PHP
+@set GOT_LANG 1
+@example
+@verbatim
+php > $REFUND_REQ = array("order_id"=>$ORDER_ID,
+php (                     "refund"=>"KUDOS:0.5",
+php (                     "instance"=>"default",
+php (                     "reason"=>"Customer did not like product");
+php > $options = array(CURLOPT_RETURNTRANSFER=>true,
+php (                  CURLOPT_CUSTOMREQUEST=>"POST",
+php (                  CURLOPT_HTTPHEADER=>array(
+php (                    "Authorization: ApiKey sandbox"),
+php (                  CURLOPT_POSTFIELDS=>json_encode($REFUND_REQ));
+php > $c = curl_init("https://backend.demo.taler.net/refund");
+php > curl_setopt_array($c, $options);
+php > $r = curl_exec($c);
+php > echo $r;
+php > echo curl_getinfo($c, CURLINFO_HTTP_CODE);
+200 # Make sure you paid first!
+@end verbatim
+@end example
+@end ifset
 @ifclear GOT_LANG
 @example
 (example not available for this language)
@@ -563,6 +586,22 @@ curl -i 'https://backend.demo.taler.net/tip-query?instance=default' --header "Au
 >>> requests.get("https://backend.demo.taler.net/tip-query?instance=default",
 ...              headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
+@end verbatim
+@end example
+@end ifset
+@ifset LANG_PHP
+@set GOT_LANG 1
+@example
+@verbatim
+php > $c = curl_init("https://backend.demo.taler.net/tip-query?instance=default");
+php >  $options = array(CURLOPT_RETURNTRANSFER=>true,
+php (                   CURLOPT_CUSTOMREQUEST=>"GET",
+php (                   CURLOPT_HTTPHEADER=>array(
+php (                     "Authorization: ApiKey sandbox"));
+php > curl_setopt_array($c, $options);
+php > $r = curl_exec($c);
+php > echo curl_getinfo($c, CURLINFO_HTTP_CODE);
+200
 @end verbatim
 @end example
 @end ifset
@@ -627,6 +666,29 @@ curl -i -X POST 'https://backend.demo.taler.net/tip-authorize' \
 @end verbatim
 @end example
 @end ifset
+
+@ifset LANG_PHP
+@set GOT_LANG 1
+@example
+@verbatim
+php > $TIP_REQ = array(
+php (   "amount"=>"KUDOS:1",
+php (   "instance"=>"default",
+php (   "justification"=>"surveying",
+php (   "next_url"=>"https://example.com/survey-thanks.html");
+php > $options = array(CURLOPT_RETURNTRANSFER=>true,
+php (                  CURLOPT_CUSTOMREQUEST=>"POST",
+php (                  CURLOPT_POSTFIELDS=>json_encode($TIP_REQ),
+php (                  CURLOPT_HTTPHEADER=>array("Authorization: ApiKey sandbox"));
+php > $c = curl_init("https://backend.demo.taler.net/tip-authorize");
+php > curl_setopt_array($c, $options);
+php > $r = curl_exec($c);
+php > echo curl_getinfo($c, CURLINFO_HTTP_CODE); 
+200
+@end verbatim
+@end example
+@end ifset
+
 @ifclear GOT_LANG
 @example
 (example not available for this language)
