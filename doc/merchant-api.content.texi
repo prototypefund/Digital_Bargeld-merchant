@@ -106,7 +106,7 @@ command line with cURL.
 @end ifset
 @ifset LANG_PHP
 This version of the tutorial has examples for PHP,
-using the pecl_http package.
+using libcurl.
 @end ifset
 @c
 Versions for other languages/environments are available as well.
