@@ -394,6 +394,22 @@ curl -i "https://backend.demo.taler.net/check-payment?order_id=$ORDER_ID" \
 @end verbatim
 @end example
 @end ifset
+@ifset LANG_PHP
+@set GOT_LANG 1
+@example
+@verbatim
+$ORDER_ID = "2018.072.12.48.51-014DKDKBMHPDP";
+php > curl_init ("https://backend.demo.taler.net/check-payment?order_id=$ORDER_ID");
+php >  $options = array(CURLOPT_RETURNTRANSFER=>true,
+php (                   CURLOPT_CUSTOMREQUEST=>"GET",
+php (                   CURLOPT_HTTPHEADER=>array(
+php (                     "Authorization: ApiKey sandbox"));
+php > curl_setopt_array($c, $options);
+php > $r = curl_exec($c);
+php > echo $r;
+@end verbatim
+@end example
+@end ifset
 @ifclear GOT_LANG
 @example
 (example not available for this language)
