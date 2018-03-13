@@ -532,7 +532,8 @@ This code snipped illustrates giving a tip:
 TIP_REQ='
 {"amount: "KUDOS:0.5",
  "instance": "default",
- "justification": "User filled out survey"}
+ "justification": "User filled out survey",
+ "next_url": "https://merchant.com/thanks.html"}
 '
 
 curl -i -X POST 'https://backend.demo.taler.net/tip-authorize' \
@@ -554,7 +555,8 @@ curl -i -X POST 'https://backend.demo.taler.net/tip-authorize' \
 >>> import requests
 >>> tip_req = dict(amount="KUDOS:0.5",
 ...                instance="default",
-...                justification="User filled out survey")
+...                justification="User filled out survey",
+...                next_url="https://merchant.com/thanks.html")
 >>> requests.post("https://backend.demo.taler.net/refund", json=tip_req,
 ...              headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
