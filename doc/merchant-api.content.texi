@@ -462,7 +462,7 @@ curl -i -X POST 'https://backend.demo.taler.net/refund' \
 GNU Taler allows Web sites to grant small amounts directly to the
 visitor.  The idea is that some sites may want incentivize actions
 such as filling out a survey or trying a new feature.  It is important
-to note that tips are not enforcable for the visitor, as there is no
+to note that tips are not enforceable for the visitor, as there is no
 contract. It is simply a voluntary gesture of appreciation of the site
 to its visitor.  However, once a tip has been granted, the visitor
 obtains full control over the funds provided by the site.
@@ -496,7 +496,7 @@ curl -i 'https://backend.demo.taler.net/tip-query?instance=default' --header "Au
 @example
 @verbatim
 >>> import requests
->>> requests.get("https://backend.demo.taler.net",
+>>> requests.get("https://backend.demo.taler.net/tip-query?instance=default",
 ...              headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
 @end verbatim
