@@ -104,6 +104,10 @@ It uses the requests library for HTTP requests.
 This version of the tutorial has examples for the
 command line with cURL.
 @end ifset
+@ifset LANG_PHP
+This version of the tutorial has examples for PHP,
+using the pecl_http package.
+@end ifset
 @c
 Versions for other languages/environments are available as well.
 
@@ -188,6 +192,23 @@ curl -i 'https://backend.demo.taler.net/' \
 >>> requests.get("https://backend.demo.taler.net",
 ...              headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
+@end verbatim
+@end example
+@end ifset
+@ifset LANG_PHP
+@set GOT_LANG 1
+@example
+@verbatim
+php > $c = curl_init("https://backend.demo.taler.net/");
+php >  $options = array(CURLOPT_RETURNTRANSFER => true,
+php (                   CURLOPT_CUSTOMREQUEST => "GET",
+php (                   CURLOPT_HTTPHEADER => array("Authorization: ApiKey sandbox"));
+php > curl_setopt_array ($c, $options);
+php > $r = curl_exec ($c);
+php > echo curl_getinfo ($c, CURLINFO_HTTP_CODE);
+200
+php > echo $r;
+Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.
 @end verbatim
 @end example
 @end ifset
@@ -295,6 +316,30 @@ curl -i -X POST 'https://backend.demo.taler.net/order' \
 >>> order_resp = requests.post("https://backend.demo.taler.net/order", json=order,
 ...               headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
+@end verbatim
+@end example
+@end ifset
+@ifset LANG_PHP
+@set GOT_LANG 1
+@example
+@verbatim
+php > $c = curl_init("https://backend.demo.taler.net/order");
+php > $json = array("order"=>
+php (   array("amount"=>"KUDOS:1",
+php (         "fulfillent_url"=>"https://example.com/thanks.html", 
+php (         "summary"=>"nice product"));
+php > $options = array(CURLOPT_RETURNTRANSFER=>true,
+php (                  CURLOPT_CUSTOMREQUEST=>"POST",
+php (                  CURLOPT_POSTFIELDS=>json_encode($json),
+php (                  CURLOPT_HTTPHEADER=>array("Authorization: ApiKey sandbox"));
+php > curl_setopt_array($c, $options);
+php > $r = curl_exec($c);
+php > echo curl_getinfo($c, CURLINFO_HTTP_CODE);
+200
+php > echo $r;
+{
+  "order_id": "2018.072.12.48.51-014DKDKBMHPDP"
+}
 @end verbatim
 @end example
 @end ifset
