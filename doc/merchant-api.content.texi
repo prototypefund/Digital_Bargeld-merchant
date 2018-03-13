@@ -392,7 +392,8 @@ by @code{POST}ing to the @code{/refund} endpoint.
 The refund request JSON object has the following fields:
 @itemize
 @item @var{order_id}: Identifies for which order a customer should be refunded.
-@item @var{instrance}: Merchant instance to use (defaults to @code{default}).
+@c NOTE: the merchant does NOT default to instance "default".
+@item @var{instance}: Merchant instance to use.
 @item @var{refund}:  Amount to be refunded.  If a previous refund was
 authorized for the same order, the new amount must be higher, otherwise
 the operation has no effect. The value indicates the
@@ -413,6 +414,7 @@ This code snipped illustrates giving a refund:
 REFUND_REQ='
 {"order_id": "2018.058.21.46.06-024C85K189H8P",
  "refund": "KUDOS:10",
+ "instance": "default",
  "reason": "Customer did not like the product"}
 '
 
@@ -435,6 +437,7 @@ curl -i -X POST 'https://backend.demo.taler.net/refund' \
 >>> import requests
 >>> refund_req = dict(order_id="2018.058.21.46.06-024C85K189H8P",
 ...                   refund="KUDOS:10",
+...                   instance="default",
 ...                   reason="Customer did not like the product")
 >>> requests.post("https://backend.demo.taler.net/refund", json=refund_req,
 ...              headers={"Authorization": "ApiKey sandbox"})
@@ -530,7 +533,7 @@ This code snipped illustrates giving a tip:
 @example
 @verbatim
 TIP_REQ='
-{"amount: "KUDOS:0.5",
+{"amount": "KUDOS:0.5",
  "instance": "default",
  "justification": "User filled out survey",
  "next_url": "https://merchant.com/thanks.html"}
@@ -557,7 +560,7 @@ curl -i -X POST 'https://backend.demo.taler.net/tip-authorize' \
 ...                instance="default",
 ...                justification="User filled out survey",
 ...                next_url="https://merchant.com/thanks.html")
->>> requests.post("https://backend.demo.taler.net/refund", json=tip_req,
+>>> requests.post("https://backend.demo.taler.net/tip-authorize", json=tip_req,
 ...              headers={"Authorization": "ApiKey sandbox"})
 <Response [200]>
 @end verbatim
