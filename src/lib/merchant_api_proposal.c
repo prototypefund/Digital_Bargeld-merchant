@@ -136,7 +136,12 @@ handle_proposal_finished (void *cls,
   switch (response_code)
   {
   case 0:
-    break;
+    po->cb (po->cb_cls,
+            response_code,
+            TALER_EC_INVALID_RESPONSE,
+            json,
+            order_id);
+    return;
   case MHD_HTTP_OK:
     {
       if (GNUNET_OK !=

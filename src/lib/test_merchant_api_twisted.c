@@ -335,12 +335,48 @@ run (void *cls,
                                1, // nresult
                                10, // start
                                10), // nrows
+
+  /**** Covering /proposal lib ****/
+
+  /**
+   * Cause the PUT /proposal callback to be called
+   * with a response code == 0.  We achieve this by malforming
+   * the response body.
+   */
+
+    TALER_TESTING_cmd_malform_response
+      ("malform-proposal",
+       PROXY_MERCHANT_CONFIG_FILE),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-0",
+       twister_merchant_url,
+       is->ctx,
+       0,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"1\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:5}\"} ] }",
+        NULL),
+
+
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
      */
     TALER_TESTING_cmd_end ()
   };
+
 
   TALER_TESTING_run_with_fakebank (is,
                                    commands,

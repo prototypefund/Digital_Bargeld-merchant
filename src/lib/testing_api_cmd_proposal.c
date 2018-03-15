@@ -262,6 +262,17 @@ proposal_cb (void *cls,
   struct ProposalState *ps = cls;
 
   ps->po = NULL;
+
+  if (ps->http_status != http_status)
+    TALER_TESTING_FAIL (ps->is);
+
+  if (0 == ps->http_status)
+  {
+    TALER_LOG_DEBUG ("/proposal, expected 0 status code\n");
+    TALER_TESTING_interpreter_next (ps->is);
+    return;
+  }
+
   switch (http_status)
   {
   case MHD_HTTP_OK:
@@ -386,8 +397,8 @@ proposal_cleanup (void *cls,
     ps->plo = NULL;
   }
 
-  GNUNET_free ((void *) ps->order_id);
-  GNUNET_free ((void *) ps->contract_terms);
+  GNUNET_free_non_null ((void *) ps->order_id);
+  GNUNET_free_non_null ((void *) ps->contract_terms);
   GNUNET_free (ps);
 }
 
