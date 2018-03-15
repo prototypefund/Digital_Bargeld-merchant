@@ -296,6 +296,15 @@ run (void *cls,
 
     #endif
     
+    /**** Covering /history lib ****/
+
+    /**
+     * Changing the response code to a unexpected
+     * one.  NOTE: this is unexpected to the *lib*
+     * code, that is then expected to trigger some
+     * emergency behaviour, like setting the response
+     * code to zero before calling the callback.
+     */
     TALER_TESTING_cmd_hack_response_code
       ("twist-history",
        PROXY_MERCHANT_CONFIG_FILE,
@@ -304,7 +313,24 @@ run (void *cls,
     TALER_TESTING_cmd_history ("history-0",
                                twister_merchant_url,
                                is->ctx,
-                               MHD_HTTP_GONE,
+                               0,
+                               GNUNET_TIME_UNIT_ZERO_ABS,
+                               1, // nresult
+                               10, // start
+                               10), // nrows
+    /**
+     * Making the returned response malformed, in order
+     * to make the JSON downloader+parser fail and call
+     * the lib passing a response code as zero.
+     */
+    TALER_TESTING_cmd_malform_response
+      ("malform-history",
+       PROXY_MERCHANT_CONFIG_FILE),
+
+    TALER_TESTING_cmd_history ("history-1",
+                               twister_merchant_url,
+                               is->ctx,
+                               0, // also works with MHD_HTTP_GONE
                                GNUNET_TIME_UNIT_ZERO_ABS,
                                1, // nresult
                                10, // start

@@ -99,7 +99,17 @@ history_raw_cb (void *cls,
   switch (response_code)
   {
   case 0:
-    break;
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "/history returned response code 0\n");
+    /**
+     * The response was malformed or didn't have the
+     * application/json header.
+     */
+    ho->cb (ho->cb_cls,
+            response_code,
+            TALER_EC_INVALID_RESPONSE,
+            json);
+    return;
   case MHD_HTTP_OK:
     ho->cb (ho->cb_cls,
             MHD_HTTP_OK,
@@ -124,6 +134,7 @@ history_raw_cb (void *cls,
     response_code = 0;
     break;
   }
+
   ho->cb (ho->cb_cls,
           response_code,
 	  TALER_JSON_get_error_code (json),

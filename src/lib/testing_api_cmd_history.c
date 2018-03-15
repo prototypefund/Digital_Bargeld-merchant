@@ -158,16 +158,16 @@ history_cb (void *cls,
 
   hs->ho = NULL;
 
-  /* 410 is a convenience status that is used to
-   * trigger the "unexpected response code" in the
-   * lib, that should then result in a 0 status code
-   * passed here to the callback. */
-  if (MHD_HTTP_GONE == hs->http_status)
-  {
-    if (0 != http_status)
+
+  if (hs->http_status != http_status)
       TALER_TESTING_FAIL (hs->is);
-    
-    TALER_TESTING_interpreter_next (hs->is);
+
+  if (0 == hs->http_status)
+  {
+    /* 0 was caused intentionally by the tests,
+     * move on without further checking. */
+    TALER_TESTING_interpreter_next (hs->is); 
+    return;
   }
 
   nresult = json_array_size (json);
