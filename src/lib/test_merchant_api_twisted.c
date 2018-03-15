@@ -46,14 +46,33 @@
 #define CONFIG_FILE "test_merchant_api_twisted.conf"
 
 /**
+ * Configuration file for the proxy between merchant and
+ * exchange.  Not used directly here in the code (instead
+ * used in the merchant config), but kept around for consistency.
+ */
+#define PROXY_EXCHANGE_CONFIG_FILE \
+  "test_merchant_api_proxy_exchange.conf"
+
+/**
+ * Configuration file for the proxy between "lib" and merchant.
+ */
+#define PROXY_MERCHANT_CONFIG_FILE \
+  "test_merchant_api_proxy_merchant.conf"
+
+/**
  * Exchange base URL.  Could also be taken from config.
  */
 #define EXCHANGE_URL "http://localhost:8081/"
 
 /**
- * (real) Twister URL.  Used at startup time to check if it runs.
+ * Twister URL that proxies the exchange.
  */
-static char *twister_url;
+static char *twister_exchange_url;
+
+/**
+ * Twister URL that proxies the merchant.
+ */
+static char *twister_merchant_url;
 
 /**
  * URL of the fakebank.  Obtained from CONFIG_FILE's
@@ -77,9 +96,14 @@ static char *exchange_url;
 static struct GNUNET_OS_Process *merchantd;
 
 /**
- * Twister process.
+ * Twister process that proxies the exchange.
  */
-static struct GNUNET_OS_Process *twisterd;
+static struct GNUNET_OS_Process *twisterexchanged;
+
+/**
+ * Twister process that proxies the merchant.
+ */
+static struct GNUNET_OS_Process *twistermerchantd;
 
 /**
  * Account number of the exchange at the bank.
@@ -158,6 +182,7 @@ run (void *cls,
 
   struct TALER_TESTING_Command commands[] = {
 
+    #ifdef TEST_FAILED_DEPENDENCY
     /**
      * Move money to the exchange's bank account.
      */
@@ -269,17 +294,21 @@ run (void *cls,
        "deposit-simple",
        "EUR:0.01"), // ignored
 
-
-    #if 0
-    TALER_TESTING_cmd_merchant_track_transfer
-      ("track-transfer-1",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       "check_bank_transfer-1",
-       "deposit-simple"),
     #endif
+    
+    TALER_TESTING_cmd_hack_response_code
+      ("twist-history",
+       PROXY_MERCHANT_CONFIG_FILE,
+       MHD_HTTP_GONE),
 
+    TALER_TESTING_cmd_history ("history-0",
+                               twister_merchant_url,
+                               is->ctx,
+                               MHD_HTTP_GONE,
+                               GNUNET_TIME_UNIT_ZERO_ABS,
+                               1, // nresult
+                               10, // start
+                               10), // nrows
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
@@ -324,8 +353,12 @@ main (int argc,
       (CONFIG_FILE)))
     return 77;
 
-  if (NULL == (twister_url = TALER_TESTING_prepare_twister
-      (CONFIG_FILE)))
+  if (NULL == (twister_exchange_url = TALER_TESTING_prepare_twister
+      (PROXY_EXCHANGE_CONFIG_FILE)))
+    return 77;
+
+  if (NULL == (twister_merchant_url = TALER_TESTING_prepare_twister
+      (PROXY_MERCHANT_CONFIG_FILE)))
     return 77;
 
   TALER_TESTING_cleanup_files (CONFIG_FILE);
@@ -343,21 +376,22 @@ main (int argc,
 
     if (NULL == (merchantd = TALER_TESTING_run_merchant
         (CONFIG_FILE)))
-    {
-      purge_process (twisterd);
-      return 1; // 1 is fine; after all is merchant test cases.
-    }
+      // 1 is fine; after all this is merchant test cases.
+      return 1;
 
-    if (NULL == (twisterd = TALER_TESTING_run_twister
-        (CONFIG_FILE)))
+    if (NULL == (twisterexchanged = TALER_TESTING_run_twister
+        (PROXY_EXCHANGE_CONFIG_FILE)))
+      return 77;
+
+    if (NULL == (twistermerchantd = TALER_TESTING_run_twister
+        (PROXY_MERCHANT_CONFIG_FILE)))
       return 77;
 
     ret = TALER_TESTING_setup_with_exchange (&run, NULL,
                                              CONFIG_FILE);
     purge_process (merchantd);
-    purge_process (twisterd);
-    GNUNET_free (merchant_url);
-    GNUNET_free (twister_url);
+    purge_process (twisterexchanged);
+    purge_process (twistermerchantd);
 
     if (GNUNET_OK != ret)
       return 1;

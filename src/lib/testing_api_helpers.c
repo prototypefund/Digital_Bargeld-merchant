@@ -59,7 +59,7 @@ TALER_TESTING_run_merchant (const char *config_filename)
 
   /* give child time to start and bind against the socket */
   fprintf (stderr,
-           "Waiting for `taler-merchant-httpd' to be ready");
+           "Waiting for `taler-merchant-httpd' to be ready\n");
   iter = 0;
   do
     {
@@ -74,7 +74,7 @@ TALER_TESTING_run_merchant (const char *config_filename)
 	GNUNET_OS_process_destroy (merchant_proc);
 	MERCHANT_FAIL ();
       }
-      fprintf (stderr, ".");
+      fprintf (stderr, ".\n");
       sleep (1);
       iter++;
     }

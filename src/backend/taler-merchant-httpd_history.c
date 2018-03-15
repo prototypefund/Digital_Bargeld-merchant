@@ -132,6 +132,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   enum GNUNET_DB_QueryStatus qs;
   struct ProcessContractClosure pcc;
 
+  LOG_INFO ("Serving /history\n");
   response = json_array ();
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
@@ -280,6 +281,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   ret = TMH_RESPONSE_reply_json (connection,
                                  response,
                                  MHD_HTTP_OK);
+  LOG_INFO ("/history, http code: %d\n", MHD_HTTP_OK);
   json_decref (response);
   return ret;
 }

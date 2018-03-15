@@ -157,8 +157,18 @@ history_cb (void *cls,
   struct GNUNET_TIME_Absolute entry_timestamp;
 
   hs->ho = NULL;
-  if (hs->http_status != http_status)
-    TALER_TESTING_FAIL (hs->is);
+
+  /* 410 is a convenience status that is used to
+   * trigger the "unexpected response code" in the
+   * lib, that should then result in a 0 status code
+   * passed here to the callback. */
+  if (MHD_HTTP_GONE == hs->http_status)
+  {
+    if (0 != http_status)
+      TALER_TESTING_FAIL (hs->is);
+    
+    TALER_TESTING_interpreter_next (hs->is);
+  }
 
   nresult = json_array_size (json);
   if (hs->nresult != nresult)
