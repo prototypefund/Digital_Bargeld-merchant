@@ -182,6 +182,111 @@ run (void *cls,
 
   struct TALER_TESTING_Command commands[] = {
 
+
+  /**** Covering /proposal lib ****/
+
+  /**
+   * Cause the PUT /proposal callback to be called
+   * with a response code == 0.  We achieve this by malforming
+   * the response body.
+   */
+
+    TALER_TESTING_cmd_malform_response
+      ("malform-proposal",
+       PROXY_MERCHANT_CONFIG_FILE),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-0",
+       twister_merchant_url,
+       is->ctx,
+       0,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"1\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:5}\"} ] }",
+        NULL),
+
+
+    /**
+     * Cause proposal to be invalid: this is achieved
+     * by deleting the "order_id" field of it.
+     */
+    TALER_TESTING_cmd_delete_object ("remove-order-id",
+                                     PROXY_MERCHANT_CONFIG_FILE,
+                                     "order_id"),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-1",
+       twister_merchant_url,
+       is->ctx,
+       0,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"2\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:5}\"} ] }",
+        NULL),
+
+    /**** Covering /history lib ****/
+
+    /**
+     * Changing the response code to a unexpected
+     * one.  NOTE: this is unexpected to the *lib*
+     * code, that is then expected to trigger some
+     * emergency behaviour, like setting the response
+     * code to zero before calling the callback.
+     */
+    TALER_TESTING_cmd_hack_response_code
+      ("twist-history",
+       PROXY_MERCHANT_CONFIG_FILE,
+       MHD_HTTP_GONE),
+
+    TALER_TESTING_cmd_history ("history-0",
+                               twister_merchant_url,
+                               is->ctx,
+                               0,
+                               GNUNET_TIME_UNIT_ZERO_ABS,
+                               1, // nresult
+                               10, // start
+                               10), // nrows
+    /**
+     * Making the returned response malformed, in order
+     * to make the JSON downloader+parser fail and call
+     * the lib passing a response code as zero.
+     */
+    TALER_TESTING_cmd_malform_response
+      ("malform-history",
+       PROXY_MERCHANT_CONFIG_FILE),
+
+    TALER_TESTING_cmd_history ("history-1",
+                               twister_merchant_url,
+                               is->ctx,
+                               0, // also works with MHD_HTTP_GONE
+                               GNUNET_TIME_UNIT_ZERO_ABS,
+                               1, // nresult
+                               10, // start
+                               10), // nrows
+
+
     #ifdef TEST_FAILED_DEPENDENCY
     /**
      * Move money to the exchange's bank account.
@@ -296,80 +401,6 @@ run (void *cls,
 
     #endif
     
-    /**** Covering /history lib ****/
-
-    /**
-     * Changing the response code to a unexpected
-     * one.  NOTE: this is unexpected to the *lib*
-     * code, that is then expected to trigger some
-     * emergency behaviour, like setting the response
-     * code to zero before calling the callback.
-     */
-    TALER_TESTING_cmd_hack_response_code
-      ("twist-history",
-       PROXY_MERCHANT_CONFIG_FILE,
-       MHD_HTTP_GONE),
-
-    TALER_TESTING_cmd_history ("history-0",
-                               twister_merchant_url,
-                               is->ctx,
-                               0,
-                               GNUNET_TIME_UNIT_ZERO_ABS,
-                               1, // nresult
-                               10, // start
-                               10), // nrows
-    /**
-     * Making the returned response malformed, in order
-     * to make the JSON downloader+parser fail and call
-     * the lib passing a response code as zero.
-     */
-    TALER_TESTING_cmd_malform_response
-      ("malform-history",
-       PROXY_MERCHANT_CONFIG_FILE),
-
-    TALER_TESTING_cmd_history ("history-1",
-                               twister_merchant_url,
-                               is->ctx,
-                               0, // also works with MHD_HTTP_GONE
-                               GNUNET_TIME_UNIT_ZERO_ABS,
-                               1, // nresult
-                               10, // start
-                               10), // nrows
-
-  /**** Covering /proposal lib ****/
-
-  /**
-   * Cause the PUT /proposal callback to be called
-   * with a response code == 0.  We achieve this by malforming
-   * the response body.
-   */
-
-    TALER_TESTING_cmd_malform_response
-      ("malform-proposal",
-       PROXY_MERCHANT_CONFIG_FILE),
-
-    TALER_TESTING_cmd_proposal
-      ("create-proposal-0",
-       twister_merchant_url,
-       is->ctx,
-       0,
-       "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
-        \"order_id\":\"1\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
-        \"summary\": \"merchant-lib testcase\",\
-        \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        NULL),
-
-
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
