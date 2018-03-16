@@ -313,6 +313,47 @@ run (void *cls,
                                        NULL,
                                        "does-not-exist"),
 
+    /* Generating a proposal-lookup response which doesn't pass
+     * validation, by removing a field that is expected by the
+     * library.  The library will call the callback with a status
+     * code of 0.  */
+
+    /* First step is to create a _valid_ proposal, so that
+     * we can lookup for it later.  */
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-5",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"5\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:5}\"} ] }",
+        NULL),
+
+    /* Remove expected field.  */
+    TALER_TESTING_cmd_delete_object ("remove-contract-terms",
+                                     PROXY_MERCHANT_CONFIG_FILE,
+                                     "contract_terms"),
+
+    /* lookup!  */
+    TALER_TESTING_cmd_proposal_lookup ("lookup-5",
+                                       is->ctx,
+                                       twister_merchant_url,
+                                       // expected response code.
+                                       0,
+                                       "create-proposal-5",
+                                       NULL),
     /**** Covering /history lib ****/
 
     /**
