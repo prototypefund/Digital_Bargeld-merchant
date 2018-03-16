@@ -279,17 +279,11 @@ handle_proposal_lookup_finished (void *cls,
 
   if (MHD_HTTP_OK != response_code)
   {
-    char *s;
-
-    s = json_dumps (json,
-                    JSON_COMPACT);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Proposal lookup failed with HTTP status code %u on input `%s'\n",
-                (unsigned int) response_code,
-                s);
-    if (NULL != s)
-      free (s);
-    GNUNET_break_op (0);
+                "Proposal lookup failed with HTTP status code %u\n",
+                (unsigned int) response_code);
+    GNUNET_break (0);
+
     plo->cb (plo->cb_cls,
              response_code,
              json,

@@ -337,7 +337,8 @@ run (void *cls,
                                        is->ctx,
                                        merchant_url,
                                        MHD_HTTP_OK,
-                                       "create-proposal-2"),
+                                       "create-proposal-2",
+                                       NULL),
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-1"),
 

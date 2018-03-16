@@ -259,7 +259,6 @@ run (void *cls,
     TALER_TESTING_cmd_delete_object ("remove-order-id",
                                      PROXY_MERCHANT_CONFIG_FILE,
                                      "order_id"),
-
     TALER_TESTING_cmd_proposal
       ("create-proposal-3",
        twister_merchant_url,
@@ -280,10 +279,9 @@ run (void *cls,
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:5}\"} ] }",
         NULL),
-
-
     /**
-     * Cause a 404 Not Found response code.
+     * Cause a 404 Not Found response code,
+     * due to a non existing merchant instance.
      */
     TALER_TESTING_cmd_proposal
       ("create-proposal-4",
@@ -294,6 +292,14 @@ run (void *cls,
          \"summary\": \"merchant-lib testcase\"}",
        "non-existent-instance"),
 
+    /* Cause a 404 Not Found from /proposal/lookup,
+     * due to a non existing order id being queried.  */
+    TALER_TESTING_cmd_proposal_lookup ("lookup-0",
+                                       is->ctx,
+                                       twister_merchant_url,
+                                       MHD_HTTP_NOT_FOUND,
+                                       NULL,
+                                       "does-not-exist"),
     /**** Covering /history lib ****/
 
     /**

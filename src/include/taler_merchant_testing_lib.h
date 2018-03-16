@@ -103,7 +103,8 @@ TALER_TESTING_cmd_proposal_lookup
    struct GNUNET_CURL_Context *ctx,
    const char *merchant_url,
    unsigned int http_status,
-   const char *proposal_reference);
+   const char *proposal_reference,
+   const char *order_id);
 
 /**
  * Make a "check payment" test command.

@@ -135,6 +135,8 @@ struct ProposalLookupState
    * Reference to a proposal operation.
    */
   const char *proposal_reference;
+
+  const char *order_id;
 };
 
 /**
@@ -513,24 +515,37 @@ proposal_lookup_run (void *cls,
   const struct TALER_TESTING_Command *proposal_cmd;
   const char *order_id;
   const struct GNUNET_CRYPTO_EddsaPublicKey *nonce;
+  /* Only used if we do NOT use the nonce from traits.  */
+  struct GNUNET_CRYPTO_EddsaPublicKey dummy_nonce;
   #define GET_TRAIT_NONCE(cmd,ptr) \
     TALER_TESTING_get_trait_peer_key_pub (cmd, 1, ptr)
 
   pls->is = is;
-  proposal_cmd = TALER_TESTING_interpreter_lookup_command
-    (is, pls->proposal_reference);
 
-  if (NULL == proposal_cmd)
-    TALER_TESTING_FAIL (is);
+  if (NULL != pls->order_id)
+  {
+    order_id = pls->order_id;
+    GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                                &dummy_nonce,
+                                sizeof (dummy_nonce));
+    nonce = &dummy_nonce;
+  }
+  else
+  {
+    proposal_cmd = TALER_TESTING_interpreter_lookup_command
+      (is, pls->proposal_reference);
 
-  if (GNUNET_OK != GET_TRAIT_NONCE (proposal_cmd,
-                                    &nonce))
-    TALER_TESTING_FAIL (is); 
+    if (NULL == proposal_cmd)
+      TALER_TESTING_FAIL (is);
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_order_id
-      (proposal_cmd, 0, &order_id))
-    TALER_TESTING_FAIL (is);
+    if (GNUNET_OK != GET_TRAIT_NONCE (proposal_cmd,
+                                      &nonce))
+      TALER_TESTING_FAIL (is); 
 
+    if (GNUNET_OK != TALER_TESTING_get_trait_order_id
+        (proposal_cmd, 0, &order_id))
+      TALER_TESTING_FAIL (is);
+  }
   pls->plo = TALER_MERCHANT_proposal_lookup (pls->ctx,
                                              pls->merchant_url,
                                              order_id,
@@ -554,7 +569,8 @@ TALER_TESTING_cmd_proposal_lookup
    struct GNUNET_CURL_Context *ctx,
    const char *merchant_url,
    unsigned int http_status,
-   const char *proposal_reference)
+   const char *proposal_reference,
+   const char *order_id)
 {
   struct ProposalLookupState *pls;
   struct TALER_TESTING_Command cmd;
@@ -564,6 +580,7 @@ TALER_TESTING_cmd_proposal_lookup
   pls->proposal_reference = proposal_reference;
   pls->merchant_url = merchant_url;
   pls->ctx = ctx;
+  pls->order_id = order_id;
 
   cmd.cls = pls;
   cmd.label = label;
