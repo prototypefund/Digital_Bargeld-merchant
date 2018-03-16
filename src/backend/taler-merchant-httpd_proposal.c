@@ -281,6 +281,7 @@ proposal_put (struct MHD_Connection *connection,
 
   if (NULL == instance)
   {
+    TALER_LOG_DEBUG ("Giving 'default' instance\n");
     instance = "default";
   }
 
@@ -296,9 +297,10 @@ proposal_put (struct MHD_Connection *connection,
 
     if (NULL == mi)
     {
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
-                                                "merchant instance not found");
+      TALER_LOG_WARNING ("Does 'default' instance exist?\n");
+      return TMH_RESPONSE_reply_not_found (connection,
+                                           TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
+                                           "merchant instance (order:instance) not found");
     }
     if (NULL == json_object_get (order, "merchant"))
     {
@@ -385,7 +387,7 @@ proposal_put (struct MHD_Connection *connection,
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
-					 "Unknown instance given");
+					 "Unknown instance (order:merchant:instance) given");
   }
   /* add fields to the contract that the backend should provide */
   json_object_set (order,

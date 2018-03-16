@@ -261,7 +261,7 @@ run (void *cls,
                                      "order_id"),
 
     TALER_TESTING_cmd_proposal
-      ("create-proposal-1",
+      ("create-proposal-3",
        twister_merchant_url,
        is->ctx,
        0,
@@ -280,6 +280,19 @@ run (void *cls,
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:5}\"} ] }",
         NULL),
+
+
+    /**
+     * Cause a 404 Not Found response code.
+     */
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-4",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_NOT_FOUND,
+       "{\"amount\":\"EUR:5\",\
+         \"summary\": \"merchant-lib testcase\"}",
+       "non-existent-instance"),
 
     /**** Covering /history lib ****/
 

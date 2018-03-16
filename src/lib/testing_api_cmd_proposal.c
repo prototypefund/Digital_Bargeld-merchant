@@ -458,6 +458,7 @@ TALER_TESTING_cmd_proposal (const char *label,
   ps->http_status = http_status;
   ps->ctx = ctx;
   ps->merchant_url = merchant_url;
+  ps->instance = instance;
 
   cmd.cls = ps;
   cmd.label = label;
@@ -539,7 +540,6 @@ proposal_lookup_run (void *cls,
                                              pls);
   GNUNET_assert (NULL != pls->plo);
 }
-
 
 
 /**
