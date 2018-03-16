@@ -300,6 +300,19 @@ run (void *cls,
                                        MHD_HTTP_NOT_FOUND,
                                        NULL,
                                        "does-not-exist"),
+    /* Cause a unparsable response to be returned.  */
+    TALER_TESTING_cmd_malform_response
+      ("malform-proposal-lookup",
+       PROXY_MERCHANT_CONFIG_FILE),
+    /* To be short, we'll make a _error_ response to be
+     * unparsable.  */
+    TALER_TESTING_cmd_proposal_lookup ("lookup-1",
+                                       is->ctx,
+                                       twister_merchant_url,
+                                       0, // response code.
+                                       NULL,
+                                       "does-not-exist"),
+
     /**** Covering /history lib ****/
 
     /**
