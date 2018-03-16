@@ -186,6 +186,41 @@ run (void *cls,
   /**** Covering /proposal lib ****/
 
   /**
+   * Make the merchant return a 400 Bad Request response
+   * due to uploaded body malformation.
+   */
+  TALER_TESTING_cmd_malform_request
+    ("malform-order",
+     PROXY_MERCHANT_CONFIG_FILE),
+
+  TALER_TESTING_cmd_proposal
+    ("create-proposal-0",
+     twister_merchant_url,
+     is->ctx,
+     MHD_HTTP_BAD_REQUEST,
+     /* giving a valid JSON to not make it fail before
+      * data reaches the merchant.  */
+     "{\"not\": \"used\"}",
+     NULL),
+
+    TALER_TESTING_cmd_hack_response_code
+      ("proposal-500",
+       PROXY_MERCHANT_CONFIG_FILE,
+       MHD_HTTP_INTERNAL_SERVER_ERROR),
+
+  TALER_TESTING_cmd_proposal
+    ("create-proposal-1",
+     twister_merchant_url,
+     is->ctx,
+     /* This status code == 0 is gotten via a 500 Internal Server
+      * Error handed to the library.  */
+     MHD_HTTP_INTERNAL_SERVER_ERROR,
+     /* giving a valid JSON to not make it fail before
+      * data reaches the merchant.  */
+     "{\"not\": \"used\"}",
+     NULL),
+
+  /**
    * Cause the PUT /proposal callback to be called
    * with a response code == 0.  We achieve this by malforming
    * the response body.
@@ -196,7 +231,7 @@ run (void *cls,
        PROXY_MERCHANT_CONFIG_FILE),
 
     TALER_TESTING_cmd_proposal
-      ("create-proposal-0",
+      ("create-proposal-2",
        twister_merchant_url,
        is->ctx,
        0,

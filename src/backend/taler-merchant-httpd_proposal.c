@@ -520,8 +520,10 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                              &root);
   if (GNUNET_SYSERR == res)
     return MHD_NO;
-  /* the POST's body has to be further fetched */
+
+  /* A error response was already generated */
   if ( (GNUNET_NO == res) ||
+  /* or, need more data to accomplish parsing */
        (NULL == root) )
     return MHD_YES;
 

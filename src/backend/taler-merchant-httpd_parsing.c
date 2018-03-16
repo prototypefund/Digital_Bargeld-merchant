@@ -64,7 +64,7 @@ struct Buffer
 
 
 /**
- * Initialize a buffer.
+ * Initialize a buffer and copy first chunk of data in it.
  *
  * @param buf the buffer to initialize
  * @param data the initial data
@@ -189,7 +189,7 @@ TMH_PARSE_post_cleanup_callback (void *con_cls)
  *               may be parsed in the future (call again);
  *               `*json` will be NULL if we need to be called again,
  *                and non-NULL if we are done.
- *    #GNUNET_NO is request incomplete or invalid
+ *    #GNUNET_NO if request is incomplete or invalid
  *               (error message was generated)
  *    #GNUNET_SYSERR on internal error
  *               (we could not even queue an error message,
@@ -203,7 +203,10 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
                      json_t **json)
 {
   struct Buffer *r = *con_cls;
-
+  
+  TALER_LOG_DEBUG ("Will parse: %.*s\n",
+                   (int) *upload_data_size,
+                   upload_data);
   *json = NULL;
   if (NULL == *con_cls)
   {
@@ -219,21 +222,27 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
       *con_cls = NULL;
       buffer_deinit (r);
       GNUNET_free (r);
-      return (MHD_NO ==
-              TMH_RESPONSE_reply_internal_error (connection,
-						 TALER_EC_PARSER_OUT_OF_MEMORY,
-                                                 "out of memory"))
-        ? GNUNET_SYSERR : GNUNET_NO;
+      /* return GNUNET_SYSERR if this isn't even
+       * able to generate proper error response.  */
+      return (MHD_NO == TMH_RESPONSE_reply_internal_error
+        (connection,
+         TALER_EC_PARSER_OUT_OF_MEMORY,
+         "out of memory")) ? GNUNET_SYSERR : GNUNET_NO;
     }
     /* everything OK, wait for more POST data */
     *upload_data_size = 0;
     *con_cls = r;
     return GNUNET_YES;
   }
+
+  /* When zero, upload is over.  */
   if (0 != *upload_data_size)
   {
-    /* We are seeing an old request with more data available. */
+    TALER_LOG_INFO ("Parser asking for more data"
+                    ", current data size is %lu\n",
+                    *upload_data_size);
 
+    /* We are seeing an old request with more data available. */
     if (GNUNET_OK !=
         buffer_append (r,
                        upload_data,
@@ -244,17 +253,19 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
       *con_cls = NULL;
       buffer_deinit (r);
       GNUNET_free (r);
-      return (MHD_NO ==
-              TMH_RESPONSE_reply_request_too_large (connection))
-        ? GNUNET_SYSERR : GNUNET_NO;
+      return (MHD_NO == TMH_RESPONSE_reply_request_too_large
+        (connection)) ? GNUNET_SYSERR : GNUNET_NO;
     }
+
     /* everything OK, wait for more POST data */
     *upload_data_size = 0;
     return GNUNET_YES;
   }
 
+  TALER_LOG_DEBUG ("About to parse: %.*s\n",
+                   (int) r->fill,
+                   r->data);
   /* We have seen the whole request. */
-
   *json = json_loadb (r->data,
                       r->fill,
                       0,
@@ -263,9 +274,8 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Failed to parse JSON request body\n");
-    return (MHD_YES ==
-            TMH_RESPONSE_reply_invalid_json (connection))
-      ? GNUNET_NO : GNUNET_SYSERR;
+    return (MHD_YES == TMH_RESPONSE_reply_invalid_json
+      (connection)) ? GNUNET_NO : GNUNET_SYSERR;
   }
   buffer_deinit (r);
   GNUNET_free (r);

@@ -408,7 +408,7 @@ handle_mhd_completion_callback (void *cls,
 
   if (NULL == hc)
     return;
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Finished handling request for `%s' with status %d\n",
               hc->rh->url,
               (int) toe);

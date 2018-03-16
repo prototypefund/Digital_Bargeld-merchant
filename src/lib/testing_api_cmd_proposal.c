@@ -290,11 +290,14 @@ proposal_cb (void *cls,
                   ps->is),
                 s);
     GNUNET_free_non_null (s);
-    TALER_TESTING_interpreter_fail (ps->is);
+    /**
+     * Not failing, as test cases are _supposed_
+     * to create non 200 OK situations.
+     */
+    TALER_TESTING_interpreter_next (ps->is);
   }
   return;
   }
-
 
   if (NULL ==
      (ps->plo = TALER_MERCHANT_proposal_lookup
