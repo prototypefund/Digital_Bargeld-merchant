@@ -395,12 +395,12 @@ run (void *cls,
                                10), // nrows
 
 
-    #ifdef TEST_FAILED_DEPENDENCY
     /**
      * Move money to the exchange's bank account.
      */
     CMD_TRANSFER_TO_EXCHANGE ("create-reserve-1",
                               "EUR:2.02"),
+
     /**
      * Make a reserve exist, according to the previous
      * transfer.
@@ -417,28 +417,27 @@ run (void *cls,
                                        "create-reserve-1",
                                        "EUR:1",
                                        MHD_HTTP_OK),
-
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
                                        is->exchange,
                                        "create-reserve-1",
                                        "EUR:1",
                                        MHD_HTTP_OK),
-
     TALER_TESTING_cmd_status ("withdraw-status",
                               is->exchange,
                               "create-reserve-1",
                               "EUR:0",
                               MHD_HTTP_OK),
+
     TALER_TESTING_cmd_proposal
-      ("create-proposal-1",
-       merchant_url,
+      ("create-proposal-6",
+       twister_merchant_url,
        is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
-        \"order_id\":\"1\",\
+        \"order_id\":\"11\",\
         \"refund_deadline\":\"\\/Date(0)\\/\",\
         \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
         \"amount\":\
@@ -451,17 +450,17 @@ run (void *cls,
         NULL),
 
     TALER_TESTING_cmd_check_payment ("check-payment-1",
-                                     merchant_url,
+                                     twister_merchant_url,
                                      is->ctx,
                                      MHD_HTTP_OK,
-                                     "create-proposal-1",
+                                     "create-proposal-6",
                                      GNUNET_NO),
 
     TALER_TESTING_cmd_pay ("deposit-simple",
-                           merchant_url,
+                           twister_merchant_url,
                            is->ctx,
                            MHD_HTTP_OK,
-                           "create-proposal-1",
+                           "create-proposal-6",
                            "withdraw-coin-1;" \
                            "withdraw-coin-2",
                            "EUR:2",
@@ -469,17 +468,17 @@ run (void *cls,
                            "EUR:0.01"), // no sense now
 
     TALER_TESTING_cmd_check_payment ("check-payment-2",
-                                     merchant_url,
+                                     twister_merchant_url,
                                      is->ctx,
                                      MHD_HTTP_OK,
-                                     "create-proposal-1",
+                                     "create-proposal-6",
                                      GNUNET_YES),
 
     CMD_EXEC_AGGREGATOR ("run-aggregator"),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-1",
-       exchange_url,
+       twister_exchange_url,
        /* paid,         1.97 =
           brutto        2.00 -
           deposit fee   0.01 * 2 -
@@ -488,27 +487,24 @@ run (void *cls,
        "EUR:1.97", 2, 62),
 
     /* Should instead change the response body somehow! */
-
     TALER_TESTING_cmd_modify_object ("hack-0",
-                                     CONFIG_FILE,
+                                     PROXY_EXCHANGE_CONFIG_FILE,
                                      "total",
                                      "EUR:0.98"),
 
     TALER_TESTING_cmd_delete_object ("hack-1",
-                                     CONFIG_FILE,
+                                     PROXY_EXCHANGE_CONFIG_FILE,
                                      "deposits.0"),
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
-       merchant_url,
+       twister_merchant_url,
        is->ctx,
        MHD_HTTP_FAILED_DEPENDENCY,
        "check_bank_transfer-1",
        "deposit-simple",
        "EUR:0.01"), // ignored
 
-    #endif
-    
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
