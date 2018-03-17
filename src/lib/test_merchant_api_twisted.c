@@ -268,17 +268,18 @@ run (void *cls,
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
-        \"order_id\":\"2\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
-        \"summary\": \"merchant-lib testcase\",\
-        \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        NULL),
+         \"fulfillment_url\": \"https://example.com/\",\
+         \"order_id\":\"2\",\
+         \"refund_deadline\":\"\\/Date(0)\\/\",\
+         \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+         \"amount\":\
+           {\"currency\":\"EUR\",\
+            \"value\":5,\
+            \"fraction\":0},\
+         \"summary\": \"merchant-lib testcase\",\
+         \"products\": [ {\"description\":\"ice cream\",\
+                          \"value\":\"{EUR:5}\"} ] }",
+         NULL),
     /**
      * Cause a 404 Not Found response code,
      * due to a non existing merchant instance.
@@ -289,6 +290,7 @@ run (void *cls,
        is->ctx,
        MHD_HTTP_NOT_FOUND,
        "{\"amount\":\"EUR:5\",\
+         \"fulfillment_url\": \"https://example.com/\",\
          \"summary\": \"merchant-lib testcase\"}",
        "non-existent-instance"),
 
@@ -336,6 +338,7 @@ run (void *cls,
           {\"currency\":\"EUR\",\
            \"value\":5,\
            \"fraction\":0},\
+        \"fulfillment_url\": \"https://example.com/\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:5}\"} ] }",
@@ -440,6 +443,7 @@ run (void *cls,
         \"order_id\":\"11\",\
         \"refund_deadline\":\"\\/Date(0)\\/\",\
         \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"fulfillment_url\": \"https://example.com/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":2,\
