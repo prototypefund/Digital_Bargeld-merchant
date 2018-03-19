@@ -231,11 +231,17 @@ AS_CASE([$with_twister],
         [no], [AC_MSG_WARN([no twister-testing will be compiled])],
         [LDFLAGS="-L$with_twister/lib $LDFLAGS"
          CPPFLAGS="-I$with_twister/include $CPPFLAGS"])
+
+# This tries to include the twister even though
+# no --with-twister option was given.  Shall it
+# be included only if the user explicitly gave
+# such option?
 AC_CHECK_LIB(talertwistertesting,TALER_TESTING_run_twister,
   [AC_CHECK_HEADER([taler/taler_twister_testing_lib.h],[twistertesting=1],,
                    [#ifdef HAVE_GNUNET_PLATFORM_H
                       #include <gnunet/platform.h>
-                    #endif])]
+                    #endif
+                    ])]
   ,,[-ltalerexchange -ltalerbank])
 AM_CONDITIONAL(HAVE_TWISTER, test x$twistertesting = x1)
 
