@@ -324,6 +324,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                         "refunded", refunded,
                                         "refund_amount", TALER_JSON_from_amount (&refund_amount),
                                         "last_session_id", last_session_id);
+    GNUNET_free_non_null (final_contract_url);
     return res;
   }
 
