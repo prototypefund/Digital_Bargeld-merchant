@@ -588,11 +588,16 @@ main (int argc,
         (PROXY_MERCHANT_CONFIG_FILE)))
       return 77;
 
+    /* Run the exchange and schedule 'run()' */
     ret = TALER_TESTING_setup_with_exchange (&run, NULL,
                                              CONFIG_FILE);
     purge_process (merchantd);
     purge_process (twisterexchanged);
     purge_process (twistermerchantd);
+    GNUNET_free (fakebank_url);
+    GNUNET_free (merchant_url);
+    GNUNET_free (twister_exchange_url);
+    GNUNET_free (twister_merchant_url);
 
     if (GNUNET_OK != ret)
       return 1;
