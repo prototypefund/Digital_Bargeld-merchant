@@ -141,6 +141,7 @@ handle_proposal_finished (void *cls,
             TALER_EC_INVALID_RESPONSE,
             json,
             order_id);
+    TALER_MERCHANT_proposal_cancel (po);
     return;
   case MHD_HTTP_OK:
     {
@@ -276,7 +277,7 @@ handle_proposal_lookup_finished (void *cls,
                                  &sig),
     GNUNET_JSON_spec_end()
   };
-
+  plo->job = NULL;
   if (MHD_HTTP_OK != response_code)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
@@ -290,6 +291,7 @@ handle_proposal_lookup_finished (void *cls,
              NULL,
              NULL,
              NULL);
+    TALER_MERCHANT_proposal_lookup_cancel (plo);
     return;
   }
 
@@ -307,6 +309,8 @@ handle_proposal_lookup_finished (void *cls,
              NULL,
              NULL,
              NULL);
+
+    TALER_MERCHANT_proposal_lookup_cancel (plo);
     return;
   }
 
@@ -322,6 +326,7 @@ handle_proposal_lookup_finished (void *cls,
              NULL,
              NULL,
              NULL);
+    TALER_MERCHANT_proposal_lookup_cancel (plo);
     return;
   }
 

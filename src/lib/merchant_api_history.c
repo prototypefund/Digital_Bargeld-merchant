@@ -109,6 +109,7 @@ history_raw_cb (void *cls,
             response_code,
             TALER_EC_INVALID_RESPONSE,
             json);
+    TALER_MERCHANT_history_cancel (ho);
     return;
   case MHD_HTTP_OK:
     ho->cb (ho->cb_cls,
