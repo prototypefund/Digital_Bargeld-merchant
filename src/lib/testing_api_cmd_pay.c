@@ -93,6 +93,12 @@ struct PayState
    */
   struct TALER_MERCHANT_Pay *po;
 
+  /**
+   * JSON object of contract terms.  Needed here
+   * to be free'd when this command gets cleaned up.
+   */
+  json_t *ct;
+
 };
 
 
@@ -692,7 +698,6 @@ _pay_run (const char *merchant_url,
 {
   const struct TALER_TESTING_Command *proposal_cmd;
   const char *contract_terms;
-  json_t *ct;
   const char *order_id;
   struct GNUNET_TIME_Absolute refund_deadline;
   struct GNUNET_TIME_Absolute pay_deadline;
@@ -709,6 +714,7 @@ _pay_run (const char *merchant_url,
   char *cr;
   struct TALER_MerchantSignatureP *merchant_sig;
   struct TALER_MERCHANT_Pay *ret;
+  struct PayState *ps = is->commands[is->ip].cls;
 
   proposal_cmd = TALER_TESTING_interpreter_lookup_command
     (is, proposal_reference);
@@ -728,9 +734,9 @@ _pay_run (const char *merchant_url,
 
   json_error_t error;
   if (NULL ==
-     (ct = json_loads (contract_terms,
-                       JSON_COMPACT,
-                       &error)))
+     (ps->ct = json_loads (contract_terms,
+                           JSON_COMPACT,
+                           &error)))
   {
     GNUNET_break (0);
     return NULL;
@@ -757,7 +763,7 @@ _pay_run (const char *merchant_url,
     GNUNET_JSON_spec_end()
   };
   if (GNUNET_OK !=
-      GNUNET_JSON_parse (ct,
+      GNUNET_JSON_parse (ps->ct,
                          spec,
                          &error_name,
                          &error_line))
@@ -877,6 +883,8 @@ pay_cleanup (void *cls,
 {
   struct PayState *ps = cls;
 
+  if (NULL != ps->ct)
+    json_decref (ps->ct);
   if (NULL != ps->po)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
