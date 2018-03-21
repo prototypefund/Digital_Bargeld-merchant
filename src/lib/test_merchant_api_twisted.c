@@ -530,7 +530,7 @@ run (void *cls,
 static void
 purge_process (struct GNUNET_OS_Process *process)
 {
-  GNUNET_OS_process_kill (process, SIGKILL);
+  GNUNET_OS_process_kill (process, SIGINT);
   GNUNET_OS_process_wait (process);
   GNUNET_OS_process_destroy (process);
 }
