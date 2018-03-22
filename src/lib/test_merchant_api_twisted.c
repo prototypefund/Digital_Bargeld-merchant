@@ -592,6 +592,29 @@ run (void *cls,
                                  "deposit-simple-for-abort",
                                  is->ctx,
                                  0),
+
+    TALER_TESTING_cmd_modify_object
+      ("hack-abort-3",
+       PROXY_MERCHANT_CONFIG_FILE,
+       "refund_permissions.0.coin_pub",
+       /* dummy coin.  */
+       "8YX10E41ZWHX0X2RK4XFAXB2D3M05M1HNG14ZFZZB8M7SA4QCKCG"),
+
+    TALER_TESTING_cmd_pay_abort ("pay-abort-3",
+                                 twister_merchant_url,
+                                 "deposit-simple-for-abort",
+                                 is->ctx,
+                                 0),
+    TALER_TESTING_cmd_flip_object
+      ("hack-abort-4",
+       PROXY_MERCHANT_CONFIG_FILE,
+       "refund_permissions.0.merchant_sig"),
+
+    TALER_TESTING_cmd_pay_abort ("pay-abort-4",
+                                 twister_merchant_url,
+                                 "deposit-simple-for-abort",
+                                 is->ctx,
+                                 0),
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
