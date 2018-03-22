@@ -572,7 +572,7 @@ run (void *cls,
                            "EUR:1.99", // no sense now
                            "EUR:0.01"), // no sense now
 
-    TALER_TESTING_cmd_delete_object ("hack-abort",
+    TALER_TESTING_cmd_delete_object ("hack-abort-1",
                                      PROXY_MERCHANT_CONFIG_FILE,
                                      "merchant_pub"),
 
@@ -580,7 +580,18 @@ run (void *cls,
                                  twister_merchant_url,
                                  "deposit-simple-for-abort",
                                  is->ctx,
-                                 MHD_HTTP_OK),
+                                 0),
+
+    TALER_TESTING_cmd_delete_object
+      ("hack-abort-2",
+       PROXY_MERCHANT_CONFIG_FILE,
+       "refund_permissions.0.rtransaction_id"),
+
+    TALER_TESTING_cmd_pay_abort ("pay-abort-2",
+                                 twister_merchant_url,
+                                 "deposit-simple-for-abort",
+                                 is->ctx,
+                                 0),
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
