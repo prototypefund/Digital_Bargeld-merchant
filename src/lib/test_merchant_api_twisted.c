@@ -687,7 +687,7 @@ run (void *cls,
        PROXY_MERCHANT_CONFIG_FILE,
        "history.0.coin_sig"),
 
-    /* Coin history will fail, due to coin's bad signature.  */
+    /* Coin history check will fail, due to coin's bad signature.  */
     TALER_TESTING_cmd_pay ("deposit-simple-fail",
                            twister_merchant_url,
                            is->ctx,
@@ -697,6 +697,8 @@ run (void *cls,
                            "EUR:1",
                            "EUR:1.99", // no sense now
                            "EUR:0.01"), // no sense now
+
+    /* max uint64 number: 9223372036854775807; try to overflow! */
 
     /**
      * End the suite.  Fixme: better to have a label for this
