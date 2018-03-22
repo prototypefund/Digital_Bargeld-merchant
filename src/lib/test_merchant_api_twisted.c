@@ -618,6 +618,18 @@ run (void *cls,
                                  is->ctx,
                                  0),
 
+    /* just malforming the response.  */
+
+    TALER_TESTING_cmd_malform_response
+      ("malform-abortion",
+       PROXY_MERCHANT_CONFIG_FILE),
+
+    TALER_TESTING_cmd_pay_abort ("pay-abort-5",
+                                 twister_merchant_url,
+                                 "deposit-simple-for-abort",
+                                 is->ctx,
+                                 0),
+
     CMD_TRANSFER_TO_EXCHANGE ("create-reserve-double-spend",
                               "EUR:1.01"),
 
