@@ -682,10 +682,16 @@ run (void *cls,
                            "EUR:1.99", // no sense now
                            "EUR:0.01"), // no sense now
 
+    TALER_TESTING_cmd_flip_object
+      ("hack-coin-history",
+       PROXY_MERCHANT_CONFIG_FILE,
+       "history.0.coin_sig"),
+
+    /* Coin history will fail, due to coin's bad signature.  */
     TALER_TESTING_cmd_pay ("deposit-simple-fail",
                            twister_merchant_url,
                            is->ctx,
-                           MHD_HTTP_FORBIDDEN,
+                           0,
                            "create-proposal-double-spend-1",
                            "withdraw-coin-double-spend",
                            "EUR:1",
