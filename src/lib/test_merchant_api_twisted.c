@@ -509,6 +509,78 @@ run (void *cls,
        "deposit-simple",
        "EUR:0.01"), // ignored
 
+    /****** Covering /pay *******/
+
+    /**
+     * Move money to the exchange's bank account.
+     */
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-abort-1",
+                              "EUR:1.01"),
+
+    /**
+     * Make a reserve exist, according to the previous
+     * transfer.
+     */
+    CMD_EXEC_WIREWATCH ("wirewatch-abort-1"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-abort-1",
+       "http://localhost:8081/",
+       "EUR:1.01", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+
+    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-abort-1",
+                                       is->exchange,
+                                       "create-reserve-abort-1",
+                                       "EUR:1",
+                                       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_status ("withdraw-status-abort-1",
+                              is->exchange,
+                              "create-reserve-abort-1",
+                              "EUR:0",
+                              MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-abort-1",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"abort-one\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":3,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:3}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_pay ("deposit-simple-for-abort",
+                           twister_merchant_url,
+                           is->ctx,
+                           0,
+                           "create-proposal-abort-1",
+                           "withdraw-coin-abort-1",
+                           "EUR:1",
+                           "EUR:1.99", // no sense now
+                           "EUR:0.01"), // no sense now
+
+    TALER_TESTING_cmd_delete_object ("hack-abort",
+                                     PROXY_MERCHANT_CONFIG_FILE,
+                                     "merchant_pub"),
+
+    TALER_TESTING_cmd_pay_abort ("pay-abort-1",
+                                 twister_merchant_url,
+                                 "deposit-simple-for-abort",
+                                 is->ctx,
+                                 MHD_HTTP_OK),
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.

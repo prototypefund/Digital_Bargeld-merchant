@@ -1226,6 +1226,7 @@ check_coin_paid (void *cls,
 
     if (GNUNET_YES == dc->found_in_db)
       continue; /* processed earlier */
+
     /* Get matching coin from results*/
     if ( (0 != memcmp (coin_pub,
                        &dc->coin_pub,
@@ -1663,6 +1664,8 @@ begin_transaction (struct PayContext *pc)
 			   "Merchant database error (could not start transaction)");
     return;
   }
+
+  /* Init. some price accumulators.  */
   GNUNET_break (GNUNET_OK ==
 		TALER_amount_get_zero (pc->amount.currency,
 				       &pc->total_paid));
@@ -1673,7 +1676,7 @@ begin_transaction (struct PayContext *pc)
 		TALER_amount_get_zero (pc->amount.currency,
 				       &pc->total_refunded));
 
-  /* Check if some of these coins already succeeded */
+  /* Check if some of these coins already succeeded for _this_ contract.  */
   qs = db->find_payments (db->cls,
 			  &pc->h_contract_terms,
 			  &pc->mi->pubkey,
@@ -1725,6 +1728,7 @@ begin_transaction (struct PayContext *pc)
 
     /* The wallet is going for a refund,
        (on aborted operation)! */
+
     /* check payment was indeed incomplete */
     qs = db->find_paid_contract_terms_from_hash (db->cls,
                                                  &terms,
