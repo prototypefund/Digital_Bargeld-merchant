@@ -562,6 +562,8 @@ run (void *cls,
                          \"value\":\"{EUR:3}\"} ] }",
         NULL),
 
+    /* Will only pay _half_ the supposed price,
+     * so we'll then have the right to abort.  */
     TALER_TESTING_cmd_pay ("deposit-simple-for-abort",
                            twister_merchant_url,
                            is->ctx,
@@ -615,6 +617,81 @@ run (void *cls,
                                  "deposit-simple-for-abort",
                                  is->ctx,
                                  0),
+
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-double-spend",
+                              "EUR:1.01"),
+
+    CMD_EXEC_WIREWATCH ("wirewatch-double-spend"),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-double-spend",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"DS-1\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":1,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\": \"will succeed\"}] }",
+        NULL),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-double-spend-1",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"DS-2\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":1,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\": \"will fail\"}] }",
+        NULL),
+
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-double-spend",
+       is->exchange,
+       "create-reserve-double-spend",
+       "EUR:1",
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_pay ("deposit-simple-ok",
+                           twister_merchant_url,
+                           is->ctx,
+                           MHD_HTTP_OK,
+                           "create-proposal-double-spend",
+                           "withdraw-coin-double-spend",
+                           "EUR:1",
+                           "EUR:1.99", // no sense now
+                           "EUR:0.01"), // no sense now
+
+    TALER_TESTING_cmd_pay ("deposit-simple-fail",
+                           twister_merchant_url,
+                           is->ctx,
+                           MHD_HTTP_FORBIDDEN,
+                           "create-proposal-double-spend-1",
+                           "withdraw-coin-double-spend",
+                           "EUR:1",
+                           "EUR:1.99", // no sense now
+                           "EUR:0.01"), // no sense now
+
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
