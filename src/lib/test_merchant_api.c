@@ -4533,7 +4533,7 @@ run (void *cls)
       .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
       .details.admin_add_incoming.auth_username = "user62",
       .details.admin_add_incoming.auth_password = "pass62",
-      /* we run *two* instances, but only this first call will
+      /* we run *two* __merchant__ instances, but only this first call will
          actually fill the reserve, as the second one will be seen as
          a duplicate. Hence fill with twice the require amount per
          round. */

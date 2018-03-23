@@ -480,7 +480,12 @@ run (void *cls,
        CONFIG_FILE),
 
 
-    CMD_EXEC_WIREWATCH ("wirewatch-11"),
+    CMD_EXEC_WIREWATCH ("wirewatch-3"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-tip-1",
+       "http://localhost:8081/",
+       "EUR:20.04", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-1",
                                      merchant_url,
@@ -592,8 +597,6 @@ run (void *cls,
        is->exchange,
        TALER_EC_TIP_PICKUP_NO_FUNDS),
 
-    // TALER_TESTING_cmd_end (),
-
     TALER_TESTING_cmd_proposal
       ("create-proposal-tip-1",
        merchant_url,
@@ -626,10 +629,6 @@ run (void *cls,
                            "EUR:4.99", // amount - fee
                            "EUR:0.01"), // refund fee
 
-    /* Will fail here until all new
-     * transfers have not been checked.  I.e.,
-     * there is now a 20.04 euro "pending" transfer.  */
-
     /* pay again logic.  */
     TALER_TESTING_cmd_fakebank_transfer
       ("create-reserve-10",
@@ -648,6 +647,9 @@ run (void *cls,
        "http://localhost:8081/",
        "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
+    /* This is not found at the original tests.  */
+    TALER_TESTING_cmd_check_bank_empty ("be_sure"),
+
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-10a",
                                        is->exchange,
                                        "create-reserve-10",
@@ -658,8 +660,6 @@ run (void *cls,
                                        "create-reserve-10",
                                        "EUR:5",
                                        MHD_HTTP_OK),
-
-
     TALER_TESTING_cmd_status ("withdraw-status-10",
                               is->exchange,
                               "create-reserve-10",
@@ -719,6 +719,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-10"),
 
+    TALER_TESTING_cmd_end (),
+
+    /* pay abort */
     CMD_TRANSFER_TO_EXCHANGE ("create-reserve-11",
                               "EUR:10.02"),
 
