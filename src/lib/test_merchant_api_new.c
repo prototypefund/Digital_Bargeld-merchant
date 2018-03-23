@@ -487,6 +487,17 @@ run (void *cls,
                                      "tip",
                                      "tip 1",
                                      "EUR:5.01"),
+
+    TALER_TESTING_cmd_tip_authorize ("authorize-tip-2",
+                                     merchant_url,
+                                     exchange_url,
+                                     is->ctx,
+                                     MHD_HTTP_OK,
+                                     "tip",
+                                     "tip 2",
+                                     "EUR:5.01"),
+
+
     /* Will fail here until all new
      * transfers have not been checked.  I.e.,
      * there is now a 20.04 euro "pending" transfer.  */
