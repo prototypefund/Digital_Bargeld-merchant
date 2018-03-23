@@ -48,6 +48,8 @@
  */
 #define EXCHANGE_URL "http://localhost:8081/"
 
+static const char *pickup_amounts_1[] = {"EUR:5", NULL};
+
 /**
  * URL of the fakebank.  Obtained from CONFIG_FILE's
  * "exchange-wire-test:BANK_URI" option.
@@ -511,6 +513,15 @@ run (void *cls,
                                               "EUR:0.0", // picked
                                               "EUR:10.02", // auth
                                               "EUR:20.04"),// ava
+
+    TALER_TESTING_cmd_tip_pickup ("pickup-tip-1",
+                                  merchant_url,
+                                  is->ctx,
+                                  MHD_HTTP_OK,
+                                  "authorize-tip-1",
+                                  pickup_amounts_1,
+                                  is->exchange),
+
     /* Will fail here until all new
      * transfers have not been checked.  I.e.,
      * there is now a 20.04 euro "pending" transfer.  */
@@ -737,7 +748,8 @@ main (int argc,
     ret = TALER_TESTING_setup_with_exchange (&run,
                                              NULL,
                                              CONFIG_FILE);
-    GNUNET_OS_process_kill (merchantd, SIGKILL); 
+
+    GNUNET_OS_process_kill (merchantd, SIGTERM); 
     GNUNET_OS_process_wait (merchantd); 
     GNUNET_OS_process_destroy (merchantd); 
     GNUNET_free (merchant_url);

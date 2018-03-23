@@ -194,6 +194,37 @@ tip_authorize_cb (void *cls,
   TALER_TESTING_interpreter_next (tas->is);
 }
 
+/**
+ * Extract information from a command that is useful for other
+ * commands.
+ *
+ * @param cls closure
+ * @param ret[out] result (could be anything)
+ * @param trait name of the trait
+ * @param selector more detailed information about which object
+ *                 to return in case there were multiple generated
+ *                 by the command
+ * @return #GNUNET_OK on success
+ */
+static int
+tip_authorize_traits (void *cls,
+                      void **ret,
+                      const char *trait,
+                      unsigned int index)
+{
+  struct TipAuthorizeState *tas = cls;
+
+  struct TALER_TESTING_Trait traits[] = {
+    TALER_TESTING_make_trait_tip_id (0, &tas->tip_id),
+    TALER_TESTING_trait_end (),
+  };
+
+  return TALER_TESTING_get_trait (traits,
+                                  ret,
+                                  trait,
+                                  index);
+  return GNUNET_SYSERR;
+}
 
 /**
  * Runs the command.  Note that upon return, the interpreter
@@ -281,6 +312,7 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
   cmd.cls = tas;
   cmd.run = &tip_authorize_run;
   cmd.cleanup = &tip_authorize_cleanup;
+  cmd.traits = &tip_authorize_traits;
   
   return cmd;
 }
@@ -593,7 +625,6 @@ pickup_cb (void *cls,
   if (num_reserve_sigs != tps->num_coins)
     TALER_TESTING_FAIL (tps->is);
 
-
   /* pickup successful, now withdraw! */
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Obtained %u signatures for withdrawal"
@@ -633,6 +664,7 @@ tip_pickup_run (void *cls,
                 const struct TALER_TESTING_Command *cmd,
                 struct TALER_TESTING_Interpreter *is)
 {
+
   struct TipPickupState *tps = cls;
   unsigned int num_planchets;
   const struct TALER_TESTING_Command *replay_cmd;
@@ -801,6 +833,7 @@ TALER_TESTING_cmd_tip_pickup
   tps->authorize_reference = authorize_reference;
   tps->amounts = amounts;
   tps->exchange = exchange;
+  tps->http_status = http_status;
 
   cmd.cls = tps;
   cmd.label = label;
