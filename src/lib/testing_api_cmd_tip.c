@@ -287,6 +287,44 @@ tip_authorize_cleanup (void *cls,
  * FIXME
  */
 struct TALER_TESTING_Command
+TALER_TESTING_cmd_tip_authorize_with_ec
+  (const char *label,
+   const char *merchant_url,
+   const char *exchange_url,
+   struct GNUNET_CURL_Context *ctx,
+   unsigned int http_status,
+   const char *instance,
+   const char *justification,
+   const char *amount,
+   enum TALER_ErrorCode ec)
+{
+  struct TipAuthorizeState *tas;
+  struct TALER_TESTING_Command cmd;
+
+  tas = GNUNET_new (struct TipAuthorizeState);
+  tas->merchant_url = merchant_url;
+  tas->exchange_url = exchange_url;
+  tas->ctx = ctx;
+  tas->instance = instance;
+  tas->justification = justification;
+  tas->amount = amount;
+  tas->http_status = http_status;
+  tas->expected_ec = ec;
+
+  cmd.label = label;
+  cmd.cls = tas;
+  cmd.run = &tip_authorize_run;
+  cmd.cleanup = &tip_authorize_cleanup;
+  cmd.traits = &tip_authorize_traits;
+  
+  return cmd;
+}
+
+
+/**
+ * FIXME
+ */
+struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize (const char *label,
                                  const char *merchant_url,
                                  const char *exchange_url,
@@ -810,6 +848,42 @@ tip_pickup_traits (void *cls,
                                   index);
   return GNUNET_SYSERR;
 }
+
+/**
+ * FIXME
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_tip_pickup_with_ec
+  (const char *label,
+   const char *merchant_url,
+   struct GNUNET_CURL_Context *ctx,
+   unsigned int http_status,
+   const char *authorize_reference,
+   const char **amounts,
+   struct TALER_EXCHANGE_Handle *exchange,
+   enum TALER_ErrorCode ec)
+{
+  struct TipPickupState *tps;
+  struct TALER_TESTING_Command cmd;
+
+  tps = GNUNET_new (struct TipPickupState);
+  tps->merchant_url = merchant_url;
+  tps->ctx = ctx;
+  tps->authorize_reference = authorize_reference;
+  tps->amounts = amounts;
+  tps->exchange = exchange;
+  tps->http_status = http_status;
+  tps->expected_ec = ec;
+
+  cmd.cls = tps;
+  cmd.label = label;
+  cmd.run = &tip_pickup_run;
+  cmd.cleanup = &tip_pickup_cleanup;
+  cmd.traits = &tip_pickup_traits;
+  
+  return cmd;
+}
+
 
 /**
  * FIXME

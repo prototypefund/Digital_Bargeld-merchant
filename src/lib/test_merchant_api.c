@@ -4625,6 +4625,7 @@ run (void *cls)
       .details.tip_authorize.justification = "tip 5",
       .details.tip_authorize.amount = "EUR:5.01",
       .details.tip_authorize.expected_ec = TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP },
+
     { .oc = OC_TIP_PICKUP,
       .label = "pickup-tip-3-too-much",
       .expected_response_code = MHD_HTTP_CONFLICT,

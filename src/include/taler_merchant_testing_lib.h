@@ -497,6 +497,23 @@ TALER_TESTING_get_trait_refund_entry
    unsigned int index,
    const struct TALER_MERCHANT_RefundEntry **refund_entry);
 
+
+/**
+ * FIXME
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_tip_authorize_with_ec
+  (const char *label,
+   const char *merchant_url,
+   const char *exchange_url,
+   struct GNUNET_CURL_Context *ctx,
+   unsigned int http_status,
+   const char *instance,
+   const char *justification,
+   const char *amount,
+   enum TALER_ErrorCode ec);
+
+
 /**
  * FIXME
  */
@@ -533,6 +550,22 @@ TALER_TESTING_cmd_tip_query_with_amounts
    const char *expected_amount_picked_up,
    const char *expected_amount_authorized,
    const char *expected_amount_available);
+
+
+/**
+ * FIXME
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_tip_pickup_with_ec
+  (const char *label,
+   const char *merchant_url,
+   struct GNUNET_CURL_Context *ctx,
+   unsigned int http_status,
+   const char *authorize_reference,
+   const char **amounts,
+   struct TALER_EXCHANGE_Handle *exchange,
+   enum TALER_ErrorCode ec);
+
 
 /**
  * FIXME

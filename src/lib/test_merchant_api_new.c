@@ -35,6 +35,7 @@
 #include <taler/taler_bank_service.h>
 #include <taler/taler_fakebank_lib.h>
 #include <taler/taler_testing_lib.h>
+#include <taler/taler_error_codes.h>
 #include "taler_merchant_testing_lib.h"
 
 /**
@@ -547,6 +548,49 @@ run (void *cls,
                                               "EUR:10.02", // pick
                                               "EUR:10.02", // auth
                                               "EUR:10.02"), // ava
+    TALER_TESTING_cmd_tip_authorize_with_ec
+      ("authorize-tip-3-insufficient-funds",
+       merchant_url,
+       exchange_url,
+       is->ctx,
+       MHD_HTTP_PRECONDITION_FAILED,
+       "dtip",
+       "tip 3",
+       "EUR:5.01",
+       TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS),
+
+    TALER_TESTING_cmd_tip_authorize_with_ec
+      ("authorize-tip-4-unknown-instance",
+       merchant_url,
+       exchange_url,
+       is->ctx,
+       MHD_HTTP_NOT_FOUND,
+       "unknown",
+       "tip 4",
+       "EUR:5.01",
+       TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN),
+
+    TALER_TESTING_cmd_tip_authorize_with_ec
+      ("authorize-tip-5-notip-instance",
+       merchant_url,
+       exchange_url,
+       is->ctx,
+       MHD_HTTP_NOT_FOUND,
+       "default",
+       "tip 5",
+       "EUR:5.01",
+       TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP),
+
+
+    TALER_TESTING_cmd_tip_pickup_with_ec
+      ("pickup-tip-3-too-much",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_CONFLICT,
+       "authorize-tip-1",
+       pickup_amounts_1,
+       is->exchange,
+       TALER_EC_TIP_PICKUP_NO_FUNDS),
 
     /* Will fail here until all new
      * transfers have not been checked.  I.e.,
