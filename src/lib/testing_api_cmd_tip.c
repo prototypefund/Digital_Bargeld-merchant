@@ -29,10 +29,22 @@
 #include "taler_merchant_service.h"
 #include "taler_merchant_testing_lib.h"
 
+/**
+ * Obtain the URL to use for an API request.
+ *
+ * @param h the exchange handle to query
+ * @param path Taler API path (i.e. "/reserve/withdraw")
+ * @return the full URL to use with cURL
+ */
+char *
+MAH_path_to_url (struct TALER_EXCHANGE_Handle *h,
+                 const char *path);
 
 struct TipPickupState
 {
   const char *merchant_url;
+
+  const char *exchange_url;
 
   struct GNUNET_CURL_Context *ctx;
 
@@ -51,6 +63,8 @@ struct TipPickupState
   struct TALER_TESTING_Interpreter *is;
 
   const char **amounts;
+
+  struct TALER_Amount *amounts_obj;
 
   unsigned int num_coins;
   
@@ -707,10 +721,10 @@ tip_pickup_run (void *cls,
   unsigned int num_planchets;
   const struct TALER_TESTING_Command *replay_cmd;
   const struct TALER_TESTING_Command *authorize_cmd;
-  struct TALER_Amount amount;
   const struct GNUNET_HashCode *tip_id;
 
   tps->is = is;
+  tps->exchange_url = MAH_path_to_url (tps->exchange, "/");
   if (NULL == tps->replay_reference)
   {
     replay_cmd = NULL;
@@ -749,15 +763,20 @@ tip_pickup_run (void *cls,
       (num_planchets,
        const struct TALER_EXCHANGE_DenomPublicKey *);
 
+    tps->amounts_obj = GNUNET_new_array
+      (num_planchets, struct TALER_Amount);
+
     for (unsigned int i=0;i<num_planchets;i++)
     {
       if (NULL == replay_cmd)
       {
         GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-          (tps->amounts[i], &amount));
+          (tps->amounts[i], &tps->amounts_obj[i]));
 
-        tps->dks[i] = TALER_TESTING_find_pk (is->keys,
-                                             &amount);
+        tps->dks[i] = TALER_TESTING_find_pk
+          (is->keys,
+           &tps->amounts_obj[i]);
+
         if (NULL == tps->dks[i])
           TALER_TESTING_FAIL (is);
 
@@ -804,7 +823,7 @@ tip_pickup_cleanup (void *cls,
                     const struct TALER_TESTING_Command *cmd)
 {
   struct TipPickupState *tps = cls;
-
+  #warning free elements *in* the state!
   if (NULL != tps->tpo)
   {
     TALER_LOG_WARNING ("Tip-pickup operation"
@@ -835,12 +854,32 @@ tip_pickup_traits (void *cls,
                    unsigned int index)
 {
   struct TipPickupState *tps = cls;
-  struct TALER_TESTING_Trait traits[tps->num_coins + 1];
+  #define NUM_TRAITS (tps->num_coins * 5) + 2
+  struct TALER_TESTING_Trait traits[NUM_TRAITS];
   
   for (unsigned int i=0; i<tps->num_coins; i++)
+  {
     traits[i] = TALER_TESTING_make_trait_planchet_secrets
-      (0, &tps->psa[i]);
-  traits[tps->num_coins + 1] = TALER_TESTING_trait_end ();
+      (i, &tps->psa[i]);
+
+    traits[i + tps->num_coins] =
+      TALER_TESTING_make_trait_coin_priv
+        (i, &tps->psa[i].coin_priv);
+
+    traits[i + (tps->num_coins * 2)] =
+      TALER_TESTING_make_trait_denom_pub (i, tps->dks[i]);
+
+    traits[i + (tps->num_coins *3)] =
+      TALER_TESTING_make_trait_denom_sig (i, &tps->sigs[i]);
+
+    traits[i + (tps->num_coins *4)] =
+      TALER_TESTING_make_trait_amount_obj
+        (i, &tps->amounts_obj[i]);
+
+  }
+  traits[NUM_TRAITS - 2] = TALER_TESTING_make_trait_url
+    (0, tps->exchange_url);
+  traits[NUM_TRAITS - 1] = TALER_TESTING_trait_end ();
 
   return TALER_TESTING_get_trait (traits,
                                   ret,

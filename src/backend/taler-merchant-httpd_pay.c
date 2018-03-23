@@ -717,7 +717,9 @@ check_payment_sufficient (struct PayContext *pc)
 		 TALER_amount_subtract (&acc_amount,
 					&acc_amount,
 					&pc->total_refunded));
-
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Subtracting total refunds from paid amount: %s\n",
+              TALER_amount_to_string (&pc->total_refunded));
   /* Now check that the customer paid enough for the full contract */
   if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
@@ -775,6 +777,9 @@ check_payment_sufficient (struct PayContext *pc)
                                             &wire_fee_customer_contribution,
                                             &deposit_fee_savings));
       /* subtract remaining wire fees from total contribution */
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "Subtract remaining wire fees from total contribution: %s",
+                  TALER_amount_to_string (&wire_fee_customer_contribution));
       if (GNUNET_SYSERR ==
           TALER_amount_subtract (&acc_amount,
                                  &acc_amount,
@@ -790,6 +795,10 @@ check_payment_sufficient (struct PayContext *pc)
                                 &pc->amount))
     {
       GNUNET_break_op (0);
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "price vs. sent: %s vs. %s\n",
+                  TALER_amount_to_string (&pc->amount),
+                  TALER_amount_to_string (&acc_amount));
       return TALER_EC_PAY_PAYMENT_INSUFFICIENT;
     }
   }

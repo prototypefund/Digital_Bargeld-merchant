@@ -592,6 +592,40 @@ run (void *cls,
        is->exchange,
        TALER_EC_TIP_PICKUP_NO_FUNDS),
 
+    // TALER_TESTING_cmd_end (),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-tip-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"1-tip\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"useful product\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:5}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_pay ("deposit-tip-simple",
+                           merchant_url,
+                           is->ctx,
+                           MHD_HTTP_OK,
+                           "create-proposal-tip-1",
+                           "pickup-tip-1",
+                           "EUR:5", // amount + fee
+                           "EUR:4.99", // amount - fee
+                           "EUR:0.01"), // refund fee
+
     /* Will fail here until all new
      * transfers have not been checked.  I.e.,
      * there is now a 20.04 euro "pending" transfer.  */
@@ -606,7 +640,6 @@ run (void *cls,
        USER_LOGIN_NAME,
        USER_LOGIN_PASS,
        EXCHANGE_URL),
-
 
     CMD_EXEC_WIREWATCH ("wirewatch-10"),
 
