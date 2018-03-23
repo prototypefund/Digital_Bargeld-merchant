@@ -258,6 +258,7 @@ tip_authorize_cleanup (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize (const char *label,
                                  const char *merchant_url,
+                                 const char *exchange_url,
                                  struct GNUNET_CURL_Context *ctx,
                                  unsigned int http_status,
                                  const char *instance,
@@ -269,6 +270,7 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
 
   tas = GNUNET_new (struct TipAuthorizeState);
   tas->merchant_url = merchant_url;
+  tas->exchange_url = exchange_url;
   tas->ctx = ctx;
   tas->instance = instance;
   tas->justification = justification;

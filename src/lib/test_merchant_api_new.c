@@ -464,7 +464,32 @@ run (void *cls,
                                      "1"),
 
     /* Test tipping.  */
+    TALER_TESTING_cmd_fakebank_transfer_with_instance
+      ("create-reserve-tip-1",
+       "EUR:20.04",
+       fakebank_url,
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO,
+       USER_LOGIN_NAME,
+       USER_LOGIN_PASS,
+       "tip",
+       EXCHANGE_URL,
+       CONFIG_FILE),
 
+
+    CMD_EXEC_WIREWATCH ("wirewatch-11"),
+
+    TALER_TESTING_cmd_tip_authorize ("authorize-tip-1",
+                                     merchant_url,
+                                     exchange_url,
+                                     is->ctx,
+                                     MHD_HTTP_OK,
+                                     "tip",
+                                     "tip 1",
+                                     "EUR:5.01"),
+    /* Will fail here until all new
+     * transfers have not been checked.  I.e.,
+     * there is now a 20.04 euro "pending" transfer.  */
 
     /* pay again logic.  */
     TALER_TESTING_cmd_fakebank_transfer
