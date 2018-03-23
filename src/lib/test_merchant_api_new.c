@@ -462,8 +462,12 @@ run (void *cls,
                                      "refund-increase-1",
                                      "deposit-simple",
                                      "1"),
-    /* test tipping */
-    TALER_TESTING_cmd_fakebank_transfer_with_instance
+
+    /* Test tipping.  */
+
+
+    /* pay again logic.  */
+    TALER_TESTING_cmd_fakebank_transfer
       ("create-reserve-10",
        "EUR:10.02",
        fakebank_url,
@@ -471,9 +475,7 @@ run (void *cls,
        EXCHANGE_ACCOUNT_NO,
        USER_LOGIN_NAME,
        USER_LOGIN_PASS,
-       "tip",
-       EXCHANGE_URL,
-       CONFIG_FILE),
+       EXCHANGE_URL),
 
 
     CMD_EXEC_WIREWATCH ("wirewatch-10"),
