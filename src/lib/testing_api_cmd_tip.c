@@ -399,6 +399,41 @@ tip_query_run (void *cls,
  * FIXME
  */
 struct TALER_TESTING_Command
+TALER_TESTING_cmd_tip_query_with_amounts
+  (const char *label,
+   const char *merchant_url,
+   struct GNUNET_CURL_Context *ctx,
+   unsigned int http_status,
+   const char *instance,
+   const char *expected_amount_picked_up,
+   const char *expected_amount_authorized,
+   const char *expected_amount_available)
+{
+  struct TipQueryState *tqs;
+  struct TALER_TESTING_Command cmd;
+
+  tqs = GNUNET_new (struct TipQueryState);
+  tqs->merchant_url = merchant_url;
+  tqs->ctx = ctx;
+  tqs->instance = instance;
+  tqs->http_status = http_status;
+  tqs->expected_amount_picked_up = expected_amount_picked_up;
+  tqs->expected_amount_authorized = expected_amount_authorized;
+  tqs->expected_amount_available = expected_amount_available;
+
+  cmd.cls = tqs;
+  cmd.label = label;
+  cmd.run = &tip_query_run;
+  cmd.cleanup = &tip_query_cleanup;
+  
+  return cmd;
+}
+
+
+/**
+ * FIXME
+ */
+struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query (const char *label,
                              const char *merchant_url,
                              struct GNUNET_CURL_Context *ctx,

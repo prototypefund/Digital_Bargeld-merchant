@@ -503,6 +503,14 @@ run (void *cls,
                                  MHD_HTTP_OK,
                                  "tip"),
 
+    TALER_TESTING_cmd_tip_query_with_amounts ("query-1",
+                                              merchant_url,
+                                              is->ctx,
+                                              MHD_HTTP_OK,
+                                              "tip",
+                                              "EUR:0.0", // picked
+                                              "EUR:10.02", // auth
+                                              "EUR:20.04"),// ava
     /* Will fail here until all new
      * transfers have not been checked.  I.e.,
      * there is now a 20.04 euro "pending" transfer.  */

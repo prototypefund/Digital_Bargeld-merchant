@@ -524,6 +524,20 @@ TALER_TESTING_cmd_tip_query (const char *label,
  * FIXME
  */
 struct TALER_TESTING_Command
+TALER_TESTING_cmd_tip_query_with_amounts
+  (const char *label,
+   const char *merchant_url,
+   struct GNUNET_CURL_Context *ctx,
+   unsigned int http_status,
+   const char *instance,
+   const char *expected_amount_picked_up,
+   const char *expected_amount_authorized,
+   const char *expected_amount_available);
+
+/**
+ * FIXME
+ */
+struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup
   (const char *label,
    const char *merchant_url,
