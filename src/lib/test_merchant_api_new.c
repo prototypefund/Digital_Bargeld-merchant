@@ -530,6 +530,24 @@ run (void *cls,
                                               "EUR:5.01", // picked
                                               NULL, // auth
                                               "EUR:15.03"),// ava
+
+    TALER_TESTING_cmd_tip_pickup ("pickup-tip-2",
+                                  merchant_url,
+                                  is->ctx,
+                                  MHD_HTTP_OK,
+                                  "authorize-tip-2",
+                                  pickup_amounts_1,
+                                  is->exchange),
+
+    TALER_TESTING_cmd_tip_query_with_amounts ("query-tip-4",
+                                              merchant_url,
+                                              is->ctx,
+                                              MHD_HTTP_OK,
+                                              "tip",
+                                              "EUR:10.02", // pick
+                                              "EUR:10.02", // auth
+                                              "EUR:10.02"), // ava
+
     /* Will fail here until all new
      * transfers have not been checked.  I.e.,
      * there is now a 20.04 euro "pending" transfer.  */
