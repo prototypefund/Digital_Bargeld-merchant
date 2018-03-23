@@ -412,6 +412,7 @@ TALER_TESTING_cmd_tip_query (const char *label,
   tqs->merchant_url = merchant_url;
   tqs->ctx = ctx;
   tqs->instance = instance;
+  tqs->http_status = http_status;
 
   cmd.cls = tqs;
   cmd.label = label;

@@ -497,6 +497,11 @@ run (void *cls,
                                      "tip 2",
                                      "EUR:5.01"),
 
+    TALER_TESTING_cmd_tip_query ("query-1",
+                                 merchant_url,
+                                 is->ctx,
+                                 MHD_HTTP_OK,
+                                 "tip"),
 
     /* Will fail here until all new
      * transfers have not been checked.  I.e.,
