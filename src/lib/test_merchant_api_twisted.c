@@ -245,8 +245,6 @@ run (void *cls,
        "proposal-for-check-payment",
        GNUNET_SYSERR),
 
-    TALER_TESTING_cmd_end (),
-
   /**** Covering /proposal lib ****/
 
   /**
