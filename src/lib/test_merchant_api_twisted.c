@@ -182,6 +182,45 @@ run (void *cls,
 
   struct TALER_TESTING_Command commands[] = {
 
+  /**** Covering /check-payment ****/
+
+    TALER_TESTING_cmd_proposal
+      ("proposal-for-check-payment",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"fail-check-payment-1\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":2,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:3}\"} ] }",
+       NULL),
+
+    /* Need any response code != 200.  */
+    TALER_TESTING_cmd_hack_response_code
+      ("non-200-response-code",
+       PROXY_MERCHANT_CONFIG_FILE,
+       MHD_HTTP_MULTIPLE_CHOICES),
+
+    TALER_TESTING_cmd_check_payment
+      ("check-payment-fail",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_MULTIPLE_CHOICES,
+       "proposal-for-check-payment",
+       GNUNET_SYSERR), // any response != 200 gives "syserr"
+
+    TALER_TESTING_cmd_end (),
 
   /**** Covering /proposal lib ****/
 
@@ -397,6 +436,8 @@ run (void *cls,
                                10, // start
                                10), // nrows
 
+
+    /***** Test transactions tracking *****/
 
     /**
      * Move money to the exchange's bank account.
