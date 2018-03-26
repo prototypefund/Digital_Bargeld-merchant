@@ -220,16 +220,19 @@ run (void *cls,
        "proposal-for-check-payment",
        GNUNET_SYSERR), // any response != 200 gives "syserr"
 
-    TALER_TESTING_cmd_modify_object ("hack-check-payment",
-                                     PROXY_MERCHANT_CONFIG_FILE,
-                                     "paid",
-                                     "non-boolean"),
-
     TALER_TESTING_cmd_delete_object ("hack-check-payment-0",
                                      PROXY_MERCHANT_CONFIG_FILE,
                                      "payment_redirect_url"),
     TALER_TESTING_cmd_check_payment
       ("check-payment-fail-invalid",
+       twister_merchant_url,
+       is->ctx,
+       0,
+       "proposal-for-check-payment",
+       GNUNET_SYSERR),
+
+    TALER_TESTING_cmd_check_payment
+      ("check-payment-fail-invalid-0",
        twister_merchant_url,
        is->ctx,
        0,
