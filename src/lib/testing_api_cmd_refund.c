@@ -237,8 +237,8 @@ refund_lookup_cb (void *cls,
 			&h_coin_pub);
     GNUNET_assert (GNUNET_OK == GNUNET_CONTAINER_multihashmap_put
       (map,
-       &h_coin_pub,
-       irefund_amount,
+       &h_coin_pub, // which
+       irefund_amount, // how much
        GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY));
   };
 
@@ -265,7 +265,7 @@ refund_lookup_cb (void *cls,
 
     if ( NULL ==
        ( icoin_cmd = TALER_TESTING_interpreter_lookup_command
-         (rls->is, icoin_reference)))
+         (rls->is, icoin_reference)) )
     {
       GNUNET_break (0);
       TALER_LOG_ERROR ("Bad reference `%s'\n",
@@ -305,9 +305,9 @@ refund_lookup_cb (void *cls,
 
   GNUNET_free (coin_reference_dup);
   
-  if ( NULL ==
-     ( increase_cmd = TALER_TESTING_interpreter_lookup_command
-       (rls->is, rls->increase_reference)))
+  if (NULL ==
+    (increase_cmd = TALER_TESTING_interpreter_lookup_command
+      (rls->is, rls->increase_reference)))
     TALER_TESTING_FAIL (rls->is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_amount

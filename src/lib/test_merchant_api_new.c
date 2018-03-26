@@ -629,6 +629,14 @@ run (void *cls,
                            "EUR:4.99", // amount - fee
                            "EUR:0.01"), // refund fee
 
+    CMD_EXEC_AGGREGATOR ("aggregator-tip-1"),
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-tip-498c",
+       "http://localhost:8081/",
+       "EUR:4.98", EXCHANGE_ACCOUNT_NO, USER_ACCOUNT_NO),
+    TALER_TESTING_cmd_check_bank_empty
+      ("check_bank_empty-at-tips"),
+
     /* pay again logic.  */
     TALER_TESTING_cmd_fakebank_transfer
       ("create-reserve-10",
@@ -646,9 +654,6 @@ run (void *cls,
       ("check_bank_transfer-10",
        "http://localhost:8081/",
        "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
-
-    /* This is not found at the original tests.  */
-    TALER_TESTING_cmd_check_bank_empty ("be_sure"),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-10a",
                                        is->exchange,
@@ -718,8 +723,6 @@ run (void *cls,
        USER_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-10"),
-
-    TALER_TESTING_cmd_end (),
 
     /* pay abort */
     CMD_TRANSFER_TO_EXCHANGE ("create-reserve-11",
