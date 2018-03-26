@@ -231,6 +231,12 @@ run (void *cls,
        "proposal-for-check-payment",
        GNUNET_SYSERR),
 
+    TALER_TESTING_cmd_modify_object
+      ("paid-true-for-unpaid",
+       PROXY_MERCHANT_CONFIG_FILE,
+       "paid",
+       "true"),
+
     TALER_TESTING_cmd_check_payment
       ("check-payment-fail-invalid-0",
        twister_merchant_url,
