@@ -632,9 +632,18 @@ wireformat_iterator_cb (void *cls,
 
   wm = GNUNET_new (struct WireMethod);
   /* FIXME: maybe use sorting to address #4939-12806? */
-  GNUNET_CONTAINER_DLL_insert (mi->wm_head,
-                               mi->wm_tail,
-                               wm);
+  wm->active = GNUNET_CONFIGURATION_get_value_yesno (iic->config,
+                                                     section,
+                                                     instance_wiresection);
+  if (GNUNET_YES == wm->active)
+    GNUNET_CONTAINER_DLL_insert (mi->wm_head,
+                                 mi->wm_tail,
+                                 wm);
+  else
+    GNUNET_CONTAINER_DLL_insert_tail (mi->wm_head,
+                                      mi->wm_tail,
+                                      wm);
+
   wm->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
                                               iic->config,
                                               section);
@@ -945,35 +954,16 @@ iterate_locations (const struct GNUNET_CONFIGURATION_Handle *config)
  * each instance's own data
  *
  * @param config configuration handle
- * @param allowed which wire format is allowed/expected?
  * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
- * (for example, if no "default" instance is defined)
+ *          (for example, if no "default" instance is defined)
  */
 static int
-iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config,
-                   const char *allowed)
+iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config)
 {
   struct IterateInstancesCls *iic;
-  char *lib_name;
 
-  (void) GNUNET_asprintf (&lib_name,
-                          "libtaler_plugin_wire_%s",
-                          allowed);
   iic = GNUNET_new (struct IterateInstancesCls);
-  iic->current_index = 0;
   iic->config = config;
-  iic->default_instance = GNUNET_NO;
-  iic->plugin = GNUNET_PLUGIN_load (lib_name,
-                                    NULL);
-  if (NULL == iic->plugin)
-  {
-    GNUNET_free (lib_name);
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Wire transfer method `%s' not supported\n",
-                allowed);
-    return GNUNET_SYSERR;
-  }
-  iic->plugin->library_name = lib_name;
   GNUNET_CONFIGURATION_iterate_sections (config,
                                          &instances_iterator_cb,
                                          iic);
@@ -1028,7 +1018,8 @@ run (void *cls,
   char *wireformat;
   int fh;
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO, "running taler-merchant-httpd\n");
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Starting taler-merchant-httpd\n");
 
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
@@ -1051,14 +1042,16 @@ run (void *cls,
   }
 
   if (NULL ==
-     (by_id_map = GNUNET_CONTAINER_multihashmap_create(1, GNUNET_NO)))
+     (by_id_map = GNUNET_CONTAINER_multihashmap_create (1,
+                                                        GNUNET_NO)))
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
 
   if (NULL ==
-     (by_kpub_map = GNUNET_CONTAINER_multihashmap_create(1, GNUNET_NO)))
+     (by_kpub_map = GNUNET_CONTAINER_multihashmap_create (1,
+                                                          GNUNET_NO)))
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
@@ -1129,29 +1122,12 @@ run (void *cls,
     return;
   }
 
-  wireformat = NULL;
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_string (config,
-                                             "merchant",
-                                             "WIREFORMAT",
-                                             &wireformat))
+      iterate_instances (config))
   {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "merchant",
-                               "WIREFORMAT");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-  if (GNUNET_OK !=
-      iterate_instances (config,
-			 wireformat))
-  {
-    GNUNET_free (wireformat);
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-  GNUNET_free (wireformat);
-
   iterate_locations (config);
 
   if (NULL ==

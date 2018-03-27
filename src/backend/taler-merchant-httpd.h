@@ -59,11 +59,6 @@ struct IterateInstancesCls
   unsigned int default_instance;
 
   /**
-   * Wire plugin
-   */
-  struct TALER_WIRE_Plugin *plugin;
-
-  /**
    * Tells if the parsing encountered any error. We need this
    * field since the iterator must return void
    */
@@ -100,6 +95,11 @@ struct WireMethod
    * Hash of our wire format details as given in #j_wire.
    */
   struct GNUNET_HashCode h_wire;
+
+  /**
+   * Is this wire method active (should it be included in new contracts)?
+   */
+  int active;
 
 };
 
