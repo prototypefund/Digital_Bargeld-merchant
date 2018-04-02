@@ -48,14 +48,29 @@
 #define EXCHANGE_ACCOUNT_NO 2
 
 /**
+ * Account number of the merchant at the bank.
+ */
+#define MERCHANT_ACCOUNT_NO 3
+
+/**
+ * Customer account number.
+ */
+#define TIP_ACCOUNT_NO 62
+
+/**
+ * Customer account number.
+ */
+#define USER_ACCOUNT_NO 63
+
+/**
  * URL of the bank.
  */
-#define BANK_URL "http://localhost:8083/"
+#define BANK_URL "http://localhost:8082/"
 
 /**
  * On which port do we run the (fake) bank?
  */
-#define BANK_PORT 8083
+#define BANK_PORT 8082
 
 /**
  * Max size allowed for an order.
@@ -4395,10 +4410,8 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-498c",
       .details.check_bank_transfer.amount = "EUR:4.98",
-      /* exchange-outgoing */
-      .details.check_bank_transfer.account_debit = 2,
-      /* merchant */
-      .details.check_bank_transfer.account_credit = 62
+      .details.check_bank_transfer.account_debit = EXCHANGE_ACCOUNT_NO,
+      .details.check_bank_transfer.account_credit = MERCHANT_ACCOUNT_NO
     },
 
     /* Check that there are no other unusual transfers */
@@ -4448,10 +4461,8 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-498c-2",
       .details.check_bank_transfer.amount = "EUR:4.98",
-      /* exchange-outgoing */
-      .details.check_bank_transfer.account_debit = 2,
-      /* merchant */
-      .details.check_bank_transfer.account_credit = 62
+      .details.check_bank_transfer.account_debit = EXCHANGE_ACCOUNT_NO,
+      .details.check_bank_transfer.account_credit = MERCHANT_ACCOUNT_NO
     },
 
     /* Check that there are no other unusual transfers */
@@ -4528,7 +4539,7 @@ run (void *cls)
       .label = "create-reserve-tip-1",
       .expected_response_code = MHD_HTTP_OK,
       .details.admin_add_incoming.instance = "tip",
-      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.debit_account_no = TIP_ACCOUNT_NO,
       .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
       .details.admin_add_incoming.auth_username = "user62",
       .details.admin_add_incoming.auth_password = "pass62",
@@ -4543,7 +4554,7 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-tip-1",
       .details.check_bank_transfer.amount = "EUR:20.04",
-      .details.check_bank_transfer.account_debit = 62,
+      .details.check_bank_transfer.account_debit = TIP_ACCOUNT_NO,
       .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
     },
     /* Authorize two tips */
@@ -4666,10 +4677,8 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-tip-498c",
       .details.check_bank_transfer.amount = "EUR:4.98",
-      /* exchange-outgoing */
-      .details.check_bank_transfer.account_debit = 2,
-      /* merchant */
-      .details.check_bank_transfer.account_credit = 62
+      .details.check_bank_transfer.account_debit = EXCHANGE_ACCOUNT_NO,
+      .details.check_bank_transfer.account_credit = MERCHANT_ACCOUNT_NO
     },
 
     /* Check that there are no other unusual transfers */
@@ -4684,7 +4693,7 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-10",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.debit_account_no = USER_ACCOUNT_NO,
       .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
       .details.admin_add_incoming.auth_username = "user62",
       .details.admin_add_incoming.auth_password = "pass62",
@@ -4695,7 +4704,7 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-10",
       .details.check_bank_transfer.amount = "EUR:10.02",
-      .details.check_bank_transfer.account_debit = 62,
+      .details.check_bank_transfer.account_debit = USER_ACCOUNT_NO,
       .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
     },
 
@@ -4773,10 +4782,8 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-9.97-10",
       .details.check_bank_transfer.amount = "EUR:9.97",
-      /* exchange-outgoing */
-      .details.check_bank_transfer.account_debit = 2,
-      /* merchant */
-      .details.check_bank_transfer.account_credit = 62
+      .details.check_bank_transfer.account_debit = EXCHANGE_ACCOUNT_NO,
+      .details.check_bank_transfer.account_credit = MERCHANT_ACCOUNT_NO
     },
 
     /* Check that there are no other unusual transfers */
@@ -4791,7 +4798,7 @@ run (void *cls)
     { .oc = OC_ADMIN_ADD_INCOMING,
       .label = "create-reserve-11",
       .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.debit_account_no = 62,
+      .details.admin_add_incoming.debit_account_no = USER_ACCOUNT_NO,
       .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
       .details.admin_add_incoming.auth_username = "user62",
       .details.admin_add_incoming.auth_password = "pass62",
@@ -4802,7 +4809,7 @@ run (void *cls)
     { .oc = OC_CHECK_BANK_TRANSFER,
       .label = "check_bank_transfer-11",
       .details.check_bank_transfer.amount = "EUR:10.02",
-      .details.check_bank_transfer.account_debit = 62,
+      .details.check_bank_transfer.account_debit = USER_ACCOUNT_NO,
       .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO
     },
 

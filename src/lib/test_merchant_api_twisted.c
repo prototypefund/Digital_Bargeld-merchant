@@ -18,7 +18,7 @@
 */
 
 /**
- * @file exchange/test_merchant_api_new.c
+ * @file exchange/test_merchant_api_twisted.c
  * @brief testcase to test exchange's HTTP API interface
  * @author Sree Harsha Totakura <sreeharsha@totakura.in>
  * @author Christian Grothoff
@@ -109,6 +109,11 @@ static struct GNUNET_OS_Process *twistermerchantd;
  * Account number of the exchange at the bank.
  */
 #define EXCHANGE_ACCOUNT_NO 2
+
+/**
+ * Account number of the merchant at the bank.
+ */
+#define MERCHANT_ACCOUNT_NO 3
 
 /**
  * Account number of some user.
@@ -552,7 +557,9 @@ run (void *cls,
           deposit fee   0.01 * 2 -
           wire fee      0.01
        */
-       "EUR:1.97", 2, 62),
+       "EUR:1.97",
+       EXCHANGE_ACCOUNT_NO,
+       MERCHANT_ACCOUNT_NO),
 
     /* Should instead change the response body somehow! */
     TALER_TESTING_cmd_modify_object ("hack-0",
@@ -804,6 +811,7 @@ purge_process (struct GNUNET_OS_Process *process)
   GNUNET_OS_process_destroy (process);
 }
 
+
 int
 main (int argc,
       char * const *argv)
@@ -879,4 +887,4 @@ main (int argc,
   return 0;
 }
 
-/* end of test_merchant_api_new.c */
+/* end of test_merchant_api_twisted.c */

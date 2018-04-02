@@ -638,7 +638,7 @@ run (void *cls,
        EXCHANGE_URL,
        "EUR:4.98",
        EXCHANGE_ACCOUNT_NO,
-       USER_ACCOUNT_NO),
+       MERCHANT_ACCOUNT_NO),
     TALER_TESTING_cmd_check_bank_empty
     ("check_bank_empty-at-tips"),
 
@@ -725,7 +725,7 @@ run (void *cls,
        EXCHANGE_URL,
        "EUR:9.97",
        EXCHANGE_ACCOUNT_NO,
-       USER_ACCOUNT_NO),
+       MERCHANT_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-10"),
 

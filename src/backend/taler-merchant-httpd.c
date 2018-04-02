@@ -1332,13 +1332,12 @@ run (void *cls,
       if (GNUNET_OK !=
           GNUNET_CONFIGURATION_get_value_string (config,
                                                  "merchant",
-                                                 "unixpath_mode",
+                                                 "UNIXPATH_MODE",
                                                  &mode))
       {
-        GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+        GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                    "merchant",
-                                   "unixpath_mode",
-                                   "unixpath_mode required");
+                                   "UNIXPATH_MODE");
         GNUNET_SCHEDULER_shutdown ();
         return;
       }
@@ -1348,8 +1347,8 @@ run (void *cls,
       {
         GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
                                    "merchant",
-                                   "unixpath_mode",
-                                   "unixpath_mode must be octal number");
+                                   "UNIXPATH_MODE",
+                                   "must be octal number");
         GNUNET_free (mode);
         GNUNET_SCHEDULER_shutdown ();
         return;
