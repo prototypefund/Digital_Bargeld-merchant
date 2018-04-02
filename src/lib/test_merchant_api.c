@@ -1072,7 +1072,7 @@ get_instance_priv (struct GNUNET_CONFIGURATION_Handle *config,
   struct GNUNET_CRYPTO_EddsaPrivateKey *ret;
 
   (void) GNUNET_asprintf (&config_section,
-                          "merchant-instance-%s",
+                          "instance-%s",
                           instance);
   if (GNUNET_OK !=
     GNUNET_CONFIGURATION_get_value_filename (config,
@@ -3159,13 +3159,13 @@ interpreter_run (void *cls)
           struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
 
           GNUNET_asprintf (&section,
-                           "merchant-instance-%s",
+                           "instance-%s",
                            cmd->details.admin_add_incoming.instance);
           if (GNUNET_OK !=
-              GNUNET_CONFIGURATION_get_value_string (cfg,
-                                                     section,
-                                                     "TIP_RESERVE_PRIV_FILENAME",
-                                                     &keys))
+              GNUNET_CONFIGURATION_get_value_filename (cfg,
+                                                       section,
+                                                       "TIP_RESERVE_PRIV_FILENAME",
+                                                       &keys))
           {
             GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                         "Configuration fails to specify reserve private key filename in section %s\n",
@@ -3806,7 +3806,7 @@ interpreter_run (void *cls)
           = TALER_MERCHANT_track_transfer (ctx,
                                            MERCHANT_URL,
                                            instance,
-					   "test",
+					   "x-taler-bank",
                                            &wtid,
                                            EXCHANGE_URL,
                                            &track_transfer_cb,

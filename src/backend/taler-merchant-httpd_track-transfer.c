@@ -946,6 +946,8 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                            "exchange");
   rctx->url = GNUNET_strdup (url);
 
+  /* FIXME: change again: we probably don't want the wire_method
+     but rather the _account_ (section) here! */
   wire_method = MHD_lookup_connection_value (connection,
 					     MHD_GET_ARGUMENT_KIND,
 					     "wire_method");
@@ -955,7 +957,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
     {
       /* temporary work-around until demo is adjusted... */
       GNUNET_break (0);
-      wire_method = "test";
+      wire_method = "x-taler-bank";
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
 		  "Client needs fixing, see API change for #4943!\n");
     }

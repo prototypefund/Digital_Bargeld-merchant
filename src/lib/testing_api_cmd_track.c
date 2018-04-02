@@ -199,12 +199,12 @@ track_transfer_run (void *cls,
   tts->tth = TALER_MERCHANT_track_transfer (tts->ctx,
                                             tts->merchant_url,
                                             "default",
-                                            "test",
+                                            "x-taler-bank",
                                             wtid,
                                             exchange_url,
                                             &track_transfer_cb,
                                             tts);
-  GNUNET_assert (NULL != tts->tth); 
+  GNUNET_assert (NULL != tts->tth);
 }
 
 /**
@@ -244,7 +244,7 @@ track_transaction_run (void *cls,
      order_id,
      &track_transaction_cb,
      tts);
-  
+
   GNUNET_assert (NULL != tts->tth);
 }
 

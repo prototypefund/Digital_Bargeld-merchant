@@ -1399,7 +1399,6 @@ interpreter_run (void *cls)
 				     "taler-exchange-wirewatch",
 				     "taler-exchange-wirewatch",
 				     "-c", cfgfilename,
-				     "-t", "test", /* use Taler's bank/fakebank */
 				     "-T", /* exit when done */
 				     NULL);
 	if (NULL == cmd->details.run_wirewatch.wirewatch_proc)

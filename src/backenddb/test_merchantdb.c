@@ -807,12 +807,12 @@ run (void *cls)
   deposit_proof = json_object ();
   GNUNET_assert (0 ==
                  json_object_set_new (deposit_proof,
-                                      "test",
+                                      "x-taler-bank",
                                       json_string ("backenddb test A")));
   transfer_proof = json_object ();
   GNUNET_assert (0 ==
                  json_object_set_new (transfer_proof,
-                                      "test",
+                                      "x-taler-bank",
                                       json_string ("backenddb test B")));
   contract = json_object ();
   contract_terms = json_object ();

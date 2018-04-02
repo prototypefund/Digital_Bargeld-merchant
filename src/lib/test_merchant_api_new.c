@@ -52,8 +52,7 @@
 static const char *pickup_amounts_1[] = {"EUR:5", NULL};
 
 /**
- * URL of the fakebank.  Obtained from CONFIG_FILE's
- * "exchange-wire-test:BANK_URI" option.
+ * URL of the fakebank.
  */
 static char *fakebank_url;
 
@@ -81,6 +80,11 @@ static char *exchange_url;
  * Account number of some user.
  */
 #define USER_ACCOUNT_NO 62
+
+/**
+ * Account number used by the merchant
+ */
+#define MERCHANT_ACCOUNT_NO 3
 
 /**
  * User name. Never checked by fakebank.
@@ -304,18 +308,18 @@ run (void *cls,
     TALER_TESTING_cmd_fakebank_transfer ("create-reserve-2",
                                          "EUR:1",
                                          fakebank_url,
-                                         63, 2,
-                                         "user63",
-                                         "pass63",
+                                         USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
+                                         "user62",
+                                         "pass62",
                                          EXCHANGE_URL),
 
     TALER_TESTING_cmd_fakebank_transfer_with_ref
       ("create-reserve-2b",
        "EUR:4.01",
        fakebank_url,
-       63, 2,
-       "user63",
-       "pass63",
+       USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
+       "user62",
+       "pass62",
        "create-reserve-2",
        EXCHANGE_URL),
     CMD_EXEC_WIREWATCH ("wirewatch-2"),
@@ -323,12 +327,12 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
        EXCHANGE_URL,
-       "EUR:1", 63, 2),
+       "EUR:1", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
        EXCHANGE_URL,
-       "EUR:4.01", 63, 2),
+       "EUR:4.01", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
                                        is->exchange,
@@ -346,12 +350,12 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-1"),
 
     CMD_EXEC_AGGREGATOR ("run-aggregator"),
-
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-498c",
        EXCHANGE_URL,
-       "EUR:4.98", 2, 62),
-
+       "EUR:4.98",
+       EXCHANGE_ACCOUNT_NO,
+       MERCHANT_ACCOUNT_NO),
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-2"),
 
     TALER_TESTING_cmd_merchant_track_transaction
@@ -390,13 +394,12 @@ run (void *cls,
                            "EUR:0.01"),
 
     CMD_EXEC_AGGREGATOR ("run-aggregator-2"),
-
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-498c-2",
        EXCHANGE_URL,
        "EUR:4.98",
        EXCHANGE_ACCOUNT_NO,
-       USER_ACCOUNT_NO),
+       MERCHANT_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty"),
 
@@ -633,9 +636,11 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-tip-498c",
        EXCHANGE_URL,
-       "EUR:4.98", EXCHANGE_ACCOUNT_NO, USER_ACCOUNT_NO),
+       "EUR:4.98",
+       EXCHANGE_ACCOUNT_NO,
+       USER_ACCOUNT_NO),
     TALER_TESTING_cmd_check_bank_empty
-      ("check_bank_empty-at-tips"),
+    ("check_bank_empty-at-tips"),
 
     /* pay again logic.  */
     TALER_TESTING_cmd_fakebank_transfer
