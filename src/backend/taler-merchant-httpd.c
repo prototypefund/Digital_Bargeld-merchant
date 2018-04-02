@@ -28,6 +28,7 @@
 #include <taler/taler_json_lib.h>
 #include <taler/taler_exchange_service.h>
 #include <taler/taler_wire_plugin.h>
+#include <taler/taler_wire_lib.h>
 #include "taler-merchant-httpd_responses.h"
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
@@ -111,6 +112,11 @@ unsigned long long default_wire_fee_amortization;
  * Should a "Connection: close" header be added to each HTTP response?
  */
 int TMH_merchant_connection_close;
+
+/**
+ * Which currency do we use?
+ */
+char *TMH_currency;
 
 /**
  * Task running the HTTP server.
@@ -328,6 +334,7 @@ hashmap_free (void *cls,
                                  mi->wm_tail,
                                  wm);
     json_decref (wm->j_wire);
+    GNUNET_free (wm->wire_method);
     GNUNET_free (wm);
   }
 
@@ -596,11 +603,16 @@ struct WireFormatIteratorContext
    * The merchant instance we are currently building.
    */
   struct MerchantInstance *mi;
+
+  /**
+   * Set to #GNUNET_YES if the default instance was found.
+   */
+  int default_instance;
 };
 
 
 /**
- * Callback that looks for 'merchant-instance-wireformat-*' sections,
+ * Callback that looks for 'account-*' sections,
  * and populates our wire method according to the data
  *
  * @param cls closure with a `struct WireFormatIteratorContext *`
@@ -613,28 +625,200 @@ wireformat_iterator_cb (void *cls,
   struct WireFormatIteratorContext *wfic = cls;
   struct MerchantInstance *mi = wfic->mi;
   struct IterateInstancesCls *iic = wfic->iic;
-  char *instance_wiresection;
+  char *instance_option;
   struct WireMethod *wm;
-  json_t *type;
-  char *emsg;
+  char *payto;
+  char *fn;
+  char *plugin_name;
+  struct TALER_WIRE_Plugin *plugin;
+  json_t *j;
+  enum TALER_ErrorCode ec;
+  struct GNUNET_HashCode h_wire;
 
-  GNUNET_asprintf (&instance_wiresection,
-                   "merchant-instance-wireformat-%s",
+  if (0 != strncasecmp (section,
+                        "account-",
+                        strlen ("account-")))
+    return;
+  GNUNET_asprintf (&instance_option,
+                   "HONOR_%s",
                    mi->id);
-  if (0 != strncmp (section,
-                    instance_wiresection,
-                    strlen (instance_wiresection)))
+  if (GNUNET_YES !=
+      GNUNET_CONFIGURATION_get_value_yesno (iic->config,
+                                            section,
+                                            instance_option))
   {
-    GNUNET_free (instance_wiresection);
+    GNUNET_free (instance_option);
     return;
   }
-  GNUNET_free (instance_wiresection);
+  GNUNET_free (instance_option);
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (iic->config,
+                                             section,
+                                             "URL",
+                                             &payto))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               section,
+                               "URL");
+    iic->ret = GNUNET_SYSERR;
+    return;
+  }
+
+  /* check payto://-URL is well-formed and matches plugin */
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (iic->config,
+                                             section,
+                                             "PLUGIN",
+                                             &plugin_name))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               section,
+                               "PLUGIN");
+    GNUNET_free (payto);
+    GNUNET_free (instance_option);
+    iic->ret = GNUNET_SYSERR;
+    return;
+  }
+  if (NULL ==
+      (plugin = TALER_WIRE_plugin_load (iic->config,
+                                        plugin_name)))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to load wire plugin `%s'\n",
+                plugin_name);
+    GNUNET_free (plugin_name);
+    GNUNET_free (instance_option);
+    GNUNET_free (payto);
+    iic->ret = GNUNET_SYSERR;
+    return;
+  }
+  if (TALER_EC_NONE !=
+      (ec = plugin->wire_validate (plugin->cls,
+                                   payto)))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "payto:// URL `%s' not supported by plugin `%s'\n",
+                payto,
+                plugin_name);
+    GNUNET_free (plugin_name);
+    GNUNET_free (instance_option);
+    GNUNET_free (payto);
+    TALER_WIRE_plugin_unload (plugin);
+    iic->ret = GNUNET_SYSERR;
+    return;
+  }
+  TALER_WIRE_plugin_unload (plugin);
+  GNUNET_free (plugin_name);
+
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_filename (iic->config,
+                                               section,
+                                               "BANK_JSON_FILENAME",
+                                               &fn))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               section,
+                               "BANK_JSON_FILENAME");
+    GNUNET_free (payto);
+    iic->ret = GNUNET_SYSERR;
+    return;
+  }
+
+  /* Try loading existing JSON from file */
+  if (GNUNET_YES ==
+      GNUNET_DISK_file_test (fn))
+  {
+    json_error_t err;
+    char *url;
+
+    if (NULL ==
+        (j = json_load_file (fn,
+                             JSON_REJECT_DUPLICATES,
+                             &err)))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed to load JSON from `%s': %s at %d:%d\n",
+                  fn,
+                  err.text,
+                  err.line,
+                  err.column);
+      GNUNET_free (fn);
+      GNUNET_free (payto);
+      iic->ret = GNUNET_SYSERR;
+      return;
+    }
+    url = TALER_JSON_wire_to_payto (j);
+    if (NULL == url)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "URL missing in `%s', disabling account `%s'\n",
+                  fn,
+                  section);
+      GNUNET_free (fn);
+      GNUNET_free (payto);
+      iic->ret = GNUNET_SYSERR;
+      return;
+    }
+    if (0 != strcasecmp (url,
+                         payto))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "URL `%s' does not match configuration `%s', disabling account `%s'\n",
+                  url,
+                  payto,
+                  section);
+      GNUNET_free (fn);
+      GNUNET_free (payto);
+      GNUNET_free (url);
+      iic->ret = GNUNET_SYSERR;
+      return;
+    }
+    GNUNET_free (url);
+  }
+  else /* need to generate JSON */
+  {
+    j = TALER_JSON_wire_signature_make (payto,
+                                        NULL);
+    if (0 != json_dump_file (j,
+                             fn,
+                             JSON_COMPACT | JSON_SORT_KEYS))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed to write hashed wire details to `%s'\n",
+                  fn);
+      GNUNET_free (fn);
+      GNUNET_free (payto);
+      json_decref (j);
+      iic->ret = GNUNET_SYSERR;
+      return;
+    }
+  }
+  GNUNET_free (fn);
+
+  if (GNUNET_OK !=
+      TALER_JSON_wire_signature_hash (j,
+                                      &h_wire))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to hash wire input\n");
+    GNUNET_free (fn);
+    GNUNET_free (payto);
+    json_decref (j);
+    iic->ret = GNUNET_SYSERR;
+    return;
+  }
+
 
   wm = GNUNET_new (struct WireMethod);
-  /* FIXME: maybe use sorting to address #4939-12806? */
+  wm->wire_method = TALER_WIRE_payto_get_method (payto);
+  GNUNET_free (payto);
+  GNUNET_asprintf (&instance_option,
+                   "ACTIVE_%s",
+                   mi->id);
   wm->active = GNUNET_CONFIGURATION_get_value_yesno (iic->config,
                                                      section,
-                                                     instance_wiresection);
+                                                     instance_option);
+  GNUNET_free (instance_option);
   if (GNUNET_YES == wm->active)
     GNUNET_CONTAINER_DLL_insert (mi->wm_head,
                                  mi->wm_tail,
@@ -644,57 +828,13 @@ wireformat_iterator_cb (void *cls,
                                       mi->wm_tail,
                                       wm);
 
-  wm->j_wire = iic->plugin->get_wire_details (iic->plugin->cls,
-                                              iic->config,
-                                              section);
-  if ( (NULL == (type = json_object_get (wm->j_wire,
-                                         "type"))) ||
-       (! json_is_string (type)) )
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Malformed wireformat: lacks type\n");
-    iic->ret |= GNUNET_SYSERR;
-    return;
-  }
-  wm->wire_method = json_string_value (type);
-
-  if (TALER_EC_NONE !=
-      iic->plugin->wire_validate (iic->plugin->cls,
-                                  wm->j_wire,
-                                  NULL,
-                                  &emsg))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Malformed wireformat: %s\n",
-                emsg);
-    GNUNET_free (emsg);
-    iic->ret |= GNUNET_SYSERR;
-    return;
-  }
-
-  if (GNUNET_OK !=
-      TALER_JSON_hash (wm->j_wire,
-                       &wm->h_wire))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to hash wireformat\n");
-    iic->ret |= GNUNET_SYSERR;
-  }
-
-#define EXTRADEBUG
-#ifdef EXTRADEBUGG
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Found wireformat instance:\n");
-  json_dumpf (wm->j_wire,
-              stdout,
-              0);
-  printf ("\n");
-#endif
+  wm->j_wire = j;
+  wm->h_wire = h_wire;
 }
 
 
 /**
- * Callback that looks for 'merchant-instance-*' sections,
+ * Callback that looks for 'instance-*' sections,
  * and populates accordingly each instance's data
  *
  * @param cls closure of type `struct IterateInstancesCls`
@@ -711,24 +851,11 @@ instances_iterator_cb (void *cls,
   /* used as hashmap keys */
   struct GNUNET_HashCode h_pk;
   struct GNUNET_HashCode h_id;
-  const char *substr;
 
-  substr = strstr (section,
-                   "merchant-instance-");
-
-  if ( (NULL == substr) ||
-       (NULL != strstr (section,
-                        "merchant-instance-wireformat-")) )
+  if (0 != strncasecmp (section,
+                        "instance-",
+                        strlen ("instance-")))
     return;
-
-  if (substr != section)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to specify a merchant instance\n");
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-
   /** Get id **/
   token = strrchr (section, '-');
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -745,7 +872,7 @@ instances_iterator_cb (void *cls,
                                section,
                                "NAME");
     GNUNET_free (mi);
-    GNUNET_SCHEDULER_shutdown ();
+    iic->ret = GNUNET_SYSERR;
     return;
   }
 
@@ -760,7 +887,7 @@ instances_iterator_cb (void *cls,
                                "KEYFILE");
     GNUNET_free (mi->name);
     GNUNET_free (mi);
-    GNUNET_SCHEDULER_shutdown ();
+    iic->ret = GNUNET_SYSERR;
     return;
   }
   if (GNUNET_OK ==
@@ -784,7 +911,7 @@ instances_iterator_cb (void *cls,
       GNUNET_free (mi->keyfile);
       GNUNET_free (mi->name);
       GNUNET_free (mi);
-      GNUNET_SCHEDULER_shutdown ();
+      iic->ret = GNUNET_SYSERR;
       return;
     }
     pk = GNUNET_CRYPTO_eddsa_key_create_from_file (tip_reserves);
@@ -798,7 +925,7 @@ instances_iterator_cb (void *cls,
       GNUNET_free (mi->keyfile);
       GNUNET_free (mi->name);
       GNUNET_free (mi);
-      GNUNET_SCHEDULER_shutdown ();
+      iic->ret = GNUNET_SYSERR;
       return;
     }
     mi->tip_reserve.eddsa_priv = *pk;
@@ -812,13 +939,13 @@ instances_iterator_cb (void *cls,
                 "Merchant private key `%s' does not exist yet, creating it!\n",
                 mi->keyfile);
   if (NULL ==
-       (pk = GNUNET_CRYPTO_eddsa_key_create_from_file (mi->keyfile)))
+      (pk = GNUNET_CRYPTO_eddsa_key_create_from_file (mi->keyfile)))
   {
     GNUNET_break (0);
     GNUNET_free (mi->keyfile);
     GNUNET_free (mi->name);
     GNUNET_free (mi);
-    GNUNET_SCHEDULER_shutdown ();
+    iic->ret = GNUNET_SYSERR;
     return;
   }
   mi->privkey.eddsa_priv = *pk;
@@ -831,26 +958,6 @@ instances_iterator_cb (void *cls,
                        mi->id))
     iic->default_instance = GNUNET_YES;
 
-  /* Initialize wireformats */
-  {
-    struct WireFormatIteratorContext wfic = {
-      .iic = iic,
-      .mi = mi
-    };
-
-    GNUNET_CONFIGURATION_iterate_sections (iic->config,
-                                           &wireformat_iterator_cb,
-                                           &wfic);
-  }
-
-  if (NULL == mi->wm_head)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to load wire formats for instance `%s'\n",
-                mi->id);
-    iic->ret |= GNUNET_SYSERR;
-  }
-
   GNUNET_CRYPTO_hash (mi->id,
                       strlen (mi->id),
                       &h_id);
@@ -862,7 +969,11 @@ instances_iterator_cb (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to put an entry into the 'by_id' hashmap\n");
-    iic->ret |= GNUNET_SYSERR;
+    iic->ret = GNUNET_SYSERR;
+    GNUNET_free (mi->keyfile);
+    GNUNET_free (mi->name);
+    GNUNET_free (mi);
+    return;
   }
   GNUNET_CRYPTO_hash (&mi->pubkey.eddsa_pub,
                       sizeof (struct GNUNET_CRYPTO_EddsaPublicKey),
@@ -875,8 +986,36 @@ instances_iterator_cb (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to put an entry into the 'by_kpub_map' hashmap\n");
-    iic->ret |= GNUNET_SYSERR;
+    GNUNET_assert (GNUNET_OK ==
+                   GNUNET_CONTAINER_multihashmap_remove (by_id_map,
+                                                         &h_id,
+                                                         mi));
+    iic->ret = GNUNET_SYSERR;
+    GNUNET_free (mi->keyfile);
+    GNUNET_free (mi->name);
+    GNUNET_free (mi);
+    return;
   }
+
+  /* Initialize wireformats */
+  {
+    struct WireFormatIteratorContext wfic = {
+      .iic = iic,
+      .mi = mi
+    };
+
+    GNUNET_CONFIGURATION_iterate_sections (iic->config,
+                                           &wireformat_iterator_cb,
+                                           &wfic);
+  }
+  if (NULL == mi->wm_head)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Failed to load wire formats for instance `%s'\n",
+                mi->id);
+    iic->ret = GNUNET_SYSERR;
+  }
+
 }
 
 
@@ -949,6 +1088,7 @@ iterate_locations (const struct GNUNET_CONFIGURATION_Handle *config)
                                          (void *) config);
 }
 
+
 /**
  * Iterate over each merchant instance, in order to populate
  * each instance's own data
@@ -960,43 +1100,28 @@ iterate_locations (const struct GNUNET_CONFIGURATION_Handle *config)
 static int
 iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config)
 {
-  struct IterateInstancesCls *iic;
+  struct IterateInstancesCls iic;
 
-  iic = GNUNET_new (struct IterateInstancesCls);
-  iic->config = config;
+  iic.config = config;
+  iic.default_instance = GNUNET_NO;
+  iic.ret = GNUNET_OK;
   GNUNET_CONFIGURATION_iterate_sections (config,
                                          &instances_iterator_cb,
-                                         iic);
+                                         &iic);
 
-  if (GNUNET_NO == iic->default_instance)
+  if (GNUNET_NO == iic.default_instance)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "No default merchant instance found\n");
-    goto fail;
+    return GNUNET_SYSERR;
   }
-  else
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Congratulations, you have a default instance\n");
-
-  if (0 != (GNUNET_SYSERR & iic->ret))
+  if (GNUNET_OK != iic.ret)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-               "At least one instance has not been successfully parsed\n");
-    goto fail;
+                "At least one instance was not successfully parsed\n");
+    return GNUNET_SYSERR;
   }
-
-  GNUNET_PLUGIN_unload (lib_name,
-                        iic->plugin);
-  GNUNET_free (lib_name);
-  GNUNET_free (iic);
   return GNUNET_OK;
-
- fail:
-  GNUNET_PLUGIN_unload (lib_name,
-			iic->plugin);
-  GNUNET_free (lib_name);
-  GNUNET_free (iic);
-  return GNUNET_SYSERR;
 }
 
 
@@ -1015,7 +1140,6 @@ run (void *cls,
      const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
-  char *wireformat;
   int fh;
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
@@ -1053,6 +1177,19 @@ run (void *cls,
      (by_kpub_map = GNUNET_CONTAINER_multihashmap_create (1,
                                                           GNUNET_NO)))
   {
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_string (config,
+                                             "taler",
+                                             "CURRENCY",
+                                             &TMH_currency))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "taler",
+                               "CURRENCY");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }

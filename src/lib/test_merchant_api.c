@@ -4949,7 +4949,7 @@ main (int argc,
                                             "test_merchant_api.conf"));
   GNUNET_assert (GNUNET_OK ==
     GNUNET_CONFIGURATION_get_value_string (cfg,
-                                           "merchant",
+                                           "TEST",
                                            "INSTANCES",
                                            &_instances));
 

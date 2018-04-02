@@ -829,7 +829,8 @@ main (int argc,
                     NULL);
 
   if (NULL ==
-    (fakebank_url = TALER_TESTING_prepare_fakebank (CONFIG_FILE)))
+      (fakebank_url = TALER_TESTING_prepare_fakebank (CONFIG_FILE,
+                                                      "account-2")))
     return 77;
 
   if (NULL ==
@@ -858,9 +859,9 @@ main (int argc,
                                              NULL,
                                              CONFIG_FILE);
 
-    GNUNET_OS_process_kill (merchantd, SIGTERM); 
-    GNUNET_OS_process_wait (merchantd); 
-    GNUNET_OS_process_destroy (merchantd); 
+    GNUNET_OS_process_kill (merchantd, SIGTERM);
+    GNUNET_OS_process_wait (merchantd);
+    GNUNET_OS_process_destroy (merchantd);
     GNUNET_free (merchant_url);
 
     if (GNUNET_OK != ret)

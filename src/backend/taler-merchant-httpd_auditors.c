@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
+  (C) 2014, 2015, 2016, 2018 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -136,12 +136,32 @@ parse_auditors (void *cls,
 {
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   char *pks;
+  char *currency;
   struct Auditor auditor;
 
   if (0 != strncasecmp (section,
-                        "merchant-auditor-",
-                        strlen ("merchant-auditor-")))
+                        "auditor-",
+                        strlen ("auditor-")))
     return;
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             section,
+                                             "CURRENCY",
+                                             &currency))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               section,
+                               "CURRENCY");
+    return;
+  }
+  if (0 != strcasecmp (currency,
+                       TMH_currency))
+  {
+    /* trusted exchange, but for a different currency; ignore */
+    GNUNET_free (currency);
+    return;
+  }
+  GNUNET_free (currency);
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,

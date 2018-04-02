@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014-2017 INRIA
+  (C) 2014-2018 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -21,6 +21,7 @@
  */
 #include "platform.h"
 #include <taler/taler_json_lib.h>
+#include <taler/taler_wire_lib.h>
 #include "taler-merchant-httpd_exchanges.h"
 
 
@@ -302,22 +303,18 @@ retry_exchange (void *cls)
  * @param cls closure
  * @param wire_method name of the wire method (i.e. "sepa")
  * @param fees fee structure for this method
+ * @return #GNUNET_OK on success
  */
-static void
-process_wire_fees (void *cls,
+static int
+process_wire_fees (struct Exchange *exchange,
+                   const struct TALER_MasterPublicKeyP *master_pub,
                    const char *wire_method,
                    const struct TALER_EXCHANGE_WireAggregateFees *fees)
 {
-  struct Exchange *exchange = cls;
   struct FeesByWireMethod *f;
   struct TALER_EXCHANGE_WireAggregateFees *endp;
   struct TALER_EXCHANGE_WireAggregateFees *af;
-  const struct TALER_EXCHANGE_Keys *keys;
-  const struct TALER_MasterPublicKeyP *master_pub;
 
-  keys = TALER_EXCHANGE_get_keys (exchange->conn);
-  GNUNET_assert (NULL != keys);
-  master_pub = &keys->master_pub;
   for (f = exchange->wire_fees_head; NULL != f; f = f->next)
     if (0 == strcasecmp (wire_method,
                          f->wire_method))
@@ -342,7 +339,7 @@ process_wire_fees (void *cls,
   {
     /* Hole in the fee structure, not allowed! */
     GNUNET_break_op (0);
-    return;
+    return GNUNET_SYSERR;
   }
   while (NULL != fees)
   {
@@ -368,7 +365,7 @@ process_wire_fees (void *cls,
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
 		  "Failed to start database transaction!\n");
       GNUNET_free (af);
-      break;
+      return GNUNET_SYSERR;
     }
     qs = db->store_wire_fee_by_exchange (db->cls,
 					 master_pub,
@@ -416,6 +413,46 @@ process_wire_fees (void *cls,
     endp = af;
     fees = fees->next;
   }
+  return GNUNET_OK;
+}
+
+
+/**
+ * Function called with information about the wire accounts
+ * of the exchanage.  Stores the wire fees with the
+ * exchange for laster use.
+ *
+ * @param exchange the exchange
+ * @param master_pub public key of the exchange
+ * @param accounts_len length of the @a accounts array
+ * @param accounts list of wire accounts of the exchange
+ * @return #GNUNET_OK on success
+ */
+static int
+process_wire_accounts (struct Exchange *exchange,
+                       const struct TALER_MasterPublicKeyP *master_pub,
+                       unsigned int accounts_len,
+                       const struct TALER_EXCHANGE_WireAccount *accounts)
+{
+  for (unsigned int i=0;i<accounts_len;i++)
+  {
+    char *method;
+
+    method = TALER_WIRE_payto_get_method (accounts[i].url);
+    if (NULL == method)
+      return GNUNET_SYSERR;
+    if (GNUNET_OK !=
+        process_wire_fees (exchange,
+                           master_pub,
+                           method,
+                           accounts[i].fees))
+    {
+      GNUNET_free (method);
+      return GNUNET_SYSERR;
+    }
+    GNUNET_free (method);
+  }
+  return GNUNET_OK;
 }
 
 
@@ -549,15 +586,15 @@ wire_task_cb (void *cls);
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful request;
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code, #TALER_EC_NONE on success
- * @param obj the received JSON reply, if successful this should be the wire
- *            format details as provided by /wire, or NULL if the
- *            reply was not in JSON format.
+ * @param accounts_len length of the @a accounts array
+ * @param accounts list of wire accounts of the exchange, NULL on error
  */
 static void
 handle_wire_data (void *cls,
                   unsigned int http_status,
                   enum TALER_ErrorCode ec,
-                  const json_t *obj)
+                  unsigned int accounts_len,
+                  const struct TALER_EXCHANGE_WireAccount *accounts)
 {
   struct Exchange *exchange = cls;
   const struct TALER_EXCHANGE_Keys *keys;
@@ -574,10 +611,10 @@ handle_wire_data (void *cls,
   keys = TALER_EXCHANGE_get_keys (exchange->conn);
   if ( (NULL == keys) ||
        (GNUNET_OK !=
-        TALER_EXCHANGE_wire_get_fees (&keys->master_pub,
-                                      obj,
-                                      &process_wire_fees,
-                                      exchange)) )
+        process_wire_accounts (exchange,
+                               &keys->master_pub,
+                               accounts_len,
+                               accounts)) )
   {
     /* Report hard failure to all callbacks! */
     struct TMH_EXCHANGES_FindOperation *fo;
@@ -918,18 +955,19 @@ accept_exchanges (void *cls,
                   const char *section)
 {
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
+  char *currency;
   char *url;
   char *mks;
   struct Exchange *exchange;
 
   if (0 != strncasecmp (section,
-                        "merchant-exchange-",
-                        strlen ("merchant-exchange-")))
+                        "exchange-",
+                        strlen ("exchange-")))
     return;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
-                                             "URL",
+                                             "BASE_URL",
                                              &url))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
@@ -937,6 +975,27 @@ accept_exchanges (void *cls,
                                "URL");
     return;
   }
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             section,
+                                             "CURRENCY",
+                                             &currency))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               section,
+                               "CURRENCY");
+    GNUNET_free (url);
+    return;
+  }
+  if (0 != strcasecmp (currency,
+                       TMH_currency))
+  {
+    /* trusted exchange, but for a different currency; ignore */
+    GNUNET_free (url);
+    GNUNET_free (currency);
+    return;
+  }
+  GNUNET_free (currency);
   exchange = GNUNET_new (struct Exchange);
   exchange->url = url;
   if (GNUNET_OK ==

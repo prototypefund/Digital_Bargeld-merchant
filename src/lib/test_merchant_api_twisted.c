@@ -671,11 +671,12 @@ run (void *cls,
                                  "deposit-simple-for-abort",
                                  is->ctx,
                                  0),
+#if FIXME_MARCELLO
     TALER_TESTING_cmd_flip_object
       ("hack-abort-4",
        PROXY_MERCHANT_CONFIG_FILE,
        "refund_permissions.0.merchant_sig"),
-
+#endif
     TALER_TESTING_cmd_pay_abort ("pay-abort-4",
                                  twister_merchant_url,
                                  "deposit-simple-for-abort",
@@ -758,11 +759,12 @@ run (void *cls,
                            "EUR:1.99", // no sense now
                            "EUR:0.01"), // no sense now
 
+#if FIXME_MARCELLO
     TALER_TESTING_cmd_flip_object
       ("hack-coin-history",
        PROXY_MERCHANT_CONFIG_FILE,
        "history.0.coin_sig"),
-
+#endif
     /* Coin history check will fail, due to coin's bad signature.  */
     TALER_TESTING_cmd_pay ("deposit-simple-fail",
                            twister_merchant_url,
@@ -814,7 +816,8 @@ main (int argc,
                     "DEBUG", NULL);
 
   if (NULL == (fakebank_url = TALER_TESTING_prepare_fakebank
-      (CONFIG_FILE)))
+               (CONFIG_FILE,
+                "account-1")))
     return 77;
 
   if (NULL == (merchant_url = TALER_TESTING_prepare_merchant

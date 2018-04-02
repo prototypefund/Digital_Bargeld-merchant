@@ -84,7 +84,7 @@ struct WireMethod
   /**
    * Which wire method is @e j_wire using?  Points into @e j_wire.
    */
-  const char *wire_method;
+  char *wire_method;
 
   /**
    * Wire details for this instance
@@ -283,6 +283,11 @@ extern struct TALER_Amount default_max_deposit_fee;
  * Default factor for wire fee amortization.
  */
 extern unsigned long long default_wire_fee_amortization;
+
+/**
+ * Which currency do we use?
+ */
+extern char *TMH_currency;
 
 /**
  * Hash of our wire format details as given in #j_wire.
