@@ -363,10 +363,6 @@ GNUnet to @code{/usr/local} in the previous steps.
 @c This section has not yet been written.
 
 
-@c @node Installing Taler using Docker
-@c @section Installing Taler using Docker
-
-@c This section has not yet been written.
 
 
 @node Installing Taler on Debian GNU/Linux
@@ -478,14 +474,14 @@ The following option sets the transport layer address used by the merchant backe
 @cindex UNIX domain socket
 @cindex TCP
 @example
-[merchant]/serve = TCP | UNIX
+[MERCHANT]/SERVE = TCP | UNIX
 @end example
 
 If given,
 @itemize
-@item @code{TCP}, then we need to set the TCP port in @code{[merchant]/port}
+@item @code{TCP}, then we need to set the TCP port in @code{[MERCHANT]/PORT}
 @item @code{UNIX}, then we need to set the unix domain socket path and mode in
-@code{[merchant]/unixpath} and @code{[merchant]/unixpath_mode}. The latter takes
+@code{[MERCHANT]/UNIXPATH} and @code{[MERCHANT]/UNIXPATH_MODE}. The latter takes
 the usual permission mask given as a number, e.g. 660 for user/group read-write access.
 @end itemize
 
@@ -499,8 +495,8 @@ to the network.
 @cindex port
 To run the Taler backend on TCP port 8888, use:
 @example
-$ taler-config -s merchant -o serve -V TCP
-$ taler-config -s merchant -o port -V 8888
+$ taler-config -s MERCHANT -o SERVE -V TCP
+$ taler-config -s MERCHANT -o PORT -V 8888
 @end example
 
 
@@ -510,14 +506,14 @@ Which currency the Web shop deals in, i.e. ``EUR'' or ``USD'', is specified usin
 @cindex currency
 @cindex KUDOS
 @example
-[taler]/currency
+[TALER]/CURRENCY
 @end example
 
 For testing purposes, the currency MUST match ``KUDOS'' so that tests will work
 with the Taler demonstration exchange at @url{https://exchange.demo.taler.net/}:
 
 @example
-$ taler-config -s taler -o currency -V KUDOS
+$ taler-config -s TALER -o CURRENCY -V KUDOS
 @end example
 
 @item Database
@@ -526,7 +522,7 @@ In principle is possible for the backend to support different DBMSs.
 The option
 
 @example
-[merchant]/db
+[MERCHANT]/DB
 @end example
 
 specifies which DBMS is to be used. However, currently only the value "postgres" is supported. This is also
@@ -563,7 +559,7 @@ given in the configuration file.
 
 To configure the Taler backend to use this database, run:
 @example
-$ taler-config -s merchantdb-postgres -o CONFIG \
+$ taler-config -s MERCHANTDB-postgres -o CONFIG \
   -V postgres:///$DBNAME
 @end example
 
@@ -571,7 +567,7 @@ $ taler-config -s merchantdb-postgres -o CONFIG \
 @item Exchange
 @cindex exchange
 To add an exchange to the list of trusted payment service providers,
-you create a section with a name that starts with ``merchant-exchange-''.
+you create a section with a name that starts with ``exchange-''.
 In that section, the following options need to be configured:
 
 @itemize
@@ -581,7 +577,7 @@ The ``url'' option specifies the exchange's base URL.  For example,
 to use the Taler demonstrator use:
 
 @example
-$ taler-config -s merchant-exchange-demo -o URL \
+$ taler-config -s EXCHANGE-demo -o URL \
   -V https://exchange.demo.taler.net/
 @end example
 
@@ -591,7 +587,7 @@ The ``master_key'' option specifies the exchange's master public key in base32 e
 For the Taler demonstrator, use:
 
 @example
-$ taler-config -s merchant-exchange-demo -o master_key \
+$ taler-config -s EXCHANGE-demo -o master_key \
   -V CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
 @end example
 
@@ -605,74 +601,120 @@ multiple currencies, you need to configure a backend per currency.
 @c FIXME: In the future, we need to describe specifying auditors here.
 @c @item Auditors
 
-@item Wireformat
-@cindex wire format
-In order to receive payments, the merchant backend needs to communicate bank
-account details to the exchange.  The banking system used is specified using the
-following global option:
-
-@example
-[merchant]/wireformat
-@end example
-
-The value @code{test} can be used to interact with the Taler
-demonstrator at @url{https://bank.demo.taler.net/}:
-
-@example
-$ taler-config -s merchant -o wireformat -V test
-@end example
-
-Other wireformats will be supported in the future to interact with
-actual banks.
 
 @item Instances
 @cindex instance
 The backend allows the user to run multiple instances of shops with
 distinct business entities against a single backend.  Each instance
-uses its own bank account and key for signing contracts.  It is
-mandatory to configure a "default" instance.  The specific
-configuration format depends slightly on the banking system selected
-via the @code{wireformat} option.
+uses its own bank accounts and key for signing contracts.  It is
+mandatory to configure a "default" instance.
+
+@itemize
+
+@item
+The ``KEYFILE'' option specifies the file containing the instance's
+private signing key.  For example, use:
+
+@example
+$ taler-config -s INSTANCE-default -o KEYFILE \
+  -V '${TALER_CONFIG_HOME}/merchant/instace/default.key'
+@end example
+
+@item
+The ``NAME'' option specifies a human-readable name for the instance.
+For example, use:
+
+@example
+$ taler-config -s INSTANCE-default -o NAME \
+  -V 'Kudos Inc.'
+@end example
+
+@item
+The optional ``TIP_EXCHANGE'' and ``TIP_EXCHANGE_PRIV_FILENAME''
+options are discussed in @see{Tipping visitors}
+@end itemize
+
+
+@item Accounts
+@cindex wire format
+In order to receive payments, the merchant backend needs to communicate bank
+account details to the exchange.  For this, the configuration must
+include one or more sections named ``ACCOUNT-name'' where @code{name} can be
+replaced by some human-readable word identifying the account.  For
+each section, the following options should be provided:
+
 
 @itemize
 @item
-For the @code{test} wire format, a sample specification looks as follows:
-
-@verbatim
-{
-  "type": "test",
-  "bank_url": "https://bank.demo.taler.net/",
-  "account_number": 5,
-  "salt": "RANDOMSALT"
-}
-@end verbatim
-
-These bank details are included in the contract in their hashed
-form. Hence, the random @code{salt} is necessary to make it difficult
-for customers to invert the hash by brute-force.
-
-You should substitute the account number with your actual account
-number.  In order to get an account number, register at our
-demonstration bank at @url{https://bank.demo.taler.net/} using your
-browser.
-
-The option ``test_response_file'' in the section
-``merchant-instance-wireformat-default'' specifies the path to this
-file.  Assuming this JSON specification is stored in a file
-@code{$TEST.json}, then run:
+The ``URL'' option specifies a @verb{payto://}-URL for the account of
+the merchant.  For example, use:
 
 @example
-$ taler-config -s merchant-instance-wireformat-default \
-                -o test_response_file -V $TEST.json
+$ taler-config -s ACCOUNT-bank -o NAME \
+  -V 'payto://x-taler-bank/bank.demo.taler.net/4'
 @end example
 
-@c Document SEPA here once supported.
+@item
+The ``WIRE_RESPONSE'' option specifies where Taler should store the
+(salted) JSON encoding of the wire account.  The file given will be
+created if it does not exist.  For example, use:
+
+@example
+$ taler-config -s ACCOUNT-bank -o WIRE_RESPONSE \
+  -V '{TALER_CONFIG_HOME}/merchant/bank.json'
+@end example
+
+@item
+The ``PLUGIN'' option specifies which wire plugin should be used for
+this account.  The plugin must support the wire method used by the
+URL.  For example, use:
+
+@example
+$ taler-config -s ACCOUNT-bank -o PLUGIN \
+  -V taler_bank
+@end example
+
+@item
+For each @code{instance} that should use this account, you should set
+@code{HONOR_instance} and @code{ACTIVE_instance} to YES.  The first
+option will cause the instance to accept payments to the account (for
+existing contracts), while the second will cause the backend to
+include the account as a possible option for new contracts.
+
+For example, use:
+
+@example
+$ taler-config -s ACCOUNT-bank -o HONOR_default \
+  -V YES
+$ taler-config -s ACCOUNT-bank -o ACTIVE_default \
+  -V YES
+@end example
+
+to use ``account-bank'' for the ``default'' instance.
+
 @end itemize
+
+Depending on which PLUGIN you configured, you may additionally specfiy
+authentication options to enable the plugin to use the account.
+
+For example, with @code{taler_bank} plugin, use:
+
+@example
+$ taler-config -s ACCOUNT-bank -o TALER_BANK_AUTH_METHOD \
+  -V basic
+$ taler-config -s ACCOUNT-bank -o USERNAME \
+  -V user42
+$ taler-config -s ACCOUNT-bank -o PASSWORD \
+  -V pass42
+@end example
+
+@c Document EBICS here once supported.
 
 Note that additional instances can be specified using different tokens
 in the section name instead of @code{default}.
 
 @end table
+
 
 @section Sample backend configuration
 
@@ -680,25 +722,36 @@ in the section name instead of @code{default}.
 The following is an example for a complete backend configuration:
 
 @smallexample
-[merchant]
-wireformat = TEST
-serve = TCP
-port = 8888
-currency = EUR
-database = postgres
+[TALER]
+CURRENCY = KUDOS
 
-[merchant-instance-default]
+[MERCHANT]
+SERVE = TCP
+PORT = 8888
+DATABASE = postgres
+
+[MERCHANTDB-postgres]
+CONFIG = postgres:///donations
+
+[INSTANCE-default]
 KEYFILE = $DATADIR/key.priv
+NAME = "Kudos Inc."
 
-[merchant-instance-wireformat-default]
-TEST_RESPONSE_FILE = $DATADIR/test.json
+[ACCOUNT-bank]
+URL = payto://x-taler-bank/bank.demo.taler.net/4
+WIRE_RESPONSE = $DATADIR/bank.json
+PLUGIN = taler_bank
+HONOR_default = YES
+ACTIVE_default = YES
+TALER_BANK_AUTH_METHOD = basic
+USERNAME = my_user
+PASSWORD = 1234pass
 
-[merchantdb-postgres]
-config = postgres:///donations
+[EXCHANGE-trusted]
+URL = https://exchange.demo.taler.net/
+MASTER_KEY = CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
+CURRENCY = KUDOS
 
-[merchant-demoexchange]
-url = https://exchange.demo.taler.net/
-master_key = CQQZ9DY3MZ1ARMN5K1VKDETS04Y2QCKMMCFHZSWJWWVN82BTTH00
 @end smallexample
 
 
@@ -755,34 +808,35 @@ This tool gets configured by a config file, that must have the following
 layout:
 
 @example
-[payments-generator]
+[PAYMENTS-GENERATOR]
 
 # The exchange used during the test: make sure the merchant backend
 # being tested accpets this exchange.
 # If the sysadmin wants, she can also install a local exchange
 # and test against it.
-exchange = https://exchange.demo.taler.net/
+EXCHANGE = https://exchange.demo.taler.net/
 
 # This value must indicate some URL where the backend
 # to be tested is listening; it doesn't have to be the
 # "official" one, though.
-merchant = http://localbackend/
+MERCHANT = http://localbackend/
 
 # This value is used when the tool tries to withdraw coins,
 # and must match the bank used by the exchange. If the test is
 # done against the exchange at https://exchange.demo.taler.net/,
 # then this value can be "https://bank.demo.taler.net/".
-bank = https://bank.demo.taler.net/
+BANK = https://bank.demo.taler.net/
 
 # The merchant instance in charge of serving the payment.
 # Make sure this instance has a bank account at the same bank
 # indicated by the 'bank' option above.
-instance = default
+INSTANCE = default
 
 # The currency used during the test. Must match the one used
 # by merchant backend and exchange.
-currency = KUDOS
+CURRENCY = KUDOS
 @end example
+@c FIXME: the last option should be removed and [taler]/CURRENCY used instead!
 
 Run the test in the following way:
 
@@ -823,7 +877,7 @@ The following example shows a 5 EURO coin configuration - needed by the
 used exchange - which is compatible with the hardcoded example above.
 
 @example
-[coin_eur_5]
+[COIN_eur_5]
 value = EUR:5
 duration_overlap = 5 minutes
 duration_withdraw = 7 days
@@ -963,10 +1017,10 @@ within their value.  To expand the @code{$DATADIR} or other $-variables
 in the configuration, pass the @code{-f} option to
 @code{taler-config}.  For example, compare:
 @example
-$ taler-config -s merchant-instance-wireformat-default \
-               -o test_response_file
-$ taler-config -f -s merchant-instance-wireformat-default \
-               -o test_response_file
+$ taler-config -s ACCOUNT-bank \
+               -o WIRE_RESPONSE
+$ taler-config -f -s ACCOUNT-bank \
+               -o WIRE_RESPONSE
 @end example
 
 While the configuration file is typically located at
@@ -980,7 +1034,7 @@ the @code{-c} option.
 @cindex merchant key
 @cindex KEYFILE
 
-The option ``KEYFILE'' in the section ``merchant-instance-default''
+The option ``KEYFILE'' in the section ``INSTANCE-default''
 specifies the path to the instance's private key.  You do not need to
 create a key manually, the backend will generate it automatically if
 it is missing.  While generally unnecessary, it is possible to display
@@ -989,8 +1043,8 @@ tool:
 
 @example
 $ gnunet-ecc -p                                  \
-  $(taler-config -f -s merchant-instance-default \
-                 -o keyfile)
+  $(taler-config -f -s INSTANCE-default \
+                 -o KEYFILE)
 @end example
 
 @c Add more on how to add that key to X.509 CSRs once we can do that.
@@ -998,32 +1052,24 @@ $ gnunet-ecc -p                                  \
 @node SEPA configuration
 @section Using the SEPA wire transfer method
 @cindex SEPA
+@cindex EBICS
 
 The following is a sample configuration for the SEPA wire transfer
 method:@footnote{Supporting SEPA is still
 work in progress; the backend will accept this configuration, but the
 exchange will not work with SEPA today.}.
 
-@verbatim
-{
-  "type": "SEPA",
-  "IBAN": "XY00 1111 2222 3333 4444 5555 6666",
-  "name": "Taler charity program",
-  "BIC": "XXXXAB99",
-  "salt": "RANDOMSALT"
-}
-
-@end verbatim
-
-We will now assume that this information is stored in file @code{$@{DATADIR@}/sepa.json}.
-Then, to configure the backend for SEPA payments in EUR, the following configuration
+Then, to configure the  EBICS backend for SEPA payments in EUR,
+the following configuration
 options need to be set:
 
 @example
-$ taler-config -s merchant -o currency -V EUR
-$ taler-config -s merchant -o wireformat -V sepa
-$ taler-config -s merchant-instance-wireformat-default \
-                -o sepa_response_file -V $@{DATADIR@}/sepa.json
+$ taler-config -s TALER -o CURRENCY -V EUR
+$ taler-config -s ACCOUNT-e -o PLUGIN -V ebics
+$ taler-config -s ACCOUNT-e -o URL \
+ -V payto://sepa/XY00111122223333444455556666
+$ taler-config -s ACCOUNT-e -o WIRE_RESPONSE
+ -V '{DATADIR/b.json}'
 @end example
 
 Please note that you will also have to configure an exchange and/or
@@ -1057,23 +1103,15 @@ There are four basic steps that must happen to tip a visitor.
 To tip users, you first need to create a reserve.  A reserve is a pool
 of money held in escrow at the Taler exchange.  This is the source of
 the funds for the tips.  Tipping will fail (resulting in disappointed
-visitors) if you do not have enough funds in your reserve! To create a
-reserve for tipping, you need to first create a tipping key.  Use
+visitors) if you do not have enough funds in your reserve!
+
+First, we configure the backend.  You need to enable tipping for each
+instance separately, or you can use an instance only for tipping.  To
+configure the ``default'' instance for tipping, use the following
+configuration:
 
 @example
-$ gnunet-ecc -g 1 tip.priv
-@end example
-
-to create a file with the private key that will be used to identify the
-reserve.
-
-Now you can configure your backend.  You need to enable tipping for
-each instance separately, or you can use an instance only for
-tipping.  To configure the ``default'' instance for tipping, use
-the following configuration:
-
-@example
-[merchant-instance-default]
+[INSTANCE-default]
 # this is NOT the tip.priv
 KEYFILE = signing_key.priv
 # replace the URL with the URL of the exchange you will use
@@ -1089,15 +1127,30 @@ created above, and you should probably use a different file here.
 Instead of manually editing the configuration, you could also run:
 
 @example
-$ taler-config -s merchant-instance-default \
+$ taler-config -s INSTANCE-default \
     -o TIP_RESERVE_PRIV_FILENAME \
     -V tip.priv
-$ taler-config -s merchant-instance-default \
+$ taler-config -s INSTANCE-default \
     -o TIP_EXCHANGE \
     -V https://exchange:443/
 @end example
 
+
+Next, to create the @code{TIP_RESERVE_PRIV_FILENAME} file, use:
+
+@example
+$ gnunet-ecc -g 1   \
+  $(taler-config -f -s INSTANCE-default \
+      -o TIP-RESERVE_PRIV_FILENAME)
+@end example
+
+This will create a file with the private key that will be used to
+identify the reserve.  You need to do this once for each instance that
+is configured to tip.
+
+
 Now you can (re)start the backend with the new configuration.
+
 
 @subsection Fund the reserve
 @cindex reserve
@@ -1106,7 +1159,9 @@ Now you can (re)start the backend with the new configuration.
 To fund the reserve, you must first extract the public key from ``tip.priv'':
 
 @example
-$ gnunet-ecc --print-public-key tip.priv
+$ gnunet-ecc --print-public-key \
+  $(taler-config -f -s INSTANCE-default \
+      -o TIP-RESERVE_PRIV_FILENAME)
 @end example
 
 In our example, the output for the public key is:
