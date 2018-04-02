@@ -441,7 +441,6 @@ Debian wheezy instructions above, you need to pass
 @c This section has not yet been written.
 
 
-
 @node Configuration
 @chapter How to configure the merchant's backend
 
@@ -515,6 +514,7 @@ with the Taler demonstration exchange at @url{https://exchange.demo.taler.net/}:
 @example
 $ taler-config -s TALER -o CURRENCY -V KUDOS
 @end example
+
 
 @item Database
 @cindex DBMS
@@ -617,7 +617,7 @@ private signing key.  For example, use:
 
 @example
 $ taler-config -s INSTANCE-default -o KEYFILE \
-  -V '${TALER_CONFIG_HOME}/merchant/instace/default.key'
+  -V '$@{TALER_CONFIG_HOME@}/merchant/instace/default.key'
 @end example
 
 @item
@@ -629,10 +629,12 @@ $ taler-config -s INSTANCE-default -o NAME \
   -V 'Kudos Inc.'
 @end example
 
+
 @item
 The optional ``TIP_EXCHANGE'' and ``TIP_EXCHANGE_PRIV_FILENAME''
-options are discussed in @see{Tipping visitors}
+options are discussed in @cite{Tipping visitors}
 @end itemize
+
 
 
 @item Accounts
@@ -646,7 +648,7 @@ each section, the following options should be provided:
 
 @itemize
 @item
-The ``URL'' option specifies a @verb{payto://}-URL for the account of
+The ``URL'' option specifies a @code{payto://}-URL for the account of
 the merchant.  For example, use:
 
 @example
@@ -661,8 +663,9 @@ created if it does not exist.  For example, use:
 
 @example
 $ taler-config -s ACCOUNT-bank -o WIRE_RESPONSE \
-  -V '{TALER_CONFIG_HOME}/merchant/bank.json'
+  -V '@{$TALER_CONFIG_HOME@}/merchant/bank.json'
 @end example
+
 
 @item
 The ``PLUGIN'' option specifies which wire plugin should be used for
@@ -707,6 +710,8 @@ $ taler-config -s ACCOUNT-bank -o USERNAME \
 $ taler-config -s ACCOUNT-bank -o PASSWORD \
   -V pass42
 @end example
+
+
 
 @c Document EBICS here once supported.
 
@@ -795,6 +800,7 @@ Please note that your backend is right now likely globally
 reachable.  Production systems should be configured to bind
 to a UNIX domain socket or properly restrict access to the
 port.
+
 
 @node Testing
 @chapter Testing
@@ -900,6 +906,7 @@ issue the following command:
 @example
 $ taler-merchant-dbinit -r
 @end example
+
 
 @node Advanced topics
 @chapter Advanced topics
@@ -1069,7 +1076,7 @@ $ taler-config -s ACCOUNT-e -o PLUGIN -V ebics
 $ taler-config -s ACCOUNT-e -o URL \
  -V payto://sepa/XY00111122223333444455556666
 $ taler-config -s ACCOUNT-e -o WIRE_RESPONSE
- -V '{DATADIR/b.json}'
+ -V '$@{DATADIR@}/b.json'
 @end example
 
 Please note that you will also have to configure an exchange and/or
