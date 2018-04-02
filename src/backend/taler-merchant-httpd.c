@@ -713,12 +713,12 @@ wireformat_iterator_cb (void *cls,
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_filename (iic->config,
                                                section,
-                                               "BANK_JSON_FILENAME",
+                                               "WIRE_RESPONSE",
                                                &fn))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "BANK_JSON_FILENAME");
+                               "WIRE_RESPONSE");
     GNUNET_free (payto);
     iic->ret = GNUNET_SYSERR;
     return;
@@ -1153,6 +1153,19 @@ run (void *cls,
                                    "WARNING",
                                    NULL));
   if (GNUNET_SYSERR ==
+      GNUNET_CONFIGURATION_get_value_string (config,
+                                             "taler",
+                                             "CURRENCY",
+                                             &TMH_currency))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "taler",
+                               "CURRENCY");
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+
+  if (GNUNET_SYSERR ==
       TMH_EXCHANGES_init (config))
   {
     GNUNET_SCHEDULER_shutdown ();
@@ -1177,19 +1190,6 @@ run (void *cls,
      (by_kpub_map = GNUNET_CONTAINER_multihashmap_create (1,
                                                           GNUNET_NO)))
   {
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-
-  if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_string (config,
-                                             "taler",
-                                             "CURRENCY",
-                                             &TMH_currency))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "taler",
-                               "CURRENCY");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }

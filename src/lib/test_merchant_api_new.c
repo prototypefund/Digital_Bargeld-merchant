@@ -165,7 +165,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-1",
@@ -322,12 +322,12 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:1", 63, 2),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:4.01", 63, 2),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
@@ -349,7 +349,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-498c",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:4.98", 2, 62),
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-2"),
@@ -393,7 +393,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-498c-2",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:4.98",
        EXCHANGE_ACCOUNT_NO,
        USER_ACCOUNT_NO),
@@ -484,7 +484,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-tip-1",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:20.04", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-1",
@@ -632,7 +632,7 @@ run (void *cls,
     CMD_EXEC_AGGREGATOR ("aggregator-tip-1"),
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-tip-498c",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:4.98", EXCHANGE_ACCOUNT_NO, USER_ACCOUNT_NO),
     TALER_TESTING_cmd_check_bank_empty
       ("check_bank_empty-at-tips"),
@@ -652,7 +652,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-10",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-10a",
@@ -717,7 +717,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-9.97-10",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:9.97",
        EXCHANGE_ACCOUNT_NO,
        USER_ACCOUNT_NO),
@@ -732,7 +732,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-11",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-11a",
@@ -830,15 +830,13 @@ main (int argc,
 
   if (NULL ==
       (fakebank_url = TALER_TESTING_prepare_fakebank (CONFIG_FILE,
-                                                      "account-2")))
+                                                      "account-exchange")))
     return 77;
-
   if (NULL ==
-    (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
+      (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
     return 77;
 
   TALER_TESTING_cleanup_files (CONFIG_FILE);
-
 
   switch (TALER_TESTING_prepare_exchange (CONFIG_FILE,
                                           &exchange_url))

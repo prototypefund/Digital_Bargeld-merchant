@@ -35,7 +35,7 @@
 /**
  * URL under which the merchant is reachable during the testcase.
  */
-#define MERCHANT_URL "http://localhost:8082"
+#define MERCHANT_URL "http://localhost:8080"
 
 /**
  * URL under which the exchange is reachable during the testcase.
@@ -3737,7 +3737,6 @@ interpreter_run (void *cls)
                                    "taler-exchange-wirewatch",
                                    "taler-exchange-wirewatch",
                                    "-c", "test_merchant_api.conf",
-                                   "-t", "test", /* use Taler's bank/fakebank */
                                    "-T", /* exit when done */
                                    (0 == once ? "-r" : NULL),
                                    NULL);

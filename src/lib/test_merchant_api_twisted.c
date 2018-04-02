@@ -476,7 +476,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:2.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-1",
@@ -589,7 +589,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-abort-1",
-       "http://localhost:8081/",
+       EXCHANGE_URL,
        "EUR:1.01", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-abort-1",
@@ -812,12 +812,12 @@ main (int argc,
   /* These environment variables get in the way... */
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
-  GNUNET_log_setup ("test-merchant-api-new-twisted",
+  GNUNET_log_setup ("test-merchant-api-twisted",
                     "DEBUG", NULL);
 
   if (NULL == (fakebank_url = TALER_TESTING_prepare_fakebank
                (CONFIG_FILE,
-                "account-1")))
+                "account-exchange")))
     return 77;
 
   if (NULL == (merchant_url = TALER_TESTING_prepare_merchant
