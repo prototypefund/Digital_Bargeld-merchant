@@ -192,7 +192,7 @@ handle_status (void *cls,
                const struct TALER_EXCHANGE_ReserveHistory *history)
 {
   struct TipQueryContext *tqc = cls;
-  struct GNUNET_TIME_Absolute expiration;
+  struct GNUNET_TIME_Absolute reserve_expiration = GNUNET_TIME_UNIT_ZERO_ABS;
 
   tqc->rsh = NULL;
   if (MHD_HTTP_OK != http_status)
@@ -246,9 +246,13 @@ handle_status (void *cls,
       {
         enum GNUNET_DB_QueryStatus qs;
         struct GNUNET_HashCode uuid;
+        struct GNUNET_TIME_Absolute deposit_expiration;
 
-        expiration = GNUNET_TIME_absolute_add (history[i].details.in_details.timestamp,
-                                               tqc->idle_reserve_expiration_time);
+        deposit_expiration = GNUNET_TIME_absolute_add (history[i].details.in_details.timestamp,
+                                                       tqc->idle_reserve_expiration_time);
+        /* We're interested in the latest DEPOSIT timestamp, since this determines the
+         * reserve's expiration date. Note that the history isn't chronologically ordered. */
+        reserve_expiration = GNUNET_TIME_absolute_max (reserve_expiration, deposit_expiration);
         GNUNET_CRYPTO_hash (history[i].details.in_details.wire_reference,
                             history[i].details.in_details.wire_reference_size,
                             &uuid);
@@ -256,7 +260,7 @@ handle_status (void *cls,
                                      &tqc->reserve_priv,
                                      &uuid,
                                      &history[i].amount,
-                                     expiration);
+                                     deposit_expiration);
         if (GNUNET_OK !=
             TALER_amount_add (&tqc->amount_deposited,
                               &tqc->amount_deposited,
@@ -331,7 +335,7 @@ handle_status (void *cls,
                                                        "reserve_pub",
                                                        GNUNET_JSON_from_data_auto (&reserve_pub),
                                                        "reserve_expiration",
-                                                       GNUNET_JSON_from_time_abs (expiration),
+                                                       GNUNET_JSON_from_time_abs (reserve_expiration),
                                                        "amount_authorized",
                                                        TALER_JSON_from_amount (&tqc->amount_authorized),
                                                        "amount_picked_up",
