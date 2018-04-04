@@ -2609,6 +2609,7 @@ process_deposits_for_refund_cb (void *cls,
   {
     const struct TALER_Amount *increment;
     struct TALER_Amount left;
+    struct TALER_Amount remaining_refund;
 
     /* How much of the coin is left after the existing refunds? */
     if (GNUNET_SYSERR ==
@@ -2630,8 +2631,6 @@ process_deposits_for_refund_cb (void *cls,
 		  TALER_B2S (&deposit_coin_pubs[i]));
       continue;
     }
-
-    struct TALER_Amount remaining_refund;
 
     /* How much of the refund is left? */
     if (GNUNET_SYSERR ==
