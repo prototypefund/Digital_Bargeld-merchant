@@ -132,7 +132,9 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
   }
   num_refunds = json_array_size (refunds);
   {
-    struct TALER_MERCHANT_RefundEntry res[num_refunds];
+    /* The "+ 1" is necessary since num_refunds might be 0, and variable size arrays must
+     * be >0, or it's undefined behavior */
+    struct TALER_MERCHANT_RefundEntry res[num_refunds + 1];
 
     for (unsigned int i=0;i<num_refunds;i++)
     {
