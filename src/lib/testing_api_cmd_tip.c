@@ -823,7 +823,7 @@ tip_pickup_cleanup (void *cls,
                     const struct TALER_TESTING_Command *cmd)
 {
   struct TipPickupState *tps = cls;
-  #warning free elements *in* the state!
+  /* FIXME:  free elements *in* the state! */
   if (NULL != tps->tpo)
   {
     TALER_LOG_WARNING ("Tip-pickup operation"
