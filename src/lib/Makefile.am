@@ -78,8 +78,10 @@ check_PROGRAMS = \
   test_merchant_api_new \
   test_merchant_api
 
+if HAVE_EXPERIMENTAL
 if HAVE_TWISTER
   check_PROGRAMS += test_merchant_api_twisted
+endif
 endif
 
 endif

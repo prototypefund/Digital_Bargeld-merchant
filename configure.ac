@@ -316,6 +316,16 @@ AM_CONDITIONAL([HAVE_TWISTER], [true])
 fi
 
 
+# should experimental code be compiled (code that may not yet compile / have passing test cases)?
+AC_MSG_CHECKING(whether to compile experimental code)
+AC_ARG_ENABLE([experimental],
+   [AS_HELP_STRING([--enable-experimental], [enable compiling experimental code])],
+   [enable_experimental=${enableval}],
+   [enable_experimental=no])
+AC_MSG_RESULT($enable_experimental)
+AM_CONDITIONAL([HAVE_EXPERIMENTAL], [test "x$enable_experimental" = "xyes"])
+
+
 AC_CONFIG_FILES([Makefile
 doc/Makefile
 src/Makefile
