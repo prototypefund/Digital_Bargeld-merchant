@@ -76,7 +76,7 @@ struct TALER_MERCHANT_Pay
    * Operational mode, either "pay" or "abort-refund".
    */
   const char *mode;
-  
+
   /**
    * Reference to the execution context.
    */
@@ -96,7 +96,7 @@ struct TALER_MERCHANT_Pay
    * Hash of the contract, only available in "abort-refund" mode.
    */
   struct GNUNET_HashCode h_contract_terms;
-  
+
 };
 
 
@@ -132,9 +132,7 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
   }
   num_refunds = json_array_size (refunds);
   {
-    /* The "+ 1" is necessary since num_refunds might be 0, and variable size arrays must
-     * be >0, or it's undefined behavior */
-    struct TALER_MERCHANT_RefundEntry res[num_refunds + 1];
+    struct TALER_MERCHANT_RefundEntry res[GNUNET_NZL(num_refunds)];
 
     for (unsigned int i=0;i<num_refunds;i++)
     {
@@ -166,7 +164,7 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
       rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
       rr.h_contract_terms = ph->h_contract_terms;
       rr.coin_pub = res[i].coin_pub;
-      rr.merchant = merchant_pub;      
+      rr.merchant = merchant_pub;
       rr.rtransaction_id = GNUNET_htonll (res[i].rtransaction_id);
       found = -1;
       for (unsigned int j=0;j<ph->num_coins;j++)
@@ -373,7 +371,7 @@ handle_pay_finished (void *cls,
       GNUNET_break (0);
       response_code = 0;
       break;
-    }    
+    }
     ph->pay_cb (ph->pay_cb_cls,
 		response_code,
 		TALER_JSON_get_error_code (json),
@@ -383,7 +381,7 @@ handle_pay_finished (void *cls,
   {
     GNUNET_assert (0 == strcasecmp (ph->mode,
 				    "abort-refund"));
-    
+
     switch (response_code)
     {
     case 0:
@@ -425,7 +423,7 @@ handle_pay_finished (void *cls,
       GNUNET_break (0);
       response_code = 0;
       break;
-    }    
+    }
     ph->abort_cb (ph->abort_cb_cls,
 		  response_code,
 		  TALER_JSON_get_error_code (json),
@@ -435,7 +433,7 @@ handle_pay_finished (void *cls,
 		  NULL,
 		  json);
   }
-    
+
   TALER_MERCHANT_pay_cancel (ph);
 }
 
@@ -660,7 +658,7 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
     GNUNET_break (0);
     return NULL;
   }
-  
+
   dr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_COIN_DEPOSIT);
   dr.purpose.size = htonl (sizeof (struct TALER_DepositRequestPS));
   dr.h_contract_terms = *h_contract_terms;
