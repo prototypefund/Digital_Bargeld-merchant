@@ -32,7 +32,7 @@ AC_ARG_ENABLE([only-doc],
 AC_MSG_RESULT($doc_only)
 AM_CONDITIONAL([DOC_ONLY], [test "$doc_only" = "yes"])
 
-if test "$doc_only" != yes
+if test "x$doc_only" != xyes
 then
 
 
@@ -74,7 +74,8 @@ AS_IF([test $libgnunetutil != 1],
 
 # test for postgres
 AX_LIB_POSTGRESQL([9.3])
-if test "$found_postgresql" = "yes"; then
+if test "x$found_postgresql" = "xyes"
+then
   postgres=true
 fi
 AM_CONDITIONAL(HAVE_POSTGRESQL, test x$postgres = xtrue)
@@ -164,7 +165,7 @@ PKG_CHECK_MODULES([JANSSON], [jansson >= 2.3],
 # check for libgnurl
 # libgnurl
 LIBGNURL_CHECK_CONFIG(,7.34.0,gnurl=1,gnurl=0)
-if test "$gnurl" = 1
+if test "x$gnurl" = x1
 then
 	AM_CONDITIONAL(HAVE_LIBGNURL, true)
 	AC_DEFINE([HAVE_LIBGNURL],[1],[Have libgnurl])
@@ -187,7 +188,7 @@ fi
 if test x$curl = xfalse
 then
 	AM_CONDITIONAL(HAVE_LIBCURL, false)
-if test "$gnurl" = 0
+if test "x$gnurl" = "x0"
 then
 	AC_MSG_WARN([GNUnet requires libcurl-gnutls  >= 7.34])
 fi
