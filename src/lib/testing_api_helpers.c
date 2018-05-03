@@ -162,15 +162,15 @@ TALER_TESTING_prepare_merchant (const char *config_filename)
   }
 
   /* DB preparation */
-  if (NULL ==
-      (dbinit_proc = GNUNET_OS_start_process (GNUNET_NO,
-                                              GNUNET_OS_INHERIT_STD_ALL,
-                                              NULL, NULL, NULL,
-                                              "taler-merchant-dbinit",
-                                              "taler-merchant-dbinit",
-                                              "-c", "test_merchant_api.conf",
-                                              "-r",
-                                              NULL)))
+  if (NULL == (dbinit_proc = GNUNET_OS_start_process
+    (GNUNET_NO,
+     GNUNET_OS_INHERIT_STD_ALL,
+     NULL, NULL, NULL,
+     "taler-merchant-dbinit",
+     "taler-merchant-dbinit",
+     "-c", config_filename,
+     "-r",
+     NULL)))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to run taler-merchant-dbinit."
