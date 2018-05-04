@@ -854,7 +854,7 @@ main (int argc,
   case GNUNET_OK:
 
     if (NULL == (merchantd = TALER_TESTING_run_merchant
-        (CONFIG_FILE)))
+        (CONFIG_FILE, merchant_url)))
       // 1 is fine; after all this is merchant test cases.
       return 1;
 

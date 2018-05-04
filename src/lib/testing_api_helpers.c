@@ -41,32 +41,12 @@
  *         be started.
  */
 struct GNUNET_OS_Process *
-TALER_TESTING_run_merchant (const char *config_filename)
+TALER_TESTING_run_merchant (const char *config_filename,
+                            const char *merchant_url)
 {
-  struct GNUNET_CONFIGURATION_Handle *cfg;
   struct GNUNET_OS_Process *merchant_proc;
   unsigned int iter;
-  unsigned long long port;
   char *wget_cmd;
-
-  cfg = GNUNET_CONFIGURATION_create ();
-  if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_load (cfg,
-                                 config_filename))
-    MERCHANT_FAIL ();
-  if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_number (cfg,
-                                             "merchant",
-                                             "PORT",
-                                             &port))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "merchant",
-                               "PORT");
-    GNUNET_CONFIGURATION_destroy (cfg);
-    MERCHANT_FAIL ();
-  }
-  GNUNET_CONFIGURATION_destroy (cfg);
 
   merchant_proc
     = GNUNET_OS_start_process (GNUNET_NO,
@@ -80,9 +60,9 @@ TALER_TESTING_run_merchant (const char *config_filename)
     MERCHANT_FAIL ();
 
   GNUNET_asprintf (&wget_cmd,
-                   "wget -q -t 1 -T 1 http://127.0.0.1:%llu/"
+                   "wget -q -t 1 -T 1 %s"
                    " -o /dev/null -O /dev/null",
-                   port);
+                   merchant_url);
 
   /* give child time to start and bind against the socket */
   fprintf (stderr,
@@ -93,7 +73,8 @@ TALER_TESTING_run_merchant (const char *config_filename)
       if (10 == iter)
       {
 	fprintf (stderr,
-                 "Failed to launch `taler-merchant-httpd' (or `wget')\n");
+                 "Failed to launch"
+                 " `taler-merchant-httpd' (or `wget')\n");
 	GNUNET_OS_process_kill (merchant_proc,
 				SIGTERM);
 	GNUNET_OS_process_wait (merchant_proc);

@@ -62,7 +62,8 @@ TALER_TESTING_prepare_merchant (const char *config_filename);
  *         be started.
  */
 struct GNUNET_OS_Process *
-TALER_TESTING_run_merchant (const char *config_filename);
+TALER_TESTING_run_merchant (const char *config_filename,
+                            const char *merchant_url);
 
 /* ******************* Generic interpreter logic ************ */
 
