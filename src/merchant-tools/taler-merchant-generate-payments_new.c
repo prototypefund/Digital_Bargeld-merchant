@@ -57,6 +57,15 @@ unsigned int payments_number;
  */
 unsigned int tracks_number;
 
+/**
+ * Merchant base URL.
+ */
+static char *merchant_url;
+
+/**
+ * Fakebank URL.
+ */
+static char *fakebank_url;
 
 /**
  * Actual commands collection.
@@ -65,6 +74,16 @@ static void
 run_commands (void *cls,
               struct TALER_TESTING_Interpreter *is)
 {
+
+
+  struct TALER_TESTING_Command commands[] = {
+
+    TALER_TESTING_cmd_end ()
+  };
+
+  TALER_TESTING_run_with_fakebank (is,
+                                   commands,
+                                   fakebank_url);
   return;
 }
 
@@ -86,10 +105,31 @@ run (void *cls,
 {
   TALER_LOG_DEBUG ("Using configuration file: %s\n", cfgfile);
 
-  if (NULL == (merchantd = TALER_TESTING_run_merchant (cfgfile)))
+  if (NULL == merchant_url)
+  {
+    TALER_LOG_ERROR ("Option -m is mandatory!\n");
+    result = 2;
+    return;
+  }
+
+  if (NULL == (merchantd = TALER_TESTING_run_merchant
+    (cfgfile, merchant_url)))
   {
     TALER_LOG_ERROR ("Failed to launch the merchant\n");
-    result = 2;
+    result = 3;
+    return;
+  }
+
+  result = 0;
+
+  if (NULL == (fakebank_url = TALER_TESTING_prepare_fakebank
+        (cfgfile, "account-1")))
+  {
+    TALER_LOG_ERROR ("Failed to prepare the fakebank\n");
+    result = 4;
+    GNUNET_OS_process_kill (merchantd, SIGTERM);
+    GNUNET_OS_process_wait (merchantd);
+    GNUNET_OS_process_destroy (merchantd);
     return;
   }
 
@@ -101,7 +141,6 @@ run (void *cls,
   GNUNET_OS_process_kill (merchantd, SIGTERM);
   GNUNET_OS_process_wait (merchantd);
   GNUNET_OS_process_destroy (merchantd);
-
 }
 
 
@@ -119,17 +158,34 @@ main (int argc,
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 
-    GNUNET_GETOPT_option_uint ('n',
-                               "payments-number",
-                               "PN",
-                               "will generate PN payments",
-                               &payments_number),
+    GNUNET_GETOPT_option_uint
+      ('n',
+       "payments-number",
+       "PN",
+       "will generate PN payments, defaults to 1",
+       &payments_number),
 
-    GNUNET_GETOPT_option_uint ('t',
-                               "tracks-number",
-                               "TN",
-                               "will perform TN /track operations",
-                               &tracks_number),
+    GNUNET_GETOPT_option_uint
+      ('t',
+       "tracks-number",
+       "TN",
+       "will perform TN /track operations, defaults to 1",
+       &tracks_number),
+
+    /**
+     * NOTE: useful when the setup serves merchant
+     * backends via unix domain sockets, since there
+     * is no way - yet? - to get the merchant base url.
+     * Clearly, we could introduce a merchant_base_url
+     * value into the configuration.
+     */
+    GNUNET_GETOPT_option_string
+      ('m',
+       "merchant-url",
+       "MU",
+       "merchant base url, mandatory",
+       &merchant_url),
+
     GNUNET_GETOPT_OPTION_END
   };
 
