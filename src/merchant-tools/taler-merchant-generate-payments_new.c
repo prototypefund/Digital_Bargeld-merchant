@@ -34,6 +34,7 @@
 #include <taler/taler_bank_service.h>
 #include <taler/taler_fakebank_lib.h>
 #include <taler/taler_testing_lib.h>
+#include <taler/taler_testing_bank_lib.h>
 #include <taler/taler_error_codes.h>
 #include "taler_merchant_testing_lib.h"
 
@@ -48,6 +49,11 @@ unsigned int result = 1;
 static struct GNUNET_OS_Process *merchantd;
 
 /**
+ * Bank process.
+ */
+static struct GNUNET_OS_Process *bankd;
+
+/**
  * How many payments we want to generate.
  */
 unsigned int payments_number;
@@ -58,14 +64,14 @@ unsigned int payments_number;
 unsigned int tracks_number;
 
 /**
+ * Bank base URL.
+ */
+static char *bank_url;
+
+/**
  * Merchant base URL.
  */
 static char *merchant_url;
-
-/**
- * Fakebank URL.
- */
-static char *fakebank_url;
 
 /**
  * Actual commands collection.
@@ -74,17 +80,12 @@ static void
 run_commands (void *cls,
               struct TALER_TESTING_Interpreter *is)
 {
-
-
-  struct TALER_TESTING_Command commands[] = {
-
+  /*struct TALER_TESTING_Command commands[] = {
     TALER_TESTING_cmd_end ()
   };
 
-  TALER_TESTING_run_with_fakebank (is,
-                                   commands,
-                                   fakebank_url);
-  return;
+  TALER_TESTING_run (is, commands);*/
+  TALER_LOG_INFO ("End-of-work\n");
 }
 
 /**
@@ -122,10 +123,16 @@ run (void *cls,
 
   result = 0;
 
-  if (NULL == (fakebank_url = TALER_TESTING_prepare_fakebank
-        (cfgfile, "account-1")))
+  if (NULL == bank_url)
   {
-    TALER_LOG_ERROR ("Failed to prepare the fakebank\n");
+    TALER_LOG_ERROR ("Option -b is mandatory!\n");
+    result = 5;
+    return;
+  }
+  if (NULL == (bankd = TALER_TESTING_run_bank (cfgfile,
+                                               bank_url)))
+  {
+    TALER_LOG_ERROR ("Failed to run the bank\n");
     result = 4;
     GNUNET_OS_process_kill (merchantd, SIGTERM);
     GNUNET_OS_process_wait (merchantd);
@@ -141,6 +148,9 @@ run (void *cls,
   GNUNET_OS_process_kill (merchantd, SIGTERM);
   GNUNET_OS_process_wait (merchantd);
   GNUNET_OS_process_destroy (merchantd);
+  GNUNET_OS_process_kill (bankd, SIGTERM);
+  GNUNET_OS_process_wait (bankd);
+  GNUNET_OS_process_destroy (bankd);
 }
 
 
@@ -185,6 +195,13 @@ main (int argc,
        "MU",
        "merchant base url, mandatory",
        &merchant_url),
+
+    GNUNET_GETOPT_option_string
+      ('b',
+       "bank-url",
+       "BU",
+       "bank base url, mandatory",
+       &bank_url),
 
     GNUNET_GETOPT_OPTION_END
   };

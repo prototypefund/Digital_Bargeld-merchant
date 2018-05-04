@@ -26,6 +26,7 @@ taler_merchant_generate_payments_new_LDADD = \
   -ltalermerchanttesting \
   -ltalerfakebank \
   -ltalerbank \
+  -ltalerbanktesting \
   -ltalerexchange \
   -ltalerjson \
   -ltalerutil \
