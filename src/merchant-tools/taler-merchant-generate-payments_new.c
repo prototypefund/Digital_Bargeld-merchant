@@ -78,13 +78,15 @@ main (int argc,
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 
     GNUNET_GETOPT_option_uint ('n',
-                               "payments number",
-                               "how many payments we want to generate",
+                               "payments-number",
+                               "PN",
+                               "will generate PN payments",
                                &payments_number),
 
     GNUNET_GETOPT_option_uint ('t',
-                               "tracks number",
-                               "how many /track operation we want to perform",
+                               "tracks-number",
+                               "TN",
+                               "will perform TN /track operations",
                                &tracks_number),
     GNUNET_GETOPT_OPTION_END
   };
