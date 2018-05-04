@@ -74,9 +74,7 @@ TALER_TESTING_run_merchant (const char *config_filename)
                                NULL, NULL, NULL,
                                "taler-merchant-httpd",
                                "taler-merchant-httpd",
-                               #ifdef CUSTOM_CONFIG
                                "-c", config_filename,
-                               #endif
                                NULL);
   if (NULL == merchant_proc)
     MERCHANT_FAIL ();
@@ -128,6 +126,9 @@ TALER_TESTING_prepare_merchant (const char *config_filename)
 {
   struct GNUNET_CONFIGURATION_Handle *cfg;
   unsigned long long port;
+  struct GNUNET_OS_Process *dbinit_proc;
+  enum GNUNET_OS_ProcessStatusType type;
+  unsigned long code;
   char *base_url;
 
   cfg = GNUNET_CONFIGURATION_create ();
@@ -160,11 +161,6 @@ TALER_TESTING_prepare_merchant (const char *config_filename)
     MERCHANT_FAIL ();
   }
 
-  #ifdef PURGE_DATABASE
-  struct GNUNET_OS_Process *dbinit_proc;
-  enum GNUNET_OS_ProcessStatusType type;
-  unsigned long code;
-
   /* DB preparation */
   if (NULL == (dbinit_proc = GNUNET_OS_start_process
     (GNUNET_NO,
@@ -172,9 +168,7 @@ TALER_TESTING_prepare_merchant (const char *config_filename)
      NULL, NULL, NULL,
      "taler-merchant-dbinit",
      "taler-merchant-dbinit",
-     #ifdef CUSTOM_CONFIG
      "-c", config_filename,
-     #endif
      "-r",
      NULL)))
   {
@@ -207,9 +201,8 @@ TALER_TESTING_prepare_merchant (const char *config_filename)
              " `taler-merchant-dbinit'!\n");
     MERCHANT_FAIL ();
   }
-
   GNUNET_OS_process_destroy (dbinit_proc);
-  #endif
+
 
 
   GNUNET_asprintf (&base_url,

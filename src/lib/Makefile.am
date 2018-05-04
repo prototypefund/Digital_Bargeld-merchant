@@ -127,7 +127,6 @@ test_merchant_api_new_LDADD = \
   -lgnunetcurl \
   -lgnunetutil \
   -ljansson
-test_merchant_api_new_CFLAGS = -DCUSTOM_CONFIG -DPURGE_DATABASE
 
 test_merchant_api_SOURCES = \
   test_merchant_api.c
