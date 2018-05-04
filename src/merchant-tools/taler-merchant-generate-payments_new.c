@@ -2,16 +2,19 @@
   This file is part of TALER
   (C) 2014-2018 Taler Systems SA
 
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Affero General Public License as published by the Free Software
-  Foundation; either version 3, or (at your option) any later version.
+  TALER is free software; you can redistribute it and/or modify it
+  under the terms of the GNU Affero General Public License as
+  published by the Free Software Foundation; either version 3, or
+  (at your option) any later version.
 
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+  TALER is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  General Public License for more details.
 
-  You should have received a copy of the GNU General Public License along with
-  TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
+  You should have received a copy of the GNU General Public License
+  along with TALER; see the file COPYING.  If not,
+  see <http://www.gnu.org/licenses/>
 */
 
 /**
@@ -35,6 +38,16 @@
 #include "taler_merchant_testing_lib.h"
 
 /**
+ * Exit code.
+ */
+unsigned int result = 1;
+
+/**
+ * Merchant process.
+ */
+static struct GNUNET_OS_Process *merchantd;
+
+/**
  * How many payments we want to generate.
  */
 unsigned int payments_number;
@@ -44,13 +57,25 @@ unsigned int payments_number;
  */
 unsigned int tracks_number;
 
+
 /**
- * Main function that will be run by the scheduler.
+ * Actual commands collection.
+ */
+static void
+run_commands (void *cls,
+              struct TALER_TESTING_Interpreter *is)
+{
+  return;
+}
+
+/**
+ * Main function that will be run by the scheduler,
+ * mainly needed to get the configuration filename to use.
  *
  * @param cls closure
  * @param args remaining command-line arguments
- * @param cfgfile name of the configuration file used (for saving, can be
- *        NULL!)
+ * @param cfgfile name of the configuration file
+ *        used (for saving, can be NULL!)
  * @param config configuration
  */
 static void
@@ -60,6 +85,23 @@ run (void *cls,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
   TALER_LOG_DEBUG ("Using configuration file: %s\n", cfgfile);
+
+  if (NULL == (merchantd = TALER_TESTING_run_merchant (cfgfile)))
+  {
+    TALER_LOG_ERROR ("Failed to launch the merchant\n");
+    result = 2;
+    return;
+  }
+
+  /* Blocks.. */
+  result = TALER_TESTING_setup_with_exchange (&run_commands,
+                                              NULL,
+                                              cfgfile);
+
+  GNUNET_OS_process_kill (merchantd, SIGTERM);
+  GNUNET_OS_process_wait (merchantd);
+  GNUNET_OS_process_destroy (merchantd);
+
 }
 
 
@@ -91,11 +133,9 @@ main (int argc,
     GNUNET_GETOPT_OPTION_END
   };
 
-  if (GNUNET_OK !=
-      GNUNET_PROGRAM_run (argc, argv,
-                          "taler-merchant-generate-payments-new",
-                          "Populate the database with payments",
-                          options, &run, NULL))
-    return 1;
-  return 0;
+  GNUNET_PROGRAM_run (argc, argv,
+                      "taler-merchant-generate-payments-new",
+                      "Populate the database with payments",
+                      options, &run, NULL);
+  return result;
 }

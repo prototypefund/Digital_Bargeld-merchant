@@ -834,8 +834,9 @@ main (int argc,
                     NULL);
 
   if (NULL ==
-      (fakebank_url = TALER_TESTING_prepare_fakebank (CONFIG_FILE,
-                                                      "account-exchange")))
+      (fakebank_url = TALER_TESTING_prepare_fakebank
+        (CONFIG_FILE,
+         "account-exchange")))
     return 77;
   if (NULL ==
       (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
