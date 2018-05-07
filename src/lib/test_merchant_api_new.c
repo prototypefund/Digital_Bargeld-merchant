@@ -322,6 +322,7 @@ run (void *cls,
        "pass62",
        "create-reserve-2",
        EXCHANGE_URL),
+
     CMD_EXEC_WIREWATCH ("wirewatch-2"),
 
     TALER_TESTING_cmd_check_bank_transfer
@@ -738,7 +739,9 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-11",
        EXCHANGE_URL,
-       "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+       "EUR:10.02",
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-11a",
                                        is->exchange,
