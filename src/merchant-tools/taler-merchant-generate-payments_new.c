@@ -87,8 +87,8 @@ static char *merchant_url;
  * Actual commands collection.
  */
 static void
-run_commands (void *cls,
-              struct TALER_TESTING_Interpreter *is)
+run (void *cls,
+     struct TALER_TESTING_Interpreter *is)
 {
   struct TALER_TESTING_Command commands[] = {
     TALER_TESTING_cmd_end ()
@@ -109,66 +109,6 @@ terminate_process (struct GNUNET_OS_Process *process)
   GNUNET_OS_process_wait (process);
   GNUNET_OS_process_destroy (process);
 }
-
-/**
- * Main function that will be run by the scheduler,
- * mainly needed to get the configuration filename to use.
- *
- * @param cls closure
- * @param args remaining command-line arguments
- * @param cfgfile name of the configuration file
- *        used (for saving, can be NULL!)
- * @param config configuration
- */
-static void
-run (void *cls,
-     char *const *args,
-     const char *cfgfile,
-     const struct GNUNET_CONFIGURATION_Handle *config)
-{
-  if (NULL == merchant_url)
-  {
-    TALER_LOG_ERROR ("Option -m is mandatory!\n");
-    result = 2;
-    return;
-  }
-
-  if (NULL == (merchantd = TALER_TESTING_run_merchant
-    (cfgfile, merchant_url)))
-  {
-    TALER_LOG_ERROR ("Failed to launch the merchant\n");
-    result = 3;
-    GNUNET_OS_process_kill (merchantd, SIGTERM);
-    GNUNET_OS_process_wait (merchantd);
-    GNUNET_OS_process_destroy (merchantd);
-    return;
-  }
-
-  if (NULL == bank_url)
-  {
-    TALER_LOG_ERROR ("Option -b is mandatory!\n");
-    result = 5;
-    return;
-  }
-  if (NULL == (bankd = TALER_TESTING_run_bank (cfgfile,
-                                               bank_url)))
-  {
-    TALER_LOG_ERROR ("Failed to run the bank\n");
-    result = 4;
-    GNUNET_OS_process_kill (merchantd, SIGTERM);
-    GNUNET_OS_process_wait (merchantd);
-    GNUNET_OS_process_destroy (merchantd);
-    return;
-  }
-
-  GNUNET_OS_process_kill (merchantd, SIGTERM);
-  GNUNET_OS_process_wait (merchantd);
-  GNUNET_OS_process_destroy (merchantd);
-  GNUNET_OS_process_kill (bankd, SIGTERM);
-  GNUNET_OS_process_wait (bankd);
-  GNUNET_OS_process_destroy (bankd);
-}
-
 
 /**
  * The main function of the serve tool
@@ -275,7 +215,7 @@ main (int argc,
   }
 
   result = TALER_TESTING_setup_with_exchange
-    (run_commands,
+    (run,
      options,
      default_config_file);
   return result;
