@@ -46,7 +46,7 @@
 /**
  * Exit code.
  */
-unsigned int result = 1;
+unsigned int result;
 
 /**
  * Merchant process.
@@ -219,5 +219,8 @@ main (int argc,
      NULL,
      default_config_file);
 
-  return result;
+  terminate_process (bankd);
+  terminate_process (merchantd);
+
+  return (GNUNET_OK == result) ? 0 : result;
 }
