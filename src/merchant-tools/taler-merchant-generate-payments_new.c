@@ -38,6 +38,11 @@
 #include <taler/taler_error_codes.h>
 #include "taler_merchant_testing_lib.h"
 
+#define MISSING_MERCHANT_URL 2
+#define FAILED_TO_LAUNCH_MERCHANT 3
+#define MISSING_BANK_URL 4
+#define FAILED_TO_LAUNCH_BANK 5
+
 /**
  * Exit code.
  */
@@ -69,6 +74,11 @@ unsigned int tracks_number;
 static char *bank_url;
 
 /**
+ * Log file.
+ */
+static char *logfile;
+
+/**
  * Merchant base URL.
  */
 static char *merchant_url;
@@ -80,12 +90,24 @@ static void
 run_commands (void *cls,
               struct TALER_TESTING_Interpreter *is)
 {
-  /*struct TALER_TESTING_Command commands[] = {
+  struct TALER_TESTING_Command commands[] = {
     TALER_TESTING_cmd_end ()
   };
 
-  TALER_TESTING_run (is, commands);*/
-  TALER_LOG_INFO ("End-of-work\n");
+  TALER_TESTING_run (is, commands);
+}
+
+/**
+ * Send SIGTERM and wait for process termination.
+ *
+ * @param process process to terminate.
+ */
+void
+terminate_process (struct GNUNET_OS_Process *process)
+{
+  GNUNET_OS_process_kill (process, SIGTERM);
+  GNUNET_OS_process_wait (process);
+  GNUNET_OS_process_destroy (process);
 }
 
 /**
@@ -104,8 +126,6 @@ run (void *cls,
      const char *cfgfile,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
-  TALER_LOG_DEBUG ("Using configuration file: %s\n", cfgfile);
-
   if (NULL == merchant_url)
   {
     TALER_LOG_ERROR ("Option -m is mandatory!\n");
@@ -118,10 +138,11 @@ run (void *cls,
   {
     TALER_LOG_ERROR ("Failed to launch the merchant\n");
     result = 3;
+    GNUNET_OS_process_kill (merchantd, SIGTERM);
+    GNUNET_OS_process_wait (merchantd);
+    GNUNET_OS_process_destroy (merchantd);
     return;
   }
-
-  result = 0;
 
   if (NULL == bank_url)
   {
@@ -139,11 +160,6 @@ run (void *cls,
     GNUNET_OS_process_destroy (merchantd);
     return;
   }
-
-  /* Blocks.. */
-  result = TALER_TESTING_setup_with_exchange (&run_commands,
-                                              NULL,
-                                              cfgfile);
 
   GNUNET_OS_process_kill (merchantd, SIGTERM);
   GNUNET_OS_process_wait (merchantd);
@@ -165,6 +181,11 @@ int
 main (int argc,
       char *const *argv)
 {
+
+  const char *default_config_file;
+
+  default_config_file = GNUNET_OS_project_data_get
+    ()->user_config_file;
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 
@@ -203,12 +224,59 @@ main (int argc,
        "bank base url, mandatory",
        &bank_url),
 
+    GNUNET_GETOPT_option_string
+      ('l',
+       "logfile",
+       "LF",
+       "will log to file LF",
+       &logfile),
+
     GNUNET_GETOPT_OPTION_END
   };
 
-  GNUNET_PROGRAM_run (argc, argv,
-                      "taler-merchant-generate-payments-new",
-                      "Populate the database with payments",
-                      options, &run, NULL);
+  GNUNET_assert (GNUNET_SYSERR != GNUNET_GETOPT_run
+    ("taler-merchant-generate-payments-new",
+     options,
+     argc,
+     argv));
+
+  GNUNET_log_setup ("taler-merchant-generate-payments-new",
+                    "INFO",
+                    logfile);
+
+  if (NULL == merchant_url)
+  {
+    TALER_LOG_ERROR ("Option -m is mandatory!\n");
+    return MISSING_MERCHANT_URL;
+  }
+
+  if (NULL == (merchantd = TALER_TESTING_run_merchant
+    (default_config_file, merchant_url)))
+  {
+    TALER_LOG_ERROR ("Failed to launch the merchant\n");
+    terminate_process (merchantd);
+    return FAILED_TO_LAUNCH_MERCHANT;
+  }
+
+  if (NULL == bank_url)
+  {
+    TALER_LOG_ERROR ("Option -b is mandatory!\n");
+    return MISSING_BANK_URL;
+  }
+
+  if (NULL == (bankd = TALER_TESTING_run_bank
+    (default_config_file,
+     bank_url)))
+  {
+    TALER_LOG_ERROR ("Failed to run the bank\n");
+    terminate_process (bankd);
+    terminate_process (merchantd);
+    return FAILED_TO_LAUNCH_BANK;
+  }
+
+  result = TALER_TESTING_setup_with_exchange
+    (run_commands,
+     options,
+     default_config_file);
   return result;
 }
