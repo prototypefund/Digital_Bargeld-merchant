@@ -216,7 +216,8 @@ main (int argc,
 
   result = TALER_TESTING_setup_with_exchange
     (run,
-     options,
+     NULL,
      default_config_file);
+
   return result;
 }
