@@ -43,10 +43,10 @@
 #define MISSING_BANK_URL 4
 #define FAILED_TO_LAUNCH_BANK 5
 
-#define USER_ACCOUNT_NO 62
+#define USER_ACCOUNT_NO 3
 #define EXCHANGE_ACCOUNT_NO 2
-#define USER_LOGIN_NAME "user42"
-#define USER_LOGIN_PASS "pass42"
+#define USER_LOGIN_NAME "Tor"
+#define USER_LOGIN_PASS "x"
 #define EXCHANGE_URL "http://example.com/"
 
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
@@ -260,6 +260,7 @@ main (int argc,
      default_config_file);
 
   terminate_process (merchantd);
+  terminate_process (bankd);
 
   return (GNUNET_OK == result) ? 0 : result;
 }
