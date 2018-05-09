@@ -581,5 +581,23 @@ TALER_TESTING_cmd_tip_pickup
    const char **amounts,
    struct TALER_EXCHANGE_Handle *exchange);
 
+/**
+ * Make the instruction pointer point to @a new_ip
+ * only if @a counter is greater than zero.
+ *
+ * @param label command label
+ * @param new_ip new instruction pointer's value.  Note that,
+ * when the next instruction will be called, the interpreter
+ * will increment the ip under the hood so this value must be
+ * set to the index of the instruction we want to execute next
+ * MINUS one.
+ * @param counter counts how many times the rewinding has
+ * to happen.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_rewind_ip
+  (const char *label,
+   int new_ip,
+   unsigned int *counter);
 
 #endif

@@ -21,9 +21,9 @@ taler_merchant_generate_payments_new_SOURCES = \
 taler_merchant_generate_payments_new_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   $(top_srcdir)/src/lib/libtalermerchant.la \
+  $(top_srcdir)/src/lib/libtalermerchanttesting.la \
   $(LIBGCRYPT_LIBS) \
   -ltalertesting \
-  -ltalermerchanttesting \
   -ltalerfakebank \
   -ltalerbank \
   -ltalerbanktesting \

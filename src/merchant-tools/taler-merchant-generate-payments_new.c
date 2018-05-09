@@ -78,7 +78,7 @@ static struct GNUNET_OS_Process *merchantd;
 /**
  * How many payments we want to generate.
  */
-static unsigned int payments_number;
+static unsigned int payments_number = 1;
 
 /**
  * How many /tracks operation we want to perform.
@@ -116,6 +116,8 @@ run (void *cls,
                               "USD:10.02"),
     TALER_TESTING_cmd_exec_wirewatch ("wirewatch-1",
                                       default_config_file),
+    TALER_TESTING_cmd_rewind_ip ("rew-payments", -1,
+                                 &payments_number),
     TALER_TESTING_cmd_end ()
   };
 
