@@ -43,15 +43,21 @@
 #define MISSING_BANK_URL 4
 #define FAILED_TO_LAUNCH_BANK 5
 
+#define USER_ACCOUNT_NO 62
+#define EXCHANGE_ACCOUNT_NO 2
+#define USER_LOGIN_NAME "user42"
+#define USER_LOGIN_PASS "pass42"
+#define EXCHANGE_URL "http://example.com/"
+
+#define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
+   TALER_TESTING_cmd_fakebank_transfer (label, amount, \
+     bank_url, USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO, \
+     USER_LOGIN_NAME, USER_LOGIN_PASS, EXCHANGE_URL)
+
 /**
  * Exit code.
  */
-unsigned int result;
-
-/**
- * Merchant process.
- */
-static struct GNUNET_OS_Process *merchantd;
+static unsigned int result;
 
 /**
  * Bank process.
@@ -59,14 +65,28 @@ static struct GNUNET_OS_Process *merchantd;
 static struct GNUNET_OS_Process *bankd;
 
 /**
+ * Indicates whether we'll use the Python bank (GNUNET_YES),
+ * or the fakebank.
+ */
+static int with_pybank;
+
+/**
+ * Merchant process.
+ */
+static struct GNUNET_OS_Process *merchantd;
+
+/**
  * How many payments we want to generate.
  */
-unsigned int payments_number;
+static unsigned int payments_number;
 
 /**
  * How many /tracks operation we want to perform.
  */
-unsigned int tracks_number;
+static unsigned int tracks_number;
+
+
+static const char *default_config_file;
 
 /**
  * Bank base URL.
@@ -83,7 +103,6 @@ static char *logfile;
  */
 static char *merchant_url;
 
-
 /**
  * Actual commands collection.
  */
@@ -91,9 +110,26 @@ static void
 run (void *cls,
      struct TALER_TESTING_Interpreter *is)
 {
-  /* Looping will be implemented by rewinding the instruction
-    pointer.  */
 
+  struct TALER_TESTING_Command commands[] = {
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-1",
+                              "USD:10.02"),
+    TALER_TESTING_cmd_exec_wirewatch ("wirewatch-1",
+                                      default_config_file),
+    TALER_TESTING_cmd_end ()
+  };
+
+  if (GNUNET_YES == with_pybank)
+  {
+    TALER_TESTING_run (is,
+                       commands);
+    return; 
+  }
+
+  TALER_TESTING_run_with_fakebank
+    (is,
+     commands,
+     bank_url);
 }
 
 /**
@@ -120,8 +156,6 @@ int
 main (int argc,
       char *const *argv)
 {
-
-  const char *default_config_file;
 
   default_config_file = GNUNET_OS_project_data_get
     ()->user_config_file;
@@ -170,6 +204,12 @@ main (int argc,
        "will log to file LF",
        &logfile),
 
+    GNUNET_GETOPT_option_flag
+      ('p',
+       "with-pybank",
+       "Use the Python bank, if given",
+       &with_pybank),
+
     GNUNET_GETOPT_OPTION_END
   };
 
@@ -203,9 +243,10 @@ main (int argc,
     return MISSING_BANK_URL;
   }
 
-  if (NULL == (bankd = TALER_TESTING_run_bank
-    (default_config_file,
-     bank_url)))
+  if ((GNUNET_YES == with_pybank)
+      && NULL == (bankd = TALER_TESTING_run_bank
+        (default_config_file,
+         bank_url)))
   {
     TALER_LOG_ERROR ("Failed to run the bank\n");
     terminate_process (bankd);
@@ -218,7 +259,6 @@ main (int argc,
      NULL,
      default_config_file);
 
-  terminate_process (bankd);
   terminate_process (merchantd);
 
   return (GNUNET_OK == result) ? 0 : result;
