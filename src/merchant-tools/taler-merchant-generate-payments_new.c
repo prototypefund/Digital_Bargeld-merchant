@@ -83,6 +83,7 @@ static char *logfile;
  */
 static char *merchant_url;
 
+
 /**
  * Actual commands collection.
  */
@@ -90,11 +91,9 @@ static void
 run (void *cls,
      struct TALER_TESTING_Interpreter *is)
 {
-  struct TALER_TESTING_Command commands[] = {
-    TALER_TESTING_cmd_end ()
-  };
+  /* Looping will be implemented by rewinding the instruction
+    pointer.  */
 
-  TALER_TESTING_run (is, commands);
 }
 
 /**
@@ -181,7 +180,7 @@ main (int argc,
      argv));
 
   GNUNET_log_setup ("taler-merchant-generate-payments-new",
-                    "INFO",
+                    "DEBUG",
                     logfile);
 
   if (NULL == merchant_url)

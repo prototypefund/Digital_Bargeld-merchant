@@ -346,6 +346,25 @@ proposal_run (void *cls,
     return;
   }
 
+  if (NULL == json_object_get (order,
+                               "order_id"))
+  {
+    struct GNUNET_TIME_Absolute now;
+    char *order_id;
+
+    now = GNUNET_TIME_absolute_get (); 
+
+    order_id = GNUNET_STRINGS_data_to_string_alloc
+      (&now.abs_value_us,
+       sizeof (now.abs_value_us));
+
+    json_object_set (order,
+                     "order_id",
+                     json_string (order_id));
+
+    GNUNET_free (order_id);
+  }
+
   GNUNET_CRYPTO_random_block
     (GNUNET_CRYPTO_QUALITY_WEAK,
      &ps->nonce,
