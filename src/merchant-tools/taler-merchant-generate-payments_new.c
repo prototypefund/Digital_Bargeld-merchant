@@ -112,12 +112,76 @@ run (void *cls,
 {
 
   struct TALER_TESTING_Command commands[] = {
-    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-1",
-                              "USD:10.02"),
-    TALER_TESTING_cmd_exec_wirewatch ("wirewatch-1",
-                                      default_config_file),
-    TALER_TESTING_cmd_rewind_ip ("rew-payments", -1,
-                                 &payments_number),
+
+    CMD_TRANSFER_TO_EXCHANGE
+      ("create-reserve-1",
+       "USD:10.02"),
+
+    TALER_TESTING_cmd_exec_wirewatch
+      ("wirewatch-1",
+       default_config_file),
+
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-1",
+       is->exchange,
+       "create-reserve-1",
+       "USD:5",
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-2",
+       is->exchange,
+       "create-reserve-1",
+       "USD:5",
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_status
+      ("withdraw-status-1",
+       is->exchange,
+       "create-reserve-1",
+       "USD:0",
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"USD\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"USD\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{USD:5}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_check_payment
+      ("check-payment-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-proposal-1",
+       GNUNET_NO),
+
+    TALER_TESTING_cmd_pay
+      ("deposit-simple",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-proposal-1",
+       "withdraw-coin-1",
+       "USD:5",
+       "USD:4.99",
+       "USD:0.01"),
+
     TALER_TESTING_cmd_end ()
   };
 
