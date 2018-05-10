@@ -38,11 +38,18 @@
 #include <taler/taler_error_codes.h>
 #include "taler_merchant_testing_lib.h"
 
+/* Error codes.  */
 #define MISSING_MERCHANT_URL 2
 #define FAILED_TO_LAUNCH_MERCHANT 3
 #define MISSING_BANK_URL 4
 #define FAILED_TO_LAUNCH_BANK 5
+#define BAD_CLI_ARG 6
 
+/* Hard-coded params.  Note, the bank is expected to
+ * have the Tor user with account number 3 and password 'x'.
+ *
+ * This is not a problem _so far_, as the fakebank mocks logins,
+ * and the Python bank makes that account by default.  */
 #define USER_ACCOUNT_NO 3
 #define EXCHANGE_ACCOUNT_NO 2
 #define USER_LOGIN_NAME "Tor"
