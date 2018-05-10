@@ -175,6 +175,42 @@ run (void *cls,
        FIRST_INSTRUCTION,
        &payments_number),
 
+    /* Next proposal-pay cycle will be used by /track CMDs
+     * and so it will not have to be looped over, only /track
+     * CMDs will have to.  */
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"USD\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"USD\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice track cream\",\
+                         \"value\":\"{USD:5}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_pay
+      ("deposit-simple-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-proposal-2",
+       "withdraw-coin-2",
+       "USD:5",
+       "USD:4.99",
+       "USD:0.01"),
+
     TALER_TESTING_cmd_end ()
   };
 
