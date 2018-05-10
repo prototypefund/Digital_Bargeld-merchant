@@ -52,6 +52,8 @@ struct TrackTransactionState
    * make the paygen work.  */
   struct TALER_WireTransferIdentifierRawP wtid; 
 
+  const char *exchange_url;
+
 };
 
 struct TrackTransferState
@@ -101,6 +103,8 @@ track_transaction_cb (void *cls,
 
     GNUNET_JSON_spec_fixed_auto ("wtid",
                                  &tts->wtid),
+    GNUNET_JSON_spec_string ("exchange",
+                             &tts->exchange_url),
     GNUNET_JSON_spec_end ()
   };
 
@@ -325,6 +329,7 @@ track_transaction_cleanup (void *cls,
                 " did not complete\n");
     TALER_MERCHANT_track_transaction_cancel (tts->tth);
   }
+  /* WARNING: who frees tts->exchange_url ? */
   GNUNET_free (tts);
 }
 
@@ -339,6 +344,7 @@ track_transaction_traits (void *cls,
 
   struct TALER_TESTING_Trait traits[] = {
     TALER_TESTING_make_trait_wtid (0, &tts->wtid),
+    TALER_TESTING_make_trait_url (0, tts->exchange_url),
     TALER_TESTING_trait_end ()
   };
 
