@@ -57,6 +57,7 @@
 #define EXCHANGE_URL "http://example.com/"
 
 #define FIRST_INSTRUCTION -1
+#define TRACKS_INSTRUCTION 10
 
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
    TALER_TESTING_cmd_fakebank_transfer (label, amount, \
@@ -210,6 +211,34 @@ run (void *cls,
        "USD:5",
        "USD:4.99",
        "USD:0.01"),
+
+    /* /track/transaction over deposit-simple-2 */
+
+    TALER_TESTING_cmd_exec_aggregator
+      ("aggregate-1",
+       default_config_file),
+
+    TALER_TESTING_cmd_merchant_track_transaction
+      ("track-transaction-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "dummy",
+       "deposit-simple-2",
+       "USD:0.01"),
+
+    TALER_TESTING_cmd_merchant_track_transfer
+      ("track-transfer-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "track-transaction-1",
+       "deposit-simple-2"),
+
+    TALER_TESTING_cmd_rewind_ip
+      ("rewind-tracks",
+       TRACKS_INSTRUCTION,
+       &tracks_number),
 
     TALER_TESTING_cmd_end ()
   };
