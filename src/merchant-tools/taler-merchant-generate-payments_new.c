@@ -49,6 +49,8 @@
 #define USER_LOGIN_PASS "x"
 #define EXCHANGE_URL "http://example.com/"
 
+#define FIRST_INSTRUCTION -1
+
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
    TALER_TESTING_cmd_fakebank_transfer (label, amount, \
      bank_url, USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO, \
@@ -181,6 +183,11 @@ run (void *cls,
        "USD:5",
        "USD:4.99",
        "USD:0.01"),
+
+    TALER_TESTING_cmd_rewind_ip
+      ("rewind-payments",
+       FIRST_INSTRUCTION,
+       &payments_number),
 
     TALER_TESTING_cmd_end ()
   };
