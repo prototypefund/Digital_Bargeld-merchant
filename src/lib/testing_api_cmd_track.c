@@ -46,6 +46,12 @@ struct TrackTransactionState
   const char *pay_reference;
 
   const char *wire_fee;
+
+  /* This only accounts for the *first* wire transfer that
+   * payed back this transaction.  So far, this suffices to
+   * make the paygen work.  */
+  struct TALER_WireTransferIdentifierRawP wtid; 
+
 };
 
 struct TrackTransferState
@@ -87,7 +93,16 @@ track_transaction_cb (void *cls,
                       enum TALER_ErrorCode ec,
                       const json_t *json)
 {
+  const char *error_json_name;
+  unsigned int error_line;
   struct TrackTransactionState *tts = cls;
+
+  struct GNUNET_JSON_Specification spec[] = {
+
+    GNUNET_JSON_spec_fixed_auto ("wtid",
+                                 &tts->wtid),
+    GNUNET_JSON_spec_end ()
+  };
 
   tts->tth = NULL;
   if (tts->http_status != http_status)
@@ -104,6 +119,26 @@ track_transaction_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "/track/transaction, response code: %u\n",
               http_status);
+
+  /* Only storing first element's wtid, as this works around
+   * the disability of the real bank to provide a "bank check"
+   * CMD as the fakebank does.  */
+  if (GNUNET_SYSERR == GNUNET_JSON_parse (json_array_get (json, 0),
+                                          spec,
+                                          &error_json_name,
+                                          &error_line))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "wtid field absent %s/%u, (%s)\n",
+                error_json_name,
+                error_line,
+                json_dumps (json, JSON_INDENT (2)));
+
+    TALER_TESTING_interpreter_fail (tts->is);
+    return;
+  }
+
+
   TALER_TESTING_interpreter_next (tts->is);
 }
 
@@ -294,6 +329,26 @@ track_transaction_cleanup (void *cls,
 }
 
 
+static int
+track_transaction_traits (void *cls,
+                          void **ret,
+                          const char *trait,
+                          unsigned int index)
+{
+  struct TrackTransactionState *tts = cls;
+
+  struct TALER_TESTING_Trait traits[] = {
+    TALER_TESTING_make_trait_wtid (0, &tts->wtid),
+    TALER_TESTING_trait_end ()
+  };
+
+  return TALER_TESTING_get_trait (traits,
+                                  ret,
+                                  trait,
+                                  index);
+  return GNUNET_SYSERR;
+}
+
 /**
  * FIXME
  */
@@ -322,6 +377,7 @@ TALER_TESTING_cmd_merchant_track_transaction
   cmd.label = label;
   cmd.run = &track_transaction_run;
   cmd.cleanup = &track_transaction_cleanup;
+  cmd.traits = &track_transaction_traits;
   // traits?
 
   return cmd;
