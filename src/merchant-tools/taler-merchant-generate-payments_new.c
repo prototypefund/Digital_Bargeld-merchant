@@ -74,12 +74,6 @@ static unsigned int result;
 static struct GNUNET_OS_Process *bankd;
 
 /**
- * Indicates whether we'll use the Python bank (GNUNET_YES),
- * or the fakebank.
- */
-static int with_pybank;
-
-/**
  * Merchant process.
  */
 static struct GNUNET_OS_Process *merchantd;
@@ -184,17 +178,8 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
-  if (GNUNET_YES == with_pybank)
-  {
-    TALER_TESTING_run (is,
-                       commands);
-    return; 
-  }
-
-  TALER_TESTING_run_with_fakebank
-    (is,
-     commands,
-     bank_url);
+  TALER_TESTING_run (is,
+                     commands);
 }
 
 /**
@@ -269,12 +254,6 @@ main (int argc,
        "will log to file LF",
        &logfile),
 
-    GNUNET_GETOPT_option_flag
-      ('p',
-       "with-pybank",
-       "Use the Python bank, if given",
-       &with_pybank),
-
     GNUNET_GETOPT_OPTION_END
   };
 
@@ -308,10 +287,9 @@ main (int argc,
     return MISSING_BANK_URL;
   }
 
-  if ((GNUNET_YES == with_pybank)
-      && NULL == (bankd = TALER_TESTING_run_bank
-        (default_config_file,
-         bank_url)))
+  if ( NULL == (bankd = TALER_TESTING_run_bank
+    (default_config_file,
+     bank_url)))
   {
     TALER_LOG_ERROR ("Failed to run the bank\n");
     terminate_process (bankd);
