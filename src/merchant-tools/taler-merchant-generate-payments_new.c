@@ -144,13 +144,6 @@ run (void *cls,
        "USD:5",
        MHD_HTTP_OK),
 
-    TALER_TESTING_cmd_status
-      ("withdraw-status-1",
-       is->exchange,
-       "create-reserve-1",
-       "USD:0",
-       MHD_HTTP_OK),
-
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
        merchant_url,
@@ -171,14 +164,6 @@ run (void *cls,
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{USD:5}\"} ] }",
         NULL),
-
-    TALER_TESTING_cmd_check_payment
-      ("check-payment-1",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       "create-proposal-1",
-       GNUNET_NO),
 
     TALER_TESTING_cmd_pay
       ("deposit-simple",
