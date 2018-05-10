@@ -972,7 +972,7 @@ accept_exchanges (void *cls,
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "URL");
+                               "BASE_URL");
     return;
   }
   if (GNUNET_OK !=
