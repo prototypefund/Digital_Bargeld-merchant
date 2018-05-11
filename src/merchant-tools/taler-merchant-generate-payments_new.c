@@ -95,6 +95,11 @@ static const char *default_config_file;
 static char *loglev;
 
 /**
+ * Config filename.
+ */
+static char *cfg_filename;
+
+/**
  * Bank base URL.
  */
 static char *bank_url;
@@ -125,7 +130,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
-       default_config_file),
+       cfg_filename),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
@@ -218,7 +223,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_exec_aggregator
       ("aggregate-1",
-       default_config_file),
+       cfg_filename),
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
@@ -279,6 +284,9 @@ main (int argc,
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 
+    GNUNET_GETOPT_option_cfgfile
+      (&cfg_filename),
+
     GNUNET_GETOPT_option_version
       (PACKAGE_VERSION " " VCS_VERSION),
 
@@ -286,7 +294,7 @@ main (int argc,
       ("Generate Taler payments to populate the database(s)"),
 
     GNUNET_GETOPT_option_loglevel
-      (loglev),
+      (&loglev),
 
     GNUNET_GETOPT_option_uint
       ('n',
@@ -350,6 +358,9 @@ main (int argc,
   GNUNET_log_setup ("taler-merchant-generate-payments-new",
                     loglev,
                     logfile);
+
+  if (NULL == cfg_filename)
+    cfg_filename = (char *) default_config_file;
 
   if (NULL == merchant_url)
   {
