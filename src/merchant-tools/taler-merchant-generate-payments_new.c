@@ -297,7 +297,7 @@ main (int argc,
       (&loglev),
 
     GNUNET_GETOPT_option_uint
-      ('n',
+      ('p',
        "payments-number",
        "PN",
        "will generate PN payments, defaults to 1",
