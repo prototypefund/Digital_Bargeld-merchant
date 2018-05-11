@@ -277,8 +277,11 @@ main (int argc,
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 
+    GNUNET_GETOPT_option_version
+      (PACKAGE_VERSION " " VCS_VERSION),
+
     GNUNET_GETOPT_option_help
-    ("Generate Taler payments to populate the database(s)"),
+      ("Generate Taler payments to populate the database(s)"),
 
     GNUNET_GETOPT_option_uint
       ('n',

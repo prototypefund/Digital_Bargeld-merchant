@@ -273,6 +273,29 @@ AC_ARG_ENABLE([logging],
    ], [])
 AC_DEFINE_UNQUOTED([GNUNET_EXTRA_LOGGING],[$extra_logging],[1 if extra logging is enabled, 2 for very verbose extra logging, 0 otherwise])
 
+# version info
+AC_PATH_PROG(gitcommand, git)
+AC_MSG_CHECKING(for source being under a VCS)
+git_version=
+AS_IF([test ! "X$gitcommand" = "X"],
+[
+  git_version=$(cd $srcdir ; git rev-list --full-history --all --abbrev-commit | head -n 1 2>/dev/null)
+])
+AS_IF([test "X$git_version" = "X"],
+  [
+    vcs_name="no"
+    vcs_version="\"release\""
+  ],
+  [
+    vcs_name="yes, git-svn"
+    vcs_version="\"git-$git_version\""
+  ])
+AC_MSG_RESULT($vcs_name)
+
+AC_MSG_CHECKING(VCS version)
+AC_MSG_RESULT($vcs_version)
+AC_DEFINE_UNQUOTED(VCS_VERSION, [$vcs_version], [VCS revision/hash or tarball version])
+
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
