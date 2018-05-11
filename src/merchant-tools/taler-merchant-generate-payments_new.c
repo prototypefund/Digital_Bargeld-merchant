@@ -277,6 +277,9 @@ main (int argc,
 
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 
+    GNUNET_GETOPT_option_help
+    ("Generate Taler payments to populate the database(s)"),
+
     GNUNET_GETOPT_option_uint
       ('n',
        "payments-number",
@@ -322,11 +325,19 @@ main (int argc,
     GNUNET_GETOPT_OPTION_END
   };
 
-  GNUNET_assert (GNUNET_SYSERR != GNUNET_GETOPT_run
+  result = GNUNET_GETOPT_run
     ("taler-merchant-generate-payments-new",
      options,
      argc,
-     argv));
+     argv);
+
+  if (GNUNET_NO == result)
+  {
+    /* --help was given, just return.  */ 
+    return 0;
+  }
+
+  GNUNET_assert (GNUNET_SYSERR != result);
 
   GNUNET_log_setup ("taler-merchant-generate-payments-new",
                     "DEBUG",
