@@ -223,7 +223,7 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "dummy",
+       "dummy", // "check bank" CMD, never used, to be deleted.
        "deposit-simple-2",
        "USD:0.01"),
 

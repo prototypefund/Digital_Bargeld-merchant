@@ -50,7 +50,14 @@ struct TrackTransactionState
   /* This only accounts for the *first* wire transfer that
    * payed back this transaction.  So far, this suffices to
    * make the paygen work.  */
-  struct TALER_WireTransferIdentifierRawP wtid; 
+  const char *wtid_str; 
+
+  /**
+   * Binary form of wtid.  Some commands expect it - via
+   * appropriate traits - to be in binary form.
+   */
+  struct TALER_WireTransferIdentifierRawP wtid;
+
 
   const char *exchange_url;
 
@@ -95,18 +102,9 @@ track_transaction_cb (void *cls,
                       enum TALER_ErrorCode ec,
                       const json_t *json)
 {
-  const char *error_json_name;
-  unsigned int error_line;
   struct TrackTransactionState *tts = cls;
-
-  struct GNUNET_JSON_Specification spec[] = {
-
-    GNUNET_JSON_spec_fixed_auto ("wtid",
-                                 &tts->wtid),
-    GNUNET_JSON_spec_string ("exchange",
-                             &tts->exchange_url),
-    GNUNET_JSON_spec_end ()
-  };
+  json_t *wtid_str;
+  json_t *exchange_url;
 
   tts->tth = NULL;
   if (tts->http_status != http_status)
@@ -127,21 +125,25 @@ track_transaction_cb (void *cls,
   /* Only storing first element's wtid, as this works around
    * the disability of the real bank to provide a "bank check"
    * CMD as the fakebank does.  */
-  if (GNUNET_SYSERR == GNUNET_JSON_parse (json_array_get (json, 0),
-                                          spec,
-                                          &error_json_name,
-                                          &error_line))
+  if (NULL == (wtid_str = json_object_get
+    (json_array_get (json, 0), "wtid")))
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "wtid field absent %s/%u, (%s)\n",
-                error_json_name,
-                error_line,
-                json_dumps (json, JSON_INDENT (2)));
+    TALER_TESTING_interpreter_fail (tts->is);
+    return; 
+  }
 
+  if (NULL == (exchange_url = json_object_get
+    (json_array_get (json, 0), "exchange")))
+  {
+  
     TALER_TESTING_interpreter_fail (tts->is);
     return;
   }
 
+  tts->exchange_url = GNUNET_strdup
+    (json_string_value (exchange_url));
+  tts->wtid_str = GNUNET_strdup
+    (json_string_value (wtid_str));
 
   TALER_TESTING_interpreter_next (tts->is);
 }
@@ -329,7 +331,11 @@ track_transaction_cleanup (void *cls,
                 " did not complete\n");
     TALER_MERCHANT_track_transaction_cancel (tts->tth);
   }
-  /* WARNING: who frees tts->exchange_url ? */
+
+  /* Need to discard 'const' before freeing.  */
+  GNUNET_free ((char *) tts->exchange_url);
+  GNUNET_free ((char *) tts->wtid_str);
+
   GNUNET_free (tts);
 }
 
@@ -341,9 +347,19 @@ track_transaction_traits (void *cls,
                           unsigned int index)
 {
   struct TrackTransactionState *tts = cls;
+  struct TALER_WireTransferIdentifierRawP *wtid_ptr;
+
+  if (GNUNET_OK != GNUNET_STRINGS_string_to_data
+      (tts->wtid_str,
+       strlen (tts->wtid_str),
+       &tts->wtid,
+       sizeof (struct TALER_WireTransferIdentifierRawP)))
+    wtid_ptr = NULL;
+  else
+    wtid_ptr = &tts->wtid;
 
   struct TALER_TESTING_Trait traits[] = {
-    TALER_TESTING_make_trait_wtid (0, &tts->wtid),
+    TALER_TESTING_make_trait_wtid (0, wtid_ptr),
     TALER_TESTING_make_trait_url (0, tts->exchange_url),
     TALER_TESTING_trait_end ()
   };
