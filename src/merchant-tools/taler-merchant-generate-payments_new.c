@@ -57,7 +57,7 @@
 #define EXCHANGE_URL "http://example.com/"
 
 #define FIRST_INSTRUCTION -1
-#define TRACKS_INSTRUCTION 10
+#define TRACKS_INSTRUCTION 9
 
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
    TALER_TESTING_cmd_fakebank_transfer (label, amount, \
