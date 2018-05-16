@@ -121,30 +121,32 @@ track_transaction_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "/track/transaction, response code: %u\n",
               http_status);
-
-  /* Only storing first element's wtid, as this works around
-   * the disability of the real bank to provide a "bank check"
-   * CMD as the fakebank does.  */
-  if (NULL == (wtid_str = json_object_get
-    (json_array_get (json, 0), "wtid")))
+  if (MHD_HTTP_OK == http_status)
   {
-    TALER_TESTING_interpreter_fail (tts->is);
-    return; 
-  }
-
-  if (NULL == (exchange_url = json_object_get
-    (json_array_get (json, 0), "exchange")))
-  {
+    /* Only storing first element's wtid, as this works around
+     * the disability of the real bank to provide a "bank check"
+     * CMD as the fakebank does.  */
   
-    TALER_TESTING_interpreter_fail (tts->is);
-    return;
+    if (NULL == (wtid_str = json_object_get
+      (json_array_get (json, 0), "wtid")))
+    {
+      TALER_TESTING_interpreter_fail (tts->is);
+      return; 
+    }
+  
+    if (NULL == (exchange_url = json_object_get
+      (json_array_get (json, 0), "exchange")))
+    {
+    
+      TALER_TESTING_interpreter_fail (tts->is);
+      return;
+    }
+  
+    tts->exchange_url = GNUNET_strdup
+      (json_string_value (exchange_url));
+    tts->wtid_str = GNUNET_strdup
+      (json_string_value (wtid_str));
   }
-
-  tts->exchange_url = GNUNET_strdup
-    (json_string_value (exchange_url));
-  tts->wtid_str = GNUNET_strdup
-    (json_string_value (wtid_str));
-
   TALER_TESTING_interpreter_next (tts->is);
 }
 
@@ -333,8 +335,8 @@ track_transaction_cleanup (void *cls,
   }
 
   /* Need to discard 'const' before freeing.  */
-  GNUNET_free ((char *) tts->exchange_url);
-  GNUNET_free ((char *) tts->wtid_str);
+  GNUNET_free_non_null ((char *) tts->exchange_url);
+  GNUNET_free_non_null ((char *) tts->wtid_str);
 
   GNUNET_free (tts);
 }

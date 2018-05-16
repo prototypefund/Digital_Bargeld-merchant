@@ -546,12 +546,10 @@ run (void *cls,
                                      MHD_HTTP_OK,
                                      "create-proposal-6",
                                      GNUNET_YES),
-
     CMD_EXEC_AGGREGATOR ("run-aggregator"),
-
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-1",
-       twister_exchange_url,
+       twister_exchange_url, /* has the 8888-port thing.  */
        /* paid,         1.97 =
           brutto        2.00 -
           deposit fee   0.01 * 2 -
@@ -561,16 +559,13 @@ run (void *cls,
        EXCHANGE_ACCOUNT_NO,
        MERCHANT_ACCOUNT_NO),
 
-    /* Should instead change the response body somehow! */
     TALER_TESTING_cmd_modify_object ("hack-0",
                                      PROXY_EXCHANGE_CONFIG_FILE,
                                      "total",
                                      "EUR:0.98"),
-
     TALER_TESTING_cmd_delete_object ("hack-1",
                                      PROXY_EXCHANGE_CONFIG_FILE,
                                      "deposits.0"),
-
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
        twister_merchant_url,
@@ -678,20 +673,18 @@ run (void *cls,
                                  "deposit-simple-for-abort",
                                  is->ctx,
                                  0),
-#if FIXME_MARCELLO
-    TALER_TESTING_cmd_flip_object
+
+    TALER_TESTING_cmd_flip_download
       ("hack-abort-4",
        PROXY_MERCHANT_CONFIG_FILE,
        "refund_permissions.0.merchant_sig"),
-#endif
+
     TALER_TESTING_cmd_pay_abort ("pay-abort-4",
                                  twister_merchant_url,
                                  "deposit-simple-for-abort",
                                  is->ctx,
                                  0),
-
     /* just malforming the response.  */
-
     TALER_TESTING_cmd_malform_response
       ("malform-abortion",
        PROXY_MERCHANT_CONFIG_FILE),
@@ -766,12 +759,11 @@ run (void *cls,
                            "EUR:1.99", // no sense now
                            "EUR:0.01"), // no sense now
 
-#if FIXME_MARCELLO
-    TALER_TESTING_cmd_flip_object
+    TALER_TESTING_cmd_flip_download
       ("hack-coin-history",
        PROXY_MERCHANT_CONFIG_FILE,
        "history.0.coin_sig"),
-#endif
+
     /* Coin history check will fail, due to coin's bad signature.  */
     TALER_TESTING_cmd_pay ("deposit-simple-fail",
                            twister_merchant_url,

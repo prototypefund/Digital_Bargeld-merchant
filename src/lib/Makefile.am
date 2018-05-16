@@ -79,11 +79,9 @@ check_PROGRAMS = \
   test_merchant_api_new \
   test_merchant_api
 
-if HAVE_EXPERIMENTAL
 if HAVE_TWISTER
 # See FIXME_MARCELLO -- had some issues (FTBFS, etc.)
-#  check_PROGRAMS += test_merchant_api_twisted
-endif
+check_PROGRAMS += test_merchant_api_twisted
 endif
 
 endif
