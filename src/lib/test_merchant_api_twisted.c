@@ -236,7 +236,7 @@ run (void *cls,
        "proposal-for-check-payment",
        GNUNET_SYSERR),
 
-    TALER_TESTING_cmd_modify_object
+    TALER_TESTING_cmd_modify_object_dl
       ("paid-true-for-unpaid",
        PROXY_MERCHANT_CONFIG_FILE,
        "paid",
@@ -559,13 +559,15 @@ run (void *cls,
        EXCHANGE_ACCOUNT_NO,
        MERCHANT_ACCOUNT_NO),
 
-    TALER_TESTING_cmd_modify_object ("hack-0",
-                                     PROXY_EXCHANGE_CONFIG_FILE,
-                                     "total",
-                                     "EUR:0.98"),
-    TALER_TESTING_cmd_delete_object ("hack-1",
-                                     PROXY_EXCHANGE_CONFIG_FILE,
-                                     "deposits.0"),
+    TALER_TESTING_cmd_modify_object_dl
+      ("hack-0",
+       PROXY_EXCHANGE_CONFIG_FILE,
+       "total",
+       "EUR:0.98"),
+    TALER_TESTING_cmd_delete_object
+      ("hack-1",
+       PROXY_EXCHANGE_CONFIG_FILE,
+       "deposits.0"),
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
        twister_merchant_url,
@@ -661,7 +663,7 @@ run (void *cls,
                                  is->ctx,
                                  0),
 
-    TALER_TESTING_cmd_modify_object
+    TALER_TESTING_cmd_modify_object_dl
       ("hack-abort-3",
        PROXY_MERCHANT_CONFIG_FILE,
        "refund_permissions.0.coin_pub",
