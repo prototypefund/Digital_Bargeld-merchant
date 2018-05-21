@@ -233,7 +233,8 @@ TALER_TESTING_cmd_refund_increase
    const char *reason,
    const char *order_id,
    const char *refund_amount,
-   const char *refund_fee);
+   const char *refund_fee,
+   unsigned int http_code);
 
 
 /**

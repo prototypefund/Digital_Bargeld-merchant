@@ -47,6 +47,8 @@ struct RefundIncreaseState
   const char *reason;
 
   struct TALER_TESTING_Interpreter *is;
+
+  unsigned int http_code;
 };
 
 struct RefundLookupState
@@ -400,7 +402,8 @@ TALER_TESTING_cmd_refund_increase
    const char *reason,
    const char *order_id,
    const char *refund_amount,
-   const char *refund_fee)
+   const char *refund_fee,
+   unsigned int http_code)
 {
   struct RefundIncreaseState *ris;
   struct TALER_TESTING_Command cmd;
@@ -412,6 +415,7 @@ TALER_TESTING_cmd_refund_increase
   ris->refund_amount = refund_amount;
   ris->refund_fee = refund_fee;
   ris->reason = reason;
+  ris->http_code = http_code;
 
   cmd.cls = ris;
   cmd.label = label;
