@@ -506,6 +506,16 @@ run (void *cls,
        "EUR:0.01",
        MHD_HTTP_BAD_REQUEST),
 
+    TALER_TESTING_cmd_refund_increase
+      ("refund-increase-unpaid-proposal",
+       merchant_url,
+       is->ctx,
+       "refund test",
+       "non-existent-id",
+       "EUR:0.1",
+       "EUR:0.01",
+       MHD_HTTP_NOT_FOUND),
+
     /* Test tipping.  */
     TALER_TESTING_cmd_fakebank_transfer_with_instance
       ("create-reserve-tip-1",

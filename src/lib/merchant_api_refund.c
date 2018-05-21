@@ -122,10 +122,11 @@ handle_refund_increase_finished (void *cls,
                 "Backend didn't even return from POST /refund\n");
     return;
 
-  /* Tolerate Bad Request here in order to let
-   * test cases move along.  */
+  /* Good to hand everything to the callback, as all
+   * the logic is actually there.  */
   case MHD_HTTP_OK:
   case MHD_HTTP_BAD_REQUEST:
+  case MHD_HTTP_NOT_FOUND:
     rio->cb (rio->cb_cls,
              response_code,
              TALER_EC_NONE,
