@@ -472,6 +472,40 @@ run (void *cls,
                                      "deposit-simple",
                                      "1"),
 
+    /* Test /refund on a contract that was never paid.  */
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-not-to-be-paid",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"1-unpaid\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"useful product\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:5}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_refund_increase
+      ("refund-increase-unpaid-proposal",
+       merchant_url,
+       is->ctx,
+       "refund test",
+       "1-unpaid",
+       "EUR:0.1",
+       "EUR:0.01",
+       MHD_HTTP_BAD_REQUEST),
+
     /* Test tipping.  */
     TALER_TESTING_cmd_fakebank_transfer_with_instance
       ("create-reserve-tip-1",

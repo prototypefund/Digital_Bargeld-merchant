@@ -129,7 +129,7 @@ refund_increase_cb (void *cls,
   struct RefundIncreaseState *ris = cls;
 
   ris->rio = NULL;
-  if (MHD_HTTP_OK != http_status)
+  if (ris->http_code != http_status)
     TALER_TESTING_FAIL (ris->is);
 
   TALER_TESTING_interpreter_next (ris->is);

@@ -121,9 +121,13 @@ handle_refund_increase_finished (void *cls,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Backend didn't even return from POST /refund\n");
     return;
+
+  /* Tolerate Bad Request here in order to let
+   * test cases move along.  */
   case MHD_HTTP_OK:
+  case MHD_HTTP_BAD_REQUEST:
     rio->cb (rio->cb_cls,
-             MHD_HTTP_OK,
+             response_code,
              TALER_EC_NONE,
              json);
     break;
@@ -133,13 +137,22 @@ handle_refund_increase_finished (void *cls,
      * NOTE that json must be a Taler-specific error object (FIXME,
      * need a link to error objects at docs)
      */
-    json_unpack ((json_t *) json,
-                 "{s:s, s:I, s:s}",
-                 "error", &error,
-                 "code", &code,
-                 "hint", &hint);
+    if (-1 == json_unpack
+        ((json_t *) json,
+         "{s:s, s:I, s:s}",
+         "error", &error,
+         "code", &code,
+         "hint", &hint))
+    
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "/refund failed (HTTP code: %lu), backend did "
+                "not give a valid error object\n", response_code);
+      break;
+    }
+
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed POST /refund, error: %s, code: %d, hint: %s\n",
+                "/refund, error: %s, code: %d, hint: %s\n",
                 error,
                 code,
                 hint);
