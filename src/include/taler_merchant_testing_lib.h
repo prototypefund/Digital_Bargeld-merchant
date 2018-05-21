@@ -219,7 +219,8 @@ TALER_TESTING_cmd_refund_lookup
    struct GNUNET_CURL_Context *ctx,
    const char *increase_reference,
    const char *pay_reference,
-   const char *order_id);
+   const char *order_id,
+   unsigned int http_code);
 
 
 /**

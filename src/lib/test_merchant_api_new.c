@@ -470,7 +470,17 @@ run (void *cls,
                                      is->ctx,
                                      "refund-increase-1",
                                      "deposit-simple",
-                                     "1"),
+                                     "1",
+                                     MHD_HTTP_OK),
+
+    /* Trying to pick up a non existent refund.  */
+    TALER_TESTING_cmd_refund_lookup ("refund-lookup-non-existent",
+                                     merchant_url,
+                                     is->ctx,
+                                     "refund-increase-1",
+                                     "deposit-simple",
+                                     "non-existend-id",
+                                     MHD_HTTP_NOT_FOUND),
 
     /* Test /refund on a contract that was never paid.  */
 

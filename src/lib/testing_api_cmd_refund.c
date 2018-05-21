@@ -65,6 +65,8 @@ struct RefundLookupState
 
   const char *increase_reference;
 
+  unsigned int http_code;
+
   struct TALER_TESTING_Interpreter *is;
 };
 
@@ -211,13 +213,18 @@ refund_lookup_cb (void *cls,
   const json_t *arr;
 
   rls->rlo = NULL;
-  if (MHD_HTTP_OK != http_status)
+  if (rls->http_code != http_status)
     TALER_TESTING_FAIL (rls->is);
 
   map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
   arr = json_object_get (obj, "refund_permissions");
   if (NULL == arr)
-    TALER_TESTING_FAIL (rls->is);
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Tolerating a refund permission not found\n");
+    TALER_TESTING_interpreter_next (rls->is);
+    return;
+  }
 
   json_array_foreach (arr, index, elem)
   {
@@ -436,7 +443,8 @@ TALER_TESTING_cmd_refund_lookup
    struct GNUNET_CURL_Context *ctx,
    const char *increase_reference,
    const char *pay_reference,
-   const char *order_id)
+   const char *order_id,
+   unsigned int http_code)
 {
   struct RefundLookupState *rls;
   struct TALER_TESTING_Command cmd;
@@ -447,6 +455,7 @@ TALER_TESTING_cmd_refund_lookup
   rls->order_id = order_id;
   rls->pay_reference = pay_reference;
   rls->increase_reference = increase_reference;
+  rls->http_code = http_code;
 
   cmd.cls = rls;
   cmd.label = label;

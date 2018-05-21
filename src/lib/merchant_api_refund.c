@@ -285,12 +285,13 @@ handle_refund_lookup_finished (void *cls,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Backend didn't even return from GET /refund\n");
     return;
+
   case MHD_HTTP_OK:
+  case MHD_HTTP_NOT_FOUND:
     rlo->cb (rlo->cb_cls,
-             MHD_HTTP_OK,
+             response_code,
              TALER_EC_NONE,
              json);
-    TALER_MERCHANT_refund_lookup_cancel (rlo);
     break;
   default:
     /**
@@ -298,15 +299,24 @@ handle_refund_lookup_finished (void *cls,
      * NOTE that json must be a Taler-specific error object (FIXME,
      * need a link to error objects at docs)
      */
-    json_unpack ((json_t *) json,
-                 "{s:s, s:I, s:s}",
-                 "error", &error,
-                 "code", &code);
+    if (-1 == json_unpack ((json_t *) json,
+        "{s:s, s:I, s:s}",
+        "error", &error,
+        "code", &code))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed GET /refund, error: %s, code: %d\n",
+                  error,
+                  code);
+      break;
+    } 
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed GET /refund, error: %s, code: %d\n",
-                error,
-                code);
+                "Failed /refund lookup, backend did not give"
+                " a valid error object, HTTP code was %lu\n",
+                response_code);
   }
+
+  TALER_MERCHANT_refund_lookup_cancel (rlo);
 }
 
 
