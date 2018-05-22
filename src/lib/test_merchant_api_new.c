@@ -732,7 +732,6 @@ run (void *cls,
        "EUR:5.01",
        TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP),
 
-
     TALER_TESTING_cmd_tip_pickup_with_ec
       ("pickup-tip-3-too-much",
        merchant_url,
@@ -742,6 +741,19 @@ run (void *cls,
        pickup_amounts_1,
        is->exchange,
        TALER_EC_TIP_PICKUP_NO_FUNDS),
+
+    TALER_TESTING_cmd_tip_authorize_fake
+      ("fake-tip-authorization"),
+
+    TALER_TESTING_cmd_tip_pickup_with_ec
+      ("pickup-non-existent-id",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_NOT_FOUND,
+       "fake-tip-authorization",
+       pickup_amounts_1,
+       is->exchange,
+       TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN),
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-tip-1",

@@ -527,6 +527,9 @@ TALER_TESTING_cmd_tip_authorize_with_ec
    const char *amount,
    enum TALER_ErrorCode ec);
 
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_tip_authorize_fake
+  (const char *label);
 
 /**
  * FIXME

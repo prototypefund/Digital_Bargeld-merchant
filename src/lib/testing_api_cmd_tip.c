@@ -278,6 +278,21 @@ tip_authorize_run (void *cls,
 }
 
 
+static void
+tip_authorize_fake_run (void *cls,
+                        const struct TALER_TESTING_Command *cmd,
+                        struct TALER_TESTING_Interpreter *is)
+{
+  struct TipAuthorizeState *tas = cls;
+
+  GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                              &tas->tip_id,
+                              sizeof (struct GNUNET_HashCode));
+
+  TALER_TESTING_interpreter_next (is);
+}
+
+
 /**
  * FIXME
  */
@@ -957,5 +972,27 @@ TALER_TESTING_cmd_tip_pickup
   return cmd;
 }
 
+/**
+ * This commands does not query the backend at all,
+ * but just makes up a fake authorization id that will
+ * be subsequently used by the "pick up" CMD in order
+ * to test against such a case.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_tip_authorize_fake (const char *label)
+{
+  struct TipAuthorizeState *tas;
+  struct TALER_TESTING_Command cmd;
+
+  tas = GNUNET_new (struct TipAuthorizeState);
+
+  cmd.label = label;
+  cmd.cls = tas;
+  cmd.run = &tip_authorize_fake_run;
+  cmd.cleanup = &tip_authorize_cleanup;
+  cmd.traits = &tip_authorize_traits;
+  
+  return cmd;
+}
 
 /* end of testing_api_cmd_tip.c */
