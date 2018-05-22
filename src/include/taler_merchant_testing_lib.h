@@ -35,7 +35,6 @@
 #define MERCHANT_FAIL() \
   do {GNUNET_break (0); return NULL; } while (0)
 
-
 #define CMD_NOT_FOUND "Command not found"
 #define TRAIT_NOT_FOUND "Trait not found"
 
@@ -57,6 +56,8 @@ TALER_TESTING_prepare_merchant (const char *config_filename);
  * merchant" function to do such tasks.
  *
  * @param config_filename configuration filename.
+ * @param merchant_url merchant base URL, used to check
+ *        if the merchant was started right.
  *
  * @return the process, or NULL if the process could not
  *         be started.
@@ -70,12 +71,12 @@ TALER_TESTING_run_merchant (const char *config_filename,
 /* ************** Specific interpreter commands ************ */
 
 /**
- * Make the /proposal command.
+ * Make a /proposal interpreter command.
  *
  * @param label command label
  * @param merchant_url merchant base url.
  * @param ctx context
- * @param http_status HTTP status code.
+ * @param http_status expected HTTP status code.
  * @param order the order
  * @param instance the merchant instance
  *
@@ -90,11 +91,18 @@ TALER_TESTING_cmd_proposal (const char *label,
                             const char *instance);
 
 /**
- * Make a "proposal lookup" command.
+ * Make a "proposal lookup" interpreter command.
  *
  * @param label command label
+ * @param ctx 
+ * @param merchant_url merchant base URL where to address
+ *        the request
  * @param http_status expected HTTP response code
- * @param proposal_reference reference to a proposal command
+ * @param proposal_reference reference to a proposal command.
+ *        This reference will provide a order it to make the
+ *        request about
+ * @param order_id order id to make the request about; takes
+ *        precedence over @a proposal_reference.
  *
  * @return the command
  */
@@ -108,11 +116,11 @@ TALER_TESTING_cmd_proposal_lookup
    const char *order_id);
 
 /**
- * Make a "check payment" test command.
+ * Make a "check payment" interpreter command.
  *
  * @param label command label.
- * @param merchant_url merchant base url
- * @param ctx CURL context.
+ * @param merchant_url merchant base url to address the request to
+ * @param ctx context.
  * @param http_status expected HTTP response code.
  * @param proposal_reference the proposal whose payment status
  *        is going to be checked.
