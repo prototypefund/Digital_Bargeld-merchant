@@ -109,6 +109,11 @@ struct TipAuthContext
    * Flag set to #GNUNET_YES when we have parsed the incoming JSON already.
    */
   int parsed_json;
+
+  /**
+   * Error code witnessing what the Exchange complained about.
+   */
+  enum TALER_ErrorCode exchange_ec;
 };
 
 
@@ -170,10 +175,12 @@ handle_status (void *cls,
   tac->rsh = NULL;
   if (MHD_HTTP_OK != http_status)
   {
+
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 _("Failed to obtain tipping reserve status from exchange (%u/%d)\n"),
                 http_status,
                 ec);
+    tac->exchange_ec = ec;
     MHD_resume_connection (tac->connection);
     TMH_trigger_daemon ();
     return;
@@ -394,7 +401,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   }
 
   /* handle irrecoverable errors */
-  if (TALER_EC_NONE != ec)
+  if (TALER_EC_NONE != (ec | tac->exchange_ec))
   {
     unsigned int rc;
     const char *msg;
@@ -418,6 +425,23 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
       msg = "Failed to approve tip: internal server error";
       break;
     }
+
+    /* If the exchange complained earlier, we do
+     * override what the database returned.  */
+    switch (tac->exchange_ec)
+    {
+    case TALER_EC_RESERVE_STATUS_UNKNOWN:
+      rc = MHD_HTTP_NOT_FOUND;
+      msg = "Exchange does not find any reserve having this key";
+      /* We override what the DB returned, as an exchange error
+       * is more important.  */
+      ec = TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN; 
+      break;
+    default:
+      /* This makes the compiler silent.  */
+      break;
+    }
+
     return TMH_RESPONSE_reply_rc (connection,
                                   rc,
                                   ec,

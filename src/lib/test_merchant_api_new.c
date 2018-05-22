@@ -651,6 +651,25 @@ run (void *cls,
                                      "tip 2",
                                      "EUR:5.01"),
 
+
+    #if 0
+    /* This command tests the authorization of tip
+     * against a reserve that does not exist.  This is
+     * implemented by passing a "tip instance" that
+     * specifies a reserve key that was never used to
+     * actually create a reserve.  */
+    TALER_TESTING_cmd_tip_authorize_with_ec
+      ("authorize-tip-null",
+       merchant_url,
+       exchange_url,
+       is->ctx,
+       MHD_HTTP_NOT_FOUND,
+       "nulltip",
+       "tip 2",
+       "EUR:5.01",
+       TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN),
+    #endif
+
     TALER_TESTING_cmd_tip_query ("query-tip-1",
                                  merchant_url,
                                  is->ctx,
@@ -699,6 +718,29 @@ run (void *cls,
                                               "EUR:10.02", // pick
                                               "EUR:10.02", // auth
                                               "EUR:10.02"), // ava
+
+    TALER_TESTING_cmd_fakebank_transfer_with_instance
+      ("create-reserve-insufficient-funds",
+       "EUR:1.01",
+       fakebank_url,
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO,
+       USER_LOGIN_NAME,
+       USER_LOGIN_PASS,
+       "dtip",
+       EXCHANGE_URL,
+       CONFIG_FILE),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-insufficient-tip-funds",
+       EXCHANGE_URL,
+       "EUR:1.01",
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO),
+
+    CMD_EXEC_WIREWATCH
+      ("wirewatch-insufficient-tip-funds"),
+
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-3-insufficient-funds",
        merchant_url,
@@ -707,7 +749,7 @@ run (void *cls,
        MHD_HTTP_PRECONDITION_FAILED,
        "dtip",
        "tip 3",
-       "EUR:5.01",
+       "EUR:2.02",
        TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS),
 
     TALER_TESTING_cmd_tip_authorize_with_ec
