@@ -652,7 +652,6 @@ run (void *cls,
                                      "EUR:5.01"),
 
 
-    #if 0
     /* This command tests the authorization of tip
      * against a reserve that does not exist.  This is
      * implemented by passing a "tip instance" that
@@ -668,7 +667,6 @@ run (void *cls,
        "tip 2",
        "EUR:5.01",
        TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN),
-    #endif
 
     TALER_TESTING_cmd_tip_query ("query-tip-1",
                                  merchant_url,
