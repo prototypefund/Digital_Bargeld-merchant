@@ -4614,6 +4614,30 @@ run (void *cls)
       .details.tip_pickup.authorize_ref = "authorize-tip-2",
       .details.tip_pickup.amounts = pickup_amounts_1 },
     /* Test authorization failure modes */
+
+    /* Need first to _create_ the reserve that should
+     * give back the "insufficient funds" error.  */
+
+    { .oc = OC_ADMIN_ADD_INCOMING,
+      .label = "create-insufficient-funds-tip-reserve",
+      .expected_response_code = MHD_HTTP_OK,
+      .details.admin_add_incoming.instance = "dtip",
+      .details.admin_add_incoming.debit_account_no = TIP_ACCOUNT_NO,
+      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
+      .details.admin_add_incoming.auth_username = "user62",
+      .details.admin_add_incoming.auth_password = "pass62",
+      /* we run *two* __merchant__ instances, but only this first call will
+         actually fill the reserve, as the second one will be seen as
+         a duplicate. Hence fill with twice the require amount per
+         round. */
+      .details.admin_add_incoming.amount = "EUR:1.01" },
+    { .oc = OC_RUN_WIREWATCH,
+      .label = "wirewatch-insufficient-funds-tip-reserve" },
+    { .oc = OC_CHECK_BANK_TRANSFER,
+      .label = "check_bank_transfer-insufficient-funds-tip-reserve",
+      .details.check_bank_transfer.amount = "EUR:1.01",
+      .details.check_bank_transfer.account_debit = TIP_ACCOUNT_NO,
+      .details.check_bank_transfer.account_credit = EXCHANGE_ACCOUNT_NO },
     { .oc = OC_TIP_AUTHORIZE,
       .label = "authorize-tip-3-insufficient-funds",
       .expected_response_code = MHD_HTTP_PRECONDITION_FAILED,
