@@ -222,6 +222,17 @@ TALER_TESTING_cmd_refund_lookup
    const char *order_id,
    unsigned int http_code);
 
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_refund_lookup_with_amount
+  (const char *label,
+   const char *merchant_url,
+   struct GNUNET_CURL_Context *ctx,
+   const char *increase_reference,
+   const char *pay_reference,
+   const char *order_id,
+   unsigned int http_code,
+   const char *refund_amount);
+
 
 /**
  * FIXME

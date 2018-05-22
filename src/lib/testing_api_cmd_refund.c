@@ -68,6 +68,8 @@ struct RefundLookupState
   unsigned int http_code;
 
   struct TALER_TESTING_Interpreter *is;
+
+  const char *refund_amount;
 };
 
 
@@ -314,30 +316,40 @@ refund_lookup_cb (void *cls,
 
   GNUNET_free (coin_reference_dup);
   
-  if (NULL ==
+  if (NULL !=
     (increase_cmd = TALER_TESTING_interpreter_lookup_command
       (rls->is, rls->increase_reference)))
-    TALER_TESTING_FAIL (rls->is);
+  {
+    if (GNUNET_OK != TALER_TESTING_get_trait_amount
+        (increase_cmd, 0, &refund_amount))
+      TALER_TESTING_FAIL (rls->is);
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_amount
-      (increase_cmd, 0, &refund_amount))
-    TALER_TESTING_FAIL (rls->is);
+    if (GNUNET_OK != TALER_string_to_amount
+        (refund_amount, &ra))
+      TALER_TESTING_FAIL (rls->is);
+  }
+  else
+  {
+    GNUNET_assert (NULL != rls->refund_amount);
 
-  if (GNUNET_OK != TALER_string_to_amount (refund_amount,
-                                           &ra))
-    TALER_TESTING_FAIL (rls->is);
+    if (GNUNET_OK != TALER_string_to_amount
+        (rls->refund_amount, &ra))
+      TALER_TESTING_FAIL (rls->is);
+  }
 
   GNUNET_CONTAINER_multihashmap_iterate (map,
                                          &hashmap_free,
                                          NULL);
   GNUNET_CONTAINER_multihashmap_destroy (map);
 
+  /* Check that what the backend claims to have been refunded
+   * actually matches _our_ refund expectation.  */
   if (0 != TALER_amount_cmp (&acc,
                              &ra))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Incomplete refund: expected '%s', got '%s'\n",
-                refund_amount,
+                TALER_amount_to_string (&ra),
                 TALER_amount_to_string (&acc));
     TALER_TESTING_interpreter_fail (rls->is);
     return;
@@ -465,6 +477,35 @@ TALER_TESTING_cmd_refund_lookup
   return cmd;
 }
 
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_refund_lookup_with_amount
+  (const char *label,
+   const char *merchant_url,
+   struct GNUNET_CURL_Context *ctx,
+   const char *increase_reference,
+   const char *pay_reference,
+   const char *order_id,
+   unsigned int http_code,
+   const char *refund_amount)
+{
+  struct RefundLookupState *rls;
+  struct TALER_TESTING_Command cmd;
 
+  rls = GNUNET_new (struct RefundLookupState);
+  rls->merchant_url = merchant_url;
+  rls->ctx = ctx;
+  rls->order_id = order_id;
+  rls->pay_reference = pay_reference;
+  rls->increase_reference = increase_reference;
+  rls->http_code = http_code;
+  rls->refund_amount = refund_amount;
+
+  cmd.cls = rls;
+  cmd.label = label;
+  cmd.run = &refund_lookup_run;
+  cmd.cleanup = &refund_lookup_cleanup;
+
+  return cmd;
+}
 
 /* end of testing_api_cmd_refund.c */

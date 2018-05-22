@@ -305,13 +305,14 @@ run (void *cls,
                                10, // start
                                10), // nrows
 
-    TALER_TESTING_cmd_fakebank_transfer ("create-reserve-2",
-                                         "EUR:1",
-                                         fakebank_url,
-                                         USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
-                                         "user62",
-                                         "pass62",
-                                         EXCHANGE_URL),
+    TALER_TESTING_cmd_fakebank_transfer
+      ("create-reserve-2",
+       "EUR:1",
+       fakebank_url,
+       USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
+       "user62",
+       "pass62",
+       EXCHANGE_URL),
 
     TALER_TESTING_cmd_fakebank_transfer_with_ref
       ("create-reserve-2b",
@@ -465,6 +466,7 @@ run (void *cls,
        "EUR:0.01",
        MHD_HTTP_OK),
 
+    /* Ordinary refund.  */
     TALER_TESTING_cmd_refund_lookup ("refund-lookup-1",
                                      merchant_url,
                                      is->ctx,
@@ -473,7 +475,7 @@ run (void *cls,
                                      "1",
                                      MHD_HTTP_OK),
 
-    /* Trying to pick up a non existent refund.  */
+    /* Trying to pick up refund from non existent proposal.  */
     TALER_TESTING_cmd_refund_lookup ("refund-lookup-non-existent",
                                      merchant_url,
                                      is->ctx,
@@ -506,6 +508,7 @@ run (void *cls,
                          \"value\":\"{EUR:5}\"} ] }",
         NULL),
 
+    /* Try to increase a non paid proposal.  */
     TALER_TESTING_cmd_refund_increase
       ("refund-increase-unpaid-proposal",
        merchant_url,
@@ -516,6 +519,7 @@ run (void *cls,
        "EUR:0.01",
        MHD_HTTP_BAD_REQUEST),
 
+    /* Try to increase a non existent proposal.  */
     TALER_TESTING_cmd_refund_increase
       ("refund-increase-unpaid-proposal",
        merchant_url,
@@ -525,6 +529,88 @@ run (void *cls,
        "EUR:0.1",
        "EUR:0.01",
        MHD_HTTP_NOT_FOUND),
+
+    /**
+     * The following block will (1) create a new
+     * reserve, then (2) a proposal, then (3) pay for
+     * it, and finally (4) attempt to pick up a refund 
+     * from it without any increasing taking place
+     * in the first place.
+     **/
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-unincreased-refund",
+                              "EUR:5.01"),
+
+    CMD_EXEC_WIREWATCH ("wirewatch-unincreased-refund"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-unincreased-refund",
+       EXCHANGE_URL,
+       "EUR:5.01",
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO),
+
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-unincreased-refund",
+       is->exchange,
+       "create-reserve-unincreased-refund",
+       "EUR:5",
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-unincreased-refund",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"unincreased-proposal\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:5}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_pay ("pay-unincreased-proposal",
+                           merchant_url,
+                           is->ctx,
+                           MHD_HTTP_OK,
+                           "create-proposal-unincreased-refund",
+                           "withdraw-coin-unincreased-refund",
+                           "EUR:5",
+                           "EUR:4.99",
+                           "EUR:0.01"),
+
+    CMD_EXEC_AGGREGATOR ("run-aggregator-unincreased-refund"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-unincreased-refund",
+       EXCHANGE_URL,
+       "EUR:4.98",
+       EXCHANGE_ACCOUNT_NO,
+       MERCHANT_ACCOUNT_NO),
+
+    /* Actually try to pick up the refund from the
+     * "unincreased proposal".  */
+    TALER_TESTING_cmd_refund_lookup_with_amount
+      ("refund-lookup-unincreased",
+       merchant_url,
+       is->ctx,
+       NULL,
+       "pay-unincreased-proposal",
+       "unincreased-proposal",
+       MHD_HTTP_OK,
+       /* If a lookup is attempted on an unincreased proposal,
+        * the backend will simply respond with a empty refunded
+        * coin "set", but the HTTP response code is 200 OK.  */
+       "EUR:0"),
 
     /* Test tipping.  */
     TALER_TESTING_cmd_fakebank_transfer_with_instance
