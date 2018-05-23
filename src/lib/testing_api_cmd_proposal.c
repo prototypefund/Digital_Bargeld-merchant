@@ -29,11 +29,16 @@
 #include "taler_merchant_service.h"
 #include "taler_merchant_testing_lib.h"
 
+/**
+ * State for a "proposal" CMD.
+ */
 struct ProposalState
 {
 
   /**
-   * The order.
+   * The order. FIXME: does a glossary exist where
+   * all these terms like 'order', 'proposal', and
+   * 'contract_terms' exist?
    */
   const char *order;
 
@@ -53,8 +58,7 @@ struct ProposalState
   const char *contract_terms;
 
   /**
-   * Proposal data hash code.  Recall: proposal data is the part
-   * of the contract terms without the signature of the merchant.
+   * Contract terms hash code.
    */
   struct GNUNET_HashCode h_contract_terms;
 
@@ -65,6 +69,9 @@ struct ProposalState
 
   /**
    * The (initial) /proposal/lookup operation handle.
+   * The logic is such that after a proposal creation,
+   * it soon makes a proposal lookup in order to check
+   * if the merchant backend is actually aware.
    */
   struct TALER_MERCHANT_ProposalLookupOperation *plo;
 
@@ -84,7 +91,7 @@ struct ProposalState
   const char *merchant_url;
 
   /**
-   * The curl context; used to be fed to the merchant lib.
+   * The curl context.
    */
   struct GNUNET_CURL_Context *ctx;
 
@@ -104,6 +111,11 @@ struct ProposalState
   struct TALER_MerchantPublicKeyP merchant_pub;
 };
 
+
+/**
+ * State for a "proposal lookup" CMD.  Not used by
+ * the initial lookup operation.
+ */
 struct ProposalLookupState
 {
   /**
@@ -117,7 +129,7 @@ struct ProposalLookupState
   const char *merchant_url;
 
   /**
-   * The curl context; used to be fed to the merchant lib.
+   * The curl context.
    */
   struct GNUNET_CURL_Context *ctx;
 
@@ -127,21 +139,25 @@ struct ProposalLookupState
   unsigned int http_status;
 
   /**
-   * The (initial) /proposal/lookup operation handle.
+   * /proposal/lookup operation handle.
    */
   struct TALER_MERCHANT_ProposalLookupOperation *plo;
 
   /**
-   * Reference to a proposal operation.
+   * Reference to a proposal operation.  Will offer the
+   * nonce for the operation.
    */
   const char *proposal_reference;
 
+  /**
+   * Order id to lookup upon.  If null, the @a proposal_reference
+   * will offer this value.
+   */
   const char *order_id;
 };
 
 /**
- * Extract information from a command that is useful for other
- * commands.
+ * Offer internal data to other commands.
  *
  * @param cls closure
  * @param ret[out] result (could be anything)
@@ -184,7 +200,9 @@ proposal_traits (void *cls,
 
 
 /**
- * Used to initialize the proposal after it was created.
+ * Used to fill the "proposal" CMD state with backend-provided
+ * values.  Also double-checks that the proposal was correctly
+ * created.
  *
  * @param cls closure
  * @param http_status HTTP status code we got
@@ -250,10 +268,10 @@ proposal_lookup_initial_cb
  * @param http_status HTTP response code coming from
  *        the backend.
  * @param ec error code.
- * @param obj when successful, it matches the format:
+ * @param obj when successful, it has the format:
  *        '{"order_id": "<order_id>"}'
+ * @param order_id order id of the proposal.
  */
-
 static void
 proposal_cb (void *cls,
              unsigned int http_status,
@@ -315,14 +333,11 @@ proposal_cb (void *cls,
 
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Run a "proposal" CMD.
  *
- * @param is interpreter state
+ * @param cls closure.
+ * @param cmd command currently being run.
+ * @param is interpreter state.
  */
 static void
 proposal_run (void *cls,
@@ -391,10 +406,11 @@ proposal_run (void *cls,
 }
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free the state of a "proposal" CMD, and possibly
+ * cancel it if it did not complete.
  *
- * @param cls closure
+ * @param cls closure.
+ * @param cmd command being freed.
  */
 static void
 proposal_cleanup (void *cls,
@@ -427,10 +443,11 @@ proposal_cleanup (void *cls,
 }
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free the state of a "proposal lookup" CMD, and possibly
+ * cancel it if it did not complete.
  *
- * @param cls closure
+ * @param cls closure.
+ * @param cmd command being freed.
  */
 static void
 proposal_lookup_cleanup (void *cls,
@@ -450,16 +467,15 @@ proposal_lookup_cleanup (void *cls,
 
 
 /**
- * Make the /proposal command.
+ * Make the "proposal" command.
  *
  * @param label command label
- * @param merchant_reference label to the merchant command.  Used
- *        to get its base url.
- * @param ctx context
- * @param http_status HTTP status code.
- * @param order the order
- * @param instance the merchant instance
- * @param merchant_url the merchant backend (base) url
+ * @param merchant_url base URL of the merchant serving
+ *        the proposal request.
+ * @param ctx CURL context.
+ * @param http_status expected HTTP status.
+ * @param order the order to PUT to the merchant.
+ * @param instance merchant instance performing the operation.
  *
  * @return the command
  */
@@ -490,12 +506,17 @@ TALER_TESTING_cmd_proposal (const char *label,
 }
 
 /**
- * Callback for GET /proposal issued at backend. Just check
- * whether response code is as expected.
+ * Callback for "proposal lookup" operation, to check the
+ * response code is as expected.
  *
  * @param cls closure
  * @param http_status HTTP status code we got
  * @param json full response we got
+ * @param contract_terms the contract terms; they are the
+ *        backend-filled up proposal minus cryptographic
+ *        information.
+ * @param sig merchant signature over the contract terms.
+ * @param hash hash code of the contract terms.
  */
 static void
 proposal_lookup_cb (void *cls,
@@ -516,14 +537,11 @@ proposal_lookup_cb (void *cls,
 
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Run the "proposal lookup" CMD.
  *
- * @param is interpreter state
+ * @param cls closure.
+ * @param cmd command currently being run.
+ * @param is interpreter state.
  */
 static void
 proposal_lookup_run (void *cls,
@@ -579,8 +597,15 @@ proposal_lookup_run (void *cls,
 /**
  * Make a "proposal lookup" command.
  *
- * @param label command label
- * @param 
+ * @param label command label.
+ * @param ctx CURL context.
+ * @param merchant_url base URL of the merchant backend
+ *        serving the proposal lookup request.
+ * @param http_status expected HTTP response code.
+ * @param proposal_reference reference to a "proposal" CMD.
+ * @param order_id order id to lookup, can be NULL.
+ *
+ * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_proposal_lookup
