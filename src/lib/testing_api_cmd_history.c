@@ -30,6 +30,10 @@
 #include "taler_merchant_testing_lib.h"
 
 
+
+/**
+ * State for a "history" CMD.
+ */
 struct HistoryState
 {
 
@@ -49,7 +53,7 @@ struct HistoryState
   const char *merchant_url;
 
   /**
-   * The curl context; used to be fed to the merchant lib.
+   * The curl context.
    */
   struct GNUNET_CURL_Context *ctx;
 
