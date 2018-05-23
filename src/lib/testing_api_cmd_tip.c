@@ -40,36 +40,84 @@ char *
 MAH_path_to_url (struct TALER_EXCHANGE_Handle *h,
                  const char *path);
 
+/**
+ * State for a /tip-pickup CMD.
+ */
 struct TipPickupState
 {
+  /**
+   * Merchant base URL.
+   */
   const char *merchant_url;
 
+  /**
+   * Exchange base URL.
+   */
   const char *exchange_url;
 
+  /**
+   * CURL context.
+   */
   struct GNUNET_CURL_Context *ctx;
 
+  /**
+   * Expected HTTP response code.
+   */
   unsigned int http_status;
 
+  /**
+   * Reference to a /tip/authorize CMD.  This will be used to
+   * get the tip id to make the request with.
+   */
   const char *authorize_reference;
 
   /**
-   * Set to non-NULL to a label of another pick up operation
-   * that we should replay.
+   * If set to non NULL, it references another pickup CMD
+   * that will provide all the data which is needed to issue
+   * the request (like planchet secrets, denomination keys..).
    */
   const char *replay_reference;
 
+  /**
+   * Handle to a on-going /tip/pickup request.
+   */
   struct TALER_MERCHANT_TipPickupOperation *tpo;
 
+  /**
+   * The interpreter state.
+   */
   struct TALER_TESTING_Interpreter *is;
 
+  /**
+   * An array of string-defined amounts that indicates
+   * which denominations are going to be used to receive
+   * tips.
+   */
   const char **amounts;
 
+  /**
+   * The object version of the above @a amounts. FIXME:
+   * try to remove and run tests to see if other commands
+   * need this data.
+   */
   struct TALER_Amount *amounts_obj;
 
+  /**
+   * How many coins are involved in the tipping operation.
+   */
   unsigned int num_coins;
   
+  /**
+   * The array of denomination keys, in the same order of @a
+   * amounts.
+   */
   const struct TALER_EXCHANGE_DenomPublicKey **dks;
 
+
+  /**
+   * The array of planchet secrets, in the same order of @a
+   * amounts.
+   */
   struct TALER_PlanchetSecretsP *psa;
 
   /**
@@ -84,64 +132,144 @@ struct TipPickupState
    */
   struct TALER_DenominationSignature *sigs;
 
+  /**
+   * Expected Taler error code (NOTE: this is NOT the HTTP
+   * response code).
+   */
   enum TALER_ErrorCode expected_ec;
 
+  /**
+   * The connection to the exchange.
+   */
   struct TALER_EXCHANGE_Handle *exchange;
 };
 
 
+/**
+ * State for a /tip-query CMD.
+ */
 struct TipQueryState
 {
+
+  /**
+   * The merchant base URL.
+   */
   const char *merchant_url;
 
+  /**
+   * The CURL context.
+   */
   struct GNUNET_CURL_Context *ctx;
 
+  /**
+   * Expected HTTP response code for this CMD.
+   */
   unsigned int http_status;
 
+  /**
+   * Which merchant instance is running this CMD.
+   */
   const char *instance;
 
+  /**
+   * The handle to the current /tip-query request.
+   */
   struct TALER_MERCHANT_TipQueryOperation *tqo;
 
+  /**
+   * The interpreter state.
+   */
   struct TALER_TESTING_Interpreter *is;
 
+  /**
+   * Expected amount to be picked up.
+   */
   const char *expected_amount_picked_up;
 
+  /**
+   * Expected amount to be tip-authorized.
+   */
   const char *expected_amount_authorized;
 
+  /**
+   * FIXME: what is this?
+   */
   const char *expected_amount_available;
 };
 
 
+/**
+ * State for a /tip-authorize CMD.
+ */
 struct TipAuthorizeState
 {
+  
+  /**
+   * Merchant base URL.
+   */
   const char *merchant_url;
 
+  /**
+   * CURL context.
+   */
   struct GNUNET_CURL_Context *ctx;
 
+  /**
+   * Expected HTTP response code.
+   */
   unsigned int http_status;
 
+  /**
+   * Merchant instance running this CMD.
+   */
   const char *instance;
 
+  /**
+   * Human-readable justification for the
+   * tip authorization carried on by this CMD.
+   */
   const char *justification;
 
+  /**
+   * Amount that should be authorized for tipping.
+   */
   const char *amount;
 
+  /**
+   * Expected Taler error code for this CMD.
+   */
   enum TALER_ErrorCode expected_ec;
 
+  /**
+   * Base URL of the involved exchange.
+   */
   const char *exchange_url;
 
+  /**
+   * The tip id; set when the CMD succeeds.
+   */
   struct GNUNET_HashCode tip_id;
 
+  /**
+   * Expiration date for this tip.
+   */
   struct GNUNET_TIME_Absolute tip_expiration;
 
+  /**
+   * Handle to the on-going /tip-authorize request.
+   */
   struct TALER_MERCHANT_TipAuthorizeOperation *tao;
 
+  /**
+   * The interpreter state.
+   */
   struct TALER_TESTING_Interpreter *is;
 };
 
 /**
- * Callback for a /tip-authorize request.  Returns the result
- * of the operation.
+ * Callback for a /tip-authorize request.  Set into the state
+ * what was returned from the backend (@a tip_id and @a
+ * tip_expiration).
  *
  * @param cls closure
  * @param http_status HTTP status returned by the merchant backend
@@ -209,7 +337,7 @@ tip_authorize_cb (void *cls,
 }
 
 /**
- * Extract information from a command that is useful for other
+ * Offers information from the /tip-authorize CMD state to other
  * commands.
  *
  * @param cls closure
@@ -241,13 +369,10 @@ tip_authorize_traits (void *cls,
 }
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Runs the /tip-authorize CMD
  *
+ * @param cls closure
+ * @param cmd the CMD representing _this_ command
  * @param is interpreter state
  */
 static void
@@ -278,6 +403,13 @@ tip_authorize_run (void *cls,
 }
 
 
+/**
+ * Run the /tip-authorize CMD, the "fake" version of it.
+ *
+ * @param cls closure
+ * @param cmd the CMD representing _this_ command
+ * @param is interpreter state *
+ */
 static void
 tip_authorize_fake_run (void *cls,
                         const struct TALER_TESTING_Command *cmd,
@@ -285,6 +417,7 @@ tip_authorize_fake_run (void *cls,
 {
   struct TipAuthorizeState *tas = cls;
 
+  /* Make up a tip id.  */
   GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
                               &tas->tip_id,
                               sizeof (struct GNUNET_HashCode));
@@ -294,7 +427,11 @@ tip_authorize_fake_run (void *cls,
 
 
 /**
- * FIXME
+ * Free the state from a /tip-authorize CMD, and possibly
+ * cancel any pending operation.
+ *
+ * @param cls closure
+ * @param cmd the /tip-authorize CMD that is about to be freed.
  */
 static void
 tip_authorize_cleanup (void *cls,
@@ -313,7 +450,22 @@ tip_authorize_cleanup (void *cls,
 
 
 /**
- * FIXME
+ * Create a /tip-authorize CMD, specifying the Taler error code
+ * that is expected to be returned by the backend.
+ *
+ * @param label this command label
+ * @param merchant_url the base URL of the merchant that will
+ *        serve the /tip-authorize request.
+ * @param exchange_url the base URL of the exchange that owns
+ *        the reserve from which the tip is going to be gotten.
+ * @param ctx the CURL context to carry on the HTTP work.
+ * @param http_status the HTTP response code which is expected
+ *        for this operation.
+ * @param instance which merchant instance is running this CMD.
+ * @param justification human-readable justification for this
+ *        tip authorization.
+ * @param amount the amount to authorize for tipping.
+ * @param ec expected Taler-defined error code.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize_with_ec
@@ -350,8 +502,22 @@ TALER_TESTING_cmd_tip_authorize_with_ec
 }
 
 
+
 /**
- * FIXME
+ * Create a /tip-authorize CMD.
+ *
+ * @param label this command label
+ * @param merchant_url the base URL of the merchant that will
+ *        serve the /tip-authorize request.
+ * @param exchange_url the base URL of the exchange that owns
+ *        the reserve from which the tip is going to be gotten.
+ * @param ctx the CURL context to carry on the HTTP work.
+ * @param http_status the HTTP response code which is expected
+ *        for this operation.
+ * @param instance which merchant instance is running this CMD.
+ * @param justification human-readable justification for this
+ *        tip authorization.
+ * @param amount the amount to authorize for tipping.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize (const char *label,
@@ -385,7 +551,9 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
 }
 
 /**
- * Callback to process a GET /tip-query request
+ * Callback to process a GET /tip-query request, it mainly
+ * checks that what the backend returned matches the command's
+ * expectations.
  *
  * @param cls closure
  * @param http_status HTTP status code for this request
@@ -457,7 +625,11 @@ tip_query_cb (void *cls,
 }
 
 /**
- * FIXME
+ * Free the state from a /tip-query CMD, and possibly cancel
+ * a pending /tip-query request.
+ *
+ * @param cls closure.
+ * @param cmd the /tip-query CMD to free.
  */
 static void
 tip_query_cleanup (void *cls,
@@ -475,7 +647,11 @@ tip_query_cleanup (void *cls,
 }
 
 /**
- * FIXME
+ * Run a /tip-query CMD.
+ *
+ * @param cls closure.
+ * @param cmd the current /tip-query CMD.
+ * @param is the interpreter state.
  */
 static void
 tip_query_run (void *cls,
@@ -495,7 +671,20 @@ tip_query_run (void *cls,
 
 
 /**
- * FIXME
+ * Define a /tip-query CMD equipped with a expected amount.
+ *
+ * @param label the command label
+ * @param merchant_url base URL of the merchant which will
+ *        server the /tip-query request.
+ * @param ctx CURL context to carry on the HTTP work.
+ * @param http_status expected HTTP response code for the
+ *        /tip-query request.
+ * @param instance the merchant instance running this CMD.
+ * @param expected_amount_picked_up expected amount already
+ *        picked up.
+ * @param expected_amount_authorized expected amount that was
+ *        authorized in the first place.
+ * @param expected_amount_available FIXME what is this?
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query_with_amounts
@@ -530,7 +719,15 @@ TALER_TESTING_cmd_tip_query_with_amounts
 
 
 /**
- * FIXME
+ * Define a /tip-query CMD.
+ *
+ * @param label the command label
+ * @param merchant_url base URL of the merchant which will
+ *        server the /tip-query request.
+ * @param ctx CURL context to carry on the HTTP work.
+ * @param http_status expected HTTP response code for the
+ *        /tip-query request.
+ * @param instance the merchant instance running this CMD.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query (const char *label,
@@ -567,7 +764,7 @@ struct WithdrawHandle
   struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
 
   /**
-   * Interpreter state we are part of.
+   * Interpreter state.
    */
   struct TALER_TESTING_Interpreter *is;
 
@@ -580,8 +777,8 @@ struct WithdrawHandle
 };
 
 /**
- * Callbacks of this type are used to serve the result of
- * submitting a withdraw request to a exchange.
+ * This callback handles the response of a withdraw operation 
+ * from the exchange, that is the final step in getting the tip.
  *
  * @param cls closure, a `struct WithdrawHandle *`
  * @param http_status HTTP response code, #MHD_HTTP_OK (200)
@@ -641,8 +838,9 @@ pickup_withdraw_cb (void *cls,
 
 
 /**
- * Callback for a /tip-pickup request.  Returns the result of
- * the operation.
+ * Callback for a /tip-pickup request, it mainly checks if
+ * values returned from the backend are as expected, and if so
+ * (and if the status was 200 OK) proceede with the withdrawal.
  *
  * @param cls closure
  * @param http_status HTTP status returned by the merchant
@@ -682,7 +880,7 @@ pickup_cb (void *cls,
   if (ec != tps->expected_ec)
     TALER_TESTING_FAIL (tps->is);
 
-
+  /* Safe to go ahead: http status was expected.  */
   if ( (MHD_HTTP_OK != http_status) ||
        (TALER_EC_NONE != ec) )
   {
@@ -697,6 +895,7 @@ pickup_cb (void *cls,
               "Obtained %u signatures for withdrawal"
               " from picking up a tip\n",
               num_reserve_sigs);
+
   GNUNET_assert (NULL == tps->withdraws);
   tps->withdraws = GNUNET_new_array
     (num_reserve_sigs, struct WithdrawHandle);
@@ -726,6 +925,14 @@ pickup_cb (void *cls,
     TALER_TESTING_interpreter_next (tps->is);
 }
 
+
+/**
+ * Run a /tip-pickup CMD.
+ *
+ * @param cls closure
+ * @param cmd the current /tip-pickup CMD.
+ * @param is interpreter state.
+ */
 static void
 tip_pickup_run (void *cls,
                 const struct TALER_TESTING_Command *cmd,
@@ -832,7 +1039,13 @@ tip_pickup_run (void *cls,
   }
 }
 
-
+/**
+ * Free a /tip-pickup CMD state, and possibly cancel a
+ * pending /tip-pickup request.
+ *
+ * @param cls closure.
+ * @param cmd current CMD to be freed.
+ */
 static void
 tip_pickup_cleanup (void *cls,
                     const struct TALER_TESTING_Command *cmd)
@@ -851,7 +1064,7 @@ tip_pickup_cleanup (void *cls,
 
 
 /**
- * Extract information from a command that is useful for other
+ * Offers information from the /tip-pickup CMD state to other
  * commands.
  *
  * @param cls closure
@@ -904,7 +1117,21 @@ tip_pickup_traits (void *cls,
 }
 
 /**
- * FIXME
+ * Define a /tip-pickup CMD, equipped with the expected error
+ * code.
+ *
+ * @param label the command label
+ * @param merchant_url base URL of the backend which will serve
+ *        the /tip-pickup request.
+ * @param ctx CURL context to carry on HTTP work.
+ * @param http_status expected HTTP response code.
+ * @param authorize_reference reference to a /tip-autorize CMD
+ *        that offers a tip id to pick up.
+ * @param amounts array of string-defined amounts that specifies
+ *        which denominations will be accepted for tipping.
+ * @param exchange connection handle to the exchange that will
+ *        eventually serve the withdraw operation.
+ * @param ec expected Taler error code.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup_with_ec
@@ -938,9 +1165,20 @@ TALER_TESTING_cmd_tip_pickup_with_ec
   return cmd;
 }
 
-
 /**
- * FIXME
+ * Define a /tip-pickup CMD.
+ *
+ * @param label the command label
+ * @param merchant_url base URL of the backend which will serve
+ *        the /tip-pickup request.
+ * @param ctx CURL context to carry on HTTP work.
+ * @param http_status expected HTTP response code.
+ * @param authorize_reference reference to a /tip-autorize CMD
+ *        that offers a tip id to pick up.
+ * @param amounts array of string-defined amounts that specifies
+ *        which denominations will be accepted for tipping.
+ * @param exchange connection handle to the exchange that will
+ *        eventually serve the withdraw operation.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup
@@ -977,6 +1215,8 @@ TALER_TESTING_cmd_tip_pickup
  * but just makes up a fake authorization id that will
  * be subsequently used by the "pick up" CMD in order
  * to test against such a case.
+ *
+ * @param label command label.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize_fake (const char *label)
