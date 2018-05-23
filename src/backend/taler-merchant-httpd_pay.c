@@ -1731,6 +1731,10 @@ begin_transaction (struct PayContext *pc)
     return;
   }
 
+  /* All the coins known to the database have
+   * been processed, now delve into specific case
+   * (pay vs. abort) */
+
   if (PC_MODE_ABORT_REFUND == pc->mode)
   {
     json_t *terms;
@@ -1776,6 +1780,7 @@ begin_transaction (struct PayContext *pc)
 					   &pc->h_contract_terms,
 					   &pc->mi->pubkey,
 					   &pc->total_paid,
+                                           /* justification */
 					   "incomplete payment aborted");
     if (0 > qs)
     {
@@ -1808,7 +1813,8 @@ begin_transaction (struct PayContext *pc)
 			     "Merchant database error: could not commit");
       return;
     }
-
+    /* At this point, the refund got correctly committed
+     * into the database.  */
     {
       json_t *refunds;
 
@@ -1819,8 +1825,10 @@ begin_transaction (struct PayContext *pc)
 	struct TALER_MerchantSignatureP msig;
 	uint64_t rtransactionid;
 
+        /* Will only work with coins found in DB.  */
 	if (GNUNET_YES != pc->dc[i].found_in_db)
 	  continue;
+
 	rtransactionid = 0;
         rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
 	rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
@@ -1847,6 +1855,8 @@ begin_transaction (struct PayContext *pc)
 				 "Refund approved, but failed to sign confirmation");
 	  return;
 	}
+
+        /* Pack refund for i-th coin.  */
 	json_array_append_new (refunds,
 			       json_pack ("{s:I, s:o, s:o s:o s:o}",
 					  "rtransaction_id", (json_int_t) rtransactionid,
@@ -1855,12 +1865,19 @@ begin_transaction (struct PayContext *pc)
                                           "refund_amount", TALER_JSON_from_amount_nbo (&rr.refund_amount),
                                           "refund_fee", TALER_JSON_from_amount_nbo (&rr.refund_fee)));
       }
-      resume_pay_with_response (pc,
-				MHD_HTTP_OK,
-				TMH_RESPONSE_make_json_pack ("{s:o, s:o, s:o}",
-							     "refund_permissions", refunds,
-							     "merchant_pub", GNUNET_JSON_from_data_auto (&pc->mi->pubkey),
-                                                             "h_contract_terms", GNUNET_JSON_from_data_auto (&pc->h_contract_terms)));
+
+      /* Resume and send back the response.  */
+      resume_pay_with_response
+        (pc,
+	 MHD_HTTP_OK,
+	 TMH_RESPONSE_make_json_pack
+           ("{s:o, s:o, s:o}",
+            /* Refunds pack.  */
+	    "refund_permissions", refunds,
+	    "merchant_pub",
+            GNUNET_JSON_from_data_auto (&pc->mi->pubkey),
+            "h_contract_terms",
+            GNUNET_JSON_from_data_auto (&pc->h_contract_terms)));
     }
     return;
   }

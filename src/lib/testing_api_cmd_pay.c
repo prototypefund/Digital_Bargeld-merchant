@@ -34,6 +34,9 @@
 #define AMOUNT_WITHOUT_FEE 1
 #define REFUND_FEE 2
 
+/**
+ * State for a /pay CMD.
+ */
 struct PayState
 {
   /**
@@ -64,7 +67,7 @@ struct PayState
   const char *coin_reference;
 
   /**
-   * The curl context; used to be fed to the merchant lib.
+   * The curl context.
    */
   struct GNUNET_CURL_Context *ctx;
 
@@ -94,14 +97,17 @@ struct PayState
   struct TALER_MERCHANT_Pay *po;
 
   /**
-   * JSON object of contract terms.  Needed here
-   * to be free'd when this command gets cleaned up.
+   * JSON object of contract terms.
+   * FIXME: really needed here in this format?
    */
   json_t *ct;
 
 };
 
 
+/**
+ * State for a /check-payment CMD.
+ */
 struct CheckPaymentState
 {
 
@@ -132,7 +138,7 @@ struct CheckPaymentState
   unsigned int expect_paid;
 
   /**
-   * The curl context; used to be fed to the merchant lib.
+   * The curl context.
    */
   struct GNUNET_CURL_Context *ctx;
 
@@ -144,6 +150,9 @@ struct CheckPaymentState
 };
 
 
+/**
+ * State for a "pay again" CMD.
+ */
 struct PayAgainState
 {
   
@@ -189,6 +198,9 @@ struct PayAgainState
 };
 
 
+/**
+ * State for a "pay abort" CMD.
+ */
 struct PayAbortState
 {
   
@@ -224,17 +236,19 @@ struct PayAbortState
 
 
   /**
-   * FIXME.
+   * How many refund permissions this CMD got
+   * the right for.  Roughly, there is one refund
+   * permission for one coin.
    */
   unsigned int num_refunds;
 
   /**
-   * FIXME.
+   * The actual refund data.
    */
   struct TALER_MERCHANT_RefundEntry *res;
 
   /**
-   * FIXME.
+   * The contract whose payment is to be aborted.
    */
   struct GNUNET_HashCode h_contract;
 
@@ -245,16 +259,39 @@ struct PayAbortState
 };
 
 
+/**
+ * State for a "pay abort refund" CMD.  This command
+ * takes the refund permissions from a "pay abort" CMD,
+ * and redeems those at the exchange.
+ */
 struct PayAbortRefundState
 {
+
+  /**
+   * "abort" CMD that will provide with refund permissions.
+   */
   const char *abort_reference;
 
+  /**
+   * Expected number of coins that were refunded.
+   * Only used to counter-check, not to perform any
+   * operation.
+   */
   unsigned int num_coins;
 
+  /**
+   * The amount to be "withdrawn" from the refund session.
+   */
   const char *refund_amount;
 
+  /**
+   * The refund fee (FIXME: who pays?  Customer or merchant?).
+   */
   const char *refund_fee;
 
+  /**
+   * The interpreter state.
+   */
   struct TALER_TESTING_Interpreter *is;
 
   /**
@@ -267,16 +304,20 @@ struct PayAbortRefundState
    */
   unsigned int http_status;
 
+  /**
+   * Connection handle to the exchange.
+   */
   struct TALER_EXCHANGE_Handle *exchange;
 };
 
 
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free a /check-payment CMD, and possibly cancel a pending
+ * operation thereof.
  *
  * @param cls closure
+ * @param cmd the command currently getting freed.
  */
 static void
 check_payment_cleanup (void *cls,
@@ -297,12 +338,19 @@ check_payment_cleanup (void *cls,
 
 
 /**
- * Callback for GET /proposal issued at backend. Just check
- * whether response code is as expected.
+ * Callback for a /check-payment request.
  *
- * @param cls closure
- * @param http_status HTTP status code we got
- * @param json full response we got
+ * @param cls closure.
+ * @param http_status HTTP status code we got.
+ * @param json full response we got.
+ * @param paid GNUNET_YES (GNUNET_NO) if the contract was paid
+ *        (not paid).
+ * @param refunded GNUNET_YES (GNUNET_NO) if the contract was
+ *        refunded (not refunded).
+ * @param refund_amount the amount that was refunded to this
+ *        contract.
+ * @param payment_redirect_url URL where the payment has to be
+ *        addressed.
  */
 static void
 check_payment_cb (void *cls,
@@ -338,14 +386,11 @@ check_payment_cb (void *cls,
 }
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Run a /check-payment CMD.
  *
- * @param is interpreter state
+ * @param cmd the command currenly being run.
+ * @param cls closure.
+ * @param is interpreter state.
  */
 static void
 check_payment_run (void *cls,
@@ -439,6 +484,7 @@ TALER_TESTING_cmd_check_payment (const char *label,
  * @param amount_without_fee to be removed, there is no
  *        per-contract fee, only per-coin exists.
  * @param refund_fee per-contract? per-coin?
+ *
  * @return #GNUNET_OK on success
  */
 static int
@@ -544,6 +590,8 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
 
 /**
  * Function called with the result of a /pay operation.
+ * Checks whether the merchant signature is valid and the
+ * HTTP response code matches our expectation.
  *
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200)
@@ -626,7 +674,20 @@ pay_cb (void *cls,
 }
 
 /**
- * FIXME
+ * Callback for a "pay abort" operation.  Mainly, check HTTP
+ * response code was as expected and stores refund permissions
+ * in the state.
+ *
+ * @param cls closure.
+ * @param http_status HTTP response code.
+ * @param ec Taler error code.
+ * @param merchant_pub public key of the merchant refunding the
+ *        contract.
+ * @param h_contract the contract involved in the refund.
+ * @param num_refunds how many refund permissions have been
+ *        issued.
+ * @param res array containing the refund permissions.
+ * @param obj raw response body.
  */
 static void
 pay_abort_cb (void *cls,
@@ -677,9 +738,27 @@ pay_abort_cb (void *cls,
 
 
 /**
- * @param cls the closure.  Will be a "pay" or "pay-abort" state,
- *        depending on whether the caller was "pay" or "pay abort"
- *        run method.
+ * Function used by both "pay" and "abort" operations.
+ * It prepares data and sends the "pay" request to the
+ * backend.
+ *
+ * @param merchant_url base URL of the merchant serving the
+ *        request.
+ * @param ctx CURL context.
+ * @param coin_reference reference to the CMD(s) that offer
+ *        "coins" traits.  It is possible to give multiple
+ *        references by using semicolons to separate them.
+ * @param proposal_refere reference to a "proposal" CMD.
+ * @param is interpreter state.
+ * @param amount_with_fee amount to be paid, including deposit
+ *        fee.
+ * @param amount_without_fee amount to be paid, without deposit
+ *        fee.
+ * @param refund_fee refund fee.
+ * @param api_func "lib" function that will be called to either
+ *        issue a "pay" or "abort" request.
+ * @param api_cb callback for @a api_func.
+ * @param cls closure.
  *
  * @return handle to the operation, NULL if errors occur.
  */
@@ -838,14 +917,11 @@ _pay_run (const char *merchant_url,
 }
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Run a "pay" CMD.
  *
- * @param is interpreter state
+ * @param cls closure.
+ * @param cmd current CMD being run.
+ * @param is interpreter state.
  */
 static void
 pay_run (void *cls,
@@ -872,10 +948,10 @@ pay_run (void *cls,
 }
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free a "pay" CMD, and cancel it if need be.
  *
- * @param cls closure
+ * @param cls closure.
+ * @param cmd command currently being freed.
  */
 static void
 pay_cleanup (void *cls,
@@ -899,8 +975,7 @@ pay_cleanup (void *cls,
 
 
 /**
- * Extract information from a command that is useful for other
- * commands.
+ * Offer internal data useful to other commands.
  *
  * @param cls closure
  * @param ret[out] result (could be anything)
@@ -1025,10 +1100,10 @@ TALER_TESTING_cmd_pay (const char *label,
 
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free a "pay abort" CMD, and cancel it if need be.
  *
- * @param cls closure
+ * @param cls closure.
+ * @param cmd command currently being freed.
  */
 static void
 pay_abort_cleanup (void *cls,
@@ -1049,13 +1124,10 @@ pay_abort_cleanup (void *cls,
 }
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Run a "pay abort" CMD.
  *
+ * @param cls closure
+ * @param cmd command being run.
  * @param is interpreter state
  */
 static void
@@ -1115,8 +1187,7 @@ pay_abort_run (void *cls,
 }
 
 /**
- * Extract information from a command that is useful for other
- * commands.
+ * Offer internal data useful to other commands.
  *
  * @param cls closure
  * @param ret[out] result (could be anything)
@@ -1190,7 +1261,8 @@ TALER_TESTING_cmd_pay_abort (const char *label,
 }
 
 /**
- * Function called with the result of a /pay again operation.
+ * Function called with the result of a /pay again operation,
+ * check signature and HTTP response code are good.
  *
  * @param cls closure with the interpreter state
  * @param http_status HTTP response code, #MHD_HTTP_OK (200)
@@ -1272,14 +1344,11 @@ pay_again_cb (void *cls,
 }
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Run a "pay again" CMD.
  *
- * @param is interpreter state
+ * @param cls closure.
+ * @param cmd command currently being run.
+ * @param is interpreter state.
  */
 static void
 pay_again_run (void *cls,
@@ -1327,10 +1396,10 @@ pay_again_run (void *cls,
 }
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free and possibly cancel a "pay again" CMD.
  *
- * @param cls closure
+ * @param cls closure.
+ * @param cmd command currently being freed.
  */
 static void
 pay_again_cleanup (void *cls,
@@ -1351,7 +1420,9 @@ pay_again_cleanup (void *cls,
 }
 
 /**
- * Make a "pay again" test command.
+ * Make a "pay again" test command.  Its purpose is to
+ * take all the data from a aborted "pay" CMD, and use
+ * good coins to correctly pay for it.
  *
  * @param label command label
  * @param merchant_url merchant base URL
@@ -1393,8 +1464,9 @@ TALER_TESTING_cmd_pay_again (const char *label,
 
 
 /**
- * Callbacks of this type are used to serve the result of
- * submitting a refund request to an exchange.
+ * Callback used to work out the response from the exchange
+ * to a refund operation.  Currently only checks if the response
+ * code is as expected.
  *
  * @param cls closure
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for
@@ -1430,7 +1502,11 @@ abort_refund_cb (void *cls,
 }
 
 /**
- * FIXME.
+ * Free the state of a "pay abort refund" CMD, and possibly
+ * cancel a pending operation.
+ *
+ * @param cls closure.
+ * @param cmd the command currently being freed.
  */
 static void
 pay_abort_refund_cleanup (void *cls,
@@ -1450,7 +1526,11 @@ pay_abort_refund_cleanup (void *cls,
 }
 
 /**
- * FIXME.
+ * Run a "pay abort refund" CMD.
+ *
+ * @param cls closure.
+ * @param cmd command currently being run.
+ * @param is interpreter state.
  */
 static void
 pay_abort_refund_run (void *cls,
@@ -1514,7 +1594,19 @@ pay_abort_refund_run (void *cls,
 
 
 /**
- * FIXME.
+ * Make a "pay abort refund" CMD.  This command uses the
+ * refund permission from a "pay abort" CMD, and redeems it
+ * at the exchange.
+ *
+ * @param label command label.
+ * @param exchange connection label to the exchange.
+ * @param abort_reference reference to the "pay abort" CMD that
+ *        will offer the refund permission.
+ * @param num_coins how many coins are expected to be refunded.
+ * @param refund_amount the amount we are going to redeem as
+ *        refund.
+ * @param refund_fee the refund fee (FIXME: who pay it?)
+ * @param http_status expected HTTP response code.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_pay_abort_refund

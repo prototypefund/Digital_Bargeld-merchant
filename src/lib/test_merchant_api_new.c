@@ -977,6 +977,12 @@ run (void *cls,
                          \"value\":\"{EUR:10}\"} ] }",
         NULL),
 
+    /* This CMD will (1) successfully deposit `withdraw-coin-11a'
+     * and subsequently _fail_ to deposit `withdraw-coin-1',
+     * because of double spending.  The abort CMD then will try
+     * to get a refund permission out of that first coin that
+     * was regularly spent, and eventually abort refund CMD, will
+     * get the actual refund coin from the exchange.  */
     TALER_TESTING_cmd_pay ("pay-fail-partial-double-11",
                            merchant_url,
                            is->ctx,
@@ -1026,10 +1032,10 @@ main (int argc,
   /* These environment variables get in the way... */
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
+
   GNUNET_log_setup ("test-merchant-api-new",
                     "DEBUG",
                     NULL);
-
   if (NULL ==
       (fakebank_url = TALER_TESTING_prepare_fakebank
         (CONFIG_FILE,
