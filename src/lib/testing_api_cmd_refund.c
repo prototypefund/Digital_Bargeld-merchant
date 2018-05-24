@@ -30,54 +30,119 @@
 #include "taler_merchant_testing_lib.h"
 
 
+/**
+ * State for a "refund increase" CMD.
+ */
 struct RefundIncreaseState
 {
+  /**
+   * Operation handle for a POST /refund request.
+   */
   struct TALER_MERCHANT_RefundIncreaseOperation *rio;
 
+  /**
+   * Base URL of the merchant serving the request.
+   */
   const char *merchant_url;
 
+  /**
+   * CURL context.
+   */
   struct GNUNET_CURL_Context *ctx;
 
+  /**
+   * Order id of the contract to refund.
+   */
   const char *order_id;
 
+  /**
+   * The amount to refund.
+   */
   const char *refund_amount;
 
+  /**
+   * Refund fee.
+   */
   const char *refund_fee;
 
+  /**
+   * Human-readable justification for the refund.
+   */
   const char *reason;
 
+  /**
+   * Interpreter state.
+   */
   struct TALER_TESTING_Interpreter *is;
 
+  /**
+   * Expected HTTP response code.
+   */
   unsigned int http_code;
 };
 
+
+/**
+ * State for a "refund lookup" CMD.
+ */
 struct RefundLookupState
 {
+  /**
+   * Operation handle for a GET /public/refund request.
+   */
   struct TALER_MERCHANT_RefundLookupOperation *rlo;
 
+  /**
+   * Base URL of the merchant serving the request.
+   */
   const char *merchant_url;
 
+  /**
+   * CURL context.
+   */
   struct GNUNET_CURL_Context *ctx;
 
+  /**
+   * Order id to look up.
+   */
   const char *order_id;
 
+  /**
+   * Reference to a "pay" CMD, used to double-check if
+   * refunded coins were actually spent:
+   */
   const char *pay_reference;
 
+  /**
+   * Reference to a "refund increase" CMD that offer
+   * the expected amount to be refunded; can be NULL.
+   */
   const char *increase_reference;
 
+  /**
+   * Expected HTTP response code.
+   */
   unsigned int http_code;
 
+  /**
+   * Interpreter state.
+   */
   struct TALER_TESTING_Interpreter *is;
 
+  /**
+   * Explicit amount to be refunded, must be defined if @a
+   * increase_reference is NULL.
+   */
   const char *refund_amount;
 };
 
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free the state of a "refund increase" CMD, and
+ * possibly cancel a pending "refund increase" operation.
  *
  * @param cls closure
+ * @param cmd command currently being freed.
  */
 static void
 refund_increase_cleanup (void *cls,
@@ -94,11 +159,13 @@ refund_increase_cleanup (void *cls,
   GNUNET_free (ris);
 }
 
+
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free the state of a "refund lookup" CMD, and
+ * possibly cancel a pending "refund lookup" operation.
  *
  * @param cls closure
+ * @param cmd command currently being freed.
  */
 static void
 refund_lookup_cleanup (void *cls,
@@ -117,7 +184,8 @@ refund_lookup_cleanup (void *cls,
 }
 
 /**
- * Process POST /refund (increase) response
+ * Process POST /refund (increase) response; just checking
+ * if the HTTP response code is the one expected.
  *
  * @param cls closure
  * @param http_status HTTP status code
@@ -139,6 +207,14 @@ refund_increase_cb (void *cls,
   TALER_TESTING_interpreter_next (ris->is);
 }
 
+
+/**
+ * Run the "refund increase" CMD.
+ *
+ * @param cls closure.
+ * @param cmd command currently being run.
+ * @param is the interpreter state.
+ */
 static void
 refund_increase_run (void *cls,
                      const struct TALER_TESTING_Command *cmd,
@@ -168,6 +244,7 @@ refund_increase_run (void *cls,
  * @param cls closure, NULL
  * @param key current key
  * @param value a `struct TALER_Amount`
+ *
  * @return always #GNUNET_YES (continue to iterate)
  */
 static int
@@ -183,7 +260,9 @@ hashmap_free (void *cls,
 
 
 /**
- * Process GET /refund (increase) response.
+ * Process "GET /public/refund" (lookup) response;
+ * mainly checking if the refunded amount matches the
+ * expectation.
  *
  * @param cls closure
  * @param http_status HTTP status code
@@ -228,6 +307,7 @@ refund_lookup_cb (void *cls,
     return;
   }
 
+  /* Put in array every refunded coin.  */
   json_array_foreach (arr, index, elem)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -253,6 +333,8 @@ refund_lookup_cb (void *cls,
        GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY));
   };
 
+  /* Compare spent coins with refunded, and if they match,
+   * increase an accumulator.  */
   if ( NULL ==
      ( pay_cmd = TALER_TESTING_interpreter_lookup_command
        (rls->is, rls->pay_reference)))
@@ -359,6 +441,13 @@ refund_lookup_cb (void *cls,
 }
 
 
+/**
+ * Run the "refund lookup" CMD.
+ *
+ * @param cls closure.
+ * @param cmd command being currently run.
+ * @param is interpreter state.
+ */
 static void
 refund_lookup_run (void *cls,
                    const struct TALER_TESTING_Command *cmd,
@@ -378,8 +467,8 @@ refund_lookup_run (void *cls,
 
 
 /**
- * Extract information from a command that is useful for other
- * commands.
+ * Offer internal data from the "refund increase" CMD
+ * state to other commands.
  *
  * @param cls closure
  * @param ret[out] result (could be anything)
@@ -411,7 +500,19 @@ refund_increase_traits (void *cls,
 }
 
 /**
- * FIXME
+ * Define a "refund increase" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the backend serving the
+ *        "refund increase" request.
+ * @param ctx CURL context.
+ * @param reason refund justification, human-readable.
+ * @param order_id order id of the contract to refund.
+ * @param refund_amount amount to be refund-increased.
+ * @param refund_fee refund fee.
+ * @param http_code expected HTTP response code.
+ *
+ * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_increase
@@ -446,7 +547,22 @@ TALER_TESTING_cmd_refund_increase
 }
 
 /**
- * FIXME
+ * Define a "refund lookup" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        "refund lookup" request.
+ * @param ctx CURL context.
+ * @param increase_reference reference to a "refund increase" CMD
+ *        that will offer the amount to check the looked up refund
+ *        against.  Must NOT be NULL.
+ * @param pay_reference reference to the "pay" CMD whose coins got
+ *        refunded.  It is used to double-check if the refunded
+ *        coins were actually spent in the first place.
+ * @param order_id order id whose refund status is to be looked up.
+ * @param http_code expected HTTP response code.
+ *
+ * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup
@@ -477,6 +593,29 @@ TALER_TESTING_cmd_refund_lookup
   return cmd;
 }
 
+
+/**
+ * Define a "refund lookup" CMD, equipped with a expected refund
+ * amount.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        "refund lookup" request.
+ * @param ctx CURL context.
+ * @param increase_reference reference to a "refund increase" CMD
+ *        that will offer the amount to check the looked up refund
+ *        against.  Can be NULL, takes precedence over @a
+ *        refund_amount.
+ * @param pay_reference reference to the "pay" CMD whose coins got
+ *        refunded.  It is used to double-check if the refunded
+ *        coins were actually spent in the first place.
+ * @param order_id order id whose refund status is to be looked up.
+ * @param http_code expected HTTP response code.
+ * @param refund_amount expected refund amount.  Must be defined
+ *        if @a increase_reference is NULL.
+ *
+ * @return the command.
+ */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup_with_amount
   (const char *label,
