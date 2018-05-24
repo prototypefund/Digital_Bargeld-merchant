@@ -29,66 +29,126 @@
 #include "taler_merchant_service.h"
 #include "taler_merchant_testing_lib.h"
 
+
+/**
+ * State for a "track transaction" CMD.
+ */
 struct TrackTransactionState
 {
+  /**
+   * Handle for a pending /track/transaction request.
+   */
   struct TALER_MERCHANT_TrackTransactionHandle *tth;
 
+  /**
+   * The interpreter state.
+   */
   struct TALER_TESTING_Interpreter *is;
 
+  /**
+   * Base URL of the merchant serving the request.
+   */
   const char *merchant_url;
 
+  /**
+   * CURL context.
+   */
   struct GNUNET_CURL_Context *ctx;
 
+  /**
+   * Expected HTTP response code.
+   */
   unsigned int http_status;
 
+  /**
+   * Not used at the moment.  FIXME: remove?
+   */
   const char *transfer_reference;
 
+  /**
+   * Reference to a "pay" CMD, used to get the order
+   * id to issue the track against.
+   */
   const char *pay_reference;
 
+  /**
+   * Not used at the moment.  FIXME: remove?
+   */
   const char *wire_fee;
 
-  /* This only accounts for the *first* wire transfer that
-   * payed back this transaction.  So far, this suffices to
-   * make the paygen work.  */
+  /**
+   * Subject line of the wire transfer that payed
+   * the tracked contract back.  WARNING: impredictible
+   * behaviour if _multiple_ wire transfers were
+   * issued to pay this contract back.
+   */
   const char *wtid_str; 
 
   /**
-   * Binary form of wtid.  Some commands expect it - via
-   * appropriate traits - to be in binary form.
+   * Binary form of @a wtid_str, expected by other commands
+   * in this form.  FIXME: ponder if one of the forms (string
+   * or binary) should be fired from this state.
    */
   struct TALER_WireTransferIdentifierRawP wtid;
 
-
+  /**
+   * base URL of the exchange that issued (or was supposed to,
+   * in case 202 Accepted was returned) the wire transfer to
+   * pay the tracked contract back.
+   */
   const char *exchange_url;
 
 };
 
+
+/**
+ * State of a "track transfer" CMD.
+ */
 struct TrackTransferState
 {
 
+  /**
+   * Handle for a "track transfer" request.
+   */
   struct TALER_MERCHANT_TrackTransferHandle *tth;
 
+  /**
+   * The interpreter state.
+   */
   struct TALER_TESTING_Interpreter *is;
 
+  /** 
+   * Base URL of the merchant serving the request.
+   */
   const char *merchant_url;
 
+  /**
+   * CURL context.
+   */
   struct GNUNET_CURL_Context *ctx;
 
+  /**
+   * Expected HTTP response code.
+   */
   unsigned int http_status;
 
+
+  /**
+   * Reference for a "check bank" CMD.  It offers the
+   * WTID to track.
+   */
   const char *check_bank_reference;
 
   /**
-   * #OC_PAY command which we expect in the result.
-   * Since we are tracking a bank transaction, we want to know
-   * which (Taler) deposit is associated with the bank
-   * transaction being tracked now.
+   * FIXME currently not used.
    */
   const char *pay_reference;
 };
 
 /**
- * Function called with detailed wire transfer data.
+ * Function called with detailed wire transfer data; checks
+ * if HTTP response code matches the expectation, and stores
+ * in the state what came from the backend.
  *
  * @param cls closure
  * @param http_status HTTP status code we got,
@@ -151,7 +211,8 @@ track_transaction_cb (void *cls,
 }
 
 /**
- * Callback for a /track/transfer operation
+ * Callback for a /track/transfer operation, only checks if
+ * response code is the expected one.
  *
  * @param cls closure for this function
  * @param http_status HTTP response code returned by the server
@@ -209,14 +270,12 @@ track_transfer_cb
 
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Run the "track transfer" CMD.
  *
- * @param is interpreter state
+ *
+ * @param cls closure.
+ * @param cmd command being run now.
+ * @param is interpreter state.
  */
 static void
 track_transfer_run (void *cls,
@@ -251,14 +310,12 @@ track_transfer_run (void *cls,
 }
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Run the "track transaction" CMD.
  *
- * @param is interpreter state
+ *
+ * @param cls closure.
+ * @param cmd command being run now.
+ * @param is interpreter state.
  */
 static void
 track_transaction_run (void *cls,
@@ -293,10 +350,11 @@ track_transaction_run (void *cls,
 
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free the state of a "track transfer" CMD, and possibly
+ * cancel a pending operation thereof.
  *
- * @param cls closure
+ * @param cls closure.
+ * @param cmd command being run.
  */
 static void
 track_transfer_cleanup (void *cls,
@@ -315,10 +373,11 @@ track_transfer_cleanup (void *cls,
 }
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free the state of a "track transaction" CMD, and possibly
+ * cancel a pending operation thereof.
  *
- * @param cls closure
+ * @param cls closure.
+ * @param cmd command being run.
  */
 static void
 track_transaction_cleanup (void *cls,
@@ -342,6 +401,17 @@ track_transaction_cleanup (void *cls,
 }
 
 
+/**
+ * Offer internal data of a "track transaction" CMD, for
+ * other CMDs to use.
+ *
+ * @param cls closure.
+ * @param ret[out] return value.
+ * @param trait name of the trait.
+ * @param index index of the trait.
+ *
+ * @return GNUNET_OK if it is successful.
+ */
 static int
 track_transaction_traits (void *cls,
                           void **ret,
@@ -374,7 +444,16 @@ track_transaction_traits (void *cls,
 }
 
 /**
- * FIXME
+ * Define a "track transaction" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        /track/transaction request.
+ * @param ctx CURL context.
+ * @param http_status expected HTTP response code.
+ * @param transfer_reference FIXME not used.
+ * @param pay_reference used to retrieve the order id to track.
+ * @param wire_fee FIXME not used.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transaction
@@ -409,7 +488,17 @@ TALER_TESTING_cmd_merchant_track_transaction
 
 
 /**
- * FIXME
+ * Define a "track transfer" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        /track/transfer request.
+ * @param ctx CURL context.
+ * @param http_status expected HTTP response code.
+ * @param check_bank_reference reference to a "check bank" CMD
+ *        that will provide the WTID and exchange URL to issue
+ *        the track against.
+ * @param pay_reference FIXME not used.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transfer
