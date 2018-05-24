@@ -43,17 +43,17 @@ struct HistoryState
   unsigned int http_status;
 
   /**
-   * The merchant instance.
+   * The merchant instance executing this CMD.
    */
   const char *instance;
 
   /**
-   * URL of the merchant backend.
+   * URL of the merchant backend serving the /history request.
    */
   const char *merchant_url;
 
   /**
-   * The curl context.
+   * The CURL context.
    */
   struct GNUNET_CURL_Context *ctx;
 
@@ -63,27 +63,29 @@ struct HistoryState
   struct TALER_TESTING_Interpreter *is;
 
   /**
-   * Handle to /history.
+   * Handle to the /history operation.
    */
   struct TALER_MERCHANT_HistoryOperation *ho;
 
   /**
-   * FIXME
+   * Only history entries younger than this
+   * value will be returned.
    */
   struct GNUNET_TIME_Absolute time;
 
   /**
-   * FIXME
+   * First row index we want in the results.
    */
   unsigned int start;
 
   /**
-   * FIXME
+   * How many rows we want the response to contain, at most.
    */
   unsigned int nrows;
 
   /**
-   * FIXME
+   * Expected number of history entries returned by the
+   * backend.
    */
   unsigned int nresult;
 };
@@ -93,7 +95,8 @@ struct HistoryState
  *
  * @param root the json object representing data
  * @param[out] ret where to write the data
- * @return #GNUNET_OK upon successful parsing; #GNUNET_SYSERR upon error
+ * @return #GNUNET_OK upon successful parsing;
+ *         #GNUNET_SYSERR upon error
  */
 static int
 parse_abs_time (json_t *root,
@@ -125,7 +128,8 @@ parse_abs_time (json_t *root,
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
   }
-  /* Time is in seconds in JSON, but in microseconds in GNUNET_TIME_Absolute */
+  /* Time is in seconds in JSON, but in microseconds in
+   * GNUNET_TIME_Absolute */
   ret->abs_value_us = tval * 1000LL * 1000LL;
   if ( (ret->abs_value_us) / 1000LL / 1000LL != tval)
   {
@@ -138,15 +142,15 @@ parse_abs_time (json_t *root,
 
 
 /**
- * Callback for a /history request. It's up to this function
- * how to render the array containing transactions details (FIXME
- * link to documentation)
+ * Callback for a /history request; checks that (1) HTTP status
+ * is expected, the number of rows returned is expected, and that
+ * the rows are sorted from the youngest to the oldest record.
  *
  * @param cls closure
  * @param http_status HTTP status returned by the merchant
  *        backend
  * @param ec taler-specific error code
- * @param json actual body containing history
+ * @param json actual body containing the history
  */
 static void
 history_cb (void *cls,
@@ -213,10 +217,11 @@ history_cb (void *cls,
 }
 
 /**
- * Clean up after the command.  Run during forced termination
- * (CTRL-C) or test failure or test success.
+ * Free the state for a "history" CMD, and possibly cancel
+ * any pending operation thereof.
  *
  * @param cls closure
+ * @param cmd command being freed now.
  */
 static void
 history_cleanup (void *cls,
@@ -234,14 +239,11 @@ history_cleanup (void *cls,
 }
 
 /**
- * Runs the command.  Note that upon return, the interpreter
- * will not automatically run the next command, as the command
- * may continue asynchronously in other scheduler tasks.  Thus,
- * the command must ensure to eventually call
- * #TALER_TESTING_interpreter_next() or
- * #TALER_TESTING_interpreter_fail().
+ * Run a "history" CMD.
  *
- * @param is interpreter state
+ * @param cls closure.
+ * @param cmd current command.
+ * @param is interpreter state.
  */
 static void
 history_run (void *cls,
@@ -274,13 +276,15 @@ history_run (void *cls,
 /**
  * Make a "history" command.
  *
- * @param label command label
- * @param merchant_url merchant base URL
- * @param ctx main CURL context
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        request.
+ * @param ctx CURL context.
  * @param http_status expected HTTP response code
- * @param time FIXME
+ * @param time limit towards the past for the history
+ *        records we want returned.
  * @param nresult how many results are expected
- * @param start FIXME.
+ * @param start first row id we want in the result.
  * @param nrows how many row we want to receive, at most.
  */
 struct TALER_TESTING_Command
