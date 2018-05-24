@@ -1422,7 +1422,8 @@ pay_again_cleanup (void *cls,
 /**
  * Make a "pay again" test command.  Its purpose is to
  * take all the data from a aborted "pay" CMD, and use
- * good coins to correctly pay for it.
+ * good coins - found in @a coin_reference - to correctly
+ * pay for it.
  *
  * @param label command label
  * @param merchant_url merchant base URL

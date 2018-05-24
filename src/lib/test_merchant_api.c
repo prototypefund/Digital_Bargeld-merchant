@@ -3690,8 +3690,11 @@ interpreter_run (void *cls)
                               (is,
                                cmd->details.pay_abort_refund.abort_ref)));
       GNUNET_assert (OC_PAY_ABORT == ref->oc);
+
       GNUNET_assert (ref->details.pay_abort.num_refunds >
+                     /* 'num_coin' is actually the coin _index_ */
 		     cmd->details.pay_abort_refund.num_coin);
+
       re = &ref->details.pay_abort.res[cmd->details.pay_abort_refund.num_coin];
 
       GNUNET_assert (GNUNET_OK ==
@@ -4862,7 +4865,8 @@ run (void *cls)
         = "create-reserve-11",
       .details.reserve_status.expected_balance = "EUR:0" },
 
-    /* Create proposal */
+    /* Create proposal, to be partially paid, then
+     * abort-refunded, and then paid again.  */
     { .oc = OC_PROPOSAL,
       .label = "create-proposal-11",
       .expected_response_code = MHD_HTTP_OK,
@@ -4884,28 +4888,55 @@ run (void *cls)
           [ {\"description\":\"ice cream\",\
              \"value\":\"{EUR:10}\"} ] }"},
 
-    /* execute simple payment, re-using one ancient coin */
+    /**
+     * The following two OC_PAY CMDs used to be one.
+     *
+     * However, This caused the refund to be issued _randomly_,
+     * because the order the good coin and the double-spent
+     * coin were deposited was random.  Therefore, when
+     * the bad coin was first deposited, the CMD returned
+     * (403) and the good coin was never deposited.  This
+     * used to make the "abort refund" CMD fail, since it
+     * expected at least one coin to be refunded.
+     *
+     * The workaround is to _split_ the payment, so as to make
+     * sure that the good coin is always deposited, therefore
+     * having _always_ one coin to get a refund for.
+     *
+     * The test case could now work even without the second
+     * half of the split, but we keep it for "historical"
+     * reasons. */
     { .oc = OC_PAY,
-      .label = "pay-fail-partial-double-11",
+      .label = "pay-fail-partial-double-11-not_acceptable",
+      .expected_response_code = MHD_HTTP_NOT_ACCEPTABLE,
+      .details.pay.contract_ref = "create-proposal-11",
+      .details.pay.coin_ref = "withdraw-coin-11a",
+      /* These amounts are given per coin! */
+      .details.pay.refund_fee = "EUR:0.01",
+      .details.pay.amount_with_fee = "EUR:5",
+      .details.pay.amount_without_fee = "EUR:4.99" },
+    { .oc = OC_PAY,
+      .label = "pay-fail-partial-double-11-forbidden",
       .expected_response_code = MHD_HTTP_FORBIDDEN,
       .details.pay.contract_ref = "create-proposal-11",
-      .details.pay.coin_ref = "withdraw-coin-11a;withdraw-coin-1",
+      .details.pay.coin_ref = "withdraw-coin-1",
       /* These amounts are given per coin! */
       .details.pay.refund_fee = "EUR:0.01",
       .details.pay.amount_with_fee = "EUR:5",
       .details.pay.amount_without_fee = "EUR:4.99" },
 
-    /* Try to replay payment reusing coin */
     { .oc = OC_PAY_ABORT,
       .label = "pay-abort-11",
       .expected_response_code = MHD_HTTP_OK,
-      .details.pay_abort.pay_ref = "pay-fail-partial-double-11",
+      .details.pay_abort.pay_ref = "pay-fail-partial-double-11-not_acceptable",
     },
 
     { .oc = OC_PAY_ABORT_REFUND,
       .label = "pay-abort-refund-11",
       .expected_response_code = MHD_HTTP_OK,
+      /* Will provide the refund permission.  */
       .details.pay_abort_refund.abort_ref = "pay-abort-11",
+      /* Coin _index_ to be refunded.  */
       .details.pay_abort_refund.num_coin = 0,
       .details.pay_abort_refund.refund_amount = "EUR:5",
       .details.pay_abort_refund.refund_fee = "EUR:0.01" },

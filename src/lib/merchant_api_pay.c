@@ -337,6 +337,10 @@ handle_pay_finished (void *cls,
     case 0:
       break;
     case MHD_HTTP_OK:
+    /* Tolerating Not Acceptable because sometimes
+     * - especially in tests - we might want to POST
+     * coins one at a time.  */
+    case MHD_HTTP_NOT_ACCEPTABLE:
       break;
     case MHD_HTTP_BAD_REQUEST:
       /* This should never happen, either us or the merchant is buggy
