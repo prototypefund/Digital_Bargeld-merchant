@@ -31,9 +31,8 @@
 /**
  * Obtain planchet secrets from a @a cmd.
  *
- * @param cmd command to extract trait from
- * @param index which signature to pick if @a cmd has multiple
- *        on offer
+ * @param cmd command to extract trait from.
+ * @param index index of the trait.
  * @param planchet_secrets[out] set to the wanted secrets.
  * @return #GNUNET_OK on success
  */
@@ -52,8 +51,7 @@ TALER_TESTING_get_trait_planchet_secrets
 /**
  * Offer planchet secrets.
  *
- * @param index which secrets to offer if there are multiple
- *        on offer
+ * @param index of the trait.
  * @param planchet_secrets set to the offered secrets.
  * @return the trait
  */
