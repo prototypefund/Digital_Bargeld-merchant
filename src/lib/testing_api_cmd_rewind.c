@@ -29,17 +29,43 @@
 #include "taler_merchant_service.h"
 #include "taler_merchant_testing_lib.h"
 
+
+/**
+ * State for a "rewind" CMD.
+ */
 struct RewindIpState
 {
+  /**
+   * Instruction pointer to set into the interpreter.
+   */
   unsigned int new_ip;
+
+  /**
+   * How many times this set should take place.
+   * However, this value lives at the calling process,
+   * and this CMD is only in charge of checking and
+   * decremeting it.
+   */
   unsigned int *counter;
 };
 
+
+/**
+ * Only defined to respect the API.
+ */
 static void
 rewind_ip_cleanup (void *cls,
                    const struct TALER_TESTING_Command *cmd)
 {}
 
+
+/**
+ * Run the "rewind" CMD.
+ *
+ * @param cls closure.
+ * @param cmd command being executed now.
+ * @param is the interpreter state.
+ */
 static void
 rewind_ip_run (void *cls,
                const struct TALER_TESTING_Command *cmd,
@@ -47,6 +73,7 @@ rewind_ip_run (void *cls,
 {
   struct RewindIpState *ris = cls;
 
+  /* FIXME: do check if '1<' is good */
   if (1 < *ris->counter)
   {
     is->ip = ris->new_ip;
@@ -63,7 +90,7 @@ rewind_ip_run (void *cls,
  * @param label command label
  * @param new_ip new instruction pointer's value.  Note that,
  * when the next instruction will be called, the interpreter
- * will increment the ip under the hood so this value must be
+ * will increment the ip _anyway_ so this value must be
  * set to the index of the instruction we want to execute next
  * MINUS one.
  * @param counter counts how many times the rewinding has

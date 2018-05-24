@@ -87,7 +87,7 @@ static unsigned int payments_number = 1;
 /**
  * How many /tracks operation we want to perform.
  */
-static unsigned int tracks_number;
+static unsigned int tracks_number = 1;
 
 
 static const char *default_config_file;
