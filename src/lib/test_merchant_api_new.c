@@ -977,25 +977,28 @@ run (void *cls,
                          \"value\":\"{EUR:10}\"} ] }",
         NULL),
 
-    /* This CMD will (1) successfully deposit `withdraw-coin-11a'
-     * and subsequently _fail_ to deposit `withdraw-coin-1',
-     * because of double spending.  The abort CMD then will try
-     * to get a refund permission out of that first coin that
-     * was regularly spent, and eventually abort refund CMD, will
-     * get the actual refund coin from the exchange.  */
-    TALER_TESTING_cmd_pay ("pay-fail-partial-double-11",
+    TALER_TESTING_cmd_pay ("pay-fail-partial-double-11-good",
+                           merchant_url,
+                           is->ctx,
+                           MHD_HTTP_NOT_ACCEPTABLE,
+                           "create-proposal-11",
+                           "withdraw-coin-11a",
+                           "EUR:5",
+                           "EUR:4.99",
+                           "EUR:0.01"),
+    TALER_TESTING_cmd_pay ("pay-fail-partial-double-11-bad",
                            merchant_url,
                            is->ctx,
                            MHD_HTTP_FORBIDDEN,
                            "create-proposal-11",
-                           "withdraw-coin-11a;withdraw-coin-1",
+                           "withdraw-coin-1",
                            "EUR:5",
                            "EUR:4.99",
                            "EUR:0.01"),
 
     TALER_TESTING_cmd_pay_abort ("pay-abort-11",
                                  merchant_url,
-                                 "pay-fail-partial-double-11",
+                                 "pay-fail-partial-double-11-good",
                                  is->ctx,
                                  MHD_HTTP_OK),
 
