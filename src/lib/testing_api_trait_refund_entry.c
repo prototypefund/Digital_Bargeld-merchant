@@ -34,10 +34,10 @@
 /**
  * Obtain refund entry from a @a cmd.
  *
- * @param cmd command to extract trait from
- * @param index which signature to pick if @a cmd has multiple
- *        on offer
+ * @param cmd command to extract the trait from.
+ * @param index the trait index.
  * @param refund_entry[out] set to the wanted data.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -55,9 +55,9 @@ TALER_TESTING_get_trait_refund_entry
 /**
  * Offer refund entry.
  *
- * @param index which tip id to offer if there are
- *        multiple on offer
+ * @param index index number of the trait to offer.
  * @param refund_entry set to the offered refund entry.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait

@@ -34,6 +34,7 @@
  * @param cmd command to extract trait from.
  * @param index index of the trait.
  * @param planchet_secrets[out] set to the wanted secrets.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -53,6 +54,7 @@ TALER_TESTING_get_trait_planchet_secrets
  *
  * @param index of the trait.
  * @param planchet_secrets set to the offered secrets.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
