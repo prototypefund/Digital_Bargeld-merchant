@@ -1217,6 +1217,8 @@ TALER_TESTING_cmd_tip_pickup
  * to test against such a case.
  *
  * @param label command label.
+ *
+ * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize_fake (const char *label)

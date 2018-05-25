@@ -35,9 +35,6 @@
 #define MERCHANT_FAIL() \
   do {GNUNET_break (0); return NULL; } while (0)
 
-#define CMD_NOT_FOUND "Command not found"
-#define TRAIT_NOT_FOUND "Trait not found"
-
 /**
  * Prepare the merchant execution.  Create tables and check if
  * the port is available.
@@ -66,19 +63,18 @@ struct GNUNET_OS_Process *
 TALER_TESTING_run_merchant (const char *config_filename,
                             const char *merchant_url);
 
-/* ******************* Generic interpreter logic ************ */
-
 /* ************** Specific interpreter commands ************ */
 
 /**
- * Make a /proposal interpreter command.
+ * Make the "proposal" command.
  *
  * @param label command label
- * @param merchant_url merchant base url.
- * @param ctx context
- * @param http_status expected HTTP status code.
- * @param order the order
- * @param instance the merchant instance
+ * @param merchant_url base URL of the merchant serving
+ *        the proposal request.
+ * @param ctx CURL context.
+ * @param http_status expected HTTP status.
+ * @param order the order to PUT to the merchant.
+ * @param instance merchant instance performing the operation.
  *
  * @return the command
  */
@@ -89,22 +85,18 @@ TALER_TESTING_cmd_proposal (const char *label,
                             unsigned int http_status,
                             const char *order,
                             const char *instance);
-
 /**
- * Make a "proposal lookup" interpreter command.
+ * Make a "proposal lookup" command.
  *
- * @param label command label
- * @param ctx 
- * @param merchant_url merchant base URL where to address
- *        the request
- * @param http_status expected HTTP response code
- * @param proposal_reference reference to a proposal command.
- *        This reference will provide a order it to make the
- *        request about
- * @param order_id order id to make the request about; takes
- *        precedence over @a proposal_reference.
+ * @param label command label.
+ * @param ctx CURL context.
+ * @param merchant_url base URL of the merchant backend
+ *        serving the proposal lookup request.
+ * @param http_status expected HTTP response code.
+ * @param proposal_reference reference to a "proposal" CMD.
+ * @param order_id order id to lookup, can be NULL.
  *
- * @return the command
+ * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_proposal_lookup
@@ -116,11 +108,11 @@ TALER_TESTING_cmd_proposal_lookup
    const char *order_id);
 
 /**
- * Make a "check payment" interpreter command.
+ * Make a "check payment" test command.
  *
  * @param label command label.
- * @param merchant_url merchant base url to address the request to
- * @param ctx context.
+ * @param merchant_url merchant base url
+ * @param ctx CURL context.
  * @param http_status expected HTTP response code.
  * @param proposal_reference the proposal whose payment status
  *        is going to be checked.
@@ -136,7 +128,6 @@ TALER_TESTING_cmd_check_payment (const char *label,
                                  unsigned int http_status,
                                  const char *proposal_reference,
                                  unsigned int expect_paid);
-
 /**
  * Make a "pay" test command.
  *
@@ -165,9 +156,11 @@ TALER_TESTING_cmd_pay (const char *label,
                        const char *amount_with_fee,
                        const char *amount_without_fee,
                        const char *refund_fee);
-
 /**
- * Make a "pay again" test command.
+ * Make a "pay again" test command.  Its purpose is to
+ * take all the data from a aborted "pay" CMD, and use
+ * good coins - found in @a coin_reference - to correctly
+ * pay for it.
  *
  * @param label command label
  * @param merchant_url merchant base URL
@@ -205,7 +198,19 @@ TALER_TESTING_cmd_pay_abort (const char *label,
                              unsigned int http_status);
 
 /**
- * FIXME.
+ * Make a "pay abort refund" CMD.  This command uses the
+ * refund permission from a "pay abort" CMD, and redeems it
+ * at the exchange.
+ *
+ * @param label command label.
+ * @param exchange connection label to the exchange.
+ * @param abort_reference reference to the "pay abort" CMD that
+ *        will offer the refund permission.
+ * @param num_coins how many coins are expected to be refunded.
+ * @param refund_amount the amount we are going to redeem as
+ *        refund.
+ * @param refund_fee the refund fee (FIXME: who pay it?)
+ * @param http_status expected HTTP response code.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_pay_abort_refund
@@ -218,7 +223,22 @@ TALER_TESTING_cmd_pay_abort_refund
    unsigned int http_status);
 
 /**
- * FIXME
+ * Define a "refund lookup" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        "refund lookup" request.
+ * @param ctx CURL context.
+ * @param increase_reference reference to a "refund increase" CMD
+ *        that will offer the amount to check the looked up refund
+ *        against.  Must NOT be NULL.
+ * @param pay_reference reference to the "pay" CMD whose coins got
+ *        refunded.  It is used to double-check if the refunded
+ *        coins were actually spent in the first place.
+ * @param order_id order id whose refund status is to be looked up.
+ * @param http_code expected HTTP response code.
+ *
+ * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup
@@ -230,6 +250,28 @@ TALER_TESTING_cmd_refund_lookup
    const char *order_id,
    unsigned int http_code);
 
+/**
+ * Define a "refund lookup" CMD, equipped with a expected refund
+ * amount.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        "refund lookup" request.
+ * @param ctx CURL context.
+ * @param increase_reference reference to a "refund increase" CMD
+ *        that will offer the amount to check the looked up refund
+ *        against.  Can be NULL, takes precedence over @a
+ *        refund_amount.
+ * @param pay_reference reference to the "pay" CMD whose coins got
+ *        refunded.  It is used to double-check if the refunded
+ *        coins were actually spent in the first place.
+ * @param order_id order id whose refund status is to be looked up.
+ * @param http_code expected HTTP response code.
+ * @param refund_amount expected refund amount.  Must be defined
+ *        if @a increase_reference is NULL.
+ *
+ * @return the command.
+ */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup_with_amount
   (const char *label,
@@ -243,7 +285,19 @@ TALER_TESTING_cmd_refund_lookup_with_amount
 
 
 /**
- * FIXME
+ * Define a "refund increase" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the backend serving the
+ *        "refund increase" request.
+ * @param ctx CURL context.
+ * @param reason refund justification, human-readable.
+ * @param order_id order id of the contract to refund.
+ * @param refund_amount amount to be refund-increased.
+ * @param refund_fee refund fee.
+ * @param http_code expected HTTP response code.
+ *
+ * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_increase
@@ -256,17 +310,18 @@ TALER_TESTING_cmd_refund_increase
    const char *refund_fee,
    unsigned int http_code);
 
-
 /**
  * Make a "history" command.
  *
- * @param label command label
- * @param merchant_url merchant base URL
- * @param ctx main CURL context
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        request.
+ * @param ctx CURL context.
  * @param http_status expected HTTP response code
- * @param time FIXME
+ * @param time limit towards the past for the history
+ *        records we want returned.
  * @param nresult how many results are expected
- * @param start FIXME.
+ * @param start first row id we want in the result.
  * @param nrows how many row we want to receive, at most.
  */
 struct TALER_TESTING_Command
@@ -280,7 +335,16 @@ TALER_TESTING_cmd_history (const char *label,
                            unsigned int nrows);
 
 /**
- * FIXME
+ * Define a "track transaction" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        /track/transaction request.
+ * @param ctx CURL context.
+ * @param http_status expected HTTP response code.
+ * @param transfer_reference FIXME not used.
+ * @param pay_reference used to retrieve the order id to track.
+ * @param wire_fee FIXME not used.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transaction
@@ -293,7 +357,17 @@ TALER_TESTING_cmd_merchant_track_transaction
    const char *wire_fee);
 
 /**
- * FIXME
+ * Define a "track transfer" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        /track/transfer request.
+ * @param ctx CURL context.
+ * @param http_status expected HTTP response code.
+ * @param check_bank_reference reference to a "check bank" CMD
+ *        that will provide the WTID and exchange URL to issue
+ *        the track against.
+ * @param pay_reference FIXME not used.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transfer
@@ -312,6 +386,7 @@ TALER_TESTING_cmd_merchant_track_transfer
  * @param index which signature to offer if there are multiple
  *        on offer
  * @param merchant_sig set to the offered signature.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -326,6 +401,7 @@ TALER_TESTING_make_trait_merchant_sig
  * @param index which signature to pick if @a cmd has multiple
  *        on offer
  * @param merchant_sig[out] set to the wanted signature.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -333,7 +409,6 @@ TALER_TESTING_get_trait_merchant_sig
   (const struct TALER_TESTING_Command *cmd,
    unsigned int index,
    struct TALER_MerchantSignatureP **merchant_sig);
-
 
 /**
  * Obtain a reference to a proposal command.  Any command that
@@ -343,10 +418,11 @@ TALER_TESTING_get_trait_merchant_sig
  * the same data needed by the former in order to use the "pay
  * abort" API.
  *
- * @param cmd command to extract trait from
+ * @param cmd command to extract the trait from.
  * @param index which reference to pick if @a cmd has multiple
- *        on offer
+ *        on offer.
  * @param proposal_reference[out] set to the wanted reference.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -359,8 +435,9 @@ TALER_TESTING_get_trait_proposal_reference
  * Offer a proposal reference.
  *
  * @param index which reference to offer if there are
- *        multiple on offer
- * @param proposal_reference set to the offered reference.
+ *        multiple on offer.
+ * @param proposal_reference pointer to the reference to offer.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -372,8 +449,9 @@ TALER_TESTING_make_trait_proposal_reference
  * Offer a coin reference.
  *
  * @param index which reference to offer if there are
- *        multiple on offer
+ *        multiple on offer.
  * @param coin_reference set to the offered reference.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -388,12 +466,14 @@ TALER_TESTING_make_trait_coin_reference
  * @param cmd command to extract trait from
  * @param index which reference to pick if @a cmd has multiple
  *        on offer
- * @param coin_reference[out] set to the wanted reference. NOTE:
- *        a _single_ reference can contain _multiple_ token,
- *        using semi-colon as separator.  For example, a _single_
- *        reference can be this: "coin-ref-1", or even this:
- *        "coin-ref-1;coin-ref-2".  The "pay" command contains
- *        functions that can parse such format.
+ * @param coin_reference[out] set to the wanted reference.
+ *        NOTE: a _single_ reference can contain
+ *        _multiple_ instances, using semi-colon as separator.
+ *        For example, a _single_ reference can be this:
+ *        "coin-ref-1", or even this: "coin-ref-1;coin-ref-2".
+ *        The "pay" command contains functions that can parse
+ *        such format.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -406,10 +486,10 @@ TALER_TESTING_get_trait_coin_reference
 /**
  * Obtain planchet secrets from a @a cmd.
  *
- * @param cmd command to extract trait from
- * @param index which signature to pick if @a cmd has multiple
- *        on offer
+ * @param cmd command to extract trait from.
+ * @param index index of the trait.
  * @param planchet_secrets[out] set to the wanted secrets.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -418,13 +498,12 @@ TALER_TESTING_get_trait_planchet_secrets
    unsigned int index,
    struct TALER_PlanchetSecretsP **planchet_secrets);
 
-
 /**
  * Offer planchet secrets.
  *
- * @param index which secrets to offer if there are multiple
- *        on offer
+ * @param index of the trait.
  * @param planchet_secrets set to the offered secrets.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -436,8 +515,8 @@ TALER_TESTING_make_trait_planchet_secrets
  * Offer tip id.
  *
  * @param index which tip id to offer if there are
- *        multiple on offer
- * @param planchet_secrets set to the offered secrets.
+ *        multiple on offer.
+ * @param tip_id set to the offered tip id.
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -445,14 +524,14 @@ TALER_TESTING_make_trait_tip_id
   (unsigned int index,
    const struct GNUNET_HashCode *tip_id);
 
-
 /**
  * Obtain tip id from a @a cmd.
  *
- * @param cmd command to extract trait from
- * @param index which signature to pick if @a cmd has multiple
- *        on offer
+ * @param cmd command to extract the trait from.
+ * @param index which tip id to pick if @a
+ *        cmd has multiple on offer
  * @param tip_id[out] set to the wanted data.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -464,9 +543,11 @@ TALER_TESTING_get_trait_tip_id
 /**
  * Offer contract terms hash code.
  *
- * @param index which hash code to offer if there are
- *        multiple on offer
- * @param h_contract_terms set to the offered hash code.
+ * @param index which hashed contract terms to
+ *        offer if there are multiple on offer
+ * @param h_contract_terms set to the offered hashed
+ *        contract terms.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -477,10 +558,10 @@ TALER_TESTING_make_trait_h_contract_terms
 /**
  * Obtain contract terms hash from a @a cmd.
  *
- * @param cmd command to extract trait from
- * @param index which hash code to pick if @a cmd has multiple
- *        on offer
+ * @param cmd command to extract the trait from.
+ * @param index index number of the trait to fetch.
  * @param h_contract_terms[out] set to the wanted data.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -489,13 +570,12 @@ TALER_TESTING_get_trait_h_contract_terms
    unsigned int index,
    const struct GNUNET_HashCode **h_contract_terms);
 
-
 /**
  * Offer refund entry.
  *
- * @param index which tip id to offer if there are
- *        multiple on offer
+ * @param index index number of the trait to offer.
  * @param refund_entry set to the offered refund entry.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -507,10 +587,10 @@ TALER_TESTING_make_trait_refund_entry
 /**
  * Obtain refund entry from a @a cmd.
  *
- * @param cmd command to extract trait from
- * @param index which signature to pick if @a cmd has multiple
- *        on offer
+ * @param cmd command to extract the trait from.
+ * @param index the trait index.
  * @param refund_entry[out] set to the wanted data.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -519,9 +599,23 @@ TALER_TESTING_get_trait_refund_entry
    unsigned int index,
    const struct TALER_MERCHANT_RefundEntry **refund_entry);
 
-
 /**
- * FIXME
+ * Create a /tip-authorize CMD, specifying the Taler error code
+ * that is expected to be returned by the backend.
+ *
+ * @param label this command label
+ * @param merchant_url the base URL of the merchant that will
+ *        serve the /tip-authorize request.
+ * @param exchange_url the base URL of the exchange that owns
+ *        the reserve from which the tip is going to be gotten.
+ * @param ctx the CURL context to carry on the HTTP work.
+ * @param http_status the HTTP response code which is expected
+ *        for this operation.
+ * @param instance which merchant instance is running this CMD.
+ * @param justification human-readable justification for this
+ *        tip authorization.
+ * @param amount the amount to authorize for tipping.
+ * @param ec expected Taler-defined error code.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize_with_ec
@@ -535,12 +629,36 @@ TALER_TESTING_cmd_tip_authorize_with_ec
    const char *amount,
    enum TALER_ErrorCode ec);
 
+
+/**
+ * This commands does not query the backend at all,
+ * but just makes up a fake authorization id that will
+ * be subsequently used by the "pick up" CMD in order
+ * to test against such a case.
+ *
+ * @param label command label.
+ *
+ * @return the command.
+ */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize_fake
   (const char *label);
 
 /**
- * FIXME
+ * Create a /tip-authorize CMD.
+ *
+ * @param label this command label
+ * @param merchant_url the base URL of the merchant that will
+ *        serve the /tip-authorize request.
+ * @param exchange_url the base URL of the exchange that owns
+ *        the reserve from which the tip is going to be gotten.
+ * @param ctx the CURL context to carry on the HTTP work.
+ * @param http_status the HTTP response code which is expected
+ *        for this operation.
+ * @param instance which merchant instance is running this CMD.
+ * @param justification human-readable justification for this
+ *        tip authorization.
+ * @param amount the amount to authorize for tipping.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize (const char *label,
@@ -553,7 +671,15 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
                                  const char *amount);
 
 /**
- * FIXME
+ * Define a /tip-query CMD.
+ *
+ * @param label the command label
+ * @param merchant_url base URL of the merchant which will
+ *        server the /tip-query request.
+ * @param ctx CURL context to carry on the HTTP work.
+ * @param http_status expected HTTP response code for the
+ *        /tip-query request.
+ * @param instance the merchant instance running this CMD.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query (const char *label,
@@ -561,9 +687,21 @@ TALER_TESTING_cmd_tip_query (const char *label,
                              struct GNUNET_CURL_Context *ctx,
                              unsigned int http_status,
                              const char *instance);
-
 /**
- * FIXME
+ * Define a /tip-query CMD equipped with a expected amount.
+ *
+ * @param label the command label
+ * @param merchant_url base URL of the merchant which will
+ *        server the /tip-query request.
+ * @param ctx CURL context to carry on the HTTP work.
+ * @param http_status expected HTTP response code for the
+ *        /tip-query request.
+ * @param instance the merchant instance running this CMD.
+ * @param expected_amount_picked_up expected amount already
+ *        picked up.
+ * @param expected_amount_authorized expected amount that was
+ *        authorized in the first place.
+ * @param expected_amount_available FIXME what is this?
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query_with_amounts
@@ -576,9 +714,22 @@ TALER_TESTING_cmd_tip_query_with_amounts
    const char *expected_amount_authorized,
    const char *expected_amount_available);
 
-
 /**
- * FIXME
+ * Define a /tip-pickup CMD, equipped with the expected error
+ * code.
+ *
+ * @param label the command label
+ * @param merchant_url base URL of the backend which will serve
+ *        the /tip-pickup request.
+ * @param ctx CURL context to carry on HTTP work.
+ * @param http_status expected HTTP response code.
+ * @param authorize_reference reference to a /tip-autorize CMD
+ *        that offers a tip id to pick up.
+ * @param amounts array of string-defined amounts that specifies
+ *        which denominations will be accepted for tipping.
+ * @param exchange connection handle to the exchange that will
+ *        eventually serve the withdraw operation.
+ * @param ec expected Taler error code.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup_with_ec
@@ -591,9 +742,20 @@ TALER_TESTING_cmd_tip_pickup_with_ec
    struct TALER_EXCHANGE_Handle *exchange,
    enum TALER_ErrorCode ec);
 
-
 /**
- * FIXME
+ * Define a /tip-pickup CMD.
+ *
+ * @param label the command label
+ * @param merchant_url base URL of the backend which will serve
+ *        the /tip-pickup request.
+ * @param ctx CURL context to carry on HTTP work.
+ * @param http_status expected HTTP response code.
+ * @param authorize_reference reference to a /tip-autorize CMD
+ *        that offers a tip id to pick up.
+ * @param amounts array of string-defined amounts that specifies
+ *        which denominations will be accepted for tipping.
+ * @param exchange connection handle to the exchange that will
+ *        eventually serve the withdraw operation.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup
@@ -612,7 +774,7 @@ TALER_TESTING_cmd_tip_pickup
  * @param label command label
  * @param new_ip new instruction pointer's value.  Note that,
  * when the next instruction will be called, the interpreter
- * will increment the ip under the hood so this value must be
+ * will increment the ip _anyway_ so this value must be
  * set to the index of the instruction we want to execute next
  * MINUS one.
  * @param counter counts how many times the rewinding has
