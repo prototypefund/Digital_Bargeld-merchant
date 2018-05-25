@@ -26,16 +26,23 @@
 #include <taler/taler_exchange_service.h>
 #include <taler/taler_testing_lib.h>
 
+/**
+ * TODO: have _one_ pair of getter/setter for hash-coded
+ * traits and define the getters/setters for tip id and hashed
+ * contract terms as _macros_.
+ */
+
 #define TALER_TESTING_TRAIT_TIP_ID "tip-id"
 #define TALER_TESTING_TRAIT_H_CONTRACT_TERMS "h-contract-terms"
 
 /**
  * Obtain tip id from a @a cmd.
  *
- * @param cmd command to extract trait from
- * @param index which signature to pick if @a cmd has multiple
- *        on offer
+ * @param cmd command to extract the trait from.
+ * @param index which tip id to pick if @a
+ *        cmd has multiple on offer
  * @param tip_id[out] set to the wanted data.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -55,8 +62,8 @@ TALER_TESTING_get_trait_tip_id
  * Offer tip id.
  *
  * @param index which tip id to offer if there are
- *        multiple on offer
- * @param planchet_secrets set to the offered secrets.
+ *        multiple on offer.
+ * @param tip_id set to the offered tip id.
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -76,10 +83,10 @@ TALER_TESTING_make_trait_tip_id
 /**
  * Obtain contract terms hash from a @a cmd.
  *
- * @param cmd command to extract trait from
- * @param index which hash code to pick if @a cmd has multiple
- *        on offer
+ * @param cmd command to extract the trait from.
+ * @param index index number of the trait to fetch.
  * @param h_contract_terms[out] set to the wanted data.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -98,9 +105,11 @@ TALER_TESTING_get_trait_h_contract_terms
 /**
  * Offer contract terms hash code.
  *
- * @param index which hash code to offer if there are
- *        multiple on offer
- * @param h_contract_terms set to the offered hash code.
+ * @param index which hashed contract terms to
+ *        offer if there are multiple on offer
+ * @param h_contract_terms set to the offered hashed
+ *        contract terms.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
