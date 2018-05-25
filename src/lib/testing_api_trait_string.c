@@ -37,10 +37,11 @@
  * the same data needed by the former in order to use the "pay
  * abort" API.
  *
- * @param cmd command to extract trait from
+ * @param cmd command to extract the trait from.
  * @param index which reference to pick if @a cmd has multiple
- *        on offer
+ *        on offer.
  * @param proposal_reference[out] set to the wanted reference.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -60,8 +61,9 @@ TALER_TESTING_get_trait_proposal_reference
  * Offer a proposal reference.
  *
  * @param index which reference to offer if there are
- *        multiple on offer
- * @param proposal_reference set to the offered reference.
+ *        multiple on offer.
+ * @param proposal_reference pointer to the reference to offer.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -85,12 +87,14 @@ TALER_TESTING_make_trait_proposal_reference
  * @param cmd command to extract trait from
  * @param index which reference to pick if @a cmd has multiple
  *        on offer
- * @param coin_reference[out] set to the wanted reference. NOTE:
- *        a _single_ reference can contain _multiple_ instances,
- *        using semi-colon as separator.  For example, a _single_
- *        reference can be this: "coin-ref-1", or even this:
- *        "coin-ref-1;coin-ref-2".  The "pay" command contains
- *        functions that can parse such format.
+ * @param coin_reference[out] set to the wanted reference.
+ *        NOTE: a _single_ reference can contain
+ *        _multiple_ instances, using semi-colon as separator.
+ *        For example, a _single_ reference can be this:
+ *        "coin-ref-1", or even this: "coin-ref-1;coin-ref-2".
+ *        The "pay" command contains functions that can parse
+ *        such format.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -110,8 +114,9 @@ TALER_TESTING_get_trait_coin_reference
  * Offer a coin reference.
  *
  * @param index which reference to offer if there are
- *        multiple on offer
+ *        multiple on offer.
  * @param coin_reference set to the offered reference.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
