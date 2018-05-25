@@ -35,6 +35,7 @@
  * @param index which signature to pick if @a cmd has multiple
  *        on offer
  * @param merchant_sig[out] set to the wanted signature.
+ *
  * @return #GNUNET_OK on success
  */
 int
@@ -55,6 +56,7 @@ TALER_TESTING_get_trait_merchant_sig
  * @param index which signature to offer if there are multiple
  *        on offer
  * @param merchant_sig set to the offered signature.
+ *
  * @return the trait
  */
 struct TALER_TESTING_Trait
