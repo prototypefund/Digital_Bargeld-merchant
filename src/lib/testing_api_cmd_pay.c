@@ -978,11 +978,9 @@ pay_cleanup (void *cls,
  * Offer internal data useful to other commands.
  *
  * @param cls closure
- * @param ret[out] result (could be anything)
+ * @param ret[out] result
  * @param trait name of the trait
- * @param selector more detailed information about which object
- *                 to return in case there were multiple generated
- *                 by the command
+ * @param index index number of the object to extract.
  * @return #GNUNET_OK on success
  */
 static int
@@ -1192,9 +1190,7 @@ pay_abort_run (void *cls,
  * @param cls closure
  * @param ret[out] result (could be anything)
  * @param trait name of the trait
- * @param selector more detailed information about which object
- *                 to return in case there were multiple generated
- *                 by the command
+ * @param index index number of the object to extract.
  * @return #GNUNET_OK on success
  */
 static int
