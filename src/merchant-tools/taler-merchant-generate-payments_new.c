@@ -126,7 +126,7 @@ run (void *cls,
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-1",
-       "USD:15.03"),
+       "USD:25.05"),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
@@ -134,7 +134,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
-       is->exchange,
+       is->exchange, // picks port from config's [exchange].
        "create-reserve-1",
        "USD:5",
        MHD_HTTP_OK),
@@ -150,6 +150,23 @@ run (void *cls,
      * in order to get 202 responses from tracks.  */
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-3",
+       is->exchange,
+       "create-reserve-1",
+       "USD:5",
+       MHD_HTTP_OK),
+
+    /* coin 4 & 5 will be deposited for the same
+     * contract; needed in case some testing utility
+     * wants to trigger a "failed dependency" error. */
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-4",
+       is->exchange,
+       "create-reserve-1",
+       "USD:5",
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-5",
        is->exchange,
        "create-reserve-1",
        "USD:5",
@@ -186,6 +203,42 @@ run (void *cls,
        "USD:5",
        "USD:4.99",
        "USD:0.01"),
+
+    /* Doing the 2-coins payment; needed to generate the
+     * "failed dependency" response error, at /track/transaction.
+     * NOTE: not used here, but done just in case a testing
+     * program would need it.  */
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-4&5",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"USD\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"USD\",\
+           \"value\":10,\
+           \"fraction\":0},\
+        \"summary\": \"2-coins payment\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"2-coins payment\",\
+                         \"value\":\"{USD:10}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_pay ("deposit-4&5",
+                           merchant_url,
+                           is->ctx,
+                           MHD_HTTP_OK,
+                           "create-proposal-4&5",
+                           "withdraw-coin-4;" \
+                           "withdraw-coin-5",
+                           "EUR:10",
+                           "EUR:9.98", // no sense now
+                           "EUR:0.02"), // no sense now
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-payments",
@@ -419,7 +472,7 @@ main (int argc,
   }
 
   if (NULL == (merchantd = TALER_TESTING_run_merchant
-    (default_config_file, merchant_url)))
+    (cfg_filename, merchant_url)))
   {
     TALER_LOG_ERROR ("Failed to launch the merchant\n");
     terminate_process (merchantd);
@@ -433,7 +486,7 @@ main (int argc,
   }
 
   if ( NULL == (bankd = TALER_TESTING_run_bank
-    (default_config_file,
+    (cfg_filename,
      bank_url)))
   {
     TALER_LOG_ERROR ("Failed to run the bank\n");
@@ -445,7 +498,7 @@ main (int argc,
   result = TALER_TESTING_setup_with_exchange
     (run,
      NULL,
-     default_config_file);
+     cfg_filename);
 
   terminate_process (merchantd);
   terminate_process (bankd);
