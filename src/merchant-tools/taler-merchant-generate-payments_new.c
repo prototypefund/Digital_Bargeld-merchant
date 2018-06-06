@@ -126,7 +126,7 @@ run (void *cls,
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-1",
-       "USD:10.02"),
+       "USD:15.03"),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
@@ -141,6 +141,15 @@ run (void *cls,
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-2",
+       is->exchange,
+       "create-reserve-1",
+       "USD:5",
+       MHD_HTTP_OK),
+
+    /* This coin will be spent but never aggregated,
+     * in order to get 202 responses from tracks.  */
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-3",
        is->exchange,
        "create-reserve-1",
        "USD:5",
@@ -241,6 +250,47 @@ run (void *cls,
        MHD_HTTP_OK,
        "track-transaction-1",
        "deposit-simple-2"),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-3",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"USD\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"USD\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"unaggregated deposit!\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"unaggregated cream\",\
+                         \"value\":\"{USD:5}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_pay
+      ("deposit-simple-3",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-proposal-3",
+       "withdraw-coin-3",
+       "USD:5",
+       "USD:4.99",
+       "USD:0.01"),
+
+    TALER_TESTING_cmd_merchant_track_transaction
+      ("track-transaction-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_ACCEPTED,
+       "dummy", // "check bank" CMD, never used, to be deleted.
+       "deposit-simple-3",
+       "USD:0.01"),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-tracks",
