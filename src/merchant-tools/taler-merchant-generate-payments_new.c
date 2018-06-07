@@ -204,42 +204,6 @@ run (void *cls,
        "USD:4.99",
        "USD:0.01"),
 
-    /* Doing the 2-coins payment; needed to generate the
-     * "failed dependency" response error, at /track/transaction.
-     * NOTE: not used here, but done just in case a testing
-     * program would need it.  */
-    TALER_TESTING_cmd_proposal
-      ("create-proposal-4&5",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
-          {\"currency\":\"USD\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-        \"amount\":\
-          {\"currency\":\"USD\",\
-           \"value\":10,\
-           \"fraction\":0},\
-        \"summary\": \"2-coins payment\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"2-coins payment\",\
-                         \"value\":\"{USD:10}\"} ] }",
-        NULL),
-
-    TALER_TESTING_cmd_pay ("deposit-4&5",
-                           merchant_url,
-                           is->ctx,
-                           MHD_HTTP_OK,
-                           "create-proposal-4&5",
-                           "withdraw-coin-4;" \
-                           "withdraw-coin-5",
-                           "EUR:10",
-                           "EUR:9.98", // no sense now
-                           "EUR:0.02"), // no sense now
-
     TALER_TESTING_cmd_rewind_ip
       ("rewind-payments",
        FIRST_INSTRUCTION,
@@ -344,6 +308,50 @@ run (void *cls,
        "dummy", // "check bank" CMD, never used, to be deleted.
        "deposit-simple-3",
        "USD:0.01"),
+
+    /* Doing the 2-coins payment; needed to generate the
+     * "failed dependency" response error, at /track/transaction.
+     * NOTE: not used here, but done just in case a testing
+     * program would need it.  And this MUST happen here, as
+     * no tracking operation happens next and so the merchant
+     * won't be able to use a cached version in its database
+     * when serving /track/..; therefore it will relate to the
+     * exchange that can be twisted by the testing logic.  */
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-4&5",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"USD\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"amount\":\
+          {\"currency\":\"USD\",\
+           \"value\":10,\
+           \"fraction\":0},\
+        \"summary\": \"2-coins payment\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"2-coins payment\",\
+                         \"value\":\"{USD:10}\"} ] }",
+        NULL),
+
+    TALER_TESTING_cmd_pay ("deposit-4&5",
+                           merchant_url,
+                           is->ctx,
+                           MHD_HTTP_OK,
+                           "create-proposal-4&5",
+                           "withdraw-coin-4;" \
+                           "withdraw-coin-5",
+                           "EUR:10",
+                           "EUR:9.98", // no sense now
+                           "EUR:0.02"), // no sense now
+
+    TALER_TESTING_cmd_exec_aggregator
+      ("aggregate-2",
+       cfg_filename),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-tracks",
