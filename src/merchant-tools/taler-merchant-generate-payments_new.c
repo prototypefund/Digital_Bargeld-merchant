@@ -485,7 +485,6 @@ main (int argc,
     (cfg_filename, merchant_url)))
   {
     TALER_LOG_ERROR ("Failed to launch the merchant\n");
-    terminate_process (merchantd);
     return FAILED_TO_LAUNCH_MERCHANT;
   }
 
