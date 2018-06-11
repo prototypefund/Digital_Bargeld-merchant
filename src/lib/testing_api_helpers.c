@@ -61,7 +61,7 @@ TALER_TESTING_run_merchant (const char *config_filename,
 
   GNUNET_asprintf (&wget_cmd,
                    "wget -q -t 1 -T 1"
-                   " --header='Authentication: ApiKey sandbox'"
+                   " --header='Authorization: ApiKey sandbox'"
                    " %s"
                    " -o /dev/null -O /dev/null",
                    merchant_url);
