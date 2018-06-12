@@ -1,2021 +1,640 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2017 Taler Systems SA
+  (C) 2014-2018 Taler Systems SA
 
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Lesser General Public License as published by the Free Software
-  Foundation; either version 2.1, or (at your option) any later version.
+  TALER is free software; you can redistribute it and/or modify it
+  under the terms of the GNU Affero General Public License as
+  published by the Free Software Foundation; either version 3, or
+  (at your option) any later version.
 
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+  TALER is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  General Public License for more details.
 
-  You should have received a copy of the GNU Lesser General Public License along with
-  TALER; see the file COPYING.LGPL.  If not, see <http://www.gnu.org/licenses/>
+  You should have received a copy of the GNU General Public License
+  along with TALER; see the file COPYING.  If not,
+  see <http://www.gnu.org/licenses/>
 */
+
 /**
- * @file taler-merchant-generate-payments.c
- * @brief tool to use (or test) the taler backend by running some transactions
- * @author Christian Grothoff
+ * @file merchant/backend/taler-merchant-httpd.c
+ * @brief HTTP serving layer intended to perform crypto-work and
+ * communication with the exchange
  * @author Marcello Stanisci
- *
- * TODO:
- * - trigger wirewatch after /admin/add/incoming!
  */
+
 #include "platform.h"
-#include <taler/taler_exchange_service.h>
-#include <taler/taler_bank_service.h>
-#include <taler/taler_fakebank_lib.h>
-#include <taler/taler_json_lib.h>
 #include <taler/taler_util.h>
 #include <taler/taler_signatures.h>
-#include "taler_merchant_service.h"
-#include "taler_merchantdb_lib.h"
+#include <taler/taler_exchange_service.h>
+#include <taler/taler_json_lib.h>
 #include <gnunet/gnunet_util_lib.h>
-#include <gnunet/gnunet_curl_lib.h>
 #include <microhttpd.h>
+#include <taler/taler_bank_service.h>
+#include <taler/taler_fakebank_lib.h>
+#include <taler/taler_testing_lib.h>
+#include <taler/taler_testing_bank_lib.h>
+#include <taler/taler_error_codes.h>
+#include "taler_merchant_testing_lib.h"
 
-/**
- * Number of the account the exchange has at the bank.
- */
+/* Error codes.  */
+enum PaymentGeneratorError {
+
+  MISSING_MERCHANT_URL = 2,
+  FAILED_TO_LAUNCH_MERCHANT,
+  MISSING_BANK_URL,
+  FAILED_TO_LAUNCH_BANK,
+  BAD_CLI_ARG,
+  BAD_CONFIG_FILE
+};
+
+/* Hard-coded params.  Note, the bank is expected to
+ * have the Tor user with account number 3 and password 'x'.
+ *
+ * This is not a problem _so far_, as the fakebank mocks logins,
+ * and the Python bank makes that account by default.  */
+#define USER_ACCOUNT_NO 3
 #define EXCHANGE_ACCOUNT_NO 2
+#define USER_LOGIN_NAME "Tor"
+#define USER_LOGIN_PASS "x"
+#define EXCHANGE_URL "http://example.com/"
+
+#define FIRST_INSTRUCTION -1
+#define TRACKS_INSTRUCTION 9
+
+#define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
+   TALER_TESTING_cmd_fakebank_transfer (label, amount, \
+     bank_url, USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO, \
+     USER_LOGIN_NAME, USER_LOGIN_PASS, EXCHANGE_URL)
 
 /**
- * The exchange process launched by the generator
+ * Exit code.
  */
-static struct GNUNET_OS_Process *exchanged;
+static unsigned int result;
 
 /**
- * The merchant process launched by the generator
+ * Bank process.
+ */
+static struct GNUNET_OS_Process *bankd;
+
+/**
+ * Merchant process.
  */
 static struct GNUNET_OS_Process *merchantd;
 
 /**
- * How many times the command list should be rerun.
+ * How many payments we want to generate.
  */
-static unsigned int times = 1;
+static unsigned int payments_number = 1;
 
 /**
- * Current iteration of commands
+ * How many /tracks operation we want to perform.
  */
-static unsigned int j = 0;
+static unsigned int tracks_number = 1;
+
 
 /**
- * Indicates whether we use an external exchange.
- * By default, the generator forks a local exchange.
+ * Usually set as ~/.config/taler.net
  */
-static int remote_bank = 0;
+static const char *default_config_file;
 
 /**
- * Indicates whether we use an external exchange.
- * By default, the generator forks a local exchange.
+ * Log level used during the run.
  */
-static int remote_exchange = 0;
+static char *loglev;
 
 /**
- * Indicates whether we use an external merchant.
- * By default, the generator tries to fork a local
- * merchant.
+ * Config filename.
  */
-static int remote_merchant = 0;
+static char *cfg_filename;
 
 /**
- * Exchange URL to withdraw from and deposit to.
- */
-static char *exchange_url;
-
-/**
- * Base URL of exchange's admin interface.
- */
-static char *exchange_url_admin;
-
-/**
- * Merchant backend to get proposals from and pay.
- */
-static char *merchant_url;
-
-/**
- * Customer's bank URL, communicated at withdrawal time
- * to the exchange; must be the same as the exchange's bank.
+ * Bank base URL.
  */
 static char *bank_url;
 
 /**
- * Which merchant instance we use.
+ * Log file.
  */
-static char *instance;
+static char *logfile;
 
 /**
- * Currency used to generate payments.
+ * Merchant base URL.
+ */
+static char *merchant_url;
+
+/**
+ * Currency used.
  */
 static char *currency;
 
 /**
- * Handle to our fakebank.
+ * Convenience macros to allocate all the currency-dependant
+ * strings;  note that the argument list of the macro is ignored.
+ * It is kept as a way to make the macro more auto-descriptive
+ * where it is called.
  */
-static struct TALER_FAKEBANK_Handle *fakebank;
+
+#define ALLOCATE_AMOUNTS(...) \
+  GNUNET_asprintf (&CURRENCY_25_05, \
+                   "%s:25.05", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_10, \
+                   "%s:10", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_9_98, \
+                   "%s:9.98", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_5, \
+                   "%s:5", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_4_99, \
+                   "%s:4.99", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_0_02, \
+                   "%s:0.02", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_0_01, \
+                   "%s:0.01", \
+                   currency);
+
+#define ALLOCATE_ORDERS(...) \
+  GNUNET_asprintf \
+    (&order_worth_5, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{%s:5}\"} ] }", \
+     currency, \
+     currency, \
+     currency); \
+  GNUNET_asprintf \
+    (&order_worth_10_2coins, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":10,\
+          \"fraction\":0},\
+        \"summary\": \"2-coins untracked payment\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"2-coins payment\",\
+                         \"value\":\"{%s:10}\"} ] }", \
+     currency, \
+     currency, \
+     currency); \
+  GNUNET_asprintf \
+    (&order_worth_5_track, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"ice track cream!\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice track cream\",\
+                         \"value\":\"{%s:5}\"} ] }", \
+     currency, \
+     currency, \
+     currency); \
+  GNUNET_asprintf \
+    (&order_worth_5_unaggregated, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"unaggregated deposit!\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"unaggregated cream\",\
+                         \"value\":\"{%s:5}\"} ] }", \
+     currency, \
+     currency, \
+     currency);
 
 /**
- * Task run on timeout.
- */
-static struct GNUNET_SCHEDULER_Task *timeout_task;
-
-/**
- * Handle to access the exchange.
- */
-static struct TALER_EXCHANGE_Handle *exchange;
-
-/**
- * Main execution context for the main loop of the exchange.
- */
-static struct GNUNET_CURL_Context *ctx;
-
-/**
- * Context for running the #ctx's event loop.
- */
-static struct GNUNET_CURL_RescheduleContext *rc;
-
-/**
- * Result of the testcases, #GNUNET_OK on success.
- */
-static int result;
-
-/**
- * Pipe used to communicate child death via signal.
- */
-static struct GNUNET_DISK_PipeHandle *sigpipe;
-
-/**
- * Signal handler we overrode.
- */
-static struct GNUNET_SIGNAL_Context *shc_chld;
-
-/**
- * Name of the configuration file we are using.
- */
-static char *cfgfilename;
-
-
-/**
- * State of the interpreter loop.
- */
-struct InterpreterState
-{
-  /**
-   * Keys from the exchange.
-   */
-  const struct TALER_EXCHANGE_Keys *keys;
-
-  /**
-   * Commands the interpreter will run.
-   */
-  struct Command *commands;
-
-  /**
-   * Interpreter task (if one is scheduled).
-   */
-  struct GNUNET_SCHEDULER_Task *task;
-
-  /**
-   * Instruction pointer.  Tells #interpreter_run() which
-   * instruction to run next.
-   */
-  unsigned int ip;
-
-};
-
-/**
- * Opcodes for the interpreter.
- */
-enum OpCode
-{
-  /**
-   * Termination code, stops the interpreter loop (with success).
-   */
-  OC_END = 0,
-
-  /**
-   * Issue a GET /proposal to the backend.
-   */
-  OC_PROPOSAL_LOOKUP,
-
-  /**
-   * Add funds to a reserve by (faking) incoming wire transfer.
-   */
-  OC_ADMIN_ADD_INCOMING,
-
-  /**
-   * Run the wirewatcher to check for incoming transactions.
-   */
-  OC_RUN_WIREWATCH,
-
-  /**
-   * Check status of a reserve.
-   */
-  OC_WITHDRAW_STATUS,
-
-  /**
-   * Withdraw a coin from a reserve.
-   */
-  OC_WITHDRAW_SIGN,
-
-  /**
-   * Issue a PUT /proposal to the backend.
-   */
-  OC_PROPOSAL,
-
-  /**
-   * Pay with coins.
-   */
-  OC_PAY
-
-};
-
-
-/**
- * Details for a exchange operation to execute.
- */
-struct Command
-{
-  /**
-   * Opcode of the command.
-   */
-  enum OpCode oc;
-
-  /**
-   * Label for the command, can be NULL.
-   */
-  const char *label;
-
-  /**
-   * Which response code do we expect for this command?
-   */
-  unsigned int expected_response_code;
-
-  /**
-   * Details about the command.
-   */
-  union
-  {
-
-    /**
-     * Information for a #OC_WITHDRAW_SIGN command.
-     */
-    struct
-    {
-
-      /**
-       * Which reserve should we withdraw from?
-       */
-      const char *reserve_reference;
-
-      /**
-       * String describing the denomination value we should withdraw.
-       * A corresponding denomination key must exist in the exchange's
-       * offerings. Can be NULL if @e pk is set instead.
-       * The interpreter must free this value after it doesn't need it
-       * anymore.
-       */
-      char *amount;
-
-      /**
-       * If @e amount is NULL, this specifies the denomination key to
-       * use.  Otherwise, this will be set (by the interpreter) to the
-       * denomination PK matching @e amount.
-       */
-      const struct TALER_EXCHANGE_DenomPublicKey *pk;
-
-      /**
-       * Set (by the interpreter) to the exchange's signature over the
-       * coin's public key.
-       */
-      struct TALER_DenominationSignature sig;
-
-      /**
-       * Secrets of the planchet. Set by the interpreter.
-       */
-      struct TALER_PlanchetSecretsP ps;
-
-      /**
-       * Withdraw handle (while operation is running).
-       */
-      struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
-
-    } reserve_withdraw;
-
-    /**
-     * Information for a #OC_ADMIN_ADD_INCOMING command.
-     */
-    struct
-    {
-
-      /**
-       * Label to another admin_add_incoming command if we
-       * should deposit into an existing reserve, NULL if
-       * a fresh reserve should be created.
-       */
-      const char *reserve_reference;
-
-      /**
-       * String describing the amount to add to the reserve.
-       */
-      char *amount;
-
-      /**
-       * Sender's bank account number.
-       */
-      uint64_t debit_account_no;
-
-      /**
-       * Receiver's bank account number.
-       */
-      uint64_t credit_account_no;
-
-      /**
-       * Set (by the interpreter) to the reserve's private key
-       * we used to fill the reserve.
-       */
-      struct TALER_ReservePrivateKeyP reserve_priv;
-
-      /**
-       * Set to the API's handle during the operation.
-       */
-      struct TALER_BANK_AdminAddIncomingHandle *aih;
-
-      /**
-       * Set to bank's identifier for the wire transfer.
-       */
-      uint64_t serial_id;
-
-    } admin_add_incoming;
-
-    struct {
-
-      /**
-       * Process for the wirewatcher.
-       */
-      struct GNUNET_OS_Process *wirewatch_proc;
-
-      /**
-       * ID of task called whenever we get a SIGCHILD.
-       */
-      struct GNUNET_SCHEDULER_Task *child_death_task;
-
-    } run_wirewatch;
-
-    /**
-     * Information for an #OC_PROPOSAL command.
-     */
-    struct
-    {
-
-      /**
-       * Max deposit fee accepted by the merchant.
-       * Given in the form "CURRENCY:X.Y".
-       */
-      char *max_fee;
-
-      /**
-       * Proposal overall price.
-       * Given in the form "CURRENCY:X.Y".
-       */
-      char *amount;
-
-      /**
-       * Handle to the active PUT /proposal operation, or NULL.
-       */
-      struct TALER_MERCHANT_ProposalOperation *po;
-
-      /**
-       * Handle to the active GET /proposal operation, or NULL
-       */
-      struct TALER_MERCHANT_ProposalLookupOperation *plo;
-
-      /**
-       * Full contract in JSON, set by the /contract operation.
-       * FIXME: verify in the code that this bit is actually proposal
-       * data and not the whole proposal.
-       */
-      json_t *contract_terms;
-
-      /**
-       * Proposal's signature.
-       */
-      struct TALER_MerchantSignatureP merchant_sig;
-
-      /**
-       * Proposal data's hashcode.
-       */
-      struct GNUNET_HashCode hash;
-
-    } proposal;
-
-    /**
-     * Information for a #OC_PAY command.
-     * FIXME: support tests where we pay with multiple coins at once.
-     */
-    struct
-    {
-
-      /**
-       * Reference to the contract.
-       */
-      const char *contract_ref;
-
-      /**
-       * Reference to a reserve_withdraw operation for a coin to
-       * be used for the /deposit operation.
-       */
-      const char *coin_ref;
-
-      /**
-       * If this @e coin_ref refers to an operation that generated
-       * an array of coins, this value determines which coin to use.
-       */
-      unsigned int coin_idx;
-
-      /**
-       * Amount to pay (from the coin, including fee).
-       */
-      char *amount_with_fee;
-
-      /**
-       * Amount to pay (from the coin, excluding fee).  The sum of the
-       * deltas between all @e amount_with_fee and the @e
-       * amount_without_fee must be less than max_fee, and the sum of
-       * the @e amount_with_fee must be larger than the @e
-       * total_amount.
-       */
-      char *amount_without_fee;
-
-      /**
-       * Deposit handle while operation is running.
-       */
-      struct TALER_MERCHANT_Pay *ph;
-
-      /**
-       * Hashcode of the proposal data associated to this payment.
-       */
-      struct GNUNET_HashCode h_contract_terms;
-
-      /**
-       * Merchant's public key
-       */
-      struct TALER_MerchantPublicKeyP merchant_pub;
-
-    } pay;
-
-  } details;
-
-};
-
-
-/**
- * Function run when the test times out.
- *
- * @param cls NULL
- */
-static void
-do_timeout (void *cls)
-{
-  timeout_task = NULL;
-  GNUNET_SCHEDULER_shutdown ();
-}
-
-
-/**
- * The generator failed, return with an error code.
- *
- * @param is interpreter state to clean up
- */
-static void
-fail (struct InterpreterState *is)
-{
-  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-              "Interpreter failed at step %s (#%u)\n",
-              is->commands[is->ip].label,
-              is->ip);
-  result = GNUNET_SYSERR;
-  GNUNET_SCHEDULER_shutdown ();
-}
-
-
-/**
- * Run the main interpreter loop that performs exchange operations.
- *
- * @param cls contains the `struct InterpreterState`
- */
-static void
-interpreter_run (void *cls);
-
-
-/**
- * Run the next command with the interpreter.
- *
- * @param is current interpeter state.
- */
-static void
-next_command (struct InterpreterState *is)
-{
-  is->ip++;
-  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                       is);
-}
-
-
-/**
- * Callback that processes GET /proposal's output.
- *
- * @param cls closure
- * @param http_status HTTP response code, 200 indicates success;
- *                    0 if the backend's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code
- * @param obj the full received JSON reply, or
- *            error details if the request failed
- * @param contract_terms the order + additional information provided by the
- * backend, NULL on error.
- * @param sig merchant's signature over the contract, NULL on error
- * @param h_contract hash of the contract, NULL on error
- */
-static void
-proposal_lookup_cb (void *cls,
-                    unsigned int http_status,
-                    const json_t *obj,
-                    const json_t *contract_terms,
-                    const struct TALER_MerchantSignatureP *sig,
-                    const struct GNUNET_HashCode *hash)
-{
-  struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-
-  cmd->details.proposal.plo = NULL;
-  switch (http_status)
-  {
-  case MHD_HTTP_OK:
-    cmd->details.proposal.contract_terms = json_incref ((json_t *) contract_terms);
-    cmd->details.proposal.merchant_sig = *sig;
-    cmd->details.proposal.hash = *hash;
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Hashed proposal, '%s'\n",
-                GNUNET_h2s (hash));
-    break;
-  default:
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "unexpected status code from /proposal: %u. Step %u\n",
-                http_status,
-                is->ip);
-    json_dumpf (obj, stderr, 0);
-    GNUNET_break (0);
-    fail (is);
-    return;
-  }
-  next_command (is);
-}
-
-/**
- * Callback that works PUT /proposal's output.
- *
- * @param cls closure
- * @param http_status HTTP response code, 200 indicates success;
- *                    0 if the backend's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code
- * @param obj the full received JSON reply, or
- *            error details if the request failed
- */
-static void
-proposal_cb (void *cls,
-             unsigned int http_status,
-	     enum TALER_ErrorCode ec,
-             const json_t *obj,
-             const char *order_id)
-{
-  struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-
-  cmd->details.proposal.po = NULL;
-  switch (http_status)
-  {
-  case MHD_HTTP_OK: {
-    struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-    struct GNUNET_CRYPTO_EddsaPublicKey pub;
-
-    priv = GNUNET_CRYPTO_eddsa_key_create ();
-    GNUNET_CRYPTO_eddsa_key_get_public (priv, &pub);
-    GNUNET_free (priv);
-
-    cmd->details.proposal.plo
-        = TALER_MERCHANT_proposal_lookup (ctx,
-                                          merchant_url,
-                                          order_id,
-                                          instance,
-                                          &pub,
-                                          &proposal_lookup_cb,
-                                          is);
-    }
-    break;
-  default:
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "unexpected status code from /proposal: %u. Step %u\n",
-                http_status,
-                is->ip);
-    json_dumpf (obj, stderr, 0);
-    GNUNET_break (0);
-    fail (is);
-    return;
-  }
-}
-
-
-/**
- * Function called with the result of a /pay operation.
- *
- * @param cls closure with the interpreter state
- * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful deposit;
- *                    0 if the exchange's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code
- * @param obj the received JSON reply, should be kept as proof (and, in case of errors,
- *            be forwarded to the customer)
- */
-static void
-pay_cb (void *cls,
-        unsigned int http_status,
-	enum TALER_ErrorCode ec,
-        const json_t *obj)
-{
-  struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-  struct PaymentResponsePS mr;
-  struct GNUNET_CRYPTO_EddsaSignature sig;
-  struct GNUNET_HashCode h_contract_terms;
-  const char *error_name;
-  unsigned int error_line;
-
-  cmd->details.pay.ph = NULL;
-  if (cmd->expected_response_code != http_status)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
-                http_status,
-                cmd->label);
-    json_dumpf (obj, stderr, 0);
-    fail (is);
-    return;
-  }
-  if (MHD_HTTP_OK == http_status)
-  {
-    /* Check signature */
-    struct GNUNET_JSON_Specification spec[] = {
-      GNUNET_JSON_spec_fixed_auto ("sig", &sig),
-      GNUNET_JSON_spec_fixed_auto ("h_contract_terms", &h_contract_terms),
-      GNUNET_JSON_spec_end ()
-    };
-    if (GNUNET_OK !=
-        GNUNET_JSON_parse (obj,
-                           spec,
-                           &error_name,
-                           &error_line))
-    {
-      GNUNET_break_op (0);
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Parser failed on %s:%u\n",
-                  error_name,
-                  error_line);
-      fail (is);
-      return;
-    }
-    mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
-    mr.purpose.size = htonl (sizeof (mr));
-    mr.h_contract_terms = h_contract_terms;
-    if (GNUNET_OK !=
-        GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
-                                    &mr.purpose,
-  		                    &sig,
-  				    &cmd->details.pay.merchant_pub.eddsa_pub))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Merchant signature given in response to /pay invalid\n");
-      fail (is);
-      return;
-    }
-
-  }
-  next_command (is);
-}
-
-
-/**
- * Function called upon completion of our /admin/add/incoming request.
- *
- * @param cls closure with the interpreter state
- * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
- *                    0 if the exchange's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code, #TALER_EC_NONE on success
- * @param serial_id unique ID of for the transfer at the bank
- * @param full_response full response from the exchange (for logging, in case of errors)
- */
-static void
-add_incoming_cb (void *cls,
-                 unsigned int http_status,
-		 enum TALER_ErrorCode ec,
-		 uint64_t serial_id,
-                 const json_t *full_response)
-{
-  struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-
-  cmd->details.admin_add_incoming.aih = NULL;
-  cmd->details.admin_add_incoming.serial_id = serial_id;
-  if (MHD_HTTP_OK != http_status)
-  {
-    GNUNET_break (0);
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "%s",
-                json_dumps (full_response,
-			    JSON_INDENT (2)));
-    fail (is);
-    return;
-  }
-  next_command (is);
-}
-
-
-/**
- * Find a command by label.
- *
- * @param is interpreter state to search
- * @param label label to look for
- * @return NULL if command was not found
- */
-static const struct Command *
-find_command (const struct InterpreterState *is,
-              const char *label)
-{
-  const struct Command *cmd;
-
-  if (NULL == label)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Attempt to lookup command for empty label\n");
-    return NULL;
-  }
-  for (unsigned int i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
-    if ( (NULL != cmd->label) &&
-         (0 == strcmp (cmd->label,
-                       label)) )
-      return cmd;
-  GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-              "Command not found: %s\n",
-              label);
-  return NULL;
-}
-
-
-/**
- * Function called upon completion of our /reserve/withdraw request.
- *
- * @param cls closure with the interpreter state
- * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
- *                    0 if the exchange's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code
- * @param sig signature over the coin, NULL on error
- * @param full_response full response from the exchange (for logging, in case of errors)
- */
-static void
-reserve_withdraw_cb (void *cls,
-                     unsigned int http_status,
-		     enum TALER_ErrorCode ec,
-                     const struct TALER_DenominationSignature *sig,
-                     const json_t *full_response)
-{
-  struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-
-  cmd->details.reserve_withdraw.wsh = NULL;
-  if (cmd->expected_response_code != http_status)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u to command %s\n",
-                http_status,
-                cmd->label);
-    json_dumpf (full_response, stderr, 0);
-    GNUNET_break (0);
-    fail (is);
-    return;
-  }
-  switch (http_status)
-  {
-  case MHD_HTTP_OK:
-    if (NULL == sig)
-    {
-      GNUNET_break (0);
-      fail (is);
-      return;
-    }
-    cmd->details.reserve_withdraw.sig.rsa_signature
-      = GNUNET_CRYPTO_rsa_signature_dup (sig->rsa_signature);
-    break;
-  case MHD_HTTP_PAYMENT_REQUIRED:
-    /* nothing to check */
-    break;
-  default:
-    /* Unsupported status code (by test harness) */
-    GNUNET_break (0);
-    break;
-  }
-  next_command (is);
-}
-
-
-/**
- * Find denomination key matching the given amount.
- *
- * @param keys array of keys to search
- * @param amount coin value to look for
- * @return NULL if no matching key was found
- */
-static const struct TALER_EXCHANGE_DenomPublicKey *
-find_pk (const struct TALER_EXCHANGE_Keys *keys,
-         const struct TALER_Amount *amount)
-{
-  struct GNUNET_TIME_Absolute now;
-  struct TALER_EXCHANGE_DenomPublicKey *pk;
-  char *str;
-
-  now = GNUNET_TIME_absolute_get ();
-  for (unsigned int i=0;i<keys->num_denom_keys;i++)
-  {
-    pk = &keys->denom_keys[i];
-    if ( (0 == TALER_amount_cmp (amount,
-                                 &pk->value)) &&
-         (now.abs_value_us >= pk->valid_from.abs_value_us) &&
-         (now.abs_value_us < pk->withdraw_valid_until.abs_value_us) )
-      return pk;
-  }
-  /* do 2nd pass to check if expiration times are to blame for failure */
-  str = TALER_amount_to_string (amount);
-  for (unsigned int i=0;i<keys->num_denom_keys;i++)
-  {
-    pk = &keys->denom_keys[i];
-    if ( (0 == TALER_amount_cmp (amount,
-                                 &pk->value)) &&
-         ( (now.abs_value_us < pk->valid_from.abs_value_us) ||
-           (now.abs_value_us > pk->withdraw_valid_until.abs_value_us) ) )
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "Have denomination key for `%s', but with wrong expiration range %llu vs [%llu,%llu)\n",
-                  str,
-                  (unsigned long long) now.abs_value_us,
-                  (unsigned long long) pk->valid_from.abs_value_us,
-                  (unsigned long long) pk->withdraw_valid_until.abs_value_us);
-      GNUNET_free (str);
-      return NULL;
-    }
-  }
-  GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-              "No denomination key for amount %s found\n",
-              str);
-  GNUNET_free (str);
-  return NULL;
-}
-
-
-/**
- * Allocates and return a string representing a order.
- * In this process, this function gives the order those
- * prices specified by the user. Please NOTE that any amount
- * must be given in the form "CUR:XX.YY".
- *
- * @param max_fee merchant's allowed max_fee
- * @param amount total amount for this order
- * @return JSON string for the order, NULL on errors
- */
-static json_t *
-make_order (const char *maxfee,
-            const char *total)
-{
-  struct TALER_Amount tmp_amount;
-  json_t *total_j;
-  json_t *maxfee_j;
-  json_t *ret;
-  unsigned long long id;
-  struct GNUNET_TIME_Absolute now;
-  char *timestamp;
-
-  if (GNUNET_OK !=
-      TALER_string_to_amount (maxfee,
-                              &tmp_amount))
-  {
-    GNUNET_break (0);
-    return NULL;
-  }
-  maxfee_j = TALER_JSON_from_amount (&tmp_amount);
-  GNUNET_assert (NULL != maxfee_j);
-  if (GNUNET_OK !=
-      TALER_string_to_amount (total,
-                              &tmp_amount))
-  {
-    GNUNET_break (0);
-    return NULL;
-  }
-  total_j = TALER_JSON_from_amount (&tmp_amount);
-  GNUNET_assert (NULL != total_j);
-  now = GNUNET_TIME_absolute_get ();
-  GNUNET_TIME_round_abs (&now);
-  GNUNET_asprintf (&timestamp,
-                   "/Date(%u)/",
-                   now.abs_value_us / 1000LL / 1000LL);
-
-  GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
-                              &id,
-                              sizeof (id));
-  ret = json_pack ("{s:o, s:s, s:s, s:s, s:s, s:o, s:s, s:[{s:s}]}",
-                   "max_fee", maxfee_j,
-                   "order_id", TALER_b2s (&id, sizeof (id)),
-                   "timestamp", timestamp,
-                   "refund_deadline", "/Date(0)/",
-                   "pay_deadline", "/Date(9999999999)/",
-                   "amount", total_j,
-                   "summary", "payments generator..",
-                   "products", "description", "ice cream");
-
-  GNUNET_assert (NULL != ret);
-  return ret;
-}
-
-
-/**
- * Free amount strings in interpreter state.
- *
- * @param is state to reset
- */
-static void
-free_interpreter_amounts (struct InterpreterState *is)
-{
-  struct Command *cmd;
-
-  for (unsigned int i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
-    switch (cmd->oc)
-    {
-    case OC_END:
-      GNUNET_assert (0);
-      break;
-    case OC_PAY:
-      GNUNET_free (cmd->details.pay.amount_with_fee);
-      GNUNET_free (cmd->details.pay.amount_without_fee);
-      break;
-    case OC_PROPOSAL:
-      GNUNET_free (cmd->details.proposal.max_fee);
-      GNUNET_free (cmd->details.proposal.amount);
-      break;
-    case OC_WITHDRAW_SIGN:
-      GNUNET_free (cmd->details.reserve_withdraw.amount);
-      break;
-    case OC_ADMIN_ADD_INCOMING:
-      GNUNET_free (cmd->details.admin_add_incoming.amount);
-      break;
-    case OC_RUN_WIREWATCH:
-      break;
-    default:
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Shutdown: unknown instruction %d at %u (%s)\n",
-                  cmd->oc,
-                  i,
-                  cmd->label);
-      break;
-    }
-}
-
-
-/**
- * Reset the interpreter state.
- *
- * @param is state to reset
- */
-static void
-reset_interpreter (struct InterpreterState *is)
-{
-  struct Command *cmd;
-
-  for (unsigned int i=0;OC_END != (cmd = &is->commands[i])->oc;i++)
-    switch (cmd->oc)
-    {
-    case OC_END:
-      GNUNET_assert (0);
-      break;
-
-    case OC_PAY:
-      if (NULL != cmd->details.pay.ph)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_MERCHANT_pay_cancel (cmd->details.pay.ph);
-        cmd->details.pay.ph = NULL;
-      }
-      break;
-
-    case OC_PROPOSAL:
-      if (NULL != cmd->details.proposal.po)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_MERCHANT_proposal_cancel (cmd->details.proposal.po);
-        cmd->details.proposal.po = NULL;
-      }
-      if (NULL != cmd->details.proposal.contract_terms)
-      {
-        json_decref (cmd->details.proposal.contract_terms);
-        cmd->details.proposal.contract_terms = NULL;
-      }
-      break;
-
-    case OC_WITHDRAW_SIGN:
-      if (NULL != cmd->details.reserve_withdraw.wsh)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_EXCHANGE_reserve_withdraw_cancel (cmd->details.reserve_withdraw.wsh);
-        cmd->details.reserve_withdraw.wsh = NULL;
-      }
-      if (NULL != cmd->details.reserve_withdraw.sig.rsa_signature)
-      {
-        GNUNET_CRYPTO_rsa_signature_free (cmd->details.reserve_withdraw.sig.rsa_signature);
-        cmd->details.reserve_withdraw.sig.rsa_signature = NULL;
-      }
-      break;
-
-    case OC_ADMIN_ADD_INCOMING:
-      if (NULL != cmd->details.admin_add_incoming.aih)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                    "Command %u (%s) did not complete\n",
-                    i,
-                    cmd->label);
-        TALER_BANK_admin_add_incoming_cancel (cmd->details.admin_add_incoming.aih);
-        cmd->details.admin_add_incoming.aih = NULL;
-      }
-      break;
-    case OC_RUN_WIREWATCH:
-      if (NULL != cmd->details.run_wirewatch.wirewatch_proc)
-      {
-        GNUNET_break (0 ==
-                      GNUNET_OS_process_kill (cmd->details.run_wirewatch.wirewatch_proc,
-                                              SIGKILL));
-        GNUNET_OS_process_wait (cmd->details.run_wirewatch.wirewatch_proc);
-        GNUNET_OS_process_destroy (cmd->details.run_wirewatch.wirewatch_proc);
-        cmd->details.run_wirewatch.wirewatch_proc = NULL;
-      }
-      if (NULL != cmd->details.run_wirewatch.child_death_task)
-      {
-        GNUNET_SCHEDULER_cancel (cmd->details.run_wirewatch.child_death_task);
-        cmd->details.run_wirewatch.child_death_task = NULL;
-      }
-      break;
-    default:
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Shutdown: unknown instruction %d at %u (%s)\n",
-                  cmd->oc,
-                  i,
-                  cmd->label);
-      break;
-    }
-}
-
-
-/**
- * Task triggered whenever we receive a SIGCHLD (child
- * process died).
- *
- * @param cls closure, NULL if we need to self-restart
- */
-static void
-maint_child_death (void *cls)
-{
-  struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-  const struct GNUNET_DISK_FileHandle *pr;
-  char c[16];
-
-  cmd->details.run_wirewatch.child_death_task = NULL;
-  pr = GNUNET_DISK_pipe_handle (sigpipe, GNUNET_DISK_PIPE_END_READ);
-  GNUNET_break (0 < GNUNET_DISK_file_read (pr, &c, sizeof (c)));
-  GNUNET_OS_process_wait (cmd->details.run_wirewatch.wirewatch_proc);
-  GNUNET_OS_process_destroy (cmd->details.run_wirewatch.wirewatch_proc);
-  cmd->details.run_wirewatch.wirewatch_proc = NULL;
-  next_command (is);
-}
-
-
-/**
- * Run the main interpreter loop that performs exchange operations.
- *
- * @param cls contains the `struct InterpreterState`
- */
-static void
-interpreter_run (void *cls)
-{
-  const struct GNUNET_SCHEDULER_TaskContext *tc;
-  struct InterpreterState *is = cls;
-  struct Command *cmd = &is->commands[is->ip];
-  const struct Command *ref;
-  struct TALER_Amount amount;
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-	      "Interpreter runs command %u/%s(%u)\n",
-	      is->ip,
-	      cmd->label,
-	      cmd->oc);
-
-  is->task = NULL;
-  tc = GNUNET_SCHEDULER_get_task_context ();
-  if (0 != (tc->reason & GNUNET_SCHEDULER_REASON_SHUTDOWN))
-  {
-    fprintf (stderr,
-             "Test aborted by shutdown request\n");
-    fail (is);
-    return;
-  }
-
-  switch (cmd->oc)
-  {
-    case OC_END:
-      j++;
-      if (j < times)
-      {
-        reset_interpreter (is);
-        is->ip = 0;
-        GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                    "Rewinding the interpreter.\n");
-        GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                  is);
-        return;
-      }
-      result = GNUNET_OK;
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    case OC_PAY:
-      {
-        struct TALER_MERCHANT_PayCoin pc;
-        const char *order_id;
-        struct GNUNET_TIME_Absolute refund_deadline;
-        struct GNUNET_TIME_Absolute pay_deadline;
-        struct GNUNET_TIME_Absolute timestamp;
-        struct GNUNET_HashCode h_wire;
-        struct TALER_MerchantPublicKeyP merchant_pub;
-        struct TALER_MerchantSignatureP merchant_sig;
-        struct TALER_Amount total_amount;
-        struct TALER_Amount max_fee;
-        const char *error_name;
-        unsigned int error_line;
-
-        /* get proposal */
-        ref = find_command (is,
-                            cmd->details.pay.contract_ref);
-        GNUNET_assert (NULL != ref);
-        merchant_sig = ref->details.proposal.merchant_sig;
-        GNUNET_assert (NULL != ref->details.proposal.contract_terms);
-        {
-          /* Get information that need to be replied in the deposit permission */
-          struct GNUNET_JSON_Specification spec[] = {
-            GNUNET_JSON_spec_string ("order_id", &order_id),
-            GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
-            GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
-            GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
-            GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
-            GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
-            TALER_JSON_spec_amount ("amount", &total_amount),
-            TALER_JSON_spec_amount ("max_fee", &max_fee),
-            GNUNET_JSON_spec_end()
-          };
-
-          if (GNUNET_OK !=
-              GNUNET_JSON_parse (ref->details.proposal.contract_terms,
-                                 spec,
-                                 &error_name,
-                                 &error_line))
-          {
-            GNUNET_break_op (0);
-            GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                        "Parser failed on %s:%u\n",
-                        error_name,
-                        error_line);
-            fail (is);
-            return;
-          }
-          cmd->details.pay.merchant_pub = merchant_pub;
-        }
-
-        {
-          const struct Command *coin_ref;
-
-          memset (&pc, 0, sizeof (pc));
-          coin_ref = find_command (is,
-                                   cmd->details.pay.coin_ref);
-          GNUNET_assert (NULL != coin_ref);
-          switch (coin_ref->oc)
-          {
-          case OC_WITHDRAW_SIGN:
-            pc.coin_priv = coin_ref->details.reserve_withdraw.ps.coin_priv;
-            pc.denom_pub = coin_ref->details.reserve_withdraw.pk->key;
-            pc.denom_sig = coin_ref->details.reserve_withdraw.sig;
-            pc.denom_value = coin_ref->details.reserve_withdraw.pk->value;
-	    pc.exchange_url = exchange_url;
-            break;
-          default:
-            GNUNET_assert (0);
-          }
-
-          if (GNUNET_OK !=
-              TALER_string_to_amount (cmd->details.pay.amount_without_fee,
-                                      &pc.amount_without_fee))
-          {
-            GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                        "Failed to parse amount `%s' at %u\n",
-                        cmd->details.pay.amount_without_fee,
-                        is->ip);
-            fail (is);
-            return;
-          }
-
-          if (GNUNET_OK !=
-              TALER_string_to_amount (cmd->details.pay.amount_with_fee,
-                                      &pc.amount_with_fee))
-          {
-            GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                        "Failed to parse amount `%s' at %u\n",
-                        cmd->details.pay.amount_with_fee,
-                        is->ip);
-            fail (is);
-            return;
-          }
-        }
-        cmd->details.pay.ph
-          = TALER_MERCHANT_pay_wallet (ctx,
-                                       merchant_url,
-                                       instance,
-                                       &ref->details.proposal.hash,
-                                       &total_amount,
-                                       &max_fee,
-                                       &merchant_pub,
-                                       &merchant_sig,
-                                       timestamp,
-                                       refund_deadline,
-                                       pay_deadline,
-                                       &h_wire,
-                                       order_id,
-                                       1 /* num_coins */,
-                                       &pc /* coins */,
-                                       &pay_cb,
-                                       is);
-      }
-      if (NULL == cmd->details.pay.ph)
-      {
-        GNUNET_break (0);
-        fail (is);
-        return;
-      }
-      return;
-    case OC_PROPOSAL:
-      {
-        json_t *order;
-        json_t *merchant_obj;
-
-        order = make_order (cmd->details.proposal.max_fee,
-                            cmd->details.proposal.amount);
-
-
-        if (NULL == order)
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Failed to create the order at command #%u\n",
-                      is->ip);
-          fail (is);
-          return;
-        }
-
-        GNUNET_assert (NULL != (merchant_obj = json_pack ("{s:{s:s}}",
-                                                          "merchant",
-                                                          "instance",
-                                                          instance)));
-
-
-        GNUNET_assert (-1 != json_object_update (order,
-                                                 merchant_obj));
-        json_decref (merchant_obj);
-        cmd->details.proposal.po
-          = TALER_MERCHANT_order_put (ctx,
-                                      merchant_url,
-                                      order,
-                                      &proposal_cb,
-                                      is);
-        json_decref (order);
-        if (NULL == cmd->details.proposal.po)
-        {
-          GNUNET_break (0);
-          fail (is);
-          return;
-        }
-        return;
-      }
-
-    case OC_ADMIN_ADD_INCOMING:
-      {
-	char *subject;
-	struct TALER_BANK_AuthenticationData auth;
-	struct TALER_ReservePublicKeyP reserve_pub;
-
-	if (NULL !=
-	    cmd->details.admin_add_incoming.reserve_reference)
-	{
-	  ref = find_command (is,
-			      cmd->details.admin_add_incoming.reserve_reference);
-	  GNUNET_assert (NULL != ref);
-	  GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
-	  cmd->details.admin_add_incoming.reserve_priv
-	    = ref->details.admin_add_incoming.reserve_priv;
-	}
-	else
-	{
-	  struct GNUNET_CRYPTO_EddsaPrivateKey *priv;
-
-	  priv = GNUNET_CRYPTO_eddsa_key_create ();
-	  cmd->details.admin_add_incoming.reserve_priv.eddsa_priv = *priv;
-	  GNUNET_free (priv);
-	}
-	GNUNET_CRYPTO_eddsa_key_get_public (&cmd->details.admin_add_incoming.reserve_priv.eddsa_priv,
-					    &reserve_pub.eddsa_pub);
-	if (GNUNET_OK !=
-	    TALER_string_to_amount (cmd->details.admin_add_incoming.amount,
-				    &amount))
-	{
-	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		      "Failed to parse amount `%s' at %u\n",
-		      cmd->details.admin_add_incoming.amount,
-		      is->ip);
-	  fail (is);
-	  return;
-	}
-
-	subject
-	  = GNUNET_STRINGS_data_to_string_alloc (&reserve_pub,
-						 sizeof (reserve_pub));
-	auth.method = TALER_BANK_AUTH_BASIC;
-	/* TODO: obtain authentication details from configuration */
-	auth.details.basic.username = "admin";
-	auth.details.basic.password = "x";
-	cmd->details.admin_add_incoming.aih
-	  = TALER_BANK_admin_add_incoming (ctx,
-					   bank_url,
-					   &auth,
-					   exchange_url,
-					   subject,
-					   &amount,
-					   cmd->details.admin_add_incoming.debit_account_no,
-					   cmd->details.admin_add_incoming.credit_account_no,
-					   &add_incoming_cb,
-					   is);
-	GNUNET_free (subject);
-	if (NULL == cmd->details.admin_add_incoming.aih)
-	{
-	  GNUNET_break (0);
-	  fail (is);
-	  return;
-	}
-	return;
-      }
-    case OC_RUN_WIREWATCH:
-      {
-	const struct GNUNET_DISK_FileHandle *pr;
-
-	cmd->details.run_wirewatch.wirewatch_proc
-	  = GNUNET_OS_start_process (GNUNET_NO,
-				     GNUNET_OS_INHERIT_STD_ALL,
-				     NULL, NULL, NULL,
-				     "taler-exchange-wirewatch",
-				     "taler-exchange-wirewatch",
-				     "-c", cfgfilename,
-				     "-T", /* exit when done */
-				     NULL);
-	if (NULL == cmd->details.run_wirewatch.wirewatch_proc)
-	{
-	  GNUNET_break (0);
-	  fail (is);
-	  return;
-	}
-	pr = GNUNET_DISK_pipe_handle (sigpipe,
-				      GNUNET_DISK_PIPE_END_READ);
-	cmd->details.run_wirewatch.child_death_task
-	  = GNUNET_SCHEDULER_add_read_file (GNUNET_TIME_UNIT_FOREVER_REL,
-					    pr,
-					    &maint_child_death,
-                                            is);
-	return;
-      }
-    case OC_WITHDRAW_SIGN:
-      GNUNET_assert (NULL !=
-		     cmd->details.reserve_withdraw.reserve_reference);
-      ref = find_command (is,
-                          cmd->details.reserve_withdraw.reserve_reference);
-      GNUNET_assert (NULL != ref);
-      GNUNET_assert (OC_ADMIN_ADD_INCOMING == ref->oc);
-      if (NULL != cmd->details.reserve_withdraw.amount)
-      {
-        if (GNUNET_OK !=
-            TALER_string_to_amount (cmd->details.reserve_withdraw.amount,
-                                    &amount))
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Failed to parse amount `%s' at %u\n",
-                      cmd->details.reserve_withdraw.amount,
-                      is->ip);
-          fail (is);
-          return;
-        }
-        cmd->details.reserve_withdraw.pk = find_pk (is->keys,
-                                                    &amount);
-      }
-      if (NULL == cmd->details.reserve_withdraw.pk)
-      {
-        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to determine denomination key at %u\n",
-                    is->ip);
-        fail (is);
-        return;
-      }
-
-      TALER_planchet_setup_random (&cmd->details.reserve_withdraw.ps);
-      cmd->details.reserve_withdraw.wsh
-        = TALER_EXCHANGE_reserve_withdraw (exchange,
-                                           cmd->details.reserve_withdraw.pk,
-                                           &ref->details.admin_add_incoming.reserve_priv,
-                                           &cmd->details.reserve_withdraw.ps,
-                                           &reserve_withdraw_cb,
-                                           is);
-      if (NULL == cmd->details.reserve_withdraw.wsh)
-      {
-        GNUNET_break (0);
-        fail (is);
-        return;
-      }
-      return;
-
-    default:
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "Unknown command, OC: %d, label: %s.\n",
-                  cmd->oc,
-                  cmd->label);
-      fail (is);
-  }
-}
-
-
-/**
- * Functions of this type are called to provide the retrieved signing and
- * denomination keys of the exchange.  No TALER_EXCHANGE_*() functions should
- * be called in this callback.
- *
- * @param cls closure
- * @param keys information about keys of the exchange
- * @param compat version compatibility data
- */
-static void
-cert_cb (void *cls,
-         const struct TALER_EXCHANGE_Keys *keys,
-	 enum TALER_EXCHANGE_VersionCompatibility compat)
-{
-  struct InterpreterState *is = cls;
-
-  /* check that keys is OK */
-#define ERR(cond) do { if(!(cond)) break; GNUNET_break (0); GNUNET_SCHEDULER_shutdown(); return; } while (0)
-  ERR (NULL == keys);
-  ERR (0 == keys->num_sign_keys);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Read %u signing keys\n",
-              keys->num_sign_keys);
-  ERR (0 == keys->num_denom_keys);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Read %u denomination keys\n",
-              keys->num_denom_keys);
-#undef ERR
-
-  /* run actual tests via interpreter-loop */
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-	      "Certificate callback invoked, starting interpreter\n");
-  is->keys = keys;
-
-  is->task = GNUNET_SCHEDULER_add_now (&interpreter_run,
-                                       is);
-}
-
-/**
- * Signal handler called for SIGCHLD.  Triggers the
- * respective handler by writing to the trigger pipe.
- */
-static void
-sighandler_child_death ()
-{
-  static char c;
-  int old_errno = errno;	/* back-up errno */
-
-  GNUNET_break (1 ==
-		GNUNET_DISK_file_write (GNUNET_DISK_pipe_handle
-					(sigpipe, GNUNET_DISK_PIPE_END_WRITE),
-					&c, sizeof (c)));
-  errno = old_errno;		/* restore errno */
-}
-
-
-/**
- * Function run when the test terminates (good or bad).
- * Cleans up our state.
- *
- * @param cls the interpreter state.
- */
-static void
-do_shutdown (void *cls)
-{
-  struct InterpreterState *is = cls;
-
-  if (NULL != timeout_task)
-  {
-    GNUNET_SCHEDULER_cancel (timeout_task);
-    timeout_task = NULL;
-  }
-
-  reset_interpreter (is);
-  if (NULL != is->task)
-  {
-    GNUNET_SCHEDULER_cancel (is->task);
-    is->task = NULL;
-  }
-  free_interpreter_amounts (is);
-  GNUNET_free (is->commands);
-  GNUNET_free (is);
-  if (NULL != exchange)
-  {
-    TALER_EXCHANGE_disconnect (exchange);
-    exchange = NULL;
-  }
-  if (NULL != ctx)
-  {
-    GNUNET_CURL_fini (ctx);
-    ctx = NULL;
-  }
-  if (NULL != rc)
-  {
-    GNUNET_CURL_gnunet_rc_destroy (rc);
-    rc = NULL;
-  }
-  if (NULL != fakebank)
-  {
-    TALER_FAKEBANK_stop (fakebank);
-    fakebank = NULL;
-  }
-}
-
-
-/**
- * Take currency and the part after ":" in the
- * "CURRENCY:XX.YY" format, and return a string
- * in the format "CURRENCY:XX.YY".
- *
- * @param currency currency
- * @param rpart float numbers after the ":", in string form
- * @return pointer to allocated and concatenated "CURRENCY:XX.YY"
- * formatted string.
- */
-static char *
-concat_amount (const char *currency,
-	       const char *rpart)
-{
-  char *str;
-
-  GNUNET_asprintf (&str,
-		   "%s:%s",
-                   currency,
-		   rpart);
-  return str;
-}
-
-
-/**
- * Actually runs the test.
- */
-static void
-run_test ()
-{
-  struct InterpreterState *is;
-  struct Command commands[] =
-  {
-    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
-    { .oc = OC_ADMIN_ADD_INCOMING,
-      .label = "create-reserve-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.debit_account_no = 62,
-      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
-      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
-
-    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
-    { .oc = OC_ADMIN_ADD_INCOMING,
-      .label = "create-reserve-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.debit_account_no = 62,
-      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
-      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
-    /* Fill reserve with EUR:5.01, as withdraw fee is 1 ct per config */
-    { .oc = OC_ADMIN_ADD_INCOMING,
-      .label = "create-reserve-3",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.admin_add_incoming.debit_account_no = 62,
-      .details.admin_add_incoming.credit_account_no = EXCHANGE_ACCOUNT_NO,
-      .details.admin_add_incoming.amount = concat_amount (currency, "5.01") },
-    { .oc = OC_RUN_WIREWATCH,
-      .label = "run-wirewatch-1"
-    },
-    /* Withdraw a 5 EUR coin, at fee of 1 ct */
-    { .oc = OC_WITHDRAW_SIGN,
-      .label = "withdraw-coin-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_withdraw.reserve_reference = "create-reserve-1",
-      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
-
-    /* Withdraw a 5 EUR coin, at fee of 1 ct */
-    { .oc = OC_WITHDRAW_SIGN,
-      .label = "withdraw-coin-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_withdraw.reserve_reference = "create-reserve-2",
-      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
-
-    /* Withdraw a 5 EUR coin, at fee of 1 ct */
-    { .oc = OC_WITHDRAW_SIGN,
-      .label = "withdraw-coin-3",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.reserve_withdraw.reserve_reference = "create-reserve-3",
-      .details.reserve_withdraw.amount = concat_amount (currency, "5") },
-
-    /* Create proposal */
-    { .oc = OC_PROPOSAL,
-      .label = "create-proposal-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.max_fee = concat_amount (currency, "0.5"),
-      .details.proposal.amount = concat_amount (currency, "0.5") },
-
-    /* Create proposal */
-    { .oc = OC_PROPOSAL,
-      .label = "create-proposal-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.max_fee = concat_amount (currency, "0.5"),
-      .details.proposal.amount = concat_amount (currency, "0.5") },
-
-    /* Create proposal */
-    { .oc = OC_PROPOSAL,
-      .label = "create-proposal-3",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.proposal.max_fee = concat_amount (currency, "0.5"),
-      .details.proposal.amount = concat_amount (currency, "5.0") },
-
-    { .oc = OC_PAY,
-      .label = "deposit-simple-1",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.pay.contract_ref = "create-proposal-1",
-      .details.pay.coin_ref = "withdraw-coin-1",
-      .details.pay.amount_with_fee = concat_amount (currency, "5"),
-      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
-
-    { .oc = OC_PAY,
-      .label = "deposit-simple-2",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.pay.contract_ref = "create-proposal-2",
-      .details.pay.coin_ref = "withdraw-coin-2",
-      .details.pay.amount_with_fee = concat_amount (currency, "5"),
-      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
-
-    { .oc = OC_PAY,
-      .label = "deposit-simple-3",
-      .expected_response_code = MHD_HTTP_OK,
-      .details.pay.contract_ref = "create-proposal-3",
-      .details.pay.coin_ref = "withdraw-coin-3",
-      .details.pay.amount_with_fee = concat_amount (currency, "5"),
-      .details.pay.amount_without_fee = concat_amount (currency, "4.99") },
-
-    { .oc = OC_END,
-      .label = "end-of-commands"}
-  };
-
-  is = GNUNET_new (struct InterpreterState);
-  is->commands = GNUNET_malloc (sizeof (commands));
-  memcpy (is->commands,
-          commands,
-          sizeof (commands));
-  ctx = GNUNET_CURL_init (&GNUNET_CURL_gnunet_scheduler_reschedule,
-                          &rc);
-  GNUNET_assert (NULL != ctx);
-  rc = GNUNET_CURL_gnunet_rc_create (ctx);
-  exchange = TALER_EXCHANGE_connect (ctx,
-                                     exchange_url,
-                                     &cert_cb,
-                                     is,
-                                     TALER_EXCHANGE_OPTION_END);
-  GNUNET_assert (NULL != exchange);
-  GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
-                                 is);
-}
-
-
-/**
- * Main function that will be run by the scheduler.
- *
- * @param cls closure
- * @param args remaining command-line arguments
- * @param cfgfile name of the configuration file used (for saving, can be
- *        NULL!)
- * @param config configuration
+ * Actual commands collection.
  */
 static void
 run (void *cls,
-     char *const *args,
-     const char *cfgfile,
-     const struct GNUNET_CONFIGURATION_Handle *config)
+     struct TALER_TESTING_Interpreter *is)
 {
-  unsigned int cnt;
-  char *wget_cmd;
 
-  cfgfilename = GNUNET_strdup (cfgfile);
-  if (! remote_bank)
-  {
-    /* TODO: do not hard-code port, find in cfg */
-    fakebank = TALER_FAKEBANK_start (8888);
-    if (NULL == fakebank)
-    {
-      fprintf (stderr,
-	       "Failed to launch fakebank\n");
-      GNUNET_SCHEDULER_shutdown ();
-    }
-  }
-  if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_string (config,
-					     "payments-generator",
-					     "exchange",
-					     &exchange_url))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "payments-generator",
-                               "exchange");
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-  if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_string (config,
-					     "payments-generator",
-					     "exchange_admin",
-					     &exchange_url_admin))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "payments-generator",
-                               "exchange_admin");
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
+  /* Currency strings.  */
+  char *CURRENCY_25_05;
+  char *CURRENCY_10;
+  char *CURRENCY_9_98;
+  char *CURRENCY_5;
+  char *CURRENCY_4_99;
+  char *CURRENCY_0_02;
+  char *CURRENCY_0_01;
 
-  if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_string (config,
-					     "payments-generator",
-					     "merchant",
-					     &merchant_url))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "payments-generator",
-                               "merchant");
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
+  ALLOCATE_AMOUNTS
+    (CURRENCY_25_05,
+     CURRENCY_10,
+     CURRENCY_9_98,
+     CURRENCY_5,
+     CURRENCY_4_99,
+     CURRENCY_0_02,
+     CURRENCY_0_01);
 
-  if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_string (config,
-					     "payments-generator",
-					     "bank",
-					     &bank_url))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "payments-generator",
-                               "bank");
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
 
-  if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_string (config,
-					     "payments-generator",
-					     "instance",
-					     &instance))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "payments-generator",
-                               "instance");
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
+  /* Orders.  */
+  char *order_worth_5;
+  char *order_worth_10_2coins;
+  char *order_worth_5_track;
+  char *order_worth_5_unaggregated;
 
-  if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_string (config,
-					     "payments-generator",
-					     "currency",
-					     &currency))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "payments-generator",
-                               "currency");
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
+  ALLOCATE_ORDERS
+    (order_worth_5,
+     order_worth_10_2coins,
+     order_worth_5_track,
+     order_worth_5_unaggregated);
 
-  if (! remote_exchange)
-  {
-    exchanged = GNUNET_OS_start_process (GNUNET_NO,
-                                         GNUNET_OS_INHERIT_STD_ALL,
-                                         NULL, NULL, NULL,
-                                         "taler-exchange-httpd",
-                                         "taler-exchange-httpd",
-                                         NULL);
-    if (NULL == exchanged)
-    {
-      fprintf (stderr,
-               "Failed to run taler-exchange-httpd. Check your PATH.\n");
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    }
+  struct TALER_TESTING_Command commands[] = {
 
-    fprintf (stderr,
-             "Waiting for taler-exchange-httpd to be ready\n");
-    cnt = 0;
+    CMD_TRANSFER_TO_EXCHANGE
+      ("create-reserve-1",
+       CURRENCY_25_05),
 
-    GNUNET_asprintf (&wget_cmd,
-		     "wget -q -t 1 -T 1 %skeys -o /dev/null -O /dev/null",
-		     exchange_url);
+    TALER_TESTING_cmd_exec_wirewatch
+      ("wirewatch-1",
+       cfg_filename),
 
-    do
-      {
-        fprintf (stderr, ".");
-        sleep (1);
-        cnt++;
-        if (cnt > 60)
-        {
-          fprintf (stderr,
-                   "\nFailed to start taler-exchange-httpd\n");
-          GNUNET_OS_process_kill (exchanged,
-                                  SIGKILL);
-          GNUNET_OS_process_wait (exchanged);
-          GNUNET_OS_process_destroy (exchanged);
-          GNUNET_SCHEDULER_shutdown ();
-          return;
-        }
-      }
-    while (0 != system (wget_cmd));
-    GNUNET_free (wget_cmd);
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-1",
+       is->exchange, // picks port from config's [exchange].
+       "create-reserve-1",
+       CURRENCY_5,
+       MHD_HTTP_OK),
 
-    fprintf (stderr, "\n");
-  }
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-2",
+       is->exchange,
+       "create-reserve-1",
+       CURRENCY_5,
+       MHD_HTTP_OK),
 
-  if (! remote_merchant)
-  {
-    merchantd = GNUNET_OS_start_process (GNUNET_NO,
-                                         GNUNET_OS_INHERIT_STD_ALL,
-                                         NULL, NULL, NULL,
-                                         "taler-merchant-httpd",
-                                         "taler-merchant-httpd",
-                                         "-L", "DEBUG",
-                                         NULL);
-    if (NULL == merchantd)
-    {
-      fprintf (stderr,
-               "Failed to run taler-merchant-httpd. Check your PATH.\n");
-      GNUNET_OS_process_kill (exchanged,
-                              SIGKILL);
-      GNUNET_OS_process_wait (exchanged);
-      GNUNET_OS_process_destroy (exchanged);
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    }
-    /* give child time to start and bind against the socket */
-    fprintf (stderr,
-             "Waiting for taler-merchant-httpd to be ready\n");
-    cnt = 0;
-    GNUNET_asprintf (&wget_cmd,
-                     "wget -q -t 1 -T 1 %s -o /dev/null -O /dev/null",
-                     merchant_url);
+    /* This coin will be spent but never aggregated,
+     * in order to get 202 responses from tracks.  */
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-3",
+       is->exchange,
+       "create-reserve-1",
+       CURRENCY_5,
+       MHD_HTTP_OK),
 
-    do
-      {
-        fprintf (stderr, ".");
-        sleep (1);
-        cnt++;
-        if (cnt > 60)
-        {
-          fprintf (stderr,
-                   "\nFailed to start taler-merchant-httpd\n");
-          GNUNET_OS_process_kill (merchantd,
-                                  SIGKILL);
-          GNUNET_OS_process_wait (merchantd);
-          GNUNET_OS_process_destroy (merchantd);
-          GNUNET_OS_process_kill (exchanged,
-                                  SIGKILL);
-          GNUNET_OS_process_wait (exchanged);
-          GNUNET_OS_process_destroy (exchanged);
-          GNUNET_SCHEDULER_shutdown ();
-          return;
-        }
-      }
-    while (0 != system (wget_cmd));
-    fprintf (stderr, "\n");
-    GNUNET_free (wget_cmd);
-  }
+    /* coin 4 & 5 will be deposited for the same
+     * contract; needed in case some testing utility
+     * wants to trigger a "failed dependency" error. */
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-4",
+       is->exchange,
+       "create-reserve-1",
+       CURRENCY_5,
+       MHD_HTTP_OK),
 
-  shc_chld = GNUNET_SIGNAL_handler_install (GNUNET_SIGCHLD,
-                                            &sighandler_child_death);
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-5",
+       is->exchange,
+       "create-reserve-1",
+       CURRENCY_5,
+       MHD_HTTP_OK),
 
-  /* timeout, given 60s + 5s per command, which should be more
-     than enough */
-  timeout_task
-    = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_add
-				    (GNUNET_TIME_UNIT_MINUTES,
-				     GNUNET_TIME_relative_multiply
-				     (GNUNET_TIME_UNIT_SECONDS,
-				      5 * times)),
-                                    &do_timeout, NULL);
-  run_test ();
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       order_worth_5,
+       NULL),
+
+    TALER_TESTING_cmd_pay
+      ("deposit-simple",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-proposal-1",
+       "withdraw-coin-1",
+       CURRENCY_5,
+       CURRENCY_4_99,
+       CURRENCY_0_01),
+
+    TALER_TESTING_cmd_rewind_ip
+      ("rewind-payments",
+       FIRST_INSTRUCTION,
+       &payments_number),
+
+    /* Next proposal-pay cycle will be used by /track CMDs
+     * and so it will not have to be looped over, only /track
+     * CMDs will have to.  */
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       order_worth_5_track,
+       NULL),
+
+    TALER_TESTING_cmd_pay
+      ("deposit-simple-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-proposal-2",
+       "withdraw-coin-2",
+       CURRENCY_5,
+       CURRENCY_4_99,
+       CURRENCY_0_01),
+
+    /* /track/transaction over deposit-simple-2 */
+
+    TALER_TESTING_cmd_exec_aggregator
+      ("aggregate-1",
+       cfg_filename),
+
+    TALER_TESTING_cmd_merchant_track_transaction
+      ("track-transaction-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "dummy", // "check bank" CMD, never used, to be deleted.
+       "deposit-simple-2",
+       CURRENCY_0_01),
+
+    TALER_TESTING_cmd_merchant_track_transfer
+      ("track-transfer-1",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "track-transaction-1",
+       "deposit-simple-2"),
+
+    /* Doing the 2-coins payment; needed to generate the
+     * "failed dependency" response error, at /track/transaction.
+     * NOTE: not used here, but done just in case a testing
+     * program would need it.  And this MUST happen here, as
+     * no tracking operation happens next and so the merchant
+     * won't be able to use a cached version in its database
+     * when serving /track/..; therefore it will relate to the
+     * exchange that can be twisted by the testing logic.  */
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-4&5",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       order_worth_10_2coins,
+       NULL),
+
+    TALER_TESTING_cmd_pay ("deposit-4&5",
+                           merchant_url,
+                           is->ctx,
+                           MHD_HTTP_OK,
+                           "create-proposal-4&5",
+                           "withdraw-coin-4;" \
+                           "withdraw-coin-5",
+                           CURRENCY_10,
+                           CURRENCY_9_98, // no sense now
+                           CURRENCY_0_02), // no sense now
+
+    TALER_TESTING_cmd_exec_aggregator
+      ("aggregate-2",
+       cfg_filename),
+
+    /* Must be _after_ any aggregation takes place.  */
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-3",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       order_worth_5_unaggregated,
+       NULL),
+
+    TALER_TESTING_cmd_pay
+      ("deposit-simple-3",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-proposal-3",
+       "withdraw-coin-3",
+       CURRENCY_5,
+       CURRENCY_4_99,
+       CURRENCY_0_01),
+
+    TALER_TESTING_cmd_merchant_track_transaction
+      ("track-transaction-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_ACCEPTED,
+       "dummy", // "check bank" CMD, never used, to be deleted.
+       "deposit-simple-3",
+       CURRENCY_0_01),
+
+    TALER_TESTING_cmd_rewind_ip
+      ("rewind-tracks",
+       TRACKS_INSTRUCTION,
+       &tracks_number),
+
+    TALER_TESTING_cmd_end ()
+  };
+
+  TALER_TESTING_run (is,
+                     commands);
 }
 
+/**
+ * Send SIGTERM and wait for process termination.
+ *
+ * @param process process to terminate.
+ */
+void
+terminate_process (struct GNUNET_OS_Process *process)
+{
+  GNUNET_OS_process_kill (process, SIGTERM);
+  GNUNET_OS_process_wait (process);
+  GNUNET_OS_process_destroy (process);
+}
 
+/**
+ * The main function of the serve tool
+ *
+ * @param argc number of arguments from the command line
+ * @param argv command line arguments
+ * @return 0 ok, or `enum PaymentGeneratorError` on error
+ */
 int
 main (int argc,
-      char *argv[])
+      char *const *argv)
 {
+  struct GNUNET_CONFIGURATION_Handle *cfg;
+
+  default_config_file = GNUNET_OS_project_data_get
+    ()->user_config_file;
+
   struct GNUNET_GETOPT_CommandLineOption options[] = {
-    GNUNET_GETOPT_option_uint ('n',
-                               "times",
-                               "TIMES",
-                               "How many times the commands should be run.",
-                               &times),
-    GNUNET_GETOPT_option_flag ('b',
-                               "remote-bank",
-                               "Do not start fakebank",
-                               &remote_bank),
-    GNUNET_GETOPT_option_flag ('e',
-                               "remote-exchange",
-                               "Do not fork any exchange",
-                               &remote_exchange),
-    GNUNET_GETOPT_option_flag ('m',
-                               "remote-merchant",
-                               "Do not fork any merchant",
-                               &remote_merchant),
+
+    GNUNET_GETOPT_option_cfgfile
+      (&cfg_filename),
+
+    GNUNET_GETOPT_option_version
+      (PACKAGE_VERSION " " VCS_VERSION),
+
+    GNUNET_GETOPT_option_help
+      ("Generate Taler payments to populate the database(s)"),
+
+    GNUNET_GETOPT_option_loglevel
+      (&loglev),
+
+    GNUNET_GETOPT_option_uint
+      ('p',
+       "payments-number",
+       "PN",
+       "will generate PN payments, defaults to 1",
+       &payments_number),
+
+    GNUNET_GETOPT_option_uint
+      ('t',
+       "tracks-number",
+       "TN",
+       "will perform TN /track operations, defaults to 1",
+       &tracks_number),
+
+    /**
+     * NOTE: useful when the setup serves merchant
+     * backends via unix domain sockets, since there
+     * is no way - yet? - to get the merchant base url.
+     * Clearly, we could introduce a merchant_base_url
+     * value into the configuration.
+     */
+    GNUNET_GETOPT_option_string
+      ('m',
+       "merchant-url",
+       "MU",
+       "merchant base url, mandatory",
+       &merchant_url),
+
+    GNUNET_GETOPT_option_string
+      ('b',
+       "bank-url",
+       "BU",
+       "bank base url, mandatory",
+       &bank_url),
+
+    GNUNET_GETOPT_option_string
+      ('l',
+       "logfile",
+       "LF",
+       "will log to file LF",
+       &logfile),
+
     GNUNET_GETOPT_OPTION_END
   };
 
-  unsetenv ("XDG_DATA_HOME");
-  unsetenv ("XDG_CONFIG_HOME");
-  GNUNET_log_setup ("taler-merchant-generate-payments",
-                    "DEBUG",
-                    NULL);
-  result = GNUNET_SYSERR;
+  result = GNUNET_GETOPT_run
+    ("taler-merchant-generate-payments-new",
+     options,
+     argc,
+     argv);
 
-  sigpipe = GNUNET_DISK_pipe (GNUNET_NO, GNUNET_NO,
-                              GNUNET_NO, GNUNET_NO);
-  GNUNET_assert (NULL != sigpipe);
+  if (GNUNET_NO == result)
+  {
+    /* --help or --version were given, just return.  */ 
+    return 0;
+  }
 
-  if (GNUNET_OK !=
-      GNUNET_PROGRAM_run (argc, argv,
-                          "taler-merchant-generate-payments",
-                          "Populates DB with fake payments",
-                          options,
-                          &run, NULL))
-    return 77;
+  GNUNET_assert (GNUNET_SYSERR != result);
+  loglev = NULL;
+  GNUNET_log_setup ("taler-merchant-generate-payments-new",
+                    loglev,
+                    logfile);
 
-  if (NULL != shc_chld)
+  if (NULL == cfg_filename)
+    cfg_filename = (char *) default_config_file;
+
+  cfg = GNUNET_CONFIGURATION_create ();
+  if (GNUNET_OK != GNUNET_CONFIGURATION_load
+      (cfg,
+       cfg_filename))
   {
-    GNUNET_SIGNAL_handler_uninstall (shc_chld);
-    shc_chld = NULL;
+    TALER_LOG_ERROR ("Could not parse configuration\n");
+    return BAD_CONFIG_FILE;
   }
-  GNUNET_DISK_pipe_close (sigpipe);
-  if (!remote_merchant && NULL != merchantd)
+  if (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string
+      (cfg,
+       "taler",
+       "currency",
+       &currency))
   {
-    GNUNET_OS_process_kill (merchantd,
-                            SIGTERM);
-    GNUNET_OS_process_wait (merchantd);
-    GNUNET_OS_process_destroy (merchantd);
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "taler",
+                               "currency");
+    GNUNET_CONFIGURATION_destroy (cfg);
+    return BAD_CONFIG_FILE;
   }
-  if (!remote_exchange && NULL != exchanged)
+  GNUNET_CONFIGURATION_destroy (cfg);
+
+  if (NULL == merchant_url)
   {
-    GNUNET_OS_process_kill (exchanged,
-                            SIGTERM);
-    GNUNET_OS_process_wait (exchanged);
-    GNUNET_OS_process_destroy (exchanged);
+    TALER_LOG_ERROR ("Option -m is mandatory!\n");
+    return MISSING_MERCHANT_URL;
   }
-  if (77 == result)
-    return 77;
-  return (GNUNET_OK == result) ? 0 : 1;
+
+  if (NULL == (merchantd = TALER_TESTING_run_merchant
+    (cfg_filename, merchant_url)))
+  {
+    TALER_LOG_ERROR ("Failed to launch the merchant\n");
+    return FAILED_TO_LAUNCH_MERCHANT;
+  }
+
+  if (NULL == bank_url)
+  {
+    TALER_LOG_ERROR ("Option -b is mandatory!\n");
+    return MISSING_BANK_URL;
+  }
+
+  if ( NULL == (bankd = TALER_TESTING_run_bank
+    (cfg_filename,
+     bank_url)))
+  {
+    TALER_LOG_ERROR ("Failed to run the bank\n");
+    terminate_process (bankd);
+    terminate_process (merchantd);
+    return FAILED_TO_LAUNCH_BANK;
+  }
+
+  result = TALER_TESTING_setup_with_exchange
+    (run,
+     NULL,
+     cfg_filename);
+
+  terminate_process (merchantd);
+  terminate_process (bankd);
+
+  return (GNUNET_OK == result) ? 0 : result;
 }
