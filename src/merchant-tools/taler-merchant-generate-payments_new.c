@@ -134,11 +134,139 @@ run (void *cls,
      struct TALER_TESTING_Interpreter *is)
 {
 
+  /* Currency strings.  */
+  char *CURRENCY_25_05;
+  char *CURRENCY_10;
+  char *CURRENCY_9_98;
+  char *CURRENCY_5;
+  char *CURRENCY_4_99;
+  char *CURRENCY_0_02;
+  char *CURRENCY_0_01;
+
+  GNUNET_asprintf (&CURRENCY_25_05,
+                   "%s:25.05",
+                   currency);
+
+  GNUNET_asprintf (&CURRENCY_10,
+                   "%s:10",
+                   currency);
+
+  GNUNET_asprintf (&CURRENCY_9_98,
+                   "%s:9.98",
+                   currency);
+
+  GNUNET_asprintf (&CURRENCY_5,
+                   "%s:5",
+                   currency);
+
+  GNUNET_asprintf (&CURRENCY_4_99,
+                   "%s:4.99",
+                   currency);
+
+  GNUNET_asprintf (&CURRENCY_0_02,
+                   "%s:0.02",
+                   currency);
+
+  GNUNET_asprintf (&CURRENCY_0_01,
+                   "%s:0.01",
+                   currency);
+
+  /* Orders.  */
+  char *order_worth_5;
+  char *order_worth_10_2coins;
+  char *order_worth_5_track;
+  char *order_worth_5_unaggregated;
+
+  GNUNET_asprintf
+    (&order_worth_5,
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{%s:5}\"} ]\
+     }",
+     currency,
+     currency,
+     currency);
+
+  GNUNET_asprintf
+    (&order_worth_10_2coins,
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":10,\
+          \"fraction\":0},\
+        \"summary\": \"2-coins untracked payment\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"2-coins payment\",\
+                         \"value\":\"{%s:10}\"} ]\
+     }",
+     currency,
+     currency,
+     currency);
+
+  GNUNET_asprintf
+    (&order_worth_5_track,
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"ice track cream!\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice track cream\",\
+                         \"value\":\"{%s:5}\"} ]\
+     }",
+     currency,
+     currency,
+     currency);
+
+
+  GNUNET_asprintf
+    (&order_worth_5_unaggregated,
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"unaggregated deposit!\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"unaggregated cream\",\
+                         \"value\":\"{%s:5}\"} ]\
+     }",
+     currency,
+     currency,
+     currency);
+
   struct TALER_TESTING_Command commands[] = {
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-1",
-       "USD:25.05"),
+       CURRENCY_25_05),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
@@ -148,14 +276,14 @@ run (void *cls,
       ("withdraw-coin-1",
        is->exchange, // picks port from config's [exchange].
        "create-reserve-1",
-       "USD:5",
+       CURRENCY_5,
        MHD_HTTP_OK),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-2",
        is->exchange,
        "create-reserve-1",
-       "USD:5",
+       CURRENCY_5,
        MHD_HTTP_OK),
 
     /* This coin will be spent but never aggregated,
@@ -164,7 +292,7 @@ run (void *cls,
       ("withdraw-coin-3",
        is->exchange,
        "create-reserve-1",
-       "USD:5",
+       CURRENCY_5,
        MHD_HTTP_OK),
 
     /* coin 4 & 5 will be deposited for the same
@@ -174,14 +302,14 @@ run (void *cls,
       ("withdraw-coin-4",
        is->exchange,
        "create-reserve-1",
-       "USD:5",
+       CURRENCY_5,
        MHD_HTTP_OK),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-5",
        is->exchange,
        "create-reserve-1",
-       "USD:5",
+       CURRENCY_5,
        MHD_HTTP_OK),
 
     TALER_TESTING_cmd_proposal
@@ -189,21 +317,8 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "{\"max_fee\":\
-          {\"currency\":\"USD\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-        \"amount\":\
-          {\"currency\":\"USD\",\
-           \"value\":5,\
-           \"fraction\":0},\
-        \"summary\": \"merchant-lib testcase\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{USD:5}\"} ] }",
-        NULL),
+       order_worth_5,
+       NULL),
 
     TALER_TESTING_cmd_pay
       ("deposit-simple",
@@ -212,9 +327,9 @@ run (void *cls,
        MHD_HTTP_OK,
        "create-proposal-1",
        "withdraw-coin-1",
-       "USD:5",
-       "USD:4.99",
-       "USD:0.01"),
+       CURRENCY_5,
+       CURRENCY_4_99,
+       CURRENCY_0_01),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-payments",
@@ -230,21 +345,8 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "{\"max_fee\":\
-          {\"currency\":\"USD\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-        \"amount\":\
-          {\"currency\":\"USD\",\
-           \"value\":5,\
-           \"fraction\":0},\
-        \"summary\": \"merchant-lib testcase\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"ice track cream\",\
-                         \"value\":\"{USD:5}\"} ] }",
-        NULL),
+       order_worth_5_track,
+       NULL),
 
     TALER_TESTING_cmd_pay
       ("deposit-simple-2",
@@ -253,9 +355,9 @@ run (void *cls,
        MHD_HTTP_OK,
        "create-proposal-2",
        "withdraw-coin-2",
-       "USD:5",
-       "USD:4.99",
-       "USD:0.01"),
+       CURRENCY_5,
+       CURRENCY_4_99,
+       CURRENCY_0_01),
 
     /* /track/transaction over deposit-simple-2 */
 
@@ -270,7 +372,7 @@ run (void *cls,
        MHD_HTTP_OK,
        "dummy", // "check bank" CMD, never used, to be deleted.
        "deposit-simple-2",
-       "USD:0.01"),
+       CURRENCY_0_01),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-1",
@@ -293,21 +395,8 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "{\"max_fee\":\
-          {\"currency\":\"USD\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-        \"amount\":\
-          {\"currency\":\"USD\",\
-           \"value\":10,\
-           \"fraction\":0},\
-        \"summary\": \"2-coins untracked payment\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"2-coins payment\",\
-                         \"value\":\"{USD:10}\"} ] }",
-        NULL),
+       order_worth_10_2coins,
+       NULL),
 
     TALER_TESTING_cmd_pay ("deposit-4&5",
                            merchant_url,
@@ -316,9 +405,9 @@ run (void *cls,
                            "create-proposal-4&5",
                            "withdraw-coin-4;" \
                            "withdraw-coin-5",
-                           "EUR:10",
-                           "EUR:9.98", // no sense now
-                           "EUR:0.02"), // no sense now
+                           CURRENCY_10,
+                           CURRENCY_9_98, // no sense now
+                           CURRENCY_0_02), // no sense now
 
     TALER_TESTING_cmd_exec_aggregator
       ("aggregate-2",
@@ -330,21 +419,8 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "{\"max_fee\":\
-          {\"currency\":\"USD\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-        \"amount\":\
-          {\"currency\":\"USD\",\
-           \"value\":5,\
-           \"fraction\":0},\
-        \"summary\": \"unaggregated deposit!\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"unaggregated cream\",\
-                         \"value\":\"{USD:5}\"} ] }",
-        NULL),
+       order_worth_5_unaggregated,
+       NULL),
 
     TALER_TESTING_cmd_pay
       ("deposit-simple-3",
@@ -353,9 +429,9 @@ run (void *cls,
        MHD_HTTP_OK,
        "create-proposal-3",
        "withdraw-coin-3",
-       "USD:5",
-       "USD:4.99",
-       "USD:0.01"),
+       CURRENCY_5,
+       CURRENCY_4_99,
+       CURRENCY_0_01),
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-2",
@@ -364,8 +440,7 @@ run (void *cls,
        MHD_HTTP_ACCEPTED,
        "dummy", // "check bank" CMD, never used, to be deleted.
        "deposit-simple-3",
-       "USD:0.01"),
-
+       CURRENCY_0_01),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-tracks",
