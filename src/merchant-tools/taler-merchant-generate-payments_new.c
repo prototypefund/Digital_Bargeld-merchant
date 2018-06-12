@@ -39,12 +39,15 @@
 #include "taler_merchant_testing_lib.h"
 
 /* Error codes.  */
-#define MISSING_MERCHANT_URL 2
-#define FAILED_TO_LAUNCH_MERCHANT 3
-#define MISSING_BANK_URL 4
-#define FAILED_TO_LAUNCH_BANK 5
-#define BAD_CLI_ARG 6
-#define BAD_CONFIG_FILE 7
+enum PaymentGeneratorError {
+
+  MISSING_MERCHANT_URL = 2,
+  FAILED_TO_LAUNCH_MERCHANT,
+  MISSING_BANK_URL,
+  FAILED_TO_LAUNCH_BANK,
+  BAD_CLI_ARG,
+  BAD_CONFIG_FILE
+};
 
 /* Hard-coded params.  Note, the bank is expected to
  * have the Tor user with account number 3 and password 'x'.
@@ -483,7 +486,7 @@ terminate_process (struct GNUNET_OS_Process *process)
  *
  * @param argc number of arguments from the command line
  * @param argv command line arguments
- * @return 0 ok, 1 on error
+ * @return 0 ok, or `enum PaymentGeneratorError` on error
  */
 int
 main (int argc,
