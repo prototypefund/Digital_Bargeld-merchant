@@ -248,6 +248,7 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
                                    strlen (po->json_enc)));
 
   list = curl_slist_append (list, "Authorization: ApiKey sandbox");
+  GNUNET_assert (NULL != list);
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_HTTPHEADER,
