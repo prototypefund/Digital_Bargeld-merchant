@@ -127,6 +127,114 @@ static char *merchant_url;
 static char *currency;
 
 /**
+ * Convenience macros to allocate all the currency-dependant
+ * strings;  note that the argument list of the macro is ignored.
+ * It is kept as a way to make the macro more auto-descriptive
+ * where it is called.
+ */
+
+#define ALLOCATE_AMOUNTS(...) \
+  GNUNET_asprintf (&CURRENCY_25_05, \
+                   "%s:25.05", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_10, \
+                   "%s:10", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_9_98, \
+                   "%s:9.98", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_5, \
+                   "%s:5", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_4_99, \
+                   "%s:4.99", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_0_02, \
+                   "%s:0.02", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_0_01, \
+                   "%s:0.01", \
+                   currency);
+
+#define ALLOCATE_ORDERS(...) \
+  GNUNET_asprintf \
+    (&order_worth_5, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{%s:5}\"} ] }", \
+     currency, \
+     currency, \
+     currency); \
+  GNUNET_asprintf \
+    (&order_worth_10_2coins, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":10,\
+          \"fraction\":0},\
+        \"summary\": \"2-coins untracked payment\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"2-coins payment\",\
+                         \"value\":\"{%s:10}\"} ] }", \
+     currency, \
+     currency, \
+     currency); \
+  GNUNET_asprintf \
+    (&order_worth_5_track, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"ice track cream!\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice track cream\",\
+                         \"value\":\"{%s:5}\"} ] }", \
+     currency, \
+     currency, \
+     currency); \
+  GNUNET_asprintf \
+    (&order_worth_5_unaggregated, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"unaggregated deposit!\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"unaggregated cream\",\
+                         \"value\":\"{%s:5}\"} ] }", \
+     currency, \
+     currency, \
+     currency);
+
+/**
  * Actual commands collection.
  */
 static void
@@ -143,33 +251,15 @@ run (void *cls,
   char *CURRENCY_0_02;
   char *CURRENCY_0_01;
 
-  GNUNET_asprintf (&CURRENCY_25_05,
-                   "%s:25.05",
-                   currency);
+  ALLOCATE_AMOUNTS
+    (CURRENCY_25_05,
+     CURRENCY_10,
+     CURRENCY_9_98,
+     CURRENCY_5,
+     CURRENCY_4_99,
+     CURRENCY_0_02,
+     CURRENCY_0_01);
 
-  GNUNET_asprintf (&CURRENCY_10,
-                   "%s:10",
-                   currency);
-
-  GNUNET_asprintf (&CURRENCY_9_98,
-                   "%s:9.98",
-                   currency);
-
-  GNUNET_asprintf (&CURRENCY_5,
-                   "%s:5",
-                   currency);
-
-  GNUNET_asprintf (&CURRENCY_4_99,
-                   "%s:4.99",
-                   currency);
-
-  GNUNET_asprintf (&CURRENCY_0_02,
-                   "%s:0.02",
-                   currency);
-
-  GNUNET_asprintf (&CURRENCY_0_01,
-                   "%s:0.01",
-                   currency);
 
   /* Orders.  */
   char *order_worth_5;
@@ -177,90 +267,11 @@ run (void *cls,
   char *order_worth_5_track;
   char *order_worth_5_unaggregated;
 
-  GNUNET_asprintf
-    (&order_worth_5,
-     "{\"max_fee\":\
-       {\"currency\":\"%s\",\
-        \"value\":0,\
-        \"fraction\":50000000},\
-       \"refund_deadline\":\"\\/Date(0)\\/\",\
-       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-       \"amount\":\
-         {\"currency\":\"%s\",\
-          \"value\":5,\
-          \"fraction\":0},\
-        \"summary\": \"merchant-lib testcase\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{%s:5}\"} ]\
-     }",
-     currency,
-     currency,
-     currency);
-
-  GNUNET_asprintf
-    (&order_worth_10_2coins,
-     "{\"max_fee\":\
-       {\"currency\":\"%s\",\
-        \"value\":0,\
-        \"fraction\":50000000},\
-       \"refund_deadline\":\"\\/Date(0)\\/\",\
-       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-       \"amount\":\
-         {\"currency\":\"%s\",\
-          \"value\":10,\
-          \"fraction\":0},\
-        \"summary\": \"2-coins untracked payment\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"2-coins payment\",\
-                         \"value\":\"{%s:10}\"} ]\
-     }",
-     currency,
-     currency,
-     currency);
-
-  GNUNET_asprintf
-    (&order_worth_5_track,
-     "{\"max_fee\":\
-       {\"currency\":\"%s\",\
-        \"value\":0,\
-        \"fraction\":50000000},\
-       \"refund_deadline\":\"\\/Date(0)\\/\",\
-       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-       \"amount\":\
-         {\"currency\":\"%s\",\
-          \"value\":5,\
-          \"fraction\":0},\
-        \"summary\": \"ice track cream!\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"ice track cream\",\
-                         \"value\":\"{%s:5}\"} ]\
-     }",
-     currency,
-     currency,
-     currency);
-
-
-  GNUNET_asprintf
-    (&order_worth_5_unaggregated,
-     "{\"max_fee\":\
-       {\"currency\":\"%s\",\
-        \"value\":0,\
-        \"fraction\":50000000},\
-       \"refund_deadline\":\"\\/Date(0)\\/\",\
-       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-       \"amount\":\
-         {\"currency\":\"%s\",\
-          \"value\":5,\
-          \"fraction\":0},\
-        \"summary\": \"unaggregated deposit!\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"unaggregated cream\",\
-                         \"value\":\"{%s:5}\"} ]\
-     }",
-     currency,
-     currency,
-     currency);
+  ALLOCATE_ORDERS
+    (order_worth_5,
+     order_worth_10_2coins,
+     order_worth_5_track,
+     order_worth_5_unaggregated);
 
   struct TALER_TESTING_Command commands[] = {
 
