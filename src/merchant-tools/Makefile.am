@@ -18,7 +18,7 @@ taler_merchant_dbinit_LDADD = \
 taler_merchant_generate_payments_SOURCES = \
   taler-merchant-generate-payments.c
 
-taler_merchant_generate_payments_new_LDADD = \
+taler_merchant_generate_payments_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   $(top_srcdir)/src/lib/libtalermerchant.la \
   $(top_srcdir)/src/lib/libtalermerchanttesting.la \
