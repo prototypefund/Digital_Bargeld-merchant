@@ -475,6 +475,7 @@ request_pay_generic (struct GNUNET_CURL_Context *ctx,
   json_t *pay_obj;
   json_t *j_coins;
   CURL *eh;
+  struct curl_slist *list = NULL;
   struct TALER_Amount total_fee;
   struct TALER_Amount total_amount;
 
@@ -592,6 +593,13 @@ request_pay_generic (struct GNUNET_CURL_Context *ctx,
                  curl_easy_setopt (eh,
                                    CURLOPT_POSTFIELDSIZE,
                                    strlen (ph->json_enc)));
+
+  list = curl_slist_append (list, "Authorization: ApiKey sandbox");
+
+  GNUNET_assert (CURLE_OK ==
+                 curl_easy_setopt (eh,
+                                   CURLOPT_HTTPHEADER,
+                                   list));
   ph->job = GNUNET_CURL_job_add (ctx,
                                  eh,
                                  GNUNET_YES,
