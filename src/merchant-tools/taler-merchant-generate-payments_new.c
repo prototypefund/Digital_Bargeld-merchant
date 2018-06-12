@@ -44,6 +44,7 @@
 #define MISSING_BANK_URL 4
 #define FAILED_TO_LAUNCH_BANK 5
 #define BAD_CLI_ARG 6
+#define BAD_CONFIG_FILE 7
 
 /* Hard-coded params.  Note, the bank is expected to
  * have the Tor user with account number 3 and password 'x'.
@@ -90,8 +91,14 @@ static unsigned int payments_number = 1;
 static unsigned int tracks_number = 1;
 
 
+/**
+ * Usually set as ~/.config/taler.net
+ */
 static const char *default_config_file;
 
+/**
+ * Log level used during the run.
+ */
 static char *loglev;
 
 /**
@@ -113,6 +120,11 @@ static char *logfile;
  * Merchant base URL.
  */
 static char *merchant_url;
+
+/**
+ * Currency used.
+ */
+static char *currency;
 
 /**
  * Actual commands collection.
@@ -391,6 +403,7 @@ int
 main (int argc,
       char *const *argv)
 {
+  struct GNUNET_CONFIGURATION_Handle *cfg;
 
   default_config_file = GNUNET_OS_project_data_get
     ()->user_config_file;
@@ -474,6 +487,28 @@ main (int argc,
 
   if (NULL == cfg_filename)
     cfg_filename = (char *) default_config_file;
+
+  cfg = GNUNET_CONFIGURATION_create ();
+  if (GNUNET_OK != GNUNET_CONFIGURATION_load
+      (cfg,
+       cfg_filename))
+  {
+    TALER_LOG_ERROR ("Could not parse configuration\n");
+    return BAD_CONFIG_FILE;
+  }
+  if (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string
+      (cfg,
+       "taler",
+       "currency",
+       &currency))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "taler",
+                               "currency");
+    GNUNET_CONFIGURATION_destroy (cfg);
+    return BAD_CONFIG_FILE;
+  }
+  GNUNET_CONFIGURATION_destroy (cfg);
 
   if (NULL == merchant_url)
   {
