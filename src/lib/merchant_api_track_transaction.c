@@ -170,6 +170,10 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
                                    tdo->url));
+  GNUNET_assert
+    (GNUNET_OK == GNUNET_CURL_append_header
+      (ctx, APIKEY_SANDBOX));
+
   tdo->job = GNUNET_CURL_job_add (ctx,
                                   eh,
                                   GNUNET_YES,

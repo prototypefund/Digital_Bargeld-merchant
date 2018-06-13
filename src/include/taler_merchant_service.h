@@ -28,6 +28,7 @@
 #include <gnunet/gnunet_curl_lib.h>
 #include <jansson.h>
 
+#define APIKEY_SANDBOX "Authorization: ApiKey sandbox"
 
 /* ********************* /refund ************************** */
 
