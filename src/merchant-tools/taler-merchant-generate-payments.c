@@ -276,6 +276,11 @@ run (void *cls,
      order_worth_5_track,
      order_worth_5_unaggregated);
 
+  /* Will be freed by testing-lib.  */
+  GNUNET_assert
+    (GNUNET_OK == GNUNET_CURL_append_header
+      (is->ctx, APIKEY_SANDBOX));
+
   struct TALER_TESTING_Command commands[] = {
 
     CMD_TRANSFER_TO_EXCHANGE
