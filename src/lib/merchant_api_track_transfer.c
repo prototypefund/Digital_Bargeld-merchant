@@ -234,7 +234,6 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
 {
   struct TALER_MERCHANT_TrackTransferHandle *tdo;
   CURL *eh;
-  struct curl_slist *list = NULL;
   char *wtid_str;
 
   wtid_str = GNUNET_STRINGS_data_to_string_alloc (wtid,
@@ -255,12 +254,6 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
                                    tdo->url));
-  list = curl_slist_append (list,
-                            "Authorization: ApiKey sandbox");
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_HTTPHEADER,
-                                   list));
   tdo->job = GNUNET_CURL_job_add (ctx,
                                   eh,
                                   GNUNET_YES,
