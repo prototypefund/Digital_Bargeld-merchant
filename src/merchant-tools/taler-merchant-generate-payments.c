@@ -305,32 +305,6 @@ run (void *cls,
        CURRENCY_5,
        MHD_HTTP_OK),
 
-    /* This coin will be spent but never aggregated,
-     * in order to get 202 responses from tracks.  */
-    TALER_TESTING_cmd_withdraw_amount
-      ("withdraw-coin-3",
-       is->exchange,
-       "create-reserve-1",
-       CURRENCY_5,
-       MHD_HTTP_OK),
-
-    /* coin 4 & 5 will be deposited for the same
-     * contract; needed in case some testing utility
-     * wants to trigger a "failed dependency" error. */
-    TALER_TESTING_cmd_withdraw_amount
-      ("withdraw-coin-4",
-       is->exchange,
-       "create-reserve-1",
-       CURRENCY_5,
-       MHD_HTTP_OK),
-
-    TALER_TESTING_cmd_withdraw_amount
-      ("withdraw-coin-5",
-       is->exchange,
-       "create-reserve-1",
-       CURRENCY_5,
-       MHD_HTTP_OK),
-
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
        merchant_url,
@@ -400,66 +374,6 @@ run (void *cls,
        MHD_HTTP_OK,
        "track-transaction-1",
        "deposit-simple-2"),
-
-    /* Doing the 2-coins payment; needed to generate the
-     * "failed dependency" response error, at /track/transaction.
-     * NOTE: not used here, but done just in case a testing
-     * program would need it.  And this MUST happen here, as
-     * no tracking operation happens next and so the merchant
-     * won't be able to use a cached version in its database
-     * when serving /track/..; therefore it will relate to the
-     * exchange that can be twisted by the testing logic.  */
-    TALER_TESTING_cmd_proposal
-      ("create-proposal-4&5",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       order_worth_10_2coins,
-       NULL),
-
-    TALER_TESTING_cmd_pay ("deposit-4&5",
-                           merchant_url,
-                           is->ctx,
-                           MHD_HTTP_OK,
-                           "create-proposal-4&5",
-                           "withdraw-coin-4;" \
-                           "withdraw-coin-5",
-                           CURRENCY_10,
-                           CURRENCY_9_98, // no sense now
-                           CURRENCY_0_02), // no sense now
-
-    TALER_TESTING_cmd_exec_aggregator
-      ("aggregate-2",
-       cfg_filename),
-
-    /* Must be _after_ any aggregation takes place.  */
-    TALER_TESTING_cmd_proposal
-      ("create-proposal-3",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       order_worth_5_unaggregated,
-       NULL),
-
-    TALER_TESTING_cmd_pay
-      ("deposit-simple-3",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       "create-proposal-3",
-       "withdraw-coin-3",
-       CURRENCY_5,
-       CURRENCY_4_99,
-       CURRENCY_0_01),
-
-    TALER_TESTING_cmd_merchant_track_transaction
-      ("track-transaction-2",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_ACCEPTED,
-       "dummy", // "check bank" CMD, never used, to be deleted.
-       "deposit-simple-3",
-       CURRENCY_0_01),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-tracks",
