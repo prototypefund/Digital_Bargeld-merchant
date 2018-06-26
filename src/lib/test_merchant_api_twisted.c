@@ -185,9 +185,8 @@ run (void *cls,
      struct TALER_TESTING_Interpreter *is)
 {
 
-  struct TALER_TESTING_Command commands[] = {
-
   /**** Covering /check-payment ****/
+  struct TALER_TESTING_Command check_payment[] = {
 
     TALER_TESTING_cmd_proposal
       ("proposal-for-check-payment",
@@ -250,48 +249,52 @@ run (void *cls,
        "proposal-for-check-payment",
        GNUNET_SYSERR),
 
+    TALER_TESTING_cmd_end ()
+  };
+
   /**** Covering /proposal lib ****/
+  struct TALER_TESTING_Command proposal[] = {
 
-  /**
-   * Make the merchant return a 400 Bad Request response
-   * due to uploaded body malformation.
-   */
-  TALER_TESTING_cmd_malform_request
-    ("malform-order",
-     PROXY_MERCHANT_CONFIG_FILE),
-
-  TALER_TESTING_cmd_proposal
-    ("create-proposal-0",
-     twister_merchant_url,
-     is->ctx,
-     MHD_HTTP_BAD_REQUEST,
-     /* giving a valid JSON to not make it fail before
-      * data reaches the merchant.  */
-     "{\"not\": \"used\"}",
-     NULL),
-
+    /**
+     * Make the merchant return a 400 Bad Request response
+     * due to uploaded body malformation.
+     */
+    TALER_TESTING_cmd_malform_request
+      ("malform-order",
+       PROXY_MERCHANT_CONFIG_FILE),
+  
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-0",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_BAD_REQUEST,
+       /* giving a valid JSON to not make it fail before
+        * data reaches the merchant.  */
+       "{\"not\": \"used\"}",
+       NULL),
+  
     TALER_TESTING_cmd_hack_response_code
       ("proposal-500",
        PROXY_MERCHANT_CONFIG_FILE,
        MHD_HTTP_INTERNAL_SERVER_ERROR),
-
-  TALER_TESTING_cmd_proposal
-    ("create-proposal-1",
-     twister_merchant_url,
-     is->ctx,
-     /* This status code == 0 is gotten via a 500 Internal Server
-      * Error handed to the library.  */
-     MHD_HTTP_INTERNAL_SERVER_ERROR,
-     /* giving a valid JSON to not make it fail before
-      * data reaches the merchant.  */
-     "{\"not\": \"used\"}",
-     NULL),
-
-  /**
-   * Cause the PUT /proposal callback to be called
-   * with a response code == 0.  We achieve this by malforming
-   * the response body.
-   */
+  
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-1",
+       twister_merchant_url,
+       is->ctx,
+       /* This status code == 0 is gotten via a 500 Internal Server
+        * Error handed to the library.  */
+       MHD_HTTP_INTERNAL_SERVER_ERROR,
+       /* giving a valid JSON to not make it fail before
+        * data reaches the merchant.  */
+       "{\"not\": \"used\"}",
+       NULL),
+  
+    /**
+     * Cause the PUT /proposal callback to be called
+     * with a response code == 0.  We achieve this by malforming
+     * the response body.
+     */
 
     TALER_TESTING_cmd_malform_response
       ("malform-proposal",
@@ -317,8 +320,6 @@ run (void *cls,
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:5}\"} ] }",
         NULL),
-
-
     /**
      * Cause proposal to be invalid: this is achieved
      * by deleting the "order_id" field of it.
@@ -424,7 +425,11 @@ run (void *cls,
                                        0,
                                        "create-proposal-5",
                                        NULL),
+    TALER_TESTING_cmd_end ()
+  };
+
     /**** Covering /history lib ****/
+  struct TALER_TESTING_Command history[] = {
 
     /**
      * Changing the response code to a unexpected
@@ -465,7 +470,11 @@ run (void *cls,
                                10), // nrows
 
 
-    /***** Test transactions tracking *****/
+    TALER_TESTING_cmd_end ()
+  };
+
+  /***** Test transactions tracking *****/
+  struct TALER_TESTING_Command track[] = {
 
     /**
      * Move money to the exchange's bank account.
@@ -577,7 +586,12 @@ run (void *cls,
        "deposit-simple",
        "EUR:0.01"), // ignored
 
-    /****** Covering /pay *******/
+    TALER_TESTING_cmd_end ()
+  };
+
+
+  /****** Covering /pay *******/
+  struct TALER_TESTING_Command pay[] = {
 
     /**
      * Move money to the exchange's bank account.
@@ -766,7 +780,8 @@ run (void *cls,
        PROXY_MERCHANT_CONFIG_FILE,
        "history.0.coin_sig"),
 
-    /* Coin history check will fail, due to coin's bad signature.  */
+    /* Coin history check will fail,
+     * due to coin's bad signature.  */
     TALER_TESTING_cmd_pay ("deposit-simple-fail",
                            twister_merchant_url,
                            is->ctx,
@@ -778,6 +793,26 @@ run (void *cls,
                            "EUR:0.01"), // no sense now
 
     /* max uint64 number: 9223372036854775807; try to overflow! */
+
+    TALER_TESTING_cmd_end ()
+  };
+
+  struct TALER_TESTING_Command commands[] = {
+
+    TALER_TESTING_cmd_batch ("check-payment",
+                             check_payment),
+
+    TALER_TESTING_cmd_batch ("proposal",
+                             proposal),
+
+    TALER_TESTING_cmd_batch ("history",
+                             history),
+
+    TALER_TESTING_cmd_batch ("track",
+                             track),
+
+    TALER_TESTING_cmd_batch ("pay",
+                             pay),
 
     /**
      * End the suite.  Fixme: better to have a label for this
