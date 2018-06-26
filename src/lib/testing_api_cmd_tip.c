@@ -772,6 +772,11 @@ struct WithdrawHandle
    */
   unsigned int off;
 
+  
+  /**
+   * Internal state of the "pickup" CMD.
+   */
+  struct TipPickupState *tps;
 };
 
 /**
@@ -796,7 +801,8 @@ pickup_withdraw_cb (void *cls,
 {
   struct WithdrawHandle *wh = cls;
   struct TALER_TESTING_Interpreter *is = wh->is;
-  struct TipPickupState *tps = is->commands[is->ip].cls;
+
+  struct TipPickupState *tps = wh->tps;
 
   wh->wsh = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -904,6 +910,7 @@ pickup_cb (void *cls,
 
     wh->off = i;
     wh->is = tps->is;
+    wh->tps = tps;
     GNUNET_assert
       ( (NULL == wh->wsh) &&
         ( (NULL == tps->sigs) ||

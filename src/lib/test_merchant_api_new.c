@@ -628,35 +628,8 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
-  struct TALER_TESTING_Command commands[] = {
 
-    TALER_TESTING_cmd_batch ("pay",
-                             pay),
-
-    TALER_TESTING_cmd_batch ("double-spending",
-                             double_spending),
-
-    TALER_TESTING_cmd_batch ("track",
-                             track),
-
-    /**
-     * Just a weird /history request, not really tied to
-     * any CMDs chunk.
-     */
-    TALER_TESTING_cmd_history
-      ("history-2",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
-                                 GNUNET_TIME_UNIT_MICROSECONDS),
-       /* zero results expected, time too ancient. */
-       0,
-       10,
-       10),
-
-    TALER_TESTING_cmd_batch ("refund",
-                             refund),
+  struct TALER_TESTING_Command tip[] = {
 
     /* Test tipping.  */
     TALER_TESTING_cmd_fakebank_transfer_with_instance
@@ -670,7 +643,6 @@ run (void *cls,
        "tip",
        EXCHANGE_URL,
        CONFIG_FILE),
-
 
     CMD_EXEC_WIREWATCH ("wirewatch-3"),
 
@@ -696,7 +668,6 @@ run (void *cls,
                                      "tip",
                                      "tip 2",
                                      "EUR:5.01"),
-
 
     /* This command tests the authorization of tip
      * against a reserve that does not exist.  This is
@@ -736,6 +707,44 @@ run (void *cls,
                                   "authorize-tip-1",
                                   pickup_amounts_1,
                                   is->exchange),
+    TALER_TESTING_cmd_end ()
+  };
+
+  struct TALER_TESTING_Command commands[] = {
+
+    TALER_TESTING_cmd_batch ("pay",
+                             pay),
+
+    TALER_TESTING_cmd_batch ("double-spending",
+                             double_spending),
+
+    TALER_TESTING_cmd_batch ("track",
+                             track),
+
+    /**
+     * Just a weird /history request, not really tied to
+     * any CMDs chunk.
+     */
+    TALER_TESTING_cmd_history
+      ("history-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
+                                 GNUNET_TIME_UNIT_MICROSECONDS),
+       /* zero results expected, time too ancient. */
+       0,
+       10,
+       10),
+
+    TALER_TESTING_cmd_batch ("refund",
+                             refund),
+
+    TALER_TESTING_cmd_batch ("tip",
+                             tip),
+
+
+
 
     TALER_TESTING_cmd_tip_query_with_amounts ("query-tip-3",
                                               merchant_url,
