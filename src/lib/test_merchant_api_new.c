@@ -150,12 +150,7 @@ static void
 run (void *cls,
      struct TALER_TESTING_Interpreter *is)
 {
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Merchant serves at `%s'\n",
-              merchant_url);
-
-  struct TALER_TESTING_Command commands[] = {
-
+  struct TALER_TESTING_Command pay[] = {
     /**
      * Move money to the exchange's bank account.
      */
@@ -170,19 +165,24 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
        EXCHANGE_URL,
-       "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+       "EUR:10.02",
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO),
 
-    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-1",
-                                       is->exchange,
-                                       "create-reserve-1",
-                                       "EUR:5",
-                                       MHD_HTTP_OK),
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-1",
+       is->exchange,
+       "create-reserve-1",
+       "EUR:5",
+       MHD_HTTP_OK),
 
-    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
-                                       is->exchange,
-                                       "create-reserve-1",
-                                       "EUR:5",
-                                       MHD_HTTP_OK),
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-2",
+       is->exchange,
+       "create-reserve-1",
+       "EUR:5",
+       MHD_HTTP_OK),
+
     /**
      * Check the reserve is depleted.
      */
@@ -220,7 +220,6 @@ run (void *cls,
                                      MHD_HTTP_OK,
                                      "create-proposal-1",
                                      GNUNET_NO),
-
     TALER_TESTING_cmd_pay ("deposit-simple",
                            merchant_url,
                            is->ctx,
@@ -254,6 +253,26 @@ run (void *cls,
                            "EUR:4.99",
                            "EUR:0.01"),
 
+    TALER_TESTING_cmd_check_bank_empty
+      ("check_bank_empty-1"),
+
+    CMD_EXEC_AGGREGATOR ("run-aggregator"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-498c",
+       EXCHANGE_URL,
+       "EUR:4.98",
+       EXCHANGE_ACCOUNT_NO,
+       MERCHANT_ACCOUNT_NO),
+
+    TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-2"),
+
+    TALER_TESTING_cmd_end ()
+  };
+
+
+  struct TALER_TESTING_Command double_spending[] = {
+
     TALER_TESTING_cmd_proposal
       ("create-proposal-2",
        merchant_url,
@@ -275,6 +294,13 @@ run (void *cls,
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:5}\"} ] }",
         NULL),
+
+    TALER_TESTING_cmd_proposal_lookup ("fetch-proposal-2",
+                                       is->ctx,
+                                       merchant_url,
+                                       MHD_HTTP_OK,
+                                       "create-proposal-2",
+                                       NULL),
 
     TALER_TESTING_cmd_pay ("deposit-double-2",
                            merchant_url,
@@ -305,60 +331,11 @@ run (void *cls,
                                10, // start
                                10), // nrows
 
-    TALER_TESTING_cmd_fakebank_transfer
-      ("create-reserve-2",
-       "EUR:1",
-       fakebank_url,
-       USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
-       "user62",
-       "pass62",
-       EXCHANGE_URL),
 
-    TALER_TESTING_cmd_fakebank_transfer_with_ref
-      ("create-reserve-2b",
-       "EUR:4.01",
-       fakebank_url,
-       USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
-       "user62",
-       "pass62",
-       "create-reserve-2",
-       EXCHANGE_URL),
+    TALER_TESTING_cmd_end ()
+  };
 
-    CMD_EXEC_WIREWATCH ("wirewatch-2"),
-
-    TALER_TESTING_cmd_check_bank_transfer
-      ("check_bank_transfer-2",
-       EXCHANGE_URL,
-       "EUR:1", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
-
-    TALER_TESTING_cmd_check_bank_transfer
-      ("check_bank_transfer-2",
-       EXCHANGE_URL,
-       "EUR:4.01", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
-
-    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
-                                       is->exchange,
-                                       "create-reserve-2",
-                                       "EUR:5",
-                                       MHD_HTTP_OK),
-
-    TALER_TESTING_cmd_proposal_lookup ("fetch-proposal-2",
-                                       is->ctx,
-                                       merchant_url,
-                                       MHD_HTTP_OK,
-                                       "create-proposal-2",
-                                       NULL),
-
-    TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-1"),
-
-    CMD_EXEC_AGGREGATOR ("run-aggregator"),
-    TALER_TESTING_cmd_check_bank_transfer
-      ("check_bank_transfer-498c",
-       EXCHANGE_URL,
-       "EUR:4.98",
-       EXCHANGE_ACCOUNT_NO,
-       MERCHANT_ACCOUNT_NO),
-    TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-2"),
+  struct TALER_TESTING_Command track[] = {
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
@@ -385,6 +362,47 @@ run (void *cls,
        "check_bank_transfer-498c",
        "deposit-simple"),
 
+    TALER_TESTING_cmd_fakebank_transfer
+      ("create-reserve-2",
+       "EUR:1",
+       fakebank_url,
+       USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
+       "user62",
+       "pass62",
+       EXCHANGE_URL),
+
+    TALER_TESTING_cmd_fakebank_transfer_with_ref
+      ("create-reserve-2b",
+       "EUR:4.01",
+       fakebank_url,
+       USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
+       "user62",
+       "pass62",
+       "create-reserve-2",
+       EXCHANGE_URL),
+
+    CMD_EXEC_WIREWATCH ("wirewatch-2"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-2a",
+       EXCHANGE_URL,
+       "EUR:1",
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-2b",
+       EXCHANGE_URL,
+       "EUR:4.01",
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO),
+
+    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
+                                       is->exchange,
+                                       "create-reserve-2",
+                                       "EUR:5",
+                                       MHD_HTTP_OK),
+
     TALER_TESTING_cmd_pay ("deposit-simple-2",
                            merchant_url,
                            is->ctx,
@@ -396,6 +414,7 @@ run (void *cls,
                            "EUR:0.01"),
 
     CMD_EXEC_AGGREGATOR ("run-aggregator-2"),
+
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-498c-2",
        EXCHANGE_URL,
@@ -444,17 +463,11 @@ run (void *cls,
                                10,
                                10),
 
-    TALER_TESTING_cmd_history
-      ("history-2",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
-                                 GNUNET_TIME_UNIT_MICROSECONDS),
-       /* zero results expected, time too ancient. */
-       0,
-       10,
-       10),
+
+    TALER_TESTING_cmd_end ()
+  };
+
+  struct TALER_TESTING_Command refund[] = {
 
     TALER_TESTING_cmd_refund_increase
       ("refund-increase-1",
@@ -611,6 +624,39 @@ run (void *cls,
         * the backend will simply respond with a empty refunded
         * coin "set", but the HTTP response code is 200 OK.  */
        "EUR:0"),
+
+    TALER_TESTING_cmd_end ()
+  };
+
+  struct TALER_TESTING_Command commands[] = {
+
+    TALER_TESTING_cmd_batch ("pay",
+                             pay),
+
+    TALER_TESTING_cmd_batch ("double-spending",
+                             double_spending),
+
+    TALER_TESTING_cmd_batch ("track",
+                             track),
+
+    /**
+     * Just a weird /history request, not really tied to
+     * any CMDs chunk.
+     */
+    TALER_TESTING_cmd_history
+      ("history-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
+                                 GNUNET_TIME_UNIT_MICROSECONDS),
+       /* zero results expected, time too ancient. */
+       0,
+       10,
+       10),
+
+    TALER_TESTING_cmd_batch ("refund",
+                             refund),
 
     /* Test tipping.  */
     TALER_TESTING_cmd_fakebank_transfer_with_instance
