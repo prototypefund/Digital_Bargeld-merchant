@@ -1042,8 +1042,6 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
-
-
   struct TALER_TESTING_Command commands[] = {
 
     TALER_TESTING_cmd_batch ("pay",
@@ -1057,7 +1055,7 @@ run (void *cls,
 
     /**
      * Just a weird /history request, not really tied to
-     * any CMDs chunk.
+     * any CMD chunk.
      */
     TALER_TESTING_cmd_history
       ("history-2",
