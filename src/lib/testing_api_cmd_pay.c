@@ -96,12 +96,6 @@ struct PayState
    */
   struct TALER_MERCHANT_Pay *po;
 
-  /**
-   * JSON object of contract terms.
-   * FIXME: really needed here in this format?
-   */
-  json_t *ct;
-
 };
 
 
@@ -203,7 +197,7 @@ struct PayAgainState
  */
 struct PayAbortState
 {
-  
+
   /**
    * Expected HTTP response code.
    */
@@ -416,16 +410,16 @@ check_payment_run (void *cls,
               "Checking for order id `%s'\n",
               order_id);
 
-  cps->cpo = TALER_MERCHANT_check_payment (
-    cps->ctx,
-    cps->merchant_url,
-    "default", // only default instance for now.
-    order_id,
-    NULL,
-    NULL,
-    NULL,
-    check_payment_cb,
-    cps);
+  cps->cpo = TALER_MERCHANT_check_payment
+    (cps->ctx,
+     cps->merchant_url,
+     "default", // only default instance for now.
+     order_id,
+     NULL,
+     NULL,
+     NULL,
+     check_payment_cb,
+     cps);
 
   GNUNET_assert (NULL != cps->cpo); 
 }
@@ -775,6 +769,7 @@ _pay_run (const char *merchant_url,
           void (*api_cb) (),
           void *cls)
 {
+  json_t *ct;
   const struct TALER_TESTING_Command *proposal_cmd;
   const char *contract_terms;
   const char *order_id;
@@ -793,7 +788,6 @@ _pay_run (const char *merchant_url,
   char *cr;
   struct TALER_MerchantSignatureP *merchant_sig;
   struct TALER_MERCHANT_Pay *ret;
-  struct PayState *ps = is->commands[is->ip].cls;
 
   proposal_cmd = TALER_TESTING_interpreter_lookup_command
     (is, proposal_reference);
@@ -813,9 +807,9 @@ _pay_run (const char *merchant_url,
 
   json_error_t error;
   if (NULL ==
-     (ps->ct = json_loads (contract_terms,
-                           JSON_COMPACT,
-                           &error)))
+     (ct = json_loads (contract_terms,
+                       JSON_COMPACT,
+                       &error)))
   {
     GNUNET_break (0);
     return NULL;
@@ -842,7 +836,7 @@ _pay_run (const char *merchant_url,
     GNUNET_JSON_spec_end()
   };
   if (GNUNET_OK !=
-      GNUNET_JSON_parse (ps->ct,
+      GNUNET_JSON_parse (ct,
                          spec,
                          &error_name,
                          &error_line))
@@ -853,6 +847,7 @@ _pay_run (const char *merchant_url,
                 error_line);
     fprintf (stderr, "%s\n", contract_terms);
     GNUNET_break_op (0);
+    json_decref (ct);
     return NULL;
   }
 
@@ -959,8 +954,6 @@ pay_cleanup (void *cls,
 {
   struct PayState *ps = cls;
 
-  if (NULL != ps->ct)
-    json_decref (ps->ct);
   if (NULL != ps->po)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
