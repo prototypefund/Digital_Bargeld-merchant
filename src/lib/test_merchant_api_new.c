@@ -707,44 +707,6 @@ run (void *cls,
                                   "authorize-tip-1",
                                   pickup_amounts_1,
                                   is->exchange),
-    TALER_TESTING_cmd_end ()
-  };
-
-  struct TALER_TESTING_Command commands[] = {
-
-    TALER_TESTING_cmd_batch ("pay",
-                             pay),
-
-    TALER_TESTING_cmd_batch ("double-spending",
-                             double_spending),
-
-    TALER_TESTING_cmd_batch ("track",
-                             track),
-
-    /**
-     * Just a weird /history request, not really tied to
-     * any CMDs chunk.
-     */
-    TALER_TESTING_cmd_history
-      ("history-2",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
-                                 GNUNET_TIME_UNIT_MICROSECONDS),
-       /* zero results expected, time too ancient. */
-       0,
-       10,
-       10),
-
-    TALER_TESTING_cmd_batch ("refund",
-                             refund),
-
-    TALER_TESTING_cmd_batch ("tip",
-                             tip),
-
-
-
 
     TALER_TESTING_cmd_tip_query_with_amounts ("query-tip-3",
                                               merchant_url,
@@ -891,6 +853,46 @@ run (void *cls,
        MERCHANT_ACCOUNT_NO),
     TALER_TESTING_cmd_check_bank_empty
     ("check_bank_empty-at-tips"),
+
+    TALER_TESTING_cmd_end ()
+  };
+
+  struct TALER_TESTING_Command commands[] = {
+
+    TALER_TESTING_cmd_batch ("pay",
+                             pay),
+
+    TALER_TESTING_cmd_batch ("double-spending",
+                             double_spending),
+
+    TALER_TESTING_cmd_batch ("track",
+                             track),
+
+    /**
+     * Just a weird /history request, not really tied to
+     * any CMDs chunk.
+     */
+    TALER_TESTING_cmd_history
+      ("history-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
+                                 GNUNET_TIME_UNIT_MICROSECONDS),
+       /* zero results expected, time too ancient. */
+       0,
+       10,
+       10),
+
+    TALER_TESTING_cmd_batch ("refund",
+                             refund),
+
+    TALER_TESTING_cmd_batch ("tip",
+                             tip),
+
+//    TALER_TESTING_cmd_batch ("pay-again",
+  //                           pay_again),
+
 
     /* pay again logic.  */
     TALER_TESTING_cmd_fakebank_transfer
