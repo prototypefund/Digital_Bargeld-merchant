@@ -857,44 +857,8 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
-  struct TALER_TESTING_Command commands[] = {
+  struct TALER_TESTING_Command pay_again[] = {
 
-    TALER_TESTING_cmd_batch ("pay",
-                             pay),
-
-    TALER_TESTING_cmd_batch ("double-spending",
-                             double_spending),
-
-    TALER_TESTING_cmd_batch ("track",
-                             track),
-
-    /**
-     * Just a weird /history request, not really tied to
-     * any CMDs chunk.
-     */
-    TALER_TESTING_cmd_history
-      ("history-2",
-       merchant_url,
-       is->ctx,
-       MHD_HTTP_OK,
-       GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
-                                 GNUNET_TIME_UNIT_MICROSECONDS),
-       /* zero results expected, time too ancient. */
-       0,
-       10,
-       10),
-
-    TALER_TESTING_cmd_batch ("refund",
-                             refund),
-
-    TALER_TESTING_cmd_batch ("tip",
-                             tip),
-
-//    TALER_TESTING_cmd_batch ("pay-again",
-  //                           pay_again),
-
-
-    /* pay again logic.  */
     TALER_TESTING_cmd_fakebank_transfer
       ("create-reserve-10",
        "EUR:10.02",
@@ -981,7 +945,10 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-10"),
 
-    /* pay abort */
+    TALER_TESTING_cmd_end ()
+  };
+
+  struct TALER_TESTING_Command pay_abort[] = {
     CMD_TRANSFER_TO_EXCHANGE ("create-reserve-11",
                               "EUR:10.02"),
 
@@ -1072,6 +1039,49 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-11"),
 
+    TALER_TESTING_cmd_end ()
+  };
+
+
+
+  struct TALER_TESTING_Command commands[] = {
+
+    TALER_TESTING_cmd_batch ("pay",
+                             pay),
+
+    TALER_TESTING_cmd_batch ("double-spending",
+                             double_spending),
+
+    TALER_TESTING_cmd_batch ("track",
+                             track),
+
+    /**
+     * Just a weird /history request, not really tied to
+     * any CMDs chunk.
+     */
+    TALER_TESTING_cmd_history
+      ("history-2",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
+                                 GNUNET_TIME_UNIT_MICROSECONDS),
+       /* zero results expected, time too ancient. */
+       0,
+       10,
+       10),
+
+    TALER_TESTING_cmd_batch ("refund",
+                             refund),
+
+    TALER_TESTING_cmd_batch ("tip",
+                             tip),
+
+    TALER_TESTING_cmd_batch ("pay-again",
+                             pay_again),
+
+    TALER_TESTING_cmd_batch ("pay-abort",
+                             pay_abort),
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
