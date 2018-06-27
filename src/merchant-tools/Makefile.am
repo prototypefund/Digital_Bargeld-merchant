@@ -15,6 +15,26 @@ taler_merchant_dbinit_LDADD = \
   -ltalerutil \
   -ltalerpq
 
+taler_merchant_generate_payments_alt_SOURCES = \
+  taler-merchant-generate-payments-alt.c
+
+taler_merchant_generate_payments_alt_LDADD = \
+  $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
+  $(top_srcdir)/src/lib/libtalermerchant.la \
+  $(top_srcdir)/src/lib/libtalermerchanttesting.la \
+  $(LIBGCRYPT_LIBS) \
+  -ltalertesting \
+  -ltalerfakebank \
+  -ltalerbank \
+  -ltalerbanktesting \
+  -ltalerexchange \
+  -ltalerjson \
+  -ltalerutil \
+  -lgnunetjson \
+  -lgnunetcurl \
+  -lgnunetutil \
+  -ljansson
+
 taler_merchant_generate_payments_SOURCES = \
   taler-merchant-generate-payments.c
 
