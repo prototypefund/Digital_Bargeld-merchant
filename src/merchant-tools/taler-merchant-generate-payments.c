@@ -543,7 +543,6 @@ main (int argc,
      bank_url)))
   {
     TALER_LOG_ERROR ("Failed to run the bank\n");
-    terminate_process (bankd);
     terminate_process (merchantd);
     return FAILED_TO_LAUNCH_BANK;
   }

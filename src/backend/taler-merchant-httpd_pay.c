@@ -1316,6 +1316,7 @@ parse_pay (struct MHD_Connection *connection,
   };
   enum GNUNET_DB_QueryStatus qs;
   const char *session_id;
+  struct GNUNET_TIME_Relative used_wire_transfer_delay;
 
   res = TMH_PARSE_json_data (connection,
                              root,
@@ -1452,9 +1453,35 @@ parse_pay (struct MHD_Connection *connection,
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
 
+    /* Use the value from config as default.  */
+    used_wire_transfer_delay = wire_transfer_delay;
+    if (NULL != json_object_get (pc->contract_terms,
+                                 "wire_transfer_delay"))
+    {
+
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "Frontend specified wire transfer delay\n");
+      
+      struct GNUNET_JSON_Specification wspec[] = {
+        GNUNET_JSON_spec_relative_time ("wire_transfer_delay",
+                                        &used_wire_transfer_delay),
+        GNUNET_JSON_spec_end()
+      };
+
+      res = TMH_PARSE_json_data (connection,
+                                 pc->contract_terms,
+                                 wspec);
+      if (GNUNET_YES != res)
+      {
+        GNUNET_JSON_parse_free (spec);
+        GNUNET_break (0);
+        return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
+      }
+    }
+
     pc->wire_transfer_deadline
       = GNUNET_TIME_absolute_add (pc->timestamp,
-                                  wire_transfer_delay);
+                                  used_wire_transfer_delay);
 
     if (pc->wire_transfer_deadline.abs_value_us < pc->refund_deadline.abs_value_us)
     {

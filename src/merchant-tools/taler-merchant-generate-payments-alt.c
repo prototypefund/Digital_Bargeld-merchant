@@ -150,7 +150,7 @@ static char *currency;
                    "%s:5.01", \
                    currency); \
   GNUNET_asprintf (&CURRENCY_5, \
-                   "%s:5.01", \
+                   "%s:5", \
                    currency); \
   GNUNET_asprintf (&CURRENCY_4_99, \
                    "%s:4.99", \
@@ -169,8 +169,9 @@ static char *currency;
        {\"currency\":\"%s\",\
         \"value\":0,\
         \"fraction\":50000000},\
-       \"refund_deadline\":\"\\/Date(99999999999)\\/\",\
-       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"wire_transfer_delay\":\"\\/forever\\/\",\
+       \"refund_deadline\":\"\\/end of time\\/\",\
+       \"pay_deadline\":\"\\/end of time\\/\",\
        \"amount\":\
          {\"currency\":\"%s\",\
           \"value\":5,\
@@ -287,17 +288,21 @@ run (void *cls,
       ("create-reserve-2",
        CURRENCY_10_02),
 
+    TALER_TESTING_cmd_exec_wirewatch
+      ("wirewatch-2",
+       cfg_filename),
+
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-2",
        is->exchange,
-       "create-reserve-1",
+       "create-reserve-2",
        CURRENCY_5,
        MHD_HTTP_OK),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-3",
        is->exchange,
-       "create-reserve-1",
+       "create-reserve-2",
        CURRENCY_5,
        MHD_HTTP_OK),
 
@@ -492,7 +497,6 @@ main (int argc,
      bank_url)))
   {
     TALER_LOG_ERROR ("Failed to run the bank\n");
-    terminate_process (bankd);
     terminate_process (merchantd);
     return FAILED_TO_LAUNCH_BANK;
   }
