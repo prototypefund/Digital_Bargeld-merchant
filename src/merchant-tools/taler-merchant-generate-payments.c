@@ -534,6 +534,7 @@ main (int argc,
   if (NULL == bank_url)
   {
     TALER_LOG_ERROR ("Option -b is mandatory!\n");
+    terminate_process (merchantd);
     return MISSING_BANK_URL;
   }
 
