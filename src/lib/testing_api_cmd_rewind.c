@@ -116,4 +116,3 @@ TALER_TESTING_cmd_rewind_ip
 
   return cmd;
 }
-
