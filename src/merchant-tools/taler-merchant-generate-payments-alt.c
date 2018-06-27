@@ -140,6 +140,9 @@ static char *currency;
   GNUNET_asprintf (&CURRENCY_10_02, \
                    "%s:10.02", \
                    currency); \
+  GNUNET_asprintf (&CURRENCY_10, \
+                   "%s:10", \
+                   currency); \
   GNUNET_asprintf (&CURRENCY_9_98, \
                    "%s:9.98", \
                    currency); \
@@ -209,6 +212,7 @@ run (void *cls,
 
   /* Currency strings.  */
   char *CURRENCY_10_02;
+  char *CURRENCY_10;
   char *CURRENCY_9_98;
   char *CURRENCY_5_01;
   char *CURRENCY_5;
@@ -226,11 +230,11 @@ run (void *cls,
      CURRENCY_0_01);
 
   /* Orders.  */
-  char *order_worth_5;
+  char *order_worth_5_unaggregated;
   char *order_worth_10_2coins;
 
   ALLOCATE_ORDERS
-    (order_worth_5,
+    (order_worth_5_unaggregated,
      order_worth_10_2coins);
 
   /* Will be freed by testing-lib.  */
@@ -260,7 +264,7 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       order_worth_5,
+       order_worth_5_unaggregated,
        NULL),
 
     TALER_TESTING_cmd_pay
@@ -302,7 +306,7 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       order_worth_5_track,
+       order_worth_10_2coins,
        NULL),
 
     TALER_TESTING_cmd_pay

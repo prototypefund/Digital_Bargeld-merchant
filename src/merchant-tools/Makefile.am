@@ -3,7 +3,8 @@ AM_CPPFLAGS = -I$(top_srcdir)/src/include
 
 bin_PROGRAMS = \
   taler-merchant-dbinit \
-  taler-merchant-generate-payments
+  taler-merchant-generate-payments \
+  taler-merchant-generate-payments-alt
 
 taler_merchant_dbinit_SOURCES = \
   taler-merchant-dbinit.c
