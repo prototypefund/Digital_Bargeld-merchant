@@ -59,4 +59,5 @@ src/merchant-tools/taler-merchant-tip-enable
 src/lib/reserve_dkey.priv
 src/lib/reserve_key.priv
 doc/version.texi
-src/merchant-tools/taler-merchant-generate-payments-new
+src/merchant-tools/taler-merchant-generate-payments-alt
+src/merchant-tools/taler-merchant-generate-payments
