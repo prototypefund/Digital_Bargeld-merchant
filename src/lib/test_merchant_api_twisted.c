@@ -544,6 +544,7 @@ run (void *cls,
     CMD_EXEC_AGGREGATOR
       ("aggregation-attempt"),
 
+    /* Make sure NO aggregation took place.  */
     TALER_TESTING_cmd_check_bank_empty
       ("check_bank_unaggregated-b"),
 
