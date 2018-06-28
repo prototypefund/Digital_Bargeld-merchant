@@ -114,6 +114,12 @@ static char *cfg_filename;
  */
 static char *bank_url;
 
+
+/**
+ * Alternative non default instance.
+ */
+static char *alt_instance;
+
 /**
  * Log file.
  */
@@ -169,9 +175,9 @@ static char *currency;
        {\"currency\":\"%s\",\
         \"value\":0,\
         \"fraction\":50000000},\
-       \"wire_transfer_delay\":\"\\/forever\\/\",\
-       \"refund_deadline\":\"\\/end of time\\/\",\
-       \"pay_deadline\":\"\\/end of time\\/\",\
+       \"wire_transfer_delay\":\"\\/Delay(30000)\\/\",\
+       \"refund_deadline\":\"\\/Date(22)\\/\",\
+       \"pay_deadline\":\"\\/Date(1)\\/\",\
        \"amount\":\
          {\"currency\":\"%s\",\
           \"value\":5,\
@@ -266,7 +272,7 @@ run (void *cls,
        is->ctx,
        MHD_HTTP_OK,
        order_worth_5_unaggregated,
-       NULL),
+       alt_instance),
 
     TALER_TESTING_cmd_pay
       ("deposit-unaggregated",
@@ -413,6 +419,15 @@ main (int argc,
        &merchant_url),
 
     GNUNET_GETOPT_option_string
+      ('i',
+       "alt-instance",
+       "AI",
+       "alternative (non default) instance,"
+       " used to provide fresh wire details to"
+       " make unaggregated transactions stay so.",
+       &alt_instance),
+
+    GNUNET_GETOPT_option_string
       ('b',
        "bank-url",
        "BU",
@@ -471,6 +486,12 @@ main (int argc,
     return BAD_CONFIG_FILE;
   }
   GNUNET_CONFIGURATION_destroy (cfg);
+
+  if (NULL == alt_instance)
+  {
+    TALER_LOG_ERROR ("Option -i is mandatory!\n");
+    return MISSING_MERCHANT_URL;
+  }
 
   if (NULL == merchant_url)
   {
