@@ -342,6 +342,7 @@ run (void *cls,
    */
   struct TALER_TESTING_Command unaggregation[] = {
 
+  #if HAVE_TALER_TALER_TWISTER_TESTING_LIB_H
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-unaggregation",
        "EUR:5.01"),
@@ -374,7 +375,7 @@ run (void *cls,
            \"fraction\":50000000},\
         \"refund_deadline\":\"\\/Date(2)\\/\",\
         \"pay_deadline\":\"\\/Date(1)\\/\",\
-        \"wire_transfer_delay\":\"\\/Delay(3)\\/\",\
+        \"wire_transfer_delay\":\"\\/Delay(30000)\\/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
@@ -401,6 +402,8 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_empty
       ("check_bank_unaggregated"),
+
+    #endif /* end of, HAVE_TWISTER */
 
     TALER_TESTING_cmd_end ()
   };

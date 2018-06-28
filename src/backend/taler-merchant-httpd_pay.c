@@ -1455,10 +1455,10 @@ parse_pay (struct MHD_Connection *connection,
 
     /* Use the value from config as default.  */
     used_wire_transfer_delay = wire_transfer_delay;
+
     if (NULL != json_object_get (pc->contract_terms,
                                  "wire_transfer_delay"))
     {
-
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                   "Frontend specified wire transfer delay\n");
       
