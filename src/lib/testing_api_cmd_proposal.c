@@ -322,7 +322,7 @@ proposal_cb (void *cls,
        (ps->ctx,
         ps->merchant_url,
         ps->order_id,
-        "default",
+        ps->instance,
         &ps->nonce,
         &proposal_lookup_initial_cb,
         ps)))
@@ -493,7 +493,7 @@ TALER_TESTING_cmd_proposal (const char *label,
   ps->http_status = http_status;
   ps->ctx = ctx;
   ps->merchant_url = merchant_url;
-  ps->instance = instance;
+  ps->instance = (NULL == instance) ? "default": instance;
 
   cmd.cls = ps;
   cmd.label = label;

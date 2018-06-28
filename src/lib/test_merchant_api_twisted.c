@@ -473,6 +473,83 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
+  /**
+   * This block tests whether a refund_deadline and/or
+   * wire_transfer_deadline very far in the future do NOT
+   * result in any wire transfer from the aggregator (#5366).
+   */
+  struct TALER_TESTING_Command unaggregation[] = {
+
+    CMD_TRANSFER_TO_EXCHANGE
+      ("create-reserve-unaggregation",
+       "EUR:5.01"),
+
+    CMD_EXEC_WIREWATCH
+      ("wirewatch-unaggregation"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-unaggregation",
+       EXCHANGE_URL,
+       "EUR:5.01",
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO),
+
+    TALER_TESTING_cmd_check_bank_empty
+      ("check_bank_unaggregated-a"),
+
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-unaggregation",
+       is->exchange,
+       "create-reserve-unaggregation",
+       "EUR:5",
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-unaggregation",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"refund_deadline\":\"\\/Date(2)\\/\",\
+        \"pay_deadline\":\"\\/Date(1)\\/\",\
+        \"wire_transfer_delay\":\"\\/Delay(30000)\\/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":5,\
+           \"fraction\":0},\
+        \"summary\": \"unaggregated product\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"unaggregated cream\",\
+                         \"value\":\"{EUR:5}\"} ] }",
+        /* Need a fresh instance in order to associate this
+         * proposal with a fresh h_wire;  this way, this proposal
+         * won't get hooked by the aggregator gathering same-H_wire'd
+         * transactions.  */
+        "tor"),
+
+    TALER_TESTING_cmd_pay
+      ("pay-unaggregation",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-proposal-unaggregation",
+       "withdraw-coin-unaggregation",
+       "EUR:5", // amount + fee
+       "EUR:4.99", // amount - fee
+       "EUR:0.01"), // refund fee
+
+    CMD_EXEC_AGGREGATOR
+      ("aggregation-attempt"),
+
+    TALER_TESTING_cmd_check_bank_empty
+      ("check_bank_unaggregated-b"),
+
+    TALER_TESTING_cmd_end ()
+  };
+
   /***** Test transactions tracking *****/
   struct TALER_TESTING_Command track[] = {
 
@@ -492,6 +569,9 @@ run (void *cls,
       ("check_bank_transfer-2",
        EXCHANGE_URL,
        "EUR:2.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+
+    TALER_TESTING_cmd_check_bank_empty
+      ("track_chunk_check_empty-a"),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-1",
                                        is->exchange,
@@ -807,6 +887,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_batch ("history",
                              history),
+
+    TALER_TESTING_cmd_batch ("unaggregation",
+                             unaggregation),
 
     TALER_TESTING_cmd_batch ("track",
                              track),
