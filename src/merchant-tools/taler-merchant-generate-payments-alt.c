@@ -385,7 +385,7 @@ main (int argc,
       (PACKAGE_VERSION " " VCS_VERSION),
 
     GNUNET_GETOPT_option_help
-      ("Generate Taler payments to populate the database(s)"),
+      ("Populate databases with corner case payments"),
 
     GNUNET_GETOPT_option_loglevel
       (&loglev),
@@ -424,7 +424,12 @@ main (int argc,
        "AI",
        "alternative (non default) instance,"
        " used to provide fresh wire details to"
-       " make unaggregated transactions stay so.",
+       " make unaggregated transactions stay so."
+       " Note, this instance will be given far"
+       " future wire deadline, and so it should"
+       " never author now-deadlined transactions,"
+       " as they would get those far future ones"
+       " aggregated too.",
        &alt_instance),
 
     GNUNET_GETOPT_option_string
