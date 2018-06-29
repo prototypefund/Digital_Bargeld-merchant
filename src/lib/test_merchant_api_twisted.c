@@ -649,6 +649,13 @@ run (void *cls,
        EXCHANGE_ACCOUNT_NO,
        MERCHANT_ACCOUNT_NO),
 
+    /**
+     * Fake total to include only one coin.  Math: each 1-EUR
+     * coin contributes 0.99 to the final wire transfer.  The
+     * wire transfer itself drains 0.01-EUR from the total amount.
+     * Therefore, wire transferring 1-EUR coin results in a net
+     * of: 0.99 - 0.01 = 0.98.
+     */
     TALER_TESTING_cmd_modify_object_dl
       ("hack-0",
        PROXY_EXCHANGE_CONFIG_FILE,
