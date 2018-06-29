@@ -476,7 +476,7 @@ main (int argc,
   };
 
   result = GNUNET_GETOPT_run
-    ("taler-merchant-generate-payments-new",
+    ("taler-merchant-generate-payments",
      options,
      argc,
      argv);
@@ -489,7 +489,7 @@ main (int argc,
 
   GNUNET_assert (GNUNET_SYSERR != result);
   loglev = NULL;
-  GNUNET_log_setup ("taler-merchant-generate-payments-new",
+  GNUNET_log_setup ("taler-merchant-generate-payments",
                     loglev,
                     logfile);
 
