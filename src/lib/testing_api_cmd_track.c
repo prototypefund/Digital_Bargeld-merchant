@@ -61,20 +61,10 @@ struct TrackTransactionState
   unsigned int http_status;
 
   /**
-   * Not used at the moment.  FIXME: remove?
-   */
-  const char *transfer_reference;
-
-  /**
    * Reference to a "pay" CMD, used to get the order
    * id to issue the track against.
    */
   const char *pay_reference;
-
-  /**
-   * Not used at the moment.  FIXME: remove?
-   */
-  const char *wire_fee;
 
   /**
    * Subject line of the wire transfer that payed
@@ -472,9 +462,7 @@ TALER_TESTING_cmd_merchant_track_transaction
   tts->merchant_url = merchant_url;
   tts->ctx = ctx;
   tts->http_status = http_status;
-  tts->transfer_reference = transfer_reference;
   tts->pay_reference = pay_reference;
-  tts->wire_fee = wire_fee;
 
   cmd.cls = tts;
   cmd.label = label;

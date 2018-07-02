@@ -73,7 +73,6 @@ rewind_ip_run (void *cls,
 {
   struct RewindIpState *ris = cls;
 
-  /* FIXME: do check if '1<' is good */
   if (1 < *ris->counter)
   {
     is->ip = ris->new_ip;

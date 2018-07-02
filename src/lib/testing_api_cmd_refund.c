@@ -171,7 +171,6 @@ static void
 refund_lookup_cleanup (void *cls,
                        const struct TALER_TESTING_Command *cmd)
 {
-  /* FIXME: make sure no other data must be free'd */
   struct RefundLookupState *rls = cls;
 
   if (NULL != rls->rlo)

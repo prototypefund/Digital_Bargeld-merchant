@@ -36,9 +36,7 @@ struct ProposalState
 {
 
   /**
-   * The order. FIXME: does a glossary exist where
-   * all these terms like 'order', 'proposal', and
-   * 'contract_terms' exist?
+   * The order.
    */
   const char *order;
 
