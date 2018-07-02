@@ -279,7 +279,7 @@ struct PayAbortRefundState
   const char *refund_amount;
 
   /**
-   * The refund fee (FIXME: who pays?  Customer or merchant?).
+   * The refund fee (charged to the merchant).
    */
   const char *refund_fee;
 
@@ -533,7 +533,6 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
 
     icoin = &(*pc)[(*npc)-1];
 
-    /* FIXME: make the two following 'const'. */
     struct TALER_CoinSpendPrivateKeyP *coin_priv; 
     struct TALER_DenominationSignature *denom_sig;
     const struct TALER_Amount *denom_value;
@@ -1595,7 +1594,7 @@ pay_abort_refund_run (void *cls,
  * @param num_coins how many coins are expected to be refunded.
  * @param refund_amount the amount we are going to redeem as
  *        refund.
- * @param refund_fee the refund fee (FIXME: who pay it?)
+ * @param refund_fee the refund fee (merchant pays it)
  * @param http_status expected HTTP response code.
  */
 struct TALER_TESTING_Command
