@@ -76,8 +76,7 @@ struct TrackTransactionState
 
   /**
    * Binary form of @a wtid_str, expected by other commands
-   * in this form.  FIXME: ponder if one of the forms (string
-   * or binary) should be fired from this state.
+   * in this form.
    */
   struct TALER_WireTransferIdentifierRawP wtid;
 
