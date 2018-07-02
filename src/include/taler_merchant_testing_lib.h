@@ -342,9 +342,7 @@ TALER_TESTING_cmd_history (const char *label,
  *        /track/transaction request.
  * @param ctx CURL context.
  * @param http_status expected HTTP response code.
- * @param transfer_reference FIXME not used.
  * @param pay_reference used to retrieve the order id to track.
- * @param wire_fee FIXME not used.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transaction
@@ -352,9 +350,7 @@ TALER_TESTING_cmd_merchant_track_transaction
    const char *merchant_url,
    struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
-   const char *transfer_reference,
-   const char *pay_reference,
-   const char *wire_fee);
+   const char *pay_reference);
 
 /**
  * Define a "track transfer" CMD.
@@ -375,8 +371,7 @@ TALER_TESTING_cmd_merchant_track_transfer
    const char *merchant_url,
    struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
-   const char *check_bank_reference,
-   const char *pay_reference);
+   const char *check_bank_reference);
 
 /* ****** Specific traits supported by this component ******* */
 

@@ -129,10 +129,6 @@ struct TrackTransferState
    */
   const char *check_bank_reference;
 
-  /**
-   * FIXME currently not used.
-   */
-  const char *pay_reference;
 };
 
 /**
@@ -441,9 +437,8 @@ track_transaction_traits (void *cls,
  *        /track/transaction request.
  * @param ctx CURL context.
  * @param http_status expected HTTP response code.
- * @param transfer_reference FIXME not used.
  * @param pay_reference used to retrieve the order id to track.
- * @param wire_fee FIXME not used.
+ * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transaction
@@ -451,9 +446,7 @@ TALER_TESTING_cmd_merchant_track_transaction
    const char *merchant_url,
    struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
-   const char *transfer_reference,
-   const char *pay_reference,
-   const char *wire_fee)
+   const char *pay_reference)
 {
   struct TrackTransactionState *tts;
   struct TALER_TESTING_Command cmd;
@@ -469,7 +462,6 @@ TALER_TESTING_cmd_merchant_track_transaction
   cmd.run = &track_transaction_run;
   cmd.cleanup = &track_transaction_cleanup;
   cmd.traits = &track_transaction_traits;
-  // traits?
 
   return cmd;
 }
@@ -486,7 +478,7 @@ TALER_TESTING_cmd_merchant_track_transaction
  * @param check_bank_reference reference to a "check bank" CMD
  *        that will provide the WTID and exchange URL to issue
  *        the track against.
- * @param pay_reference FIXME not used.
+ * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transfer
@@ -494,8 +486,7 @@ TALER_TESTING_cmd_merchant_track_transfer
    const char *merchant_url,
    struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
-   const char *check_bank_reference,
-   const char *pay_reference)
+   const char *check_bank_reference)
 {
   struct TrackTransferState *tts;
   struct TALER_TESTING_Command cmd;
@@ -505,13 +496,11 @@ TALER_TESTING_cmd_merchant_track_transfer
   tts->ctx = ctx;
   tts->http_status = http_status;
   tts->check_bank_reference = check_bank_reference;
-  tts->pay_reference = pay_reference;
 
   cmd.cls = tts;
   cmd.label = label;
   cmd.run = &track_transfer_run;
   cmd.cleanup = &track_transfer_cleanup;
-  // traits?
 
   return cmd;
 }

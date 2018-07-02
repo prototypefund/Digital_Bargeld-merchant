@@ -342,25 +342,21 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "check_bank_transfer-498c",
-       "deposit-simple",
-       "EUR:0.01"),
+       "deposit-simple"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-1",
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "check_bank_transfer-498c",
-       "deposit-simple"),
+       "check_bank_transfer-498c"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-again",
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "check_bank_transfer-498c",
-       "deposit-simple"),
+       "check_bank_transfer-498c"),
 
     TALER_TESTING_cmd_fakebank_transfer
       ("create-reserve-2",
@@ -429,25 +425,21 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "check_bank_transfer-498c-2",
-       "deposit-simple-2"),
+       "check_bank_transfer-498c-2"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-2-again",
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "check_bank_transfer-498c-2",
-       "deposit-simple-2"),
+       "check_bank_transfer-498c-2"),
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-2",
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "check_bank_transfer-498c-2",
-       "deposit-simple-2",
-       "EUR:0.01"),
+       "deposit-simple-2"),
 
     TALER_TESTING_cmd_history ("history-1",
                                merchant_url,

@@ -363,17 +363,14 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "dummy", // "check bank" CMD, never used, to be deleted.
-       "deposit-simple-2",
-       CURRENCY_0_01),
+       "deposit-simple-2"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-1",
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       "track-transaction-1",
-       "deposit-simple-2"),
+       "track-transaction-1"),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-tracks",
