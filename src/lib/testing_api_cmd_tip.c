@@ -96,9 +96,7 @@ struct TipPickupState
   const char **amounts;
 
   /**
-   * The object version of the above @a amounts. FIXME:
-   * try to remove and run tests to see if other commands
-   * need this data.
+   * The object version of the above @a amounts.
    */
   struct TALER_Amount *amounts_obj;
 
@@ -192,7 +190,8 @@ struct TipQueryState
   const char *expected_amount_authorized;
 
   /**
-   * FIXME: what is this?
+   * Amount that is expected to be still available
+   * from the tip reserve.
    */
   const char *expected_amount_available;
 };
@@ -557,6 +556,12 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
  * @param http_status HTTP status code for this request
  * @param ec Taler-specific error code
  * @param raw raw response body
+ * @param reserve_expiration when the tip reserve will expire
+ * @param reserve_pub tip reserve public key
+ * @param amount_authorized total amount authorized on tip reserve
+ * @param amount_available total amount still available on
+ *        tip reserve
+ * @param amount_picked_up total amount picked up from tip reserve
  */
 static void
 tip_query_cb (void *cls,
@@ -682,7 +687,9 @@ tip_query_run (void *cls,
  *        picked up.
  * @param expected_amount_authorized expected amount that was
  *        authorized in the first place.
- * @param expected_amount_available FIXME what is this?
+ * @param expected_amount_available expected amount which is
+ *        still available from the tip reserve
+ * @return the command
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query_with_amounts
@@ -1056,7 +1063,13 @@ tip_pickup_cleanup (void *cls,
                     const struct TALER_TESTING_Command *cmd)
 {
   struct TipPickupState *tps = cls;
-  /* FIXME:  free elements *in* the state! */
+
+  GNUNET_free_non_null (tps->amounts_obj);
+  GNUNET_free_non_null (tps->dks);
+  GNUNET_free_non_null (tps->psa);
+  GNUNET_free_non_null (tps->withdraws);
+  GNUNET_free_non_null (tps->sigs);
+
   if (NULL != tps->tpo)
   {
     TALER_LOG_WARNING ("Tip-pickup operation"

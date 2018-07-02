@@ -1005,6 +1005,11 @@ struct TALER_MERCHANT_TipQueryOperation;
  * @param http_status HTTP status code for this request
  * @param ec Taler-specific error code
  * @param raw raw response body
+ * @param reserve_expiration when the tip reserve will expire
+ * @param reserve_pub tip reserve public key
+ * @param amount_authorized total amount authorized on tip reserve
+ * @param amount_available total amount still available on tip reserve
+ * @param amount_picked_up total amount picked up from tip reserve
  */
 typedef void
 (*TALER_MERCHANT_TipQueryCallback) (void *cls,
