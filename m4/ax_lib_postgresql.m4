@@ -38,7 +38,6 @@
 # LICENSE
 #
 #   Copyright (c) 2008 Mateusz Loskot <mateusz@loskot.net>
-#   Copyright (c) 2014 Sree Harsha Totakura <sreeharsha@totakura.in>
 #
 #   Copying and distribution of this file, with or without modification, are
 #   permitted in any medium without royalty provided the copyright notice
@@ -81,7 +80,7 @@ AC_DEFUN([AX_LIB_POSTGRESQL],
         fi
 
         if test ! -x "$PG_CONFIG"; then
-            AC_MSG_ERROR([$PG_CONFIG does not exist or it is not an exectuable file])
+            dnl AC_MSG_ERROR([$PG_CONFIG does not exist or it is not an exectuable file])
             PG_CONFIG="no"
             found_postgresql="no"
         fi
@@ -92,7 +91,7 @@ AC_DEFUN([AX_LIB_POSTGRESQL],
             POSTGRESQL_CPPFLAGS="-I`$PG_CONFIG --includedir`"
             POSTGRESQL_LDFLAGS="-L`$PG_CONFIG --libdir`"
 
-            POSTGRESQL_VERSION=`$PG_CONFIG --version | sed -e 's#PostgreSQL ##'`
+            POSTGRESQL_VERSION=`$PG_CONFIG --version | sed -e 's#PostgreSQL ##' | awk '{print $1}'`
 
             AC_DEFINE([HAVE_POSTGRESQL], [1],
                 [Define to 1 if PostgreSQL libraries are available])
@@ -114,7 +113,7 @@ AC_DEFUN([AX_LIB_POSTGRESQL],
 
     if test "$found_postgresql" = "yes" -a -n "$postgresql_version_req"; then
 
-        AC_MSG_CHECKING([if PostgreSQL version is >= $postgresql_version_req])
+        AC_MSG_CHECKING([if PostgreSQL version $POSTGRESQL_VERSION is >= $postgresql_version_req])
 
         dnl Decompose required version string of PostgreSQL
         dnl and calculate its number representation
