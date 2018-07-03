@@ -442,10 +442,9 @@ main (int argc,
     GNUNET_GETOPT_option_version
       (PACKAGE_VERSION " " VCS_VERSION),
 
-    GNUNET_GETOPT_option_string
+    GNUNET_GETOPT_option_flag
       ('h',
        "help",
-       NULL,
        "root help TBW",
        &root_help),
 
