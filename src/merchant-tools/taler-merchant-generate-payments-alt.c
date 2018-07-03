@@ -451,15 +451,12 @@ main (int argc,
 
   result = GNUNET_GETOPT_run
     ("taler-merchant-generate-payments-alt",
-     options,
+     root,
      argc,
      argv);
 
-  if (GNUNET_NO == result)
-  {
-    /* --help or --version were given, just return.  */ 
-    return 0;
-  }
+
+  return 0;
 
   GNUNET_assert (GNUNET_SYSERR != result);
   loglev = NULL;

@@ -69,6 +69,26 @@ enum PaymentGeneratorError {
      USER_LOGIN_NAME, USER_LOGIN_PASS, EXCHANGE_URL)
 
 /**
+ * Help string shown if NO subcommand is given on command line.
+ */
+char *root_help;
+
+/**
+ * Alternative non default instance.
+ */
+static char *alt_instance;
+
+/**
+ * How many unaggregated payments we want to generate.
+ */
+static unsigned int unaggregated_number = 1;
+
+/**
+ * How many payments that use two coins we want to generate.
+ */
+static unsigned int twocoins_number = 1;
+
+/**
  * Exit code.
  */
 static unsigned int result;
@@ -413,7 +433,95 @@ main (int argc,
   default_config_file = GNUNET_OS_project_data_get
     ()->user_config_file;
 
-  struct GNUNET_GETOPT_CommandLineOption options[] = {
+
+  struct GNUNET_GETOPT_CommandLineOption root[] = {
+
+    GNUNET_GETOPT_option_cfgfile
+      (&cfg_filename),
+
+    GNUNET_GETOPT_option_version
+      (PACKAGE_VERSION " " VCS_VERSION),
+
+    GNUNET_GETOPT_option_string
+      ('h',
+       "help",
+       NULL,
+       "root help TBW",
+       &root_help),
+
+    GNUNET_GETOPT_OPTION_END
+  };
+
+  struct GNUNET_GETOPT_CommandLineOption corner[] = {
+
+    GNUNET_GETOPT_option_help
+      ("Populate databases with corner case payments"),
+
+    GNUNET_GETOPT_option_loglevel
+      (&loglev),
+
+    GNUNET_GETOPT_option_uint
+      ('u',
+       "unaggregated-number",
+       "UN",
+       "will generate UN unaggregated payments, defaults to 1",
+       &unaggregated_number),
+
+    GNUNET_GETOPT_option_uint
+      ('t',
+       "two-coins",
+       "TC",
+       "will perform TC 2-coins payments, defaults to 1",
+       &twocoins_number),
+
+    /**
+     * NOTE: useful when the setup serves merchant
+     * backends via unix domain sockets, since there
+     * is no way - yet? - to get the merchant base url.
+     * Clearly, we could introduce a merchant_base_url
+     * value into the configuration.
+     */
+    GNUNET_GETOPT_option_string
+      ('m',
+       "merchant-url",
+       "MU",
+       "merchant base url, mandatory",
+       &merchant_url),
+
+    GNUNET_GETOPT_option_string
+      ('i',
+       "alt-instance",
+       "AI",
+       "alternative (non default) instance,"
+       " used to provide fresh wire details to"
+       " make unaggregated transactions stay so."
+       " Note, this instance will be given far"
+       " future wire deadline, and so it should"
+       " never author now-deadlined transactions,"
+       " as they would get those far future ones"
+       " aggregated too.",
+       &alt_instance),
+
+    GNUNET_GETOPT_option_string
+      ('b',
+       "bank-url",
+       "BU",
+       "bank base url, mandatory",
+       &bank_url),
+
+    GNUNET_GETOPT_option_string
+      ('l',
+       "logfile",
+       "LF",
+       "will log to file LF",
+       &logfile),
+
+    GNUNET_GETOPT_OPTION_END
+
+
+  };
+
+  struct GNUNET_GETOPT_CommandLineOption ordinary[] = {
 
     GNUNET_GETOPT_option_cfgfile
       (&cfg_filename),
@@ -474,15 +582,42 @@ main (int argc,
 
   result = GNUNET_GETOPT_run
     ("taler-merchant-generate-payments",
-     options,
+     root,
      argc,
      argv);
 
+  if (root_help)
+  {
+    fprintf (stderr, "Main/root help string\n"); 
+    return 0; 
+  }
+
   if (GNUNET_NO == result)
   {
-    /* --help or --version were given, just return.  */ 
+    /* --version was given, just return.  */ 
     return 0;
   }
+
+  GNUNET_assert (GNUNET_SYSERR != result);
+
+  /* extract subcommand.  */
+  if (0 == strcmp ("ordinary", argv[result]))
+  {
+    TALER_LOG_DEBUG ("'ordinary' subcommand found\n"); 
+    return 0; // DEBUGGISH 
+  }
+  else if (0 == strcmp ("corner", argv[result]))
+  {
+    TALER_LOG_DEBUG ("'corner' subcommand found\n"); 
+    return 0; // DEBUGGISH 
+  }
+  else
+  {
+    TALER_LOG_ERROR ("Unknown subcommand given.\n"); 
+    return 1;  
+  }
+
+  return 0;
 
   GNUNET_assert (GNUNET_SYSERR != result);
   loglev = NULL;
