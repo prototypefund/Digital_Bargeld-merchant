@@ -62,6 +62,7 @@ enum PaymentGeneratorError {
 
 #define FIRST_INSTRUCTION -1
 #define TRACKS_INSTRUCTION 9
+#define TWOCOINS_INSTRUCTION 5
 
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
    TALER_TESTING_cmd_fakebank_transfer (label, amount, \
@@ -174,14 +175,30 @@ static char *currency;
  * where it is called.
  */
 
-#define ALLOCATE_ORDINARY_AMOUNTS(...) \
+#define ALLOCATE_AMOUNTS(...) \
   char *CURRENCY_10_02; \
+  char *CURRENCY_10; \
+  char *CURRENCY_9_98; \
+  char *CURRENCY_5_01; \
   char *CURRENCY_5; \
   char *CURRENCY_4_99; \
+  char *CURRENCY_0_02; \
   char *CURRENCY_0_01; \
   \
   GNUNET_asprintf (&CURRENCY_10_02, \
                    "%s:10.02", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_10, \
+                   "%s:10", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_9_98, \
+                   "%s:9.98", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_10_02, \
+                   "%s:9.98", \
+                   currency); \
+  GNUNET_asprintf (&CURRENCY_5_01, \
+                   "%s:5.01", \
                    currency); \
   GNUNET_asprintf (&CURRENCY_5, \
                    "%s:5", \
@@ -189,13 +206,18 @@ static char *currency;
   GNUNET_asprintf (&CURRENCY_4_99, \
                    "%s:4.99", \
                    currency); \
+  GNUNET_asprintf (&CURRENCY_0_02, \
+                   "%s:0.02", \
+                   currency); \
   GNUNET_asprintf (&CURRENCY_0_01, \
                    "%s:0.01", \
                    currency);
 
-#define ALLOCATE_ORDINARY_ORDERS(...) \
+#define ALLOCATE_ORDERS(...) \
   char *order_worth_5; \
   char *order_worth_5_track; \
+  char *order_worth_5_unaggregated; \
+  char *order_worth_10_2coins; \
   \
   GNUNET_asprintf \
     (&order_worth_5, \
@@ -234,7 +256,47 @@ static char *currency;
                          \"value\":\"{%s:5}\"} ] }", \
      currency, \
      currency, \
+     currency); \
+  GNUNET_asprintf \
+    (&order_worth_5_unaggregated, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"wire_transfer_delay\":\"\\/Delay(30000)\\/\",\
+       \"refund_deadline\":\"\\/Date(22)\\/\",\
+       \"pay_deadline\":\"\\/Date(1)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":5,\
+          \"fraction\":0},\
+        \"summary\": \"unaggregated deposit!\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"unaggregated cream\",\
+                         \"value\":\"{%s:5}\"} ] }", \
+     currency, \
+     currency, \
+     currency); \
+  GNUNET_asprintf \
+    (&order_worth_10_2coins, \
+     "{\"max_fee\":\
+       {\"currency\":\"%s\",\
+        \"value\":0,\
+        \"fraction\":50000000},\
+       \"refund_deadline\":\"\\/Date(0)\\/\",\
+       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+       \"amount\":\
+         {\"currency\":\"%s\",\
+          \"value\":10,\
+          \"fraction\":0},\
+        \"summary\": \"2-coins payment\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"2-coins payment\",\
+                         \"value\":\"{%s:10}\"} ] }", \
+     currency, \
+     currency, \
      currency);
+
 
 /**
  * Actual commands collection.
@@ -249,15 +311,20 @@ run (void *cls,
     (GNUNET_OK == GNUNET_CURL_append_header
       (is->ctx, APIKEY_SANDBOX));
 
-  ALLOCATE_ORDINARY_AMOUNTS
+  ALLOCATE_AMOUNTS
       (CURRENCY_10_02,
+       CURRENCY_9_98,
+       CURRENCY_5_01,
        CURRENCY_5,
        CURRENCY_4_99,
+       CURRENCY_0_02,
        CURRENCY_0_01);
 
-  ALLOCATE_ORDINARY_ORDERS
+  ALLOCATE_ORDERS
     (order_worth_5,
-     order_worth_5_track);
+     order_worth_5_track,
+     order_worth_5_unaggregated,
+     order_worth_10_2coins);
 
   struct TALER_TESTING_Command ordinary_commands[] = {
 
@@ -358,6 +425,101 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
+  struct TALER_TESTING_Command corner_commands[] = {
+
+    CMD_TRANSFER_TO_EXCHANGE
+      ("create-reserve-1",
+       CURRENCY_5_01),
+
+    TALER_TESTING_cmd_exec_wirewatch
+      ("wirewatch-1",
+       cfg_filename),
+
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-1",
+       is->exchange,
+       "create-reserve-1",
+       CURRENCY_5,
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_proposal
+      ("create-unaggregated-proposal",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       order_worth_5_unaggregated,
+       alt_instance),
+
+    TALER_TESTING_cmd_pay
+      ("deposit-unaggregated",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-unaggregated-proposal",
+       "withdraw-coin-1",
+       CURRENCY_5,
+       CURRENCY_4_99,
+       CURRENCY_0_01),
+
+    TALER_TESTING_cmd_rewind_ip
+      ("rewind-unaggregated",
+       FIRST_INSTRUCTION,
+       &unaggregated_number),
+
+    CMD_TRANSFER_TO_EXCHANGE
+      ("create-reserve-2",
+       CURRENCY_10_02),
+
+    TALER_TESTING_cmd_exec_wirewatch
+      ("wirewatch-2",
+       cfg_filename),
+
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-2",
+       is->exchange,
+       "create-reserve-2",
+       CURRENCY_5,
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-3",
+       is->exchange,
+       "create-reserve-2",
+       CURRENCY_5,
+       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_proposal
+      ("create-twocoins-proposal",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       order_worth_10_2coins,
+       NULL),
+
+    TALER_TESTING_cmd_pay
+      ("deposit-twocoins",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "create-twocoins-proposal",
+       "withdraw-coin-2;withdraw-coin-3",
+       CURRENCY_10,
+       CURRENCY_9_98,
+       CURRENCY_0_02),
+
+    TALER_TESTING_cmd_exec_aggregator
+      ("aggregate-twocoins",
+       cfg_filename),
+
+    TALER_TESTING_cmd_rewind_ip
+      ("rewind-twocoins",
+       TWOCOINS_INSTRUCTION,
+       &twocoins_number),
+
+    TALER_TESTING_cmd_end ()
+  };
+
+
   if (GNUNET_OK == ordinary)
     TALER_TESTING_run (is,
                        ordinary_commands);
@@ -367,7 +529,8 @@ run (void *cls,
                        corner_commands);
   TALER_LOG_ERROR ("Neither ordinary or corner payments"
                    " were specified to be run.\n");
-  return 1;
+
+  result = 1;
 }
 
 /**
@@ -604,8 +767,6 @@ main (int argc,
     TALER_LOG_ERROR ("Unknown subcommand given.\n"); 
     return 1;  
   }
-
-  return 0;
 
   if (NULL == cfg_filename)
     cfg_filename = (char *) default_config_file;
