@@ -567,7 +567,7 @@ main (int argc,
                     loglev,
                     logfile);
 
-  struct GNUNET_GETOPT_CommandLineOption root[] = {
+  struct GNUNET_GETOPT_CommandLineOption root_options[] = {
 
     GNUNET_GETOPT_option_cfgfile
       (&cfg_filename),
@@ -711,61 +711,42 @@ main (int argc,
     GNUNET_GETOPT_OPTION_END
   };
 
-  result = GNUNET_GETOPT_run
+  if (GNUNET_SYSERR != (result = GNUNET_GETOPT_run
     ("taler-merchant-benchmark",
-     root,
+     root_options,
      argc,
-     argv);
-
-  GNUNET_assert (GNUNET_SYSERR != result);
-
-  if (GNUNET_OK == root_help && (NULL == argv[result]))
+     argv)) && (NULL == argv[result]))
   {
-    fprintf (stderr, root_help_str); 
-    return 0; 
-  }
+    if (GNUNET_YES == root_help)
+      fprintf (stderr, root_help_str);
 
-  if (GNUNET_NO == result)
-  {
-    /* --version was given, just return.  */ 
+    /* either --version or "root" --help at this point.  */
     return 0;
   }
 
-  /* extract subcommand.  */
-  if (0 == strcmp ("ordinary", argv[result]))
-  {
-    TALER_LOG_DEBUG ("'ordinary' subcommand found\n"); 
-
-    ordinary = GNUNET_OK;
-    result = GNUNET_GETOPT_run
+  if ((GNUNET_SYSERR != (result = GNUNET_GETOPT_run
       ("taler-merchant-benchmark",
        ordinary_options,
        argc,
-       argv);
-    GNUNET_assert (GNUNET_SYSERR != result);
-    if (GNUNET_NO == result)
-      /* --help was given.  */
-      return 0;
-  }
-  else if (0 == strcmp ("corner", argv[result]))
+       argv))) && (0 == strcmp ("ordinary", argv[result])))
   {
-    TALER_LOG_DEBUG ("'corner' subcommand found\n"); 
+    ordinary = 1; 
+  }
 
-    corner = GNUNET_OK;
-    result = GNUNET_GETOPT_run
+  if ((GNUNET_SYSERR != (result = GNUNET_GETOPT_run
       ("taler-merchant-benchmark",
        corner_options,
        argc,
-       argv);
-    GNUNET_assert (GNUNET_SYSERR != result);
-    if (GNUNET_NO == result)
-      /* --help was given.  */
-      return 0;
-  }
-  else
+       argv))) && (0 == strcmp ("corner", argv[result])))
   {
-    TALER_LOG_ERROR ("Unknown subcommand given.\n"); 
-    return 1;  
+    corner = 1; 
+  }
+
+  if ((GNUNET_YES != ordinary) && (GNUNET_YES != corner))
+  {
+    TALER_LOG_ERROR
+      ("Neither 'ordinary' or 'corner' were given\n");
+    return 1;
   }
 
   if (NULL == cfg_filename)
