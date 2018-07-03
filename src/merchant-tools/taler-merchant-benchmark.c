@@ -174,15 +174,14 @@ static char *currency;
  * where it is called.
  */
 
-#define ALLOCATE_AMOUNTS(...) \
-  GNUNET_asprintf (&CURRENCY_25_05, \
-                   "%s:25.05", \
-                   currency); \
-  GNUNET_asprintf (&CURRENCY_10, \
-                   "%s:10", \
-                   currency); \
-  GNUNET_asprintf (&CURRENCY_9_98, \
-                   "%s:9.98", \
+#define ALLOCATE_ORDINARY_AMOUNTS(...) \
+  char *CURRENCY_10_02; \
+  char *CURRENCY_5; \
+  char *CURRENCY_4_99; \
+  char *CURRENCY_0_01; \
+  \
+  GNUNET_asprintf (&CURRENCY_10_02, \
+                   "%s:10.02", \
                    currency); \
   GNUNET_asprintf (&CURRENCY_5, \
                    "%s:5", \
@@ -190,14 +189,14 @@ static char *currency;
   GNUNET_asprintf (&CURRENCY_4_99, \
                    "%s:4.99", \
                    currency); \
-  GNUNET_asprintf (&CURRENCY_0_02, \
-                   "%s:0.02", \
-                   currency); \
   GNUNET_asprintf (&CURRENCY_0_01, \
                    "%s:0.01", \
                    currency);
 
-#define ALLOCATE_ORDERS(...) \
+#define ALLOCATE_ORDINARY_ORDERS(...) \
+  char *order_worth_5; \
+  char *order_worth_5_track; \
+  \
   GNUNET_asprintf \
     (&order_worth_5, \
      "{\"max_fee\":\
@@ -214,25 +213,6 @@ static char *currency;
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{%s:5}\"} ] }", \
-     currency, \
-     currency, \
-     currency); \
-  GNUNET_asprintf \
-    (&order_worth_10_2coins, \
-     "{\"max_fee\":\
-       {\"currency\":\"%s\",\
-        \"value\":0,\
-        \"fraction\":50000000},\
-       \"refund_deadline\":\"\\/Date(0)\\/\",\
-       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-       \"amount\":\
-         {\"currency\":\"%s\",\
-          \"value\":10,\
-          \"fraction\":0},\
-        \"summary\": \"2-coins untracked payment\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"2-coins payment\",\
-                         \"value\":\"{%s:10}\"} ] }", \
      currency, \
      currency, \
      currency); \
@@ -254,25 +234,6 @@ static char *currency;
                          \"value\":\"{%s:5}\"} ] }", \
      currency, \
      currency, \
-     currency); \
-  GNUNET_asprintf \
-    (&order_worth_5_unaggregated, \
-     "{\"max_fee\":\
-       {\"currency\":\"%s\",\
-        \"value\":0,\
-        \"fraction\":50000000},\
-       \"refund_deadline\":\"\\/Date(0)\\/\",\
-       \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
-       \"amount\":\
-         {\"currency\":\"%s\",\
-          \"value\":5,\
-          \"fraction\":0},\
-        \"summary\": \"unaggregated deposit!\",\
-        \"fulfillment_url\": \"https://example.com/\",\
-        \"products\": [ {\"description\":\"unaggregated cream\",\
-                         \"value\":\"{%s:5}\"} ] }", \
-     currency, \
-     currency, \
      currency);
 
 /**
@@ -283,47 +244,26 @@ run (void *cls,
      struct TALER_TESTING_Interpreter *is)
 {
 
-  /* Currency strings.  */
-  char *CURRENCY_25_05;
-  char *CURRENCY_10;
-  char *CURRENCY_9_98;
-  char *CURRENCY_5;
-  char *CURRENCY_4_99;
-  char *CURRENCY_0_02;
-  char *CURRENCY_0_01;
-
-  ALLOCATE_AMOUNTS
-    (CURRENCY_25_05,
-     CURRENCY_10,
-     CURRENCY_9_98,
-     CURRENCY_5,
-     CURRENCY_4_99,
-     CURRENCY_0_02,
-     CURRENCY_0_01);
-
-
-  /* Orders.  */
-  char *order_worth_5;
-  char *order_worth_10_2coins;
-  char *order_worth_5_track;
-  char *order_worth_5_unaggregated;
-
-  ALLOCATE_ORDERS
-    (order_worth_5,
-     order_worth_10_2coins,
-     order_worth_5_track,
-     order_worth_5_unaggregated);
-
   /* Will be freed by testing-lib.  */
   GNUNET_assert
     (GNUNET_OK == GNUNET_CURL_append_header
       (is->ctx, APIKEY_SANDBOX));
 
-  struct TALER_TESTING_Command corner_commands[] = {
+  ALLOCATE_ORDINARY_AMOUNTS
+      (CURRENCY_10_02,
+       CURRENCY_5,
+       CURRENCY_4_99,
+       CURRENCY_0_01);
+
+  ALLOCATE_ORDINARY_ORDERS
+    (order_worth_5,
+     order_worth_5_track);
+
+  struct TALER_TESTING_Command ordinary_commands[] = {
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-1",
-       CURRENCY_25_05),
+       CURRENCY_10_02),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
