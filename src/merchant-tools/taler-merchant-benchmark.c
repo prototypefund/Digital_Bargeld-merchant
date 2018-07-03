@@ -74,6 +74,16 @@ enum PaymentGeneratorError {
 int root_help;
 
 /**
+ * Witnesses if the ordinary cases payment suite should be run.
+ */
+unsigned int ordinary;
+
+/**
+ * Witnesses if the corner cases payment suite should be run.
+ */
+unsigned int corner;
+
+/**
  * Root help string.
  */
 char *root_help_str = \
@@ -309,7 +319,7 @@ run (void *cls,
     (GNUNET_OK == GNUNET_CURL_append_header
       (is->ctx, APIKEY_SANDBOX));
 
-  struct TALER_TESTING_Command commands[] = {
+  struct TALER_TESTING_Command corner_commands[] = {
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-1",
@@ -408,8 +418,16 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
-  TALER_TESTING_run (is,
-                     commands);
+  if (GNUNET_OK == ordinary)
+    TALER_TESTING_run (is,
+                       ordinary_commands);
+
+  if (GNUNET_OK == corner)
+    TALER_TESTING_run (is,
+                       corner_commands);
+  TALER_LOG_ERROR ("Neither ordinary or corner payments"
+                   " were specified to be run.\n");
+  return 1;
 }
 
 /**
@@ -596,7 +614,6 @@ main (int argc,
      argc,
      argv);
 
-
   GNUNET_assert (GNUNET_SYSERR != result);
 
   if (GNUNET_OK == root_help && (NULL == argv[result]))
@@ -616,23 +633,31 @@ main (int argc,
   {
     TALER_LOG_DEBUG ("'ordinary' subcommand found\n"); 
 
+    ordinary = GNUNET_OK;
     result = GNUNET_GETOPT_run
       ("taler-merchant-benchmark",
        ordinary_options,
        argc,
        argv);
-    return 0; // DEBUGGISH 
+    GNUNET_assert (GNUNET_SYSERR != result);
+    if (GNUNET_NO == result)
+      /* --help was given.  */
+      return 0;
   }
   else if (0 == strcmp ("corner", argv[result]))
   {
     TALER_LOG_DEBUG ("'corner' subcommand found\n"); 
 
+    corner = GNUNET_OK;
     result = GNUNET_GETOPT_run
       ("taler-merchant-benchmark",
        corner_options,
        argc,
        argv);
-    return 0; // DEBUGGISH 
+    GNUNET_assert (GNUNET_SYSERR != result);
+    if (GNUNET_NO == result)
+      /* --help was given.  */
+      return 0;
   }
   else
   {
