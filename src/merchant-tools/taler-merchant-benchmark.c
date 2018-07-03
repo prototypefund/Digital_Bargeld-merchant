@@ -194,9 +194,6 @@ static char *currency;
   GNUNET_asprintf (&CURRENCY_9_98, \
                    "%s:9.98", \
                    currency); \
-  GNUNET_asprintf (&CURRENCY_10_02, \
-                   "%s:9.98", \
-                   currency); \
   GNUNET_asprintf (&CURRENCY_5_01, \
                    "%s:5.01", \
                    currency); \
