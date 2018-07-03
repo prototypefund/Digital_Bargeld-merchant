@@ -71,7 +71,15 @@ enum PaymentGeneratorError {
 /**
  * Help string shown if NO subcommand is given on command line.
  */
-char *root_help;
+int root_help;
+
+/**
+ * Root help string.
+ */
+char *root_help_str = \
+  "taler-merchant-benchmark\nPopulates production database"
+  " with fake payments.\nMust be used with either 'ordinary'"
+  " or 'corner' sub-commands.\n";
 
 /**
  * Alternative non default instance.
@@ -433,6 +441,10 @@ main (int argc,
   default_config_file = GNUNET_OS_project_data_get
     ()->user_config_file;
 
+  loglev = NULL;
+  GNUNET_log_setup ("taler-merchant-benchmark",
+                    loglev,
+                    logfile);
 
   struct GNUNET_GETOPT_CommandLineOption root[] = {
 
@@ -445,13 +457,13 @@ main (int argc,
     GNUNET_GETOPT_option_flag
       ('h',
        "help",
-       "root help TBW",
+       NULL,
        &root_help),
 
     GNUNET_GETOPT_OPTION_END
   };
 
-  struct GNUNET_GETOPT_CommandLineOption corner[] = {
+  struct GNUNET_GETOPT_CommandLineOption corner_options[] = {
 
     GNUNET_GETOPT_option_help
       ("Populate databases with corner case payments"),
@@ -516,11 +528,9 @@ main (int argc,
        &logfile),
 
     GNUNET_GETOPT_OPTION_END
-
-
   };
 
-  struct GNUNET_GETOPT_CommandLineOption ordinary[] = {
+  struct GNUNET_GETOPT_CommandLineOption ordinary_options[] = {
 
     GNUNET_GETOPT_option_cfgfile
       (&cfg_filename),
@@ -529,7 +539,8 @@ main (int argc,
       (PACKAGE_VERSION " " VCS_VERSION),
 
     GNUNET_GETOPT_option_help
-      ("Generate Taler payments to populate the database(s)"),
+      ("Generate Taler ordinary payments"
+       " to populate the databases"),
 
     GNUNET_GETOPT_option_loglevel
       (&loglev),
@@ -580,14 +591,17 @@ main (int argc,
   };
 
   result = GNUNET_GETOPT_run
-    ("taler-merchant-generate-payments",
+    ("taler-merchant-benchmark",
      root,
      argc,
      argv);
 
-  if (root_help)
+
+  GNUNET_assert (GNUNET_SYSERR != result);
+
+  if (GNUNET_OK == root_help && (NULL == argv[result]))
   {
-    fprintf (stderr, "Main/root help string\n"); 
+    fprintf (stderr, root_help_str); 
     return 0; 
   }
 
@@ -597,17 +611,27 @@ main (int argc,
     return 0;
   }
 
-  GNUNET_assert (GNUNET_SYSERR != result);
-
   /* extract subcommand.  */
   if (0 == strcmp ("ordinary", argv[result]))
   {
     TALER_LOG_DEBUG ("'ordinary' subcommand found\n"); 
+
+    result = GNUNET_GETOPT_run
+      ("taler-merchant-benchmark",
+       ordinary_options,
+       argc,
+       argv);
     return 0; // DEBUGGISH 
   }
   else if (0 == strcmp ("corner", argv[result]))
   {
     TALER_LOG_DEBUG ("'corner' subcommand found\n"); 
+
+    result = GNUNET_GETOPT_run
+      ("taler-merchant-benchmark",
+       corner_options,
+       argc,
+       argv);
     return 0; // DEBUGGISH 
   }
   else
@@ -617,12 +641,6 @@ main (int argc,
   }
 
   return 0;
-
-  GNUNET_assert (GNUNET_SYSERR != result);
-  loglev = NULL;
-  GNUNET_log_setup ("taler-merchant-generate-payments",
-                    loglev,
-                    logfile);
 
   if (NULL == cfg_filename)
     cfg_filename = (char *) default_config_file;
