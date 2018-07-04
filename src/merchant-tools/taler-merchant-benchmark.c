@@ -564,6 +564,8 @@ main (int argc,
                     loglev,
                     logfile);
 
+  struct GNUNET_GETOPT_CommandLineOption *options;
+
   struct GNUNET_GETOPT_CommandLineOption root_options[] = {
 
     GNUNET_GETOPT_option_cfgfile
@@ -707,42 +709,46 @@ main (int argc,
 
     GNUNET_GETOPT_OPTION_END
   };
+  
+  options = root_options;
+  if (0 == strcmp ("ordinary", argv[1]))
+  {
+    ordinary = GNUNET_YES;
+    options = ordinary_options;
+  }
+  if (0 == strcmp ("corner", argv[1]))
+  {
+    corner = GNUNET_YES;
+    options = corner_options;
+  }
 
   if (GNUNET_SYSERR != (result = GNUNET_GETOPT_run
-    ("taler-merchant-benchmark",
-     root_options,
-     argc,
-     argv)) && (NULL == argv[result]))
+      ("taler-merchant-benchmark",
+       options,
+       argc,
+       argv))) 
   {
+
     if (GNUNET_YES == root_help)
-      fprintf (stderr, root_help_str);
+    {
+      fprintf (stdout, root_help_str);
+      return 0;
+    }
 
-    /* either --version or "root" --help at this point.  */
-    return 0;
+    /* --help was given.  */
+    if (0 == result) 
+      return 0;
   }
 
-  if ((GNUNET_SYSERR != (result = GNUNET_GETOPT_run
-      ("taler-merchant-benchmark",
-       ordinary_options,
-       argc,
-       argv))) && (0 == strcmp ("ordinary", argv[result])))
+  if (-1 == result)
   {
-    ordinary = 1; 
+    return 1;
   }
 
-  if ((GNUNET_SYSERR != (result = GNUNET_GETOPT_run
-      ("taler-merchant-benchmark",
-       corner_options,
-       argc,
-       argv))) && (0 == strcmp ("corner", argv[result])))
+  if ((GNUNET_YES == corner) && (NULL == alt_instance))
   {
-    corner = 1; 
-  }
-
-  if ((GNUNET_YES != ordinary) && (GNUNET_YES != corner))
-  {
-    TALER_LOG_ERROR
-      ("Neither 'ordinary' or 'corner' were given\n");
+    fprintf (stderr, "option '-i' is mandatory"
+                     " with sub-command 'corner'!\n");
     return 1;
   }
 
