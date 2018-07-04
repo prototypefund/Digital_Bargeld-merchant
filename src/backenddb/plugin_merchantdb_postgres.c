@@ -744,7 +744,7 @@ postgres_start (void *cls,
  * @param cls the `struct PostgresClosure` with the plugin-specific state
  * @return #GNUNET_OK on success
  */
-void
+static void
 postgres_rollback (void *cls)
 {
   struct PostgresClosure *pg = cls;
@@ -1077,7 +1077,7 @@ postgres_insert_order (void *cls,
  *        if payment was not session-bound
  * @return transaction status
  */
-enum GNUNET_DB_QueryStatus
+static enum GNUNET_DB_QueryStatus
 postgres_mark_proposal_paid (void *cls,
                              const struct GNUNET_HashCode *h_contract_terms,
                              const struct TALER_MerchantPublicKeyP *merchant_pub,
@@ -1510,7 +1510,7 @@ find_tip_authorizations_cb (void *cls,
  *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if the reserve_priv
  *      does not identify a known tipping reserve
  */
-enum GNUNET_DB_QueryStatus
+static enum GNUNET_DB_QueryStatus
 postgres_get_authorized_tip_amount (void *cls,
                                     const struct TALER_ReservePrivateKeyP *reserve_priv,
                                     struct TALER_Amount *authorized_amount)
@@ -2252,7 +2252,7 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
  * @param refund how much this coin is refunding
  * @param refund_fee refund fee for this coin
  */
-enum GNUNET_DB_QueryStatus
+static enum GNUNET_DB_QueryStatus
 insert_refund (void *cls,
                const struct TALER_MerchantPublicKeyP *merchant_pub,
                const struct GNUNET_HashCode *h_contract_terms,

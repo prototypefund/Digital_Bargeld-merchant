@@ -460,7 +460,7 @@ abort_deposit (struct PayContext *pc)
  * @param pc payment context
  * @return the mhd response
  */
-struct MHD_Response *
+static struct MHD_Response *
 sign_success_response (struct PayContext *pc)
 {
   json_t *refunds;

@@ -268,7 +268,7 @@ TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation
 /**
  * Process GET /refund response
  */
-void
+static void
 handle_refund_lookup_finished (void *cls,
                                long response_code,
                                const json_t *json)

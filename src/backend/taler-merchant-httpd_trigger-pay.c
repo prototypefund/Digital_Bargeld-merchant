@@ -41,7 +41,7 @@
  * @param response response that receives the header
  * @param header_name name of the header to set
  */
-void
+static void
 add_header_from_arg (struct MHD_Connection *connection, const char *arg_name,
                      struct MHD_Response *response, const char *header_name)
 {
