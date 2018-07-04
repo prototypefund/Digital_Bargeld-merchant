@@ -61,3 +61,4 @@ src/lib/reserve_key.priv
 doc/version.texi
 src/merchant-tools/taler-merchant-generate-payments-alt
 src/merchant-tools/taler-merchant-generate-payments
+src/merchant-tools/taler-merchant-benchmark
