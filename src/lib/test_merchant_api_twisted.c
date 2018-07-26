@@ -670,9 +670,7 @@ run (void *cls,
        twister_merchant_url,
        is->ctx,
        MHD_HTTP_FAILED_DEPENDENCY,
-       "check_bank_transfer-1",
-       "deposit-simple",
-       "EUR:0.01"), // ignored
+       "deposit-simple"),
 
     TALER_TESTING_cmd_end ()
   };
