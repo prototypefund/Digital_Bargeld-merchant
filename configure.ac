@@ -234,7 +234,7 @@ AS_CASE([$with_twister],
          CPPFLAGS="-I$with_twister/include $CPPFLAGS"])
 
 AC_CHECK_HEADERS([taler/taler_twister_testing_lib.h],
- [AC_CHECK_LIB([talertwistertesting], [TALER_TESTING_run_twister], twistertesting=1)],
+ [AC_CHECK_LIB([talertwistertesting], [TALER_TESTING_run_twister], twistertesting=1,, [-ltalerexchange -ltalerbank])],
    [], [#ifdef HAVE_GNUNET_PLATFORM_H
         #include <gnunet/platform.h>
        #endif])
