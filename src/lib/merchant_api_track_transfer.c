@@ -179,6 +179,9 @@ handle_track_transfer_finished (void *cls,
     GNUNET_break_op (0);
     response_code = 0;
     break;
+  case MHD_HTTP_FAILED_DEPENDENCY:
+    /* Not a reason to break execution.  */ 
+    break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */

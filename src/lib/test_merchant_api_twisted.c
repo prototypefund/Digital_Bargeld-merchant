@@ -551,6 +551,88 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
+  /***** Test #5383 *****/
+  struct TALER_TESTING_Command track_5383[] = {
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-5383",
+                              "EUR:2.02"),
+    CMD_EXEC_WIREWATCH ("wirewatch-5383"),
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_bank_transfer-5383",
+       EXCHANGE_URL,
+       "EUR:2.02",
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO),
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-5383a",
+       is->exchange,
+       "create-reserve-5383",
+       "EUR:1",
+       MHD_HTTP_OK),
+    TALER_TESTING_cmd_withdraw_amount
+      ("withdraw-coin-5383b",
+       is->exchange,
+       "create-reserve-5383",
+       "EUR:1",
+       MHD_HTTP_OK),
+    TALER_TESTING_cmd_proposal
+      ("create-proposal-5383",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"5383\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":2,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:2}\"} ] }",
+        NULL),
+    TALER_TESTING_cmd_pay ("deposit-simple-5383",
+                           twister_merchant_url,
+                           is->ctx,
+                           MHD_HTTP_OK,
+                           "create-proposal-5383",
+                           "withdraw-coin-5383a;" \
+                           "withdraw-coin-5383b",
+                           "EUR:2",
+                           "EUR:1.99", // no sense now
+                           "EUR:0.01"), // no sense now
+    CMD_EXEC_AGGREGATOR ("run-aggregator-5383"),
+    TALER_TESTING_cmd_check_bank_transfer
+      ("check_aggregation_transfer-5383",
+       twister_exchange_url, /* has the 8888-port thing.  */
+       /* paid,         1.97 =
+          brutto        2.00 -
+          deposit fee   0.01 * 2 -
+          wire fee      0.01
+       */
+       "EUR:1.97",
+       EXCHANGE_ACCOUNT_NO,
+       MERCHANT_ACCOUNT_NO),
+    TALER_TESTING_cmd_modify_object_dl
+      ("hack-5383",
+       PROXY_EXCHANGE_CONFIG_FILE,
+       "total",
+       "EUR:0.98"),
+    TALER_TESTING_cmd_merchant_track_transfer
+      ("track-5383",
+       twister_merchant_url,
+       is->ctx,
+       MHD_HTTP_FAILED_DEPENDENCY,
+       "check_aggregation_transfer-5383"),
+
+    TALER_TESTING_cmd_end ()
+  };
+
+
   /***** Test transactions tracking *****/
   struct TALER_TESTING_Command track[] = {
 
@@ -899,6 +981,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_batch ("track",
                              track),
+
+    TALER_TESTING_cmd_batch ("track-5383",
+                             track_5383),
 
     TALER_TESTING_cmd_batch ("pay",
                              pay),
