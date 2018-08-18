@@ -1461,7 +1461,7 @@ parse_pay (struct MHD_Connection *connection,
     {
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                   "Frontend specified wire transfer delay\n");
-      
+
       struct GNUNET_JSON_Specification wspec[] = {
         GNUNET_JSON_spec_relative_time ("wire_transfer_delay",
                                         &used_wire_transfer_delay),
@@ -1687,6 +1687,17 @@ begin_transaction (struct PayContext *pc)
 
   GNUNET_assert (GNUNET_YES == pc->suspended);
 
+  /* Init. some price accumulators.  */
+  GNUNET_break (GNUNET_OK ==
+		TALER_amount_get_zero (pc->amount.currency,
+				       &pc->total_paid));
+  GNUNET_break (GNUNET_OK ==
+		TALER_amount_get_zero (pc->amount.currency,
+				       &pc->total_fees_paid));
+  GNUNET_break (GNUNET_OK ==
+		TALER_amount_get_zero (pc->amount.currency,
+				       &pc->total_refunded));
+
   /* First, try to see if we have all we need already done */
   db->preflight (db->cls);
   if (GNUNET_OK !=
@@ -1700,17 +1711,6 @@ begin_transaction (struct PayContext *pc)
 			   "Merchant database error (could not start transaction)");
     return;
   }
-
-  /* Init. some price accumulators.  */
-  GNUNET_break (GNUNET_OK ==
-		TALER_amount_get_zero (pc->amount.currency,
-				       &pc->total_paid));
-  GNUNET_break (GNUNET_OK ==
-		TALER_amount_get_zero (pc->amount.currency,
-				       &pc->total_fees_paid));
-  GNUNET_break (GNUNET_OK ==
-		TALER_amount_get_zero (pc->amount.currency,
-				       &pc->total_refunded));
 
   /* Check if some of these coins already succeeded for _this_ contract.  */
   qs = db->find_payments (db->cls,
@@ -1828,9 +1828,9 @@ begin_transaction (struct PayContext *pc)
     qs = db->commit (db->cls);
     if (0 > qs)
     {
+      db->rollback (db->cls);
       if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
       {
-	db->rollback (db->cls);
 	begin_transaction (pc);
 	return;
       }
@@ -1926,6 +1926,8 @@ begin_transaction (struct PayContext *pc)
                                    pc->session_id);
       if (0 <= qs)
 	qs = db->commit (db->cls);
+      else
+        db->rollback (db->cls);
       if (0 > qs)
       {
 	if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
