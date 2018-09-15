@@ -4971,7 +4971,8 @@ run (void *cls)
   GNUNET_assert (NULL != (exchange
     = TALER_EXCHANGE_connect (ctx,
                               EXCHANGE_URL,
-                              &cert_cb, is,
+                              &cert_cb,
+                              is,
                               TALER_EXCHANGE_OPTION_END)));
   timeout_task
     = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_relative_multiply
