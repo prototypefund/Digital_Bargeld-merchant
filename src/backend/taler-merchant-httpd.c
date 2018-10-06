@@ -777,8 +777,18 @@ wireformat_iterator_cb (void *cls,
   }
   else /* need to generate JSON */
   {
-    j = TALER_JSON_wire_signature_make (payto,
-                                        NULL);
+    struct GNUNET_HashCode salt;
+    char *salt_str;
+
+    GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_NONCE,
+                                &salt,
+                                sizeof (salt));
+    salt_str = GNUNET_STRINGS_data_to_string_alloc (&salt,
+                                                    sizeof (salt));
+    j = json_pack ("{s:s, s:s}",
+                   "url", payto,
+                   "salt", salt_str);
+    GNUNET_free (salt_str);
     if (0 != json_dump_file (j,
                              fn,
                              JSON_COMPACT | JSON_SORT_KEYS))
@@ -796,8 +806,8 @@ wireformat_iterator_cb (void *cls,
   GNUNET_free (fn);
 
   if (GNUNET_OK !=
-      TALER_JSON_wire_signature_hash (j,
-                                      &h_wire))
+      TALER_JSON_merchant_wire_signature_hash (j,
+                                               &h_wire))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to hash wire input\n");
