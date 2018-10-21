@@ -112,13 +112,8 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
 
       }
       for (unsigned int k=0;j<ai->num_denom_keys;k++)
-      {
-        unsigned int off = ai->denom_key_offsets[k];
-
-        GNUNET_assert (off < keys->num_denom_keys);
-        if (&keys->denom_keys[off] == dk)
+        if (&keys->denom_keys[k] == dk)
           return GNUNET_OK;
-      }
     }
   }
   GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
