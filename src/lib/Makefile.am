@@ -56,6 +56,7 @@ libtalermerchanttesting_la_SOURCES = \
   testing_api_trait_refund_entry.c
 
 libtalermerchanttesting_la_LIBADD = \
+  libtalermerchant.la \
   -ltalerexchange \
   -ltalerjson \
   -ltalerutil \
