@@ -91,6 +91,11 @@ static char *merchant_url;
 static char *exchange_url;
 
 /**
+ * Auditor URL; fixes FTBFS.
+ */
+static char *auditor_url;
+
+/**
  * Merchant process.
  */
 static struct GNUNET_OS_Process *merchantd;
@@ -1053,6 +1058,7 @@ main (int argc,
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
   switch (TALER_TESTING_prepare_exchange (CONFIG_FILE,
+                                          &auditor_url,
                                           &exchange_url))
   {
   case GNUNET_SYSERR:

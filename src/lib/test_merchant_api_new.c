@@ -72,6 +72,11 @@ static struct GNUNET_OS_Process *merchantd;
 static char *exchange_url;
 
 /**
+ * Auditor base URL; only used to fix FTBFS.
+ */
+static char *auditor_url;
+
+/**
  * Account number of the exchange at the bank.
  */
 #define EXCHANGE_ACCOUNT_NO 2
@@ -1108,6 +1113,7 @@ main (int argc,
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
   switch (TALER_TESTING_prepare_exchange (CONFIG_FILE,
+                                          &auditor_url,
                                           &exchange_url))
   {
   case GNUNET_SYSERR:
