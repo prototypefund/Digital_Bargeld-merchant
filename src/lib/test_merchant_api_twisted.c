@@ -1,21 +1,21 @@
-/*
-  This file is part of TALER
-  Copyright (C) 2014-2018 Taler Systems SA
-
-  TALER is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as
-  published by the Free Software Foundation; either version 3, or
-  (at your option) any later version.
-
-  TALER is distributed in the hope that it will be useful, but
-  WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public
-  License along with TALER; see the file COPYING.  If not, see
-  <http://www.gnu.org/licenses/>
-*/
+/**
+ * This file is part of TALER
+ * Copyright (C) 2014-2018 Taler Systems SA
+ *
+ * TALER is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 3, or
+ * (at your option) any later version.
+ *
+ * TALER is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public
+ * License along with TALER; see the file COPYING.  If not, see
+ * <http://www.gnu.org/licenses/>
+ */
 
 /**
  * @file exchange/test_merchant_api_twisted.c
@@ -736,8 +736,15 @@ run (void *cls,
      * coin contributes 0.99 to the final wire transfer.  The
      * wire transfer itself drains 0.01-EUR from the total amount.
      * Therefore, wire transferring 1-EUR coin results in a net
-     * of: 0.99 - 0.01 = 0.98.
-     */
+     * of: 0.99 - 0.01 = 0.98. */
+
+    /**
+     * NOTE: the following two hacks aim at modifying the
+     * communication between the merchant and the exchange.
+     * In particular, they are supposed to modify the call
+     * to /track/transfer issued from the merchant to the
+     * exchange that happens _before_ the call to /track/transaction
+     * issued below by the test case (to the merchant backend.) */
     TALER_TESTING_cmd_modify_object_dl
       ("hack-0",
        PROXY_EXCHANGE_CONFIG_FILE,
