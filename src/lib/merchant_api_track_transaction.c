@@ -76,9 +76,10 @@ struct TALER_MERCHANT_TrackTransactionHandle
 static void
 handle_track_transaction_finished (void *cls,
                                    long response_code,
-                                   const json_t *json)
+                                   const void *response)
 {
   struct TALER_MERCHANT_TrackTransactionHandle *tdo = cls;
+  const json_t *json = response;
 
   tdo->job = NULL;
   switch (response_code)

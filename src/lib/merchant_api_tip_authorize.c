@@ -123,9 +123,10 @@ check_ok (struct TALER_MERCHANT_TipAuthorizeOperation *tao,
 static void
 handle_tip_authorize_finished (void *cls,
                                long response_code,
-                               const json_t *json)
+                               const void *response)
 {
   struct TALER_MERCHANT_TipAuthorizeOperation *tao = cls;
+  const json_t *json = response;
 
   tao->job = NULL;
   switch (response_code)

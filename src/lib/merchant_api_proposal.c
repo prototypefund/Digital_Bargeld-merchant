@@ -122,10 +122,12 @@ struct TALER_MERCHANT_ProposalLookupOperation
 static void
 handle_proposal_finished (void *cls,
                           long response_code,
-                          const json_t *json)
+                          const void *response)
 {
   struct TALER_MERCHANT_ProposalOperation *po = cls;
   const char *order_id;
+  const json_t *json = response;
+
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_string ("order_id",
                              &order_id),
@@ -264,12 +266,14 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
 static void
 handle_proposal_lookup_finished (void *cls,
                                  long response_code,
-                                 const json_t *json)
+                                 const void *response)
 {
   struct TALER_MERCHANT_ProposalLookupOperation *plo = cls;
   json_t *contract_terms;
   struct TALER_MerchantSignatureP sig;
   struct GNUNET_HashCode hash;
+  const json_t *json = response;
+
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_json ("contract_terms",
                            &contract_terms),

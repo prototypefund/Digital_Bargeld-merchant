@@ -106,12 +106,13 @@ struct TALER_MERCHANT_RefundIncreaseOperation
 static void
 handle_refund_increase_finished (void *cls,
                                  long response_code,
-                                 const json_t *json)
+                                 const void *response)
 {
   struct TALER_MERCHANT_RefundIncreaseOperation *rio = cls;
   char *error;
   char *hint;
   enum TALER_ErrorCode code;
+  const json_t *json = response;
 
   rio->job = NULL;
   switch (response_code)
@@ -271,11 +272,12 @@ TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation
 static void
 handle_refund_lookup_finished (void *cls,
                                long response_code,
-                               const json_t *json)
+                               const void *response)
 {
   struct TALER_MERCHANT_RefundLookupOperation *rlo = cls;
   char *error;
   enum TALER_ErrorCode code;
+  const json_t *json = response;
 
   rlo->job = NULL;
   switch (response_code)

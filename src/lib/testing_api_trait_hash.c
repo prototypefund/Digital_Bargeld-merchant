@@ -52,7 +52,7 @@ TALER_TESTING_get_trait_tip_id
    struct GNUNET_HashCode **tip_id)
 {
   return cmd->traits (cmd->cls,
-                      (void **) tip_id,
+                      (const void **) tip_id,
                       TALER_TESTING_TRAIT_TIP_ID,
                       index);
 }
@@ -96,7 +96,7 @@ TALER_TESTING_get_trait_h_contract_terms
    const struct GNUNET_HashCode **h_contract_terms)
 {
   return cmd->traits (cmd->cls,
-                      (void **) h_contract_terms,
+                      (const void **) h_contract_terms,
                       TALER_TESTING_TRAIT_H_CONTRACT_TERMS,
                       index);
 }

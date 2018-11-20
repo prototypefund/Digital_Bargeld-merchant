@@ -44,7 +44,7 @@ TALER_TESTING_get_trait_planchet_secrets
    struct TALER_PlanchetSecretsP **planchet_secrets)
 {
   return cmd->traits (cmd->cls,
-                      (void **) planchet_secrets,
+                      (const void **) planchet_secrets,
                       TALER_TESTING_TRAIT_PLANCHET_SECRETS,
                       index);
 }

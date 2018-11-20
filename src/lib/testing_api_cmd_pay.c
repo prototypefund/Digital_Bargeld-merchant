@@ -533,8 +533,8 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
 
     icoin = &(*pc)[(*npc)-1];
 
-    struct TALER_CoinSpendPrivateKeyP *coin_priv; 
-    struct TALER_DenominationSignature *denom_sig;
+    const struct TALER_CoinSpendPrivateKeyP *coin_priv; 
+    const struct TALER_DenominationSignature *denom_sig;
     const struct TALER_Amount *denom_value;
     const struct TALER_EXCHANGE_DenomPublicKey *denom_pub;
 
@@ -770,7 +770,7 @@ _pay_run (const char *merchant_url,
 {
   json_t *ct;
   const struct TALER_TESTING_Command *proposal_cmd;
-  const char *contract_terms;
+  const json_t *contract_terms;
   const char *order_id;
   struct GNUNET_TIME_Absolute refund_deadline;
   struct GNUNET_TIME_Absolute pay_deadline;
@@ -804,15 +804,6 @@ _pay_run (const char *merchant_url,
     return NULL;
   }
 
-  json_error_t error;
-  if (NULL ==
-     (ct = json_loads (contract_terms,
-                       JSON_COMPACT,
-                       &error)))
-  {
-    GNUNET_break (0);
-    return NULL;
-  }
   /* Get information that needs to be put verbatim in the
    * deposit permission */
   struct GNUNET_JSON_Specification spec[] = {
@@ -835,7 +826,7 @@ _pay_run (const char *merchant_url,
     GNUNET_JSON_spec_end()
   };
   if (GNUNET_OK !=
-      GNUNET_JSON_parse (ct,
+      GNUNET_JSON_parse (contract_terms,
                          spec,
                          &error_name,
                          &error_line))
@@ -844,7 +835,9 @@ _pay_run (const char *merchant_url,
                 "Parser failed on %s:%u\n",
                 error_name,
                 error_line);
-    fprintf (stderr, "%s\n", contract_terms);
+    fprintf (stderr, "%s\n",
+             json_dumps (contract_terms,
+                         JSON_INDENT (1)));
     GNUNET_break_op (0);
     json_decref (ct);
     return NULL;
@@ -977,7 +970,7 @@ pay_cleanup (void *cls,
  */
 static int
 pay_traits (void *cls,
-            void **ret,
+            const void **ret,
             const char *trait,
             unsigned int index)
 {
@@ -1187,7 +1180,7 @@ pay_abort_run (void *cls,
  */
 static int
 pay_abort_traits (void *cls,
-                  void **ret,
+                  const void **ret,
                   const char *trait,
                   unsigned int index)
 {
@@ -1530,7 +1523,7 @@ pay_abort_refund_run (void *cls,
   struct TALER_Amount refund_fee;
   struct TALER_Amount refund_amount;
   const struct TALER_MERCHANT_RefundEntry *refund_entry;
-  unsigned int *num_refunds;
+  const unsigned int *num_refunds;
   const struct TALER_TESTING_Command *abort_cmd;
   const struct GNUNET_CRYPTO_EddsaPublicKey *merchant_pub;
   const struct GNUNET_HashCode *h_contract_terms;

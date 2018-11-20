@@ -47,7 +47,7 @@ TALER_TESTING_get_trait_refund_entry
    const struct TALER_MERCHANT_RefundEntry **refund_entry)
 {
   return cmd->traits (cmd->cls,
-                      (void **) refund_entry,
+                      (const void **) refund_entry,
                       TALER_TESTING_TRAIT_REFUND_ENTRY,
                       index);
 }

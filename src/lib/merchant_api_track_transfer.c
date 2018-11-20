@@ -159,9 +159,10 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
 static void
 handle_track_transfer_finished (void *cls,
                                 long response_code,
-                                const json_t *json)
+                                const void *response)
 {
   struct TALER_MERCHANT_TrackTransferHandle *tdo = cls;
+  const json_t *json = response;
 
   tdo->job = NULL;
   switch (response_code)

@@ -51,7 +51,7 @@ TALER_TESTING_get_trait_proposal_reference
    const char **proposal_reference)
 {
   return cmd->traits (cmd->cls,
-                      (void **) proposal_reference,
+                      (const void **) proposal_reference,
                       TALER_TESTING_TRAIT_PROPOSAL_REFERENCE,
                       index);
 }
@@ -104,7 +104,7 @@ TALER_TESTING_get_trait_coin_reference
    const char **coin_reference)
 {
   return cmd->traits (cmd->cls,
-                      (void **) coin_reference,
+                      (const void **) coin_reference,
                       TALER_TESTING_TRAIT_COIN_REFERENCE,
                       index);
 }

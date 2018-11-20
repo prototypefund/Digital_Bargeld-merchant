@@ -350,7 +350,7 @@ refund_lookup_cb (void *cls,
        NULL != icoin_reference;
        icoin_reference = strtok (NULL, ";"))
   {
-    struct TALER_CoinSpendPrivateKeyP *icoin_priv;
+    const struct TALER_CoinSpendPrivateKeyP *icoin_priv;
     struct TALER_CoinSpendPublicKeyP icoin_pub;
     struct GNUNET_HashCode h_icoin_pub;
     struct TALER_Amount *iamount;
@@ -477,7 +477,7 @@ refund_lookup_run (void *cls,
  */
 static int
 refund_increase_traits (void *cls,
-                        void **ret,
+                        const void **ret,
                         const char *trait,
                         unsigned int index)
 {

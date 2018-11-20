@@ -156,9 +156,10 @@ check_ok (struct TALER_MERCHANT_TipPickupOperation *tpo,
 static void
 handle_tip_pickup_finished (void *cls,
                             long response_code,
-                            const json_t *json)
+                            const void *response)
 {
   struct TALER_MERCHANT_TipPickupOperation *tpo = cls;
+  const json_t *json = response;
 
   tpo->job = NULL;
   switch (response_code)

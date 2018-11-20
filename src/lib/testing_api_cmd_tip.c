@@ -347,7 +347,7 @@ tip_authorize_cb (void *cls,
  */
 static int
 tip_authorize_traits (void *cls,
-                      void **ret,
+                      const void **ret,
                       const char *trait,
                       unsigned int index)
 {
@@ -970,7 +970,7 @@ tip_pickup_run (void *cls,
   }
   else
   {
-    unsigned int *np;
+    const unsigned int *np;
     if ( NULL == /* looking for "parent" tip-pickup command */
        ( replay_cmd = TALER_TESTING_interpreter_lookup_command
          (is, tps->replay_reference)) )
@@ -1093,7 +1093,7 @@ tip_pickup_cleanup (void *cls,
  */
 static int
 tip_pickup_traits (void *cls,
-                   void **ret,
+                   const void **ret,
                    const char *trait,
                    unsigned int index)
 {

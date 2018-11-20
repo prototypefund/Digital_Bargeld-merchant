@@ -45,7 +45,7 @@ TALER_TESTING_get_trait_merchant_sig
    struct TALER_MerchantSignatureP **merchant_sig)
 {
   return cmd->traits (cmd->cls,
-                      (void **) merchant_sig,
+                      (const void **) merchant_sig,
                       TALER_TESTING_TRAIT_MERCHANT_SIG,
                       index);
 }

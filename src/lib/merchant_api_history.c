@@ -91,9 +91,10 @@ TALER_MERCHANT_history_cancel (struct TALER_MERCHANT_HistoryOperation *ho)
 static void
 history_raw_cb (void *cls,
                 long response_code,
-                const json_t *json)
+                const void *response)
 {
   struct TALER_MERCHANT_HistoryOperation *ho = cls;
+  const json_t *json = response;
 
   ho->job = NULL;
   switch (response_code)

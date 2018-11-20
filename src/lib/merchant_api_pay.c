@@ -321,9 +321,10 @@ check_forbidden (struct TALER_MERCHANT_Pay *ph,
 static void
 handle_pay_finished (void *cls,
                      long response_code,
-                     const json_t *json)
+                     const void *response)
 {
   struct TALER_MERCHANT_Pay *ph = cls;
+  const json_t *json = response;
 
   ph->job = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,

@@ -268,7 +268,7 @@ track_transfer_run (void *cls,
                     struct TALER_TESTING_Interpreter *is)
 {
   struct TrackTransferState *tts = cls;
-  struct TALER_WireTransferIdentifierRawP *wtid;
+  const struct TALER_WireTransferIdentifierRawP *wtid;
   const struct TALER_TESTING_Command *check_bank_cmd;
   const char *exchange_url;
 
@@ -399,7 +399,7 @@ track_transaction_cleanup (void *cls,
  */
 static int
 track_transaction_traits (void *cls,
-                          void **ret,
+                          const void **ret,
                           const char *trait,
                           unsigned int index)
 {

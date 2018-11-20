@@ -131,9 +131,10 @@ check_ok (struct TALER_MERCHANT_TipQueryOperation *tqo,
 static void
 handle_tip_query_finished (void *cls,
                             long response_code,
-                            const json_t *json)
+                            const void *response)
 {
   struct TALER_MERCHANT_TipQueryOperation *tqo = cls;
+  const json_t *json = response;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Got /tip-query response with status code %u\n",

@@ -53,7 +53,7 @@ struct ProposalState
   /**
    * Contract terms obtained from the backend.
    */
-  const char *contract_terms;
+  json_t *contract_terms;
 
   /**
    * Contract terms hash code.
@@ -165,7 +165,7 @@ struct ProposalLookupState
  */
 static int
 proposal_traits (void *cls,
-                 void **ret,
+                 const void **ret,
                  const char *trait,
                  unsigned int index)
 {
@@ -222,8 +222,7 @@ proposal_lookup_initial_cb
   if (ps->http_status != http_status)
     TALER_TESTING_FAIL (ps->is);
 
-  ps->contract_terms = json_dumps (contract_terms,
-                                   JSON_COMPACT);
+  ps->contract_terms = json_deep_copy (contract_terms);
   ps->h_contract_terms = *hash;
   ps->merchant_sig = *sig;
 
@@ -244,7 +243,10 @@ proposal_lookup_initial_cb
                 "Parser failed on %s:%u\n",
                 error_name,
                 error_line);
-    fprintf (stderr, "%s\n", ps->contract_terms);
+    fprintf (stderr,
+             "%s\n",
+             json_dumps (ps->contract_terms,
+                         JSON_INDENT (1)));
     TALER_TESTING_FAIL (ps->is);
   }
 
@@ -433,8 +435,8 @@ proposal_cleanup (void *cls,
     ps->plo = NULL;
   }
 
+  json_decref (ps->contract_terms);
   GNUNET_free_non_null ((void *) ps->order_id);
-  GNUNET_free_non_null ((void *) ps->contract_terms);
   GNUNET_free (ps);
 }
 

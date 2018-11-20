@@ -75,11 +75,12 @@ struct TALER_MERCHANT_CheckPaymentOperation
 static void
 handle_check_payment_finished (void *cls,
                                long response_code,
-                               const json_t *json)
+                               const void *response)
 {
   struct TALER_MERCHANT_CheckPaymentOperation *cpo = cls;
   struct TALER_Amount refund_amount = { 0 };
   int refunded;
+  const json_t *json = response;
   
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_boolean ("refunded",
