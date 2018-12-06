@@ -30,17 +30,6 @@
 #include "taler_merchant_testing_lib.h"
 
 /**
- * Obtain the URL to use for an API request.
- *
- * @param h the exchange handle to query
- * @param path Taler API path (i.e. "/reserve/withdraw")
- * @return the full URL to use with cURL
- */
-char *
-MAH_path_to_url (struct TALER_EXCHANGE_Handle *h,
-                 const char *path);
-
-/**
  * State for a /tip-pickup CMD.
  */
 struct TipPickupState
@@ -958,7 +947,7 @@ tip_pickup_run (void *cls,
   const struct GNUNET_HashCode *tip_id;
 
   tps->is = is;
-  tps->exchange_url = MAH_path_to_url (tps->exchange, "/");
+  tps->exchange_url = TALER_EXCHANGE_get_base_url (tps->exchange);
   if (NULL == tps->replay_reference)
   {
     replay_cmd = NULL;
