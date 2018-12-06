@@ -104,34 +104,6 @@ AC_CHECK_HEADERS([gnunet/gnunet_pq_lib.h],
        #endif])
 AM_CONDITIONAL(HAVE_GNUNETPQ, test x$libgnunetpq = x1)
 
-
-
-# Check for Taler's libtalerfakebank
-libtalerfakebank=0
-AC_MSG_CHECKING([for libtalerfakebank])
-AC_ARG_WITH(exchange,
-            [AS_HELP_STRING([--with-exchange=PFX], [base of Taler EXCHANGE installation])],
-            [AC_MSG_RESULT([given as $with_exchange])],
-            [AC_MSG_RESULT(not given)
-             with_exchange=yes])
-AS_CASE([$with_exchange],
-        [yes], [],
-        [no], [AC_MSG_ERROR([--with-exchange is required])],
-        [LDFLAGS="-L$with_exchange/lib $LDFLAGS"
-         CPPFLAGS="-I$with_exchange/include $CPPFLAGS $POSTGRESQL_CPPFLAGS"])
-
-CPPFLAGS="$CPPFLAGS $POSTGRESQL_CPPFLAGS"
-LDFLAGS="$LDFLAGS -L/usr/local/lib"
-
-AC_CHECK_HEADERS([taler/taler_fakebank_lib.h],
- [AC_CHECK_LIB([talerfakebank], [TALER_FAKEBANK_start], libtalerfakebank=1)],
-   [], [#ifdef HAVE_GNUNET_PLATFORM_H
-        #include <gnunet/platform.h>
-       #endif])
-AM_CONDITIONAL(HAVE_TALERFAKEBANK, test x$libtalerfakebank = x1)
-
-
-
 # check for libmicrohttpd
 microhttpd=0
 AC_MSG_CHECKING([for microhttpd])
@@ -175,28 +147,20 @@ fi
 
 # libcurl-gnutls
 LIBCURL_CHECK_CONFIG(,7.34.0,[curl=true],[curl=false])
-if test "x$curl" = xtrue
-then
- AC_CHECK_HEADERS([curl/curl.h],
-   AC_CHECK_DECLS(CURLINFO_TLS_SESSION,[curl=true],[curl=false],[[#include <curl/curl.h>]]),
-   [curl=false])
- # need libcurl-gnutls.so, everything else is not acceptable
- AC_CHECK_LIB([curl-gnutls],[curl_easy_getinfo],,[curl=false])
- # cURL must support CURLINFO_TLS_SESSION, version >= 7.34
-
-fi
-if test x$curl = xfalse
-then
-	AM_CONDITIONAL(HAVE_LIBCURL, false)
-if test "x$gnurl" = "x0"
-then
-	AC_MSG_WARN([GNUnet requires libcurl-gnutls  >= 7.34])
-fi
-else
-	AM_CONDITIONAL(HAVE_LIBCURL, true)
-	AC_DEFINE([HAVE_LIBCURL],[1],[Have CURL])
-fi
-
+AS_IF([test "x$curl" = xtrue],
+      [LDFLAGS="-L$with_libcurl/lib $LDFLAGS"
+       CPPFLAGS="-I$with_libcurl/include $CPPFLAGS"
+       AC_CHECK_HEADERS([curl/curl.h],
+                        [AC_CHECK_DECLS(CURLINFO_TLS_SESSION,
+                         [curl=true],
+                         [curl=false],
+                         [[#include <curl/curl.h>]])],
+                        [curl=false])
+       # need libcurl-gnutls.so, everything else is not acceptable
+       AC_CHECK_LIB([curl-gnutls],
+                    [curl_easy_getinfo],,
+                    [curl=false])])
+       # cURL must support CURLINFO_TLS_SESSION, version >= 7.34
 
 # Check for curl/curl.h and gnurl/curl.h so we can use #ifdef
 # HAVE_CURL_CURL_H later (the above LIBCURL_CHECK_CONFIG accepted
@@ -206,18 +170,43 @@ AC_CHECK_HEADERS([curl/curl.h],,
   AC_CHECK_HEADERS([gnurl/curl.h],,
   gnurl=false))
 
-
 # libgnurl
-if test "x$gnurl" = "x0"
-then
-  if test "x$curl" = "x0"
-  then
-    AC_MSG_NOTICE([NOTICE: libgnurl not found.  http client support will not be compiled.])
-    AC_MSG_WARN([ERROR: libgnurl not found.  hostlist daemon will not be compiled, and you probably WANT the hostlist daemon])
-  else
-    AC_MSG_NOTICE([WARNING: libgnurl not found, trying to use libcurl-gnutls instead.])
-  fi
-fi
+AS_IF([test "x$gnurl" = "x0"],
+      [AS_IF([test "x$curl" = "x0"],
+              [AC_MSG_NOTICE([NOTICE: libgnurl not found. taler-bank support will not be compiled.])],
+              [AC_MSG_NOTICE([WARNING: libgnurl not found, trying to use libcurl-gnutls instead.])])])
+
+AS_IF([test x$curl = xfalse],
+       [AM_CONDITIONAL(HAVE_LIBCURL, false)
+        AS_IF([test "x$gnurl" = "x0"],
+              [AC_MSG_WARN([GNU Taler requires libcurl-gnutls  >= 7.34])])],
+       [AM_CONDITIONAL(HAVE_LIBCURL, true)
+	AC_DEFINE([HAVE_LIBCURL],[1],[Have CURL])])
+
+# Check for Taler's libtalerfakebank
+libtalerfakebank=0
+AC_MSG_CHECKING([for libtalerfakebank])
+AC_ARG_WITH(exchange,
+            [AS_HELP_STRING([--with-exchange=PFX], [base of Taler EXCHANGE installation])],
+            [AC_MSG_RESULT([given as $with_exchange])],
+            [AC_MSG_RESULT(not given)
+             with_exchange=yes])
+AS_CASE([$with_exchange],
+        [yes], [],
+        [no], [AC_MSG_ERROR([--with-exchange is required])],
+        [LDFLAGS="-L$with_exchange/lib $LDFLAGS"
+         CPPFLAGS="-I$with_exchange/include $CPPFLAGS $POSTGRESQL_CPPFLAGS"])
+
+CPPFLAGS="$CPPFLAGS $POSTGRESQL_CPPFLAGS"
+LDFLAGS="$LDFLAGS -L/usr/local/lib"
+
+AC_CHECK_HEADERS([taler/taler_fakebank_lib.h],
+ [AC_CHECK_LIB([talerfakebank], [TALER_FAKEBANK_start], libtalerfakebank=1)],
+   [], [#ifdef HAVE_GNUNET_PLATFORM_H
+        #include <gnunet/platform.h>
+       #endif])
+AM_CONDITIONAL(HAVE_TALERFAKEBANK, test x$libtalerfakebank = x1)
+
 
 # check for libtalertwistertesting
 twistertesting=0
