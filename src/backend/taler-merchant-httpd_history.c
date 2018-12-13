@@ -128,7 +128,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   unsigned long long seconds;
   struct MerchantInstance *mi;
   unsigned long long start = UINT64_MAX;
-  unsigned int delta;
+  long long delta;
   enum GNUNET_DB_QueryStatus qs;
   struct ProcessContractClosure pcc;
 
@@ -234,14 +234,14 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   if (NULL != str)
   {
     if (1 != sscanf (str,
-		     "%u",
+		     "%lld",
 		     &delta))
       return TMH_RESPONSE_reply_arg_invalid (connection,
                                              TALER_EC_PARAMETER_MALFORMED,
                                              "delta");
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Querying history back to %s, start: %lld, delta: %u\n",
+              "Querying history back to %s, start: %lld, delta: %lld\n",
               GNUNET_STRINGS_absolute_time_to_string (date),
               start,
               delta);
@@ -252,8 +252,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                                   date,
                                                   &mi->pubkey,
                                                   start,
-                                                  delta,
-                                                  GNUNET_NO,
+                                                  llabs (delta),
+                                                  delta < 0 ? GNUNET_YES : GNUNET_NO,
                                                   &pd_cb,
                                                   &pcc);
   if ( (0 > qs) ||

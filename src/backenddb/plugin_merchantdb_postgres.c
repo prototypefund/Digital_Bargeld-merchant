@@ -441,23 +441,23 @@ postgres_initialize (void *cls)
                             ",row_id"
                             " FROM merchant_contract_terms"
                             " WHERE"
-                            " timestamp<$1"
+                            " timestamp>$1"
                             " AND merchant_pub=$2"
-                            " AND row_id<$3"
+                            " AND row_id>$3"
                             " AND paid=TRUE"
                             " ORDER BY row_id DESC, timestamp DESC"
                             " LIMIT $4",
                             4),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_future",
+    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past",
                             "SELECT"
                             " contract_terms"
                             ",order_id"
                             ",row_id"
                             " FROM merchant_contract_terms"
                             " WHERE"
-                            " timestamp>$1"
+                            " timestamp<$1"
                             " AND merchant_pub=$2"
-                            " AND row_id>$3"
+                            " AND row_id<$3"
                             " AND paid=TRUE"
                             " ORDER BY row_id DESC, timestamp DESC"
                             " LIMIT $4",
@@ -1364,7 +1364,7 @@ find_contracts_cb (void *cls,
  * furtherly older records, and so on. Alternatively, you can use always
  * the same timestamp and just go behind in history by tuning `start`.
  * @param nrows only nrows rows are returned.
- * @param future if set to #GNUNET_YES, retrieves rows younger than `date`.
+ * @param past if set to #GNUNET_YES, retrieves rows older than `date`.
  * This is tipically used to show live updates on the merchant's backoffice
  * Web interface.
  * @param cb function to call with transaction data, can be NULL.
@@ -1377,7 +1377,7 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
 						const struct TALER_MerchantPublicKeyP *merchant_pub,
 						uint64_t start,
 						uint64_t nrows,
-						int future,
+						int past,
 						TALER_MERCHANTDB_ProposalDataCallback cb,
 						void *cb_cls)
 {
@@ -1398,8 +1398,8 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "DB serving /history with date %s\n",
               GNUNET_STRINGS_absolute_time_to_string (date));
-  if (GNUNET_YES == future)
-    stmt = "find_contract_terms_by_date_and_range_future";
+  if (GNUNET_YES == past)
+    stmt = "find_contract_terms_by_date_and_range_past";
   else
     stmt = "find_contract_terms_by_date_and_range";
   check_connection (pg);

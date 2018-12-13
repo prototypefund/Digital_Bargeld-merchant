@@ -775,8 +775,8 @@ struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                         const char *backend_url,
                         const char *instance,
-                        unsigned int start,
-                        unsigned int delta,
+                        unsigned long long start,
+                        long long delta,
                         struct GNUNET_TIME_Absolute date,
                         TALER_MERCHANT_HistoryOperationCallback history_cb,
                         void *history_cb_cls);

@@ -309,18 +309,18 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Return proposals whose timestamp are older than `date`.
+   * Return proposals whose timestamps are younger than `date`.
    * Among those proposals, only those ones being between the
    * start-th and (start-nrows)-th record are returned.  The rows
    * are sorted having the youngest first.
    *
    * @param cls our plugin handle.
-   * @param date only results older than this date are returned.
+   * @param date only results younger than this date are returned.
    * @param merchant_pub instance's public key; only rows related to this
    * instance are returned.
    * @param start only rows with serial id less than start are returned.
    * @param nrows only nrows rows are returned.
-   * @param future if set to #GNUNET_YES, retrieves rows younger than `date`.
+   * @param past if set to #GNUNET_YES, retrieves rows older than `date`.
    * This is typically used to show live updates on the merchant's backoffice
    * @param cb function to call with transaction data, can be NULL.
    * @param cb_cls closure for @a cb
@@ -332,7 +332,7 @@ struct TALER_MERCHANTDB_Plugin
 					    const struct TALER_MerchantPublicKeyP *merchant_pub,
 					    uint64_t start,
 					    uint64_t nrows,
-					    int future,
+					    int past,
 					    TALER_MERCHANTDB_ProposalDataCallback cb,
 					    void *cb_cls);
 

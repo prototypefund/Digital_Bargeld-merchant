@@ -76,12 +76,12 @@ struct HistoryState
   /**
    * First row index we want in the results.
    */
-  unsigned int start;
+  unsigned long long start;
 
   /**
    * How many rows we want the response to contain, at most.
    */
-  unsigned int nrows;
+  long long nrows;
 
   /**
    * Expected number of history entries returned by the
@@ -265,7 +265,7 @@ history_run (void *cls,
                                         hs->merchant_url,
                                         "default",
                                         hs->start,
-                                        hs->nrows,
+                                        (-1) * hs->nrows,
                                         hs->time,
                                         &history_cb,
                                         hs)))
@@ -294,8 +294,8 @@ TALER_TESTING_cmd_history (const char *label,
                            unsigned int http_status,
                            struct GNUNET_TIME_Absolute time,
                            unsigned int nresult,
-                           unsigned int start,
-                           unsigned int nrows)
+                           unsigned long long start,
+                           long long nrows)
 {
   struct HistoryState *hs;
   struct TALER_TESTING_Command cmd;

@@ -904,7 +904,7 @@ run (void *cls)
 							 &merchant_pub,
 							 2,
 							 1,
-							 GNUNET_NO,
+							 GNUNET_YES,
 							 &pd_cb,
 							 NULL));
   timestamp = GNUNET_TIME_absolute_get ();
@@ -934,7 +934,7 @@ run (void *cls)
 							 &merchant_pub,
 							 0,
 							 5,
-							 GNUNET_YES,
+							 GNUNET_NO,
 							 &pd_cb,
 							 NULL));
 

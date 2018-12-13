@@ -331,8 +331,8 @@ TALER_TESTING_cmd_history (const char *label,
                            unsigned int http_status,
                            struct GNUNET_TIME_Absolute time,
                            unsigned int nresult,
-                           unsigned int start,
-                           unsigned int nrows);
+                           unsigned long long start,
+                           long long nrows);
 
 /**
  * Define a "track transaction" CMD.
