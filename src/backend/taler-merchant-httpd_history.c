@@ -127,7 +127,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   int ret;
   unsigned long long seconds;
   struct MerchantInstance *mi;
-  int start = -1;
+  unsigned long long start = UINT64_MAX;
   unsigned int delta;
   enum GNUNET_DB_QueryStatus qs;
   struct ProcessContractClosure pcc;
@@ -217,9 +217,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   if (NULL != str)
   {
     if ( (1 != sscanf (str,
-		       "%d",
-		       &start)) ||
-         (0 > start) )
+		       "%llu",
+		       &start)))
     {
       json_decref (response);
       return TMH_RESPONSE_reply_arg_invalid (connection,
@@ -242,29 +241,21 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                              "delta");
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Querying history back to %s, start: %u, delta: %u\n",
+              "Querying history back to %s, start: %lld, delta: %u\n",
               GNUNET_STRINGS_absolute_time_to_string (date),
               start,
               delta);
 
   pcc.response = response;
   pcc.failure = GNUNET_NO;
-  if (0 > start)
-    qs = db->find_contract_terms_by_date (db->cls,
-					  date,
-					  &mi->pubkey,
-					  delta,
-					  &pd_cb,
-					  &pcc);
-  else
-    qs = db->find_contract_terms_by_date_and_range (db->cls,
-						    date,
-						    &mi->pubkey,
-						    (unsigned int) start,
-						    delta,
-						    GNUNET_NO,
-						    &pd_cb,
-						    &pcc);
+  qs = db->find_contract_terms_by_date_and_range (db->cls,
+                                                  date,
+                                                  &mi->pubkey,
+                                                  start,
+                                                  delta,
+                                                  GNUNET_NO,
+                                                  &pd_cb,
+                                                  &pcc);
   if ( (0 > qs) ||
        (GNUNET_SYSERR == pcc.failure) )
   {
