@@ -128,7 +128,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   unsigned long long seconds;
   struct MerchantInstance *mi;
   unsigned long long start = UINT64_MAX;
-  long long delta;
+  long long delta = -20;
   enum GNUNET_DB_QueryStatus qs;
   struct ProcessContractClosure pcc;
 
@@ -210,7 +210,6 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     return ret;
   }
 
-  delta = 20;
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "start");
