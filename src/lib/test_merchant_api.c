@@ -812,12 +812,12 @@ struct Command
        * The backend will return records with row_id
        * less than this value.
        */
-      unsigned int start;
+      unsigned long long start;
 
       /**
        * The backend will return at most `nrows` records.
        */
-      unsigned int nrows;
+      long long nrows;
 
     } history;
 
@@ -3865,6 +3865,7 @@ interpreter_run (void *cls)
     return;
   }
   case OC_HISTORY:
+    /* If given as zero, convert it as now+1_hour.  */
     if (0 == cmd->details.history.date.abs_value_us)
     {
       cmd->details.history.date = GNUNET_TIME_absolute_add
@@ -4346,7 +4347,7 @@ run (void *cls)
        */
       .details.history.nresult = 1,
       .details.history.start = 10,
-      .details.history.nrows = 10
+      .details.history.nrows = -10
     },
 
     /* Fill second reserve with EUR:1 */
@@ -4510,17 +4511,20 @@ run (void *cls)
        */
       .details.history.nresult = 2,
       .details.history.start = 10,
-      .details.history.nrows = 10
+      .details.history.nrows = -10
     },
 
     { .oc = OC_HISTORY,
       .label = "history-2",
       .expected_response_code = MHD_HTTP_OK,
-      /*no records returned, time limit too ancient*/
+      /* no records returned, time limit too ancient
+       * and start's too high.  */
       .details.history.date.abs_value_us = 1,
       .details.history.nresult = 0,
+      /* younger than 'start' */
       .details.history.start = 10,
       .details.history.nrows = 10
+      /* end of "younger than 'start'" */
     },
 
     { .oc = OC_REFUND_INCREASE,
