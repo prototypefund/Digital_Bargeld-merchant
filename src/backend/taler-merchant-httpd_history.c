@@ -125,6 +125,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute date;
   json_t *response;
   int ret;
+  unsigned int ascending = GNUNET_NO;
   unsigned long long seconds;
   struct MerchantInstance *mi;
   unsigned long long start = UINT64_MAX;
@@ -247,12 +248,21 @@ MH_handler_history (struct TMH_RequestHandler *rh,
 
   pcc.response = response;
   pcc.failure = GNUNET_NO;
+
+  str = MHD_lookup_connection_value (connection,
+                                     MHD_GET_ARGUMENT_KIND,
+                                     "ordering");
+  if ((NULL != str) && (0 == strcmp ("ascending",
+                                     str)))
+    ascending = GNUNET_YES;
+
   qs = db->find_contract_terms_by_date_and_range (db->cls,
                                                   date,
                                                   &mi->pubkey,
                                                   start,
                                                   llabs (delta),
                                                   delta < 0 ? GNUNET_YES : GNUNET_NO,
+                                                  ascending,
                                                   &pd_cb,
                                                   &pcc);
   if ( (0 > qs) ||

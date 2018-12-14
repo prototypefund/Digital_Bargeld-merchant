@@ -434,6 +434,22 @@ postgres_initialize (void *cls)
                             " WHERE merchant_pub=$1"
                             " AND h_contract_terms=$2",
                             2),
+
+    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_asc",
+                            "SELECT"
+                            " contract_terms"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " timestamp>$1"
+                            " AND merchant_pub=$2"
+                            " AND row_id>$3"
+                            " AND paid=TRUE"
+                            " ORDER BY row_id ASC, timestamp ASC"
+                            " LIMIT $4",
+                            4),
+
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range",
                             "SELECT"
                             " contract_terms"
@@ -446,6 +462,21 @@ postgres_initialize (void *cls)
                             " AND row_id>$3"
                             " AND paid=TRUE"
                             " ORDER BY row_id DESC, timestamp DESC"
+                            " LIMIT $4",
+                            4),
+
+    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past_asc",
+                            "SELECT"
+                            " contract_terms"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " timestamp<$1"
+                            " AND merchant_pub=$2"
+                            " AND row_id<$3"
+                            " AND paid=TRUE"
+                            " ORDER BY row_id ASC, timestamp ASC"
                             " LIMIT $4",
                             4),
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past",
@@ -1365,6 +1396,7 @@ find_contracts_cb (void *cls,
  * the same timestamp and just go behind in history by tuning `start`.
  * @param nrows only nrows rows are returned.
  * @param past if set to #GNUNET_YES, retrieves rows older than `date`.
+ * @param ascending if GNUNET_YES, results will be sorted in chronological order.
  * This is tipically used to show live updates on the merchant's backoffice
  * Web interface.
  * @param cb function to call with transaction data, can be NULL.
@@ -1378,6 +1410,7 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
 						uint64_t start,
 						uint64_t nrows,
 						int past,
+                                                unsigned int ascending,
 						TALER_MERCHANTDB_ProposalDataCallback cb,
 						void *cb_cls)
 {
@@ -1398,10 +1431,15 @@ postgres_find_contract_terms_by_date_and_range (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "DB serving /history with date %s\n",
               GNUNET_STRINGS_absolute_time_to_string (date));
-  if (GNUNET_YES == past)
+  if ((GNUNET_YES == past) && (GNUNET_YES == ascending))
+    stmt = "find_contract_terms_by_date_and_range_past_asc";
+  else if ((GNUNET_YES == past) && (GNUNET_NO == ascending))
     stmt = "find_contract_terms_by_date_and_range_past";
-  else
+
+  else if ((GNUNET_NO == past) && (GNUNET_NO == ascending))
     stmt = "find_contract_terms_by_date_and_range";
+  else
+    stmt = "find_contract_terms_by_date_and_range_asc";
   check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
 					     stmt,

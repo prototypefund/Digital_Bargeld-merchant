@@ -321,6 +321,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param start only rows with serial id less than start are returned.
    * @param nrows only nrows rows are returned.
    * @param past if set to #GNUNET_YES, retrieves rows older than `date`.
+   * @param ascending if GNUNET_YES, then results will be sorted with youngest first.
    * This is typically used to show live updates on the merchant's backoffice
    * @param cb function to call with transaction data, can be NULL.
    * @param cb_cls closure for @a cb
@@ -333,6 +334,7 @@ struct TALER_MERCHANTDB_Plugin
 					    uint64_t start,
 					    uint64_t nrows,
 					    int past,
+                                            unsigned int ascending,
 					    TALER_MERCHANTDB_ProposalDataCallback cb,
 					    void *cb_cls);
 
