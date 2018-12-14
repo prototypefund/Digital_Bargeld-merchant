@@ -243,8 +243,72 @@ track_transfer_cb
   }
   switch (http_status)
   {
+    /**
+     * Check that all the deposits sum up to the total
+     * transferred amount.  */
     case MHD_HTTP_OK:
-      break;
+    {
+      json_t *deposits;
+      const char *amount_str;
+      struct TALER_Amount total;
+      struct TALER_Amount wire_fee;
+      struct TALER_Amount amount_iter;
+      struct TALER_Amount deposit_fee_iter;
+      struct TALER_Amount sum;
+
+      size_t index;
+      json_t *value;
+
+      amount_str = json_string_value
+        (json_object_get (json,
+                          "total"));
+      TALER_string_to_amount (amount_str,
+                              &total);
+      amount_str = json_string_value
+        (json_object_get (json,
+                          "wire_fee"));
+      TALER_string_to_amount (amount_str,
+                              &wire_fee);
+      TALER_amount_get_zero (total.currency,
+                             &sum);
+      deposits = json_object_get (json,
+                                  "deposits_sums");
+      json_array_foreach (deposits, index, value)
+      {
+        amount_str = json_string_value
+          (json_object_get (value,
+                            "deposit_value"));
+        TALER_string_to_amount (amount_str,
+                                &amount_iter);
+        amount_str = json_string_value
+          (json_object_get (value,
+                            "deposit_fee"));
+        TALER_string_to_amount (amount_str,
+                                &deposit_fee_iter);
+        TALER_amount_add (&sum,
+                          &sum,
+                          &amount_iter);
+        TALER_amount_subtract (&sum,
+                               &sum,
+                               &deposit_fee_iter);
+      }
+
+      TALER_amount_subtract (&sum,
+                             &sum,
+                             &wire_fee);
+      if (0 != TALER_amount_cmp (&sum,
+                                 &total))
+      {
+        GNUNET_break (0);
+        TALER_LOG_ERROR
+          ("Inconsistent amount transferred."
+           "  Sum: %s, claimed: %s\n",
+           TALER_amount_to_string (&sum),
+           TALER_amount_to_string (&total));
+        TALER_TESTING_interpreter_fail (tts->is);
+      }
+    }
+    break;
     default:
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "Unhandled HTTP status.\n");
