@@ -516,14 +516,20 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
-
   if (GNUNET_OK == ordinary)
+  {
     TALER_TESTING_run (is,
                        ordinary_commands);
+    return;
+  }
 
   if (GNUNET_OK == corner)
+  {
     TALER_TESTING_run (is,
                        corner_commands);
+    return;
+  }
+
   TALER_LOG_ERROR ("Neither ordinary or corner payments"
                    " were specified to be run.\n");
 
