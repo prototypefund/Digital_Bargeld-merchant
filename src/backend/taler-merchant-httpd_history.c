@@ -128,7 +128,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   unsigned int ascending = GNUNET_NO;
   unsigned long long seconds;
   struct MerchantInstance *mi;
-  unsigned long long start = UINT64_MAX;
+  unsigned long long start;
   long long delta = -20;
   enum GNUNET_DB_QueryStatus qs;
   struct ProcessContractClosure pcc;
@@ -228,6 +228,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                              "start");
     }
   }
+  else
+    start = UINT64_MAX;
 
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
