@@ -216,6 +216,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                      "start");
   if (NULL != str)
   {
+    TALER_LOG_DEBUG ("'start' argument given ('%s')\n",
+                     str);
     if ( (1 != sscanf (str,
 		       "%llu",
 		       &start)))
