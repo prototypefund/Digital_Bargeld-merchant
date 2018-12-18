@@ -87,7 +87,6 @@ TALER_TESTING_cmd_proposal (const char *label,
  * Make a "proposal lookup" command.
  *
  * @param label command label.
- * @param ctx CURL context.
  * @param merchant_url base URL of the merchant backend
  *        serving the proposal lookup request.
  * @param http_status expected HTTP response code.
