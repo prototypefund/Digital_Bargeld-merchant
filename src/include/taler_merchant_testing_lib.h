@@ -112,7 +112,6 @@ TALER_TESTING_cmd_proposal_lookup
  *
  * @param label command label.
  * @param merchant_url merchant base url
- * @param ctx CURL context.
  * @param http_status expected HTTP response code.
  * @param proposal_reference the proposal whose payment status
  *        is going to be checked.
@@ -124,7 +123,6 @@ TALER_TESTING_cmd_proposal_lookup
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_check_payment (const char *label,
                                  const char *merchant_url,
-                                 struct GNUNET_CURL_Context *ctx,
                                  unsigned int http_status,
                                  const char *proposal_reference,
                                  unsigned int expect_paid);
@@ -133,7 +131,6 @@ TALER_TESTING_cmd_check_payment (const char *label,
  *
  * @param label command label.
  * @param merchant_url merchant base url
- * @param ctx CURL context.
  * @param http_status expected HTTP response code.
  * @param proposal_reference the proposal whose payment status
  *        is going to be checked.
@@ -149,7 +146,6 @@ TALER_TESTING_cmd_check_payment (const char *label,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_pay (const char *label,
                        const char *merchant_url,
-                       struct GNUNET_CURL_Context *ctx,
                        unsigned int http_status,
                        const char *proposal_reference,
                        const char *coin_reference,
@@ -166,7 +162,6 @@ TALER_TESTING_cmd_pay (const char *label,
  * @param merchant_url merchant base URL
  * @param pay_reference reference to the payment to replay
  * @param coin_reference reference to the coins to use
- * @param ctx main CURL context
  * @param http_status expected HTTP response code
  *
  * @return the command
@@ -177,7 +172,6 @@ TALER_TESTING_cmd_pay_again (const char *label,
                              const char *pay_reference,
                              const char *coin_reference,
                              const char *refund_fee,
-                             struct GNUNET_CURL_Context *ctx,
                              unsigned int http_status);
 /**
  * Make a "pay abort" test command.
@@ -185,7 +179,6 @@ TALER_TESTING_cmd_pay_again (const char *label,
  * @param label command label
  * @param merchant_url merchant base URL
  * @param pay_reference reference to the payment to abort
- * @param ctx main CURL context
  * @param http_status expected HTTP response code
  *
  * @return the command
@@ -194,7 +187,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_pay_abort (const char *label,
                              const char *merchant_url,
                              const char *pay_reference,
-                             struct GNUNET_CURL_Context *ctx,
                              unsigned int http_status);
 
 /**

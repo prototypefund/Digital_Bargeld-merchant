@@ -67,11 +67,6 @@ struct PayState
   const char *coin_reference;
 
   /**
-   * The curl context.
-   */
-  struct GNUNET_CURL_Context *ctx;
-
-  /**
    * The merchant base URL.
    */
   const char *merchant_url;
@@ -132,15 +127,9 @@ struct CheckPaymentState
   unsigned int expect_paid;
 
   /**
-   * The curl context.
-   */
-  struct GNUNET_CURL_Context *ctx;
-
-  /**
    * The merchant base URL.
    */
   const char *merchant_url;
-
 };
 
 
@@ -164,11 +153,6 @@ struct PayAgainState
    * Reference to the coins to use.
    */
   const char *coin_reference;
-
-  /**
-   * Main CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
 
   /**
    * Merchant URL.
@@ -207,11 +191,6 @@ struct PayAbortState
    * Reference to the "pay" command to abort.
    */
   const char *pay_reference;
-
-  /**
-   * Main CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
 
   /**
    * Merchant URL.
@@ -411,7 +390,7 @@ check_payment_run (void *cls,
               order_id);
 
   cps->cpo = TALER_MERCHANT_check_payment
-    (cps->ctx,
+    (is->ctx,
      cps->merchant_url,
      "default", // only default instance for now.
      order_id,
@@ -429,7 +408,6 @@ check_payment_run (void *cls,
  *
  * @param label command label.
  * @param merchant_url merchant base url
- * @param ctx CURL context.
  * @param http_status expected HTTP response code.
  * @param proposal_reference the proposal whose payment status
  *        is going to be checked.
@@ -441,7 +419,6 @@ check_payment_run (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_check_payment (const char *label,
                                  const char *merchant_url,
-                                 struct GNUNET_CURL_Context *ctx,
                                  unsigned int http_status,
                                  const char *proposal_reference,
                                  unsigned int expect_paid)
@@ -453,7 +430,6 @@ TALER_TESTING_cmd_check_payment (const char *label,
   cps->http_status = http_status;
   cps->proposal_reference = proposal_reference;
   cps->expect_paid = expect_paid;
-  cps->ctx = ctx;
   cps->merchant_url = merchant_url;
 
   cmd.cls = cps;
@@ -737,7 +713,6 @@ pay_abort_cb (void *cls,
  *
  * @param merchant_url base URL of the merchant serving the
  *        request.
- * @param ctx CURL context.
  * @param coin_reference reference to the CMD(s) that offer
  *        "coins" traits.  It is possible to give multiple
  *        references by using semicolons to separate them.
@@ -757,7 +732,6 @@ pay_abort_cb (void *cls,
  */
 static struct TALER_MERCHANT_Pay *
 _pay_run (const char *merchant_url,
-          struct GNUNET_CURL_Context *ctx,
           const char *coin_reference,
           const char *proposal_reference,
           struct TALER_TESTING_Interpreter *is,
@@ -879,7 +853,7 @@ _pay_run (const char *merchant_url,
     return NULL;
   }
 
-  ret = api_func (ctx,
+  ret = api_func (is->ctx,
                   merchant_url,
                   "default", // instance
                   h_proposal,
@@ -919,18 +893,16 @@ pay_run (void *cls,
   struct PayState *ps = cls;
   
   ps->is = is;
-  if ( NULL == 
-     ( ps->po = _pay_run (ps->merchant_url,
-                          ps->ctx,
-                          ps->coin_reference,
-                          ps->proposal_reference,
-                          is,
-                          ps->amount_with_fee,
-                          ps->amount_without_fee,
-                          ps->refund_fee,
-                          &TALER_MERCHANT_pay_wallet,
-                          &pay_cb,
-                          ps)) )
+  if (NULL == (ps->po = _pay_run (ps->merchant_url,
+                                  ps->coin_reference,
+                                  ps->proposal_reference,
+                                  is,
+                                  ps->amount_with_fee,
+                                  ps->amount_without_fee,
+                                  ps->refund_fee,
+                                  &TALER_MERCHANT_pay_wallet,
+                                  &pay_cb,
+                                  ps)))
     TALER_TESTING_FAIL (is);
 }
 
@@ -1034,7 +1006,6 @@ pay_traits (void *cls,
  *
  * @param label command label.
  * @param merchant_url merchant base url
- * @param ctx CURL context.
  * @param http_status expected HTTP response code.
  * @param proposal_reference the proposal whose payment status
  *        is going to be checked.
@@ -1050,7 +1021,6 @@ pay_traits (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_pay (const char *label,
                        const char *merchant_url,
-                       struct GNUNET_CURL_Context *ctx,
                        unsigned int http_status,
                        const char *proposal_reference,
                        const char *coin_reference,
@@ -1065,7 +1035,6 @@ TALER_TESTING_cmd_pay (const char *label,
   ps->http_status = http_status;
   ps->proposal_reference = proposal_reference;
   ps->coin_reference = coin_reference;
-  ps->ctx = ctx;
   ps->merchant_url = merchant_url;
   ps->amount_with_fee = amount_with_fee;
   ps->amount_without_fee = amount_without_fee;
@@ -1154,18 +1123,16 @@ pay_abort_run (void *cls,
     (pay_cmd, REFUND_FEE, &refund_fee))
     TALER_TESTING_FAIL (is);
 
-  if ( NULL ==
-     ( pas->pao = _pay_run (pas->merchant_url,
-                            pas->ctx,
-                            coin_reference,
-                            proposal_reference,
-                            is,
-                            amount_with_fee,
-                            amount_without_fee,
-                            refund_fee,
-                            &TALER_MERCHANT_pay_abort,
-                            &pay_abort_cb,
-                            pas)) )
+  if (NULL == (pas->pao = _pay_run (pas->merchant_url,
+                                    coin_reference,
+                                    proposal_reference,
+                                    is,
+                                    amount_with_fee,
+                                    amount_without_fee,
+                                    refund_fee,
+                                    &TALER_MERCHANT_pay_abort,
+                                    &pay_abort_cb,
+                                    pas)))
     TALER_TESTING_FAIL (is);
 }
 
@@ -1211,7 +1178,6 @@ pay_abort_traits (void *cls,
  * @param label command label
  * @param merchant_url merchant base URL
  * @param pay_reference reference to the payment to abort
- * @param ctx main CURL context
  * @param http_status expected HTTP response code
  *
  * @return the command
@@ -1220,7 +1186,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_pay_abort (const char *label,
                              const char *merchant_url,
                              const char *pay_reference,
-                             struct GNUNET_CURL_Context *ctx,
                              unsigned int http_status)
 {
   struct PayAbortState *pas;
@@ -1229,7 +1194,6 @@ TALER_TESTING_cmd_pay_abort (const char *label,
   pas = GNUNET_new (struct PayAbortState);
   pas->http_status = http_status;
   pas->pay_reference = pay_reference;
-  pas->ctx = ctx;
   pas->merchant_url = merchant_url;
 
   cmd.cls = pas;
@@ -1361,18 +1325,16 @@ pay_again_run (void *cls,
     (pay_cmd, AMOUNT_WITHOUT_FEE, &amount_without_fee))
     TALER_TESTING_FAIL (is);
 
-  if ( NULL ==
-     ( pas->pao = _pay_run (pas->merchant_url,
-                            pas->ctx,
-                            pas->coin_reference,
-                            proposal_reference,
-                            is,
-                            amount_with_fee,
-                            amount_without_fee,
-                            pas->refund_fee,
-                            &TALER_MERCHANT_pay_wallet,
-                            &pay_again_cb,
-                            pas)) )
+  if (NULL == (pas->pao = _pay_run (pas->merchant_url,
+                                    pas->coin_reference,
+                                    proposal_reference,
+                                    is,
+                                    amount_with_fee,
+                                    amount_without_fee,
+                                    pas->refund_fee,
+                                    &TALER_MERCHANT_pay_wallet,
+                                    &pay_again_cb,
+                                    pas)))
     TALER_TESTING_FAIL (is);
 }
 
@@ -1410,7 +1372,6 @@ pay_again_cleanup (void *cls,
  * @param merchant_url merchant base URL
  * @param pay_reference reference to the payment to replay
  * @param coin_reference reference to the coins to use
- * @param ctx main CURL context
  * @param http_status expected HTTP response code
  *
  * @return the command
@@ -1421,7 +1382,6 @@ TALER_TESTING_cmd_pay_again (const char *label,
                              const char *pay_reference,
                              const char *coin_reference,
                              const char *refund_fee,
-                             struct GNUNET_CURL_Context *ctx,
                              unsigned int http_status)
 {
 
@@ -1432,7 +1392,6 @@ TALER_TESTING_cmd_pay_again (const char *label,
   pas->http_status = http_status;
   pas->pay_reference = pay_reference;
   pas->coin_reference = coin_reference;
-  pas->ctx = ctx;
   pas->merchant_url = merchant_url;
   pas->refund_fee = refund_fee;
 
