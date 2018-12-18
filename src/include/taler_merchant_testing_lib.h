@@ -316,7 +316,6 @@ TALER_TESTING_cmd_refund_increase
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        request.
- * @param ctx CURL context.
  * @param http_status expected HTTP response code
  * @param time limit towards the past for the history
  *        records we want returned.
@@ -327,7 +326,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_history_default_start
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    struct GNUNET_TIME_Absolute time,
    unsigned int nresult,
@@ -339,7 +337,6 @@ TALER_TESTING_cmd_history_default_start
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        request.
- * @param ctx CURL context.
  * @param http_status expected HTTP response code
  * @param time limit towards the past for the history
  *        records we want returned.
@@ -350,7 +347,6 @@ TALER_TESTING_cmd_history_default_start
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_history (const char *label,
                            const char *merchant_url,
-                           struct GNUNET_CURL_Context *ctx,
                            unsigned int http_status,
                            struct GNUNET_TIME_Absolute time,
                            unsigned int nresult,

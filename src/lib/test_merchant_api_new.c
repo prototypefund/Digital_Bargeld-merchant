@@ -319,7 +319,6 @@ run (void *cls,
 
     TALER_TESTING_cmd_history ("history-0",
                                merchant_url,
-                               is->ctx,
                                MHD_HTTP_OK,
       /**
        * all records to be returned; setting date as 0 lets the
@@ -448,7 +447,6 @@ run (void *cls,
 
     TALER_TESTING_cmd_history ("history-1",
                                merchant_url,
-                               is->ctx,
                                MHD_HTTP_OK,
                                GNUNET_TIME_UNIT_ZERO_ABS,
       /**
@@ -1050,7 +1048,6 @@ run (void *cls,
     TALER_TESTING_cmd_history
       ("history-2",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
                                  GNUNET_TIME_UNIT_MICROSECONDS),
@@ -1075,7 +1072,6 @@ run (void *cls,
     TALER_TESTING_cmd_history_default_start
       ("history-default-start",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        GNUNET_TIME_UNIT_ZERO_ABS,
        5, /* Expected number of records */

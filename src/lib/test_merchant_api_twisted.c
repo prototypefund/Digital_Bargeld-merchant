@@ -450,7 +450,6 @@ run (void *cls,
 
     TALER_TESTING_cmd_history ("history-0",
                                twister_merchant_url,
-                               is->ctx,
                                0,
                                GNUNET_TIME_UNIT_ZERO_ABS,
                                1, // nresult
@@ -467,7 +466,6 @@ run (void *cls,
 
     TALER_TESTING_cmd_history ("history-1",
                                twister_merchant_url,
-                               is->ctx,
                                0, // also works with MHD_HTTP_GONE
                                GNUNET_TIME_UNIT_ZERO_ABS,
                                1, // nresult

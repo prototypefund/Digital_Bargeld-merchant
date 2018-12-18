@@ -53,11 +53,6 @@ struct HistoryState
   const char *merchant_url;
 
   /**
-   * The CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
-
-  /**
    * The interpreter state.
    */
   struct TALER_TESTING_Interpreter *is;
@@ -272,7 +267,7 @@ history_run (void *cls,
   {
     case GNUNET_YES:
     hs->ho = TALER_MERCHANT_history_default_start
-      (hs->ctx,
+      (is->ctx,
        hs->merchant_url,
        "default",
        hs->nrows,
@@ -282,7 +277,7 @@ history_run (void *cls,
     break;
 
     case GNUNET_NO:
-    hs->ho = TALER_MERCHANT_history (hs->ctx,
+    hs->ho = TALER_MERCHANT_history (is->ctx,
                                      hs->merchant_url,
                                      "default",
                                      hs->start,
@@ -322,7 +317,6 @@ history_run (void *cls,
 static struct TALER_TESTING_Command
 TALER_TESTING_cmd_history2 (const char *label,
                             const char *merchant_url,
-                            struct GNUNET_CURL_Context *ctx,
                             unsigned int http_status,
                             struct GNUNET_TIME_Absolute time,
                             unsigned int nresult,
@@ -340,7 +334,6 @@ TALER_TESTING_cmd_history2 (const char *label,
   hs->start = start;
   hs->nrows = nrows;
   hs->merchant_url = merchant_url;
-  hs->ctx = ctx;
   hs->use_default_start = use_default_start;
 
   cmd.cls = hs;
@@ -368,7 +361,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_history_default_start
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    struct GNUNET_TIME_Absolute time,
    unsigned int nresult,
@@ -376,7 +368,6 @@ TALER_TESTING_cmd_history_default_start
 {
   return TALER_TESTING_cmd_history2 (label,
                                      merchant_url,
-                                     ctx,
                                      http_status,
                                      time,
                                      nresult,
@@ -403,7 +394,6 @@ TALER_TESTING_cmd_history_default_start
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_history (const char *label,
                            const char *merchant_url,
-                           struct GNUNET_CURL_Context *ctx,
                            unsigned int http_status,
                            struct GNUNET_TIME_Absolute time,
                            unsigned int nresult,
@@ -412,7 +402,6 @@ TALER_TESTING_cmd_history (const char *label,
 {
   return TALER_TESTING_cmd_history2 (label,
                                      merchant_url,
-                                     ctx,
                                      http_status,
                                      time,
                                      nresult,
