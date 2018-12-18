@@ -144,6 +144,119 @@ history_raw_cb (void *cls,
   TALER_MERCHANT_history_cancel (ho);
 }
 
+/**
+ * Issue a /history request to the backend.
+ *
+ * @param ctx execution context
+ * @param backend_url base URL of the merchant backend
+ * @param instance which merchant instance is performing this call
+ * @param start return `delta` records starting from position `start`.
+ *        If given as zero, then no initial skip of `start` records is done.
+ * @param use_default_start do NOT include the 'start' argument in URL.
+ * @param delta return `delta` records starting from position `start`
+ * @param date only transactions younger than/equals to date will be returned
+ * @param history_cb callback which will work the response gotten from the backend
+ * @param history_cb_cls closure to pass to @a history_cb
+ * @return handle for this operation, NULL upon errors
+ */
+static struct TALER_MERCHANT_HistoryOperation *
+TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
+                         const char *backend_url,
+                         const char *instance,
+                         unsigned long long start,
+                         int use_default_start,
+                         long long delta,
+                         struct GNUNET_TIME_Absolute date,
+                         TALER_MERCHANT_HistoryOperationCallback history_cb,
+                         void *history_cb_cls)
+{
+  struct TALER_MERCHANT_HistoryOperation *ho;
+  uint64_t seconds;
+  CURL *eh;
+  char *base;
+
+  ho = GNUNET_new (struct TALER_MERCHANT_HistoryOperation);
+  ho->ctx = ctx;
+  ho->cb = history_cb;
+  ho->cb_cls = history_cb_cls;
+  seconds = date.abs_value_us / 1000LL / 1000LL;
+  base = TALER_url_join (backend_url, "/history", NULL);
+
+  if (GNUNET_YES == use_default_start)
+    GNUNET_asprintf (&ho->url,
+                     "%s?date=%llu&instance=%s&delta=%lld",
+                     base,
+                     seconds,
+                     instance,
+                     delta);
+  else
+    GNUNET_asprintf (&ho->url,
+                     "%s?date=%llu&instance=%s&delta=%lld&start=%llu",
+                     base,
+                     seconds,
+                     instance,
+                     delta,
+                     start);
+    
+
+
+  GNUNET_free (base);
+  eh = curl_easy_init ();
+  if (CURLE_OK != curl_easy_setopt (eh,
+                                    CURLOPT_URL,
+                                    ho->url))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+
+  if (NULL == (ho->job = GNUNET_CURL_job_add (ctx,
+                                              eh,
+                                              GNUNET_YES,
+                                              &history_raw_cb,
+                                              ho)))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+  return ho;
+}
+
+
+/**
+ * Issue a /history request to the backend.
+ *
+ * @param ctx execution context
+ * @param backend_url base URL of the merchant backend
+ * @param instance which merchant instance is performing this call
+ * @param start return `delta` records starting from position `start`.
+ * If given as zero, then no initial skip of `start` records is done.
+ * @param delta return `delta` records starting from position `start`
+ * @param date only transactions younger than/equals to date will be returned
+ * @param history_cb callback which will work the response gotten from the backend
+ * @param history_cb_cls closure to pass to @a history_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_HistoryOperation *
+TALER_MERCHANT_history_default_start (struct GNUNET_CURL_Context *ctx,
+                                      const char *backend_url,
+                                      const char *instance,
+                                      long long delta,
+                                      struct GNUNET_TIME_Absolute date,
+                                      TALER_MERCHANT_HistoryOperationCallback history_cb,
+                                      void *history_cb_cls)
+{
+  return TALER_MERCHANT_history2 (ctx,
+                                  backend_url,
+                                  instance,
+                                  -1, /* fake 'start' argument: will NOT be used */
+                                  GNUNET_YES, /* Specifies "no start argument" in final URL */
+                                  delta,
+                                  date,
+                                  history_cb,
+                                  history_cb_cls);
+}
+
 
 /**
  * Issue a /history request to the backend.
@@ -169,44 +282,15 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                         TALER_MERCHANT_HistoryOperationCallback history_cb,
                         void *history_cb_cls)
 {
-  struct TALER_MERCHANT_HistoryOperation *ho;
-  uint64_t seconds;
-  CURL *eh;
-  char *base;
-
-  ho = GNUNET_new (struct TALER_MERCHANT_HistoryOperation);
-  ho->ctx = ctx;
-  ho->cb = history_cb;
-  ho->cb_cls = history_cb_cls;
-  seconds = date.abs_value_us / 1000LL / 1000LL;
-  base = TALER_url_join (backend_url, "/history", NULL);
-  GNUNET_asprintf (&ho->url,
-                   "%s?date=%llu&instance=%s&start=%llu&delta=%lld",
-                   base,
-                   seconds,
-                   instance,
-                   start,
-                   delta);
-  GNUNET_free (base);
-  eh = curl_easy_init ();
-  if (CURLE_OK != curl_easy_setopt (eh,
-                                    CURLOPT_URL,
-                                    ho->url))
-  {
-    GNUNET_break (0);
-    return NULL;
-  }
-
-  if (NULL == (ho->job = GNUNET_CURL_job_add (ctx,
-                                              eh,
-                                              GNUNET_YES,
-                                              &history_raw_cb,
-                                              ho)))
-  {
-    GNUNET_break (0);
-    return NULL;
-  }
-  return ho;
+  return TALER_MERCHANT_history2 (ctx,
+                                  backend_url,
+                                  instance,
+                                  start,
+                                  GNUNET_NO,
+                                  delta,
+                                  date,
+                                  history_cb,
+                                  history_cb_cls);
 }
 
 

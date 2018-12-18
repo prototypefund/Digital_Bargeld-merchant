@@ -781,6 +781,28 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
                         TALER_MERCHANT_HistoryOperationCallback history_cb,
                         void *history_cb_cls);
 
+/**
+ * Issue a /history request to the backend.
+ *
+ * @param ctx execution context
+ * @param backend_url base URL of the merchant backend
+ * @param instance which merchant instance is performing this call
+ * @param start return `delta` records starting from position `start`.
+ * If given as zero, then no initial skip of `start` records is done.
+ * @param delta return `delta` records starting from position `start`
+ * @param date only transactions younger than/equals to date will be returned
+ * @param history_cb callback which will work the response gotten from the backend
+ * @param history_cb_cls closure to pass to @a history_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_HistoryOperation *
+TALER_MERCHANT_history_default_start (struct GNUNET_CURL_Context *ctx,
+                                      const char *backend_url,
+                                      const char *instance,
+                                      long long delta,
+                                      struct GNUNET_TIME_Absolute date,
+                                      TALER_MERCHANT_HistoryOperationCallback history_cb,
+                                      void *history_cb_cls);
 
 
 /**
