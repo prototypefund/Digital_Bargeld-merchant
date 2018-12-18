@@ -71,7 +71,6 @@ TALER_TESTING_run_merchant (const char *config_filename,
  * @param label command label
  * @param merchant_url base URL of the merchant serving
  *        the proposal request.
- * @param ctx CURL context.
  * @param http_status expected HTTP status.
  * @param order the order to PUT to the merchant.
  * @param instance merchant instance performing the operation.
@@ -81,7 +80,6 @@ TALER_TESTING_run_merchant (const char *config_filename,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_proposal (const char *label,
                             const char *merchant_url,
-                            struct GNUNET_CURL_Context *ctx,
                             unsigned int http_status,
                             const char *order,
                             const char *instance);
@@ -101,7 +99,6 @@ TALER_TESTING_cmd_proposal (const char *label,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_proposal_lookup
   (const char *label,
-   struct GNUNET_CURL_Context *ctx,
    const char *merchant_url,
    unsigned int http_status,
    const char *proposal_reference,

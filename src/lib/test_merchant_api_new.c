@@ -200,7 +200,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -276,7 +275,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-2",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -296,7 +294,6 @@ run (void *cls,
         NULL),
 
     TALER_TESTING_cmd_proposal_lookup ("fetch-proposal-2",
-                                       is->ctx,
                                        merchant_url,
                                        MHD_HTTP_OK,
                                        "create-proposal-2",
@@ -488,7 +485,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-not-to-be-paid",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -558,7 +554,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-unincreased-refund",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -800,7 +795,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-tip-1",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -880,7 +874,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-10",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -964,7 +957,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-11",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\

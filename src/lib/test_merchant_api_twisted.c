@@ -196,7 +196,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("proposal-for-check-payment",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -268,7 +267,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-0",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_BAD_REQUEST,
        /* giving a valid JSON to not make it fail before
         * data reaches the merchant.  */
@@ -283,7 +281,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
        twister_merchant_url,
-       is->ctx,
        /* This status code == 0 is gotten via a 500 Internal Server
         * Error handed to the library.  */
        MHD_HTTP_INTERNAL_SERVER_ERROR,
@@ -305,7 +302,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-2",
        twister_merchant_url,
-       is->ctx,
        0,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -332,7 +328,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-3",
        twister_merchant_url,
-       is->ctx,
        0,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -357,7 +352,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-4",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_NOT_FOUND,
        "{\"amount\":\"EUR:5\",\
          \"fulfillment_url\": \"https://example.com/\",\
@@ -367,7 +361,6 @@ run (void *cls,
     /* Cause a 404 Not Found from /proposal/lookup,
      * due to a non existing order id being queried.  */
     TALER_TESTING_cmd_proposal_lookup ("lookup-0",
-                                       is->ctx,
                                        twister_merchant_url,
                                        MHD_HTTP_NOT_FOUND,
                                        NULL,
@@ -379,7 +372,6 @@ run (void *cls,
     /* To be short, we'll make a _error_ response to be
      * unparsable.  */
     TALER_TESTING_cmd_proposal_lookup ("lookup-1",
-                                       is->ctx,
                                        twister_merchant_url,
                                        0, // response code.
                                        NULL,
@@ -395,7 +387,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-5",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -421,7 +412,6 @@ run (void *cls,
 
     /* lookup!  */
     TALER_TESTING_cmd_proposal_lookup ("lookup-5",
-                                       is->ctx,
                                        twister_merchant_url,
                                        // expected response code.
                                        0,
@@ -507,7 +497,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-unaggregation",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -576,7 +565,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-5383",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -673,7 +661,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-6",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -795,7 +782,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-abort-1",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -883,7 +869,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-double-spend",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -904,7 +889,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-double-spend-1",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\

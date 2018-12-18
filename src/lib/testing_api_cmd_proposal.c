@@ -89,11 +89,6 @@ struct ProposalState
   const char *merchant_url;
 
   /**
-   * The curl context.
-   */
-  struct GNUNET_CURL_Context *ctx;
-
-  /**
    * The interpreter state.
    */
   struct TALER_TESTING_Interpreter *is;
@@ -125,11 +120,6 @@ struct ProposalLookupState
    * URL of the merchant backend.
    */
   const char *merchant_url;
-
-  /**
-   * The curl context.
-   */
-  struct GNUNET_CURL_Context *ctx;
 
   /**
    * Expected status code.
@@ -319,7 +309,7 @@ proposal_cb (void *cls,
 
   if (NULL ==
      (ps->plo = TALER_MERCHANT_proposal_lookup
-       (ps->ctx,
+       (ps->is->ctx,
         ps->merchant_url,
         ps->order_id,
         ps->instance,
@@ -394,7 +384,7 @@ proposal_run (void *cls,
                          merchant);
   }
 
-  ps->po = TALER_MERCHANT_order_put (ps->ctx,
+  ps->po = TALER_MERCHANT_order_put (is->ctx,
                                      ps->merchant_url,
                                      order,
                                      &proposal_cb,
@@ -470,7 +460,6 @@ proposal_lookup_cleanup (void *cls,
  * @param label command label
  * @param merchant_url base URL of the merchant serving
  *        the proposal request.
- * @param ctx CURL context.
  * @param http_status expected HTTP status.
  * @param order the order to PUT to the merchant.
  * @param instance merchant instance performing the operation.
@@ -480,7 +469,6 @@ proposal_lookup_cleanup (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_proposal (const char *label,
                             const char *merchant_url,
-                            struct GNUNET_CURL_Context *ctx,
                             unsigned int http_status,
                             const char *order,
                             const char *instance)
@@ -491,7 +479,6 @@ TALER_TESTING_cmd_proposal (const char *label,
   ps = GNUNET_new (struct ProposalState);
   ps->order = order;
   ps->http_status = http_status;
-  ps->ctx = ctx;
   ps->merchant_url = merchant_url;
   ps->instance = (NULL == instance) ? "default": instance;
 
@@ -581,7 +568,7 @@ proposal_lookup_run (void *cls,
         (proposal_cmd, 0, &order_id))
       TALER_TESTING_FAIL (is);
   }
-  pls->plo = TALER_MERCHANT_proposal_lookup (pls->ctx,
+  pls->plo = TALER_MERCHANT_proposal_lookup (is->ctx,
                                              pls->merchant_url,
                                              order_id,
                                              "default",
@@ -596,7 +583,6 @@ proposal_lookup_run (void *cls,
  * Make a "proposal lookup" command.
  *
  * @param label command label.
- * @param ctx CURL context.
  * @param merchant_url base URL of the merchant backend
  *        serving the proposal lookup request.
  * @param http_status expected HTTP response code.
@@ -608,7 +594,6 @@ proposal_lookup_run (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_proposal_lookup
   (const char *label,
-   struct GNUNET_CURL_Context *ctx,
    const char *merchant_url,
    unsigned int http_status,
    const char *proposal_reference,
@@ -621,7 +606,6 @@ TALER_TESTING_cmd_proposal_lookup
   pls->http_status = http_status;
   pls->proposal_reference = proposal_reference;
   pls->merchant_url = merchant_url;
-  pls->ctx = ctx;
   pls->order_id = order_id;
 
   cmd.cls = pls;
