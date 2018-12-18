@@ -2,21 +2,25 @@
   This file is part of TALER
   Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
 
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Lesser General Public License as published by the Free Software
-  Foundation; either version 2.1, or (at your option) any later version.
+  TALER is free software; you can redistribute it and/or modify it
+  under the terms of the GNU Lesser General Public License as
+  published by the Free Software Foundation; either version 2.1,
+  or (at your option) any later version.
 
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+  TALER is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
 
-  You should have received a copy of the GNU Lesser General Public License along with
-  TALER; see the file COPYING.LGPL.  If not, see
-  <http://www.gnu.org/licenses/>
+  You should have received a copy of the GNU Lesser General Public
+  License along with TALER; see the file COPYING.LGPL.  If not,
+  see <http://www.gnu.org/licenses/>
 */
+
 /**
  * @file lib/merchant_api_contract.c
- * @brief Implementation of the /history request of the merchant's HTTP API
+ * @brief Implementation of the /history request of the merchant's
+ *        HTTP API
  * @author Marcello Stanisci
  */
 #include "platform.h"
@@ -229,28 +233,35 @@ TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
  * @param instance which merchant instance is performing this call
- * @param start return `delta` records starting from position `start`.
- * If given as zero, then no initial skip of `start` records is done.
- * @param delta return `delta` records starting from position `start`
- * @param date only transactions younger than/equals to date will be returned
- * @param history_cb callback which will work the response gotten from the backend
+ * @param start return `delta` records starting from position
+ *        `start`.  If given as zero, then no initial skip of
+ *        `start` records is done.
+ * @param delta return `delta` records starting from position
+ *        `start`
+ * @param date only transactions younger than/equals to date will
+ *        be returned
+ * @param history_cb callback which will work the response gotten
+ *        from the backend
  * @param history_cb_cls closure to pass to @a history_cb
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_HistoryOperation *
-TALER_MERCHANT_history_default_start (struct GNUNET_CURL_Context *ctx,
-                                      const char *backend_url,
-                                      const char *instance,
-                                      long long delta,
-                                      struct GNUNET_TIME_Absolute date,
-                                      TALER_MERCHANT_HistoryOperationCallback history_cb,
-                                      void *history_cb_cls)
+TALER_MERCHANT_history_default_start
+  (struct GNUNET_CURL_Context *ctx,
+   const char *backend_url,
+   const char *instance,
+   long long delta,
+   struct GNUNET_TIME_Absolute date,
+   TALER_MERCHANT_HistoryOperationCallback history_cb,
+   void *history_cb_cls)
 {
   return TALER_MERCHANT_history2 (ctx,
                                   backend_url,
                                   instance,
-                                  -1, /* fake 'start' argument: will NOT be used */
-                                  GNUNET_YES, /* Specifies "no start argument" in final URL */
+                /* fake 'start' argument: will NOT be used */
+                                  -1, 
+                /* Specifies "no start argument" in final URL */
+                                  GNUNET_YES, 
                                   delta,
                                   date,
                                   history_cb,
@@ -264,23 +275,28 @@ TALER_MERCHANT_history_default_start (struct GNUNET_CURL_Context *ctx,
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
  * @param instance which merchant instance is performing this call
- * @param start return `delta` records starting from position `start`.
- * If given as zero, then no initial skip of `start` records is done.
- * @param delta return `delta` records starting from position `start`
- * @param date only transactions younger than/equals to date will be returned
- * @param history_cb callback which will work the response gotten from the backend
+ * @param start return `delta` records starting from position
+ *        `start`.  If given as zero, then no initial skip of
+ *        `start` records is done.
+ * @param delta return `delta` records starting from position
+ *        `start`
+ * @param date only transactions younger than/equals to date will
+ *        be returned
+ * @param history_cb callback which will work the response gotten
+ *        from the backend
  * @param history_cb_cls closure to pass to @a history_cb
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_HistoryOperation *
-TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
-                        const char *backend_url,
-                        const char *instance,
-                        unsigned long long start,
-                        long long delta,
-                        struct GNUNET_TIME_Absolute date,
-                        TALER_MERCHANT_HistoryOperationCallback history_cb,
-                        void *history_cb_cls)
+TALER_MERCHANT_history
+  (struct GNUNET_CURL_Context *ctx,
+   const char *backend_url,
+   const char *instance,
+   unsigned long long start,
+   long long delta,
+   struct GNUNET_TIME_Absolute date,
+   TALER_MERCHANT_HistoryOperationCallback history_cb,
+   void *history_cb_cls)
 {
   return TALER_MERCHANT_history2 (ctx,
                                   backend_url,

@@ -78,6 +78,13 @@ struct HistoryState
    */
   unsigned long long start;
 
+
+  /**
+   * When this flag is GNUNET_YES, then the interpreter
+   * will request /history *omitting* the 'start' URL argument.
+   */
+  int use_default_start;
+
   /**
    * How many rows we want the response to contain, at most.
    */
@@ -260,16 +267,37 @@ history_run (void *cls,
        GNUNET_TIME_UNIT_HOURS);
     GNUNET_TIME_round_abs (&hs->time);
   }
-  if ( NULL ==
-     ( hs->ho = TALER_MERCHANT_history (hs->ctx,
-                                        hs->merchant_url,
-                                        "default",
-                                        hs->start,
-                                        hs->nrows,
-                                        hs->time,
-                                        &history_cb,
-                                        hs)))
-  TALER_TESTING_FAIL (is);
+
+  switch (hs->use_default_start)
+  {
+    case GNUNET_YES:
+    hs->ho = TALER_MERCHANT_history_default_start
+      (hs->ctx,
+       hs->merchant_url,
+       "default",
+       hs->nrows,
+       hs->time,
+       &history_cb,
+       hs);
+    break;
+
+    case GNUNET_NO:
+    hs->ho = TALER_MERCHANT_history (hs->ctx,
+                                     hs->merchant_url,
+                                     "default",
+                                     hs->start,
+                                     hs->nrows,
+                                     hs->time,
+                                     &history_cb,
+                                     hs);
+    break;
+    default:
+      TALER_LOG_ERROR ("Bad value for 'use_default_start'\n");
+      TALER_TESTING_FAIL (is);
+  }
+
+  if (NULL == hs->ho)
+    TALER_TESTING_FAIL (is);
 }
 
 
@@ -313,6 +341,7 @@ TALER_TESTING_cmd_history2 (const char *label,
   hs->nrows = nrows;
   hs->merchant_url = merchant_url;
   hs->ctx = ctx;
+  hs->use_default_start = use_default_start;
 
   cmd.cls = hs;
   cmd.label = label;

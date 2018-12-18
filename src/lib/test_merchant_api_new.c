@@ -1077,9 +1077,9 @@ run (void *cls,
        merchant_url,
        is->ctx,
        MHD_HTTP_OK,
-       GNUNET_TIME_UNIT_FOREVER_ABS,
-       0,
-       -100),
+       GNUNET_TIME_UNIT_ZERO_ABS,
+       5, /* Expected number of records */
+       -100), /* Delta */
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
