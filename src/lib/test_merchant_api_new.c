@@ -334,7 +334,7 @@ run (void *cls,
        */
                                1, // nresult
                                10, // start
-                               10), // nrows
+                               -10), // nrows
 
 
     TALER_TESTING_cmd_end ()
@@ -458,9 +458,7 @@ run (void *cls,
        */
                                2,
                                10,
-                               10),
-
-
+                               -10),
     TALER_TESTING_cmd_end ()
   };
 
@@ -1049,11 +1047,6 @@ run (void *cls,
 
     TALER_TESTING_cmd_batch ("track",
                              track),
-
-    /**
-     * Just a weird /history request, not really tied to
-     * any CMD chunk.
-     */
     TALER_TESTING_cmd_history
       ("history-2",
        merchant_url,
@@ -1061,7 +1054,8 @@ run (void *cls,
        MHD_HTTP_OK,
        GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
                                  GNUNET_TIME_UNIT_MICROSECONDS),
-       /* zero results expected, time too ancient. */
+       /* zero results expected, there isn't any row with id
+        * bigger than 10. */
        0,
        10,
        10),

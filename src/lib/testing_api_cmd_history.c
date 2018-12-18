@@ -265,7 +265,7 @@ history_run (void *cls,
                                         hs->merchant_url,
                                         "default",
                                         hs->start,
-                                        (-1) * hs->nrows,
+                                        hs->nrows,
                                         hs->time,
                                         &history_cb,
                                         hs)))
