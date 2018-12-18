@@ -46,11 +46,6 @@ struct RefundIncreaseState
   const char *merchant_url;
 
   /**
-   * CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
-
-  /**
    * Order id of the contract to refund.
    */
   const char *order_id;
@@ -96,11 +91,6 @@ struct RefundLookupState
    * Base URL of the merchant serving the request.
    */
   const char *merchant_url;
-
-  /**
-   * CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
 
   /**
    * Order id to look up.
@@ -226,7 +216,7 @@ refund_increase_run (void *cls,
   if (GNUNET_OK != TALER_string_to_amount (ris->refund_amount,
                                            &refund_amount))
     TALER_TESTING_FAIL (is);
-  ris->rio = TALER_MERCHANT_refund_increase (ris->ctx,
+  ris->rio = TALER_MERCHANT_refund_increase (is->ctx,
                                              ris->merchant_url,
                                              ris->order_id,
                                              &refund_amount,
@@ -455,7 +445,7 @@ refund_lookup_run (void *cls,
   struct RefundLookupState *rls = cls;
   
   rls->is = is;
-  rls->rlo = TALER_MERCHANT_refund_lookup (rls->ctx,
+  rls->rlo = TALER_MERCHANT_refund_lookup (is->ctx,
                                            rls->merchant_url,
                                            rls->order_id,
                                            "default",
@@ -502,7 +492,6 @@ refund_increase_traits (void *cls,
  * @param label command label.
  * @param merchant_url base URL of the backend serving the
  *        "refund increase" request.
- * @param ctx CURL context.
  * @param reason refund justification, human-readable.
  * @param order_id order id of the contract to refund.
  * @param refund_amount amount to be refund-increased.
@@ -515,7 +504,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_increase
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    const char *reason,
    const char *order_id,
    const char *refund_amount,
@@ -527,7 +515,6 @@ TALER_TESTING_cmd_refund_increase
 
   ris = GNUNET_new (struct RefundIncreaseState);
   ris->merchant_url = merchant_url;
-  ris->ctx = ctx;
   ris->order_id = order_id;
   ris->refund_amount = refund_amount;
   ris->refund_fee = refund_fee;
@@ -549,7 +536,6 @@ TALER_TESTING_cmd_refund_increase
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        "refund lookup" request.
- * @param ctx CURL context.
  * @param increase_reference reference to a "refund increase" CMD
  *        that will offer the amount to check the looked up refund
  *        against.  Must NOT be NULL.
@@ -565,7 +551,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    const char *increase_reference,
    const char *pay_reference,
    const char *order_id,
@@ -576,7 +561,6 @@ TALER_TESTING_cmd_refund_lookup
 
   rls = GNUNET_new (struct RefundLookupState);
   rls->merchant_url = merchant_url;
-  rls->ctx = ctx;
   rls->order_id = order_id;
   rls->pay_reference = pay_reference;
   rls->increase_reference = increase_reference;
@@ -598,7 +582,6 @@ TALER_TESTING_cmd_refund_lookup
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        "refund lookup" request.
- * @param ctx CURL context.
  * @param increase_reference reference to a "refund increase" CMD
  *        that will offer the amount to check the looked up refund
  *        against.  Can be NULL, takes precedence over @a
@@ -617,7 +600,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup_with_amount
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    const char *increase_reference,
    const char *pay_reference,
    const char *order_id,
@@ -629,7 +611,6 @@ TALER_TESTING_cmd_refund_lookup_with_amount
 
   rls = GNUNET_new (struct RefundLookupState);
   rls->merchant_url = merchant_url;
-  rls->ctx = ctx;
   rls->order_id = order_id;
   rls->pay_reference = pay_reference;
   rls->increase_reference = increase_reference;

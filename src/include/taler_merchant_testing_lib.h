@@ -217,7 +217,6 @@ TALER_TESTING_cmd_pay_abort_refund
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        "refund lookup" request.
- * @param ctx CURL context.
  * @param increase_reference reference to a "refund increase" CMD
  *        that will offer the amount to check the looked up refund
  *        against.  Must NOT be NULL.
@@ -233,7 +232,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    const char *increase_reference,
    const char *pay_reference,
    const char *order_id,
@@ -246,7 +244,6 @@ TALER_TESTING_cmd_refund_lookup
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        "refund lookup" request.
- * @param ctx CURL context.
  * @param increase_reference reference to a "refund increase" CMD
  *        that will offer the amount to check the looked up refund
  *        against.  Can be NULL, takes precedence over @a
@@ -265,7 +262,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup_with_amount
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    const char *increase_reference,
    const char *pay_reference,
    const char *order_id,
@@ -279,7 +275,6 @@ TALER_TESTING_cmd_refund_lookup_with_amount
  * @param label command label.
  * @param merchant_url base URL of the backend serving the
  *        "refund increase" request.
- * @param ctx CURL context.
  * @param reason refund justification, human-readable.
  * @param order_id order id of the contract to refund.
  * @param refund_amount amount to be refund-increased.
@@ -292,7 +287,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_increase
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    const char *reason,
    const char *order_id,
    const char *refund_amount,
