@@ -285,17 +285,22 @@ history_run (void *cls,
  *        records we want returned.
  * @param nresult how many results are expected
  * @param start first row id we want in the result.
+ * @param use_default_start if GNUNET_YES, then it will
+ *        use the API call that requests /history omitting
+ *        the 'start' argument.  This makes easier to test
+ *        the server default behaviour.
  * @param nrows how many row we want to receive, at most.
  */
-struct TALER_TESTING_Command
-TALER_TESTING_cmd_history (const char *label,
-                           const char *merchant_url,
-                           struct GNUNET_CURL_Context *ctx,
-                           unsigned int http_status,
-                           struct GNUNET_TIME_Absolute time,
-                           unsigned int nresult,
-                           unsigned long long start,
-                           long long nrows)
+static struct TALER_TESTING_Command
+TALER_TESTING_cmd_history2 (const char *label,
+                            const char *merchant_url,
+                            struct GNUNET_CURL_Context *ctx,
+                            unsigned int http_status,
+                            struct GNUNET_TIME_Absolute time,
+                            unsigned int nresult,
+                            unsigned long long start,
+                            int use_default_start,
+                            long long nrows)
 {
   struct HistoryState *hs;
   struct TALER_TESTING_Command cmd;
@@ -316,5 +321,76 @@ TALER_TESTING_cmd_history (const char *label,
   
   return cmd;
 }
+
+/**
+ * Make a "history" command.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        request.
+ * @param ctx CURL context.
+ * @param http_status expected HTTP response code
+ * @param time limit towards the past for the history
+ *        records we want returned.
+ * @param nresult how many results are expected
+ * @param nrows how many row we want to receive, at most.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_history_default_start
+  (const char *label,
+   const char *merchant_url,
+   struct GNUNET_CURL_Context *ctx,
+   unsigned int http_status,
+   struct GNUNET_TIME_Absolute time,
+   unsigned int nresult,
+   long long nrows)
+{
+  return TALER_TESTING_cmd_history2 (label,
+                                     merchant_url,
+                                     ctx,
+                                     http_status,
+                                     time,
+                                     nresult,
+                                     -1, /* ignored */
+                                     GNUNET_YES,
+                                     nrows);
+}
+
+
+/**
+ * Make a "history" command.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        request.
+ * @param ctx CURL context.
+ * @param http_status expected HTTP response code
+ * @param time limit towards the past for the history
+ *        records we want returned.
+ * @param nresult how many results are expected
+ * @param start first row id we want in the result.
+ * @param nrows how many row we want to receive, at most.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_history (const char *label,
+                           const char *merchant_url,
+                           struct GNUNET_CURL_Context *ctx,
+                           unsigned int http_status,
+                           struct GNUNET_TIME_Absolute time,
+                           unsigned int nresult,
+                           unsigned long long start,
+                           long long nrows)
+{
+  return TALER_TESTING_cmd_history2 (label,
+                                     merchant_url,
+                                     ctx,
+                                     http_status,
+                                     time,
+                                     nresult,
+                                     start,
+                                     GNUNET_NO,
+                                     nrows);
+}
+
 
 /* end of testing_api_cmd_history.c */

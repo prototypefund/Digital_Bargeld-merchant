@@ -321,6 +321,29 @@ TALER_TESTING_cmd_refund_increase
  * @param time limit towards the past for the history
  *        records we want returned.
  * @param nresult how many results are expected
+ * @param nrows how many row we want to receive, at most.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_history_default_start
+  (const char *label,
+   const char *merchant_url,
+   struct GNUNET_CURL_Context *ctx,
+   unsigned int http_status,
+   struct GNUNET_TIME_Absolute time,
+   unsigned int nresult,
+   long long nrows);
+
+/**
+ * Make a "history" command.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        request.
+ * @param ctx CURL context.
+ * @param http_status expected HTTP response code
+ * @param time limit towards the past for the history
+ *        records we want returned.
+ * @param nresult how many results are expected
  * @param start first row id we want in the result.
  * @param nrows how many row we want to receive, at most.
  */

@@ -1071,6 +1071,15 @@ run (void *cls,
 
     TALER_TESTING_cmd_batch ("pay-abort",
                              pay_abort),
+
+    TALER_TESTING_cmd_history_default_start
+      ("history-default-start",
+       merchant_url,
+       is->ctx,
+       MHD_HTTP_OK,
+       GNUNET_TIME_UNIT_FOREVER_ABS,
+       0,
+       -100),
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
