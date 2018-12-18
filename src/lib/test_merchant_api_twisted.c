@@ -611,7 +611,6 @@ run (void *cls,
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-5383",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_FAILED_DEPENDENCY,
        "check_aggregation_transfer-5383"),
 
@@ -739,7 +738,6 @@ run (void *cls,
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
        twister_merchant_url,
-       is->ctx,
        MHD_HTTP_FAILED_DEPENDENCY,
        "deposit-simple"),
 

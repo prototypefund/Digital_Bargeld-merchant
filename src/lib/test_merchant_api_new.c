@@ -335,21 +335,18 @@ run (void *cls,
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "deposit-simple"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-1",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "check_bank_transfer-498c"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-again",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "check_bank_transfer-498c"),
 
@@ -417,21 +414,18 @@ run (void *cls,
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-2",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "check_bank_transfer-498c-2"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-2-again",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "check_bank_transfer-498c-2"),
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-2",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "deposit-simple-2"),
 

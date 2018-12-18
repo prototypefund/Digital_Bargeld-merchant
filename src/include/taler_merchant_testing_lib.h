@@ -342,7 +342,6 @@ TALER_TESTING_cmd_history (const char *label,
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        /track/transaction request.
- * @param ctx CURL context.
  * @param http_status expected HTTP response code.
  * @param pay_reference used to retrieve the order id to track.
  */
@@ -350,7 +349,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transaction
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *pay_reference);
 
@@ -360,7 +358,6 @@ TALER_TESTING_cmd_merchant_track_transaction
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        /track/transfer request.
- * @param ctx CURL context.
  * @param http_status expected HTTP response code.
  * @param check_bank_reference reference to a "check bank" CMD
  *        that will provide the WTID and exchange URL to issue
@@ -371,7 +368,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transfer
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *check_bank_reference);
 

@@ -51,11 +51,6 @@ struct TrackTransactionState
   const char *merchant_url;
 
   /**
-   * CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
-
-  /**
    * Expected HTTP response code.
    */
   unsigned int http_status;
@@ -110,11 +105,6 @@ struct TrackTransferState
    * Base URL of the merchant serving the request.
    */
   const char *merchant_url;
-
-  /**
-   * CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
 
   /**
    * Expected HTTP response code.
@@ -347,7 +337,7 @@ track_transfer_run (void *cls,
   if (GNUNET_OK != TALER_TESTING_get_trait_url
       (check_bank_cmd, 0, &exchange_url))
     TALER_TESTING_FAIL (is);
-  tts->tth = TALER_MERCHANT_track_transfer (tts->ctx,
+  tts->tth = TALER_MERCHANT_track_transfer (is->ctx,
                                             tts->merchant_url,
                                             "default",
                                             "x-taler-bank",
@@ -387,7 +377,7 @@ track_transaction_run (void *cls,
     TALER_TESTING_FAIL (is);
 
   tts->tth = TALER_MERCHANT_track_transaction
-    (tts->ctx,
+    (is->ctx,
      tts->merchant_url,
      "default",
      order_id,
@@ -498,7 +488,6 @@ track_transaction_traits (void *cls,
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        /track/transaction request.
- * @param ctx CURL context.
  * @param http_status expected HTTP response code.
  * @param pay_reference used to retrieve the order id to track.
  * @return the command.
@@ -507,7 +496,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transaction
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *pay_reference)
 {
@@ -516,7 +504,6 @@ TALER_TESTING_cmd_merchant_track_transaction
 
   tts = GNUNET_new (struct TrackTransactionState);
   tts->merchant_url = merchant_url;
-  tts->ctx = ctx;
   tts->http_status = http_status;
   tts->pay_reference = pay_reference;
 
@@ -536,7 +523,6 @@ TALER_TESTING_cmd_merchant_track_transaction
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        /track/transfer request.
- * @param ctx CURL context.
  * @param http_status expected HTTP response code.
  * @param check_bank_reference reference to a "check bank" CMD
  *        that will provide the WTID and exchange URL to issue
@@ -547,7 +533,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transfer
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *check_bank_reference)
 {
@@ -556,7 +541,6 @@ TALER_TESTING_cmd_merchant_track_transfer
 
   tts = GNUNET_new (struct TrackTransferState);
   tts->merchant_url = merchant_url;
-  tts->ctx = ctx;
   tts->http_status = http_status;
   tts->check_bank_reference = check_bank_reference;
 
