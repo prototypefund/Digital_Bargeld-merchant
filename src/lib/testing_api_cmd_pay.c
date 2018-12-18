@@ -276,13 +276,7 @@ struct PayAbortRefundState
    * Expected HTTP response code.
    */
   unsigned int http_status;
-
-  /**
-   * Connection handle to the exchange.
-   */
-  struct TALER_EXCHANGE_Handle *exchange;
 };
-
 
 
 /**
@@ -1519,7 +1513,7 @@ pay_abort_refund_run (void *cls,
     (pars->refund_fee, &refund_fee));
 
   pars->rh = TALER_EXCHANGE_refund2
-    (pars->exchange,
+    (is->exchange,
      &refund_amount,
      &refund_fee,
      h_contract_terms,
@@ -1540,7 +1534,6 @@ pay_abort_refund_run (void *cls,
  * at the exchange.
  *
  * @param label command label.
- * @param exchange connection label to the exchange.
  * @param abort_reference reference to the "pay abort" CMD that
  *        will offer the refund permission.
  * @param num_coins how many coins are expected to be refunded.
@@ -1552,7 +1545,6 @@ pay_abort_refund_run (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_pay_abort_refund
   (const char *label,
-   struct TALER_EXCHANGE_Handle *exchange,
    const char *abort_reference,
    unsigned int num_coins,
    const char *refund_amount,
@@ -1568,7 +1560,6 @@ TALER_TESTING_cmd_pay_abort_refund
   pars->refund_amount = refund_amount;
   pars->refund_fee = refund_fee;
   pars->http_status = http_status;
-  pars->exchange = exchange;
 
   cmd.cls = pars;
   cmd.label = label;

@@ -192,19 +192,17 @@ TALER_TESTING_cmd_pay_abort (const char *label,
  * at the exchange.
  *
  * @param label command label.
- * @param exchange connection label to the exchange.
  * @param abort_reference reference to the "pay abort" CMD that
  *        will offer the refund permission.
  * @param num_coins how many coins are expected to be refunded.
  * @param refund_amount the amount we are going to redeem as
  *        refund.
- * @param refund_fee the refund fee (FIXME: who pay it?)
+ * @param refund_fee the refund fee (FIXME: who pays it?)
  * @param http_status expected HTTP response code.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_pay_abort_refund
   (const char *label,
-   struct TALER_EXCHANGE_Handle *exchange,
    const char *abort_reference,
    unsigned int num_coins,
    const char *refund_amount,

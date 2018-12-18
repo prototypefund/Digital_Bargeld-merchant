@@ -968,7 +968,6 @@ run (void *cls,
                                  MHD_HTTP_OK),
 
     TALER_TESTING_cmd_pay_abort_refund ("pay-abort-refund-11",
-                                        is->exchange,
                                         /* abort reference */
                                         "pay-abort-11",
                                         0,
