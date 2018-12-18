@@ -605,7 +605,6 @@ TALER_TESTING_get_trait_refund_entry
  *        serve the /tip-authorize request.
  * @param exchange_url the base URL of the exchange that owns
  *        the reserve from which the tip is going to be gotten.
- * @param ctx the CURL context to carry on the HTTP work.
  * @param http_status the HTTP response code which is expected
  *        for this operation.
  * @param instance which merchant instance is running this CMD.
@@ -619,7 +618,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
   (const char *label,
    const char *merchant_url,
    const char *exchange_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *instance,
    const char *justification,
@@ -649,7 +647,6 @@ TALER_TESTING_cmd_tip_authorize_fake
  *        serve the /tip-authorize request.
  * @param exchange_url the base URL of the exchange that owns
  *        the reserve from which the tip is going to be gotten.
- * @param ctx the CURL context to carry on the HTTP work.
  * @param http_status the HTTP response code which is expected
  *        for this operation.
  * @param instance which merchant instance is running this CMD.
@@ -661,7 +658,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize (const char *label,
                                  const char *merchant_url,
                                  const char *exchange_url,
-                                 struct GNUNET_CURL_Context *ctx,
                                  unsigned int http_status,
                                  const char *instance,
                                  const char *justification,
@@ -673,7 +669,6 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
  * @param label the command label
  * @param merchant_url base URL of the merchant which will
  *        server the /tip-query request.
- * @param ctx CURL context to carry on the HTTP work.
  * @param http_status expected HTTP response code for the
  *        /tip-query request.
  * @param instance the merchant instance running this CMD.
@@ -681,7 +676,6 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query (const char *label,
                              const char *merchant_url,
-                             struct GNUNET_CURL_Context *ctx,
                              unsigned int http_status,
                              const char *instance);
 /**
@@ -690,7 +684,6 @@ TALER_TESTING_cmd_tip_query (const char *label,
  * @param label the command label
  * @param merchant_url base URL of the merchant which will
  *        server the /tip-query request.
- * @param ctx CURL context to carry on the HTTP work.
  * @param http_status expected HTTP response code for the
  *        /tip-query request.
  * @param instance the merchant instance running this CMD.
@@ -704,7 +697,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query_with_amounts
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *instance,
    const char *expected_amount_picked_up,
@@ -718,25 +710,20 @@ TALER_TESTING_cmd_tip_query_with_amounts
  * @param label the command label
  * @param merchant_url base URL of the backend which will serve
  *        the /tip-pickup request.
- * @param ctx CURL context to carry on HTTP work.
  * @param http_status expected HTTP response code.
  * @param authorize_reference reference to a /tip-autorize CMD
  *        that offers a tip id to pick up.
  * @param amounts array of string-defined amounts that specifies
  *        which denominations will be accepted for tipping.
- * @param exchange connection handle to the exchange that will
- *        eventually serve the withdraw operation.
  * @param ec expected Taler error code.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup_with_ec
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *authorize_reference,
    const char **amounts,
-   struct TALER_EXCHANGE_Handle *exchange,
    enum TALER_ErrorCode ec);
 
 /**
@@ -745,24 +732,19 @@ TALER_TESTING_cmd_tip_pickup_with_ec
  * @param label the command label
  * @param merchant_url base URL of the backend which will serve
  *        the /tip-pickup request.
- * @param ctx CURL context to carry on HTTP work.
  * @param http_status expected HTTP response code.
  * @param authorize_reference reference to a /tip-autorize CMD
  *        that offers a tip id to pick up.
  * @param amounts array of string-defined amounts that specifies
  *        which denominations will be accepted for tipping.
- * @param exchange connection handle to the exchange that will
- *        eventually serve the withdraw operation.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *authorize_reference,
-   const char **amounts,
-   struct TALER_EXCHANGE_Handle *exchange);
+   const char **amounts);
 
 /**
  * Make the instruction pointer point to @a new_ip

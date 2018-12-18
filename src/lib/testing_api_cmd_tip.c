@@ -45,11 +45,6 @@ struct TipPickupState
   const char *exchange_url;
 
   /**
-   * CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
-
-  /**
    * Expected HTTP response code.
    */
   unsigned int http_status;
@@ -124,11 +119,6 @@ struct TipPickupState
    * response code).
    */
   enum TALER_ErrorCode expected_ec;
-
-  /**
-   * The connection to the exchange.
-   */
-  struct TALER_EXCHANGE_Handle *exchange;
 };
 
 
@@ -142,11 +132,6 @@ struct TipQueryState
    * The merchant base URL.
    */
   const char *merchant_url;
-
-  /**
-   * The CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
 
   /**
    * Expected HTTP response code for this CMD.
@@ -196,11 +181,6 @@ struct TipAuthorizeState
    * Merchant base URL.
    */
   const char *merchant_url;
-
-  /**
-   * CURL context.
-   */
-  struct GNUNET_CURL_Context *ctx;
 
   /**
    * Expected HTTP response code.
@@ -375,7 +355,7 @@ tip_authorize_run (void *cls,
     TALER_TESTING_FAIL (is);
 
   tas->tao = TALER_MERCHANT_tip_authorize
-    (tas->ctx,
+    (is->ctx,
      tas->merchant_url,
      "http://merchant.com/pickup",
      "http://merchant.com/continue",
@@ -444,7 +424,6 @@ tip_authorize_cleanup (void *cls,
  *        serve the /tip-authorize request.
  * @param exchange_url the base URL of the exchange that owns
  *        the reserve from which the tip is going to be gotten.
- * @param ctx the CURL context to carry on the HTTP work.
  * @param http_status the HTTP response code which is expected
  *        for this operation.
  * @param instance which merchant instance is running this CMD.
@@ -458,7 +437,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
   (const char *label,
    const char *merchant_url,
    const char *exchange_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *instance,
    const char *justification,
@@ -471,7 +449,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
   tas = GNUNET_new (struct TipAuthorizeState);
   tas->merchant_url = merchant_url;
   tas->exchange_url = exchange_url;
-  tas->ctx = ctx;
   tas->instance = instance;
   tas->justification = justification;
   tas->amount = amount;
@@ -497,7 +474,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
  *        serve the /tip-authorize request.
  * @param exchange_url the base URL of the exchange that owns
  *        the reserve from which the tip is going to be gotten.
- * @param ctx the CURL context to carry on the HTTP work.
  * @param http_status the HTTP response code which is expected
  *        for this operation.
  * @param instance which merchant instance is running this CMD.
@@ -509,7 +485,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize (const char *label,
                                  const char *merchant_url,
                                  const char *exchange_url,
-                                 struct GNUNET_CURL_Context *ctx,
                                  unsigned int http_status,
                                  const char *instance,
                                  const char *justification,
@@ -521,7 +496,6 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
   tas = GNUNET_new (struct TipAuthorizeState);
   tas->merchant_url = merchant_url;
   tas->exchange_url = exchange_url;
-  tas->ctx = ctx;
   tas->instance = instance;
   tas->justification = justification;
   tas->amount = amount;
@@ -653,7 +627,7 @@ tip_query_run (void *cls,
   struct TipQueryState *tqs = cls;
   
   tqs->is = is;
-  tqs->tqo = TALER_MERCHANT_tip_query (tqs->ctx,
+  tqs->tqo = TALER_MERCHANT_tip_query (is->ctx,
                                        tqs->merchant_url,
                                        tqs->instance,
                                        &tip_query_cb,
@@ -668,7 +642,6 @@ tip_query_run (void *cls,
  * @param label the command label
  * @param merchant_url base URL of the merchant which will
  *        server the /tip-query request.
- * @param ctx CURL context to carry on the HTTP work.
  * @param http_status expected HTTP response code for the
  *        /tip-query request.
  * @param instance the merchant instance running this CMD.
@@ -684,7 +657,6 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query_with_amounts
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *instance,
    const char *expected_amount_picked_up,
@@ -696,7 +668,6 @@ TALER_TESTING_cmd_tip_query_with_amounts
 
   tqs = GNUNET_new (struct TipQueryState);
   tqs->merchant_url = merchant_url;
-  tqs->ctx = ctx;
   tqs->instance = instance;
   tqs->http_status = http_status;
   tqs->expected_amount_picked_up = expected_amount_picked_up;
@@ -718,7 +689,6 @@ TALER_TESTING_cmd_tip_query_with_amounts
  * @param label the command label
  * @param merchant_url base URL of the merchant which will
  *        server the /tip-query request.
- * @param ctx CURL context to carry on the HTTP work.
  * @param http_status expected HTTP response code for the
  *        /tip-query request.
  * @param instance the merchant instance running this CMD.
@@ -726,7 +696,6 @@ TALER_TESTING_cmd_tip_query_with_amounts
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query (const char *label,
                              const char *merchant_url,
-                             struct GNUNET_CURL_Context *ctx,
                              unsigned int http_status,
                              const char *instance)
 {
@@ -735,7 +704,6 @@ TALER_TESTING_cmd_tip_query (const char *label,
 
   tqs = GNUNET_new (struct TipQueryState);
   tqs->merchant_url = merchant_url;
-  tqs->ctx = ctx;
   tqs->instance = instance;
   tqs->http_status = http_status;
 
@@ -912,7 +880,7 @@ pickup_cb (void *cls,
         ( (NULL == tps->sigs) ||
           (NULL == tps->sigs[wh->off].rsa_signature) ) );
     wh->wsh = TALER_EXCHANGE_reserve_withdraw2
-      (tps->exchange,
+      (tps->is->exchange,
        tps->dks[i],
        &reserve_sigs[i],
        reserve_pub,
@@ -947,7 +915,7 @@ tip_pickup_run (void *cls,
   const struct GNUNET_HashCode *tip_id;
 
   tps->is = is;
-  tps->exchange_url = TALER_EXCHANGE_get_base_url (tps->exchange);
+  tps->exchange_url = TALER_EXCHANGE_get_base_url (is->exchange);
   if (NULL == tps->replay_reference)
   {
     replay_cmd = NULL;
@@ -1029,7 +997,7 @@ tip_pickup_run (void *cls,
       (authorize_cmd, 0, &tip_id))
       TALER_TESTING_FAIL (is);
 
-    tps->tpo = TALER_MERCHANT_tip_pickup (tps->ctx,
+    tps->tpo = TALER_MERCHANT_tip_pickup (is->ctx,
                                           tps->merchant_url,
                                           tip_id,
                                           num_planchets,
@@ -1128,7 +1096,6 @@ tip_pickup_traits (void *cls,
  * @param label the command label
  * @param merchant_url base URL of the backend which will serve
  *        the /tip-pickup request.
- * @param ctx CURL context to carry on HTTP work.
  * @param http_status expected HTTP response code.
  * @param authorize_reference reference to a /tip-autorize CMD
  *        that offers a tip id to pick up.
@@ -1142,11 +1109,9 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup_with_ec
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *authorize_reference,
    const char **amounts,
-   struct TALER_EXCHANGE_Handle *exchange,
    enum TALER_ErrorCode ec)
 {
   struct TipPickupState *tps;
@@ -1154,10 +1119,8 @@ TALER_TESTING_cmd_tip_pickup_with_ec
 
   tps = GNUNET_new (struct TipPickupState);
   tps->merchant_url = merchant_url;
-  tps->ctx = ctx;
   tps->authorize_reference = authorize_reference;
   tps->amounts = amounts;
-  tps->exchange = exchange;
   tps->http_status = http_status;
   tps->expected_ec = ec;
 
@@ -1176,34 +1139,27 @@ TALER_TESTING_cmd_tip_pickup_with_ec
  * @param label the command label
  * @param merchant_url base URL of the backend which will serve
  *        the /tip-pickup request.
- * @param ctx CURL context to carry on HTTP work.
  * @param http_status expected HTTP response code.
  * @param authorize_reference reference to a /tip-autorize CMD
  *        that offers a tip id to pick up.
  * @param amounts array of string-defined amounts that specifies
  *        which denominations will be accepted for tipping.
- * @param exchange connection handle to the exchange that will
- *        eventually serve the withdraw operation.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup
   (const char *label,
    const char *merchant_url,
-   struct GNUNET_CURL_Context *ctx,
    unsigned int http_status,
    const char *authorize_reference,
-   const char **amounts,
-   struct TALER_EXCHANGE_Handle *exchange)
+   const char **amounts)
 {
   struct TipPickupState *tps;
   struct TALER_TESTING_Command cmd;
 
   tps = GNUNET_new (struct TipPickupState);
   tps->merchant_url = merchant_url;
-  tps->ctx = ctx;
   tps->authorize_reference = authorize_reference;
   tps->amounts = amounts;
-  tps->exchange = exchange;
   tps->http_status = http_status;
 
   cmd.cls = tps;
