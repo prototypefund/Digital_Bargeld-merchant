@@ -335,14 +335,12 @@ run (void *cls,
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
-       is->exchange, // picks port from config's [exchange].
        "create-reserve-1",
        CURRENCY_5,
        MHD_HTTP_OK),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-2",
-       is->exchange,
        "create-reserve-1",
        CURRENCY_5,
        MHD_HTTP_OK),
@@ -350,7 +348,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        order_worth_5,
        NULL),
@@ -358,7 +355,6 @@ run (void *cls,
     TALER_TESTING_cmd_pay
       ("deposit-simple",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "create-proposal-1",
        "withdraw-coin-1",
@@ -378,7 +374,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-proposal-2",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        order_worth_5_track,
        NULL),
@@ -386,7 +381,6 @@ run (void *cls,
     TALER_TESTING_cmd_pay
       ("deposit-simple-2",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "create-proposal-2",
        "withdraw-coin-2",
@@ -403,14 +397,12 @@ run (void *cls,
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "deposit-simple-2"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-1",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "track-transaction-1"),
 
@@ -434,7 +426,6 @@ run (void *cls,
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
-       is->exchange,
        "create-reserve-1",
        CURRENCY_5,
        MHD_HTTP_OK),
@@ -442,7 +433,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-unaggregated-proposal",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        order_worth_5_unaggregated,
        alt_instance),
@@ -450,7 +440,6 @@ run (void *cls,
     TALER_TESTING_cmd_pay
       ("deposit-unaggregated",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "create-unaggregated-proposal",
        "withdraw-coin-1",
@@ -473,14 +462,12 @@ run (void *cls,
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-2",
-       is->exchange,
        "create-reserve-2",
        CURRENCY_5,
        MHD_HTTP_OK),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-3",
-       is->exchange,
        "create-reserve-2",
        CURRENCY_5,
        MHD_HTTP_OK),
@@ -488,7 +475,6 @@ run (void *cls,
     TALER_TESTING_cmd_proposal
       ("create-twocoins-proposal",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        order_worth_10_2coins,
        NULL),
@@ -496,7 +482,6 @@ run (void *cls,
     TALER_TESTING_cmd_pay
       ("deposit-twocoins",
        merchant_url,
-       is->ctx,
        MHD_HTTP_OK,
        "create-twocoins-proposal",
        "withdraw-coin-2;withdraw-coin-3",
