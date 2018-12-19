@@ -418,7 +418,6 @@ TALER_TESTING_cmd_check_payment (const char *label,
                                  unsigned int expect_paid)
 {
   struct CheckPaymentState *cps;
-  struct TALER_TESTING_Command cmd;
 
   cps = GNUNET_new (struct CheckPaymentState);
   cps->http_status = http_status;
@@ -426,10 +425,12 @@ TALER_TESTING_cmd_check_payment (const char *label,
   cps->expect_paid = expect_paid;
   cps->merchant_url = merchant_url;
 
-  cmd.cls = cps;
-  cmd.label = label;
-  cmd.run = &check_payment_run;
-  cmd.cleanup = &check_payment_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = cps,
+    .label = label,
+    .run = &check_payment_run,
+    .cleanup = &check_payment_cleanup
+  };
 
   return cmd;
 
@@ -1023,7 +1024,6 @@ TALER_TESTING_cmd_pay (const char *label,
                        const char *refund_fee)
 {
   struct PayState *ps;
-  struct TALER_TESTING_Command cmd;
 
   ps = GNUNET_new (struct PayState);
   ps->http_status = http_status;
@@ -1034,11 +1034,13 @@ TALER_TESTING_cmd_pay (const char *label,
   ps->amount_without_fee = amount_without_fee;
   ps->refund_fee = refund_fee;
 
-  cmd.cls = ps;
-  cmd.label = label;
-  cmd.run = &pay_run;
-  cmd.cleanup = &pay_cleanup;
-  cmd.traits = &pay_traits;
+  struct TALER_TESTING_Command cmd = {
+    .cls = ps,
+    .label = label,
+    .run = &pay_run,
+    .cleanup = &pay_cleanup,
+    .traits = &pay_traits
+  };
 
   return cmd;
 
@@ -1183,18 +1185,19 @@ TALER_TESTING_cmd_pay_abort (const char *label,
                              unsigned int http_status)
 {
   struct PayAbortState *pas;
-  struct TALER_TESTING_Command cmd;
 
   pas = GNUNET_new (struct PayAbortState);
   pas->http_status = http_status;
   pas->pay_reference = pay_reference;
   pas->merchant_url = merchant_url;
 
-  cmd.cls = pas;
-  cmd.label = label;
-  cmd.run = &pay_abort_run;
-  cmd.cleanup = &pay_abort_cleanup;
-  cmd.traits = &pay_abort_traits;
+  struct TALER_TESTING_Command cmd = {
+    .cls = pas,
+    .label = label,
+    .run = &pay_abort_run,
+    .cleanup = &pay_abort_cleanup,
+    .traits = &pay_abort_traits
+  };
   
   return cmd;
 }
@@ -1380,7 +1383,6 @@ TALER_TESTING_cmd_pay_again (const char *label,
 {
 
   struct PayAgainState *pas;
-  struct TALER_TESTING_Command cmd;
 
   pas = GNUNET_new (struct PayAgainState);
   pas->http_status = http_status;
@@ -1389,10 +1391,12 @@ TALER_TESTING_cmd_pay_again (const char *label,
   pas->merchant_url = merchant_url;
   pas->refund_fee = refund_fee;
 
-  cmd.cls = pas;
-  cmd.label = label;
-  cmd.run = &pay_again_run;
-  cmd.cleanup = &pay_again_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = pas,
+    .label = label,
+    .run = &pay_again_run,
+    .cleanup = &pay_again_cleanup
+  };
   
   return cmd;
 }
@@ -1552,7 +1556,6 @@ TALER_TESTING_cmd_pay_abort_refund
    unsigned int http_status)
 {
   struct PayAbortRefundState *pars;
-  struct TALER_TESTING_Command cmd;
 
   pars = GNUNET_new (struct PayAbortRefundState);
   pars->abort_reference = abort_reference;
@@ -1561,10 +1564,12 @@ TALER_TESTING_cmd_pay_abort_refund
   pars->refund_fee = refund_fee;
   pars->http_status = http_status;
 
-  cmd.cls = pars;
-  cmd.label = label;
-  cmd.run = &pay_abort_refund_run;
-  cmd.cleanup = &pay_abort_refund_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = pars,
+    .label = label,
+    .run = &pay_abort_refund_run,
+    .cleanup = &pay_abort_refund_cleanup
+  };
 
   return cmd;
 }

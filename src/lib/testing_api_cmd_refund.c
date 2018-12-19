@@ -511,7 +511,6 @@ TALER_TESTING_cmd_refund_increase
    unsigned int http_code)
 {
   struct RefundIncreaseState *ris;
-  struct TALER_TESTING_Command cmd;
 
   ris = GNUNET_new (struct RefundIncreaseState);
   ris->merchant_url = merchant_url;
@@ -521,11 +520,13 @@ TALER_TESTING_cmd_refund_increase
   ris->reason = reason;
   ris->http_code = http_code;
 
-  cmd.cls = ris;
-  cmd.label = label;
-  cmd.run = &refund_increase_run;
-  cmd.cleanup = &refund_increase_cleanup;
-  cmd.traits = &refund_increase_traits;
+  struct TALER_TESTING_Command cmd = {
+    .cls = ris,
+    .label = label,
+    .run = &refund_increase_run,
+    .cleanup = &refund_increase_cleanup,
+    .traits = &refund_increase_traits
+  };
 
   return cmd;
 }
@@ -557,7 +558,6 @@ TALER_TESTING_cmd_refund_lookup
    unsigned int http_code)
 {
   struct RefundLookupState *rls;
-  struct TALER_TESTING_Command cmd;
 
   rls = GNUNET_new (struct RefundLookupState);
   rls->merchant_url = merchant_url;
@@ -566,10 +566,12 @@ TALER_TESTING_cmd_refund_lookup
   rls->increase_reference = increase_reference;
   rls->http_code = http_code;
 
-  cmd.cls = rls;
-  cmd.label = label;
-  cmd.run = &refund_lookup_run;
-  cmd.cleanup = &refund_lookup_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = rls,
+    .label = label,
+    .run = &refund_lookup_run,
+    .cleanup = &refund_lookup_cleanup
+  };
 
   return cmd;
 }
@@ -607,7 +609,6 @@ TALER_TESTING_cmd_refund_lookup_with_amount
    const char *refund_amount)
 {
   struct RefundLookupState *rls;
-  struct TALER_TESTING_Command cmd;
 
   rls = GNUNET_new (struct RefundLookupState);
   rls->merchant_url = merchant_url;
@@ -617,10 +618,12 @@ TALER_TESTING_cmd_refund_lookup_with_amount
   rls->http_code = http_code;
   rls->refund_amount = refund_amount;
 
-  cmd.cls = rls;
-  cmd.label = label;
-  cmd.run = &refund_lookup_run;
-  cmd.cleanup = &refund_lookup_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = rls,
+    .label = label,
+    .run = &refund_lookup_run,
+    .cleanup = &refund_lookup_cleanup
+  };
 
   return cmd;
 }

@@ -315,17 +315,16 @@ history_run (void *cls,
  * @param nrows how many row we want to receive, at most.
  */
 static struct TALER_TESTING_Command
-TALER_TESTING_cmd_history2 (const char *label,
-                            const char *merchant_url,
-                            unsigned int http_status,
-                            struct GNUNET_TIME_Absolute time,
-                            unsigned int nresult,
-                            unsigned long long start,
-                            int use_default_start,
-                            long long nrows)
+cmd_history2 (const char *label,
+              const char *merchant_url,
+              unsigned int http_status,
+              struct GNUNET_TIME_Absolute time,
+              unsigned int nresult,
+              unsigned long long start,
+              int use_default_start,
+              long long nrows)
 {
   struct HistoryState *hs;
-  struct TALER_TESTING_Command cmd;
 
   hs = GNUNET_new (struct HistoryState);
   hs->http_status = http_status;
@@ -336,10 +335,12 @@ TALER_TESTING_cmd_history2 (const char *label,
   hs->merchant_url = merchant_url;
   hs->use_default_start = use_default_start;
 
-  cmd.cls = hs;
-  cmd.label = label;
-  cmd.run = &history_run;
-  cmd.cleanup = &history_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = hs,
+    .label = label,
+    .run = &history_run,
+    .cleanup = &history_cleanup
+  };
   
   return cmd;
 }
@@ -366,14 +367,14 @@ TALER_TESTING_cmd_history_default_start
    unsigned int nresult,
    long long nrows)
 {
-  return TALER_TESTING_cmd_history2 (label,
-                                     merchant_url,
-                                     http_status,
-                                     time,
-                                     nresult,
-                                     -1, /* ignored */
-                                     GNUNET_YES,
-                                     nrows);
+  return cmd_history2 (label,
+                       merchant_url,
+                       http_status,
+                       time,
+                       nresult,
+                       -1, /* ignored */
+                       GNUNET_YES,
+                       nrows);
 }
 
 
@@ -400,14 +401,14 @@ TALER_TESTING_cmd_history (const char *label,
                            unsigned long long start,
                            long long nrows)
 {
-  return TALER_TESTING_cmd_history2 (label,
-                                     merchant_url,
-                                     http_status,
-                                     time,
-                                     nresult,
-                                     start,
-                                     GNUNET_NO,
-                                     nrows);
+  return cmd_history2 (label,
+                       merchant_url,
+                       http_status,
+                       time,
+                       nresult,
+                       start,
+                       GNUNET_NO,
+                       nrows);
 }
 
 

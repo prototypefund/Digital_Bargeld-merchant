@@ -444,7 +444,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
    enum TALER_ErrorCode ec)
 {
   struct TipAuthorizeState *tas;
-  struct TALER_TESTING_Command cmd;
 
   tas = GNUNET_new (struct TipAuthorizeState);
   tas->merchant_url = merchant_url;
@@ -455,11 +454,13 @@ TALER_TESTING_cmd_tip_authorize_with_ec
   tas->http_status = http_status;
   tas->expected_ec = ec;
 
-  cmd.label = label;
-  cmd.cls = tas;
-  cmd.run = &tip_authorize_run;
-  cmd.cleanup = &tip_authorize_cleanup;
-  cmd.traits = &tip_authorize_traits;
+  struct TALER_TESTING_Command cmd = {
+    .label = label,
+    .cls = tas,
+    .run = &tip_authorize_run,
+    .cleanup = &tip_authorize_cleanup,
+    .traits = &tip_authorize_traits
+  };
   
   return cmd;
 }
@@ -491,7 +492,6 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
                                  const char *amount)
 {
   struct TipAuthorizeState *tas;
-  struct TALER_TESTING_Command cmd;
 
   tas = GNUNET_new (struct TipAuthorizeState);
   tas->merchant_url = merchant_url;
@@ -501,11 +501,13 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
   tas->amount = amount;
   tas->http_status = http_status;
 
-  cmd.label = label;
-  cmd.cls = tas;
-  cmd.run = &tip_authorize_run;
-  cmd.cleanup = &tip_authorize_cleanup;
-  cmd.traits = &tip_authorize_traits;
+  struct TALER_TESTING_Command cmd = {
+    .label = label,
+    .cls = tas,
+    .run = &tip_authorize_run,
+    .cleanup = &tip_authorize_cleanup,
+    .traits = &tip_authorize_traits
+  };
   
   return cmd;
 }
@@ -664,7 +666,6 @@ TALER_TESTING_cmd_tip_query_with_amounts
    const char *expected_amount_available)
 {
   struct TipQueryState *tqs;
-  struct TALER_TESTING_Command cmd;
 
   tqs = GNUNET_new (struct TipQueryState);
   tqs->merchant_url = merchant_url;
@@ -674,10 +675,12 @@ TALER_TESTING_cmd_tip_query_with_amounts
   tqs->expected_amount_authorized = expected_amount_authorized;
   tqs->expected_amount_available = expected_amount_available;
 
-  cmd.cls = tqs;
-  cmd.label = label;
-  cmd.run = &tip_query_run;
-  cmd.cleanup = &tip_query_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = tqs,
+    .label = label,
+    .run = &tip_query_run,
+    .cleanup = &tip_query_cleanup
+  };
   
   return cmd;
 }
@@ -700,17 +703,18 @@ TALER_TESTING_cmd_tip_query (const char *label,
                              const char *instance)
 {
   struct TipQueryState *tqs;
-  struct TALER_TESTING_Command cmd;
 
   tqs = GNUNET_new (struct TipQueryState);
   tqs->merchant_url = merchant_url;
   tqs->instance = instance;
   tqs->http_status = http_status;
 
-  cmd.cls = tqs;
-  cmd.label = label;
-  cmd.run = &tip_query_run;
-  cmd.cleanup = &tip_query_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = tqs,
+    .label = label,
+    .run = &tip_query_run,
+    .cleanup = &tip_query_cleanup
+  };
   
   return cmd;
 }
@@ -1115,7 +1119,6 @@ TALER_TESTING_cmd_tip_pickup_with_ec
    enum TALER_ErrorCode ec)
 {
   struct TipPickupState *tps;
-  struct TALER_TESTING_Command cmd;
 
   tps = GNUNET_new (struct TipPickupState);
   tps->merchant_url = merchant_url;
@@ -1124,11 +1127,13 @@ TALER_TESTING_cmd_tip_pickup_with_ec
   tps->http_status = http_status;
   tps->expected_ec = ec;
 
-  cmd.cls = tps;
-  cmd.label = label;
-  cmd.run = &tip_pickup_run;
-  cmd.cleanup = &tip_pickup_cleanup;
-  cmd.traits = &tip_pickup_traits;
+  struct TALER_TESTING_Command cmd = {
+    .cls = tps,
+    .label = label,
+    .run = &tip_pickup_run,
+    .cleanup = &tip_pickup_cleanup,
+    .traits = &tip_pickup_traits
+  };
   
   return cmd;
 }
@@ -1154,7 +1159,6 @@ TALER_TESTING_cmd_tip_pickup
    const char **amounts)
 {
   struct TipPickupState *tps;
-  struct TALER_TESTING_Command cmd;
 
   tps = GNUNET_new (struct TipPickupState);
   tps->merchant_url = merchant_url;
@@ -1162,11 +1166,13 @@ TALER_TESTING_cmd_tip_pickup
   tps->amounts = amounts;
   tps->http_status = http_status;
 
-  cmd.cls = tps;
-  cmd.label = label;
-  cmd.run = &tip_pickup_run;
-  cmd.cleanup = &tip_pickup_cleanup;
-  cmd.traits = &tip_pickup_traits;
+  struct TALER_TESTING_Command cmd = {
+    .cls = tps,
+    .label = label,
+    .run = &tip_pickup_run,
+    .cleanup = &tip_pickup_cleanup,
+    .traits = &tip_pickup_traits
+  };
   
   return cmd;
 }
@@ -1185,15 +1191,16 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize_fake (const char *label)
 {
   struct TipAuthorizeState *tas;
-  struct TALER_TESTING_Command cmd;
 
   tas = GNUNET_new (struct TipAuthorizeState);
 
-  cmd.label = label;
-  cmd.cls = tas;
-  cmd.run = &tip_authorize_fake_run;
-  cmd.cleanup = &tip_authorize_cleanup;
-  cmd.traits = &tip_authorize_traits;
+  struct TALER_TESTING_Command cmd = {
+    .label = label,
+    .cls = tas,
+    .run = &tip_authorize_fake_run,
+    .cleanup = &tip_authorize_cleanup,
+    .traits = &tip_authorize_traits
+  };
   
   return cmd;
 }

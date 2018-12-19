@@ -500,18 +500,19 @@ TALER_TESTING_cmd_merchant_track_transaction
    const char *pay_reference)
 {
   struct TrackTransactionState *tts;
-  struct TALER_TESTING_Command cmd;
 
   tts = GNUNET_new (struct TrackTransactionState);
   tts->merchant_url = merchant_url;
   tts->http_status = http_status;
   tts->pay_reference = pay_reference;
 
-  cmd.cls = tts;
-  cmd.label = label;
-  cmd.run = &track_transaction_run;
-  cmd.cleanup = &track_transaction_cleanup;
-  cmd.traits = &track_transaction_traits;
+  struct TALER_TESTING_Command cmd = {
+    .cls = tts,
+    .label = label,
+    .run = &track_transaction_run,
+    .cleanup = &track_transaction_cleanup,
+    .traits = &track_transaction_traits
+  };
 
   return cmd;
 }
@@ -537,17 +538,18 @@ TALER_TESTING_cmd_merchant_track_transfer
    const char *check_bank_reference)
 {
   struct TrackTransferState *tts;
-  struct TALER_TESTING_Command cmd;
 
   tts = GNUNET_new (struct TrackTransferState);
   tts->merchant_url = merchant_url;
   tts->http_status = http_status;
   tts->check_bank_reference = check_bank_reference;
 
-  cmd.cls = tts;
-  cmd.label = label;
-  cmd.run = &track_transfer_run;
-  cmd.cleanup = &track_transfer_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = tts,
+    .label = label,
+    .run = &track_transfer_run,
+    .cleanup = &track_transfer_cleanup
+  };
 
   return cmd;
 }

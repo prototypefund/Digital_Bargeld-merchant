@@ -473,7 +473,6 @@ TALER_TESTING_cmd_proposal (const char *label,
                             const char *order,
                             const char *instance)
 {
-  struct TALER_TESTING_Command cmd;
   struct ProposalState *ps;
 
   ps = GNUNET_new (struct ProposalState);
@@ -482,11 +481,14 @@ TALER_TESTING_cmd_proposal (const char *label,
   ps->merchant_url = merchant_url;
   ps->instance = (NULL == instance) ? "default": instance;
 
-  cmd.cls = ps;
-  cmd.label = label;
-  cmd.run = &proposal_run;
-  cmd.cleanup = &proposal_cleanup;
-  cmd.traits = &proposal_traits;
+  struct TALER_TESTING_Command cmd = {
+    .cls = ps,
+    .label = label,
+    .run = &proposal_run,
+    .cleanup = &proposal_cleanup,
+    .traits = &proposal_traits
+  };
+
   return cmd;
 }
 
@@ -600,7 +602,6 @@ TALER_TESTING_cmd_proposal_lookup
    const char *order_id)
 {
   struct ProposalLookupState *pls;
-  struct TALER_TESTING_Command cmd;
   
   pls = GNUNET_new (struct ProposalLookupState);
   pls->http_status = http_status;
@@ -608,10 +609,12 @@ TALER_TESTING_cmd_proposal_lookup
   pls->merchant_url = merchant_url;
   pls->order_id = order_id;
 
-  cmd.cls = pls;
-  cmd.label = label;
-  cmd.run = &proposal_lookup_run;
-  cmd.cleanup = &proposal_lookup_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = pls,
+    .label = label,
+    .run = &proposal_lookup_run,
+    .cleanup = &proposal_lookup_cleanup
+  };
 
   return cmd;
 }

@@ -102,16 +102,17 @@ TALER_TESTING_cmd_rewind_ip
    unsigned int *counter)
 {
   struct RewindIpState *ris;
-  struct TALER_TESTING_Command cmd;
 
   ris = GNUNET_new (struct RewindIpState);
   ris->new_ip = new_ip;
   ris->counter = counter;
 
-  cmd.cls = ris;
-  cmd.label = label;
-  cmd.run = &rewind_ip_run;
-  cmd.cleanup = &rewind_ip_cleanup;
+  struct TALER_TESTING_Command cmd = {
+    .cls = ris,
+    .label = label,
+    .run = &rewind_ip_run,
+    .cleanup = &rewind_ip_cleanup
+  };
 
   return cmd;
 }
