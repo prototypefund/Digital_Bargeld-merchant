@@ -436,15 +436,20 @@ proposal_put (struct MHD_Connection *connection,
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS != qs)
   {
-    if ( (GNUNET_DB_STATUS_SOFT_ERROR == qs) ||
-         (GNUNET_DB_STATUS_HARD_ERROR == qs) )
+    if (GNUNET_DB_STATUS_HARD_ERROR == qs)
     {
       return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PROPOSAL_STORE_DB_ERROR,
-                                                "db error: could not check for existing order");
+                                                TALER_EC_PROPOSAL_STORE_DB_ERROR_HARD,
+                                                "db error: could not check for existing order due to hard transaction failure");
+    }
+    if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+    {
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
+                                                "db error: could not check for existing order due to soft transaction failure (FIXME: should implement retry logic)");
     }
     return TMH_RESPONSE_reply_external_error (connection,
-                                              TALER_EC_PROPOSAL_STORE_DB_ERROR,
+                                              TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
                                               "proposal already exists");
   }
 
