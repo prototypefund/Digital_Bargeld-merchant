@@ -912,128 +912,15 @@ $ taler-merchant-dbinit -r
 @chapter Advanced topics
 
 @menu
-* Configuration in Taler::  Configuration patterns
+* Configuration format::    Configuration file format
 * Using taler-config::      Introduction to the taler-config tool
 * Key management::          Managing the merchant's cryptographic keys
 * SEPA configuration::      Configuring a SEPA bank account
 * Tipping visitors::        Giving money to Web site visitors with Taler
 @end menu
 
-@node Configuration in Taler
-@section Configuration in Taler
-@cindex configuration
-
-In Taler realm, any component obeys to the same pattern to get configuration
-values.  According to this pattern, once the component has been installed, the
-installation deploys default values in @cite{$@{prefix@}/share/taler/config.d/}, in
-@cite{.conf} files.  In order to override these defaults, the user can write a custom
-@cite{.conf} file and either pass it to the component at execution time, or name it
-@cite{taler.conf} and place it under @cite{$HOME/.config/}.
-
-
-A config file is a text file containing @cite{sections}, and each section contains
-its @cite{values}. The right format follows:
-
-@example
-[section1]
-value1 = string
-value2 = 23
-
-[section2]
-value21 = string
-value22 = /path22
-@end example
-
-Throughout any configuration file, it is possible to use @code{$}-prefixed variables,
-like @code{$VAR}, especially when they represent filesystem paths.
-It is also possible to provide defaults values for those variables that are unset,
-by using the following syntax: @code{$@{VAR:-default@}}.
-However, there are two ways a user can set @code{$}-prefixable variables:
-
-by defining them under a @code{[paths]} section, see example below,
-
-@example
-[paths]
-TALER_DEPLOYMENT_SHARED = $@{HOME@}/shared-data
-..
-[section-x]
-path-x = $@{TALER_DEPLOYMENT_SHARED@}/x
-@end example
-
-or by setting them in the environment:
-
-@example
-$ export VAR=/x
-@end example
-
-The configuration loader will give precedence to variables set under @code{[path]},
-though.
-
-The utility @code{taler-config}, which gets installed along with the exchange, serves
-to get and set configuration values without directly editing the @cite{.conf}.
-The option @code{-f} is particularly useful to resolve pathnames, when they use
-several levels of @code{$}-expanded variables. See @code{taler-config --help}.
-
-Note that, in this stage of development, the file @code{$HOME/.config/taler.conf}
-can contain sections for @emph{all} the component. For example, both an exchange and
-a bank can read values from it.
-
-The repository @code{git://taler.net/deployment} contains examples of configuration
-file used in our demos. See under @code{deployment/config}.
-
-@cartouche
-@quotation Note
-Expectably, some components will not work just by using default values, as their
-work is often interdependent. For example, a merchant needs to know an exchange
-URL, or a database name.
-@end quotation
-@end cartouche
-
-
-@node Using taler-config
-@section Using taler-config
-@cindex taler-config
-
-The tool @code{taler-config} can be used to
-extract or manipulate configuration values; however, the configuration
-use the well-known INI file format and can also be edited by hand.
-
-Run
-@example
-$ taler-config -s $SECTION
-@end example
-to list all of the configuration values in section @code{$SECTION}.
-
-Run
-@example
-$ taler-config -s $section -o $option
-@end example
-to extract the respective configuration value for option @code{$option}
-in section @code{$section}.
-
-Finally, to change a setting, run
-@example
-$ taler-config -s $section -o $option -V $value
-@end example
-to set the respective configuration value to @code{$value}. Note that you have to
-manually restart the Taler backend after you change the configuration to
-make the new configuration go into effect.
-
-Some default options will use $-variables, such as @code{$DATADIR}
-within their value.  To expand the @code{$DATADIR} or other $-variables
-in the configuration, pass the @code{-f} option to
-@code{taler-config}.  For example, compare:
-@example
-$ taler-config -s ACCOUNT-bank \
-               -o WIRE_RESPONSE
-$ taler-config -f -s ACCOUNT-bank \
-               -o WIRE_RESPONSE
-@end example
-
-While the configuration file is typically located at
-@code{$HOME/.config/taler.conf}, an alternative location can be
-specified to @code{taler-merchant-httpd} and @code{taler-config} using
-the @code{-c} option.
+@include configuration-format.texi
+@include taler-config.texi
 
 
 @node Key management
