@@ -737,7 +737,6 @@ _pay_run (const char *merchant_url,
           void (*api_cb) (),
           void *cls)
 {
-  json_t *ct;
   const struct TALER_TESTING_Command *proposal_cmd;
   const json_t *contract_terms;
   const char *order_id;
@@ -757,8 +756,8 @@ _pay_run (const char *merchant_url,
   struct TALER_MerchantSignatureP *merchant_sig;
   struct TALER_MERCHANT_Pay *ret;
 
-  proposal_cmd = TALER_TESTING_interpreter_lookup_command
-    (is, proposal_reference);
+  proposal_cmd = TALER_TESTING_interpreter_lookup_command (is,
+							   proposal_reference);
 
   if (NULL == proposal_cmd)
   {
@@ -766,8 +765,10 @@ _pay_run (const char *merchant_url,
     return NULL;
   }
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_contract_terms
-    (proposal_cmd, 0, &contract_terms))
+  if (GNUNET_OK !=
+      TALER_TESTING_get_trait_contract_terms (proposal_cmd,
+					      0,
+					      &contract_terms))
   {
     GNUNET_break (0);
     return NULL;
@@ -794,6 +795,7 @@ _pay_run (const char *merchant_url,
                             &max_fee),
     GNUNET_JSON_spec_end()
   };
+
   if (GNUNET_OK !=
       GNUNET_JSON_parse (contract_terms,
                          spec,
@@ -801,14 +803,12 @@ _pay_run (const char *merchant_url,
                          &error_line))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Parser failed on %s:%u\n",
+                "Parser failed on %s:%u for input `%s'\n",
                 error_name,
-                error_line);
-    fprintf (stderr, "%s\n",
-             json_dumps (contract_terms,
-                         JSON_INDENT (1)));
+                error_line,
+		json_dumps (contract_terms,
+			    JSON_INDENT (1)));
     GNUNET_break_op (0);
-    json_decref (ct);
     return NULL;
   }
 
