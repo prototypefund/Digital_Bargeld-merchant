@@ -34,6 +34,18 @@
  */
 #define MAX_RETRIES 3
 
+/**
+ * What is the label under which we find/place the merchant's jurisdiction
+ * in the locations list by default?
+ */
+#define STANDARD_LABEL_MERCHANT_JURISDICTION "_mj"
+
+/**
+ * What is the label under which we find/place the merchant's address
+ * in the locations list by default?
+ */
+#define STANDARD_LABEL_MERCHANT_ADDRESS "_ma"
+
 
 /**
  * Check that the given JSON array of products is well-formed.
@@ -126,7 +138,7 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
  * Write the resulting proposal or an error message ot a MHD connection
  *
  * @param connection connection to write the result or error to
- * @param order to process
+ * @param order[in] order to process (can be modified)
  * @return MHD result code
  */
 static int
@@ -269,8 +281,6 @@ proposal_put (struct MHD_Connection *connection,
   if (NULL == json_object_get (order,
                                "products"))
   {
-    // FIXME:  When there is no explicit product,
-    // should we create a singleton product list?
     json_object_set_new (order,
                          "products",
                          json_array ());
@@ -285,15 +295,11 @@ proposal_put (struct MHD_Connection *connection,
     instance = "default";
   }
 
-  // Fill in merchant information if necessary
+  /* Fill in merchant information if necessary */
   {
-    // The frontend either fully specifieds the "merchant" field, or just gives
-    // the backend the "instance" name and lets it fill out.
+    /* The frontend either fully specifieds the "merchant" field, or just gives
+       the backend the "instance" name and lets it fill out. */
     struct MerchantInstance *mi = TMH_lookup_instance (instance);
-    json_t *merchant;
-    json_t *locations;
-    json_t *loc;
-    char *label;
 
     if (NULL == mi)
     {
@@ -304,58 +310,82 @@ proposal_put (struct MHD_Connection *connection,
     }
     if (NULL == json_object_get (order, "merchant"))
     {
+      const char *mj = NULL;
+      const char *ma = NULL;
+      json_t *locations;
+      json_t *locj;
+      json_t *loca;
+      json_t *merchant;
+      char *label;
+      
       merchant = json_object ();
-      /* FIXME: should the 'instance' field really be included in the
-         contract? This is really internal to the business! */
-      json_object_set_new (merchant,
-                           "instance",
-                           json_string (instance));
       json_object_set_new (merchant,
                            "name",
                            json_string (mi->name));
-      json_object_set_new (merchant,
-                           "jurisdiction",
-                           json_string ("_mj"));
-      json_object_set_new (merchant,
-                           "address",
-                           json_string ("_ma"));
       json_object_set_new (order,
                            "merchant",
                            merchant);
-      json_object_del (order,
-                       "instance");
-
       locations = json_object_get (order,
                                    "locations");
-      if (NULL == locations)
+      if (NULL != locations)
       {
-        locations = json_object ();
-        json_object_set_new (order,
-                             "locations",
-                             locations);
-      }
+	/* Handle merchant address */
+	GNUNET_assert (0 < GNUNET_asprintf (&label,
+					    "%s-address",
+					    mi->id));
+	loca = json_object_get (default_locations,
+				label);
+	if (NULL != loca)
+	{
+	  loca = json_deep_copy (loca);
+	  ma = STANDARD_LABEL_MERCHANT_ADDRESS;
+	  json_object_set_new (locations,
+			       ma,
+			       loca);
+	  json_object_set_new (merchant,
+			       "address",
+			       json_string (ma));
+	}
+	GNUNET_free (label);
 
-      GNUNET_assert (0 < GNUNET_asprintf (&label, "%s-address", mi->id));
-      loc = json_object_get (default_locations, label);
-      if (NULL == loc)
-        loc = json_object ();
-      else
-        loc = json_deep_copy (loc);
-      json_object_set_new (locations, "_ma", loc);
-      GNUNET_free (label);
+	/* Handle merchant jurisdiction */
+	GNUNET_assert (0 < GNUNET_asprintf (&label,
+					    "%s-jurisdiction",
+					    mi->id));
+	locj = json_object_get (default_locations,
+				label);
+	if (NULL != locj)
+	{
+	  if ( (NULL != loca) &&
+	       (1 == json_equal (locj,
+				 loca)) )
+	  {
+	    /* addresses equal, re-use */
+	    mj = ma;
+	  }
+	  else
+	  {
+	    locj = json_deep_copy (locj);
+	    mj = STANDARD_LABEL_MERCHANT_JURISDICTION;
+	    json_object_set_new (locations,
+				 mj,
+				 locj);
+	  }
+	  json_object_set_new (merchant,
+			       "jurisdiction",
+			       json_string (mj));
+	}
+	GNUNET_free (label);
+      } /* have locations */
+    } /* needed to synthesize merchant info */
+  } /* scope of 'mi' */
 
-      GNUNET_assert (0 < GNUNET_asprintf (&label, "%s-jurisdiction", mi->id));
-      loc = json_object_get (default_locations, label);
-      if (NULL == loc)
-        loc = json_object ();
-      else
-        loc = json_deep_copy (loc);
-      json_object_set_new (locations, "_mj", loc);
-      GNUNET_free (label);
-    }
-  }
+  /* "instance" information does not belong with the proposal,
+     instances are internal to the backend, so remove here (if present) */
+  json_object_del (order,
+		   "instance");
 
-  /* extract fields we need to sign separately */
+      /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection,
                              order,
                              spec);
@@ -422,37 +452,6 @@ proposal_put (struct MHD_Connection *connection,
               "Inserting order '%s' for instance '%s'\n",
               order_id,
               mi->id);
-
-  {
-    json_t *dummy_contract_terms;
-
-    dummy_contract_terms = NULL;
-    qs = db->find_order (db->cls,
-                         &dummy_contract_terms,
-                         order_id,
-                         &mi->pubkey);
-    if (NULL != dummy_contract_terms)
-      json_decref (dummy_contract_terms);
-  }
-  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS != qs)
-  {
-    if (GNUNET_DB_STATUS_HARD_ERROR == qs)
-    {
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PROPOSAL_STORE_DB_ERROR_HARD,
-                                                "db error: could not check for existing order due to hard transaction failure");
-    }
-    if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
-    {
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
-                                                "db error: could not check for existing order due to soft transaction failure (FIXME: should implement retry logic)");
-    }
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
-                                              "proposal already exists");
-  }
-
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
     qs = db->insert_order (db->cls,
@@ -466,15 +465,40 @@ proposal_put (struct MHD_Connection *connection,
   if (0 > qs)
   {
     /* Special report if retries insufficient */
-    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
-    /* Always report on hard error as well to enable diagnostics */
-    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+    {
+      GNUNET_break (0);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
+                                                "db error: could not check for existing order due to repeated soft transaction failure");
+    }
+    {
+      /* Hard error could be constraint violation, check if order already exists */
+      json_t *dummy_contract_terms = NULL;
+      
+      qs = db->find_order (db->cls,
+			   &dummy_contract_terms,
+			   order_id,
+			   &mi->pubkey);
+      if (NULL != dummy_contract_terms)
+	json_decref (dummy_contract_terms);
+      if (0 < qs)
+      {
+	/* Yep, indeed uniqueness constraint violation */
+	GNUNET_JSON_parse_free (spec);
+	return TMH_RESPONSE_reply_external_error (connection,
+						  TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
+						  "proposal already exists");
+      }
+    }
+    /* Other hard transaction error */
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_PROPOSAL_STORE_DB_ERROR,
+                                              TALER_EC_PROPOSAL_STORE_DB_ERROR_HARD,
                                               "db error: could not store this proposal's data into db");
   }
-
+  
+  /* DB transaction succeeded, generate positive response */
   res = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
                                       "{s:s}",
@@ -581,6 +605,8 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   json_t *contract_terms;
   struct MerchantInstance *mi;
   char *last_session_id = NULL;
+  struct TALER_ProposalDataPS pdps;
+  struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
 
   instance = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -627,6 +653,12 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
+    struct GNUNET_TIME_Absolute timestamp;
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
+      GNUNET_JSON_spec_end ()
+    };
+
     qs = db->find_order (db->cls,
                          &contract_terms,
                          order_id,
@@ -638,16 +670,14 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                            "unknown order id");
     }
     GNUNET_assert (NULL != contract_terms);
-    // FIXME:  now we can delete (merchant_pub, order_id) from the merchant_orders table
-    json_object_set_new (contract_terms, "nonce", json_string (nonce));
+    json_object_set_new (contract_terms,
+			 "nonce",
+			 json_string (nonce));
 
-    struct GNUNET_TIME_Absolute timestamp;
-    struct GNUNET_JSON_Specification spec[] = {
-      GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
-      GNUNET_JSON_spec_end ()
-    };
     /* extract fields we need to sign separately */
-    res = TMH_PARSE_json_data (connection, contract_terms, spec);
+    res = TMH_PARSE_json_data (connection,
+			       contract_terms,
+			       spec);
     if (GNUNET_NO == res)
     {
       return MHD_YES;
@@ -679,30 +709,32 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                                 TALER_EC_PROPOSAL_STORE_DB_ERROR,
                                                 "db error: could not store this proposal's data into db");
     }
+    // FIXME: now we can delete (merchant_pub, order_id) from the merchant_orders table
   }
 
   GNUNET_assert (NULL != contract_terms);
   GNUNET_free_non_null (last_session_id);
 
-  const char *stored_nonce = json_string_value (json_object_get (contract_terms, "nonce"));
+  const char *stored_nonce
+    = json_string_value (json_object_get (contract_terms,
+					  "nonce"));
 
   if (NULL == stored_nonce)
   {
     GNUNET_break (0);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
-                                              "existing proposal has non nonce");
+                                              "existing proposal has no nonce");
   }
 
-  if (0 != strcmp (stored_nonce, nonce))
+  if (0 != strcmp (stored_nonce,
+		   nonce))
   {
     return TMH_RESPONSE_reply_bad_request (connection,
                                            TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
                                            "mismatched nonce");
   }
 
-  struct TALER_ProposalDataPS pdps;
-  struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
 
   /* create proposal signature */
   pdps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_CONTRACT);
