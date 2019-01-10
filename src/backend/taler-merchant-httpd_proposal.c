@@ -474,24 +474,45 @@ proposal_put (struct MHD_Connection *connection,
     }
     {
       /* Hard error could be constraint violation, check if order already exists */
-      json_t *dummy_contract_terms = NULL;
+      json_t *contract_terms = NULL;
       
       qs = db->find_order (db->cls,
-			   &dummy_contract_terms,
+			   &contract_terms,
 			   order_id,
 			   &mi->pubkey);
-      if (NULL != dummy_contract_terms)
-	json_decref (dummy_contract_terms);
       if (0 < qs)
       {
 	/* Yep, indeed uniqueness constraint violation */
+	int rv;
+	char *msg;
+	
 	GNUNET_JSON_parse_free (spec);
-	return TMH_RESPONSE_reply_external_error (connection,
-						  TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
-						  "proposal already exists");
+	GNUNET_asprintf (&msg,
+			 "order ID `%s' already exists",
+			 order_id);
+	{
+	  /* Log plenty of details for the admin */
+	  char *js;
+	  
+	  js = json_dumps (contract_terms,
+			   JSON_COMPACT);
+	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+		      _("Order ID `%s' already exists with proposal `%s'\n"),
+		      order_id,
+		      js);
+	  free (js);
+	}
+	json_decref (contract_terms);
+	
+	/* contract_terms may be private, only expose duplicate order_id to the network */
+	rv = TMH_RESPONSE_reply_external_error (connection,
+						TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
+						msg);
+	GNUNET_free (msg);
+	return rv;
       }
     }
-    /* Other hard transaction error */
+    /* Other hard transaction error (disk full, etc.) */
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PROPOSAL_STORE_DB_ERROR_HARD,

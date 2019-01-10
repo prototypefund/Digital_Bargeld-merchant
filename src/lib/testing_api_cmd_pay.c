@@ -802,12 +802,16 @@ _pay_run (const char *merchant_url,
                          &error_name,
                          &error_line))
   {
+    char *js;
+
+    js = json_dumps (contract_terms,
+		     JSON_INDENT (1));
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Parser failed on %s:%u for input `%s'\n",
                 error_name,
                 error_line,
-		json_dumps (contract_terms,
-			    JSON_INDENT (1)));
+		js);
+    free (js);
     GNUNET_break_op (0);
     return NULL;
   }
