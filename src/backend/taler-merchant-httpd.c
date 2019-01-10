@@ -675,7 +675,6 @@ wireformat_iterator_cb (void *cls,
                                section,
                                "PLUGIN");
     GNUNET_free (payto);
-    GNUNET_free (instance_option);
     iic->ret = GNUNET_SYSERR;
     return;
   }
@@ -687,7 +686,6 @@ wireformat_iterator_cb (void *cls,
                 "Failed to load wire plugin `%s'\n",
                 plugin_name);
     GNUNET_free (plugin_name);
-    GNUNET_free (instance_option);
     GNUNET_free (payto);
     iic->ret = GNUNET_SYSERR;
     return;
@@ -701,7 +699,6 @@ wireformat_iterator_cb (void *cls,
                 payto,
                 plugin_name);
     GNUNET_free (plugin_name);
-    GNUNET_free (instance_option);
     GNUNET_free (payto);
     TALER_WIRE_plugin_unload (plugin);
     iic->ret = GNUNET_SYSERR;
@@ -1060,8 +1057,8 @@ TMH_lookup_instance (const char *name)
  * @param json the JSON to inspect; it is not required to
  * comply with any particular format. It will only be checked
  * if the field "instance" is there.
- * @return a pointer to a #struct MerchantInstance. This will be
- * the 'default' merchant if the frontend did not specif any
+ * @return a pointer to a `struct MerchantInstance`. This will be
+ * the 'default' merchant if the frontend did not specify any
  * "instance" field. The user should not care to free the returned
  * value, as it is taken from a global array that will be freed
  * by the general shutdown routine. NULL if the frontend specified
