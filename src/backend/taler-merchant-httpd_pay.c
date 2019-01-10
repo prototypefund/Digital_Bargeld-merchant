@@ -1880,7 +1880,7 @@ begin_transaction (struct PayContext *pc)
 	  json_decref (refunds);
 	  resume_pay_with_error (pc,
 				 MHD_HTTP_INTERNAL_SERVER_ERROR,
-				 TALER_EC_NONE, /* FIXME! */
+				 TALER_EC_PAY_REFUND_SIGNATURE_FAILED,
 				 "Refund approved, but failed to sign confirmation");
 	  return;
 	}

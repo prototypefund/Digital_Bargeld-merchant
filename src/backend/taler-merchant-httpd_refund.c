@@ -283,7 +283,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     json_decref (root);
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_NONE, /* FIXME! */
+                                              TALER_EC_REFUND_MERCHANT_SIGNING_FAILED,
                                               "Refund done, but failed to sign confirmation");
 
   }

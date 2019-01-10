@@ -198,8 +198,9 @@ handle_status (void *cls,
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_break_op (0);
-    resume_with_response (tqc, MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
+    resume_with_response (tqc,
+			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_STATUS_FAILED_EXCHANGE_DOWN,
                                                    "Unable to obtain reserve status from exchange"));
     return;
   }
@@ -207,8 +208,9 @@ handle_status (void *cls,
   if (0 == history_length)
   {
     GNUNET_break_op (0);
-    resume_with_response (tqc, MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
+    resume_with_response (tqc,
+			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_FAILED_EMPTY,
                                                    "Exchange returned empty reserve history"));
     return;
   }
@@ -216,8 +218,9 @@ handle_status (void *cls,
   if (TALER_EXCHANGE_RTT_DEPOSIT != history[0].type)
   {
     GNUNET_break_op (0);
-    resume_with_response (tqc, MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
+    resume_with_response (tqc,
+			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_INVALID_NO_DEPOSIT,
                                                    "Exchange returned invalid reserve history"));
     return;
   }
@@ -227,9 +230,21 @@ handle_status (void *cls,
                              &tqc->amount_withdrawn))
   {
     GNUNET_break_op (0);
-    resume_with_response (tqc, MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
+    resume_with_response (tqc,
+			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_INVALID_CURRENCY,
                                                    "Exchange returned invalid reserve history"));
+    return;
+  }
+
+  if (0 != strcasecmp (TMH_currency,
+		       history[0].amount.currency))
+  {
+    GNUNET_break_op (0);
+    resume_with_response (tqc,
+			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_CURRENCY_MISSMATCH,
+                                                   "Exchange currency unexpected"));
     return;
   }
 
@@ -269,7 +284,7 @@ handle_status (void *cls,
           GNUNET_break_op (0);
           resume_with_response (tqc,
                                 MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
+                                TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_DEPOSIT,
                                                          "Exchange returned invalid reserve history (amount overflow)"));
           return;
         }
@@ -291,7 +306,7 @@ handle_status (void *cls,
         GNUNET_break_op (0);
         resume_with_response (tqc,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
+                              TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_WITHDRAW,
                                                        "Exchange returned invalid reserve history (amount overflow)"));
         return;
       }
@@ -301,8 +316,19 @@ handle_status (void *cls,
                   _("Encountered unsupported /payback operation on tipping reserve\n"));
       break;
     case TALER_EXCHANGE_RTT_CLOSE:
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  _("Exchange closed reserve (due to expiration), balance calulation is likely wrong. Please create a fresh reserve.\n"));
+      /* We count 'closing' amounts just like withdrawals */
+      if (GNUNET_OK !=
+          TALER_amount_add (&tqc->amount_withdrawn,
+                            &tqc->amount_withdrawn,
+                            &history[i].amount))
+      {
+        GNUNET_break_op (0);
+        resume_with_response (tqc,
+                              MHD_HTTP_INTERNAL_SERVER_ERROR,
+                              TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_CLOSED,
+                                                       "Exchange returned invalid reserve history (amount overflow)"));
+        return;
+      }
       break;
     }
   }
@@ -326,7 +352,7 @@ handle_status (void *cls,
 
         resume_with_response (tqc,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TMH_RESPONSE_make_error (TALER_EC_NONE /* FIXME */,
+                              TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_INCONSISTENT,
                                                        "Exchange returned invalid reserve history (amount overflow)"));
     }
     resume_with_response (tqc,
@@ -350,7 +376,7 @@ handle_status (void *cls,
  * Function called with the result of a #TMH_EXCHANGES_find_exchange()
  * operation.
  *
- * @param cls closure with a `struct TipQueryContext *'
+ * @param cls closure with a `struct TipQueryContext *`
  * @param eh handle to the exchange context
  * @param wire_fee current applicable wire fee for dealing with @a eh, NULL if not available
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
@@ -485,13 +511,13 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Database hard error on get_authorized_tip_amount\n");
       return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_NONE /* FIXME */,
+                                                TALER_EC_TIP_QUERY_DB_ERROR,
                                                 "Merchant database error");
     }
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     {
-      // We'll set amount_authorized to zero later once
-      // we know the currency
+      /* we'll set amount_authorized to zero later once
+	 we know the currency */
       tqc->none_authorized = GNUNET_YES;
     }
   }
