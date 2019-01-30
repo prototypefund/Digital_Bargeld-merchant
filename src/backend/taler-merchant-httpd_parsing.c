@@ -239,7 +239,7 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
   if (0 != *upload_data_size)
   {
     TALER_LOG_INFO ("Parser asking for more data"
-                    ", current data size is %lu\n",
+                    ", current data size is %zu\n",
                     *upload_data_size);
 
     /* We are seeing an old request with more data available. */

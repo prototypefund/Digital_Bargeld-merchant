@@ -753,6 +753,7 @@ keys_mgmt_cb (void *cls,
     }
   }
   expire = TALER_EXCHANGE_check_keys_current (exchange->conn,
+                                              GNUNET_NO,
                                               GNUNET_NO);
   if (0 == expire.abs_value_us)
     delay = RELOAD_DELAY;
