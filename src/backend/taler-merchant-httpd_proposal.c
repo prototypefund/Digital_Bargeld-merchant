@@ -2,20 +2,25 @@
   This file is part of TALER
   (C) 2014, 2015, 2016, 2018 Taler Systems SA
 
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Affero General Public License as published by the Free Software
-  Foundation; either version 3, or (at your option) any later version.
+  TALER is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Affero General Public License as
+  published by the Free Software Foundation; either version 3,
+  or (at your option) any later version.
 
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+  TALER is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-  You should have received a copy of the GNU General Public License along with
-  TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
+  You should have received a copy of the GNU General Public
+  License along with TALER; see the file COPYING.  If not,
+  see <http://www.gnu.org/licenses/>
 */
+
 /**
  * @file backend/taler-merchant-httpd_proposal.c
- * @brief HTTP serving layer mainly intended to communicate with the frontend
+ * @brief HTTP serving layer mainly intended to communicate
+ * with the frontend
  * @author Marcello Stanisci
  */
 #include "platform.h"
@@ -35,14 +40,14 @@
 #define MAX_RETRIES 3
 
 /**
- * What is the label under which we find/place the merchant's jurisdiction
- * in the locations list by default?
+ * What is the label under which we find/place the merchant's
+ * jurisdiction in the locations list by default?
  */
 #define STANDARD_LABEL_MERCHANT_JURISDICTION "_mj"
 
 /**
- * What is the label under which we find/place the merchant's address
- * in the locations list by default?
+ * What is the label under which we find/place the merchant's
+ * address in the locations list by default?
  */
 #define STANDARD_LABEL_MERCHANT_ADDRESS "_ma"
 
@@ -134,8 +139,9 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
 
 
 /**
- * Transform an order into a proposal and store it in the database.
- * Write the resulting proposal or an error message ot a MHD connection
+ * Transform an order into a proposal and store it in the
+ * database. Write the resulting proposal or an error message
+ * of a MHD connection.
  *
  * @param connection connection to write the result or error to
  * @param order[in] order to process (can be modified)
@@ -156,19 +162,24 @@ proposal_put (struct MHD_Connection *connection,
   struct GNUNET_TIME_Absolute timestamp;
   struct GNUNET_TIME_Absolute refund_deadline;
   struct GNUNET_TIME_Absolute pay_deadline;
+
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
     GNUNET_JSON_spec_string ("order_id", &order_id),
     GNUNET_JSON_spec_string ("summary", &summary),
-    GNUNET_JSON_spec_string ("fulfillment_url", &fulfillment_url),
+    GNUNET_JSON_spec_string ("fulfillment_url",
+                             &fulfillment_url),
     /**
      * The following entries we don't actually need,
      * except to check that the order is well-formed */
     GNUNET_JSON_spec_json ("products", &products),
     GNUNET_JSON_spec_json ("merchant", &merchant),
-    GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
-    GNUNET_JSON_spec_absolute_time ("refund_deadline", &refund_deadline),
-    GNUNET_JSON_spec_absolute_time ("pay_deadline", &pay_deadline),
+    GNUNET_JSON_spec_absolute_time ("timestamp",
+                                    &timestamp),
+    GNUNET_JSON_spec_absolute_time ("refund_deadline",
+                                    &refund_deadline),
+    GNUNET_JSON_spec_absolute_time ("pay_deadline",
+                                    &pay_deadline),
     GNUNET_JSON_spec_end ()
   };
   enum GNUNET_DB_QueryStatus qs;
@@ -189,19 +200,22 @@ proposal_put (struct MHD_Connection *connection,
     tm_info = localtime (&timer);
     if (NULL == tm_info)
     {
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PROPOSAL_NO_LOCALTIME,
-                                                "failed to determine local time");
+      return TMH_RESPONSE_reply_internal_error
+        (connection,
+         TALER_EC_PROPOSAL_NO_LOCALTIME,
+         "failed to determine local time");
     }
     off = strftime (buf,
                     sizeof (buf),
                     "%Y.%j.%H.%M.%S",
                     tm_info);
     buf[off++] = '-';
-    uint64_t rand = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK,
-                                              UINT64_MAX);
-    char *last = GNUNET_STRINGS_data_to_string (&rand, sizeof (uint64_t),
-                                                &buf[off], sizeof (buf) - off);
+    uint64_t rand = GNUNET_CRYPTO_random_u64
+      (GNUNET_CRYPTO_QUALITY_WEAK,
+       UINT64_MAX);
+    char *last = GNUNET_STRINGS_data_to_string
+      (&rand, sizeof (uint64_t),
+       &buf[off], sizeof (buf) - off);
     *last = '\0';
     json_object_set_new (order,
                          "order_id",
@@ -220,6 +234,7 @@ proposal_put (struct MHD_Connection *connection,
                          GNUNET_JSON_from_time_abs (now));
   }
 
+  /* If no refund_deadline given, set one as zero.  */
   if (NULL == json_object_get (order,
                                "refund_deadline"))
   {
@@ -247,7 +262,8 @@ proposal_put (struct MHD_Connection *connection,
   {
     json_object_set_new (order,
                          "max_wire_fee",
-                         TALER_JSON_from_amount (&default_max_wire_fee));
+                         TALER_JSON_from_amount
+                           (&default_max_wire_fee));
   }
 
   if (NULL == json_object_get (order,
@@ -255,15 +271,18 @@ proposal_put (struct MHD_Connection *connection,
   {
     json_object_set_new (order,
                          "max_fee",
-                         TALER_JSON_from_amount (&default_max_deposit_fee));
+                         TALER_JSON_from_amount
+                           (&default_max_deposit_fee));
   }
 
   if (NULL == json_object_get (order,
                                "wire_fee_amortization"))
   {
-    json_object_set_new (order,
-                         "wire_fee_amortization",
-                         json_integer ((json_int_t) default_wire_fee_amortization));
+    json_object_set_new
+      (order,
+       "wire_fee_amortization",
+       json_integer
+         ((json_int_t) default_wire_fee_amortization));
   }
 
   if (NULL == json_object_get (order,
@@ -271,7 +290,10 @@ proposal_put (struct MHD_Connection *connection,
   {
     char *url;
 
-    url = TALER_url_absolute_mhd (connection, "/public/pay", NULL);
+    url = TALER_url_absolute_mhd (connection,
+                                  "/public/pay",
+                                  NULL);
+
     json_object_set_new (order,
                          "pay_url",
                          json_string (url));
@@ -297,18 +319,27 @@ proposal_put (struct MHD_Connection *connection,
 
   /* Fill in merchant information if necessary */
   {
-    /* The frontend either fully specifieds the "merchant" field, or just gives
-       the backend the "instance" name and lets it fill out. */
+    /* The frontend either fully specifieds the "merchant" field,
+     * or just gives the backend the "instance" name and lets it
+     * fill out. */
     struct MerchantInstance *mi = TMH_lookup_instance (instance);
 
     if (NULL == mi)
     {
       TALER_LOG_WARNING ("Does 'default' instance exist?\n");
-      return TMH_RESPONSE_reply_not_found (connection,
-                                           TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
-                                           "merchant instance (order:instance) not found");
+      return TMH_RESPONSE_reply_not_found
+        (connection,
+         TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
+         "merchant instance (order:instance) not found");
     }
-    if (NULL == json_object_get (order, "merchant"))
+
+    /**
+     * Potential bug: if the outer 'instance' field is not
+     * given and the 'merchant' object is also missing, then
+     * is not possible to extract the instance!
+     */
+    if (NULL == json_object_get (order,
+                                 "merchant"))
     {
       const char *mj = NULL;
       const char *ma = NULL;
@@ -381,32 +412,38 @@ proposal_put (struct MHD_Connection *connection,
   } /* scope of 'mi' */
 
   /* "instance" information does not belong with the proposal,
-     instances are internal to the backend, so remove here (if present) */
+     instances are internal to the backend, so remove here
+     (if present) */
   json_object_del (order,
 		   "instance");
 
-      /* extract fields we need to sign separately */
+  /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection,
                              order,
                              spec);
+  /* json is malformed */
   if (GNUNET_NO == res)
   {
     return MHD_YES;
   }
+
+  /* other internal errors might have occurred */
   if (GNUNET_SYSERR == res)
   {
-    return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
-					      "Impossible to parse the order");
+    return TMH_RESPONSE_reply_internal_error
+      (connection,
+       TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
+       "Impossible to parse the order");
   }
 
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))
   {
     GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-					   TALER_EC_PARAMETER_MALFORMED,
-					   "order:products");
+    return TMH_RESPONSE_reply_arg_invalid
+      (connection,
+       TALER_EC_PARAMETER_MALFORMED,
+       "order:products");
   }
 
   mi = TMH_lookup_instance_json (merchant);
@@ -415,9 +452,10 @@ proposal_put (struct MHD_Connection *connection,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Not able to find the specified instance\n");
     GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
-					 "Unknown instance (order:merchant:instance) given");
+    return TMH_RESPONSE_reply_not_found
+      (connection,
+       TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
+       "Unknown instance (order:merchant:instance) given");
   }
   /* add fields to the contract that the backend should provide */
   json_object_set (order,
@@ -426,17 +464,20 @@ proposal_put (struct MHD_Connection *connection,
   json_object_set (order,
                    "auditors",
                    j_auditors);
-  /* TODO (#4939-12806): add proper mechanism for selection of wire method(s) by merchant! */
+  /* TODO (#4939-12806): add proper mechanism for
+     selection of wire method(s) by merchant! */
   wm = mi->wm_head;
 
   if (NULL == wm)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "No wire method available for specified instance\n");
+                "No wire method available for"
+                " specified instance\n");
     GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
-					 "No wire method configured for instance");
+    return TMH_RESPONSE_reply_not_found
+      (connection,
+       TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
+       "No wire method configured for instance");
   }
   json_object_set_new (order,
                        "H_wire",
@@ -468,12 +509,15 @@ proposal_put (struct MHD_Connection *connection,
     if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
     {
       GNUNET_break (0);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
-                                                "db error: could not check for existing order due to repeated soft transaction failure");
+      return TMH_RESPONSE_reply_internal_error
+        (connection,
+         TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
+         "db error: could not check for existing order"
+         " due to repeated soft transaction failure");
     }
     {
-      /* Hard error could be constraint violation, check if order already exists */
+      /* Hard error could be constraint violation,
+         check if order already exists */
       json_t *contract_terms = NULL;
       
       qs = db->find_order (db->cls,
@@ -496,27 +540,31 @@ proposal_put (struct MHD_Connection *connection,
 	  
 	  js = json_dumps (contract_terms,
 			   JSON_COMPACT);
-	  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		      _("Order ID `%s' already exists with proposal `%s'\n"),
-		      order_id,
-		      js);
+	  GNUNET_log
+            (GNUNET_ERROR_TYPE_ERROR,
+	     _("Order ID `%s' already exists with proposal `%s'\n"),
+             order_id,
+             js);
 	  free (js);
 	}
 	json_decref (contract_terms);
 	
-	/* contract_terms may be private, only expose duplicate order_id to the network */
-	rv = TMH_RESPONSE_reply_external_error (connection,
-						TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
-						msg);
+	/* contract_terms may be private, only expose
+         * duplicate order_id to the network */
+	rv = TMH_RESPONSE_reply_external_error
+          (connection,
+	   TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
+	   msg);
 	GNUNET_free (msg);
 	return rv;
       }
     }
     /* Other hard transaction error (disk full, etc.) */
     GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_PROPOSAL_STORE_DB_ERROR_HARD,
-                                              "db error: could not store this proposal's data into db");
+    return TMH_RESPONSE_reply_internal_error
+      (connection,
+       TALER_EC_PROPOSAL_STORE_DB_ERROR_HARD,
+       "db error: could not store this proposal's data into db");
   }
   
   /* DB transaction succeeded, generate positive response */
@@ -531,15 +579,17 @@ proposal_put (struct MHD_Connection *connection,
 
 
 /**
- * Generate a proposal, given its order. In practical terms, it adds the
- * fields  'exchanges', 'merchant_pub', and 'H_wire' to the order gotten
- * from the frontend. Finally, it signs this data, and returns it to the
- * frontend.
+ * Generate a proposal, given its order. In practical terms,
+ * it adds the fields  'exchanges', 'merchant_pub', and 'H_wire'
+ * to the order gotten from the frontend. Finally, it signs this
+ * data, and returns it to the frontend.
  *
  * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
+ * @param[in,out] connection_cls the connection's closure
+ * (can be updated)
  * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param[in,out] upload_data_size number of bytes (left) in
+ * @a upload_data
  * @return MHD result code
  */
 int
@@ -583,15 +633,14 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                            "order");
   if (NULL == order)
   {
-    res = TMH_RESPONSE_reply_arg_missing (connection,
-                                          TALER_EC_PARAMETER_MISSING,
-				          "order");
+    res = TMH_RESPONSE_reply_arg_missing
+      (connection,
+       TALER_EC_PARAMETER_MISSING,
+       "order");
   }
   else
-  {
     res = proposal_put (connection,
                         order);
-  }
   json_decref (root);
   return res;
 }
