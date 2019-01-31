@@ -447,6 +447,20 @@ proposal_put (struct MHD_Connection *connection,
   }
 
   mi = TMH_lookup_instance_json (merchant);
+
+  /* The outer instance field, and the one included
+   * in the merchant object are different */
+  if (0 != strcmp (mi->id,
+                   instance))
+  {
+    TALER_LOG_ERROR
+      ("Inconsistent instance specified by merchant\n");
+    return TMH_RESPONSE_reply_not_found
+      (connection,
+       TALER_EC_CONTRACT_INSTANCE_INCONSISTENT,
+       "Inconsistent instance given");
+  }
+
   if (NULL == mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,

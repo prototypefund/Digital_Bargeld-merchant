@@ -1052,7 +1052,9 @@ TMH_lookup_instance (const char *name)
 
 
 /**
- * Extract merchant instance from the given JSON
+ * Extract merchant instance from the given JSON; if not
+ * 'instance' field was found, then "default" instance is
+ * returned.
  *
  * @param json the JSON to inspect; it is not required to
  * comply with any particular format. It will only be checked
