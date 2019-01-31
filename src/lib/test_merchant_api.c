@@ -3311,14 +3311,36 @@ interpreter_run (void *cls)
       {
         json_t *merchant;
 
+        TALER_LOG_DEBUG ("/proposal: explicit set of merchant:instance to '%s'\n",
+                         instance);
+
         merchant = json_object ();
+
         json_object_set_new (merchant,
                              "instance",
                              json_string (instance));
+
         json_object_set_new (order,
                              "merchant",
                              merchant);
+
+        /* When a instance other than the default is used, we're
+           forced to specify the outer 'instance' field too, otherwise
+           we'll hit a 2001 "inconsistent instance" error.  */
+        if (0 != strcmp ("default",
+                         instance))
+        {
+          json_object_set_new (order,
+                               "instance",
+                               json_string (instance));
+        
+        }
       }
+
+      TALER_LOG_DEBUG ("PUTting order: %s\n",
+                       json_dumps (order,
+                                   JSON_INDENT (1)));
+
       cmd->details.proposal.po = TALER_MERCHANT_order_put (ctx,
                                                            MERCHANT_URL,
                                                            order,

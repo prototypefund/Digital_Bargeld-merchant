@@ -504,6 +504,7 @@ run (void *cls,
         \"refund_deadline\":\"\\/Date(2)\\/\",\
         \"pay_deadline\":\"\\/Date(1)\\/\",\
         \"wire_transfer_delay\":\"\\/Delay(30000)\\/\",\
+        \"instance\":\"tor\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\

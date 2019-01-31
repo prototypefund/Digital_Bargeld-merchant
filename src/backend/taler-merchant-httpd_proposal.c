@@ -310,7 +310,6 @@ proposal_put (struct MHD_Connection *connection,
 
   instance = json_string_value (json_object_get (order,
                                                  "instance"));
-
   if (NULL == instance)
   {
     TALER_LOG_DEBUG ("Giving 'default' instance\n");
@@ -411,12 +410,6 @@ proposal_put (struct MHD_Connection *connection,
     } /* needed to synthesize merchant info */
   } /* scope of 'mi' */
 
-  /* "instance" information does not belong with the proposal,
-     instances are internal to the backend, so remove here
-     (if present) */
-  json_object_del (order,
-		   "instance");
-
   /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection,
                              order,
@@ -448,19 +441,6 @@ proposal_put (struct MHD_Connection *connection,
 
   mi = TMH_lookup_instance_json (merchant);
 
-  /* The outer instance field, and the one included
-   * in the merchant object are different */
-  if (0 != strcmp (mi->id,
-                   instance))
-  {
-    TALER_LOG_ERROR
-      ("Inconsistent instance specified by merchant\n");
-    return TMH_RESPONSE_reply_not_found
-      (connection,
-       TALER_EC_CONTRACT_INSTANCE_INCONSISTENT,
-       "Inconsistent instance given");
-  }
-
   if (NULL == mi)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -471,10 +451,33 @@ proposal_put (struct MHD_Connection *connection,
        TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
        "Unknown instance (order:merchant:instance) given");
   }
+
+  /* The outer instance field, and the one included
+   * in the merchant object are different */
+  if (0 != strcmp (mi->id,
+                   instance))
+  {
+    TALER_LOG_ERROR
+      ("Inconsistent instance specified"
+       " by merchant ('%s' vs '%s')\n",
+       instance,
+       mi->id);
+
+    TALER_LOG_DEBUG ("Dump wrong order: %s\n",
+                     json_dumps (order,
+                                 JSON_INDENT (1)));
+
+    return TMH_RESPONSE_reply_not_found
+      (connection,
+       TALER_EC_CONTRACT_INSTANCE_INCONSISTENT,
+       "Inconsistent instance given");
+  }
+
   /* add fields to the contract that the backend should provide */
   json_object_set (order,
                    "exchanges",
                    trusted_exchanges);
+
   json_object_set (order,
                    "auditors",
                    j_auditors);
@@ -507,6 +510,7 @@ proposal_put (struct MHD_Connection *connection,
               "Inserting order '%s' for instance '%s'\n",
               order_id,
               mi->id);
+
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
     qs = db->insert_order (db->cls,
@@ -529,6 +533,7 @@ proposal_put (struct MHD_Connection *connection,
          "db error: could not check for existing order"
          " due to repeated soft transaction failure");
     }
+
     {
       /* Hard error could be constraint violation,
          check if order already exists */
@@ -556,7 +561,8 @@ proposal_put (struct MHD_Connection *connection,
 			   JSON_COMPACT);
 	  GNUNET_log
             (GNUNET_ERROR_TYPE_ERROR,
-	     _("Order ID `%s' already exists with proposal `%s'\n"),
+	     _("Order ID `%s' already exists"
+               " with proposal `%s'\n"),
              order_id,
              js);
 	  free (js);
@@ -573,6 +579,7 @@ proposal_put (struct MHD_Connection *connection,
 	return rv;
       }
     }
+
     /* Other hard transaction error (disk full, etc.) */
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_internal_error

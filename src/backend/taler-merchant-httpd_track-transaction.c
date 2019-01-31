@@ -605,21 +605,36 @@ wtid_cb (void *cls,
   enum GNUNET_DB_QueryStatus qs;
 
   tcc->dwh = NULL;
+
   if (MHD_HTTP_OK != http_status)
   {
-    /* Transaction not resolved for one of the coins, report error!
-       We keep the status code for #MHD_HTTP_ACCEPTED, but box all the
-       others (as #MHD_HTTP_ACCEPTED is not an error). */
+    if (MHD_HTTP_ACCEPTED == http_status)
+    {
+      resume_track_transaction_with_response
+        (tcc->tctx,
+         MHD_HTTP_ACCEPTED,
+         /* Return verbatim what the exchange said.  */
+         TMH_RESPONSE_make_json (json));
+
+      return;
+    }
+
+    /* Transaction not resolved for one of the
+       coins, report error! */
     resume_track_transaction_with_response
       (tcc->tctx,
-       (MHD_HTTP_ACCEPTED == http_status)
-       ? MHD_HTTP_ACCEPTED
-       : MHD_HTTP_FAILED_DEPENDENCY,
-       TMH_RESPONSE_make_json_pack ("{s:I, s:I, s:I, s:O}",
-                                    "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_COIN_TRACE_ERROR,
-                                    "exchange-http-status", (json_int_t) http_status,
-                                    "exchange-code", (json_int_t) ec,
-                                    "details", json));
+       MHD_HTTP_FAILED_DEPENDENCY,
+       TMH_RESPONSE_make_json_pack
+         ("{s:I, s:I, s:I, s:O}",
+          "code",
+          (json_int_t) TALER_EC_TRACK_TRANSACTION_COIN_TRACE_ERROR,
+          "exchange-http-status",
+          (json_int_t) http_status,
+          "exchange-code",
+          (json_int_t) ec,
+          "details",
+          json));
+
     return;
   }
   tctx->current_wtid = *wtid;
@@ -635,15 +650,17 @@ wtid_cb (void *cls,
 			       &pcc);
   if (0 > qs)
   {
-    /* Simple select queries should not cause serialization issues */
+    /* Simple select queries should not
+       cause serialization issues */
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     resume_track_transaction_with_response
       (tcc->tctx,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
-       TMH_RESPONSE_make_error (TALER_EC_TRACK_TRANSACTION_DB_FETCH_FAILED,
-				"Fail to query database about proofs"));
+       TMH_RESPONSE_make_error
+         (TALER_EC_TRACK_TRANSACTION_DB_FETCH_FAILED,
+	  "Fail to query database about proofs"));
     return;
   }
 

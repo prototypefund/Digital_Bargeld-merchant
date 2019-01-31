@@ -272,7 +272,12 @@ proposal_cb (void *cls,
   ps->po = NULL;
 
   if (ps->http_status != http_status)
+  {
+    TALER_LOG_ERROR ("Given vs expected: %u vs %u\n",
+                     http_status,
+                     ps->http_status);
     TALER_TESTING_FAIL (ps->is);
+  }
 
   if (0 == ps->http_status)
   {
