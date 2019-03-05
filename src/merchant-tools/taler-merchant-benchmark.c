@@ -46,7 +46,7 @@ enum PaymentGeneratorError {
   MISSING_BANK_URL,
   FAILED_TO_LAUNCH_BANK,
   BAD_CLI_ARG,
-  BAD_CONFIG_FILE
+  MISSING_CURRENCY
 };
 
 /* Hard-coded params.  Note, the bank is expected to
@@ -520,7 +520,6 @@ run (void *cls,
   fprintf (stderr,
            "None of 'ordinary' or 'corner'"
            " subcommands were given\n");
-
   result = 1;
 }
 
@@ -612,6 +611,13 @@ main (int argc,
        "MU",
        "merchant base url, mandatory",
        &merchant_url),
+
+    GNUNET_GETOPT_option_string
+      ('k',
+       "currency",
+       "K",
+       "Used currency, mandatory",
+       &currency),
 
     GNUNET_GETOPT_option_string
       ('i',
@@ -729,7 +735,8 @@ main (int argc,
 
     if (GNUNET_YES == root_help)
     {
-      fprintf (stdout, root_help_str);
+      fprintf (stdout,
+               root_help_str);
       return 0;
     }
 
@@ -760,27 +767,11 @@ main (int argc,
   if (NULL == cfg_filename)
     cfg_filename = (char *) default_config_file;
 
-  cfg = GNUNET_CONFIGURATION_create ();
-  if (GNUNET_OK != GNUNET_CONFIGURATION_load
-      (cfg,
-       cfg_filename))
+  if (NULL == currency)
   {
-    TALER_LOG_ERROR ("Could not parse configuration\n");
-    return BAD_CONFIG_FILE;
+    TALER_LOG_ERROR ("Option -k is mandatory!\n");
+    return MISSING_CURRENCY;
   }
-  if (GNUNET_OK != GNUNET_CONFIGURATION_get_value_string
-      (cfg,
-       "taler",
-       "currency",
-       &currency))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "taler",
-                               "currency");
-    GNUNET_CONFIGURATION_destroy (cfg);
-    return BAD_CONFIG_FILE;
-  }
-  GNUNET_CONFIGURATION_destroy (cfg);
 
   if (NULL == merchant_url)
   {
