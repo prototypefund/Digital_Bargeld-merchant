@@ -514,9 +514,12 @@ run (void *cls,
                        corner_commands);
     return;
   }
-
-  TALER_LOG_ERROR ("Neither ordinary or corner payments"
-                   " were specified to be run.\n");
+  
+  /* Should never get here, as the control on subcommands
+   * happens earlier at launch time.  */
+  fprintf (stderr,
+           "None of 'ordinary' or 'corner'"
+           " subcommands were given\n");
 
   result = 1;
 }
