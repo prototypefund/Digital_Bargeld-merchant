@@ -740,7 +740,7 @@ main (int argc,
     return 1;
   }
 
-  if ((GNUNET_YES != ordinary) || (GNUNET_YES != corner))
+  if ((GNUNET_YES != ordinary) && (GNUNET_YES != corner))
   {
     fprintf (stderr,
              "Please use 'ordinary' or 'corner' subcommands.\n"); 
