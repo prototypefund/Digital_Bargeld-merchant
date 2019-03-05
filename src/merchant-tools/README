@@ -1,4 +1,3 @@
-
 ** Taler Merchant Payments Generator **
 
 === INTRODUCTION ===
@@ -10,7 +9,7 @@ payments to be in place.
 
 It is mandatory to give it a config file that contains information
 about the setup to target. Note that the merchant and the exchange
-tun by this command will use their own config files, so just few values
+run by this command will use their own config files, so just few values
 are required for it to run.
 
 
@@ -43,9 +42,5 @@ currency = EUR
 
 taler-merchant-generate-payments -c config/file.conf [-n ITERATIONS]
 
-The -n option instructs the tools about how many iteration of all
+The -n option instructs the tool about how many iterations of all
 the (internal) commands we want to execute.
-
-** Taler Merchant Dbinit **
-
-TBD

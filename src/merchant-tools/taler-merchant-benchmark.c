@@ -702,15 +702,19 @@ main (int argc,
   };
   
   options = root_options;
-  if (0 == strcmp ("ordinary", argv[1]))
+
+  if (NULL != argv[1])
   {
-    ordinary = GNUNET_YES;
-    options = ordinary_options;
-  }
-  if (0 == strcmp ("corner", argv[1]))
-  {
-    corner = GNUNET_YES;
-    options = corner_options;
+    if (0 == strcmp ("ordinary", argv[1]))
+    {
+      ordinary = GNUNET_YES;
+      options = ordinary_options;
+    }
+    if (0 == strcmp ("corner", argv[1]))
+    {
+      corner = GNUNET_YES;
+      options = corner_options;
+    }
   }
 
   if (GNUNET_SYSERR != (result = GNUNET_GETOPT_run
@@ -733,6 +737,13 @@ main (int argc,
 
   if (-1 == result)
   {
+    return 1;
+  }
+
+  if ((GNUNET_YES != ordinary) || (GNUNET_YES != corner))
+  {
+    fprintf (stderr,
+             "Please use 'ordinary' or 'corner' subcommands.\n"); 
     return 1;
   }
 
