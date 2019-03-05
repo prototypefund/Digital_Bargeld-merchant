@@ -19,7 +19,7 @@ merchant-api-python.html: merchant-api.content.texi arch-api.png
 AM_MAKEINFOHTMLFLAGS = --no-split --css-ref=docstyle.css --css-ref=brown-paper.css
 
 man_MANS = \
-  taler-merchant-generate-payments.1 \
+  taler-merchant-benchmark.1 \
   taler-merchant-httpd.1
 
 info_TEXINFOS = \

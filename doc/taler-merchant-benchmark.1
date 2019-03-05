@@ -1,0 +1,82 @@
+.TH TALER\-MERCHANT\-BENCHMARK 1 "Mar 5, 2019" "GNU Taler"
+
+.SH NAME
+taler\-merchant\-benchmark \- Generate Taler\-style fake payments.
+
+.SH SYNOPSIS
+.B taler\-merchant\-benchmark
+.RI [ subcommand ]
+.RI [ options ]
+.br
+
+.SH DESCRIPTION
+\fBtaler\-merchant\-benchmark\fP is a command line tool to populate your merchant database with fake Taler\-style payments.
+
+.SH SUBCOMMAND
+.B
+.SS ordinary
+Generate normal payments: all the payments are performed (by the default instance) and aggregated by the exchange.
+Takes the following options.
+
+.B
+.IP "\-p PN,  \-\-payments\-number=PN"
+Perform PN many payments, defaults to 1.
+
+.B
+.IP "\-t TN,  \-\-tracks\-number=TN"
+Perform TN many tracking operations, defaults to 1.
+
+.B
+.SS corner
+Drive the generator to create unusual situations, like for example leaving payments
+unaggregated, or using a non-default merchant instance.  Takes the following options.
+
+.B
+.IP "\-t TC, \-\-two\-coins=TC"
+Perform TC many payments that use two coins (normally, all the payments use only one coin).  TC defaults to 1.
+
+.B
+.IP "\-i AI, \-\-alt\-instance=AI"
+Use AI as the instance, instead of 'default' (which is the default instance used.)
+
+.B
+.IP "\-u UN, \-\-unaggregated\-number=UN"
+Generate UN payments that will be left unaggregated.  Note that subsequent invocations of the generator may pick
+those unaggregated payments and actually aggregated them.
+
+
+.SH COMMON OPTIONS
+
+.B
+.IP "\-m URL, \-\-merchant\-url=URL"
+Use URL as the merchant base URL during the benchmark.  The URL is mainly used to download and pay for contracts.
+
+.B
+.IP "\-b URL, \-\-bank\-url=URL"
+Use URL as the bank's base URL during the benchmark.  The URL is used to test whether the bank is up and running.
+
+.B
+.IP "\-c FILENAME,  \-\-config=FILENAME"
+Use the configuration and other resources for the merchant to operate from FILENAME.
+
+.B
+.IP "\-h, \-\-help"
+Print short help on options.
+
+.B
+.IP "\-v, \-\-version"
+Print version information.
+
+.B
+.IP "\-l LF, \-\-logfile=LF"
+Sends logs to file whose path is LF.
+
+.B
+.IP "\-L LOGLEVEL, \-\-log=LOGLEVEL"
+Use loglevel LOGLEVEL.
+
+.SH BUGS
+Report bugs by using Mantis <https://gnunet.org/bugs/> or by sending electronic mail to <taler@gnu.org>
+
+.SH "SEE ALSO"
+\fBtaler\-merchant\-dbinit\fP(1), \fBtaler\-merchant\-tip\-enable\fP(1), \fBtaler.conf\fP(5)
