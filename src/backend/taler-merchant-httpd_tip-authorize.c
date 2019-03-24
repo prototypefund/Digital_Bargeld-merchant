@@ -202,11 +202,11 @@ handle_status (void *cls,
         GNUNET_CRYPTO_hash (history[i].details.in_details.wire_reference,
                             history[i].details.in_details.wire_reference_size,
                             &uuid);
-        qs = db->enable_tip_reserve (db->cls,
-                                     &tac->reserve_priv,
-                                     &uuid,
-                                     &history[i].amount,
-                                     expiration);
+        qs = db->enable_tip_reserve_TR (db->cls,
+                                        &tac->reserve_priv,
+                                        &uuid,
+                                        &history[i].amount,
+                                        expiration);
         if (0 > qs)
         {
           GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -377,14 +377,13 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
 					 "exchange for tipping not configured for the instance");
   }
   tac->reserve_priv = mi->tip_reserve;
-  db->preflight (db->cls);
-  ec = db->authorize_tip (db->cls,
-                          tac->justification,
-                          &tac->amount,
-                          &mi->tip_reserve,
-			  mi->tip_exchange,
-                          &expiration,
-                          &tip_id);
+  ec = db->authorize_tip_TR (db->cls,
+                             tac->justification,
+                             &tac->amount,
+                             &mi->tip_reserve,
+                             mi->tip_exchange,
+                             &expiration,
+                             &tip_id);
   /* If we have insufficient funds according to OUR database,
      check with exchange to see if the reserve has been topped up
      in the meantime (or if tips were not withdrawn yet). */

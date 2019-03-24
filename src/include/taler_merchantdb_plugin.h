@@ -650,11 +650,11 @@ struct TALER_MERCHANTDB_Plugin
    *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if @a credit_uuid already known
    */
   enum GNUNET_DB_QueryStatus
-  (*enable_tip_reserve)(void *cls,
-                        const struct TALER_ReservePrivateKeyP *reserve_priv,
-                        const struct GNUNET_HashCode *credit_uuid,
-                        const struct TALER_Amount *credit,
-                        struct GNUNET_TIME_Absolute expiration);
+  (*enable_tip_reserve_TR)(void *cls,
+                           const struct TALER_ReservePrivateKeyP *reserve_priv,
+                           const struct GNUNET_HashCode *credit_uuid,
+                           const struct TALER_Amount *credit,
+                           struct GNUNET_TIME_Absolute expiration);
 
 
   /**
@@ -678,13 +678,13 @@ struct TALER_MERCHANTDB_Plugin
    *      #TALER_EC_NONE upon success
    */
   enum TALER_ErrorCode
-  (*authorize_tip)(void *cls,
-                   const char *justification,
-                   const struct TALER_Amount *amount,
-                   const struct TALER_ReservePrivateKeyP *reserve_priv,
-		   const char *exchange_url,
-                   struct GNUNET_TIME_Absolute *expiration,
-                   struct GNUNET_HashCode *tip_id);
+  (*authorize_tip_TR)(void *cls,
+                      const char *justification,
+                      const struct TALER_Amount *amount,
+                      const struct TALER_ReservePrivateKeyP *reserve_priv,
+                      const char *exchange_url,
+                      struct GNUNET_TIME_Absolute *expiration,
+                      struct GNUNET_HashCode *tip_id);
 
   /**
    * Get the total amount of authorized tips for a tipping reserve.
@@ -739,11 +739,11 @@ struct TALER_MERCHANTDB_Plugin
    *      #TALER_EC_NONE upon success (@a reserve_priv was set)
    */
   enum TALER_ErrorCode
-  (*pickup_tip)(void *cls,
-                const struct TALER_Amount *amount,
-                const struct GNUNET_HashCode *tip_id,
-                const struct GNUNET_HashCode *pickup_id,
-                struct TALER_ReservePrivateKeyP *reserve_priv);
+  (*pickup_tip_TR)(void *cls,
+                   const struct TALER_Amount *amount,
+                   const struct GNUNET_HashCode *tip_id,
+                   const struct GNUNET_HashCode *pickup_id,
+                   struct TALER_ReservePrivateKeyP *reserve_priv);
 
 
   /**

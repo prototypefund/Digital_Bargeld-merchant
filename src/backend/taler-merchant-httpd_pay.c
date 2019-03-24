@@ -1781,8 +1781,8 @@ begin_transaction (struct PayContext *pc)
       db->rollback (db->cls);
       if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
       {
-	begin_transaction (pc);
-	return;
+        begin_transaction (pc);
+        return;
       }
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
@@ -1816,8 +1816,8 @@ begin_transaction (struct PayContext *pc)
       db->rollback (db->cls);
       if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
       {
-	begin_transaction (pc);
-	return;
+        begin_transaction (pc);
+        return;
       }
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);

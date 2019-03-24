@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014-2018 INRIA
+  (C) 2014--2019 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -421,20 +421,19 @@ postgres_initialize (void *cls)
                             3),
     GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
                             "SELECT"
-			    " coin_pub"
-			    ",rtransaction_id"
-			    ",refund_amount_val"
-			    ",refund_amount_frac"
-			    ",refund_amount_curr"
-			    ",refund_fee_val"
-			    ",refund_fee_frac"
-			    ",refund_fee_curr"
-			    ",reason"
-			    " FROM merchant_refunds"
+                            " coin_pub"
+                            ",rtransaction_id"
+                            ",refund_amount_val"
+                            ",refund_amount_frac"
+                            ",refund_amount_curr"
+                            ",refund_fee_val"
+                            ",refund_fee_frac"
+                            ",refund_fee_curr"
+                            ",reason"
+                            " FROM merchant_refunds"
                             " WHERE merchant_pub=$1"
                             " AND h_contract_terms=$2",
                             2),
-
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_asc",
                             "SELECT"
                             " contract_terms"
@@ -449,7 +448,6 @@ postgres_initialize (void *cls)
                             " ORDER BY row_id ASC, timestamp ASC"
                             " LIMIT $4",
                             4),
-
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range",
                             "SELECT"
                             " contract_terms"
@@ -464,7 +462,6 @@ postgres_initialize (void *cls)
                             " ORDER BY row_id DESC, timestamp DESC"
                             " LIMIT $4",
                             4),
-
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past_asc",
                             "SELECT"
                             " contract_terms"
@@ -496,7 +493,7 @@ postgres_initialize (void *cls)
     GNUNET_PQ_make_prepare ("find_deposits",
                             "SELECT"
                             " coin_pub"
-			    ",exchange_url"
+                            ",exchange_url"
                             ",amount_with_fee_val"
                             ",amount_with_fee_frac"
                             ",amount_with_fee_curr"
@@ -528,7 +525,7 @@ postgres_initialize (void *cls)
                             ",wire_fee_val"
                             ",wire_fee_frac"
                             ",wire_fee_curr"
-			    ",exchange_url"
+                            ",exchange_url"
                             ",exchange_proof"
                             " FROM merchant_deposits"
                             " WHERE h_contract_terms=$1"
@@ -618,7 +615,7 @@ postgres_initialize (void *cls)
                             "INSERT INTO merchant_tips"
                             "(reserve_priv"
                             ",tip_id"
-			    ",exchange_url"
+                            ",exchange_url"
                             ",justification"
                             ",timestamp"
                             ",amount_val"
@@ -701,7 +698,6 @@ postgres_initialize (void *cls)
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
-
   if (GNUNET_OK !=
       GNUNET_PQ_prepare_statements (pg->conn,
                                     ps))
@@ -733,6 +729,42 @@ check_connection (struct PostgresClosure *pg)
 
 
 /**
+ * Do a pre-flight check that we are not in an uncommitted transaction.
+ * If we are, try to commit the previous transaction and output a warning.
+ * Does not return anything, as we will continue regardless of the outcome.
+ *
+ * @param cls the `struct PostgresClosure` with the plugin-specific state
+ */
+static void
+postgres_preflight (void *cls)
+{
+  struct PostgresClosure *pg = cls;
+  PGresult *result;
+  ExecStatusType status;
+
+  if (NULL == pg->transaction_name)
+    return; /* all good */
+  result = PQexec (pg->conn,
+                   "COMMIT");
+  status = PQresultStatus (result);
+  if (PGRES_COMMAND_OK == status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "BUG: Preflight check committed transaction `%s'!\n",
+                pg->transaction_name);
+  }
+  else
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "BUG: Preflight check failed to commit transaction `%s'!\n",
+                pg->transaction_name);
+  }
+  pg->transaction_name = NULL;
+  PQclear (result);
+}
+
+
+/**
  * Start a transaction.
  *
  * @param cls the `struct PostgresClosure` with the plugin-specific state
@@ -749,6 +781,7 @@ postgres_start (void *cls,
   ExecStatusType ex;
 
   check_connection (pg);
+  postgres_preflight (pg);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Starting merchant DB transaction\n");
   result = PQexec (pg->conn,
@@ -793,42 +826,6 @@ postgres_rollback (void *cls)
 
 
 /**
- * Do a pre-flight check that we are not in an uncommitted transaction.
- * If we are, try to commit the previous transaction and output a warning.
- * Does not return anything, as we will continue regardless of the outcome.
- *
- * @param cls the `struct PostgresClosure` with the plugin-specific state
- */
-static void
-postgres_preflight (void *cls)
-{
-  struct PostgresClosure *pg = cls;
-  PGresult *result;
-  ExecStatusType status;
-
-  if (NULL == pg->transaction_name)
-    return; /* all good */
-  result = PQexec (pg->conn,
-                   "COMMIT");
-  status = PQresultStatus (result);
-  if (PGRES_COMMAND_OK == status)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "BUG: Preflight check committed transaction `%s'!\n",
-                pg->transaction_name);
-  }
-  else
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "BUG: Preflight check failed to commit transaction `%s'!\n",
-                pg->transaction_name);
-  }
-  pg->transaction_name = NULL;
-  PQclear (result);
-}
-
-
-/**
  * Commit the current transaction of a database connection.
  *
  * @param cls the `struct PostgresClosure` with the plugin-specific state
@@ -846,8 +843,8 @@ postgres_commit (void *cls)
               "Committing merchant DB transaction\n");
   pg->transaction_name = NULL;
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
-					     "end_transaction",
-					     params);
+                                             "end_transaction",
+                                             params);
 }
 
 
@@ -913,6 +910,8 @@ postgres_find_paid_contract_terms_from_hash (void *cls,
     GNUNET_PQ_result_spec_end
   };
 
+  /* no preflight check here, runs in its own transaction from
+     caller (in /pay case) */
   check_connection (pg);
   return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
 						   "find_paid_contract_terms_from_hash",
@@ -1727,7 +1726,7 @@ find_payments_cb (void *cls,
 static enum GNUNET_DB_QueryStatus
 postgres_find_payments (void *cls,
                         const struct GNUNET_HashCode *h_contract_terms,
-		        const struct TALER_MerchantPublicKeyP *merchant_pub,
+                        const struct TALER_MerchantPublicKeyP *merchant_pub,
                         TALER_MERCHANTDB_CoinDepositCallback cb,
                         void *cb_cls)
 {
@@ -1744,6 +1743,8 @@ postgres_find_payments (void *cls,
   };
   enum GNUNET_DB_QueryStatus qs;
 
+  /* no preflight check here, run in its own transaction by the
+     caller! */
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Finding payment for h_contract_terms '%s'\n",
               GNUNET_h2s (h_contract_terms));
@@ -2263,6 +2264,7 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
   };
   enum GNUNET_DB_QueryStatus qs;
 
+  /* no preflight check here, run in transaction by caller! */
   TALER_LOG_DEBUG ("Looking for refund %s + %s\n",
                    GNUNET_h2s (h_contract_terms),
                    TALER_B2S (merchant_pub));
@@ -2358,6 +2360,7 @@ postgres_store_wire_fee_by_exchange (void *cls,
     GNUNET_PQ_query_param_end
   };
 
+  /* no preflight check here, run in its own transaction by the caller */
   check_connection (pg);
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
 	      "Storing wire fee for %s starting at %s of %s\n",
@@ -2540,8 +2543,8 @@ struct InsertRefundContext
  */
 static void
 process_deposits_for_refund_cb (void *cls,
-				PGresult *result,
-				unsigned int num_results)
+                                PGresult *result,
+                                unsigned int num_results)
 {
   struct InsertRefundContext *ctx = cls;
   struct TALER_Amount current_refund;
@@ -2556,7 +2559,6 @@ process_deposits_for_refund_cb (void *cls,
 
   /* Pass 1:  Collect amount of existing refunds into current_refund.
    * Also store existing refunded amount for each deposit in deposit_refund. */
-
   for (unsigned int i=0; i<num_results; i++)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -2616,8 +2618,8 @@ process_deposits_for_refund_cb (void *cls,
     deposit_refund_fee[i] = refund_fee;
     if (GNUNET_SYSERR ==
 	TALER_amount_add (&current_refund,
-			  &current_refund,
-			  &ictx.refunded_amount))
+                      &current_refund,
+                      &ictx.refunded_amount))
     {
       GNUNET_break (0);
       ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
@@ -2642,7 +2644,6 @@ process_deposits_for_refund_cb (void *cls,
   }
 
   /* Phase 2:  Try to increase current refund until it matches desired refund */
-
   for (unsigned int i=0;i<num_results; i++)
   {
     const struct TALER_Amount *increment;
@@ -2651,9 +2652,9 @@ process_deposits_for_refund_cb (void *cls,
 
     /* How much of the coin is left after the existing refunds? */
     if (GNUNET_SYSERR ==
-	TALER_amount_subtract (&left,
-			       &deposit_amount_with_fee[i],
-			       &deposit_refund[i]))
+        TALER_amount_subtract (&left,
+                               &deposit_amount_with_fee[i],
+                               &deposit_refund[i]))
     {
       GNUNET_break (0);
       ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
@@ -2661,20 +2662,20 @@ process_deposits_for_refund_cb (void *cls,
     }
 
     if ( (0 == left.value) &&
-	 (0 == left.fraction) )
+         (0 == left.fraction) )
     {
       /* coin was fully refunded, move to next coin */
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		  "Coin %s fully refunded, moving to next coin\n",
-		  TALER_B2S (&deposit_coin_pubs[i]));
+                  "Coin %s fully refunded, moving to next coin\n",
+                  TALER_B2S (&deposit_coin_pubs[i]));
       continue;
     }
 
     /* How much of the refund is left? */
     if (GNUNET_SYSERR ==
-	TALER_amount_subtract (&remaining_refund,
-			       ctx->refund,
-			       &current_refund))
+        TALER_amount_subtract (&remaining_refund,
+                               ctx->refund,
+                               &current_refund))
     {
       GNUNET_break (0);
       ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
@@ -2683,7 +2684,7 @@ process_deposits_for_refund_cb (void *cls,
 
     /* By how much will we increase the refund for this coin? */
     if (0 >= TALER_amount_cmp (&remaining_refund,
-			       &left))
+                               &left))
     {
       /* remaining_refund <= left */
       increment = &remaining_refund;
@@ -2694,9 +2695,9 @@ process_deposits_for_refund_cb (void *cls,
     }
 
     if (GNUNET_SYSERR ==
-	TALER_amount_add (&current_refund,
-			  &current_refund,
-			  increment))
+        TALER_amount_add (&current_refund,
+                          &current_refund,
+                          increment))
     {
       GNUNET_break (0);
       ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
@@ -2705,28 +2706,28 @@ process_deposits_for_refund_cb (void *cls,
 
     /* actually run the refund */
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		"Coin %s deposit amount is %s\n",
-		TALER_B2S (&deposit_coin_pubs[i]),
-		TALER_amount2s (&deposit_amount_with_fee[i]));
+                "Coin %s deposit amount is %s\n",
+                TALER_B2S (&deposit_coin_pubs[i]),
+                TALER_amount2s (&deposit_amount_with_fee[i]));
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		"Coin %s refund will be incremented by %s\n",
-		TALER_B2S (&deposit_coin_pubs[i]),
-		TALER_amount2s (increment));
+                "Coin %s refund will be incremented by %s\n",
+                TALER_B2S (&deposit_coin_pubs[i]),
+                TALER_amount2s (increment));
     {
       enum GNUNET_DB_QueryStatus qs;
 
       if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-	  (qs = insert_refund (ctx->pg,
-			       ctx->merchant_pub,
-			       ctx->h_contract_terms,
-			       &deposit_coin_pubs[i],
-			       ctx->reason,
-			       increment,
-			       &deposit_refund_fee[i])))
+          (qs = insert_refund (ctx->pg,
+                               ctx->merchant_pub,
+                               ctx->h_contract_terms,
+                               &deposit_coin_pubs[i],
+                               ctx->reason,
+                               increment,
+                               &deposit_refund_fee[i])))
       {
-	GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
-	ctx->qs = qs;
-	return;
+        GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
+        ctx->qs = qs;
+        return;
       }
     }
     /* stop immediately if we are done */
@@ -2742,8 +2743,8 @@ process_deposits_for_refund_cb (void *cls,
    * rely upon the frontend being correct.
    */
   GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-	      "The refund of %s is bigger than the order's value\n",
-	      TALER_amount2s (ctx->refund));
+              "The refund of %s is bigger than the order's value\n",
+              TALER_amount2s (ctx->refund));
   ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
 }
 
@@ -2784,13 +2785,6 @@ postgres_increase_refund_for_contract (void *cls,
               "Asked to refund %s on contract %s\n",
               TALER_amount2s (refund),
               GNUNET_h2s (h_contract_terms));
-  if (GNUNET_OK !=
-      postgres_start (cls,
-                      "increase refund"))
-  {
-    GNUNET_break (0);
-    return GNUNET_DB_STATUS_HARD_ERROR;
-  }
   ctx.pg = pg;
   ctx.qs = GNUNET_DB_STATUS_SUCCESS_ONE_RESULT;
   ctx.refund = refund;
@@ -2798,10 +2792,10 @@ postgres_increase_refund_for_contract (void *cls,
   ctx.h_contract_terms = h_contract_terms;
   ctx.merchant_pub = merchant_pub;
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
-					     "find_deposits",
-					     params,
-					     &process_deposits_for_refund_cb,
-					     &ctx);
+                                             "find_deposits",
+                                             params,
+                                             &process_deposits_for_refund_cb,
+                                             &ctx);
   switch (qs)
   {
   case GNUNET_DB_STATUS_SUCCESS_NO_RESULTS:
@@ -2809,28 +2803,12 @@ postgres_increase_refund_for_contract (void *cls,
                 "Unknown contract: %s (merchant_pub: %s), no refund possible\n",
                 GNUNET_h2s (h_contract_terms),
                 TALER_B2S (merchant_pub));
-    postgres_rollback (cls);
     return qs;
   case GNUNET_DB_STATUS_SOFT_ERROR:
   case GNUNET_DB_STATUS_HARD_ERROR:
-    postgres_rollback (cls);
     return qs;
   default:
     /* Got one or more deposits */
-    if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != ctx.qs)
-    {
-      postgres_rollback (cls);
-      return ctx.qs;
-    }
-    qs = postgres_commit (cls);
-    if (0 > qs)
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "Failed to commit transaction increasing refund\n");
-      return qs;
-    }
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		"Committed refund transaction\n");
     return ctx.qs;
   }
 }
@@ -2899,11 +2877,11 @@ postgres_find_proof_by_wtid (void *cls,
  *      #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if @a credit_uuid already known
  */
 static enum GNUNET_DB_QueryStatus
-postgres_enable_tip_reserve (void *cls,
-                             const struct TALER_ReservePrivateKeyP *reserve_priv,
-                             const struct GNUNET_HashCode *credit_uuid,
-                             const struct TALER_Amount *credit,
-                             struct GNUNET_TIME_Absolute expiration)
+postgres_enable_tip_reserve_TR (void *cls,
+                                const struct TALER_ReservePrivateKeyP *reserve_priv,
+                                const struct GNUNET_HashCode *credit_uuid,
+                                const struct TALER_Amount *credit,
+                                struct GNUNET_TIME_Absolute expiration)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_TIME_Absolute old_expiration;
@@ -3092,13 +3070,13 @@ postgres_enable_tip_reserve (void *cls,
  *      #TALER_EC_NONE upon success
  */
 static enum TALER_ErrorCode
-postgres_authorize_tip (void *cls,
-                        const char *justification,
-                        const struct TALER_Amount *amount,
-                        const struct TALER_ReservePrivateKeyP *reserve_priv,
-			const char *exchange_url,
-                        struct GNUNET_TIME_Absolute *expiration,
-                        struct GNUNET_HashCode *tip_id)
+postgres_authorize_tip_TR (void *cls,
+                           const char *justification,
+                           const struct TALER_Amount *amount,
+                           const struct TALER_ReservePrivateKeyP *reserve_priv,
+                           const char *exchange_url,
+                           struct GNUNET_TIME_Absolute *expiration,
+                           struct GNUNET_HashCode *tip_id)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -3295,11 +3273,11 @@ postgres_lookup_tip_by_id (void *cls,
  *      #TALER_EC_NONE upon success (@a reserve_priv was set)
  */
 static enum TALER_ErrorCode
-postgres_pickup_tip (void *cls,
-                     const struct TALER_Amount *amount,
-                     const struct GNUNET_HashCode *tip_id,
-                     const struct GNUNET_HashCode *pickup_id,
-                     struct TALER_ReservePrivateKeyP *reserve_priv)
+postgres_pickup_tip_TR (void *cls,
+                        const struct TALER_Amount *amount,
+                        const struct GNUNET_HashCode *tip_id,
+                        const struct GNUNET_HashCode *pickup_id,
+                        struct TALER_ReservePrivateKeyP *reserve_priv)
 {
   struct PostgresClosure *pg = cls;
   struct TALER_Amount left_amount;
@@ -3536,10 +3514,10 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->lookup_wire_fee = &postgres_lookup_wire_fee;
   plugin->increase_refund_for_contract = &postgres_increase_refund_for_contract;
   plugin->mark_proposal_paid = &postgres_mark_proposal_paid;
-  plugin->enable_tip_reserve = &postgres_enable_tip_reserve;
-  plugin->authorize_tip = &postgres_authorize_tip;
+  plugin->enable_tip_reserve_TR = &postgres_enable_tip_reserve_TR;
+  plugin->authorize_tip_TR = &postgres_authorize_tip_TR;
   plugin->lookup_tip_by_id = &postgres_lookup_tip_by_id;
-  plugin->pickup_tip = &postgres_pickup_tip;
+  plugin->pickup_tip_TR = &postgres_pickup_tip_TR;
   plugin->start = postgres_start;
   plugin->commit = postgres_commit;
   plugin->preflight = postgres_preflight;

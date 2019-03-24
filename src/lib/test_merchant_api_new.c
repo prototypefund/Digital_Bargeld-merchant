@@ -441,7 +441,6 @@ run (void *cls,
   };
 
   struct TALER_TESTING_Command refund[] = {
-
     TALER_TESTING_cmd_refund_increase
       ("refund-increase-1",
        merchant_url,
@@ -458,7 +457,6 @@ run (void *cls,
                                      "deposit-simple",
                                      "1",
                                      MHD_HTTP_OK),
-
     /* Trying to pick up refund from non existent proposal.  */
     TALER_TESTING_cmd_refund_lookup ("refund-lookup-non-existent",
                                      merchant_url,

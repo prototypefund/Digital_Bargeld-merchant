@@ -181,7 +181,7 @@ pickup_cleanup (struct TM_HandlerContext *hc)
  */
 static int
 run_pickup (struct MHD_Connection *connection,
-	    struct PickupContext *pc)
+            struct PickupContext *pc)
 {
   struct TALER_ReservePrivateKeyP reserve_priv;
   struct TALER_ReservePublicKeyP reserve_pub;
@@ -195,11 +195,11 @@ run_pickup (struct MHD_Connection *connection,
 				  pc->ec,
 				  pc->error_hint);
   }
-  ec = db->pickup_tip (db->cls,
-		       &pc->total,
-		       &pc->tip_id,
-		       &pc->pickup_id,
-		       &reserve_priv);
+  ec = db->pickup_tip_TR (db->cls,
+                          &pc->total,
+                          &pc->tip_id,
+                          &pc->pickup_id,
+                          &reserve_priv);
   if (TALER_EC_NONE != ec)
   {
     unsigned int response_code;

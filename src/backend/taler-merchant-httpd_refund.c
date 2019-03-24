@@ -130,6 +130,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_JSON_spec_end ()
   };
   enum GNUNET_DB_QueryStatus qs;
+  enum GNUNET_DB_QueryStatus qsx;
 
   if (NULL == *connection_cls)
   {
@@ -178,17 +179,17 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_REFUND_INSTANCE_UNKNOWN,
-					 "Unknown instance given");
+                                         "Unknown instance given");
   }
 
   db->preflight (db->cls);
 
   /* Convert order id to h_contract_terms */
   qs = db->find_contract_terms (db->cls,
-				&contract_terms,
+                                &contract_terms,
                                 &last_session_id,
-				order_id,
-				&mi->pubkey);
+                                order_id,
+                                &mi->pubkey);
   if (0 > qs)
   {
     /* single, read-only SQL statements should never cause
@@ -226,12 +227,46 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   }
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
+    if (GNUNET_OK !=
+        db->start (db->cls,
+                   "increase refund"))
+    {
+      GNUNET_break (0);
+      return GNUNET_DB_STATUS_HARD_ERROR;
+    }
     qs = db->increase_refund_for_contract (db->cls,
-					   &h_contract_terms,
-					   &mi->pubkey,
-					   &refund,
-					   reason);
-    if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+                                           &h_contract_terms,
+                                           &mi->pubkey,
+                                           &refund,
+                                           reason);
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "increase refund returned %d\n",
+                qs);
+    if (GNUNET_DB_STATUS_HARD_ERROR == qs)
+    {
+      GNUNET_break (0);
+      db->rollback (db->cls);
+      break;
+    }
+    if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+    {
+      db->rollback (db->cls);
+      continue;
+    }
+    /* Got one or more deposits */
+    if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
+    {
+      db->rollback (db->cls);
+      break;
+    }
+    qsx = db->commit (db->cls);
+    if (GNUNET_DB_STATUS_HARD_ERROR == qsx)
+    {
+      GNUNET_break (0);
+      qs = qsx;
+      break;
+    }
+    if (GNUNET_DB_STATUS_SOFT_ERROR != qsx)
       break;
   }
   if (0 > qs)
@@ -265,7 +300,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
    * Just a "200 OK" should be fine here, as the frontend has all
    * the information needed to generate the right response.
    */
-
   confirmation.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK);
   confirmation.purpose.size = htonl (sizeof (struct TALER_MerchantRefundConfirmationPS));
   GNUNET_CRYPTO_hash (order_id,
@@ -465,10 +499,10 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   /* Convert order id to h_contract_terms */
   contract_terms = NULL;
   qs = db->find_contract_terms (db->cls,
-				&contract_terms,
+                                &contract_terms,
                                 &last_session_id,
-				order_id,
-				&mi->pubkey);
+                                order_id,
+                                &mi->pubkey);
   if (0 > qs)
   {
     /* single, read-only SQL statements should never cause
@@ -554,13 +588,14 @@ TM_get_refund_json (const struct MerchantInstance *mi,
   prd.h_contract_terms = h_contract_terms;
   prd.merchant = mi;
   prd.ec = TALER_EC_NONE;
+  db->preflight (db->cls);
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
     qs = db->get_refunds_from_contract_terms_hash (db->cls,
-						   &mi->pubkey,
-						   h_contract_terms,
-						   &process_refunds_cb,
-						   &prd);
+                                                   &mi->pubkey,
+                                                   h_contract_terms,
+                                                   &process_refunds_cb,
+                                                   &prd);
     if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
       break;
   }

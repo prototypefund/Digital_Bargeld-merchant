@@ -199,7 +199,7 @@ handle_status (void *cls,
   {
     GNUNET_break_op (0);
     resume_with_response (tqc,
-			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          MHD_HTTP_SERVICE_UNAVAILABLE,
                           TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_STATUS_FAILED_EXCHANGE_DOWN,
                                                    "Unable to obtain reserve status from exchange"));
     return;
@@ -209,7 +209,7 @@ handle_status (void *cls,
   {
     GNUNET_break_op (0);
     resume_with_response (tqc,
-			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          MHD_HTTP_SERVICE_UNAVAILABLE,
                           TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_FAILED_EMPTY,
                                                    "Exchange returned empty reserve history"));
     return;
@@ -219,7 +219,7 @@ handle_status (void *cls,
   {
     GNUNET_break_op (0);
     resume_with_response (tqc,
-			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          MHD_HTTP_SERVICE_UNAVAILABLE,
                           TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_INVALID_NO_DEPOSIT,
                                                    "Exchange returned invalid reserve history"));
     return;
@@ -231,18 +231,18 @@ handle_status (void *cls,
   {
     GNUNET_break_op (0);
     resume_with_response (tqc,
-			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          MHD_HTTP_SERVICE_UNAVAILABLE,
                           TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_HISTORY_INVALID_CURRENCY,
                                                    "Exchange returned invalid reserve history"));
     return;
   }
 
   if (0 != strcasecmp (TMH_currency,
-		       history[0].amount.currency))
+                       history[0].amount.currency))
   {
     GNUNET_break_op (0);
     resume_with_response (tqc,
-			  MHD_HTTP_SERVICE_UNAVAILABLE,
+                          MHD_HTTP_SERVICE_UNAVAILABLE,
                           TMH_RESPONSE_make_error (TALER_EC_TIP_QUERY_RESERVE_CURRENCY_MISSMATCH,
                                                    "Exchange currency unexpected"));
     return;
@@ -271,11 +271,11 @@ handle_status (void *cls,
         GNUNET_CRYPTO_hash (history[i].details.in_details.wire_reference,
                             history[i].details.in_details.wire_reference_size,
                             &uuid);
-        qs = db->enable_tip_reserve (db->cls,
-                                     &tqc->reserve_priv,
-                                     &uuid,
-                                     &history[i].amount,
-                                     deposit_expiration);
+        qs = db->enable_tip_reserve_TR (db->cls,
+                                        &tqc->reserve_priv,
+                                        &uuid,
+                                        &history[i].amount,
+                                        deposit_expiration);
         if (GNUNET_OK !=
             TALER_amount_add (&tqc->amount_deposited,
                               &tqc->amount_deposited,
@@ -425,10 +425,10 @@ exchange_cont (void *cls,
  */
 int
 MH_handler_tip_query (struct TMH_RequestHandler *rh,
-                          struct MHD_Connection *connection,
-                          void **connection_cls,
-                          const char *upload_data,
-                          size_t *upload_data_size)
+                      struct MHD_Connection *connection,
+                      void **connection_cls,
+                      const char *upload_data,
+                      size_t *upload_data_size)
 {
   struct TipQueryContext *tqc;
   int res;
@@ -471,7 +471,7 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
                                                "instance");
   if (NULL == tqc->instance)
     return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
+                                           TALER_EC_PARAMETER_MISSING,
                                            "instance");
 
   mi = TMH_lookup_instance (tqc->instance);
@@ -495,11 +495,11 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
   }
   tqc->reserve_priv = mi->tip_reserve;
 
-  db->preflight (db->cls);
   {
     int qs;
     for (unsigned int i=0;i<MAX_RETRIES;i++)
     {
+      db->preflight (db->cls);
       qs = db->get_authorized_tip_amount (db->cls,
                                           &tqc->reserve_priv,
                                           &tqc->amount_authorized);
@@ -517,11 +517,10 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     {
       /* we'll set amount_authorized to zero later once
-	 we know the currency */
+         we know the currency */
       tqc->none_authorized = GNUNET_YES;
     }
   }
-
 
   MHD_suspend_connection (connection);
   tqc->suspended = GNUNET_YES;

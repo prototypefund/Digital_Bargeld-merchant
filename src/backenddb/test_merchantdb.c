@@ -507,13 +507,13 @@ test_tipping ()
 
   RND_BLK (&tip_reserve_priv);
   if (TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS !=
-      plugin->authorize_tip (plugin->cls,
-                             "testing tips reserve unknown",
-                             &amount,
-                             &tip_reserve_priv,
-			     "http://localhost:8081/",
-                             &tip_expiration,
-                             &tip_id))
+      plugin->authorize_tip_TR (plugin->cls,
+                                "testing tips reserve unknown",
+                                &amount,
+                                &tip_reserve_priv,
+                                "http://localhost:8081/",
+                                &tip_expiration,
+                                &tip_id))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -527,22 +527,22 @@ test_tipping ()
   reserve_expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS,
                                                                                         2));
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-      plugin->enable_tip_reserve (plugin->cls,
-                                  &tip_reserve_priv,
-                                  &tip_credit_uuid,
-                                  &total,
-                                  reserve_expiration))
+      plugin->enable_tip_reserve_TR (plugin->cls,
+                                     &tip_reserve_priv,
+                                     &tip_credit_uuid,
+                                     &total,
+                                     reserve_expiration))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
   /* check idempotency */
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
-      plugin->enable_tip_reserve (plugin->cls,
-                                  &tip_reserve_priv,
-                                  &tip_credit_uuid,
-                                  &total,
-                                  reserve_expiration))
+      plugin->enable_tip_reserve_TR (plugin->cls,
+                                     &tip_reserve_priv,
+                                     &tip_credit_uuid,
+                                     &total,
+                                     reserve_expiration))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -550,13 +550,13 @@ test_tipping ()
   /* Make sure it has expired, so at this point the value is back at ZERO! */
   sleep (3);
   if (TALER_EC_TIP_AUTHORIZE_RESERVE_EXPIRED !=
-      plugin->authorize_tip (plugin->cls,
-                             "testing tips too late",
-                             &amount,
-                             &tip_reserve_priv,
-			     "http://localhost:8081/",
-                             &tip_expiration,
-                             &tip_id))
+      plugin->authorize_tip_TR (plugin->cls,
+                                "testing tips too late",
+                                &amount,
+                                &tip_reserve_priv,
+                                "http://localhost:8081/",
+                                &tip_expiration,
+                                &tip_id))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -567,11 +567,11 @@ test_tipping ()
   reserve_expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS,
                                                                                         2));
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-      plugin->enable_tip_reserve (plugin->cls,
-                                  &tip_reserve_priv,
-                                  &tip_credit_uuid,
-                                  &total,
-                                  reserve_expiration))
+      plugin->enable_tip_reserve_TR (plugin->cls,
+                                     &tip_reserve_priv,
+                                     &tip_credit_uuid,
+                                     &total,
+                                     reserve_expiration))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -581,11 +581,11 @@ test_tipping ()
   RND_BLK (&tip_credit_uuid);
   reserve_expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_UNIT_DAYS);
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-      plugin->enable_tip_reserve (plugin->cls,
-                                  &tip_reserve_priv,
-                                  &tip_credit_uuid,
-                                  &total,
-                                  reserve_expiration))
+      plugin->enable_tip_reserve_TR (plugin->cls,
+                                     &tip_reserve_priv,
+                                     &tip_credit_uuid,
+                                     &total,
+                                     reserve_expiration))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -596,13 +596,13 @@ test_tipping ()
                  TALER_string_to_amount (CURRENCY ":4",
                                          &amount));
   if (TALER_EC_NONE !=
-      plugin->authorize_tip (plugin->cls,
-                             "testing tips",
-                             &amount,
-                             &tip_reserve_priv,
-			     "http://localhost:8081/",
-                             &tip_expiration,
-                             &tip_id))
+      plugin->authorize_tip_TR (plugin->cls,
+                                "testing tips",
+                                &amount,
+                                &tip_reserve_priv,
+                                "http://localhost:8081/",
+                                &tip_expiration,
+                                &tip_id))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -630,13 +630,13 @@ test_tipping ()
   }
   GNUNET_free (url);
   if (TALER_EC_NONE !=
-      plugin->authorize_tip (plugin->cls,
-                             "testing tips more",
-                             &amount,
-                             &tip_reserve_priv,
-			     "http://localhost:8081/",
-                             &tip_expiration,
-                             &tip_id))
+      plugin->authorize_tip_TR (plugin->cls,
+                                "testing tips more",
+                                &amount,
+                                &tip_reserve_priv,
+                                "http://localhost:8081/",
+                                &tip_expiration,
+                                &tip_id))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -653,11 +653,11 @@ test_tipping ()
                                          &inc));
   RND_BLK (&pickup_id);
   if (TALER_EC_NONE !=
-      plugin->pickup_tip (plugin->cls,
-                          &inc,
-                          &tip_id,
-                          &pickup_id,
-                          &pres))
+      plugin->pickup_tip_TR (plugin->cls,
+                             &inc,
+                             &tip_id,
+                             &pickup_id,
+                             &pres))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -671,11 +671,11 @@ test_tipping ()
   }
   RND_BLK (&pickup_id);
   if (TALER_EC_NONE !=
-      plugin->pickup_tip (plugin->cls,
-                          &inc,
-                          &tip_id,
-                          &pickup_id,
-                          &pres))
+      plugin->pickup_tip_TR (plugin->cls,
+                             &inc,
+                             &tip_id,
+                             &pickup_id,
+                             &pres))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -691,11 +691,11 @@ test_tipping ()
   /* Third attempt should fail, as we've picked up 4/4 in amount */
   RND_BLK (&pickup_id);
   if (TALER_EC_TIP_PICKUP_NO_FUNDS !=
-      plugin->pickup_tip (plugin->cls,
-                          &inc,
-                          &tip_id,
-                          &pickup_id,
-                          &pres))
+      plugin->pickup_tip_TR (plugin->cls,
+                             &inc,
+                             &tip_id,
+                             &pickup_id,
+                             &pres))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -703,13 +703,13 @@ test_tipping ()
 
   /* We authorized 8 out of 10, so going for another 4 should fail with insufficient funds */
   if (TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS !=
-      plugin->authorize_tip (plugin->cls,
-                             "testing tips insufficient funds",
-                             &amount,
-                             &tip_reserve_priv,
-			     "http://localhost:8081/",
-                             &tip_expiration,
-                             &tip_id))
+      plugin->authorize_tip_TR (plugin->cls,
+                                "testing tips insufficient funds",
+                                &amount,
+                                &tip_reserve_priv,
+                                "http://localhost:8081/",
+                                &tip_expiration,
+                                &tip_id))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -719,11 +719,11 @@ test_tipping ()
   RND_BLK (&tip_id);
   RND_BLK (&pickup_id);
   if (TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN !=
-      plugin->pickup_tip (plugin->cls,
-                          &inc,
-                          &tip_id,
-                          &pickup_id,
-                          &pres))
+      plugin->pickup_tip_TR (plugin->cls,
+                             &inc,
+                             &tip_id,
+                             &pickup_id,
+                             &pres))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
