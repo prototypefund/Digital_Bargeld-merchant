@@ -1698,6 +1698,7 @@ refund_increase_cb (void *cls,
   struct InterpreterState *is = cls;
   struct Command *cmd = &is->commands[is->ip];
 
+  cmd->details.refund_increase.rio = NULL;
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -1705,7 +1706,6 @@ refund_increase_cb (void *cls,
     fail (is);
     return;
   }
-  cmd->details.refund_increase.rio = NULL;
   next_command (is);
 }
 
@@ -3925,7 +3925,7 @@ interpreter_run (void *cls)
                     &refund_amount,
                     cmd->details.refund_increase.reason,
                     instance,
-                    refund_increase_cb,
+                    &refund_increase_cb,
                     is)))
         {
           GNUNET_break (0);
