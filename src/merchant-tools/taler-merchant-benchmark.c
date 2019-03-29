@@ -547,8 +547,6 @@ int
 main (int argc,
       char *const *argv)
 {
-  struct GNUNET_CONFIGURATION_Handle *cfg;
-
   default_config_file = GNUNET_OS_project_data_get
     ()->user_config_file;
 
