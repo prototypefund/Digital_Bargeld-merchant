@@ -191,9 +191,9 @@ run_pickup (struct MHD_Connection *connection,
   if (TALER_EC_NONE != pc->ec)
   {
     return TMH_RESPONSE_reply_rc (connection,
-				  pc->response_code,
-				  pc->ec,
-				  pc->error_hint);
+                                  pc->response_code,
+                                  pc->ec,
+                                  pc->error_hint);
   }
   ec = db->pickup_tip_TR (db->cls,
                           &pc->total,
@@ -221,13 +221,13 @@ run_pickup (struct MHD_Connection *connection,
       break;
     }
     return TMH_RESPONSE_reply_rc (connection,
-				  response_code,
-				  ec,
-				  human);
+                                  response_code,
+                                  ec,
+                                  human);
   }
   sigs = json_array ();
   GNUNET_CRYPTO_eddsa_key_get_public (&reserve_priv.eddsa_priv,
-				      &reserve_pub.eddsa_pub);
+                                      &reserve_pub.eddsa_pub);
   for (unsigned int i=0;i<pc->planchets_len;i++)
   {
     struct PlanchetDetail *pd = &pc->planchets[i];
@@ -262,9 +262,9 @@ run_pickup (struct MHD_Connection *connection,
  */
 static void
 exchange_found_cb (void *cls,
-		   struct TALER_EXCHANGE_Handle *eh,
-		   const struct TALER_Amount *wire_fee,
-		   int exchange_trusted)
+                   struct TALER_EXCHANGE_Handle *eh,
+                   const struct TALER_Amount *wire_fee,
+                   int exchange_trusted)
 {
   struct PickupContext *pc = cls;
   const struct TALER_EXCHANGE_Keys *keys;
@@ -294,8 +294,8 @@ exchange_found_cb (void *cls,
   GNUNET_assert (0 != pc->planchets_len);
   ae = GNUNET_NO;
   memset (&total,
-	  0,
-	  sizeof (total));
+          0,
+          sizeof (total));
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Calculating tip amount over %u planchets!\n",
               pc->planchets_len);
@@ -307,7 +307,7 @@ exchange_found_cb (void *cls,
     struct TALER_Amount amount_with_fee;
 
     dk = TALER_EXCHANGE_get_denomination_key_by_hash (keys,
-						      &pd->wr.h_denomination_pub);
+                                                      &pd->wr.h_denomination_pub);
     if (NULL == dk)
     {
       pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEY;
@@ -318,15 +318,15 @@ exchange_found_cb (void *cls,
       return;
     }
     GNUNET_CRYPTO_hash_context_read (hc,
-				     &pd->wr.h_denomination_pub,
-				     sizeof (struct GNUNET_HashCode));
+                                     &pd->wr.h_denomination_pub,
+                                     sizeof (struct GNUNET_HashCode));
     GNUNET_CRYPTO_hash_context_read (hc,
-				     pd->coin_ev,
-				     pd->coin_ev_size);
+                                     pd->coin_ev,
+                                     pd->coin_ev_size);
     if (GNUNET_OK !=
-	TALER_amount_add (&amount_with_fee,
-			  &dk->value,
-			  &dk->fee_withdraw))
+        TALER_amount_add (&amount_with_fee,
+                          &dk->value,
+                          &dk->fee_withdraw))
     {
       ae = GNUNET_YES;
     }
@@ -337,20 +337,20 @@ exchange_found_cb (void *cls,
     else
     {
       if (GNUNET_OK !=
-	  TALER_amount_add (&total,
-			    &total,
-			    &amount_with_fee))
+          TALER_amount_add (&total,
+                            &total,
+                            &amount_with_fee))
       {
-	ae = GNUNET_YES;
+        ae = GNUNET_YES;
       }
     }
     TALER_amount_hton (&pd->wr.withdraw_fee,
-		       &dk->fee_withdraw);
+                       &dk->fee_withdraw);
     TALER_amount_hton (&pd->wr.amount_with_fee,
-		       &amount_with_fee);
+                       &amount_with_fee);
   }
   GNUNET_CRYPTO_hash_context_finish (hc,
-				     &pc->pickup_id);
+                                     &pc->pickup_id);
   if (GNUNET_YES == ae)
   {
     pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_AMOUNT_OVERFLOW;
@@ -407,21 +407,21 @@ prepare_pickup (struct PickupContext *pc)
       break;
     }
     return TMH_RESPONSE_reply_rc (pc->connection,
-				  response_code,
-				  ec,
-				  "Could not determine exchange URL for the given tip id");
+                                  response_code,
+                                  ec,
+                                  "Could not determine exchange URL for the given tip id");
 
   }
   pc->fo = TMH_EXCHANGES_find_exchange (pc->exchange_url,
-					NULL,
-					&exchange_found_cb,
-					pc);
+                                        NULL,
+                                        &exchange_found_cb,
+                                        pc);
   if (NULL == pc->fo)
   {
     return TMH_RESPONSE_reply_rc (pc->connection,
-				  MHD_HTTP_INTERNAL_SERVER_ERROR,
-				  TALER_EC_INTERNAL_INVARIANT_FAILURE,
-				  "consult server logs");
+                                  MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                  TALER_EC_INTERNAL_INVARIANT_FAILURE,
+                                  "consult server logs");
   }
   MHD_suspend_connection (pc->connection);
   return MHD_YES;
@@ -439,29 +439,29 @@ prepare_pickup (struct PickupContext *pc)
  */
 static int
 parse_planchet (struct MHD_Connection *connection,
-		const json_t *planchet,
-		struct PlanchetDetail *pd)
+                const json_t *planchet,
+                struct PlanchetDetail *pd)
 {
   int ret;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_fixed_auto ("denom_pub_hash",
-				 &pd->wr.h_denomination_pub),
+                                 &pd->wr.h_denomination_pub),
     GNUNET_JSON_spec_varsize ("coin_ev",
-			      (void **) &pd->coin_ev,
-			      &pd->coin_ev_size),
+                              (void **) &pd->coin_ev,
+                              &pd->coin_ev_size),
     GNUNET_JSON_spec_end()
   };
 
   ret = TMH_PARSE_json_data (connection,
-			     planchet,
-			     spec);
+                             planchet,
+                             spec);
   if (GNUNET_OK != ret)
     return ret;
   pd->wr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_RESERVE_WITHDRAW);
   pd->wr.purpose.size = htonl (sizeof (struct TALER_WithdrawRequestPS));
   GNUNET_CRYPTO_hash (pd->coin_ev,
-		      pd->coin_ev_size,
-		      &pd->wr.h_coin_envelope);
+                      pd->coin_ev_size,
+                      &pd->wr.h_coin_envelope);
   return ret;
 }
 
@@ -512,7 +512,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
        after an exchange /keys' request to obtain the DKs
        (and not for each request). */
     return run_pickup (connection,
-		       pc);
+                       pc);
   }
   res = TMH_PARSE_post_json (connection,
                              &pc->json_parse_context,
@@ -541,29 +541,29 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
     return TMH_RESPONSE_reply_rc (connection,
-				  MHD_HTTP_BAD_REQUEST,
-				  TALER_EC_TIP_PICKUP_EXCHANGE_TOO_MANY_PLANCHETS,
-				  "limit of 1024 planchets exceeded by request");
+                                  MHD_HTTP_BAD_REQUEST,
+                                  TALER_EC_TIP_PICKUP_EXCHANGE_TOO_MANY_PLANCHETS,
+                                  "limit of 1024 planchets exceeded by request");
   }
   if (0 == pc->planchets_len)
   {
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
     return TMH_RESPONSE_reply_rc (connection,
-				  MHD_HTTP_BAD_REQUEST,
-				  TALER_EC_PARAMETER_MALFORMED,
-				  "no planchets specified");
+                                  MHD_HTTP_BAD_REQUEST,
+                                  TALER_EC_PARAMETER_MALFORMED,
+                                  "no planchets specified");
   }
   db->preflight (db->cls);
   pc->planchets = GNUNET_new_array (pc->planchets_len,
-				    struct PlanchetDetail);
+                                    struct PlanchetDetail);
   for (unsigned int i=0;i<pc->planchets_len;i++)
   {
     if (GNUNET_OK !=
-	(res = parse_planchet (connection,
-			       json_array_get (planchets,
-					       i),
-			       &pc->planchets[i])))
+        (res = parse_planchet (connection,
+                               json_array_get (planchets,
+                                               i),
+                               &pc->planchets[i])))
     {
       GNUNET_JSON_parse_free (spec);
       json_decref (root);

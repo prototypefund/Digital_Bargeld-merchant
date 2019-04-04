@@ -455,8 +455,8 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
       return MHD_NO; /* hard error */
     }
     res = MHD_queue_response (connection,
-			      tqc->response_code,
-			      tqc->response);
+                              tqc->response_code,
+                              tqc->response);
     MHD_destroy_response (tqc->response);
     tqc->response = NULL;
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -490,8 +490,8 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
                 "Instance `%s' not configured for tipping\n",
                 tqc->instance);
     return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
-					 "exchange for tipping not configured for the instance");
+                                         TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
+                                         "exchange for tipping not configured for the instance");
   }
   tqc->reserve_priv = mi->tip_reserve;
 
