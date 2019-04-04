@@ -511,7 +511,7 @@ run (void *cls,
     /**
      * The following block will (1) create a new
      * reserve, then (2) a proposal, then (3) pay for
-     * it, and finally (4) attempt to pick up a refund 
+     * it, and finally (4) attempt to pick up a refund
      * from it without any increasing taking place
      * in the first place.
      **/
@@ -641,7 +641,7 @@ run (void *cls,
        "nulltip",
        "tip 2",
        "EUR:5.01",
-       TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN),
+       TALER_EC_RESERVE_STATUS_UNKNOWN),
 
     TALER_TESTING_cmd_tip_query ("query-tip-1",
                                  merchant_url,

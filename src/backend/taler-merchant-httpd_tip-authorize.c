@@ -28,6 +28,7 @@
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_tip-authorize.h"
+#include "taler-merchant-httpd_tip-reserve-helper.h"
 
 
 struct TipAuthContext
@@ -42,11 +43,6 @@ struct TipAuthContext
    * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
    */
   void *json_parse_context;
-
-  /**
-   * HTTP connection we are handling.
-   */
-  struct MHD_Connection *connection;
 
   /**
    * Merchant instance to use.
@@ -74,30 +70,14 @@ struct TipAuthContext
   json_t *root;
 
   /**
-   * Handle to pending /reserve/status request.
+   * Context for checking the tipping reserve's status.
    */
-  struct TALER_EXCHANGE_ReserveStatusHandle *rsh;
-
-  /**
-   * Handle for operation to obtain exchange handle.
-   */
-  struct TMH_EXCHANGES_FindOperation *fo;
-
-  /**
-   * Reserve expiration time as provided by the exchange.
-   * Set in #exchange_cont.
-   */
-  struct GNUNET_TIME_Relative idle_reserve_expiration_time;
+  struct CheckTipReserve ctr;
 
   /**
    * Tip amount requested.
    */
   struct TALER_Amount amount;
-
-  /**
-   * Private key used by this merchant for the tipping reserve.
-   */
-  struct TALER_ReservePrivateKeyP reserve_priv;
 
   /**
    * Flag set to #GNUNET_YES when we have tried /reserve/status of the
@@ -110,10 +90,6 @@ struct TipAuthContext
    */
   int parsed_json;
 
-  /**
-   * Error code witnessing what the Exchange complained about.
-   */
-  enum TALER_ErrorCode exchange_ec;
 };
 
 
@@ -132,148 +108,9 @@ cleanup_tac (struct TM_HandlerContext *hc)
     json_decref (tac->root);
     tac->root = NULL;
   }
-  if (NULL != tac->rsh)
-  {
-    TALER_EXCHANGE_reserve_status_cancel (tac->rsh);
-    tac->rsh = NULL;
-  }
-  if (NULL != tac->fo)
-  {
-    TMH_EXCHANGES_find_exchange_cancel (tac->fo);
-    tac->fo = NULL;
-  }
+  TMH_check_tip_reserve_cleanup (&tac->ctr);
   TMH_PARSE_post_cleanup_callback (tac->json_parse_context);
   GNUNET_free (tac);
-}
-
-
-/**
- * Function called with the result of the /reserve/status request
- * for the tipping reserve.  Update our database balance with the
- * result.
- *
- * @param cls closure with a `struct TipAuthContext *'
- * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
- *                    0 if the exchange's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code, #TALER_EC_NONE on success
- * @param[in] json original response in JSON format (useful only for diagnostics)
- * @param balance current balance in the reserve, NULL on error
- * @param history_length number of entries in the transaction history, 0 on error
- * @param history detailed transaction history, NULL on error
- */
-static void
-handle_status (void *cls,
-               unsigned int http_status,
-               enum TALER_ErrorCode ec,
-               const json_t *json,
-               const struct TALER_Amount *balance,
-               unsigned int history_length,
-               const struct TALER_EXCHANGE_ReserveHistory *history)
-{
-  struct TipAuthContext *tac = cls;
-
-  tac->rsh = NULL;
-  if (MHD_HTTP_OK != http_status)
-  {
-
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                _("Failed to obtain tipping reserve status from exchange (%u/%d)\n"),
-                http_status,
-                ec);
-    tac->exchange_ec = ec;
-    MHD_resume_connection (tac->connection);
-    TMH_trigger_daemon ();
-    return;
-  }
-
-  /* Update DB based on status! */
-  for (unsigned int i=0;i<history_length;i++)
-  {
-    switch (history[i].type)
-    {
-    case TALER_EXCHANGE_RTT_DEPOSIT:
-      {
-        enum GNUNET_DB_QueryStatus qs;
-        struct GNUNET_HashCode uuid;
-        struct GNUNET_TIME_Absolute expiration;
-
-        expiration = GNUNET_TIME_absolute_add (history[i].details.in_details.timestamp,
-                                               tac->idle_reserve_expiration_time);
-        GNUNET_CRYPTO_hash (history[i].details.in_details.wire_reference,
-                            history[i].details.in_details.wire_reference_size,
-                            &uuid);
-        qs = db->enable_tip_reserve_TR (db->cls,
-                                        &tac->reserve_priv,
-                                        &uuid,
-                                        &history[i].amount,
-                                        expiration);
-        if (0 > qs)
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      _("Database error updating tipping reserve status: %d\n"),
-                      qs);
-        }
-      }
-      break;
-    case TALER_EXCHANGE_RTT_WITHDRAWAL:
-      /* expected */
-      break;
-    case TALER_EXCHANGE_RTT_PAYBACK:
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  _("Encountered unsupported /payback operation on tipping reserve\n"));
-      break;
-    case TALER_EXCHANGE_RTT_CLOSE:
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  _("Exchange closed reserve (due to expiration), balance calulation is likely wrong. Please create a fresh reserve.\n"));
-      break;
-    }
-  }
-  /* Finally, resume processing */
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Resuming HTTP processing\n");
-  MHD_resume_connection (tac->connection);
-  TMH_trigger_daemon ();
-}
-
-
-/**
- * Function called with the result of a #TMH_EXCHANGES_find_exchange()
- * operation.
- *
- * @param cls closure with a `struct TipAuthContext *'
- * @param eh handle to the exchange context
- * @param wire_fee current applicable wire fee for dealing with @a eh, NULL if not available
- * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
- */
-static void
-exchange_cont (void *cls,
-               struct TALER_EXCHANGE_Handle *eh,
-               const struct TALER_Amount *wire_fee,
-               int exchange_trusted)
-{
-  struct TipAuthContext *tac = cls;
-  struct TALER_ReservePublicKeyP reserve_pub;
-  const struct TALER_EXCHANGE_Keys *keys;
-
-  tac->fo = NULL;
-  if (NULL == eh)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                _("Failed to contact exchange configured for tipping!\n"));
-    MHD_resume_connection (tac->connection);
-    TMH_trigger_daemon ();
-    return;
-  }
-  keys = TALER_EXCHANGE_get_keys (eh);
-  GNUNET_assert (NULL != keys);
-  tac->idle_reserve_expiration_time
-    = keys->reserve_closing_delay;
-  GNUNET_CRYPTO_eddsa_key_get_public (&tac->reserve_priv.eddsa_priv,
-                                      &reserve_pub.eddsa_pub);
-  tac->rsh = TALER_EXCHANGE_reserve_status (eh,
-                                            &reserve_pub,
-                                            &handle_status,
-                                            tac);
 }
 
 
@@ -305,14 +142,22 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   {
     tac = GNUNET_new (struct TipAuthContext);
     tac->hc.cc = &cleanup_tac;
-    tac->connection = connection;
+    tac->ctr.connection = connection;
     *connection_cls = tac;
   }
   else
   {
     tac = *connection_cls;
   }
-
+  if (NULL != tac->ctr.response)
+  {
+    res = MHD_queue_response (connection,
+                              tac->ctr.response_code,
+                              tac->ctr.response);
+    MHD_destroy_response (tac->ctr.response);
+    tac->ctr.response = NULL;
+    return res;
+  }
   if (GNUNET_NO == tac->parsed_json)
   {
     struct GNUNET_JSON_Specification spec[] = {
@@ -336,13 +181,16 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
          (NULL == tac->root) )
       return MHD_YES;
 
-    if (NULL == json_object_get (tac->root, "pickup_url"))
+    if (NULL == json_object_get (tac->root,
+                                 "pickup_url"))
     {
       char *pickup_url = TALER_url_absolute_mhd (connection,
                                                  "/public/tip-pickup",
                                                  NULL);
       GNUNET_assert (NULL != pickup_url);
-      json_object_set_new (tac->root, "pickup_url", json_string (pickup_url));
+      json_object_set_new (tac->root,
+                           "pickup_url",
+                           json_string (pickup_url));
       GNUNET_free (pickup_url);
     }
 
@@ -364,8 +212,8 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                 "Instance `%s' not configured\n",
                 tac->instance);
     return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN,
-					 "unknown instance");
+                                         TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN,
+                                         "unknown instance");
   }
   if (NULL == mi->tip_exchange)
   {
@@ -373,10 +221,10 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                 "Instance `%s' not configured for tipping\n",
                 tac->instance);
     return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
-					 "exchange for tipping not configured for the instance");
+                                         TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
+                                         "exchange for tipping not configured for the instance");
   }
-  tac->reserve_priv = mi->tip_reserve;
+  tac->ctr.reserve_priv = mi->tip_reserve;
   ec = db->authorize_tip_TR (db->cls,
                              tac->justification,
                              &tac->amount,
@@ -390,17 +238,15 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   if ( (TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS == ec) &&
        (GNUNET_NO == tac->checked_status) )
   {
-    MHD_suspend_connection (connection);
     tac->checked_status = GNUNET_YES;
-    tac->fo = TMH_EXCHANGES_find_exchange (mi->tip_exchange,
-                                           NULL,
-                                           &exchange_cont,
-                                           tac);
+    tac->ctr.none_authorized = GNUNET_YES;
+    TMH_check_tip_reserve (&tac->ctr,
+                           mi->tip_exchange);
     return MHD_YES;
   }
 
   /* handle irrecoverable errors */
-  if (TALER_EC_NONE != (ec | tac->exchange_ec))
+  if (TALER_EC_NONE != ec)
   {
     unsigned int rc;
     const char *msg;
@@ -422,22 +268,6 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     default:
       rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
       msg = "Failed to approve tip: internal server error";
-      break;
-    }
-
-    /* If the exchange complained earlier, we do
-     * override what the database returned.  */
-    switch (tac->exchange_ec)
-    {
-    case TALER_EC_RESERVE_STATUS_UNKNOWN:
-      rc = MHD_HTTP_NOT_FOUND;
-      msg = "Exchange does not find any reserve having this key";
-      /* We override what the DB returned, as an exchange error
-       * is more important.  */
-      ec = TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN; 
-      break;
-    default:
-      /* This makes the compiler silent.  */
       break;
     }
 

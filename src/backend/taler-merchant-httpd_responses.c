@@ -43,14 +43,14 @@ TMH_RESPONSE_make_json (const json_t *json)
   char *json_str;
 
   json_str = json_dumps (json,
-			 JSON_INDENT(2));
+                         JSON_INDENT(2));
   if (NULL == json_str)
   {
     GNUNET_break (0);
     return NULL;
   }
   resp = MHD_create_response_from_buffer (strlen (json_str),
-					  json_str,
+                                          json_str,
                                           MHD_RESPMEM_MUST_FREE);
   if (NULL == resp)
   {
@@ -152,9 +152,9 @@ TMH_RESPONSE_reply_json_pack (struct MHD_Connection *connection,
 
   va_start (argp, fmt);
   json = json_vpack_ex (&jerror,
-			0,
-			fmt,
-			argp);
+                        0,
+                        fmt,
+                        argp);
   va_end (argp);
   if (NULL == json)
   {
@@ -182,10 +182,10 @@ TMH_RESPONSE_reply_json_pack (struct MHD_Connection *connection,
  */
 struct MHD_Response *
 TMH_RESPONSE_make_error (enum TALER_ErrorCode ec,
-			 const char *hint)
+                         const char *hint)
 {
   return TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-				      "code", (json_int_t) ec,
+                                      "code", (json_int_t) ec,
                                       "hint", hint);
 }
 
@@ -200,13 +200,13 @@ TMH_RESPONSE_make_error (enum TALER_ErrorCode ec,
  */
 int
 TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
-				   enum TALER_ErrorCode ec,
+                                   enum TALER_ErrorCode ec,
                                    const char *hint)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
                                        "{s:I, s:s}",
-				       "code", (json_int_t) ec,
+                                       "code", (json_int_t) ec,
                                        "hint", hint);
 }
 
@@ -255,7 +255,7 @@ TMH_RESPONSE_reply_rc (struct MHD_Connection *connection,
   return TMH_RESPONSE_reply_json_pack (connection,
                                        response_code,
                                        "{s:I, s:s}",
-				       "code", (json_int_t) ec,
+                                       "code", (json_int_t) ec,
                                        "error", msg);
 }
 
@@ -272,7 +272,7 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection)
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
                                        "{s:I, s:s}",
-				       "code", (json_int_t) TALER_EC_JSON_INVALID,
+                                       "code", (json_int_t) TALER_EC_JSON_INVALID,
                                        "error", "invalid json");
 }
 
@@ -288,13 +288,13 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection)
  */
 int
 TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
-			      enum TALER_ErrorCode ec,
+                              enum TALER_ErrorCode ec,
                               const char *object)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_NOT_FOUND,
                                        "{s:I, s:s}",
-				       "code", (json_int_t) ec,
+                                       "code", (json_int_t) ec,
                                        "error", object);
 }
 
@@ -309,13 +309,13 @@ TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
  */
 int
 TMH_RESPONSE_reply_bad_request (struct MHD_Connection *connection,
-				enum TALER_ErrorCode ec,
+                                enum TALER_ErrorCode ec,
                                 const char *issue)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
                                        "{s:I, s:s}",
-				       "code", (json_int_t) ec,
+                                       "code", (json_int_t) ec,
                                        "error", issue);
 }
 
@@ -347,13 +347,13 @@ TMH_RESPONSE_add_global_headers (struct MHD_Response *response)
  */
 int
 TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
-				   enum TALER_ErrorCode ec,
+                                   enum TALER_ErrorCode ec,
                                    const char *hint)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
                                        "{s:I, s:s}",
-				       "code", (json_int_t) ec,
+                                       "code", (json_int_t) ec,
                                        "hint", hint);
 }
 
@@ -368,14 +368,14 @@ TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
  */
 int
 TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
-				enum TALER_ErrorCode ec,
+                                enum TALER_ErrorCode ec,
                                 const char *param_name)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
                                        "{s:s, s:I, s:s}",
                                        "error", "missing parameter",
-				       "code", (json_int_t) ec,
+                                       "code", (json_int_t) ec,
                                        "parameter", param_name);
 }
 
@@ -390,14 +390,14 @@ TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
  */
 int
 TMH_RESPONSE_reply_arg_invalid (struct MHD_Connection *connection,
-				enum TALER_ErrorCode ec,
-				const char *param_name)
+                                enum TALER_ErrorCode ec,
+                                const char *param_name)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
                                        "{s:s, s:I, s:s}",
                                        "error", "invalid parameter",
-				       "code", (json_int_t) ec,
+                                       "code", (json_int_t) ec,
                                        "parameter", param_name);
 }
 
