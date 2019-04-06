@@ -500,9 +500,8 @@ wire_deposits_cb (void *cls,
     for (unsigned int d=0;d<details_length;d++)
     {
 
-      if (0 == memcmp (&details[d].coin_pub,
-                       &tcc->coin_pub,
-                       sizeof (struct TALER_CoinSpendPublicKeyP)))
+      if (0 == GNUNET_memcmp (&details[d].coin_pub,
+                              &tcc->coin_pub))
       {
         tcc->wtid = tctx->current_wtid;
         tcc->execution_time = tctx->current_execution_time;
@@ -713,9 +712,8 @@ generate_response (struct TrackTransactionContext *tctx)
 	 tcc2 != tcc;
 	 tcc2 = tcc2->next)
     {
-      if (0 == memcmp (&tcc->wtid,
-                       &tcc2->wtid,
-                       sizeof (struct TALER_WireTransferIdentifierRawP)))
+      if (0 == GNUNET_memcmp (&tcc->wtid,
+                              &tcc2->wtid))
       {
         found = GNUNET_YES;
         break;
@@ -741,9 +739,8 @@ generate_response (struct TrackTransactionContext *tctx)
 	   tcc2 != tcc;
 	   tcc2 = tcc2->next)
       {
-        if (0 == memcmp (&tcc->wtid,
-                         &tcc2->wtid,
-                         sizeof (struct TALER_WireTransferIdentifierRawP)))
+        if (0 == GNUNET_memcmp (&tcc->wtid,
+                                &tcc2->wtid))
         {
           found = GNUNET_YES;
           break;
@@ -764,9 +761,8 @@ generate_response (struct TrackTransactionContext *tctx)
 	     NULL != tcc2;
 	     tcc2 = tcc2->next)
         {
-          if (0 == memcmp (&wt->wtid,
-                           &tcc2->wtid,
-                           sizeof (struct TALER_WireTransferIdentifierRawP)))
+          if (0 == GNUNET_memcmp (&wt->wtid,
+                                  &tcc2->wtid))
             num_coins++;
         }
         /* initialize coins array */
@@ -778,9 +774,8 @@ generate_response (struct TrackTransactionContext *tctx)
 	     NULL != tcc2;
 	     tcc2 = tcc2->next)
         {
-          if (0 == memcmp (&wt->wtid,
-                           &tcc2->wtid,
-                           sizeof (struct TALER_WireTransferIdentifierRawP)))
+          if (0 == GNUNET_memcmp (&wt->wtid,
+                                  &tcc2->wtid))
           {
             struct TALER_MERCHANT_CoinWireTransfer *coin = &wt->coins[num_coins++];
 
@@ -939,9 +934,8 @@ transfer_cb (void *cls,
 {
   struct TrackCoinContext *tcc = cls;
 
-  if (0 != memcmp (coin_pub,
-                   &tcc->coin_pub,
-                   sizeof (struct TALER_CoinSpendPublicKeyP)))
+  if (0 != GNUNET_memcmp (coin_pub,
+                          &tcc->coin_pub))
     return;
   tcc->wtid = *wtid;
   tcc->execution_time = execution_time;
@@ -1128,7 +1122,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_not_found (connection,
 					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
 					 "unknown instance");
-  
+
   /* Map order id to contract terms; the objective is to get
      the contract term's hashcode so as to retrieve all the
      coins which have been deposited for it. */
