@@ -42,8 +42,10 @@
  * @param header_name name of the header to set
  */
 static void
-add_header_from_arg (struct MHD_Connection *connection, const char *arg_name,
-                     struct MHD_Response *response, const char *header_name)
+add_header_from_arg (struct MHD_Connection *connection,
+                     const char *arg_name,
+                     struct MHD_Response *response,
+                     const char *header_name)
 {
   const char *arg = MHD_lookup_connection_value (connection,
                                                  MHD_GET_ARGUMENT_KIND,
@@ -75,22 +77,66 @@ MH_handler_trigger_pay (struct TMH_RequestHandler *rh,
                         size_t *upload_data_size)
 {
   struct MHD_Response *response;
-
-
   // FIXME: Taler wallet detection!
   char *data = "<html><body><p>Processing payment ...</p></body></html>";
 
-  response = MHD_create_response_from_buffer (strlen (data), data, MHD_RESPMEM_PERSISTENT);
+  response = MHD_create_response_from_buffer (strlen (data),
+                                              data,
+                                              MHD_RESPMEM_PERSISTENT);
+  add_header_from_arg (connection,
+                       "session_id",
+                       response,
+                       "Taler-Session-Id");
+  add_header_from_arg (connection,
+                       "contract_url",
+                       response,
+                       "Taler-Contract-Url");
+  add_header_from_arg (connection,
+                       "h_contract_terms",
+                       response,
+                       "Taler-Contract-Hash");
+  add_header_from_arg (connection,
+                       "tip_token",
+                       response,
+                       "Taler-Tip");
+  add_header_from_arg (connection,
+                       "refund_url",
+                       response,
+                       "Taler-Refund-Url");
+  add_header_from_arg (connection,
+                       "resource_url",
+                       response,
+                       "Taler-Resource-Url");
+  /* FIXME: the X- variants should go away in the future, for now
+     preserved for backwards-compatibility only! */
+  add_header_from_arg (connection,
+                       "session_id",
+                       response,
+                       "X-Taler-Session-Id");
+  add_header_from_arg (connection,
+                       "contract_url",
+                       response,
+                       "X-Taler-Contract-Url");
+  add_header_from_arg (connection,
+                       "h_contract_terms",
+                       response,
+                       "X-Taler-Contract-Hash");
+  add_header_from_arg (connection,
+                       "tip_token",
+                       response,
+                       "X-Taler-Tip");
+  add_header_from_arg (connection,
+                       "refund_url",
+                       response,
+                       "X-Taler-Refund-Url");
+  add_header_from_arg (connection,
+                       "resource_url",
+                       response,
+                       "X-Taler-Resource-Url");
 
-  add_header_from_arg (connection, "session_id", response, "X-Taler-Session-Id");
-  add_header_from_arg (connection, "contract_url", response, "X-Taler-Contract-Url");
-  add_header_from_arg (connection, "h_contract_terms", response, "X-Taler-Contract-Hash");
-  add_header_from_arg (connection, "tip_token", response, "X-Taler-Tip");
-  add_header_from_arg (connection, "refund_url", response, "X-Taler-Refund-Url");
-  add_header_from_arg (connection, "resource_url", response, "X-Taler-Resource-Url");
-
-  MHD_queue_response (connection, 402, response);
+  MHD_queue_response (connection,
+                      MHD_HTTP_PAYMENT_REQUIRED,
+                      response);
   MHD_destroy_response (response);
-
   return MHD_YES;
 }
