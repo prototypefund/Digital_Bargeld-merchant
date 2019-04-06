@@ -234,11 +234,11 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
       GNUNET_break (0);
       return GNUNET_DB_STATUS_HARD_ERROR;
     }
-    qs = db->increase_refund_for_contract (db->cls,
-                                           &h_contract_terms,
-                                           &mi->pubkey,
-                                           &refund,
-                                           reason);
+    qs = db->increase_refund_for_contract_NT (db->cls,
+                                              &h_contract_terms,
+                                              &mi->pubkey,
+                                              &refund,
+                                              reason);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "increase refund returned %d\n",
                 qs);

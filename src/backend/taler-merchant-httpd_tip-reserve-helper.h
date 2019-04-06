@@ -63,6 +63,16 @@ struct CheckTipReserve
   struct TALER_EXCHANGE_ReserveStatusHandle *rsh;
 
   /**
+   * Internal: DLL for resumption on shutdown.
+   */
+  struct CheckTipReserve *next;
+
+  /**
+   * Internal: DLL for resumption on shutdown.
+   */
+  struct CheckTipReserve *prev;
+
+  /**
    * Output: response object to return (on error only)
    */
   struct MHD_Response *response;
@@ -133,5 +143,13 @@ TMH_check_tip_reserve (struct CheckTipReserve *ctr,
  */
 void
 TMH_check_tip_reserve_cleanup (struct CheckTipReserve *ctr);
+
+/**
+ * Force all tip reserve helper contexts to be resumed as we are about to shut
+ * down MHD.
+ */
+void
+MH_force_trh_resume (void);
+
 
 #endif

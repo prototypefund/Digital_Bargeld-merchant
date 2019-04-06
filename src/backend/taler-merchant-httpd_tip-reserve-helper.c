@@ -23,6 +23,34 @@
 
 
 /**
+ * Head of active ctr context DLL.
+ */
+static struct CheckTipReserve *ctr_head;
+
+/**
+ * Tail of active ctr context DLL.
+ */
+static struct CheckTipReserve *ctr_tail;
+
+
+/**
+ * Resume connection underlying @a ctr.
+ *
+ * @param ctr what to resume
+ */
+static void
+resume_ctr (struct CheckTipReserve *ctr)
+{
+  GNUNET_assert (GNUNET_YES == ctr->suspended);
+  GNUNET_CONTAINER_DLL_remove (ctr_head,
+                               ctr_tail,
+                               ctr);
+  MHD_resume_connection (ctr->connection);
+  TMH_trigger_daemon (); /* we resumed, kick MHD */
+}
+
+
+/**
  * Resume the given context and send the given response.  Stores the response
  * in the @a ctr and signals MHD to resume the connection.  Also ensures MHD
  * runs immediately.
@@ -38,10 +66,8 @@ resume_with_response (struct CheckTipReserve *ctr,
 {
   ctr->response_code = response_code;
   ctr->response = response;
-  GNUNET_assert (GNUNET_YES == ctr->suspended);
+  resume_ctr (ctr);
   ctr->suspended = GNUNET_NO;
-  MHD_resume_connection (ctr->connection);
-  TMH_trigger_daemon (); /* we resumed, kick MHD */
 }
 
 
@@ -285,6 +311,9 @@ TMH_check_tip_reserve (struct CheckTipReserve *ctr,
                        const char *tip_exchange)
 {
   MHD_suspend_connection (ctr->connection);
+  GNUNET_CONTAINER_DLL_insert (ctr_head,
+                               ctr_tail,
+                               ctr);
   ctr->suspended = GNUNET_YES;
   ctr->fo = TMH_EXCHANGES_find_exchange (tip_exchange,
                                          NULL,
@@ -324,6 +353,32 @@ TMH_check_tip_reserve_cleanup (struct CheckTipReserve *ctr)
     MHD_destroy_response (ctr->response);
     ctr->response = NULL;
   }
+  if (MHD_YES == ctr->suspended)
+  {
+    resume_ctr (ctr);
+    ctr->suspended = GNUNET_NO;
+  }
 }
+
+
+/**
+ * Force all tip reserve helper contexts to be resumed as we are about to shut
+ * down MHD.
+ */
+void
+MH_force_trh_resume ()
+{
+  struct CheckTipReserve *n;
+
+  for (struct CheckTipReserve *ctr = ctr_head;
+       NULL != ctr;
+       ctr = n)
+  {
+    n = ctr->next;
+    resume_ctr (ctr);
+    ctr->suspended = GNUNET_SYSERR;
+  }
+}
+
 
 /* end of taler-merchant-httpd_tip-reserve-helper.c */

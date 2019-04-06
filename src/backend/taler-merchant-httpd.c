@@ -43,6 +43,7 @@
 #include "taler-merchant-httpd_tip-authorize.h"
 #include "taler-merchant-httpd_tip-pickup.h"
 #include "taler-merchant-httpd_tip-query.h"
+#include "taler-merchant-httpd_tip-reserve-helper.h"
 #include "taler-merchant-httpd_history.h"
 #include "taler-merchant-httpd_refund.h"
 #include "taler-merchant-httpd_check-payment.h"
@@ -356,12 +357,13 @@ hashmap_free (void *cls,
 static void
 do_shutdown (void *cls)
 {
+  MH_force_pc_resume ();
+  MH_force_trh_resume ();
   if (NULL != mhd_task)
   {
     GNUNET_SCHEDULER_cancel (mhd_task);
     mhd_task = NULL;
   }
-  MH_force_pc_resume ();
   if (NULL != mhd)
   {
     MHD_stop_daemon (mhd);

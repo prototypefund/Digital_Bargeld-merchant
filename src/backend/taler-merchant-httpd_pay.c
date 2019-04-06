@@ -451,6 +451,7 @@ abort_deposit (struct PayContext *pc)
       dci->dh = NULL;
     }
   }
+  db->rollback (db->cls);
 }
 
 
@@ -467,7 +468,6 @@ sign_success_response (struct PayContext *pc)
   enum TALER_ErrorCode ec;
   const char *errmsg;
   struct GNUNET_CRYPTO_EddsaSignature sig;
-  struct PaymentResponsePS mr;
   json_t *resp;
   struct MHD_Response *mret;
 
@@ -478,13 +478,17 @@ sign_success_response (struct PayContext *pc)
   if (NULL == refunds)
     return TMH_RESPONSE_make_error (ec,
                                     errmsg);
+  {
+    struct PaymentResponsePS mr = {
+     .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK),
+     .purpose.size = htonl (sizeof (mr)),
+     .h_contract_terms = pc->h_contract_terms
+    };
 
-  mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
-  mr.purpose.size = htonl (sizeof (mr));
-  mr.h_contract_terms = pc->h_contract_terms;
-  GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
-                            &mr.purpose,
-			    &sig);
+    GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
+                              &mr.purpose,
+                              &sig);
+  }
   resp = json_pack ("{s:O, s:o, s:o, s:o}",
                     "contract_terms",
                     pc->contract_terms,
@@ -499,11 +503,12 @@ sign_success_response (struct PayContext *pc)
   if (NULL != pc->session_id)
   {
     struct GNUNET_CRYPTO_EddsaSignature session_sig;
-    struct TALER_MerchantPaySessionSigPS mps;
+    struct TALER_MerchantPaySessionSigPS mps = {
+      .purpose.size = htonl (sizeof (struct TALER_MerchantPaySessionSigPS)),
+      .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAY_SESSION)
+    };
 
     GNUNET_assert (NULL != pc->order_id);
-    mps.purpose.size = htonl (sizeof (struct TALER_MerchantPaySessionSigPS));
-    mps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAY_SESSION);
     GNUNET_CRYPTO_hash (pc->order_id,
                         strlen (pc->order_id),
                         &mps.h_order_id);
@@ -713,9 +718,9 @@ check_payment_sufficient (struct PayContext *pc)
 
   /* Do not count any refunds towards the payment */
   GNUNET_assert (GNUNET_SYSERR !=
-		 TALER_amount_subtract (&acc_amount,
-					&acc_amount,
-					&pc->total_refunded));
+                 TALER_amount_subtract (&acc_amount,
+                                        &acc_amount,
+                                        &pc->total_refunded));
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Subtracting total refunds from paid amount: %s\n",
               TALER_amount_to_string (&pc->total_refunded));
@@ -925,7 +930,6 @@ deposit_cb (void *cls,
                 http_status);
     /* Transaction failed; stop all other ongoing deposits */
     abort_deposit (pc);
-    db->rollback (db->cls);
 
     if (NULL == proof)
     {
@@ -1062,7 +1066,7 @@ process_pay_with_exchange (void *cls,
 		     pc->current_exchange))
       continue;
     denom_details = TALER_EXCHANGE_get_denomination_key (keys,
-							 &dc->denom);
+                                                         &dc->denom);
     if (NULL == denom_details)
     {
       GNUNET_break_op (0);
@@ -1223,9 +1227,8 @@ check_coin_paid (void *cls,
 {
   struct PayContext *pc = cls;
 
-  if (0 != memcmp (&pc->h_contract_terms,
-                   h_contract_terms,
-                   sizeof (struct GNUNET_HashCode)))
+  if (0 != GNUNET_memcmp (&pc->h_contract_terms,
+                          h_contract_terms))
   {
     GNUNET_break (0);
     return;
@@ -1238,9 +1241,8 @@ check_coin_paid (void *cls,
       continue; /* processed earlier */
 
     /* Get matching coin from results*/
-    if ( (0 != memcmp (coin_pub,
-                       &dc->coin_pub,
-                       sizeof (struct TALER_CoinSpendPublicKeyP))) ||
+    if ( (0 != GNUNET_memcmp (coin_pub,
+                              &dc->coin_pub)) ||
          (0 != TALER_amount_cmp (amount_with_fee,
                                  &dc->amount_with_fee)) )
       continue;
@@ -1499,9 +1501,8 @@ parse_pay (struct MHD_Connection *connection,
     struct WireMethod *wm;
 
     wm = pc->mi->wm_head;
-    while (0 != memcmp (&pc->h_wire,
-                        &wm->h_wire,
-                        sizeof (struct GNUNET_HashCode)))
+    while (0 != GNUNET_memcmp (&pc->h_wire,
+                               &wm->h_wire))
       wm = wm->next;
     if (NULL == wm)
     {
@@ -1648,9 +1649,8 @@ check_coin_refunded (void *cls,
     struct DepositConfirmation *dc = &pc->dc[i];
 
     /* Get matching coin from results*/
-    if (0 != memcmp (coin_pub,
-                     &dc->coin_pub,
-                     sizeof (struct TALER_CoinSpendPublicKeyP)))
+    if (0 != GNUNET_memcmp (coin_pub,
+                            &dc->coin_pub))
     {
       dc->refunded = GNUNET_YES;
       GNUNET_break (GNUNET_OK ==
@@ -1804,12 +1804,12 @@ begin_transaction (struct PayContext *pc)
     }
 
     /* Store refund in DB */
-    qs = db->increase_refund_for_contract (db->cls,
-                                           &pc->h_contract_terms,
-                                           &pc->mi->pubkey,
-                                           &pc->total_paid,
-                                           /* justification */
-                                           "incomplete payment aborted");
+    qs = db->increase_refund_for_contract_NT (db->cls,
+                                              &pc->h_contract_terms,
+                                              &pc->mi->pubkey,
+                                              &pc->total_paid,
+                                              /* justification */
+                                              "incomplete payment aborted");
     if (0 > qs)
     {
       db->rollback (db->cls);

@@ -101,9 +101,8 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
     ai = &keys->auditors[i];
     for (unsigned int j=0;j<nauditors;j++)
     {
-      if (0 == memcmp (&ai->auditor_pub,
-                       &auditors[j].public_key,
-                       sizeof (struct TALER_AuditorPublicKeyP)))
+      if (0 == GNUNET_memcmp (&ai->auditor_pub,
+                              &auditors[j].public_key))
       {
         GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                     "Found supported auditor `%s' (%s)\n",

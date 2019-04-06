@@ -88,17 +88,28 @@ pd_cb (void *cls,
   if (NULL == summary)
     summary = json_string (order_id);
 
-  GNUNET_break (NULL != (entry = json_pack ("{s:I, s:s, s:O, s:O, s:O, s:O}",
-                                            "row_id", row_id,
-                                            "order_id", order_id,
-                                            "amount", amount,
-                                            "timestamp", timestamp,
-                                            "instance", instance,
-                                            "summary", summary)));
-
-  GNUNET_break (0 ==
-                json_array_append_new (pcc->response,
-                                       entry));
+  if (NULL == (entry =
+               json_pack ("{s:I, s:s, s:O, s:O, s:O, s:O}",
+                          "row_id", row_id,
+                          "order_id", order_id,
+                          "amount", amount,
+                          "timestamp", timestamp,
+                          "instance", instance,
+                          "summary", summary)))
+  {
+    GNUNET_break (0);
+    pcc->failure = GNUNET_SYSERR;
+    return;
+  }
+  if (0 !=
+      json_array_append_new (pcc->response,
+                             entry))
+  {
+    GNUNET_break (0);
+    pcc->failure = GNUNET_SYSERR;
+    json_decref (entry);
+    return;
+  }
 }
 
 
@@ -151,9 +162,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                              TALER_EC_PARAMETER_MALFORMED,
                                              "date");
     }
-
     date.abs_value_us = seconds * 1000LL * 1000LL;
-
     if (date.abs_value_us / 1000LL / 1000LL != seconds)
     {
       json_decref (response);
@@ -176,6 +185,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                          "instance");
   }
 
+  /* Sanity check that we don't have some odd stale transaction running */
   db->preflight (db->cls);
 
   /* Here goes the cherry-picking logic */
@@ -187,10 +197,10 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     pcc.response = response;
     pcc.failure = GNUNET_NO;
     qs = db->find_contract_terms_history (db->cls,
-					  str,
-					  &mi->pubkey,
-					  &pd_cb,
-					  &pcc);
+                                          str,
+                                          &mi->pubkey,
+                                          &pd_cb,
+                                          &pcc);
     /* single, read-only SQL statements should never cause
        serialization problems */
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
@@ -202,7 +212,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
       json_decref (response);
       return TMH_RESPONSE_reply_internal_error (connection,
                                                 TALER_EC_HISTORY_DB_FETCH_ERROR,
-					        "db error to get history");
+                                                "db error to get history");
     }
     ret = TMH_RESPONSE_reply_json (connection,
                                    response,
@@ -218,9 +228,9 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   {
     TALER_LOG_DEBUG ("'start' argument given ('%s')\n",
                      str);
-    if ( (1 != sscanf (str,
-		       "%llu",
-		       &start)))
+    if (1 != sscanf (str,
+                     "%llu",
+                     &start))
     {
       json_decref (response);
       return TMH_RESPONSE_reply_arg_invalid (connection,
@@ -236,8 +246,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   if (NULL != str)
   {
     if (1 != sscanf (str,
-		     "%lld",
-		     &delta))
+                     "%lld",
+                     &delta))
       return TMH_RESPONSE_reply_arg_invalid (connection,
                                              TALER_EC_PARAMETER_MALFORMED,
                                              "delta");
@@ -254,8 +264,9 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "ordering");
-  if ((NULL != str) && (0 == strcmp ("ascending",
-                                     str)))
+  if ( (NULL != str) &&
+       (0 == strcmp ("ascending",
+                     str)) )
     ascending = GNUNET_YES;
 
   qs = db->find_contract_terms_by_date_and_range (db->cls,
@@ -263,7 +274,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                                   &mi->pubkey,
                                                   start,
                                                   llabs (delta),
-                                                  delta < 0 ? GNUNET_YES : GNUNET_NO,
+                                                  (delta < 0) ? GNUNET_YES : GNUNET_NO,
                                                   ascending,
                                                   &pd_cb,
                                                   &pcc);
@@ -283,7 +294,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   ret = TMH_RESPONSE_reply_json (connection,
                                  response,
                                  MHD_HTTP_OK);
-  LOG_INFO ("/history, http code: %d\n", MHD_HTTP_OK);
+  LOG_INFO ("/history, http code: %d\n",
+            MHD_HTTP_OK);
   json_decref (response);
   return ret;
 }

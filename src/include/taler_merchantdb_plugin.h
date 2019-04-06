@@ -59,7 +59,7 @@ struct TALER_MERCHANTDB_Plugin;
  */
 typedef void
 (*TALER_MERCHANTDB_TransactionCallback)(void *cls,
-					const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                        const struct TALER_MerchantPublicKeyP *merchant_pub,
                                         const struct GNUNET_HashCode *h_contract_terms,
                                         const struct GNUNET_HashCode *h_wire,
                                         struct GNUNET_TIME_Absolute timestamp,
@@ -85,11 +85,11 @@ typedef void
 (*TALER_MERCHANTDB_CoinDepositCallback)(void *cls,
                                         const struct GNUNET_HashCode *h_contract_terms,
                                         const struct TALER_CoinSpendPublicKeyP *coin_pub,
-					const char *exchange_url,
+                                        const char *exchange_url,
                                         const struct TALER_Amount *amount_with_fee,
                                         const struct TALER_Amount *deposit_fee,
                                         const struct TALER_Amount *refund_fee,
-					const struct TALER_Amount *wire_fee,
+                                        const struct TALER_Amount *wire_fee,
                                         const json_t *exchange_proof);
 
 
@@ -151,6 +151,12 @@ typedef void
 
 /**
  * Handle to interact with the database.
+ *
+ * Functions ending with "_TR" run their OWN transaction scope
+ * and MUST NOT be called from within a transaction setup by the
+ * caller.  Functions ending with "_NT" require the caller to
+ * setup a transaction scope.  Functions without a suffix are
+ * simple, single SQL queries that MAY be used either way.
  */
 struct TALER_MERCHANTDB_Plugin
 {
@@ -329,14 +335,14 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*find_contract_terms_by_date_and_range) (void *cls,
-					    struct GNUNET_TIME_Absolute date,
-					    const struct TALER_MerchantPublicKeyP *merchant_pub,
-					    uint64_t start,
-					    uint64_t nrows,
-					    int past,
+                                            struct GNUNET_TIME_Absolute date,
+                                            const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                            uint64_t start,
+                                            uint64_t nrows,
+                                            int past,
                                             unsigned int ascending,
-					    TALER_MERCHANTDB_ProposalDataCallback cb,
-					    void *cb_cls);
+                                            TALER_MERCHANTDB_ProposalDataCallback cb,
+                                            void *cb_cls);
 
   /**
    * Lookup for a proposal, respecting the signature used by the
@@ -372,11 +378,11 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*find_contract_terms_by_date) (void *cls,
-				  struct GNUNET_TIME_Absolute date,
-				  const struct TALER_MerchantPublicKeyP *merchant_pub,
-				  uint64_t nrows,
-				  TALER_MERCHANTDB_ProposalDataCallback cb,
-				  void *cb_cls);
+                                  struct GNUNET_TIME_Absolute date,
+                                  const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                  uint64_t nrows,
+                                  TALER_MERCHANTDB_ProposalDataCallback cb,
+                                  void *cb_cls);
 
 
   /**
@@ -399,7 +405,7 @@ struct TALER_MERCHANTDB_Plugin
                     const struct GNUNET_HashCode *h_contract_terms,
                     const struct TALER_MerchantPublicKeyP *merchant_pub,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
-		    const char *exchange_url,
+                    const char *exchange_url,
                     const struct TALER_Amount *amount_with_fee,
                     const struct TALER_Amount *deposit_fee,
                     const struct TALER_Amount *refund_fee,
@@ -463,13 +469,13 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*store_wire_fee_by_exchange) (void *cls,
-				 const struct TALER_MasterPublicKeyP *exchange_pub,
-				 const struct GNUNET_HashCode *h_wire_method,
-				 const struct TALER_Amount *wire_fee,
-				 const struct TALER_Amount *closing_fee,
-				 struct GNUNET_TIME_Absolute start_date,
-				 struct GNUNET_TIME_Absolute end_date,
-				 const struct TALER_MasterSignatureP *exchange_sig);
+                                 const struct TALER_MasterPublicKeyP *exchange_pub,
+                                 const struct GNUNET_HashCode *h_wire_method,
+                                 const struct TALER_Amount *wire_fee,
+                                 const struct TALER_Amount *closing_fee,
+                                 struct GNUNET_TIME_Absolute start_date,
+                                 struct GNUNET_TIME_Absolute end_date,
+                                 const struct TALER_MasterSignatureP *exchange_sig);
 
 
 
@@ -585,19 +591,21 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*lookup_wire_fee) (void *cls,
-		      const struct TALER_MasterPublicKeyP *exchange_pub,
-		      const struct GNUNET_HashCode *h_wire_method,
-		      struct GNUNET_TIME_Absolute contract_date,
-		      struct TALER_Amount *wire_fee,
-		      struct TALER_Amount *closing_fee,
-		      struct GNUNET_TIME_Absolute *start_date,
-		      struct GNUNET_TIME_Absolute *end_date,
-		      struct TALER_MasterSignatureP *exchange_sig);
+                      const struct TALER_MasterPublicKeyP *exchange_pub,
+                      const struct GNUNET_HashCode *h_wire_method,
+                      struct GNUNET_TIME_Absolute contract_date,
+                      struct TALER_Amount *wire_fee,
+                      struct TALER_Amount *closing_fee,
+                      struct GNUNET_TIME_Absolute *start_date,
+                      struct GNUNET_TIME_Absolute *end_date,
+                      struct TALER_MasterSignatureP *exchange_sig);
 
 
   /**
    * Function called when some backoffice staff decides to award or
-   * increase the refund on an existing contract.
+   * increase the refund on an existing contract.  This function
+   * MUST be called from within a transaction scope setup by the
+   * caller as it executes multiple SQL statements (NT).
    *
    * @param cls closure
    * @param merchant_pub merchant's instance public key
@@ -609,11 +617,11 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*increase_refund_for_contract)(void *cls,
-                                  const struct GNUNET_HashCode *h_contract_terms,
-                                  const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                  const struct TALER_Amount *refund,
-                                  const char *reason);
+  (*increase_refund_for_contract_NT)(void *cls,
+                                     const struct GNUNET_HashCode *h_contract_terms,
+                                     const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                     const struct TALER_Amount *refund,
+                                     const char *reason);
 
 
   /**

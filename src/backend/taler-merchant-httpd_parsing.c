@@ -133,7 +133,7 @@ buffer_append (struct Buffer *buf,
   {
     char *new_buf;
     size_t new_size = buf->alloc ? buf->alloc : 1;
-    
+
     while (new_size < buf->fill + data_size)
       new_size *= 2;
     if (new_size > max_size)
@@ -203,7 +203,7 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
                      json_t **json)
 {
   struct Buffer *r = *con_cls;
-  
+
   TALER_LOG_DEBUG ("Will parse: %.*s\n",
                    (int) *upload_data_size,
                    upload_data);
