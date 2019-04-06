@@ -92,7 +92,7 @@ extern struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
  */
 static struct MHD_Response *
 make_track_transaction_ok (unsigned int num_transfers,
-			   const struct TransactionWireTransfer *transfers)
+                           const struct TransactionWireTransfer *transfers)
 {
   struct MHD_Response *ret;
   json_t *j_transfers;
@@ -109,9 +109,9 @@ make_track_transaction_ok (unsigned int num_transfers,
       const struct TALER_MERCHANT_CoinWireTransfer *coin = &transfer->coins[j];
 
       GNUNET_assert (GNUNET_SYSERR !=
-		     TALER_amount_add (&sum,
-				       &sum,
-				       &coin->amount_with_fee));
+                     TALER_amount_add (&sum,
+                                       &sum,
+                                       &coin->amount_with_fee));
     }
 
     GNUNET_assert (0 ==
@@ -443,7 +443,7 @@ trace_coins (struct TrackTransactionContext *tctx);
 static void
 wire_deposits_cb (void *cls,
                   unsigned int http_status,
-		  enum TALER_ErrorCode ec,
+                  enum TALER_ErrorCode ec,
                   const struct TALER_ExchangePublicKeyP *exchange_pub,
                   const json_t *json,
                   const struct GNUNET_HashCode *h_wire,
@@ -464,20 +464,21 @@ wire_deposits_cb (void *cls,
       (tctx,
        MHD_HTTP_FAILED_DEPENDENCY,
        TMH_RESPONSE_make_json_pack ("{s:I, s:I, s:I, s:O}",
-				    "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
+                                    "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
                                     "exchange-http-status", (json_int_t) http_status,
-				    "exchange-code", (json_int_t) ec,
+                                    "exchange-code", (json_int_t) ec,
                                     "details", json));
     return;
   }
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
+    db->preflight (db->cls);
     qs = db->store_transfer_to_proof (db->cls,
-				      tctx->current_exchange,
-				      &tctx->current_wtid,
-				      tctx->current_execution_time,
-				      exchange_pub,
-				      json);
+                                      tctx->current_exchange,
+                                      &tctx->current_wtid,
+                                      tctx->current_execution_time,
+                                      exchange_pub,
+                                      json);
     if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
       break;
   }
@@ -510,12 +511,13 @@ wire_deposits_cb (void *cls,
 
       for (unsigned int i=0;i<MAX_RETRIES;i++)
       {
-	qs = db->store_coin_to_transfer (db->cls,
-					 &details[d].h_contract_terms,
-					 &details[d].coin_pub,
-					 &tctx->current_wtid);
-	if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
-	  break;
+        db->preflight (db->cls);
+        qs = db->store_coin_to_transfer (db->cls,
+                                         &details[d].h_contract_terms,
+                                         &details[d].coin_pub,
+                                         &tctx->current_wtid);
+        if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+          break;
       }
       if (0 > qs)
       {
@@ -591,7 +593,7 @@ proof_cb (void *cls,
 static void
 wtid_cb (void *cls,
          unsigned int http_status,
-	 enum TALER_ErrorCode ec,
+         enum TALER_ErrorCode ec,
          const struct TALER_ExchangePublicKeyP *exchange_pub,
          const json_t *json,
          const struct TALER_WireTransferIdentifierRawP *wtid,
@@ -642,11 +644,12 @@ wtid_cb (void *cls,
   pcc.p_ret = NULL;
   /* attempt to find this wtid's track from our database,
      Will make pcc.p_ret point to a "proof", if one exists. */
+  db->preflight (db->cls);
   qs = db->find_proof_by_wtid (db->cls,
-			       tctx->current_exchange,
-			       wtid,
-			       &proof_cb,
-			       &pcc);
+                               tctx->current_exchange,
+                               wtid,
+                               &proof_cb,
+                               &pcc);
   if (0 > qs)
   {
     /* Simple select queries should not
@@ -659,7 +662,7 @@ wtid_cb (void *cls,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
        TMH_RESPONSE_make_error
          (TALER_EC_TRACK_TRANSACTION_DB_FETCH_FAILED,
-	  "Fail to query database about proofs"));
+          "Fail to query database about proofs"));
     return;
   }
 
@@ -926,7 +929,7 @@ handle_track_transaction_timeout (void *cls)
  */
 static void
 transfer_cb (void *cls,
-	     const struct GNUNET_HashCode *h_contract_terms,
+             const struct GNUNET_HashCode *h_contract_terms,
              const struct TALER_CoinSpendPublicKeyP *coin_pub,
              const struct TALER_WireTransferIdentifierRawP *wtid,
              struct GNUNET_TIME_Absolute execution_time,
@@ -959,7 +962,7 @@ static void
 coin_cb (void *cls,
          const struct GNUNET_HashCode *h_contract_terms,
          const struct TALER_CoinSpendPublicKeyP *coin_pub,
-	 const char *exchange_url,
+         const char *exchange_url,
          const struct TALER_Amount *amount_with_fee,
          const struct TALER_Amount *deposit_fee,
          const struct TALER_Amount *refund_fee,
@@ -986,9 +989,9 @@ coin_cb (void *cls,
      will then set the wtid for the "current coin"
      context. */
   qs = db->find_transfers_by_hash (db->cls,
-				   h_contract_terms,
-				   &transfer_cb,
-				   tcc);
+                                   h_contract_terms,
+                                   &transfer_cb,
+                                   tcc);
   if (0 > qs)
   {
     GNUNET_break (0);
@@ -1014,9 +1017,9 @@ find_exchange (struct TrackTransactionContext *tctx)
   {
     tctx->current_exchange = tcc->exchange_url;
     tctx->fo = TMH_EXCHANGES_find_exchange (tctx->current_exchange,
-					    NULL,
-					    &process_track_transaction_with_exchange,
-					    tctx);
+                                            NULL,
+                                            &process_track_transaction_with_exchange,
+                                            tctx);
 
   }
   else
@@ -1101,7 +1104,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   if (NULL == order_id)
     return TMH_RESPONSE_reply_arg_missing (connection,
                                            TALER_EC_PARAMETER_MISSING,
-					   "order_id");
+                                           "order_id");
   instance = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
                                           "instance");
@@ -1120,28 +1123,29 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 
   if (NULL == tctx->mi)
     return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
-					 "unknown instance");
+                                         TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
+                                         "unknown instance");
 
   /* Map order id to contract terms; the objective is to get
      the contract term's hashcode so as to retrieve all the
      coins which have been deposited for it. */
+  db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
-				&contract_terms,
+                                &contract_terms,
                                 &last_session_id,
-				order_id,
-				&tctx->mi->pubkey);
+                                order_id,
+                                &tctx->mi->pubkey);
   if (0 > qs)
   {
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
+                                              TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
                                               "Database error finding contract terms");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
-					 "Given order_id doesn't map to any proposal");
+                                         TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
+                                         "Given order_id doesn't map to any proposal");
 
   GNUNET_free (last_session_id);
 
@@ -1151,7 +1155,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   {
     json_decref (contract_terms);
     return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_INTERNAL_LOGIC_ERROR,
+                                              TALER_EC_INTERNAL_LOGIC_ERROR,
                                               "Failed to hash contract terms");
   }
 
@@ -1189,10 +1193,10 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   /* Find coins which have been deposited for this contract,
      and retrieve the wtid for each one. */
   qs = db->find_payments (db->cls,
-			  &tctx->h_contract_terms,
-			  &tctx->mi->pubkey,
-			  &coin_cb,
-			  tctx);
+                          &tctx->h_contract_terms,
+                          &tctx->mi->pubkey,
+                          &coin_cb,
+                          tctx);
   if ( (0 > qs) ||
        (0 > tctx->qs) )
   {
@@ -1205,7 +1209,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_TRACK_TRANSACTION_DB_NO_DEPOSITS_ERROR,
+                                         TALER_EC_TRACK_TRANSACTION_DB_NO_DEPOSITS_ERROR,
                                          "deposit data not found");
   }
   *connection_cls = tctx;
@@ -1215,8 +1219,8 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   MHD_suspend_connection (connection);
   tctx->timeout_task
     = GNUNET_SCHEDULER_add_delayed (TRACK_TIMEOUT,
-				    &handle_track_transaction_timeout,
-				    tctx);
+                                    &handle_track_transaction_timeout,
+                                    tctx);
   find_exchange (tctx);
   return MHD_YES;
 }
