@@ -183,7 +183,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   }
 
   db->preflight (db->cls);
-
   /* Convert order id to h_contract_terms */
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
@@ -498,6 +497,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
 
   /* Convert order id to h_contract_terms */
   contract_terms = NULL;
+  db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
                                 &last_session_id,
