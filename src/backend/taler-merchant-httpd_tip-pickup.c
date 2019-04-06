@@ -195,6 +195,7 @@ run_pickup (struct MHD_Connection *connection,
                                   pc->ec,
                                   pc->error_hint);
   }
+  db->preflight (db->cls);
   ec = db->pickup_tip_TR (db->cls,
                           &pc->total,
                           &pc->tip_id,
@@ -377,6 +378,7 @@ prepare_pickup (struct PickupContext *pc)
 {
   enum GNUNET_DB_QueryStatus qs;
 
+  db->preflight (db->cls);
   qs = db->lookup_tip_by_id (db->cls,
                              &pc->tip_id,
                              &pc->exchange_url,
@@ -488,8 +490,10 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
   struct GNUNET_HashCode tip_id;
   json_t *planchets;
   struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_fixed_auto ("tip_id", &tip_id),
-    GNUNET_JSON_spec_json ("planchets", &planchets),
+    GNUNET_JSON_spec_fixed_auto ("tip_id",
+                                 &tip_id),
+    GNUNET_JSON_spec_json ("planchets",
+                           &planchets),
     GNUNET_JSON_spec_end()
   };
   struct PickupContext *pc;

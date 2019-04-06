@@ -183,6 +183,7 @@ handle_status (void *cls,
         GNUNET_CRYPTO_hash (history[i].details.in_details.wire_reference,
                             history[i].details.in_details.wire_reference_size,
                             &uuid);
+        db->preflight (db->cls);
         qs = db->enable_tip_reserve_TR (db->cls,
                                         &ctr->reserve_priv,
                                         &uuid,
@@ -311,6 +312,7 @@ TMH_check_tip_reserve (struct CheckTipReserve *ctr,
                        const char *tip_exchange)
 {
   MHD_suspend_connection (ctr->connection);
+  db->preflight (db->cls);
   GNUNET_CONTAINER_DLL_insert (ctr_head,
                                ctr_tail,
                                ctr);

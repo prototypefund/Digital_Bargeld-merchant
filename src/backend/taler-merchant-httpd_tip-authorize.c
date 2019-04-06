@@ -225,6 +225,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                                          "exchange for tipping not configured for the instance");
   }
   tac->ctr.reserve_priv = mi->tip_reserve;
+  db->preflight (db->cls);
   ec = db->authorize_tip_TR (db->cls,
                              tac->justification,
                              &tac->amount,
