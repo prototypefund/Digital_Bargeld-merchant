@@ -451,7 +451,6 @@ abort_deposit (struct PayContext *pc)
       dci->dh = NULL;
     }
   }
-  db->rollback (db->cls);
 }
 
 
@@ -967,6 +966,7 @@ deposit_cb (void *cls,
               TALER_B2S (&pc->mi->pubkey));
   /* NOTE: not run in any transaction block, simply as a
      transaction by itself! */
+  db->preflight (db->cls);
   qs = db->store_deposit (db->cls,
                           &pc->h_contract_terms,
                           &pc->mi->pubkey,
@@ -1103,6 +1103,7 @@ process_pay_with_exchange (void *cls,
                 "Timing for this payment, wire_deadline: %llu, refund_deadline: %llu\n",
                 (unsigned long long) pc->wire_transfer_deadline.abs_value_us,
                 (unsigned long long) pc->refund_deadline.abs_value_us);
+    db->preflight (db->cls);
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
@@ -1151,6 +1152,7 @@ find_next_exchange (struct PayContext *pc)
 
     if (GNUNET_YES != dc->found_in_db)
     {
+      db->preflight (db->cls);
       pc->current_exchange = dc->exchange_url;
       pc->fo = TMH_EXCHANGES_find_exchange (pc->current_exchange,
                                             pc->wm->wire_method,
@@ -1169,6 +1171,7 @@ find_next_exchange (struct PayContext *pc)
     }
   }
   pc->current_exchange = NULL;
+  db->preflight (db->cls);
   /* We are done with all the HTTP requests, go back and try
      the 'big' database transaction! (It should work now!) */
   begin_transaction (pc);
