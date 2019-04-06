@@ -238,6 +238,7 @@ build_deposits_response (void *cls,
   json_t *contract_terms;
   json_t *order_id;
 
+  db->preflight (db->cls);
   if (GNUNET_OK !=
       db->find_contract_terms_from_hash (db->cls,
                                          &contract_terms,
@@ -443,7 +444,7 @@ static void
 check_transfer (void *cls,
                 const struct GNUNET_HashCode *h_contract_terms,
                 const struct TALER_CoinSpendPublicKeyP *coin_pub,
-		const char *exchange_url,
+                const char *exchange_url,
                 const struct TALER_Amount *amount_with_fee,
                 const struct TALER_Amount *deposit_fee,
                 const struct TALER_Amount *refund_fee,
@@ -500,9 +501,9 @@ check_transfer (void *cls,
  */
 static int
 check_wire_fee (struct TrackTransferContext *rctx,
-		const json_t *json,
-		struct GNUNET_TIME_Absolute execution_time,
-		const struct TALER_Amount *wire_fee)
+                const json_t *json,
+                struct GNUNET_TIME_Absolute execution_time,
+                const struct TALER_Amount *wire_fee)
 {
   const struct TALER_MasterPublicKeyP *master_pub;
   struct GNUNET_HashCode h_wire_method;
@@ -522,29 +523,30 @@ check_wire_fee (struct TrackTransferContext *rctx,
   }
   master_pub = &keys->master_pub;
   GNUNET_CRYPTO_hash (rctx->wire_method,
-		      strlen (rctx->wire_method) + 1,
-		      &h_wire_method);
+                      strlen (rctx->wire_method) + 1,
+                      &h_wire_method);
+  db->preflight (db->cls);
   qs = db->lookup_wire_fee (db->cls,
-			    master_pub,
-			    &h_wire_method,
-			    execution_time,
-			    &expected_fee,
-			    &closing_fee,
-			    &start_date,
-			    &end_date,
-			    &master_sig);
+                            master_pub,
+                            &h_wire_method,
+                            execution_time,
+                            &expected_fee,
+                            &closing_fee,
+                            &start_date,
+                            &end_date,
+                            &master_sig);
   if (0 >= qs)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-		"Failed to find wire fee for `%s' and method `%s' at %s in DB, accepting blindly that the fee is %s\n",
-		TALER_B2S (master_pub),
-		rctx->wire_method,
-		GNUNET_STRINGS_absolute_time_to_string (execution_time),
-		TALER_amount2s (wire_fee));
+                "Failed to find wire fee for `%s' and method `%s' at %s in DB, accepting blindly that the fee is %s\n",
+                TALER_B2S (master_pub),
+                rctx->wire_method,
+                GNUNET_STRINGS_absolute_time_to_string (execution_time),
+                TALER_amount2s (wire_fee));
     return GNUNET_NO;
   }
   if (0 <= TALER_amount_cmp (&expected_fee,
-			     wire_fee))
+                             wire_fee))
     return GNUNET_OK; /* expected_fee >= wire_fee */
 
   /* Wire fee check failed, export proof to client */
@@ -552,16 +554,16 @@ check_wire_fee (struct TrackTransferContext *rctx,
     (rctx,
      MHD_HTTP_INTERNAL_SERVER_ERROR,
      TMH_RESPONSE_make_json_pack ("{s:I, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:O}",
-				  "code", (json_int_t) TALER_EC_TRACK_TRANSFER_JSON_BAD_WIRE_FEE,
-				  "wire_fee", TALER_JSON_from_amount (wire_fee),
-				  "execution_time", GNUNET_JSON_from_time_abs (execution_time),
-				  "expected_wire_fee", TALER_JSON_from_amount (&expected_fee),
-				  "expected_closing_fee", TALER_JSON_from_amount (&closing_fee),
-				  "start_date", GNUNET_JSON_from_time_abs (start_date),
-				  "end_date", GNUNET_JSON_from_time_abs (end_date),
-				  "master_sig", GNUNET_JSON_from_data_auto (&master_sig),
-				  "master_pub", GNUNET_JSON_from_data_auto (master_pub),
-				  "json", json));
+                                  "code", (json_int_t) TALER_EC_TRACK_TRANSFER_JSON_BAD_WIRE_FEE,
+                                  "wire_fee", TALER_JSON_from_amount (wire_fee),
+                                  "execution_time", GNUNET_JSON_from_time_abs (execution_time),
+                                  "expected_wire_fee", TALER_JSON_from_amount (&expected_fee),
+                                  "expected_closing_fee", TALER_JSON_from_amount (&closing_fee),
+                                  "start_date", GNUNET_JSON_from_time_abs (start_date),
+                                  "end_date", GNUNET_JSON_from_time_abs (end_date),
+                                  "master_sig", GNUNET_JSON_from_data_auto (&master_sig),
+                                  "master_pub", GNUNET_JSON_from_data_auto (master_pub),
+                                  "json", json));
   return GNUNET_SYSERR;
 }
 
@@ -587,7 +589,7 @@ check_wire_fee (struct TrackTransferContext *rctx,
 static void
 wire_transfer_cb (void *cls,
                   unsigned int http_status,
-		  enum TALER_ErrorCode ec,
+                  enum TALER_ErrorCode ec,
                   const struct TALER_ExchangePublicKeyP *exchange_pub,
                   const json_t *json,
                   const struct GNUNET_HashCode *h_wire,
@@ -611,7 +613,7 @@ wire_transfer_cb (void *cls,
       (rctx,
        MHD_HTTP_FAILED_DEPENDENCY,
        TMH_RESPONSE_make_json_pack ("{s:I, s:I, s:I, s:O}",
-				    "code", (json_int_t) TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
+                                    "code", (json_int_t) TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
                                     "exchange-code", (json_int_t) ec,
                                     "exchange-http-status", (json_int_t) http_status,
                                     "details", json));
@@ -619,12 +621,13 @@ wire_transfer_cb (void *cls,
   }
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
+    db->preflight (db->cls);
     qs = db->store_transfer_to_proof (db->cls,
-				      rctx->url,
-				      &rctx->wtid,
-				      execution_time,
-				      exchange_pub,
-				      json);
+                                      rctx->url,
+                                      &rctx->wtid,
+                                      execution_time,
+                                      exchange_pub,
+                                      json);
     if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
       break;
   }
@@ -638,7 +641,7 @@ wire_transfer_cb (void *cls,
       (rctx,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
        TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-				    "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_STORE_TRANSFER_ERROR,
+                                    "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_STORE_TRANSFER_ERROR,
                                     "details", "failed to store response from exchange to local database"));
     return;
   }
@@ -646,9 +649,9 @@ wire_transfer_cb (void *cls,
 
   if (GNUNET_SYSERR ==
       check_wire_fee (rctx,
-		      json,
-		      execution_time,
-		      wire_fee))
+                      json,
+                      execution_time,
+                      wire_fee))
     return;
 
   /* Now we want to double-check that any (Taler coin) deposit
@@ -665,12 +668,13 @@ wire_transfer_cb (void *cls,
     rctx->current_detail = &details[i];
     /* Set the coin as "never seen" before. */
     rctx->check_transfer_result = GNUNET_NO;
+    db->preflight (db->cls);
     qs = db->find_payments_by_hash_and_coin (db->cls,
-					     &details[i].h_contract_terms,
-					     &rctx->mi->pubkey,
-					     &details[i].coin_pub,
-					     &check_transfer,
-					     rctx);
+                                             &details[i].h_contract_terms,
+                                             &rctx->mi->pubkey,
+                                             &details[i].coin_pub,
+                                             &check_transfer,
+                                             rctx);
     if (0 > qs)
     {
       /* single, read-only SQL statements should never cause
@@ -682,7 +686,7 @@ wire_transfer_cb (void *cls,
         (rctx,
          MHD_HTTP_INTERNAL_SERVER_ERROR,
          TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-				      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_FETCH_DEPOSIT_ERROR,
+                                      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_FETCH_DEPOSIT_ERROR,
                                       "details", "failed to obtain deposit data from local database"));
       return;
     }
@@ -704,7 +708,7 @@ wire_transfer_cb (void *cls,
         (rctx,
          MHD_HTTP_INTERNAL_SERVER_ERROR,
          TMH_RESPONSE_make_json_pack ("{s:I, s:s, s:I, s:s}",
-				      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_INTERNAL_LOGIC_ERROR,
+                                      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_INTERNAL_LOGIC_ERROR,
                                       "details", "internal logic error",
                                       "line", (json_int_t) __LINE__,
                                       "file", __FILE__));
@@ -726,12 +730,13 @@ wire_transfer_cb (void *cls,
        remember it for future reference */
     for (unsigned int i=0;i<MAX_RETRIES;i++)
     {
+      db->preflight (db->cls);
       qs = db->store_coin_to_transfer (db->cls,
-				       &details[i].h_contract_terms,
-				       &details[i].coin_pub,
-				       &rctx->wtid);
+                                       &details[i].h_contract_terms,
+                                       &details[i].coin_pub,
+                                       &rctx->wtid);
       if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
-	break;
+        break;
     }
     if (0 > qs)
     {
@@ -743,7 +748,7 @@ wire_transfer_cb (void *cls,
         (rctx,
          MHD_HTTP_INTERNAL_SERVER_ERROR,
          TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-				      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_STORE_COIN_ERROR,
+                                      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_DB_STORE_COIN_ERROR,
                                       "details", "failed to store response from exchange to local database"));
       return;
     }
@@ -754,14 +759,14 @@ wire_transfer_cb (void *cls,
               "About to call tracks transformator.\n");
 
   if (NULL == (jresponse =
-	       transform_response (json,
-				   rctx)))
+               transform_response (json,
+                                   rctx)))
   {
     resume_track_transfer_with_response
       (rctx,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
        TMH_RESPONSE_make_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
-				"Fail to elaborate the response."));
+                                "Fail to elaborate the response."));
     return;
   }
 
@@ -942,15 +947,15 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                      "exchange");
   if (NULL == url)
     return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
+                                           TALER_EC_PARAMETER_MISSING,
                                            "exchange");
   rctx->url = GNUNET_strdup (url);
 
   /* FIXME: change again: we probably don't want the wire_method
      but rather the _account_ (section) here! */
   wire_method = MHD_lookup_connection_value (connection,
-					     MHD_GET_ARGUMENT_KIND,
-					     "wire_method");
+                                             MHD_GET_ARGUMENT_KIND,
+                                             "wire_method");
   if (NULL == wire_method)
   {
     if (1)
@@ -977,14 +982,14 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   rctx->mi = TMH_lookup_instance (instance_str);
   if (NULL == rctx->mi)
     return TMH_RESPONSE_reply_not_found (connection,
-					 TALER_EC_TRACK_TRANSFER_INSTANCE_UNKNOWN,
+                                         TALER_EC_TRACK_TRANSFER_INSTANCE_UNKNOWN,
                                          "instance unknown");
   str = MHD_lookup_connection_value (connection,
                                      MHD_GET_ARGUMENT_KIND,
                                      "wtid");
   if (NULL == str)
     return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
+                                           TALER_EC_PARAMETER_MISSING,
                                            "wtid");
   if (GNUNET_OK !=
       GNUNET_STRINGS_string_to_data (str,
@@ -993,17 +998,17 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                      sizeof (rctx->wtid)))
   {
     return TMH_RESPONSE_reply_arg_invalid (connection,
-					   TALER_EC_PARAMETER_MALFORMED,
+                                           TALER_EC_PARAMETER_MALFORMED,
                                            "wtid");
   }
 
   /* Check if reply is already in database! */
   db->preflight (db->cls);
   qs = db->find_proof_by_wtid (db->cls,
-			       rctx->url,
-			       &rctx->wtid,
-			       &proof_cb,
-			       rctx);
+                               rctx->url,
+                               &rctx->wtid,
+                               &proof_cb,
+                               rctx);
   if (0 > qs)
   {
     /* Simple select queries should not cause serialization issues */
@@ -1011,8 +1016,8 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_TRACK_TRANSFER_DB_FETCH_FAILED,
-					      "Fail to query database about proofs");
+                                              TALER_EC_TRACK_TRANSFER_DB_FETCH_FAILED,
+                                              "Fail to query database about proofs");
   }
   if (0 != rctx->response_code)
   {
