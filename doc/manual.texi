@@ -1,5 +1,7 @@
 \input texinfo @c -*-texinfo-*-
 @c %**start of header
+@c Too generic, should be renamed to avoid system conflicts.
+@c probably: manual.info -> taler-merchant.info
 @setfilename manual.info
 @include version-manual.texi
 @settitle The GNU Taler merchant backend operator tutorial @value{VERSION}
@@ -16,7 +18,7 @@
 @copying
 This manual is for the GNU Taler merchant backend (version @value{VERSION}, @value{UPDATED}),
 
-Copyright @copyright{} 2016, 2017 Taler Systems SA
+Copyright @copyright{} 2016, 2017, 2019 Taler Systems SA
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -63,23 +65,63 @@ Texts.  A copy of the license is included in the section entitled
 
 Appendices
 
-* GNU-LGPL::                     The GNU Lesser General Public License says how you
-                                 can use the code of libtalermerchant.so in your own projects.
-* GNU Affero GPL::               The Affero GNU General Public License says how you
-                                 can copy and share the Taler merchant backend.
-* GNU-FDL::                      The GNU Free Documentation License says how you
-                                 can copy and share the documentation of GNU Taler.
+* GNU-LGPL::                The GNU Lesser General Public License says how you
+                            can use the code of libtalermerchant.so in your own projects.
+* GNU Affero GPL::          The Affero GNU General Public License says how you
+                            can copy and share the Taler merchant backend.
+* GNU-FDL::                 The GNU Free Documentation License says how you
+                            can copy and share the documentation of GNU Taler.
 
 Indices
 
-* Concept Index::               Index of concepts and programs.
+* Concept Index::           Index of concepts and programs.
 
+@detailmenu
+ --- The Detailed Node Listing ---
+
+Introduction
+
+* About GNU Taler::
+* About this manual::
+* Architecture overview::
+
+Installation
+
+* Installing Taler using Docker::
+* Generic instructions::
+* Installing Taler on Debian GNU/Linux::
+
+Configuration
+
+* Backend options::
+* Sample backend configuration::
+* Launching the backend::
+
+Testing
+
+Advanced topics
+
+* Configuration format::
+* Using taler-config::
+* Merchant key management::
+* SEPA configuration::
+* Tipping visitors::
+* Generate payments::
+
+@end detailmenu
 @end menu
 
 
 @node Introduction
 @chapter Introduction
 
+@menu
+* About GNU Taler::
+* About this manual::
+* Architecture overview::
+@end menu
+
+@node About GNU Taler
 @section About GNU Taler
 
 GNU Taler is an open protocol for an electronic payment system with a
@@ -97,17 +139,20 @@ not regular currencies.  This is not so much because of limitations
 in the backend, but because we are not aware of a Taler exchange
 operator offering regular currencies today.
 
+@node About this manual
 @section About this manual
 
 This tutorial targets system administrators who want to
 install a GNU Taler merchant @emph{backend}.
 
 We expect some moderate familiarity with the compilation and installation
-of free software packages. An understanding of cryptography is not required.
+of free software packages. An understanding of cryptography
+is not required.
 
-This first chapter of the tutorial will give a brief overview of the overall
-Taler architecture, describing the environment in which the Taler backend
-operates.  The second chapter then explains how to install the software,
+This first chapter of the tutorial will give a brief overview of
+the overall Taler architecture, describing the environment in which
+the Taler backend operates.
+The second chapter then explains how to install the software,
 including key dependencies.  The third chapter will explain how to
 configure the backend, including in particular the configuration of the
 bank account details of the merchant.
@@ -118,6 +163,7 @@ The last chapter gives some additional information about advanced topics
 which will be useful for system administrators but are not necessary for
 operating a basic backend.
 
+@node Architecture overview
 @section Architecture overview
 
 @cindex crypto-currency
@@ -174,17 +220,17 @@ account information is encapsulated within the Taler backend.
 
 
 @node Installation
+@chapter Installation
+
 @menu
-* Installing Taler using Docker:: Installing Taler using Docker
-* generic-instructions:: Generic installation guidelines
-* Installing Taler on Debian GNU/Linux:: Installing Taler on Debian GNU/Linux
+* Installing Taler using Docker::
+* Generic instructions::
+* Installing Taler on Debian GNU/Linux::
 @c * Installing Taler with GNU Guix:: Installing Taler with GNU Guix
 @c * Installing Taler on Arch Linux:: Installing Taler on Arch Linux
 @c * Installing Taler on Windows:: Installing Taler on Windows
 @c * Installing Taler on OS X:: Installing Taler on OS X
 @end menu
-
-@chapter Installation
 
 This chapter describes how to install the GNU Taler merchant backend.
 
@@ -243,7 +289,7 @@ $ curl http://$(docker-machine ip)/
 @end smallexample
 
 
-@node generic-instructions
+@node Generic instructions
 @section Generic instructions
 
 This section provides generic instructions for the merchant backend
@@ -254,6 +300,14 @@ instructions if those are available, and only consult the generic
 instructions if no system-specific instructions are provided for your
 specific operating system.
 
+@menu
+* Installation of dependencies::
+* Installing libgnunetutil::
+* Installing the GNU Taler exchange::
+* Installing the GNU Taler merchant backend::
+@end menu
+
+@node Installation of dependencies
 @subsection Installation of dependencies
 
 The following packages need to be installed before we can compile the
@@ -282,7 +336,7 @@ package manager.
 The following sections will provide detailed instructions for
 installing the libgnunetutil and GNU Taler exchange dependencies.
 
-
+@node Installing libgnunetutil
 @subsection Installing libgnunetutil
 
 @cindex GNUnet
@@ -307,6 +361,7 @@ If you did not specify a prefix, GNUnet will install to
 @code{/usr/local}, which requires you to run the last step as
 @code{root}.
 
+@node Installing the GNU Taler exchange
 @subsection Installing the GNU Taler exchange
 
 @cindex exchange
@@ -331,7 +386,7 @@ If you did not specify a prefix, the exchange will install to
 @code{--with-gnunet=/usr/local} if you installed GNUnet to
 @code{/usr/local} in the previous step.
 
-
+@node Installing the GNU Taler merchant backend
 @subsection Installing the GNU Taler merchant backend
 
 @cindex backend
@@ -416,9 +471,10 @@ For more recent versions of Debian, you should instead run:
   libmicrohttpd-dev
 @end example
 
-For the rest of the installation, follow the generic installation instructions
-starting with the installation of libgnunetutil.  Note that if you used the
-Debian wheezy instructions above, you need to pass
+For the rest of the installation, follow the
+generic installation instructions starting with the installation of
+libgnunetutil.  Note that if you used the Debian wheezy instructions
+above, you need to pass
 @code{--with-microhttpd=/usr/local/} to all @code{configure} invocations.
 
 
@@ -456,13 +512,20 @@ the well-known INI file format.  You can edit the file by hand, or
 use the @code{taler-config} commands given as examples.
 For more information on @code{taler-config}, @pxref{Using taler-config}.
 
+@menu
+* Backend options::
+* Sample backend configuration::
+* Launching the backend::
+@end menu
 
+@node Backend options
 @section Backend options
 
-The following table describes the options that commonly need to be modified.
+The following table describes the options that commonly need to
+be modified.
 Here, the notation @code{[$section]/$option} denotes the option
-@code{$option} under the section @code{[$section]} in the configuration file.
-
+@code{$option} under the section @code{[$section]} in the
+configuration file.
 
 
 @table @asis
@@ -720,7 +783,7 @@ in the section name instead of @code{default}.
 
 @end table
 
-
+@node Sample backend configuration
 @section Sample backend configuration
 
 @cindex configuration
@@ -771,6 +834,7 @@ Please note that @code{doc/config.sh} will walk you through all
 configuration steps, showing how to invoke @code{taler-config}
 for each of them.
 
+@node Launching the backend
 @section Launching the backend
 
 @cindex backend
@@ -808,7 +872,8 @@ port.
 The tool @code{taler-merchant-generate-payments} can be used to test
 the merchant backend installation.  It implements all the payment's steps
 in a programmatically way, relying on the backend you give it as input.
-Note that this tool gets installed along all the merchant backend's binaries.
+Note that this tool gets installed along all the
+merchant backend's binaries.
 
 This tool gets configured by a config file, that must have the following
 layout:
@@ -850,20 +915,22 @@ Run the test in the following way:
 $ taler-merchant-generate-payments [-c config] [-e EURL] [-m MURL]
 @end example
 
-the argument @code{config} given to @code{-c} points to the configuration
-file and is optional -- @code{~/.config/taler.conf} will be checked by default.
-By default, the tool forks two processes: one for the merchant backend, and one
-for the exchange.
-The option @code{-e} (@code{-m}) avoids any exchange (merchant backend) fork,
-and just runs the generator against the exchange (merchant backend) running
-at @code{EURL} (@code{MURL}).
+The argument @code{config} given to @code{-c} points to the configuration
+file and is optional -- @code{~/.config/taler.conf} will be checked by
+default.
+By default, the tool forks two processes: one for the merchant backend,
+and one for the exchange.
+The option @code{-e} (@code{-m}) avoids any exchange (merchant backend)
+fork, and just runs the generator against the exchange (merchant backend)
+running at @code{EURL} (@code{MURL}).
 
-Please NOTE that the generator contains @emph{hardcoded} values, as for deposit
-fees of the coins it uses.  In order to work against the used exchange, those values
-MUST match the ones used by the exchange.
+Please NOTE that the generator contains @emph{hardcoded} values, as for
+deposit fees of the coins it uses.
+In order to work against the used exchange, those values MUST match the
+ones used by the exchange.
 
-The following example shows how the generator "sets" a deposit fee of EUR:0.01
-for the 5 EURO coin.
+The following example shows how the generator "sets" a deposit fee
+of EUR:0.01 for the 5 EURO coin.
 
 @example
 // from <merchant_repository>/src/sample/generate_payments.c
@@ -896,12 +963,12 @@ fee_refund = EUR:0.00
 rsa_keysize = 1024
 @end example
 
-If the command terminates with no errors, then the merchant backend is correctly
-installed.
+If the command terminates with no errors, then the merchant backend
+is correctly installed.
 
 After this operation is done, the merchant database will have some dummy
-data in it, so it may be convenient to clean all the tables; to this purpose,
-issue the following command:
+data in it, so it may be convenient to clean all the tables; to this
+purpose, issue the following command:
 
 @example
 $ taler-merchant-dbinit -r
@@ -914,7 +981,7 @@ $ taler-merchant-dbinit -r
 @menu
 * Configuration format::    Configuration file format
 * Using taler-config::      Introduction to the taler-config tool
-* Key management::          Managing the merchant's cryptographic keys
+* Merchant key management:: Managing the merchant's cryptographic keys
 * SEPA configuration::      Configuring a SEPA bank account
 * Tipping visitors::        Giving money to Web site visitors with Taler
 * Generate payments::       Generate fake payments for testing purposes
@@ -924,7 +991,7 @@ $ taler-merchant-dbinit -r
 @include taler-config.texi
 
 
-@node Key management
+@node Merchant key management
 @section Merchant key management
 @cindex merchant key
 @cindex KEYFILE
@@ -974,7 +1041,6 @@ we expect future versions of the Taler backend to ship with
 pre-configured exchanges and auditors for common denominations.
 
 
-
 @node Tipping visitors
 @section Tipping visitors
 @cindex tipping
@@ -987,6 +1053,14 @@ how to setup the Taler merchant backend for tipping.
 
 There are four basic steps that must happen to tip a visitor.
 
+@menu
+* Configure a reserve and exchange for tipping::
+* Fund the reserve::
+* Authorize a tip::
+* Picking up of the tip::
+@end menu
+
+@node Configure a reserve and exchange for tipping
 @subsection Configure a reserve and exchange for tipping
 @cindex gnunet-ecc
 @cindex reserve key
@@ -1046,12 +1120,13 @@ is configured to tip.
 
 Now you can (re)start the backend with the new configuration.
 
-
+@node Fund the reserve
 @subsection Fund the reserve
 @cindex reserve
 @cindex close
 
-To fund the reserve, you must first extract the public key from ``tip.priv'':
+To fund the reserve, you must first extract the public key
+from ``tip.priv'':
 
 @example
 $ gnunet-ecc --print-public-key \
@@ -1088,7 +1163,7 @@ weeks to the exchange initially. If your campaign runs longer, you
 should wire further funds to the reserve every other week to prevent
 it from expiring.
 
-
+@node Authorize a tip
 @subsection Authorize a tip
 
 When your frontend has reached the point where a client is supposed
@@ -1107,23 +1182,24 @@ in the body of the POST request:
 @item The tip-pickup URL (see next section)
 @end itemize
 
-In response to this request, the backend will return a tip token, an expiration
-time and the exchange URL.  The expiration time will indicate how long the tip
-is valid (when the reserve expires).  The tip token is an opaque string that
-contains all the information needed by the wallet to process the tip.  The
-frontend must send this tip token to the browser in a  a special ``402 Payment
-Required'' response inside the @code{X-Taler-Tip} header.
+In response to this request, the backend will return a tip token, an
+expiration time and the exchange URL.
+The expiration time will indicate how long the tip is valid (when the
+reserve expires).  The tip token is an opaque string that contains all
+the information needed by the wallet to process the tip.  The
+frontend must send this tip token to the browser in a
+special ``402 Payment Required'' response inside
+the @code{X-Taler-Tip} header.
 
 The frontend should handle errors returned by the backend, such
 as missconfigured instances or a lack of remaining funds for tipping.
 
-
+@node Picking up of the tip
 @subsection Picking up of the tip
 
-The wallet will POST a JSON object to the shop's ``/tip-pickup'' handler.  The
-frontend must then forward this request to the backend.  The response
+The wallet will POST a JSON object to the shop's ``/tip-pickup'' handler.
+The frontend must then forward this request to the backend.  The response
 generated by the backend can then be forwarded directly to the wallet.
-
 
 @node Generate payments
 @section Generate payments
@@ -1175,7 +1251,6 @@ many payments that use two coins, because normally only one coin is spent per pa
 (one coin) payments that will be left unaggregated.
 @item @code{--alt-instance=AI} This option instructs the tool to perform payments
 using the merchant instance @emph{AI} (instead of the @emph{default} instance)
-@item 
 @end itemize
 
 As for the @code{ordinary} subcommand, it is worth explaining the
@@ -1189,7 +1264,6 @@ tracking operation accounts for @code{/track/transaction} and @code{/track/trans
 This command should only be used to see if the operation ends without problems, as
 no actual measurement of performance is provided (despite of the 'benchmark' work used
 in the tool's name).
-
 @end itemize
 
 @c **********************************************************

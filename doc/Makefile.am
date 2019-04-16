@@ -16,7 +16,16 @@ merchant-api-python.pdf: merchant-api.content.texi arch-api.pdf
 merchant-api-curl.html: merchant-api.content.texi arch-api.png
 merchant-api-python.html: merchant-api.content.texi arch-api.png
 
-AM_MAKEINFOHTMLFLAGS = --no-split --css-ref=docstyle.css --css-ref=brown-paper.css
+# NOTE: While GNU makeinfo 6.5 supports --css-ref=URL,
+# makeinfo 4.8 (in NetBSD 8.0, macOS, and maybe other
+# base) does only support --css-include=FILE.
+# The only difference is a shorter html output and
+# in 6.5 the ability to use refs instead of include.
+# We prefer not to break builds in this case, so
+# we use the include version which is backwards compatible
+# and upwards compatible, while the ref variant is neither.
+
+AM_MAKEINFOHTMLFLAGS = --no-split --css-include=docstyle.css --css-include=brown-paper.css
 
 man_MANS = \
   taler-merchant-benchmark.1 \
