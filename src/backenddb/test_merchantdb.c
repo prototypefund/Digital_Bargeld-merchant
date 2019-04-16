@@ -255,19 +255,17 @@ static void
 deposit_cb (void *cls,
             const struct GNUNET_HashCode *ah_contract_terms,
             const struct TALER_CoinSpendPublicKeyP *acoin_pub,
-	    const char *aexchange_url,
+            const char *aexchange_url,
             const struct TALER_Amount *aamount_with_fee,
             const struct TALER_Amount *adeposit_fee,
             const struct TALER_Amount *arefund_fee,
             const struct TALER_Amount *awire_fee,
             const json_t *aexchange_proof)
 {
-  CHECK ((0 == memcmp (ah_contract_terms,
-                       &h_contract_terms,
-                       sizeof (struct GNUNET_HashCode))));
-  CHECK (0 == memcmp (acoin_pub,
-                      &coin_pub,
-                      sizeof (struct TALER_CoinSpendPublicKeyP)));
+  CHECK ((0 == GNUNET_memcmp (ah_contract_terms,
+                              &h_contract_terms)));
+  CHECK (0 == GNUNET_memcmp (acoin_pub,
+                             &coin_pub));
   CHECK (0 == strcmp (aexchange_url,
                       EXCHANGE_URL));
   CHECK (0 == TALER_amount_cmp (aamount_with_fee,
@@ -306,16 +304,13 @@ transfer_cb (void *cls,
              struct GNUNET_TIME_Absolute execution_time,
              const json_t *exchange_proof)
 {
-  CHECK (0 == memcmp (ah_contract_terms,
-                      &h_contract_terms,
-                      sizeof (struct GNUNET_HashCode)));
+  CHECK (0 == GNUNET_memcmp (ah_contract_terms,
+                             &h_contract_terms));
 
-  CHECK (0 == memcmp (acoin_pub,
-                      &coin_pub,
-                      sizeof (struct TALER_CoinSpendPublicKeyP)));
-  CHECK (0 == memcmp (awtid,
-                      &wtid,
-                      sizeof (struct TALER_WireTransferIdentifierRawP)));
+  CHECK (0 == GNUNET_memcmp (acoin_pub,
+                             &coin_pub));
+  CHECK (0 == GNUNET_memcmp (awtid,
+                             &wtid));
   CHECK (1 == json_equal ((json_t *) exchange_proof,
                           transfer_proof));
 }
@@ -426,9 +421,8 @@ test_wire_fee ()
   }
   if ( (start_date.abs_value_us != date2.abs_value_us) ||
        (end_date.abs_value_us != date3.abs_value_us) ||
-       (0 != memcmp (&exchange_sig,
-		     &exchange_sig2,
-		     sizeof (exchange_sig))) ||
+       (0 != GNUNET_memcmp (&exchange_sig,
+                            &exchange_sig2)) ||
        (0 != TALER_amount_cmp (&wire_fee2,
 			       &wire_fee3)) ||
        (0 != TALER_amount_cmp (&closing_fee2,
@@ -455,9 +449,8 @@ test_wire_fee ()
   }
   if ( (start_date.abs_value_us != date1.abs_value_us) ||
        (end_date.abs_value_us != date2.abs_value_us) ||
-       (0 != memcmp (&exchange_sig,
-		     &exchange_sig2,
-		     sizeof (exchange_sig))) ||
+       (0 != GNUNET_memcmp (&exchange_sig,
+                            &exchange_sig2)) ||
        (0 != TALER_amount_cmp (&wire_fee1,
 			       &wire_fee3)) ||
        (0 != TALER_amount_cmp (&closing_fee1,
@@ -662,9 +655,8 @@ test_tipping ()
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
-  if (0 != memcmp (&pres,
-                   &tip_reserve_priv,
-                   sizeof (pres)))
+  if (0 != GNUNET_memcmp (&pres,
+                          &tip_reserve_priv))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -680,9 +672,8 @@ test_tipping ()
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
-  if (0 != memcmp (&pres,
-                   &tip_reserve_priv,
-                   sizeof (pres)))
+  if (0 != GNUNET_memcmp (&pres,
+                          &tip_reserve_priv))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
