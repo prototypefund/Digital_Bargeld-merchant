@@ -314,17 +314,17 @@ The following packages need to be installed before we can compile the
 backend:
 
 @itemize
-@item autoconf @math{\ge 2.69}
-@item automake @math{\ge 1.14}
-@item libtool @math{\ge 2.4}
-@item autopoint @math{\ge 0.19}
-@item libltdl @math{\ge 2.4}
-@item libunistring @math{\ge 0.9.3}
-@item libcurl @math{\ge 7.26} (or libgnurl @math{\ge 7.26})
-@item GNU libmicrohttpd @math{\ge 0.9.39}
-@item GNU libgcrypt @math{\ge 1.6}
-@item libjansson @math{\ge 2.7}
-@item Postgres @math{\ge 9.4}, including libpq
+@item autoconf >= 2.69
+@item automake >= 1.14
+@item libtool >= 2.4
+@item autopoint >= 0.19
+@item libltdl >= 2.4
+@item libunistring >= 0.9.3
+@item libcurl >= 7.26 (or libgnurl >= 7.26)
+@item GNU libmicrohttpd >= 0.9.39
+@item GNU libgcrypt >= 1.6
+@item libjansson >= 2.7
+@item Postgres >= 9.4, including libpq
 @item libgnunetutil (from Git)
 @item GNU Taler exchange (from Git)
 @end itemize
