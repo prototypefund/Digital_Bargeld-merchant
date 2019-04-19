@@ -1188,6 +1188,7 @@ next_command (struct InterpreterState *is)
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code, #TALER_EC_NONE on success
  * @param serial_id unique ID of the wire transfer
+ * @param timestamp time stamp when the transfer was made effective at the bank
  * @param full_response full response from the exchange (for logging, in case of errors)
  */
 static void
@@ -1195,6 +1196,7 @@ add_incoming_cb (void *cls,
                  unsigned int http_status,
 		 enum TALER_ErrorCode ec,
                  uint64_t serial_id,
+                 struct GNUNET_TIME_Absolute timestamp,
                  const json_t *full_response)
 {
   struct InterpreterState *is = cls;
