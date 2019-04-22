@@ -1194,7 +1194,7 @@ next_command (struct InterpreterState *is)
 static void
 add_incoming_cb (void *cls,
                  unsigned int http_status,
-		 enum TALER_ErrorCode ec,
+                 enum TALER_ErrorCode ec,
                  uint64_t serial_id,
                  struct GNUNET_TIME_Absolute timestamp,
                  const json_t *full_response)
@@ -3335,7 +3335,7 @@ interpreter_run (void *cls)
           json_object_set_new (order,
                                "instance",
                                json_string (instance));
-        
+
         }
       }
 
