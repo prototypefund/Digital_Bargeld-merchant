@@ -353,6 +353,9 @@ proposal_put (struct MHD_Connection *connection,
       json_object_set_new (merchant,
                            "name",
                            json_string (mi->name));
+      json_object_set_new (merchant,
+                           "instance",
+                           json_string (instance));
       json_object_set_new (order,
                            "merchant",
                            merchant);
