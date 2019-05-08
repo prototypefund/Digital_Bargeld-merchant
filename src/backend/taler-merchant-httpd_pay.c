@@ -935,7 +935,7 @@ deposit_cb (void *cls,
       /* We can't do anything meaningful here, the exchange did something wrong */
       resume_pay_with_response (pc,
                                 MHD_HTTP_SERVICE_UNAVAILABLE,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:I, s:s}",
+                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:I, s:I, s:s}",
                                                              "error", "exchange failed",
                                                              "code", (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
                                                              "exchange-code", (json_int_t) ec,
