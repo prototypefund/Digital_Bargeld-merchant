@@ -477,6 +477,11 @@ proposal_put (struct MHD_Connection *connection,
        "Inconsistent instance given");
   }
 
+  /* Setting the instance on the order directly is just a shortcut,
+     the wallet shouldn't see that. */
+  json_object_del (order, "instance");
+  instance = NULL;
+
   /* add fields to the contract that the backend should provide */
   json_object_set (order,
                    "exchanges",
