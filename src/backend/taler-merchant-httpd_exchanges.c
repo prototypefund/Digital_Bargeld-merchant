@@ -1056,6 +1056,7 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
+  GNUNET_CURL_enable_async_scope_header (merchant_curl_ctx, "Taler-Correlation-Id");
   merchant_curl_rc = GNUNET_CURL_gnunet_rc_create (merchant_curl_ctx);
   /* get exchanges from the merchant configuration and try to connect to them */
   GNUNET_CONFIGURATION_iterate_sections (cfg,

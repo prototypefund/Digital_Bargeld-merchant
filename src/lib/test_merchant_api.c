@@ -4995,6 +4995,7 @@ run (void *cls)
   GNUNET_assert (ctx = GNUNET_CURL_init
     (&GNUNET_CURL_gnunet_scheduler_reschedule,
      &rc));
+  GNUNET_CURL_enable_async_scope_header (ctx, "Taler-Correlation-Id");
   rc = GNUNET_CURL_gnunet_rc_create (ctx);
   GNUNET_assert (NULL != (exchange
     = TALER_EXCHANGE_connect (ctx,

@@ -257,6 +257,10 @@ struct TM_HandlerContext
    */
   const struct TMH_RequestHandler *rh;
 
+  /**
+   * Asynchronous request context id.
+   */
+  struct GNUNET_AsyncScopeId async_scope_id;
 };
 
 
