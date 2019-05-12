@@ -32,8 +32,9 @@ AC_ARG_ENABLE([only-doc],
 AC_MSG_RESULT($doc_only)
 AM_CONDITIONAL([DOC_ONLY], [test "$doc_only" = "yes"])
 
-if test "x$doc_only" != xyes
-then
+
+# Not indented as it covers most of the file...
+AS_IF([test "x$doc_only" != xyes],[
 
 
 # Checks for programs.
@@ -74,10 +75,7 @@ AS_IF([test $libgnunetutil != 1],
 
 # test for postgres
 AX_LIB_POSTGRESQL([9.3])
-if test "x$found_postgresql" = "xyes"
-then
-  postgres=true
-fi
+AS_IF([test "x$found_postgresql" = "xyes"],[postgres=true])
 AM_CONDITIONAL(HAVE_POSTGRESQL, test x$postgres = xtrue)
 
 # Check for Taler's libtalerpq
@@ -137,13 +135,12 @@ PKG_CHECK_MODULES([JANSSON], [jansson >= 2.3],
 # check for libgnurl
 # libgnurl
 LIBGNURL_CHECK_CONFIG(,7.34.0,gnurl=1,gnurl=0)
-if test "x$gnurl" = x1
-then
+AS_IF([test "x$gnurl" = x1],[
 	AM_CONDITIONAL(HAVE_LIBGNURL, true)
 	AC_DEFINE([HAVE_LIBGNURL],[1],[Have libgnurl])
-else
+],[
 	AM_CONDITIONAL(HAVE_LIBGNURL, false)
-fi
+])
 
 # libcurl-gnutls
 LIBCURL_CHECK_CONFIG(,7.34.0,[curl=true],[curl=false])
@@ -305,7 +302,8 @@ AC_ARG_ENABLE([[doc]],
 test "x$enable_doc" = "xno" || enable_doc=yes
 AM_CONDITIONAL([ENABLE_DOC], [test "x$enable_doc" = "xyes"])
 
-else
+
+],[  # this is about the doc-only if on top of the file
 
 # logic if doc_only is set, make sure conditionals are still defined
 AM_CONDITIONAL([HAVE_GNUNETPQ], [false])
@@ -320,7 +318,7 @@ AM_CONDITIONAL([HAVE_TWISTER], [true])
 
 
 # end of 'doc_only'
-fi
+])
 
 
 # should experimental code be compiled (code that may not yet compile / have passing test cases)?
