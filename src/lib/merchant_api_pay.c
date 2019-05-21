@@ -368,6 +368,10 @@ handle_pay_finished (void *cls,
       /* Server had an internal issue; we should retry, but this API
 	 leaves this to the application */
       break;
+    case MHD_HTTP_SERVICE_UNAVAILABLE:
+      /* Exchange couldn't respond properly; the retry is left to the
+       * application */
+      break;
     default:
       /* unexpected response code */
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,

@@ -190,6 +190,80 @@ run (void *cls,
      struct TALER_TESTING_Interpreter *is)
 {
 
+  /**** Triggering #5719 ****/
+  struct TALER_TESTING_Command bug_5719[] = {
+
+    /**
+     * Move money to the exchange's bank account.
+     */
+    CMD_TRANSFER_TO_EXCHANGE ("5719-create-reserve",
+                              "EUR:1.01"),
+    /**
+     * Make a reserve exist, according to the previous
+     * transfer.
+     */
+    CMD_EXEC_WIREWATCH ("5719-wirewatch"),
+
+    TALER_TESTING_cmd_check_bank_transfer
+      ("5719-check-transfer",
+       EXCHANGE_URL,
+       "EUR:1.01",
+       USER_ACCOUNT_NO,
+       EXCHANGE_ACCOUNT_NO),
+
+    TALER_TESTING_cmd_withdraw_amount ("5719-withdraw",
+                                       "5719-create-reserve",
+                                       "EUR:1",
+                                       MHD_HTTP_OK),
+
+    TALER_TESTING_cmd_status ("5719-reserve-status",
+                              "5719-create-reserve",
+                              "EUR:0",
+                              MHD_HTTP_OK),
+    TALER_TESTING_cmd_proposal
+      ("5719-create-proposal",
+       twister_merchant_url,
+       MHD_HTTP_OK,
+       "{\"max_fee\":\
+          {\"currency\":\"EUR\",\
+           \"value\":0,\
+           \"fraction\":50000000},\
+        \"order_id\":\"5719TRIGGER\",\
+        \"refund_deadline\":\"\\/Date(0)\\/\",\
+        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"amount\":\
+          {\"currency\":\"EUR\",\
+           \"value\":1,\
+           \"fraction\":0},\
+        \"summary\": \"merchant-lib testcase\",\
+        \"products\": [ {\"description\":\"triggering bug 5719\",\
+                         \"value\":\"{EUR:1}\"} ] }",
+        NULL),
+
+    /**
+     * Instruct the Twister to malform the response given by
+     * the exchange to the merchant.  This way, the parser will
+     * not manage to pass the callback a valid JSON and will
+     * instead pass a NULL pointer.  This should trigger the path
+     * mentioned in the bug report #5719.
+     */
+    TALER_TESTING_cmd_malform_response
+      ("5719-malform-xcg-resp",
+       PROXY_EXCHANGE_CONFIG_FILE),
+
+    TALER_TESTING_cmd_pay ("5719-deposit",
+                           twister_merchant_url,
+                           MHD_HTTP_SERVICE_UNAVAILABLE,
+                           "5719-create-proposal",
+                           "5719-withdraw",
+                           "EUR:1",
+                           "EUR:1.99", // no sense now
+                           "EUR:0.01"), // no sense now
+    TALER_TESTING_cmd_end ()
+  };
+  
+
   /**** Covering /check-payment ****/
   struct TALER_TESTING_Command check_payment[] = {
 
@@ -956,6 +1030,8 @@ run (void *cls,
     TALER_TESTING_cmd_batch ("pay",
                              pay),
 
+    TALER_TESTING_cmd_batch ("bug-5719",
+                             bug_5719),
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.

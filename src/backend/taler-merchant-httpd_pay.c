@@ -2024,7 +2024,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   json_t *root;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-	      "In handler for /pay.\n");
+              "In handler for /pay.\n");
   if (NULL == *connection_cls)
   {
     pc = GNUNET_new (struct PayContext);
