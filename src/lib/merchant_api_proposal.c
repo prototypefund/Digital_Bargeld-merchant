@@ -231,7 +231,7 @@ TALER_MERCHANT_order_put
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
   eh = curl_easy_init ();
-  if (GNUNET_OK != TEAH_curl_easy_post (&po->post_ctx,
+  if (GNUNET_OK != TALER_curl_easy_post (&po->post_ctx,
                                         eh,
                                         req))
   {
