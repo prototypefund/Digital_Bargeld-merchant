@@ -651,6 +651,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                              upload_data,
                              upload_data_size,
                              &root);
+
   if (GNUNET_SYSERR == res)
     return MHD_NO;
 

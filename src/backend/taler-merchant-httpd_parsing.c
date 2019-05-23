@@ -2,21 +2,25 @@
   This file is part of TALER
   Copyright (C) 2014, 2015, 2016 GNUnet e.V.
 
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Affero General Public License as published by the Free Software
-  Foundation; either version 3, or (at your option) any later version.
+  TALER is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Affero General Public License as
+  published by the Free Software Foundation; either version 3,
+  or (at your option) any later version.
 
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
+  TALER is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU Affero General Public License for more details.
 
-  You should have received a copy of the GNU Affero General Public License along with
-  TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
+  You should have received a copy of the GNU Affero General Public
+  License along with TALER; see the file COPYING.  If not,
+  see <http://www.gnu.org/licenses/>
 */
 
 /**
  * @file taler-exchange-httpd_parsing.c
- * @brief functions to parse incoming requests (MHD arguments and JSON snippets)
+ * @brief functions to parse incoming requests
+ *        (MHD arguments and JSON snippets)
  * @author Florian Dold
  * @author Benedikt Mueller
  * @author Christian Grothoff
@@ -175,9 +179,9 @@ TMH_PARSE_post_cleanup_callback (void *con_cls)
 /**
  * Process a POST request containing a JSON object.  This function
  * realizes an MHD POST processor that will (incrementally) process
- * JSON data uploaded to the HTTP server.  It will store the required
- * state in the @a con_cls, which must be cleaned up using
- * #TMH_PARSE_post_cleanup_callback().
+ * JSON data uploaded to the HTTP server.  It will store the
+ * required state in the @a con_cls, which must be cleaned up
+ * using #TMH_PARSE_post_cleanup_callback().
  *
  * @param connection the MHD connection
  * @param con_cls the closure (points to a `struct Buffer *`)
@@ -202,86 +206,41 @@ TMH_PARSE_post_json (struct MHD_Connection *connection,
                      size_t *upload_data_size,
                      json_t **json)
 {
-  struct Buffer *r = *con_cls;
+  enum GNUNET_JSON_PostResult pr;
 
-  TALER_LOG_DEBUG ("Will parse: %.*s\n",
-                   (int) *upload_data_size,
-                   upload_data);
-  *json = NULL;
-  if (NULL == *con_cls)
+  pr = GNUNET_JSON_post_parser (REQUEST_BUFFER_MAX,
+                                connection,
+                                con_cls,
+                                upload_data,
+                                upload_data_size,
+                                json);
+  switch (pr)
   {
-    /* We are seeing a fresh POST request. */
-    r = GNUNET_new (struct Buffer);
-    if (GNUNET_OK !=
-        buffer_init (r,
-                     upload_data,
-                     *upload_data_size,
-                     REQUEST_BUFFER_INITIAL,
-                     REQUEST_BUFFER_MAX))
-    {
-      *con_cls = NULL;
-      buffer_deinit (r);
-      GNUNET_free (r);
-      /* return GNUNET_SYSERR if this isn't even
-       * able to generate proper error response.  */
-      return (MHD_NO == TMH_RESPONSE_reply_internal_error
-        (connection,
-         TALER_EC_PARSER_OUT_OF_MEMORY,
-         "out of memory")) ? GNUNET_SYSERR : GNUNET_NO;
-    }
-    /* everything OK, wait for more POST data */
-    *upload_data_size = 0;
-    *con_cls = r;
+
+  case GNUNET_JSON_PR_OUT_OF_MEMORY:
+    return (MHD_NO == TMH_RESPONSE_reply_internal_error
+      (connection,
+       TALER_EC_PARSER_OUT_OF_MEMORY,
+       "out of memory")) ? GNUNET_SYSERR : GNUNET_NO;
+
+  case GNUNET_JSON_PR_CONTINUE:
+    return GNUNET_YES;
+
+  case GNUNET_JSON_PR_REQUEST_TOO_LARGE:
+    return (MHD_NO == TMH_RESPONSE_reply_request_too_large
+      (connection)) ? GNUNET_SYSERR : GNUNET_NO;
+
+  case GNUNET_JSON_PR_JSON_INVALID:
+    return (MHD_YES ==
+            TMH_RESPONSE_reply_invalid_json (connection))
+      ? GNUNET_NO : GNUNET_SYSERR;
+  case GNUNET_JSON_PR_SUCCESS:
+    GNUNET_break (NULL != *json);
     return GNUNET_YES;
   }
-
-  /* When zero, upload is over.  */
-  if (0 != *upload_data_size)
-  {
-    TALER_LOG_INFO ("Parser asking for more data"
-                    ", current data size is %zu\n",
-                    *upload_data_size);
-
-    /* We are seeing an old request with more data available. */
-    if (GNUNET_OK !=
-        buffer_append (r,
-                       upload_data,
-                       *upload_data_size,
-                       REQUEST_BUFFER_MAX))
-    {
-      /* Request too long */
-      *con_cls = NULL;
-      buffer_deinit (r);
-      GNUNET_free (r);
-      return (MHD_NO == TMH_RESPONSE_reply_request_too_large
-        (connection)) ? GNUNET_SYSERR : GNUNET_NO;
-    }
-
-    /* everything OK, wait for more POST data */
-    *upload_data_size = 0;
-    return GNUNET_YES;
-  }
-
-  TALER_LOG_DEBUG ("About to parse: %.*s\n",
-                   (int) r->fill,
-                   r->data);
-  /* We have seen the whole request. */
-  *json = json_loadb (r->data,
-                      r->fill,
-                      0,
-                      NULL);
-  if (NULL == *json)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Failed to parse JSON request body\n");
-    return (MHD_YES == TMH_RESPONSE_reply_invalid_json
-      (connection)) ? GNUNET_NO : GNUNET_SYSERR;
-  }
-  buffer_deinit (r);
-  GNUNET_free (r);
-  *con_cls = NULL;
-
-  return GNUNET_YES;
+  /* this should never happen */
+  GNUNET_break (0);
+  return GNUNET_SYSERR;
 }
 
 

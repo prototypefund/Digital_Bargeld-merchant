@@ -2,18 +2,21 @@
   This file is part of TALER
   Copyright (C) 2014-2017 GNUnet e.V. and INRIA
 
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Lesser General Public License as published by the Free Software
-  Foundation; either version 2.1, or (at your option) any later version.
+  TALER is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License as
+  published by the Free Software Foundation; either version 2.1,
+  or (at your option) any later version.
 
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+  TALER is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU Lesser General Public License for more details.
 
-  You should have received a copy of the GNU Lesser General Public License along with
-  TALER; see the file COPYING.LGPL.  If not, see
-  <http://www.gnu.org/licenses/>
+  You should have received a copy of the GNU Lesser General Public
+  License along with TALER; see the file COPYING.LGPL.  If not,
+  see <http://www.gnu.org/licenses/>
 */
+
 /**
  * @file lib/merchant_api_proposal.c
  * @brief Implementation of the /proposal POST and GET
@@ -29,6 +32,7 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
+#include <taler/teah_common.h>
 
 
 /**
@@ -41,11 +45,6 @@ struct TALER_MERCHANT_ProposalOperation
    * The url for this request.
    */
   char *url;
-
-  /**
-   * JSON encoding of the request to POST.
-   */
-  char *json_enc;
 
   /**
    * Handle for the request.
@@ -66,6 +65,11 @@ struct TALER_MERCHANT_ProposalOperation
    * Reference to the execution context.
    */
   struct GNUNET_CURL_Context *ctx;
+
+  /**
+   * Minor context that holds body and headers.
+   */
+  struct TEAH_PostContext post_ctx;
 };
 
 /**
@@ -208,11 +212,12 @@ handle_proposal_finished (void *cls,
  * @return a handle for this request, NULL on error
  */
 struct TALER_MERCHANT_ProposalOperation *
-TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
-                          const char *backend_url,
-                          const json_t *order,
-                          TALER_MERCHANT_ProposalCallback proposal_cb,
-                          void *proposal_cb_cls)
+TALER_MERCHANT_order_put
+  (struct GNUNET_CURL_Context *ctx,
+   const char *backend_url,
+   const json_t *order,
+   TALER_MERCHANT_ProposalCallback proposal_cb,
+   void *proposal_cb_cls)
 {
   struct TALER_MERCHANT_ProposalOperation *po;
   json_t *req;
@@ -226,32 +231,26 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
   eh = curl_easy_init ();
-  po->json_enc = json_dumps (req,
-                             JSON_COMPACT);
-  json_decref (req);
-  if (NULL == po->json_enc)
+  if (GNUNET_OK != TEAH_curl_easy_post (&po->post_ctx,
+                                        eh,
+                                        req))
   {
     GNUNET_break (0);
     GNUNET_free (po);
     return NULL;
   }
+  json_decref (req);
+
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
                                    po->url));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDS,
-                                   po->json_enc));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDSIZE,
-                                   strlen (po->json_enc)));
-  po->job = GNUNET_CURL_job_add (ctx,
-                                 eh,
-                                 GNUNET_YES,
-                                 &handle_proposal_finished,
-                                 po);
+
+  po->job = GNUNET_CURL_job_add2 (ctx,
+                                  eh,
+                                  po->post_ctx.headers,
+                                  &handle_proposal_finished,
+                                  po);
   return po;
 }
 
@@ -437,7 +436,8 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
  * @param po the proposal operation request handle
  */
 void
-TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po)
+TALER_MERCHANT_proposal_cancel
+  (struct TALER_MERCHANT_ProposalOperation *po)
 {
   if (NULL != po->job)
   {
@@ -445,7 +445,7 @@ TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po)
     po->job = NULL;
   }
   GNUNET_free (po->url);
-  GNUNET_free (po->json_enc);
+  GNUNET_free (po->post_ctx.json_enc);
   GNUNET_free (po);
 }
 
@@ -456,7 +456,8 @@ TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po)
  * @param plo handle to the request to be canceled
  */
 void
-TALER_MERCHANT_proposal_lookup_cancel (struct TALER_MERCHANT_ProposalLookupOperation *plo)
+TALER_MERCHANT_proposal_lookup_cancel
+  (struct TALER_MERCHANT_ProposalLookupOperation *plo)
 {
   if (NULL != plo->job)
   {
