@@ -2,22 +2,26 @@
   This file is part of TALER
   Copyright (C) 2014, 2015, 2016, 2017 GNUnet e.V. and INRIA
 
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Lesser General Public License as published by the Free Software
-  Foundation; either version 2.1, or (at your option) any later version.
+  TALER is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License as
+  published by the Free Software Foundation; either version 2.1,
+  or (at your option) any later version.
 
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more details.
+  TALER is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU Lesser General Public License for more details.
 
-  You should have received a copy of the GNU Lesser General Public License along with
-  TALER; see the file COPYING.LGPL.  If not, see
-  <http://www.gnu.org/licenses/>
+  You should have received a copy of the GNU Lesser General
+  Public License along with TALER; see the file COPYING.LGPL.
+  If not, see <http://www.gnu.org/licenses/>
 */
 /**
  * @file lib/merchant_api_pay.c
- * @brief Implementation of the /pay request of the merchant's HTTP API
+ * @brief Implementation of the /pay request
+ *        of the merchant's HTTP API
  * @author Christian Grothoff
+ * @author Marcello Stanisci
  */
 #include "platform.h"
 #include <curl/curl.h>
@@ -41,11 +45,6 @@ struct TALER_MERCHANT_Pay
    * The url for this request.
    */
   char *url;
-
-  /**
-   * JSON encoding of the request to POST.
-   */
-  char *json_enc;
 
   /**
    * Handle for the request.
@@ -81,6 +80,11 @@ struct TALER_MERCHANT_Pay
    * Reference to the execution context.
    */
   struct GNUNET_CURL_Context *ctx;
+
+  /**
+   * Minor context that holds body and headers.
+   */
+  struct TEAH_PostContext post_ctx;
 
   /**
    * The coins we are paying with.
@@ -160,8 +164,10 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
         return GNUNET_SYSERR;
       }
 
-      rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
-      rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
+      rr.purpose.purpose = htonl
+        (TALER_SIGNATURE_MERCHANT_REFUND);
+      rr.purpose.size = htonl
+        (sizeof (struct TALER_RefundRequestPS));
       rr.h_contract_terms = ph->h_contract_terms;
       rr.coin_pub = res[i].coin_pub;
       rr.merchant = merchant_pub;
@@ -171,7 +177,8 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
       {
 	if (0 == memcmp (&ph->coins[j].coin_pub,
 			 &res[i].coin_pub,
-			 sizeof (struct TALER_CoinSpendPublicKeyP)))
+			 sizeof
+                           (struct TALER_CoinSpendPublicKeyP)))
 	{
 	  TALER_amount_hton (&rr.refund_amount,
 			     &ph->coins[j].amount_with_fee);
@@ -187,10 +194,11 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
       }
 
       if (GNUNET_OK !=
-	  GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_REFUND,
-				      &rr.purpose,
-				      &sig->eddsa_sig,
-				      &merchant_pub.eddsa_pub))
+	  GNUNET_CRYPTO_eddsa_verify
+            (TALER_SIGNATURE_MERCHANT_REFUND,
+	     &rr.purpose,
+	     &sig->eddsa_sig,
+	     &merchant_pub.eddsa_pub))
       {
 	GNUNET_break_op (0);
 	return GNUNET_SYSERR;
@@ -217,8 +225,8 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
  * coin was actually already spent!
  *
  * @param pc handle of the original coin we paid with
- * @param json cryptographic proof of coin's transaction history as
- *        was returned by the exchange/merchant
+ * @param json cryptographic proof of coin's transaction
+ *        history as was returned by the exchange/merchant
  * @return #GNUNET_OK if proof checks out
  */
 static int
@@ -229,10 +237,11 @@ check_coin_history (const struct TALER_MERCHANT_PaidCoin *pc,
   struct TALER_Amount spent_plus_contrib;
 
   if (GNUNET_OK !=
-      TALER_EXCHANGE_verify_coin_history (pc->amount_with_fee.currency,
-                                          &pc->coin_pub,
-                                          json,
-                                          &spent))
+      TALER_EXCHANGE_verify_coin_history
+        (pc->amount_with_fee.currency,
+         &pc->coin_pub,
+         json,
+         &spent))
   {
     /* Exchange's history fails to verify */
     GNUNET_break_op (0);
@@ -267,7 +276,8 @@ check_coin_history (const struct TALER_MERCHANT_PaidCoin *pc,
  * coin was actually already spent!
  *
  * @param ph handle of the original pay operation
- * @param json cryptographic proof returned by the exchange/merchant
+ * @param json cryptographic proof returned by the
+ *        exchange/merchant
  * @return #GNUNET_OK if proof checks out
  */
 static int
@@ -344,8 +354,9 @@ handle_pay_finished (void *cls,
     case MHD_HTTP_NOT_ACCEPTABLE:
       break;
     case MHD_HTTP_BAD_REQUEST:
-      /* This should never happen, either us or the merchant is buggy
-	 (or API version conflict); just pass JSON reply to the application */
+      /* This should never happen, either us
+       * or the merchant is buggy (or API version conflict);
+       * just pass JSON reply to the application */
       break;
     case MHD_HTTP_FORBIDDEN:
       if (GNUNET_OK != check_forbidden (ph,
@@ -356,21 +367,23 @@ handle_pay_finished (void *cls,
       }
       break;
     case MHD_HTTP_UNAUTHORIZED:
-      /* Nothing really to verify, merchant says one of the signatures is
-	 invalid; as we checked them, this should never happen, we
-	 should pass the JSON reply to the application */
+      /* Nothing really to verify, merchant says one of the
+       * signatures is invalid; as we checked them, this
+       * should never happen, we should pass the JSON reply
+       * to the application */
       break;
     case MHD_HTTP_NOT_FOUND:
       /* Nothing really to verify, this should never
-	 happen, we should pass the JSON reply to the application */
+	 happen, we should pass the JSON reply to the
+         application */
       break;
     case MHD_HTTP_INTERNAL_SERVER_ERROR:
-      /* Server had an internal issue; we should retry, but this API
-	 leaves this to the application */
+      /* Server had an internal issue; we should retry,
+         but this API leaves this to the application */
       break;
     case MHD_HTTP_SERVICE_UNAVAILABLE:
-      /* Exchange couldn't respond properly; the retry is left to the
-       * application */
+      /* Exchange couldn't respond properly; the retry is
+         left to the application */
       break;
     default:
       /* unexpected response code */
@@ -406,23 +419,26 @@ handle_pay_finished (void *cls,
       response_code = 0;
       break;
     case MHD_HTTP_BAD_REQUEST:
-      /* This should never happen, either us or the merchant is buggy
-	 (or API version conflict); just pass JSON reply to the application */
+      /* This should never happen, either us or the
+         merchant is buggy (or API version conflict); just
+         pass JSON reply to the application */
       break;
     case MHD_HTTP_FORBIDDEN:
       break;
     case MHD_HTTP_UNAUTHORIZED:
-      /* Nothing really to verify, merchant says one of the signatures is
-	 invalid; as we checked them, this should never happen, we
-	 should pass the JSON reply to the application */
+      /* Nothing really to verify, merchant says one of
+         the signatures is invalid; as we checked them,
+         this should never happen, we should pass the JSON
+         reply to the application */
       break;
     case MHD_HTTP_NOT_FOUND:
       /* Nothing really to verify, this should never
-	 happen, we should pass the JSON reply to the application */
+	 happen, we should pass the JSON reply to the
+         application */
       break;
     case MHD_HTTP_INTERNAL_SERVER_ERROR:
-      /* Server had an internal issue; we should retry, but this API
-	 leaves this to the application */
+      /* Server had an internal issue; we should retry,
+         but this API leaves this to the application */
       break;
     default:
       /* unexpected response code */
@@ -457,24 +473,26 @@ handle_pay_finished (void *cls,
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
  * @param mode mode string to use ("pay" or "abort-refund").
- * @param pay_cb the callback to call when a reply for this request is available
+ * @param pay_cb the callback to call when a reply for this
+ *        request is available
  * @param pay_cb_cls closure for @a pay_cb
  * @param abort_cb callback to call for the abort-refund variant
  * @param abort_cb_cls closure for @a abort_cb
  * @return a handle for this request
  */
 static struct TALER_MERCHANT_Pay *
-request_pay_generic (struct GNUNET_CURL_Context *ctx,
-		     const char *merchant_url,
-		     const struct TALER_MerchantPublicKeyP *merchant_pub,
-		     const char *order_id,
-		     unsigned int num_coins,
-		     const struct TALER_MERCHANT_PaidCoin *coins,
-		     const char *mode,
-		     TALER_MERCHANT_PayCallback pay_cb,
-		     void *pay_cb_cls,
-		     TALER_MERCHANT_PayRefundCallback abort_cb,
-		     void *abort_cb_cls)
+request_pay_generic
+  (struct GNUNET_CURL_Context *ctx,
+   const char *merchant_url,
+   const struct TALER_MerchantPublicKeyP *merchant_pub,
+   const char *order_id,
+   unsigned int num_coins,
+   const struct TALER_MERCHANT_PaidCoin *coins,
+   const char *mode,
+   TALER_MERCHANT_PayCallback pay_cb,
+   void *pay_cb_cls,
+   TALER_MERCHANT_PayRefundCallback abort_cb,
+   void *abort_cb_cls)
 {
   struct TALER_MERCHANT_Pay *ph;
   json_t *pay_obj;
@@ -530,16 +548,20 @@ request_pay_generic (struct GNUNET_CURL_Context *ctx,
     }
 
     /* create JSON for this coin */
-    j_coin = json_pack ("{s:o, s:o," /* contribution/coin_pub */
-			" s:s, s:o," /* exchange_url / denom_pub */
-			" s:o, s:o}", /* ub_sig / coin_sig */
-			"contribution", TALER_JSON_from_amount (&pc->amount_with_fee),
-			"coin_pub", GNUNET_JSON_from_data_auto (&pc->coin_pub),
-			"exchange_url", pc->exchange_url,
-			"denom_pub", GNUNET_JSON_from_rsa_public_key (pc->denom_pub.rsa_public_key),
-			"ub_sig", GNUNET_JSON_from_rsa_signature (pc->denom_sig.rsa_signature),
-			"coin_sig", GNUNET_JSON_from_data_auto (&pc->coin_sig)
-			);
+    j_coin = json_pack
+      ("{s:o, s:o," /* contribution/coin_pub */
+       " s:s, s:o," /* exchange_url / denom_pub */
+       " s:o, s:o}", /* ub_sig / coin_sig */
+       "contribution", TALER_JSON_from_amount
+         (&pc->amount_with_fee),
+       "coin_pub", GNUNET_JSON_from_data_auto
+         (&pc->coin_pub),
+       "exchange_url", pc->exchange_url,
+       "denom_pub", GNUNET_JSON_from_rsa_public_key
+         (pc->denom_pub.rsa_public_key),
+       "ub_sig", GNUNET_JSON_from_rsa_signature
+         (pc->denom_sig.rsa_signature),
+       "coin_sig", GNUNET_JSON_from_data_auto (&pc->coin_sig));
     if (0 !=
         json_array_append_new (j_coins,
                                j_coin))
@@ -559,7 +581,8 @@ request_pay_generic (struct GNUNET_CURL_Context *ctx,
 		       "mode", mode,
 		       "coins", j_coins,
                        "order_id", order_id,
-                       "merchant_pub", GNUNET_JSON_from_data_auto (merchant_pub));
+                       "merchant_pub", GNUNET_JSON_from_data_auto
+                         (merchant_pub));
   if (NULL == pay_obj)
   {
     GNUNET_break (0);

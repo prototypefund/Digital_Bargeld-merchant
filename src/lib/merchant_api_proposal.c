@@ -163,23 +163,25 @@ handle_proposal_finished (void *cls,
     }
     break;
   case MHD_HTTP_BAD_REQUEST:
-      /* This should never happen, either us or the merchant is buggy
-         (or API version conflict); just pass JSON reply to the application */
+      /* This should never happen, either us or
+         the merchant is buggy (or API version conflict);
+         just pass JSON reply to the application */
     break;
   case MHD_HTTP_FORBIDDEN:
     break;
   case MHD_HTTP_UNAUTHORIZED:
-    /* Nothing really to verify, merchant says one of the signatures is
-       invalid; as we checked them, this should never happen, we
-       should pass the JSON reply to the application */
+    /* Nothing really to verify, merchant says one
+       of the signatures is invalid; as we checked them,
+       this should never happen, we should pass the JSON
+       reply to the application */
     break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
-    /* Server had an internal issue; we should retry, but this API
-       leaves this to the application */
+    /* Server had an internal issue; we should retry,
+       but this API leaves this to the application */
     break;
   default:
     /* unexpected response code */
@@ -204,10 +206,10 @@ handle_proposal_finished (void *cls,
  *
  * @param ctx execution context
  * @param backend_url URL of the backend
- * @param order basic information about this purchase, to be extended by the
- * backend
- * @param proposal_cb the callback to call when a reply for this request is
- * available
+ * @param order basic information about this purchase,
+ *        to be extended by the backend
+ * @param proposal_cb the callback to call when a reply
+ *        for this request is available
  * @param proposal_cb_cls closure for @a proposal_cb
  * @return a handle for this request, NULL on error
  */
@@ -232,8 +234,8 @@ TALER_MERCHANT_order_put
                    "order", (json_t *) order);
   eh = curl_easy_init ();
   if (GNUNET_OK != TALER_curl_easy_post (&po->post_ctx,
-                                        eh,
-                                        req))
+                                         eh,
+                                         req))
   {
     GNUNET_break (0);
     GNUNET_free (po);
