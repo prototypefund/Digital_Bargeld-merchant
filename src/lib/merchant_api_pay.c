@@ -33,6 +33,7 @@
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
 #include <taler/taler_exchange_service.h>
+#include <taler/teah_common.h>
 
 
 /**
@@ -604,53 +605,61 @@ request_pay_generic
           num_coins * sizeof (struct TALER_MERCHANT_PaidCoin));
 
   eh = curl_easy_init ();
-  GNUNET_assert (NULL != (ph->json_enc =
-                          json_dumps (pay_obj,
-                                      JSON_COMPACT)));
+
+  if (GNUNET_OK != TALER_curl_easy_post (&ph->post_ctx,
+                                         eh,
+                                         pay_obj))
+  {
+    GNUNET_break (0);
+    GNUNET_free (ph);
+    return NULL;
+  }
+
   json_decref (pay_obj);
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_URL,
-                                   ph->url));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDS,
-                                   ph->json_enc));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDSIZE,
-                                   strlen (ph->json_enc)));
-  ph->job = GNUNET_CURL_job_add (ctx,
-                                 eh,
-                                 GNUNET_YES,
-                                 &handle_pay_finished,
-                                 ph);
+  GNUNET_assert (CURLE_OK == curl_easy_setopt (eh,
+                                               CURLOPT_URL,
+                                               ph->url));
+  ph->job = GNUNET_CURL_job_add2 (ctx,
+                                  eh,
+                                  ph->post_ctx.headers,
+                                  &handle_pay_finished,
+                                  ph);
   return ph;
 }
 
 
 /**
- * Pay a merchant.  API for wallets that have the coin's private keys.
- * _NOTE_: this function does NOT calculate each coin amount in order
- * to match the contract total price.  This calculation is to be made
- * by the logic using this library.
+ * Pay a merchant.  API for wallets that have the coin's private
+ * keys.
+ * _NOTE_: this function does NOT calculate each coin amount in
+ * order to match the contract total price.  This calculation is
+ * to be made by the logic using this library.
  *
  * @param ctx the execution loop context
  * @param merchant_url base URL of the merchant's backend
- * @param instance which merchant instance will receive this payment
+ * @param instance which merchant instance will receive this
+ *        payment
  * @param h_contract_terms hashcode of the proposal being paid
- * @param amount total value of the contract to be paid to the merchant
- * @param max_fee maximum fee covered by the merchant (according to the contract)
- * @param merchant_pub the public key of the merchant (used to identify the merchant for refund requests)
- * @param merchant_sig signature from the merchant over the original contract
- * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
- * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
+ * @param amount total value of the contract to be paid to the
+ *        merchant
+ * @param max_fee maximum fee covered by the merchant
+ *        (according to the contract)
+ * @param merchant_pub the public key of the merchant
+ *        (used to identify the merchant for refund requests)
+ * @param merchant_sig signature from the merchant over the
+ *        original contract
+ * @param timestamp timestamp when the contract was finalized,
+ *        must match approximately the current time of the merchant
+ * @param refund_deadline date until which the merchant can issue
+ *        a refund to the customer via the merchant (can be zero
+ *        if refunds are not allowed)
  * @param pay_deadline maximum time limit to pay for this contract
  * @param h_wire hash of the merchant’s account details
  * @param order_id order id of the proposal being paid
  * @param num_coins number of coins used to pay
  * @param coins array of coins we use to pay
- * @param pay_cb the callback to call when a reply for this request is available
+ * @param pay_cb the callback to call when a reply for this
+ *        request is available
  * @param pay_cb_cls closure for @a pay_cb
  * @return a handle for this request
  */
@@ -947,7 +956,7 @@ TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *pay)
   }
   GNUNET_free (pay->coins);
   GNUNET_free (pay->url);
-  GNUNET_free (pay->json_enc);
+  GNUNET_free (pay->post_ctx.json_enc);
   GNUNET_free (pay);
 }
 
