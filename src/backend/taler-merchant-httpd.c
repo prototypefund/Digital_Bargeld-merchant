@@ -296,10 +296,6 @@ url_handler (void *cls,
       "<html><title>404: not found</title></html>", 0,
       &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
     };
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Handling request (%s) for URL `%s'\n",
-              method,
-              url);
 
   struct TM_HandlerContext *hc;
   struct GNUNET_AsyncScopeId aid;
