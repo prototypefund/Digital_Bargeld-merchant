@@ -405,6 +405,10 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                      instance);
   }
   GNUNET_free (base);
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "looking up proposal from %s\n",
+              plo->url);
+
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,
@@ -413,10 +417,6 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
     GNUNET_break (0);
     return NULL;
   }
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "looking up proposal from %s\n",
-              plo->url);
 
   if (NULL == (plo->job = GNUNET_CURL_job_add (ctx,
                                                eh,

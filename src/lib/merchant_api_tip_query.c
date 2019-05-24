@@ -207,14 +207,17 @@ TALER_MERCHANT_tip_query (struct GNUNET_CURL_Context *ctx,
   tqo->url = TALER_url_join (backend_url, "/tip-query",
                              "instance", instance,
                              NULL);
+
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Requesting URL '%s'\n",
               tqo->url);
+
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
                                    tqo->url));
+
   tqo->job = GNUNET_CURL_job_add (ctx,
                                   eh,
                                   GNUNET_YES,

@@ -29,6 +29,7 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
+#include <taler/teah_common.h>
 
 
 /**
@@ -43,9 +44,9 @@ struct TALER_MERCHANT_TipPickupOperation
   char *url;
 
   /**
-   * JSON encoding of the request to POST.
+   * Minor context that holds body and headers.
    */
-  char *json_enc;
+  struct TEAH_PostContext post_ctx;
 
   /**
    * Handle for the request.
@@ -282,39 +283,34 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
   tpo->ctx = ctx;
   tpo->cb = pickup_cb;
   tpo->cb_cls = pickup_cb_cls;
-  tpo->url = TALER_url_join (backend_url, "/public/tip-pickup", NULL);
-  if (NULL == (tpo->json_enc =
-               json_dumps (tp_obj,
-                           JSON_COMPACT)))
+
+  tpo->url = TALER_url_join (backend_url,
+                             "/public/tip-pickup",
+                             NULL);
+  eh = curl_easy_init ();
+  if (GNUNET_OK != TALER_curl_easy_post (&tpo->post_ctx,
+                                         eh,
+                                         tp_obj))
   {
     GNUNET_break (0);
-    json_decref (tp_obj);
-    GNUNET_free (tpo->url);
     GNUNET_free (tpo);
     return NULL;
   }
+
   json_decref (tp_obj);
+
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Requesting URL '%s'\n",
               tpo->url);
-  eh = curl_easy_init ();
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_URL,
-                                   tpo->url));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDS,
-                                   tpo->json_enc));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDSIZE,
-                                   strlen (tpo->json_enc)));
-  tpo->job = GNUNET_CURL_job_add (ctx,
-                                  eh,
-                                  GNUNET_YES,
-                                  &handle_tip_pickup_finished,
-                                  tpo);
+
+  GNUNET_assert (CURLE_OK == curl_easy_setopt (eh,
+                                               CURLOPT_URL,
+                                               tpo->url));
+  tpo->job = GNUNET_CURL_job_add2 (ctx,
+                                   eh,
+                                   tpo->post_ctx.headers,
+                                   &handle_tip_pickup_finished,
+                                   tpo);
   return tpo;
 }
 
@@ -333,7 +329,7 @@ TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tpo)
     GNUNET_CURL_job_cancel (tpo->job);
     tpo->job = NULL;
   }
-  GNUNET_free_non_null (tpo->json_enc);
+  GNUNET_free_non_null (tpo->post_ctx.json_enc);
   GNUNET_free (tpo->url);
   GNUNET_free (tpo);
 }
