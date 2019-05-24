@@ -29,7 +29,7 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
-#include <taler/teah_common.h>
+#include <taler/taler_curl_lib.h>
 
 
 /**

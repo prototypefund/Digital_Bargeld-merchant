@@ -67,38 +67,6 @@ struct Buffer
 };
 
 
-/**
- * Initialize a buffer and copy first chunk of data in it.
- *
- * @param buf the buffer to initialize
- * @param data the initial data
- * @param data_size size of the initial data
- * @param alloc_size size of the buffer
- * @param max_size maximum size that the buffer can grow to
- * @return a GNUnet result code
- */
-static int
-buffer_init (struct Buffer *buf,
-             const void *data,
-             size_t data_size,
-             size_t alloc_size,
-             size_t max_size)
-{
-  if (data_size > max_size || alloc_size > max_size)
-    return GNUNET_SYSERR;
-  if (data_size > alloc_size)
-    alloc_size = data_size;
-  if (0 == alloc_size)
-  {
-    buf->data = NULL;
-    return GNUNET_OK;
-  }
-  buf->data = GNUNET_malloc (alloc_size);
-  GNUNET_memcpy (buf->data,
-                 data,
-                 data_size);
-  return GNUNET_OK;
-}
 
 
 /**
@@ -114,46 +82,6 @@ buffer_deinit (struct Buffer *buf)
   buf->data = NULL;
 }
 
-
-/**
- * Append data to a buffer, growing the buffer if necessary.
- *
- * @param buf the buffer to append to
- * @param data the data to append
- * @param data_size the size of @a data
- * @param max_size maximum size that the buffer can grow to
- * @return #GNUNET_OK on success,
- *         #GNUNET_NO if the buffer can't accomodate for the new data
- */
-static int
-buffer_append (struct Buffer *buf,
-               const void *data,
-               size_t data_size,
-               size_t max_size)
-{
-  if (buf->fill + data_size > max_size)
-    return GNUNET_NO;
-  if (data_size + buf->fill > buf->alloc)
-  {
-    char *new_buf;
-    size_t new_size = buf->alloc ? buf->alloc : 1;
-
-    while (new_size < buf->fill + data_size)
-      new_size *= 2;
-    if (new_size > max_size)
-      return GNUNET_NO;
-    new_buf = GNUNET_malloc (new_size);
-    memcpy (new_buf, buf->data, buf->fill);
-    GNUNET_free (buf->data);
-    buf->data = new_buf;
-    buf->alloc = new_size;
-  }
-  memcpy (buf->data + buf->fill,
-	  data,
-	  data_size);
-  buf->fill += data_size;
-  return GNUNET_OK;
-}
 
 
 /**
