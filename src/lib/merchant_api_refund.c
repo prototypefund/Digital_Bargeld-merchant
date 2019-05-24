@@ -30,6 +30,7 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
+#include <taler/teah_common.h>
 
 
 struct TALER_MERCHANT_RefundLookupOperation
@@ -69,9 +70,9 @@ struct TALER_MERCHANT_RefundIncreaseOperation
   char *url;
 
   /**
-   * The request body
+   * Minor context that holds body and headers.
    */
-  char *json_enc;
+  struct TEAH_PostContext post_ctx;
 
   /**
    * The CURL context to connect to the backend
@@ -92,7 +93,6 @@ struct TALER_MERCHANT_RefundIncreaseOperation
    * Handle for the request
    */
   struct GNUNET_CURL_Job *job;
-
 };
 
 
@@ -176,7 +176,7 @@ TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOpera
     rio->job = NULL;
   }
   GNUNET_free (rio->url);
-  GNUNET_free (rio->json_enc);
+  GNUNET_free (rio->post_ctx.json_enc);
   GNUNET_free (rio);
 }
 
@@ -217,32 +217,28 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                    "reason", reason,
                    "instance", instance);
   eh = curl_easy_init ();
-  rio->json_enc = json_dumps (req,
-                              JSON_COMPACT);
-  json_decref (req);
-  if (NULL == rio->json_enc)
+
+  if (GNUNET_OK != TALER_curl_easy_post (&rio->post_ctx,
+                                         eh,
+                                         req))
   {
     GNUNET_break (0);
     GNUNET_free (rio);
     return NULL;
   }
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_URL,
-                                   rio->url));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDS,
-                                   rio->json_enc));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDSIZE,
-                                   strlen (rio->json_enc)));
-  rio->job = GNUNET_CURL_job_add (ctx,
-                                  eh,
-                                  GNUNET_YES,
-                                  &handle_refund_increase_finished,
-                                  rio);
+
+  json_decref (req);
+
+  GNUNET_assert (CURLE_OK == curl_easy_setopt (eh,
+                                               CURLOPT_URL,
+                                               rio->url));
+  rio->job = GNUNET_CURL_job_add2
+    (ctx,
+     eh,
+     rio->post_ctx.headers,
+     &handle_refund_increase_finished,
+     rio);
+
   return rio;
 }
 

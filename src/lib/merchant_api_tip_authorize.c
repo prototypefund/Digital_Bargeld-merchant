@@ -29,6 +29,7 @@
 #include "taler_merchant_service.h"
 #include <taler/taler_json_lib.h>
 #include <taler/taler_signatures.h>
+#include <taler/teah_common.h>
 
 
 /**
@@ -41,11 +42,6 @@ struct TALER_MERCHANT_TipAuthorizeOperation
    * The url for this request.
    */
   char *url;
-
-  /**
-   * JSON encoding of the request to POST.
-   */
-  char *json_enc;
 
   /**
    * Handle for the request.
@@ -66,6 +62,11 @@ struct TALER_MERCHANT_TipAuthorizeOperation
    * Reference to the execution context.
    */
   struct GNUNET_CURL_Context *ctx;
+
+  /**
+   * Minor context that holds body and headers.
+   */
+  struct TEAH_PostContext post_ctx;
 };
 
 
@@ -223,38 +224,30 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
     GNUNET_free (tao);
     return NULL;
   }
-  if (NULL == (tao->json_enc =
-               json_dumps (te_obj,
-                           JSON_COMPACT)))
+
+  eh = curl_easy_init ();
+  if (GNUNET_OK != TALER_curl_easy_post (&tao->post_ctx,
+                                         eh,
+                                         te_obj))
   {
     GNUNET_break (0);
-    json_decref (te_obj);
-    GNUNET_free (tao->url);
     GNUNET_free (tao);
     return NULL;
   }
+
   json_decref (te_obj);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Requesting URL '%s'\n",
               tao->url);
-  eh = curl_easy_init ();
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_URL,
-                                   tao->url));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDS,
-                                   tao->json_enc));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_POSTFIELDSIZE,
-                                   strlen (tao->json_enc)));
-  tao->job = GNUNET_CURL_job_add (ctx,
-                                  eh,
-                                  GNUNET_YES,
-                                  &handle_tip_authorize_finished,
-                                  tao);
+  GNUNET_assert (CURLE_OK == curl_easy_setopt (eh,
+                                               CURLOPT_URL,
+                                               tao->url));
+
+  tao->job = GNUNET_CURL_job_add2 (ctx,
+                                   eh,
+                                   tao->post_ctx.headers,
+                                   &handle_tip_authorize_finished,
+                                   tao);
   return tao;
 }
 
@@ -273,7 +266,7 @@ TALER_MERCHANT_tip_authorize_cancel (struct TALER_MERCHANT_TipAuthorizeOperation
     GNUNET_CURL_job_cancel (tao->job);
     tao->job = NULL;
   }
-  GNUNET_free_non_null (tao->json_enc);
+  GNUNET_free_non_null (tao->post_ctx.json_enc);
   GNUNET_free (tao->url);
   GNUNET_free (tao);
 }
