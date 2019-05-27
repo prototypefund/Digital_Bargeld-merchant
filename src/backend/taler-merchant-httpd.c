@@ -1352,7 +1352,10 @@ run (void *cls,
 
 
   {
-    const char *choices[] = {"tcp", "unix"};
+    const char *choices[] = {"tcp",
+                             "unix",
+                             NULL};
+
     const char *serve_type;
 
     if (GNUNET_OK !=
