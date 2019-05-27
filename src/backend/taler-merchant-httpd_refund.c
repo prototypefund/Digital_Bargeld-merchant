@@ -238,9 +238,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                                               &mi->pubkey,
                                               &refund,
                                               reason);
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "increase refund returned %d\n",
                 qs);
+
     if (GNUNET_DB_STATUS_HARD_ERROR == qs)
     {
       GNUNET_break (0);

@@ -371,7 +371,6 @@ postgres_initialize (void *cls)
                             "COMMIT",
                             0),
 
-    /*NOTE: minimal version, to be expanded on a needed basis*/
     GNUNET_PQ_make_prepare ("find_refunds",
                             "SELECT"
                             " refund_amount_val"
@@ -2634,7 +2633,9 @@ process_deposits_for_refund_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Total existing refund is %s\n",
               TALER_amount2s (&current_refund));
-  /* stop immediately if we are done */
+
+  /* stop immediately if we are 'done' === amount already
+   * refunded.  */
   if (0 >= TALER_amount_cmp (ctx->refund,
                              &current_refund))
   {
@@ -2670,7 +2671,7 @@ process_deposits_for_refund_cb (void *cls,
       continue;
     }
 
-    /* How much of the refund is left? */
+    /* How much of the refund is still to be paid back? */
     if (GNUNET_SYSERR ==
         TALER_amount_subtract (&remaining_refund,
                                ctx->refund,
@@ -2729,6 +2730,7 @@ process_deposits_for_refund_cb (void *cls,
         return;
       }
     }
+
     /* stop immediately if we are done */
     if (0 == TALER_amount_cmp (ctx->refund,
                                &current_refund))
@@ -2736,7 +2738,7 @@ process_deposits_for_refund_cb (void *cls,
   }
 
   /**
-   * We end up here if nto all of the refund has been covered.
+   * We end up here if not all of the refund has been covered.
    * Although this should be checked as the business should never
    * issue a refund bigger than the contract's actual price, we cannot
    * rely upon the frontend being correct.
@@ -2744,6 +2746,7 @@ process_deposits_for_refund_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
               "The refund of %s is bigger than the order's value\n",
               TALER_amount2s (ctx->refund));
+
   ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
 }
 
