@@ -634,6 +634,12 @@ check_payment_sufficient (struct PayContext *pc)
   acc_fee = pc->dc[0].deposit_fee;
   total_wire_fee = pc->dc[0].wire_fee;
   acc_amount = pc->dc[0].amount_with_fee;
+
+
+  /**
+   * This loops calculates what are the deposit fee / total
+   * amount with fee / and wire fee, for all the coins.
+   */
   for (unsigned int i=1;i<pc->coins_cnt;i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
@@ -686,8 +692,8 @@ check_payment_sufficient (struct PayContext *pc)
     }
   }
 
-  /* Now compare exchange wire fee compared to what we are willing to
-     pay */
+  /* Now compare exchange wire fee compared to
+   * what we are willing to pay */
   if (GNUNET_YES !=
       TALER_amount_cmp_currency (&total_wire_fee,
                                  &pc->max_wire_fee))
@@ -696,23 +702,24 @@ check_payment_sufficient (struct PayContext *pc)
     return TALER_EC_PAY_WIRE_FEE_CURRENCY_MISSMATCH;
   }
 
-  if (GNUNET_OK ==
-      TALER_amount_subtract (&wire_fee_delta,
-                             &total_wire_fee,
-                             &pc->max_wire_fee))
+  if (GNUNET_OK == TALER_amount_subtract (&wire_fee_delta,
+                                          &total_wire_fee,
+                                          &pc->max_wire_fee))
   {
-    /* Actual wire fee is indeed higher than our maximum, compute
-       how much the customer is expected to cover! */
+    /* Actual wire fee is indeed higher than our maximum,
+       compute how much the customer is expected to cover!  */
     TALER_amount_divide (&wire_fee_customer_contribution,
                          &wire_fee_delta,
                          pc->wire_fee_amortization);
   }
   else
   {
-    GNUNET_assert (GNUNET_OK ==
-                   TALER_amount_get_zero (total_wire_fee.currency,
-                                          &wire_fee_customer_contribution));
-
+    /* Wire fee threshold is still above the wire fee amount.
+       Customer is not going to contribute on this.  */
+    GNUNET_assert
+      (GNUNET_OK == TALER_amount_get_zero
+        (total_wire_fee.currency,
+         &wire_fee_customer_contribution));
   }
 
   /* Do not count any refunds towards the payment */
@@ -723,7 +730,9 @@ check_payment_sufficient (struct PayContext *pc)
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Subtracting total refunds from paid amount: %s\n",
               TALER_amount_to_string (&pc->total_refunded));
-  /* Now check that the customer paid enough for the full contract */
+
+  /* Now check that the customer paid
+     enough for the full contract */
   if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
   {
@@ -764,36 +773,46 @@ check_payment_sufficient (struct PayContext *pc)
     struct TALER_Amount deposit_fee_savings;
 
     /* Compute how much the customer saved by not going to the
-       limit on the deposit fees, as this amount is counted against
-       what we expect him to cover for the wire fees */
-    GNUNET_assert (GNUNET_SYSERR !=
-                   TALER_amount_subtract (&deposit_fee_savings,
-                                          &pc->max_fee,
-                                          &acc_fee));
-    /* See how much of wire fee contribution is covered by fee_savings */
+       limit on the deposit fees, as this amount is counted
+       against what we expect him to cover for the wire fees */
+    GNUNET_assert
+      (GNUNET_SYSERR != TALER_amount_subtract
+        (&deposit_fee_savings,
+         &pc->max_fee,
+         &acc_fee));
+
+    /* See how much of wire fee
+       contribution is covered by
+       fee_savings */
     if (-1 == TALER_amount_cmp (&deposit_fee_savings,
                                 &wire_fee_customer_contribution))
     {
       /* wire_fee_customer_contribution > deposit_fee_savings */
-      GNUNET_assert (GNUNET_SYSERR !=
-                     TALER_amount_subtract (&wire_fee_customer_contribution,
-                                            &wire_fee_customer_contribution,
-                                            &deposit_fee_savings));
+      GNUNET_assert
+        (GNUNET_SYSERR != TALER_amount_subtract
+          (&wire_fee_customer_contribution,
+           &wire_fee_customer_contribution,
+           &deposit_fee_savings));
+
       /* subtract remaining wire fees from total contribution */
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "Subtract remaining wire fees from total contribution: %s",
-                  TALER_amount_to_string (&wire_fee_customer_contribution));
-      if (GNUNET_SYSERR ==
-          TALER_amount_subtract (&acc_amount,
-                                 &acc_amount,
-                                 &wire_fee_customer_contribution))
+                  "Subtract remaining wire fees"
+                  " from total contribution: %s",
+                  TALER_amount_to_string
+                    (&wire_fee_customer_contribution));
+
+      if (GNUNET_SYSERR == TALER_amount_subtract
+        (&acc_amount,
+         &acc_amount,
+         &wire_fee_customer_contribution))
       {
         GNUNET_break_op (0);
         return TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES;
       }
     }
 
-    /* fees are acceptable, merchant covers them all; let's check the amount */
+    /* fees are acceptable, merchant covers them all;
+       let's check the amount */
     if (-1 == TALER_amount_cmp (&acc_amount,
                                 &pc->amount))
     {
@@ -802,9 +821,11 @@ check_payment_sufficient (struct PayContext *pc)
                   "price vs. sent: %s vs. %s\n",
                   TALER_amount_to_string (&pc->amount),
                   TALER_amount_to_string (&acc_amount));
+
       return TALER_EC_PAY_PAYMENT_INSUFFICIENT;
     }
   }
+
   return TALER_EC_NONE;
 }
 
@@ -1286,7 +1307,6 @@ check_coin_paid (void *cls,
 /**
  * Try to parse the pay request into the given pay context.
  * Schedules an error response in the connection on failure.
- *
  *
  * @param connection HTTP connection we are receiving payment on
  * @param root JSON upload with payment data
