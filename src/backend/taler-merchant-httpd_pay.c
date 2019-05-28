@@ -1046,8 +1046,10 @@ deposit_cb (void *cls,
  *
  * @param cls the `struct PayContext`
  * @param mh NULL if exchange was not found to be acceptable
- * @param wire_fee current applicable fee for dealing with @a mh, NULL if not available
- * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
+ * @param wire_fee current applicable fee for dealing with @a mh,
+ *        NULL if not available
+ * @param exchange_trusted #GNUNET_YES if this exchange is
+ *        trusted by config
  */
 static void
 process_pay_with_exchange (void *cls,
@@ -1084,7 +1086,8 @@ process_pay_with_exchange (void *cls,
   }
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Found transaction data for proposal `%s' of merchant `%s', initiating deposits\n",
+              "Found transaction data for proposal `%s'"
+              " of merchant `%s', initiating deposits\n",
               GNUNET_h2s (&pc->h_contract_terms),
               TALER_B2S (&pc->mi->pubkey));
 
@@ -1101,18 +1104,23 @@ process_pay_with_exchange (void *cls,
     if (0 != strcmp (dc->exchange_url,
 		     pc->current_exchange))
       continue;
-    denom_details = TALER_EXCHANGE_get_denomination_key (keys,
-                                                         &dc->denom);
+    denom_details = TALER_EXCHANGE_get_denomination_key
+      (keys,
+       &dc->denom);
+
     if (NULL == denom_details)
     {
       GNUNET_break_op (0);
-      resume_pay_with_response (pc,
-                                MHD_HTTP_BAD_REQUEST,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:o, s:o}",
-                                                             "error", "denomination not found",
-                                                             "code", TALER_EC_PAY_DENOMINATION_KEY_NOT_FOUND,
-                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key),
-                                                             "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
+      resume_pay_with_response
+        (pc,
+         MHD_HTTP_BAD_REQUEST,
+         TMH_RESPONSE_make_json_pack
+           ("{s:s, s:I, s:o, s:o}",
+            "error", "denomination not found",
+            "code", TALER_EC_PAY_DENOMINATION_KEY_NOT_FOUND,
+            "denom_pub", GNUNET_JSON_from_rsa_public_key
+              (dc->denom.rsa_public_key),
+            "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
       return;
     }
     if (GNUNET_OK !=
@@ -1121,25 +1129,34 @@ process_pay_with_exchange (void *cls,
                                exchange_trusted))
     {
       GNUNET_break_op (0);
-      resume_pay_with_response (pc,
-                                MHD_HTTP_BAD_REQUEST,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:o}",
-                                                             "error", "invalid denomination",
-                                                             "code", (json_int_t) TALER_EC_PAY_DENOMINATION_KEY_AUDITOR_FAILURE,
-                                                             "denom_pub", GNUNET_JSON_from_rsa_public_key (dc->denom.rsa_public_key)));
+      resume_pay_with_response
+        (pc,
+         MHD_HTTP_BAD_REQUEST,
+         TMH_RESPONSE_make_json_pack
+           ("{s:s, s:I, s:o}",
+            "error", "invalid denomination",
+            "code", (json_int_t)
+              TALER_EC_PAY_DENOMINATION_KEY_AUDITOR_FAILURE,
+            "denom_pub", GNUNET_JSON_from_rsa_public_key
+              (dc->denom.rsa_public_key)));
       return;
     }
+
     dc->deposit_fee = denom_details->fee_deposit;
     dc->refund_fee = denom_details->fee_refund;
     dc->wire_fee = *wire_fee;
 
     GNUNET_assert (NULL != pc->wm);
     GNUNET_assert (NULL != pc->wm->j_wire);
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Timing for this payment, wire_deadline: %llu, refund_deadline: %llu\n",
-                (unsigned long long) pc->wire_transfer_deadline.abs_value_us,
-                (unsigned long long) pc->refund_deadline.abs_value_us);
+    GNUNET_log
+      (GNUNET_ERROR_TYPE_DEBUG,
+       "Timing for this payment, wire_deadline:"
+       " %llu, refund_deadline: %llu\n",
+       (unsigned long long)
+         pc->wire_transfer_deadline.abs_value_us,
+       (unsigned long long) pc->refund_deadline.abs_value_us);
     db->preflight (db->cls);
+
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
@@ -1156,18 +1173,21 @@ process_pay_with_exchange (void *cls,
                                      dc);
     if (NULL == dc->dh)
     {
-      /* Signature was invalid.  If the exchange was unavailable,
-       * we'd get that information in the callback. */
+      /* Signature was invalid.  If the exchange was
+         unavailable, we'd get that information in the callback. */
       GNUNET_break_op (0);
-      resume_pay_with_response (pc,
-                                MHD_HTTP_UNAUTHORIZED,
-                                TMH_RESPONSE_make_json_pack ("{s:s, s:I, s:i}",
-                                                             "hint", "Coin signature invalid.",
-                                                             "code", (json_int_t) TALER_EC_PAY_COIN_SIGNATURE_INVALID,
-
-                                                             "coin_idx", i));
+      resume_pay_with_response
+        (pc,
+         MHD_HTTP_UNAUTHORIZED,
+         TMH_RESPONSE_make_json_pack
+           ("{s:s, s:I, s:i}",
+            "hint", "Coin signature invalid.",
+            "code", (json_int_t)
+              TALER_EC_PAY_COIN_SIGNATURE_INVALID,
+            "coin_idx", i));
       return;
     }
+
     pc->pending_at_ce++;
   }
 }
@@ -1974,10 +1994,12 @@ begin_transaction (struct PayContext *pc)
           begin_transaction (pc);
           return;
         }
-        resume_pay_with_error (pc,
-                               MHD_HTTP_INTERNAL_SERVER_ERROR,
-                               TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
-                               "Merchant database error: could not mark proposal as 'paid'");
+        resume_pay_with_error
+          (pc,
+           MHD_HTTP_INTERNAL_SERVER_ERROR,
+           TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
+           "Merchant database error: could not "
+           "mark proposal as 'paid'");
         return;
       }
       resume_pay_with_response (pc,
@@ -2020,15 +2042,21 @@ handler_pay_json (struct MHD_Connection *connection,
   ret = parse_pay (connection,
                    root,
                    pc);
+
   if (GNUNET_OK != ret)
     return (GNUNET_NO == ret) ? MHD_YES : MHD_NO;
+
   MHD_suspend_connection (connection);
   pc->suspended = GNUNET_YES;
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Suspending /pay handling while working with the exchange\n");
-  pc->timeout_task = GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT,
-                                                   &handle_pay_timeout,
-                                                   pc);
+  GNUNET_log
+    (GNUNET_ERROR_TYPE_DEBUG,
+     "Suspending /pay handling while working with the exchange\n");
+
+  pc->timeout_task = GNUNET_SCHEDULER_add_delayed
+    (PAY_TIMEOUT,
+     &handle_pay_timeout,
+     pc);
+
   begin_transaction (pc);
   return MHD_YES;
 }
@@ -2077,7 +2105,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   }
   if (0 != pc->response_code)
   {
-    /* We are *done* processing the request, just queue the response (!) */
+    /* We are *done* processing the request,
+       just queue the response (!) */
     if (UINT_MAX == pc->response_code)
     {
       GNUNET_break (0);
