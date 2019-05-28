@@ -2,17 +2,21 @@
   This file is part of TALER
   (C) 2014-2017 GNUnet e.V. and INRIA
 
-  TALER is free software; you can redistribute it and/or modify it under the
-  terms of the GNU Affero General Public License as published by the Free Software
-  Foundation; either version 3, or (at your option) any later version.
+  TALER is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Affero General Public License as
+  published by the Free Software Foundation; either version 3,
+  or (at your option) any later version.
 
-  TALER is distributed in the hope that it will be useful, but WITHOUT ANY
-  WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
-  A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+  TALER is distributed in the hope that it will be useful, but
+  WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-  You should have received a copy of the GNU General Public License along with
-  TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
+  You should have received a copy of the GNU General Public
+  License along with TALER; see the file COPYING.  If not,
+  see <http://www.gnu.org/licenses/>
 */
+
 /**
  * @file backend/taler-merchant-httpd_pay.c
  * @brief handling of /pay requests
@@ -221,8 +225,8 @@ struct PayContext
   struct GNUNET_HashCode h_contract_terms;
 
   /**
-   * "H_wire" from @e contract_terms.  Used to identify the instance's
-   * wire transfer method.
+   * "H_wire" from @e contract_terms.  Used to identify
+   * the instance's wire transfer method.
    */
   struct GNUNET_HashCode h_wire;
 
@@ -230,7 +234,8 @@ struct PayContext
    * Maximum fee the merchant is willing to pay, from @e root.
    * Note that IF the total fee of the exchange is higher, that is
    * acceptable to the merchant if the customer is willing to
-   * pay the difference (i.e. amount - max_fee <= actual-amount - actual-fee).
+   * pay the difference
+   * (i.e. amount - max_fee <= actual-amount - actual-fee).
    */
   struct TALER_Amount max_fee;
 
@@ -635,7 +640,6 @@ check_payment_sufficient (struct PayContext *pc)
   total_wire_fee = pc->dc[0].wire_fee;
   acc_amount = pc->dc[0].amount_with_fee;
 
-
   /**
    * This loops calculates what are the deposit fee / total
    * amount with fee / and wire fee, for all the coins.
@@ -723,42 +727,46 @@ check_payment_sufficient (struct PayContext *pc)
   }
 
   /* Do not count any refunds towards the payment */
-  GNUNET_assert (GNUNET_SYSERR !=
-                 TALER_amount_subtract (&acc_amount,
-                                        &acc_amount,
-                                        &pc->total_refunded));
+  GNUNET_assert
+    (GNUNET_SYSERR != TALER_amount_subtract (&acc_amount,
+                                             &acc_amount,
+                                             &pc->total_refunded));
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Subtracting total refunds from paid amount: %s\n",
               TALER_amount_to_string (&pc->total_refunded));
 
-  /* Now check that the customer paid
-     enough for the full contract */
+
+  /**
+   * Deposit fees of *all* the coins are higher than
+   * the fixed limit that the merchant is willing to
+   * pay.  The fees difference must be paid by the customer.
+   */
   if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
   {
-    /* acc_fee > max_fee, customer needs to cover difference */
     struct TALER_Amount excess_fee;
     struct TALER_Amount total_needed;
 
     /* compute fee amount to be covered by customer */
-    GNUNET_assert (GNUNET_OK ==
-                   TALER_amount_subtract (&excess_fee,
-                                          &acc_fee,
-                                          &pc->max_fee));
+    GNUNET_assert
+      (GNUNET_OK == TALER_amount_subtract (&excess_fee,
+                                           &acc_fee,
+                                           &pc->max_fee));
     /* add that to the total */
-    if (GNUNET_OK !=
-        TALER_amount_add (&total_needed,
-                          &excess_fee,
-                          &pc->amount))
+    if (GNUNET_OK != TALER_amount_add (&total_needed,
+                                       &excess_fee,
+                                       &pc->amount))
     {
       GNUNET_break (0);
       return TALER_EC_PAY_AMOUNT_OVERFLOW;
     }
+
     /* add wire fee contribution to the total */
-    if (GNUNET_OK ==
-        TALER_amount_add (&total_needed,
-                          &total_needed,
-                          &wire_fee_customer_contribution))
+    GNUNET_assert
+      (GNUNET_OK == TALER_amount_add
+        (&total_needed,
+         &total_needed,
+         &wire_fee_customer_contribution))
 
     /* check if total payment sufficies */
     if (-1 == TALER_amount_cmp (&acc_amount,
@@ -768,13 +776,20 @@ check_payment_sufficient (struct PayContext *pc)
       return TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES;
     }
   }
+
+  /**
+   * The deposit fees of all the coins are below the
+   * limit that the merchant is willing to pay, for some X
+   * delta.  Since a fraction of the wire fee must be paid
+   * by the customer, this block will take from X such a
+   * fraction, and check that the remaining paid amount is
+   * enough to pay both the remaining wire fee customer's
+   * fraction AND the price of the contract itself.
+   */
   else
   {
     struct TALER_Amount deposit_fee_savings;
 
-    /* Compute how much the customer saved by not going to the
-       limit on the deposit fees, as this amount is counted
-       against what we expect him to cover for the wire fees */
     GNUNET_assert
       (GNUNET_SYSERR != TALER_amount_subtract
         (&deposit_fee_savings,
@@ -797,7 +812,7 @@ check_payment_sufficient (struct PayContext *pc)
       /* subtract remaining wire fees from total contribution */
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                   "Subtract remaining wire fees"
-                  " from total contribution: %s",
+                  " from total contribution: %s\n",
                   TALER_amount_to_string
                     (&wire_fee_customer_contribution));
 
