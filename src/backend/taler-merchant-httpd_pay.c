@@ -734,8 +734,6 @@ check_payment_sufficient (struct PayContext *pc)
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Subtracting total refunds from paid amount: %s\n",
               TALER_amount_to_string (&pc->total_refunded));
-
-
   /**
    * Deposit fees of *all* the coins are higher than
    * the fixed limit that the merchant is willing to
@@ -766,7 +764,7 @@ check_payment_sufficient (struct PayContext *pc)
       (GNUNET_OK == TALER_amount_add
         (&total_needed,
          &total_needed,
-         &wire_fee_customer_contribution))
+         &wire_fee_customer_contribution));
 
     /* check if total payment sufficies */
     if (-1 == TALER_amount_cmp (&acc_amount,
