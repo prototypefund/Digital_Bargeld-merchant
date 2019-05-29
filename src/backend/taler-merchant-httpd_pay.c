@@ -1982,39 +1982,43 @@ begin_transaction (struct PayContext *pc)
     enum TALER_ErrorCode ec;
 
     ec = check_payment_sufficient (pc);
-    if (TALER_EC_NONE == ec)
+    if (TALER_EC_NONE != ec)
     {
-      /* Payment succeeded, commit! */
-      qs = db->mark_proposal_paid (db->cls,
-                                   &pc->h_contract_terms,
-                                   &pc->mi->pubkey,
-                                   pc->session_id);
-      if (0 <= qs)
-        qs = db->commit (db->cls);
-      else
-        db->rollback (db->cls);
-      if (0 > qs)
-      {
-        if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
-        {
-          begin_transaction (pc);
-          return;
-        }
-        resume_pay_with_error
-          (pc,
-           MHD_HTTP_INTERNAL_SERVER_ERROR,
-           TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
-           "Merchant database error: could not "
-           "mark proposal as 'paid'");
-        return;
-      }
-      resume_pay_with_response (pc,
-                                MHD_HTTP_OK,
-                                sign_success_response (pc));
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "Payment is not sufficient (ec=%u).\n",
+                  (unsigned int) ec);
+      db->rollback (db->cls);
+      generate_error_response (pc,
+                               ec);
       return;
     }
-    generate_error_response (pc,
-                             ec);
+    /* Payment succeeded, commit! */
+    qs = db->mark_proposal_paid (db->cls,
+                                 &pc->h_contract_terms,
+                                 &pc->mi->pubkey,
+                                 pc->session_id);
+    if (0 <= qs)
+      qs = db->commit (db->cls);
+    else
+      db->rollback (db->cls);
+    if (0 > qs)
+    {
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+      {
+        begin_transaction (pc);
+        return;
+      }
+      resume_pay_with_error
+        (pc,
+         MHD_HTTP_INTERNAL_SERVER_ERROR,
+         TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
+         "Merchant database error: could not "
+         "mark proposal as 'paid'");
+      return;
+    }
+    resume_pay_with_response (pc,
+                              MHD_HTTP_OK,
+                              sign_success_response (pc));
     return;
   }
 
