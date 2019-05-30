@@ -684,10 +684,6 @@ check_payment_sufficient (struct PayContext *pc)
         }
       if (GNUNET_YES == new_exchange)
       {
-        GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                    "Depositing coins at: %s\n",
-                    dc->exchange_url);
-
         if (GNUNET_OK !=
             TALER_amount_add (&total_wire_fee,
                               &total_wire_fee,
@@ -710,6 +706,10 @@ check_payment_sufficient (struct PayContext *pc)
               "Total wire fee: %s\nMax wire fee: %s\n",
               TALER_amount_to_string (&total_wire_fee),
               TALER_amount_to_string (&pc->max_wire_fee));
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Deposit fee limit for merchant: %s\n",
+              TALER_amount_to_string (&pc->max_fee));
 
   /* Now compare exchange wire fee compared to
    * what we are willing to pay */
