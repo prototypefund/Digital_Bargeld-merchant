@@ -699,6 +699,13 @@ check_payment_sufficient (struct PayContext *pc)
       }
     }
   }
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Amount got by wallet: %s"
+              "\nDeposit fee for all coins: %s\n",
+              TALER_amount_to_string (&acc_amount),
+              TALER_amount_to_string (&acc_fee));
+
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Total wire fee: %s\nMax wire fee: %s\n",
               TALER_amount_to_string (&total_wire_fee),
