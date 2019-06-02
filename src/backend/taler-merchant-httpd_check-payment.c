@@ -141,7 +141,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   if (NULL == contract_url)
   {
     final_contract_url = TALER_url_absolute_mhd (connection,
-						 "/public/proposal",
+                                                 "/public/proposal",
                                                  "instance", instance_str,
                                                  "order_id", order_id,
                                                  NULL);
@@ -331,7 +331,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
 do_pay:
   {
-    char *url = TALER_url_absolute_mhd (connection, "public/trigger-pay",
+    char *url = TALER_url_absolute_mhd (connection,
+                                        "public/trigger-pay",
                                         "contract_url", final_contract_url,
                                         "session_id", session_id,
                                         "resource_url", resource_url,

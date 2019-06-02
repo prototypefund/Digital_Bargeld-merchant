@@ -67,7 +67,7 @@ struct TrackTransactionState
    * behaviour if _multiple_ wire transfers were
    * issued to pay this contract back.
    */
-  const char *wtid_str; 
+  const char *wtid_str;
 
   /**
    * Binary form of @a wtid_str, expected by other commands
@@ -101,7 +101,7 @@ struct TrackTransferState
    */
   struct TALER_TESTING_Interpreter *is;
 
-  /** 
+  /**
    * Base URL of the merchant serving the request.
    */
   const char *merchant_url;
@@ -110,7 +110,6 @@ struct TrackTransferState
    * Expected HTTP response code.
    */
   unsigned int http_status;
-
 
   /**
    * Reference for a "check bank" CMD.  It offers the
@@ -161,22 +160,22 @@ track_transaction_cb (void *cls,
     /* Only storing first element's wtid, as this works around
      * the disability of the real bank to provide a "bank check"
      * CMD as the fakebank does.  */
-  
+
     if (NULL == (wtid_str = json_object_get
       (json_array_get (json, 0), "wtid")))
     {
       TALER_TESTING_interpreter_fail (tts->is);
-      return; 
+      return;
     }
-  
+
     if (NULL == (exchange_url = json_object_get
       (json_array_get (json, 0), "exchange")))
     {
-    
+
       TALER_TESTING_interpreter_fail (tts->is);
       return;
     }
-  
+
     tts->exchange_url = GNUNET_strdup
       (json_string_value (exchange_url));
     tts->wtid_str = GNUNET_strdup
@@ -245,20 +244,35 @@ track_transfer_cb
       struct TALER_Amount amount_iter;
       struct TALER_Amount deposit_fee_iter;
       struct TALER_Amount sum;
-
       size_t index;
       json_t *value;
 
       amount_str = json_string_value
         (json_object_get (json,
                           "total"));
-      TALER_string_to_amount (amount_str,
-                              &total);
+      if (GNUNET_OK !=
+          TALER_string_to_amount (amount_str,
+                                  &total))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse amount `%s'\n",
+                    amount_str);
+        TALER_TESTING_FAIL (tts->is);
+        return;
+      }
       amount_str = json_string_value
         (json_object_get (json,
                           "wire_fee"));
-      TALER_string_to_amount (amount_str,
-                              &wire_fee);
+      if (GNUNET_OK !=
+          TALER_string_to_amount (amount_str,
+                                  &wire_fee))
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "Failed to parse amount `%s'\n",
+                    amount_str);
+        TALER_TESTING_FAIL (tts->is);
+        return;
+      }
       TALER_amount_get_zero (total.currency,
                              &sum);
       deposits = json_object_get (json,
@@ -268,24 +282,43 @@ track_transfer_cb
         amount_str = json_string_value
           (json_object_get (value,
                             "deposit_value"));
-        TALER_string_to_amount (amount_str,
-                                &amount_iter);
+        if (GNUNET_OK !=
+            TALER_string_to_amount (amount_str,
+                                    &amount_iter))
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Failed to parse amount `%s'\n",
+                      amount_str);
+          TALER_TESTING_FAIL (tts->is);
+          return;
+        }
         amount_str = json_string_value
           (json_object_get (value,
                             "deposit_fee"));
-        TALER_string_to_amount (amount_str,
-                                &deposit_fee_iter);
-        TALER_amount_add (&sum,
-                          &sum,
-                          &amount_iter);
-        TALER_amount_subtract (&sum,
-                               &sum,
-                               &deposit_fee_iter);
+        if (GNUNET_OK !=
+            TALER_string_to_amount (amount_str,
+                                    &deposit_fee_iter))
+        {
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Failed to parse amount `%s'\n",
+                      amount_str);
+          TALER_TESTING_FAIL (tts->is);
+          return;
+        }
+        GNUNET_assert (GNUNET_SYSERR !=
+                       TALER_amount_add (&sum,
+                                         &sum,
+                                         &amount_iter));
+        GNUNET_assert (GNUNET_SYSERR !=
+                       TALER_amount_subtract (&sum,
+                                              &sum,
+                                              &deposit_fee_iter));
       }
 
-      TALER_amount_subtract (&sum,
-                             &sum,
-                             &wire_fee);
+      GNUNET_assert (GNUNET_SYSERR !=
+                     TALER_amount_subtract (&sum,
+                                            &sum,
+                                            &wire_fee));
       if (0 != TALER_amount_cmp (&sum,
                                  &total))
       {
@@ -366,7 +399,6 @@ track_transaction_run (void *cls,
   const struct TALER_TESTING_Command *pay_cmd;
 
   tts->is = is;
-
   if ( NULL ==
      ( pay_cmd = TALER_TESTING_interpreter_lookup_command
       (is, tts->pay_reference)))
