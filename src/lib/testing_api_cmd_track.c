@@ -273,8 +273,9 @@ track_transfer_cb
         TALER_TESTING_FAIL (tts->is);
         return;
       }
-      TALER_amount_get_zero (total.currency,
-                             &sum);
+      GNUNET_assert (GNUNET_OK ==
+                     TALER_amount_get_zero (total.currency,
+                                            &sum));
       deposits = json_object_get (json,
                                   "deposits_sums");
       json_array_foreach (deposits, index, value)
