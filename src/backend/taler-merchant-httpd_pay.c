@@ -1918,6 +1918,15 @@ begin_transaction (struct PayContext *pc)
       json_t *refunds;
 
       refunds = json_array ();
+      if (NULL == refunds)
+      {
+        GNUNET_break (0);
+        resume_pay_with_error (pc,
+                               MHD_HTTP_INTERNAL_SERVER_ERROR,
+                               TALER_EC_JSON_ALLOCATION_FAILURE,
+                               "could not create JSON array");
+        return;
+      }
       for (unsigned int i=0;i<pc->coins_cnt;i++)
       {
         struct TALER_RefundRequestPS rr;
@@ -1956,13 +1965,23 @@ begin_transaction (struct PayContext *pc)
         }
 
         /* Pack refund for i-th coin.  */
-        json_array_append_new (refunds,
-                               json_pack ("{s:I, s:o, s:o s:o s:o}",
-                                          "rtransaction_id", (json_int_t) rtransactionid,
-                                          "coin_pub", GNUNET_JSON_from_data_auto (&rr.coin_pub),
-                                          "merchant_sig", GNUNET_JSON_from_data_auto (&msig),
-                                          "refund_amount", TALER_JSON_from_amount_nbo (&rr.refund_amount),
-                                          "refund_fee", TALER_JSON_from_amount_nbo (&rr.refund_fee)));
+        if (0 !=
+            json_array_append_new (refunds,
+                                   json_pack ("{s:I, s:o, s:o s:o s:o}",
+                                              "rtransaction_id", (json_int_t) rtransactionid,
+                                              "coin_pub", GNUNET_JSON_from_data_auto (&rr.coin_pub),
+                                              "merchant_sig", GNUNET_JSON_from_data_auto (&msig),
+                                              "refund_amount", TALER_JSON_from_amount_nbo (&rr.refund_amount),
+                                              "refund_fee", TALER_JSON_from_amount_nbo (&rr.refund_fee))))
+        {
+          json_decref (refunds);
+          GNUNET_break (0);
+          resume_pay_with_error (pc,
+                                 MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                 TALER_EC_JSON_ALLOCATION_FAILURE,
+                                 "could not create JSON array");
+          return;
+        }
       }
 
       /* Resume and send back the response.  */

@@ -227,6 +227,14 @@ run_pickup (struct MHD_Connection *connection,
                                   human);
   }
   sigs = json_array ();
+  if (NULL == sigs)
+  {
+    GNUNET_break (0);
+    return TMH_RESPONSE_reply_rc (connection,
+                                  MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                  TALER_EC_JSON_ALLOCATION_FAILURE,
+                                  "could not create JSON array");
+  }
   GNUNET_CRYPTO_eddsa_key_get_public (&reserve_priv.eddsa_priv,
                                       &reserve_pub.eddsa_pub);
   for (unsigned int i=0;i<pc->planchets_len;i++)
@@ -239,10 +247,19 @@ run_pickup (struct MHD_Connection *connection,
 		   GNUNET_CRYPTO_eddsa_sign (&reserve_priv.eddsa_priv,
 					     &pd->wr.purpose,
 					     &reserve_sig.eddsa_signature));
-    json_array_append_new (sigs,
-                           json_pack ("{s:o}",
-                                      "reserve_sig",
-                                      GNUNET_JSON_from_data_auto (&reserve_sig)));
+    if (0 !=
+        json_array_append_new (sigs,
+                               json_pack ("{s:o}",
+                                          "reserve_sig",
+                                          GNUNET_JSON_from_data_auto (&reserve_sig))))
+    {
+      GNUNET_break (0);
+      json_decref (sigs);
+      return TMH_RESPONSE_reply_rc (connection,
+                                    MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                    TALER_EC_JSON_ALLOCATION_FAILURE,
+                                    "could not add element to JSON array");
+    }
   }
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_OK,

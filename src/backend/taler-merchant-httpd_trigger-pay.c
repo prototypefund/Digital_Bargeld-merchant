@@ -52,8 +52,8 @@ add_header_from_arg (struct MHD_Connection *connection,
                                                  arg_name);
   if (NULL == arg)
     return;
-
-  MHD_add_response_header (response, header_name, arg);
+  GNUNET_break (MHD_YES ==
+                MHD_add_response_header (response, header_name, arg));
 }
 
 

@@ -58,9 +58,10 @@ TMH_RESPONSE_make_json (const json_t *json)
     GNUNET_break (0);
     return NULL;
   }
-  (void) MHD_add_response_header (resp,
-                                  MHD_HTTP_HEADER_CONTENT_TYPE,
-                                  "application/json");
+  GNUNET_break (MHD_YES ==
+                MHD_add_response_header (resp,
+                                         MHD_HTTP_HEADER_CONTENT_TYPE,
+                                         "application/json"));
   return resp;
 }
 
@@ -331,9 +332,10 @@ void
 TMH_RESPONSE_add_global_headers (struct MHD_Response *response)
 {
   if (TMH_merchant_connection_close)
-    (void) MHD_add_response_header (response,
-                                    MHD_HTTP_HEADER_CONNECTION,
-                                    "close");
+    GNUNET_break (MHD_YES ==
+                  MHD_add_response_header (response,
+                                           MHD_HTTP_HEADER_CONNECTION,
+                                           "close"));
 }
 
 
