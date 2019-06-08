@@ -66,6 +66,115 @@ process_refunds_cb (void *cls,
 
 
 /**
+ * The client did not yet pay, send it the payment request.
+ *
+ * @param connection connection to send on
+ * @param final_contract_url where to get the contract
+ * @param session_id session of the client
+ * @param resource_url where the resource will be (?), can be NULL!
+ * @param h_contract_terms_str hash of the contract terms, stringified
+ * @return #MHD_YES on success
+ */
+static int
+send_pay_request (struct MHD_Connection *connection,
+                  const char *final_contract_url,
+                  const char *session_id,
+                  const char *resource_url,
+                  const char *h_contract_terms_str)
+{
+  int ret;
+  char *url = TALER_url_absolute_mhd (connection,
+                                      "public/trigger-pay",
+                                      "contract_url", final_contract_url,
+                                      "session_id", session_id,
+                                      "resource_url", resource_url,
+                                      "h_contract_terms", h_contract_terms_str,
+                                      NULL);
+  GNUNET_assert (NULL != url);
+  ret = TMH_RESPONSE_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
+                                      "{s:s, s:b}",
+                                      "payment_redirect_url",
+                                      url,
+                                      "paid",
+                                      0);
+  GNUNET_free (url);
+  return ret;
+}
+
+
+/**
+ * Check that we are aware of @a order_id and if so request the payment,
+ * otherwise generate an error response.
+ *
+ * @param connection where to send the response
+ * @param mi the merchant's instance
+ * @param final_contract_url where to redirect for the contract
+ * @param session_id the session_id
+ * @param resource_url where the resource will be (?), can be NULL!
+ * @param order_id the order to look up
+ * @return #MHD_YES on success
+ */
+static int
+check_order_and_request_payment (struct MHD_Connection *connection,
+                                 struct MerchantInstance *mi,
+                                 const char *final_contract_url,
+                                 const char *session_id,
+                                 const char *resource_url,
+                                 const char *order_id)
+{
+  enum GNUNET_DB_QueryStatus qs;
+  json_t *contract_terms;
+  struct GNUNET_HashCode h_contract_terms;
+  char *h_contract_terms_str;
+  int ret;
+
+  qs = db->find_order (db->cls,
+                       &contract_terms,
+                       order_id,
+                       &mi->pubkey);
+  if (0 > qs)
+  {
+    /* single, read-only SQL statements should never cause
+       serialization problems */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
+                                              "db error fetching order");
+  }
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+  {
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_CHECK_PAYMENT_ORDER_ID_UNKNOWN,
+                                         "unknown order_id");
+  }
+  if (GNUNET_OK !=
+      TALER_JSON_hash (contract_terms,
+                       &h_contract_terms))
+  {
+  GNUNET_break (0);
+  json_decref (contract_terms);
+  return TMH_RESPONSE_reply_internal_error (connection,
+                                            TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
+                                            "Failed to hash proposal");
+  }
+  /* Offer was not picked up yet, but we ensured that it exists */
+  h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
+                                                              sizeof (struct GNUNET_HashCode));
+  ret = send_pay_request (connection,
+                          final_contract_url,
+                          session_id,
+                          resource_url,
+                          h_contract_terms_str);
+  GNUNET_free_non_null (h_contract_terms_str);
+  json_decref (contract_terms);
+  return ret;
+}
+
+
+/**
  * Manages a /check-payment call, checking the status
  * of a payment and, if necessary, constructing the URL
  * for a payment redirect URL.
@@ -90,54 +199,41 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   const char *session_sig_str;
   const char *instance_str;
   const char *resource_url;
-  char *final_contract_url = NULL;
-  char *h_contract_terms_str = NULL;
+  char *final_contract_url;
+  char *h_contract_terms_str;
   struct MerchantInstance *mi;
   enum GNUNET_DB_QueryStatus qs;
   json_t *contract_terms;
   struct GNUNET_HashCode h_contract_terms;
   struct TALER_Amount refund_amount;
   char *last_session_id;
+  int ret;
+  int refunded;
 
-  order_id = MHD_lookup_connection_value (connection,
-                                          MHD_GET_ARGUMENT_KIND,
-                                          "order_id");
-  contract_url = MHD_lookup_connection_value (connection,
-                                              MHD_GET_ARGUMENT_KIND,
-                                              "contract_url");
-  session_id = MHD_lookup_connection_value (connection,
-                                                MHD_GET_ARGUMENT_KIND,
-                                                "session_id");
-  session_sig_str = MHD_lookup_connection_value (connection,
-                                                MHD_GET_ARGUMENT_KIND,
-                                                "session_sig");
   instance_str = MHD_lookup_connection_value (connection,
                                               MHD_GET_ARGUMENT_KIND,
                                               "instance");
-  resource_url = MHD_lookup_connection_value (connection,
-                                              MHD_GET_ARGUMENT_KIND,
-                                              "resource_url");
-
   if (NULL == instance_str)
     instance_str = "default";
-
   mi = TMH_lookup_instance (instance_str);
   if (NULL == mi)
     return TMH_RESPONSE_reply_bad_request (connection,
                                            TALER_EC_CHECK_PAYMENT_INSTANCE_UNKNOWN,
                                            "merchant instance unknown");
-
+  order_id = MHD_lookup_connection_value (connection,
+                                          MHD_GET_ARGUMENT_KIND,
+                                          "order_id");
   if (NULL == order_id)
   {
-    if (NULL == contract_url)
-      return TMH_RESPONSE_reply_bad_request (connection,
-                                             TALER_EC_PARAMETER_MISSING,
-                                             "either order_id or contract_url must be given");
-    goto do_pay;
-    // No order_id given, redirect to a page that gives the wallet a new
-    // contract.
+    /* order_id is required but missing */
+    GNUNET_break_op (0);
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           TALER_EC_PARAMETER_MISSING,
+                                           "order_id required");
   }
-
+  contract_url = MHD_lookup_connection_value (connection,
+                                              MHD_GET_ARGUMENT_KIND,
+                                              "contract_url");
   if (NULL == contract_url)
   {
     final_contract_url = TALER_url_absolute_mhd (connection,
@@ -151,32 +247,45 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   {
     final_contract_url = GNUNET_strdup (contract_url);
   }
-
+  resource_url = MHD_lookup_connection_value (connection,
+                                              MHD_GET_ARGUMENT_KIND,
+                                              "resource_url");
+  /* NULL is allowed for resource_url! */
+  session_id = MHD_lookup_connection_value (connection,
+                                                MHD_GET_ARGUMENT_KIND,
+                                                "session_id");
+  session_sig_str = MHD_lookup_connection_value (connection,
+                                                MHD_GET_ARGUMENT_KIND,
+                                                "session_sig");
   if (NULL != session_id)
   {
     struct GNUNET_CRYPTO_EddsaSignature sig;
     struct TALER_MerchantPaySessionSigPS mps;
-    // If the session id is given, the frontend wants us
-    // to verify the session signature.
+    /* If the session id is given, the frontend wants us
+       to verify the session signature. */
     if (NULL == session_sig_str)
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "pay session signature required but missing\n");
-      goto do_pay;
+      /* pay session signature required but missing */
+      GNUNET_break_op (0);
+      GNUNET_free (final_contract_url);
+      return TMH_RESPONSE_reply_bad_request (connection,
+                                             TALER_EC_PARAMETER_MISSING,
+                                             "session_sig required if session_id given");
     }
-
     if (GNUNET_OK !=
         GNUNET_STRINGS_string_to_data (session_sig_str,
                                        strlen (session_sig_str),
                                        &sig,
                                        sizeof (struct GNUNET_CRYPTO_EddsaSignature)))
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "pay session signature malformed\n");
-      goto do_pay;
+      GNUNET_break_op (0);
+      GNUNET_free (final_contract_url);
+      return TMH_RESPONSE_reply_bad_request (connection,
+                                             TALER_EC_PARAMETER_MALFORMED,
+                                             "session_sig malformed");
     }
     mps.purpose.size = htonl (sizeof (struct TALER_MerchantPaySessionSigPS));
     mps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAY_SESSION);
-    GNUNET_assert (NULL != order_id);
-    GNUNET_assert (NULL != session_id);
     GNUNET_CRYPTO_hash (order_id, strlen (order_id), &mps.h_order_id);
     GNUNET_CRYPTO_hash (session_id, strlen (session_id), &mps.h_session_id);
     if (GNUNET_OK != GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAY_SESSION,
@@ -184,12 +293,14 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                                  &sig,
                                                  &mi->pubkey.eddsa_pub))
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "pay session signature invalid\n");
-      goto do_pay;
+      /* pay session signature invalid */
+      GNUNET_break_op (0);
+      GNUNET_free (final_contract_url);
+      return TMH_RESPONSE_reply_bad_request (connection,
+                                             TALER_EC_CHECK_PAYMENT_SESSION_SIGNATURE_INVALID,
+                                             "session_sig fails to verify");
     }
   }
-
-  GNUNET_assert (NULL != order_id);
 
   db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
@@ -204,35 +315,22 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    GNUNET_free (final_contract_url);
     return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
-					      "db error fetching contract terms");
+                                              TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
+                                              "db error fetching contract terms");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    qs = db->find_order (db->cls,
-                         &contract_terms,
-                         order_id,
-                         &mi->pubkey);
-    if (0 > qs)
-    {
-      /* single, read-only SQL statements should never cause
-         serialization problems */
-      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
-      /* Always report on hard error as well to enable diagnostics */
-      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
-                                                "db error fetching order");
-    }
-    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
-    {
-      return TMH_RESPONSE_reply_not_found (connection,
-                                           TALER_EC_CHECK_PAYMENT_ORDER_ID_UNKNOWN,
-                                           "unknown order id");
-    }
-    /* Offer was not picked up yet, but we ensured that it exists */
-    goto do_pay;
+    /* Check that we're at least aware of the order */
+    ret = check_order_and_request_payment (connection,
+                                           mi,
+                                           final_contract_url,
+                                           session_id,
+                                           resource_url,
+                                           order_id);
+    GNUNET_free (final_contract_url);
+    return ret;
   }
 
   GNUNET_assert (NULL != contract_terms);
@@ -243,6 +341,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                        &h_contract_terms))
   {
     GNUNET_break (0);
+    json_decref (contract_terms);
+    GNUNET_free (final_contract_url);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
                                               "Failed to hash proposal");
@@ -250,7 +350,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
                                                               sizeof (struct GNUNET_HashCode));
-
 
   /* Check if paid */
   {
@@ -265,6 +364,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
       GNUNET_free_non_null (h_contract_terms_str);
+      GNUNET_free (final_contract_url);
+      json_decref (contract_terms);
       return TMH_RESPONSE_reply_internal_error (connection,
                                                 TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
                                                 "Merchant database error");
@@ -272,7 +373,16 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     if (0 == qs)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "not paid yet\n");
-      goto do_pay;
+      ret = send_pay_request (connection,
+                              final_contract_url,
+                              session_id,
+                              resource_url,
+                              h_contract_terms_str);
+      GNUNET_free_non_null (h_contract_terms_str);
+      GNUNET_free (final_contract_url);
+      json_decref (contract_terms);
+      return ret;
+
     }
     GNUNET_break (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs);
     GNUNET_assert (NULL != xcontract_terms);
@@ -285,20 +395,26 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       TALER_JSON_spec_amount ("amount", &amount),
       GNUNET_JSON_spec_end ()
     };
+
     if (GNUNET_OK != GNUNET_JSON_parse (contract_terms, spec, NULL, NULL))
+    {
+      GNUNET_free_non_null (h_contract_terms_str);
+      GNUNET_free (final_contract_url);
+      json_decref (contract_terms);
       return TMH_RESPONSE_reply_internal_error (connection,
                                                 TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
                                                 "Merchant database error (contract terms corrupted)");
+    }
     TALER_amount_get_zero (amount.currency, &refund_amount);
   }
 
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
     qs = db->get_refunds_from_contract_terms_hash (db->cls,
-						   &mi->pubkey,
-						   &h_contract_terms,
-						   &process_refunds_cb,
-						   &refund_amount);
+                                                   &mi->pubkey,
+                                                   &h_contract_terms,
+                                                   &process_refunds_cb,
+                                                   &refund_amount);
     if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
       break;
   }
@@ -307,49 +423,26 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Database hard error on refunds_from_contract_terms_hash lookup: %s\n",
                 GNUNET_h2s (&h_contract_terms));
+    GNUNET_free_non_null (h_contract_terms_str);
+    GNUNET_free (final_contract_url);
+    json_decref (contract_terms);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
                                               "Merchant database error");
   }
-
   GNUNET_free_non_null (h_contract_terms_str);
 
-  {
-    int refunded = (0 != refund_amount.value) || (0 != refund_amount.fraction);
-    int res;
-    res = TMH_RESPONSE_reply_json_pack (connection,
-                                        MHD_HTTP_OK,
-                                        "{s:o s:b, s:b, s:o, s:s}",
-                                        "contract_terms", contract_terms,
-                                        "paid", 1,
-                                        "refunded", refunded,
-                                        "refund_amount", TALER_JSON_from_amount (&refund_amount),
-                                        "last_session_id", last_session_id);
-    GNUNET_free_non_null (final_contract_url);
-    return res;
-  }
+  refunded = (0 != refund_amount.value) || (0 != refund_amount.fraction);
 
-do_pay:
-  {
-    char *url = TALER_url_absolute_mhd (connection,
-                                        "public/trigger-pay",
-                                        "contract_url", final_contract_url,
-                                        "session_id", session_id,
-                                        "resource_url", resource_url,
-                                        "h_contract_terms", h_contract_terms_str,
-                                        NULL);
-    GNUNET_assert (NULL != url);
-    int ret = TMH_RESPONSE_reply_json_pack (connection,
-                                            MHD_HTTP_OK,
-                                            "{s:s, s:b}",
-                                            "payment_redirect_url",
-                                            url,
-                                            "paid",
-                                            0);
-    GNUNET_free_non_null (h_contract_terms_str);
-    GNUNET_free_non_null (final_contract_url);
-    json_decref (contract_terms);
-    GNUNET_free (url);
-    return ret;
-  }
+  ret = TMH_RESPONSE_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
+                                      "{s:o, s:b, s:b, s:o, s:s}",
+                                      "contract_terms", contract_terms,
+                                      "paid", 1,
+                                      "refunded", refunded,
+                                      "refund_amount", TALER_JSON_from_amount (&refund_amount),
+                                      "last_session_id", last_session_id);
+  GNUNET_free (final_contract_url);
+  GNUNET_free (last_session_id);
+  return ret;
 }
