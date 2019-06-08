@@ -77,7 +77,6 @@ endif
 
 if HAVE_TALERFAKEBANK
 check_PROGRAMS = \
-  test_merchant_api_new \
   test_merchant_api
 
 if HAVE_TWISTER
@@ -110,30 +109,14 @@ test_merchant_api_twisted_LDADD = \
   -ljansson \
   -ltalertwister
 
-test_merchant_api_new_SOURCES = \
-  test_merchant_api_new.c
-test_merchant_api_new_LDADD = \
-  $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
-  libtalermerchant.la \
-  $(LIBGCRYPT_LIBS) \
-  -ltalertesting \
-  -ltalermerchanttesting \
-  -ltalerfakebank \
-  -ltalerbank \
-  -ltalerexchange \
-  -ltalerjson \
-  -ltalerutil \
-  -lgnunetjson \
-  -lgnunetcurl \
-  -lgnunetutil \
-  -ljansson
-
 test_merchant_api_SOURCES = \
   test_merchant_api.c
 test_merchant_api_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
+  -ltalertesting \
+  -ltalermerchanttesting \
   -ltalerfakebank \
   -ltalerbank \
   -ltalerexchange \
