@@ -861,7 +861,6 @@ wireformat_iterator_cb (void *cls,
       return;
     }
   }
-  GNUNET_free (fn);
 
   if (GNUNET_OK == GNUNET_CONFIGURATION_get_value_string
     (iic->config,
@@ -878,15 +877,19 @@ wireformat_iterator_cb (void *cls,
                                  "WIRE_FILE_MODE",
                                  "Must be octal number\n");
       iic->ret = GNUNET_SYSERR;
+      GNUNET_free (fn);
       return;
     }
     if (0 != chmod (fn, mode))
     {
       TALER_LOG_ERROR ("chmod failed on %s\n", fn);
       iic->ret = GNUNET_SYSERR;
+      GNUNET_free (fn);
       return;
     }
   }
+
+  GNUNET_free (fn);
 
   if (GNUNET_OK !=
       TALER_JSON_merchant_wire_signature_hash (j,
