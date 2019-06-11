@@ -694,6 +694,7 @@ wireformat_iterator_cb (void *cls,
   json_t *j;
   enum TALER_ErrorCode ec;
   struct GNUNET_HashCode h_wire;
+  char *wire_file_mode;
 
   if (0 != strncasecmp (section,
                         "account-",
@@ -861,6 +862,31 @@ wireformat_iterator_cb (void *cls,
     }
   }
   GNUNET_free (fn);
+
+  if (GNUNET_OK == GNUNET_CONFIGURATION_get_value_string
+    (iic->config,
+     section,
+     "WIRE_FILE_MODE",
+     &wire_file_mode))
+  {
+    errno = 0;
+    mode_t mode = (mode_t) strtoul (wire_file_mode, NULL, 8);
+    if (0 != errno)
+    {
+      GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
+                                 section,
+                                 "WIRE_FILE_MODE",
+                                 "Must be octal number\n");
+      iic->ret = GNUNET_SYSERR;
+      return;
+    }
+    if (0 != chmod (fn, mode))
+    {
+      TALER_LOG_ERROR ("chmod failed on %s\n", fn);
+      iic->ret = GNUNET_SYSERR;
+      return;
+    }
+  }
 
   if (GNUNET_OK !=
       TALER_JSON_merchant_wire_signature_hash (j,
