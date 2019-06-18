@@ -411,11 +411,11 @@ handle_pay_finished (void *cls,
       break;
     case MHD_HTTP_OK:
       if (GNUNET_OK ==
-	  check_abort_refund (ph,
-			      json))
+          check_abort_refund (ph,
+                              json))
       {
-	TALER_MERCHANT_pay_cancel (ph);
-	return;
+        TALER_MERCHANT_pay_cancel (ph);
+        return;
       }
       response_code = 0;
       break;
