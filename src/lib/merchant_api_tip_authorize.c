@@ -266,7 +266,7 @@ TALER_MERCHANT_tip_authorize_cancel (struct TALER_MERCHANT_TipAuthorizeOperation
     GNUNET_CURL_job_cancel (tao->job);
     tao->job = NULL;
   }
-  GNUNET_free_non_null (tao->post_ctx.json_enc);
+  TALER_curl_easy_post_finished (&tao->post_ctx);
   GNUNET_free (tao->url);
   GNUNET_free (tao);
 }

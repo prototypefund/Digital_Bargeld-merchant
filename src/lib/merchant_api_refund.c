@@ -145,7 +145,7 @@ handle_refund_increase_finished (void *cls,
          "error", &error,
          "code", &code,
          "hint", &hint))
-    
+
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "/refund failed (HTTP code: %lu), backend did "
@@ -175,6 +175,7 @@ TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOpera
     GNUNET_CURL_job_cancel (rio->job);
     rio->job = NULL;
   }
+  TALER_curl_easy_post_finished (&rio->post_ctx);
   GNUNET_free (rio->url);
   GNUNET_free (rio->post_ctx.json_enc);
   GNUNET_free (rio);
@@ -246,7 +247,7 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
 /**
  * Cancel a /refund lookup operation
  *
- * @param 
+ * @param
  */
 void
 TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation *rlo)
@@ -256,7 +257,6 @@ TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation
     GNUNET_CURL_job_cancel (rlo->job);
     rlo->job = NULL;
   }
-  
   GNUNET_free (rlo->url);
   GNUNET_free (rlo);
 }
@@ -307,7 +307,7 @@ handle_refund_lookup_finished (void *cls,
                   error,
                   code);
       break;
-    } 
+    }
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed /refund lookup, backend did not give"
                 " a valid error object, HTTP code was %lu\n",
@@ -344,7 +344,7 @@ TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
   rlo->ctx = ctx;
   rlo->cb = cb;
   rlo->cb_cls = cb_cls;
-  
+
   base = TALER_url_join (backend_url, "/public/refund", NULL);
   GNUNET_asprintf (&rlo->url,
                    "%s?instance=%s&order_id=%s",
@@ -369,7 +369,7 @@ TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
   {
     GNUNET_break (0);
     return NULL;
-  
+
   }
 
   return rlo;

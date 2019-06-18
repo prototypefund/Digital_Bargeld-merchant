@@ -447,7 +447,7 @@ TALER_MERCHANT_proposal_cancel
     po->job = NULL;
   }
   GNUNET_free (po->url);
-  GNUNET_free (po->post_ctx.json_enc);
+  TALER_curl_easy_post_finished (&po->post_ctx);
   GNUNET_free (po);
 }
 

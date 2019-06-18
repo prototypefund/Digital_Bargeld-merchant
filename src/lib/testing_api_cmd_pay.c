@@ -689,9 +689,9 @@ pay_abort_cb (void *cls,
     pas->res = GNUNET_new_array
       (num_refunds, struct TALER_MERCHANT_RefundEntry);
 
-    memcpy (pas->res, res,
-	    num_refunds * sizeof
-              (struct TALER_MERCHANT_RefundEntry));
+    memcpy (pas->res,
+            res,
+            num_refunds * sizeof (struct TALER_MERCHANT_RefundEntry));
     pas->h_contract = *h_contract;
     pas->merchant_pub = *merchant_pub;
   }
@@ -1073,7 +1073,7 @@ pay_abort_cleanup (void *cls,
                   pas->is));
     TALER_MERCHANT_pay_cancel (pas->pao);
   }
-
+  GNUNET_free_non_null (pas->res);
   GNUNET_free (pas);
 }
 

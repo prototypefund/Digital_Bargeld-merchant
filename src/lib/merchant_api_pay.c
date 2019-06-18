@@ -116,7 +116,7 @@ struct TALER_MERCHANT_Pay
  */
 static int
 check_abort_refund (struct TALER_MERCHANT_Pay *ph,
-		    const json_t *json)
+                    const json_t *json)
 {
   json_t *refunds;
   unsigned int num_refunds;
@@ -145,11 +145,11 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
       json_t *refund = json_array_get (refunds, i);
       struct GNUNET_JSON_Specification spec_detail[] = {
         GNUNET_JSON_spec_fixed_auto ("merchant_sig",
-				     sig),
+                                     sig),
         GNUNET_JSON_spec_fixed_auto ("coin_pub",
-				     &res[i].coin_pub),
-	GNUNET_JSON_spec_uint64 ("rtransaction_id",
-				 &res[i].rtransaction_id),
+                                     &res[i].coin_pub),
+        GNUNET_JSON_spec_uint64 ("rtransaction_id",
+                                 &res[i].rtransaction_id),
         GNUNET_JSON_spec_end()
       };
       struct TALER_RefundRequestPS rr;
@@ -161,7 +161,7 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
                              NULL, NULL))
       {
         GNUNET_break_op (0);
-	GNUNET_JSON_parse_free (spec);
+        GNUNET_JSON_parse_free (spec);
         return GNUNET_SYSERR;
       }
 
@@ -190,19 +190,19 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
       }
       if (-1 == found)
       {
-	GNUNET_break_op (0);
-	return GNUNET_SYSERR;
+        GNUNET_break_op (0);
+        return GNUNET_SYSERR;
       }
 
       if (GNUNET_OK !=
-	  GNUNET_CRYPTO_eddsa_verify
+          GNUNET_CRYPTO_eddsa_verify
             (TALER_SIGNATURE_MERCHANT_REFUND,
 	     &rr.purpose,
 	     &sig->eddsa_sig,
 	     &merchant_pub.eddsa_pub))
       {
-	GNUNET_break_op (0);
-	return GNUNET_SYSERR;
+        GNUNET_break_op (0);
+        return GNUNET_SYSERR;
       }
     }
     ph->abort_cb (ph->abort_cb_cls,
@@ -363,8 +363,8 @@ handle_pay_finished (void *cls,
       if (GNUNET_OK != check_forbidden (ph,
 					json))
       {
-	GNUNET_break_op (0);
-	response_code = 0;
+        GNUNET_break_op (0);
+        response_code = 0;
       }
       break;
     case MHD_HTTP_UNAUTHORIZED:
@@ -954,6 +954,7 @@ TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *pay)
     GNUNET_CURL_job_cancel (pay->job);
     pay->job = NULL;
   }
+  TALER_curl_easy_post_finished (&pay->post_ctx);
   GNUNET_free (pay->coins);
   GNUNET_free (pay->url);
   GNUNET_free (pay->post_ctx.json_enc);

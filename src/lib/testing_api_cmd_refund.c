@@ -285,7 +285,6 @@ refund_lookup_cb (void *cls,
   if (rls->http_code != http_status)
     TALER_TESTING_FAIL (rls->is);
 
-  map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
   arr = json_object_get (obj, "refund_permissions");
   if (NULL == arr)
   {
@@ -294,6 +293,7 @@ refund_lookup_cb (void *cls,
     TALER_TESTING_interpreter_next (rls->is);
     return;
   }
+  map = GNUNET_CONTAINER_multihashmap_create (1, GNUNET_NO);
 
   /* Put in array every refunded coin.  */
   json_array_foreach (arr, index, elem)
@@ -353,6 +353,7 @@ refund_lookup_cb (void *cls,
       TALER_LOG_ERROR ("Bad reference `%s'\n",
                        icoin_reference);
       TALER_TESTING_interpreter_fail (rls->is);
+      GNUNET_CONTAINER_multihashmap_destroy (map);
       return;
     }
 
@@ -364,6 +365,7 @@ refund_lookup_cb (void *cls,
                       " priv trait\n",
                       icoin_reference);
      TALER_TESTING_interpreter_fail (rls->is);
+     GNUNET_CONTAINER_multihashmap_destroy (map);
      return;
     }
 

@@ -329,7 +329,7 @@ TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tpo)
     GNUNET_CURL_job_cancel (tpo->job);
     tpo->job = NULL;
   }
-  GNUNET_free_non_null (tpo->post_ctx.json_enc);
+  TALER_curl_easy_post_finished (&tpo->post_ctx);
   GNUNET_free (tpo->url);
   GNUNET_free (tpo);
 }

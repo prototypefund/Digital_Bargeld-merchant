@@ -556,9 +556,15 @@ tip_query_cb (void *cls,
   {
     GNUNET_assert (GNUNET_OK == TALER_string_to_amount
       (tqs->expected_amount_available, &a));
-    TALER_LOG_INFO ("expected available %s, actual %s\n",
-                    TALER_amount_to_string (&a),
-                    TALER_amount_to_string (amount_available));
+    {
+      char *str;
+
+      str = TALER_amount_to_string (amount_available);
+      TALER_LOG_INFO ("expected available %s, actual %s\n",
+                      TALER_amount2s (&a),
+                      str);
+      GNUNET_free (str);
+    }
     if (0 != TALER_amount_cmp (amount_available, &a))
       TALER_TESTING_FAIL (tqs->is);
   }
@@ -567,9 +573,15 @@ tip_query_cb (void *cls,
   {
     GNUNET_assert (GNUNET_OK == TALER_string_to_amount
       (tqs->expected_amount_authorized, &a));
-    TALER_LOG_INFO ("expected authorized %s, actual %s\n",
-                    TALER_amount_to_string (&a),
-                    TALER_amount_to_string (amount_authorized));
+    {
+      char *str;
+
+      str = TALER_amount_to_string (amount_authorized);
+      TALER_LOG_INFO ("expected authorized %s, actual %s\n",
+                      TALER_amount2s (&a),
+                      str);
+      GNUNET_free (str);
+    }
     if (0 != TALER_amount_cmp (amount_authorized, &a))
       TALER_TESTING_FAIL (tqs->is);
   }
@@ -578,9 +590,14 @@ tip_query_cb (void *cls,
   {
     GNUNET_assert (GNUNET_OK == TALER_string_to_amount
       (tqs->expected_amount_picked_up, &a));
-    TALER_LOG_INFO ("expected picked_up %s, actual %s\n",
-                    TALER_amount_to_string (&a),
-                    TALER_amount_to_string (amount_picked_up));
+    {
+      char *str;
+      str = TALER_amount_to_string (amount_picked_up);
+      TALER_LOG_INFO ("expected picked_up %s, actual %s\n",
+                      TALER_amount2s (&a),
+                      str);
+      GNUNET_free (str);
+    }
     if (0 != TALER_amount_cmp (amount_picked_up, &a))
       TALER_TESTING_FAIL (tqs->is);
   }
@@ -910,7 +927,6 @@ tip_pickup_run (void *cls,
                 const struct TALER_TESTING_Command *cmd,
                 struct TALER_TESTING_Interpreter *is)
 {
-
   struct TipPickupState *tps = cls;
   unsigned int num_planchets;
   const struct TALER_TESTING_Command *replay_cmd;
@@ -1007,6 +1023,12 @@ tip_pickup_run (void *cls,
                                           planchets,
                                           &pickup_cb,
                                           tps);
+    for (unsigned int i=0;i<num_planchets;i++)
+    {
+      GNUNET_free (planchets[i].coin_ev);
+      planchets[i].coin_ev = NULL;
+      planchets[i].coin_ev_size = 0;
+    }
     GNUNET_assert (NULL != tps->tpo);
   }
 }
@@ -1028,7 +1050,13 @@ tip_pickup_cleanup (void *cls,
   GNUNET_free_non_null (tps->dks);
   GNUNET_free_non_null (tps->psa);
   GNUNET_free_non_null (tps->withdraws);
-  GNUNET_free_non_null (tps->sigs);
+  if (NULL != tps->sigs)
+  {
+    for (unsigned int i=0;i<tps->num_coins;i++)
+      if (NULL != tps->sigs[i].rsa_signature)
+        GNUNET_CRYPTO_rsa_signature_free (tps->sigs[i].rsa_signature);
+    GNUNET_free (tps->sigs);
+  }
 
   if (NULL != tps->tpo)
   {
