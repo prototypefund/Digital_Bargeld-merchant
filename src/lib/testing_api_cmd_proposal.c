@@ -359,16 +359,14 @@ proposal_run (void *cls,
     struct GNUNET_TIME_Absolute now;
     char *order_id;
 
+    // FIXME: should probably use get_monotone() to ensure uniqueness!
     now = GNUNET_TIME_absolute_get ();
-
     order_id = GNUNET_STRINGS_data_to_string_alloc
       (&now.abs_value_us,
        sizeof (now.abs_value_us));
-
-    json_object_set (order,
-                     "order_id",
-                     json_string (order_id));
-
+    json_object_set_new (order,
+                         "order_id",
+                         json_string (order_id));
     GNUNET_free (order_id);
   }
 
@@ -379,6 +377,7 @@ proposal_run (void *cls,
   if (NULL != ps->instance)
   {
     json_t *merchant;
+
     merchant = json_object ();
     json_object_set_new (merchant,
                          "instance",
@@ -396,6 +395,7 @@ proposal_run (void *cls,
   json_decref (order);
   GNUNET_assert (NULL != ps->po);
 }
+
 
 /**
  * Free the state of a "proposal" CMD, and possibly

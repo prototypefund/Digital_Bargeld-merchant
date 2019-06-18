@@ -162,6 +162,7 @@ handle_refund_increase_finished (void *cls,
   TALER_MERCHANT_refund_increase_cancel (rio);
 }
 
+
 /**
  * Cancel a POST /refund request.
  *
@@ -179,6 +180,7 @@ TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOpera
   GNUNET_free (rio->url);
   GNUNET_free (rio);
 }
+
 
 /**
  * Increase the refund associated to a order
