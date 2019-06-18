@@ -136,7 +136,6 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
                       size_t *upload_data_size)
 {
   struct TipQueryContext *tqc;
-  int res;
   struct MerchantInstance *mi;
 
   if (NULL == *connection_cls)
@@ -153,6 +152,8 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
 
   if (0 != tqc->ctr.response_code)
   {
+    int res;
+
     /* We are *done* processing the request, just queue the response (!) */
     if (UINT_MAX == tqc->ctr.response_code)
     {

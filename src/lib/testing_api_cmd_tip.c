@@ -88,7 +88,7 @@ struct TipPickupState
    * How many coins are involved in the tipping operation.
    */
   unsigned int num_coins;
-  
+
   /**
    * The array of denomination keys, in the same order of @a
    * amounts.
@@ -176,7 +176,7 @@ struct TipQueryState
  */
 struct TipAuthorizeState
 {
-  
+
   /**
    * Merchant base URL.
    */
@@ -255,7 +255,7 @@ tip_authorize_cb (void *cls,
                   struct GNUNET_TIME_Absolute tip_expiration,
                   const char *exchange_url)
 {
-  struct TipAuthorizeState *tas = cls; 
+  struct TipAuthorizeState *tas = cls;
 
   tas->tao = NULL;
   if (tas->http_status != http_status)
@@ -321,7 +321,6 @@ tip_authorize_traits (void *cls,
                       unsigned int index)
 {
   struct TipAuthorizeState *tas = cls;
-
   struct TALER_TESTING_Trait traits[] = {
     TALER_TESTING_make_trait_tip_id (0, &tas->tip_id),
     TALER_TESTING_trait_end (),
@@ -331,8 +330,8 @@ tip_authorize_traits (void *cls,
                                   ret,
                                   trait,
                                   index);
-  return GNUNET_SYSERR;
 }
+
 
 /**
  * Runs the /tip-authorize CMD
@@ -347,7 +346,7 @@ tip_authorize_run (void *cls,
                    struct TALER_TESTING_Interpreter *is)
 {
   struct TipAuthorizeState *tas = cls;
-  struct TALER_Amount amount; 
+  struct TALER_Amount amount;
 
   tas->is = is;
   if (GNUNET_OK != TALER_string_to_amount (tas->amount,
@@ -461,7 +460,7 @@ TALER_TESTING_cmd_tip_authorize_with_ec
     .cleanup = &tip_authorize_cleanup,
     .traits = &tip_authorize_traits
   };
-  
+
   return cmd;
 }
 
@@ -508,7 +507,7 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
     .cleanup = &tip_authorize_cleanup,
     .traits = &tip_authorize_traits
   };
-  
+
   return cmd;
 }
 
@@ -627,7 +626,7 @@ tip_query_run (void *cls,
                struct TALER_TESTING_Interpreter *is)
 {
   struct TipQueryState *tqs = cls;
-  
+
   tqs->is = is;
   tqs->tqo = TALER_MERCHANT_tip_query (is->ctx,
                                        tqs->merchant_url,
@@ -681,7 +680,7 @@ TALER_TESTING_cmd_tip_query_with_amounts
     .run = &tip_query_run,
     .cleanup = &tip_query_cleanup
   };
-  
+
   return cmd;
 }
 
@@ -715,7 +714,7 @@ TALER_TESTING_cmd_tip_query (const char *label,
     .run = &tip_query_run,
     .cleanup = &tip_query_cleanup
   };
-  
+
   return cmd;
 }
 
@@ -740,7 +739,7 @@ struct WithdrawHandle
    */
   unsigned int off;
 
-  
+
   /**
    * Internal state of the "pickup" CMD.
    */
@@ -748,7 +747,7 @@ struct WithdrawHandle
 };
 
 /**
- * This callback handles the response of a withdraw operation 
+ * This callback handles the response of a withdraw operation
  * from the exchange, that is the final step in getting the tip.
  *
  * @param cls closure, a `struct WithdrawHandle *`
@@ -935,8 +934,8 @@ tip_pickup_run (void *cls,
     if ( NULL == /* looking for "parent" tip-pickup command */
        ( replay_cmd = TALER_TESTING_interpreter_lookup_command
          (is, tps->replay_reference)) )
-    TALER_TESTING_FAIL (is);   
-    
+    TALER_TESTING_FAIL (is);
+
     if (GNUNET_OK != TALER_TESTING_get_trait_uint
         (replay_cmd, 0, &np))
       TALER_TESTING_FAIL (is);
@@ -975,7 +974,7 @@ tip_pickup_run (void *cls,
         if (NULL == tps->dks[i])
           TALER_TESTING_FAIL (is);
 
-        TALER_planchet_setup_random (&tps->psa[i]); 
+        TALER_planchet_setup_random (&tps->psa[i]);
       }
       else
       {
@@ -994,9 +993,9 @@ tip_pickup_run (void *cls,
       if (GNUNET_OK != TALER_planchet_prepare (&tps->dks[i]->key,
                                                &tps->psa[i],
                                                &planchets[i]))
-        TALER_TESTING_FAIL (is); 
+        TALER_TESTING_FAIL (is);
     }
-    
+
     if (GNUNET_OK != TALER_TESTING_get_trait_tip_id
       (authorize_cmd, 0, &tip_id))
       TALER_TESTING_FAIL (is);
@@ -1061,7 +1060,7 @@ tip_pickup_traits (void *cls,
   struct TipPickupState *tps = cls;
   #define NUM_TRAITS (tps->num_coins * 5) + 2
   struct TALER_TESTING_Trait traits[NUM_TRAITS];
-  
+
   for (unsigned int i=0; i<tps->num_coins; i++)
   {
     traits[i] = TALER_TESTING_make_trait_planchet_secrets
@@ -1090,8 +1089,8 @@ tip_pickup_traits (void *cls,
                                   ret,
                                   trait,
                                   index);
-  return GNUNET_SYSERR;
 }
+
 
 /**
  * Define a /tip-pickup CMD, equipped with the expected error
@@ -1134,7 +1133,7 @@ TALER_TESTING_cmd_tip_pickup_with_ec
     .cleanup = &tip_pickup_cleanup,
     .traits = &tip_pickup_traits
   };
-  
+
   return cmd;
 }
 
@@ -1173,7 +1172,7 @@ TALER_TESTING_cmd_tip_pickup
     .cleanup = &tip_pickup_cleanup,
     .traits = &tip_pickup_traits
   };
-  
+
   return cmd;
 }
 
@@ -1201,7 +1200,7 @@ TALER_TESTING_cmd_tip_authorize_fake (const char *label)
     .cleanup = &tip_authorize_cleanup,
     .traits = &tip_authorize_traits
   };
-  
+
   return cmd;
 }
 

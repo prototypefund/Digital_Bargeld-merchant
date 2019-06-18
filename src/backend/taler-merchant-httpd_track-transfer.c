@@ -728,7 +728,7 @@ wire_transfer_cb (void *cls,
     }
     /* Response is consistent with the /deposit we made,
        remember it for future reference */
-    for (unsigned int i=0;i<MAX_RETRIES;i++)
+    for (unsigned int r=0;r<MAX_RETRIES;r++)
     {
       db->preflight (db->cls);
       qs = db->store_coin_to_transfer (db->cls,

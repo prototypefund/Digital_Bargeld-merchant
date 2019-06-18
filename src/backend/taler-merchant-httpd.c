@@ -224,6 +224,9 @@ url_handler (void *cls,
       { "/", MHD_HTTP_METHOD_GET, "text/plain",
         "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n", 0,
         &TMH_MHD_handler_static_response, MHD_HTTP_OK },
+      { "/agpl", MHD_HTTP_METHOD_GET, "text/plain",
+        NULL, 0,
+        &TMH_MHD_handler_agpl_redirect, MHD_HTTP_FOUND },
       { "/public/pay", MHD_HTTP_METHOD_POST, "application/json",
         NULL, 0,
         &MH_handler_pay, MHD_HTTP_OK },
@@ -693,7 +696,7 @@ wireformat_iterator_cb (void *cls,
   struct TALER_WIRE_Plugin *plugin;
   json_t *j;
   enum TALER_ErrorCode ec;
-  struct GNUNET_HashCode h_wire;
+  struct GNUNET_HashCode jh_wire;
   char *wire_file_mode;
 
   if (0 != strncasecmp (section,
@@ -893,7 +896,7 @@ wireformat_iterator_cb (void *cls,
 
   if (GNUNET_OK !=
       TALER_JSON_merchant_wire_signature_hash (j,
-                                               &h_wire))
+                                               &jh_wire))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to hash wire input\n");
@@ -925,7 +928,7 @@ wireformat_iterator_cb (void *cls,
                                       wm);
 
   wm->j_wire = j;
-  wm->h_wire = h_wire;
+  wm->h_wire = jh_wire;
 }
 
 
@@ -993,7 +996,7 @@ instances_iterator_cb (void *cls,
                                              &mi->tip_exchange))
   {
     char *tip_reserves;
-    struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
+    struct GNUNET_CRYPTO_EddsaPrivateKey *tip_pk;
 
     if (GNUNET_OK !=
         GNUNET_CONFIGURATION_get_value_filename (iic->config,
@@ -1010,8 +1013,8 @@ instances_iterator_cb (void *cls,
       iic->ret = GNUNET_SYSERR;
       return;
     }
-    pk = GNUNET_CRYPTO_eddsa_key_create_from_file (tip_reserves);
-    if (NULL == pk)
+    tip_pk = GNUNET_CRYPTO_eddsa_key_create_from_file (tip_reserves);
+    if (NULL == tip_pk)
     {
       GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
                                  section,
@@ -1024,8 +1027,8 @@ instances_iterator_cb (void *cls,
       iic->ret = GNUNET_SYSERR;
       return;
     }
-    mi->tip_reserve.eddsa_priv = *pk;
-    GNUNET_free (pk);
+    mi->tip_reserve.eddsa_priv = *tip_pk;
+    GNUNET_free (tip_pk);
     GNUNET_free (tip_reserves);
   }
 

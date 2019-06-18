@@ -1657,7 +1657,7 @@ parse_pay (struct MHD_Connection *connection,
   {
     struct DepositConfirmation *dc = &pc->dc[coins_index];
     const char *exchange_url;
-    struct GNUNET_JSON_Specification spec[] = {
+    struct GNUNET_JSON_Specification ispec[] = {
       TALER_JSON_spec_denomination_public_key ("denom_pub",
                                               &dc->denom),
       TALER_JSON_spec_amount ("contribution",
@@ -1675,7 +1675,7 @@ parse_pay (struct MHD_Connection *connection,
 
     res = TMH_PARSE_json_data (connection,
                                coin,
-                               spec);
+                               ispec);
     if (GNUNET_YES != res)
     {
       GNUNET_JSON_parse_free (spec);

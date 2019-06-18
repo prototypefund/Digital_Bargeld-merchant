@@ -176,12 +176,11 @@ proposal_traits (void *cls,
     MAKE_TRAIT_NONCE (&ps->nonce),
     TALER_TESTING_trait_end ()
   };
-  
+
   return TALER_TESTING_get_trait (traits,
                                   ret,
                                   trait,
                                   index);
-  return GNUNET_SYSERR;
 }
 
 
@@ -350,7 +349,7 @@ proposal_run (void *cls,
     // human error here.
     GNUNET_break (0);
     fprintf (stderr, "%s\n", error.text);
-    TALER_TESTING_interpreter_fail (is); 
+    TALER_TESTING_interpreter_fail (is);
     return;
   }
 
@@ -360,7 +359,7 @@ proposal_run (void *cls,
     struct GNUNET_TIME_Absolute now;
     char *order_id;
 
-    now = GNUNET_TIME_absolute_get (); 
+    now = GNUNET_TIME_absolute_get ();
 
     order_id = GNUNET_STRINGS_data_to_string_alloc
       (&now.abs_value_us,
@@ -541,7 +540,6 @@ proposal_lookup_run (void *cls,
                      struct TALER_TESTING_Interpreter *is)
 {
   struct ProposalLookupState *pls = cls;
-  const struct TALER_TESTING_Command *proposal_cmd;
   const char *order_id;
   const struct GNUNET_CRYPTO_EddsaPublicKey *nonce;
   /* Only used if we do NOT use the nonce from traits.  */
@@ -561,6 +559,8 @@ proposal_lookup_run (void *cls,
   }
   else
   {
+    const struct TALER_TESTING_Command *proposal_cmd;
+
     proposal_cmd = TALER_TESTING_interpreter_lookup_command
       (is, pls->proposal_reference);
 
@@ -569,7 +569,7 @@ proposal_lookup_run (void *cls,
 
     if (GNUNET_OK != GET_TRAIT_NONCE (proposal_cmd,
                                       &nonce))
-      TALER_TESTING_FAIL (is); 
+      TALER_TESTING_FAIL (is);
 
     if (GNUNET_OK != TALER_TESTING_get_trait_order_id
         (proposal_cmd, 0, &order_id))
@@ -607,7 +607,7 @@ TALER_TESTING_cmd_proposal_lookup
    const char *order_id)
 {
   struct ProposalLookupState *pls;
-  
+
   pls = GNUNET_new (struct ProposalLookupState);
   pls->http_status = http_status;
   pls->proposal_reference = proposal_reference;

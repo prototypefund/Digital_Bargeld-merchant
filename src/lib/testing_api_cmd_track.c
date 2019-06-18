@@ -137,8 +137,6 @@ track_transaction_cb (void *cls,
                       const json_t *json)
 {
   struct TrackTransactionState *tts = cls;
-  json_t *wtid_str;
-  json_t *exchange_url;
 
   tts->tth = NULL;
   if (tts->http_status != http_status)
@@ -160,6 +158,8 @@ track_transaction_cb (void *cls,
     /* Only storing first element's wtid, as this works around
      * the disability of the real bank to provide a "bank check"
      * CMD as the fakebank does.  */
+    json_t *wtid_str;
+    json_t *exchange_url;
 
     if (NULL == (wtid_str = json_object_get
       (json_array_get (json, 0), "wtid")))

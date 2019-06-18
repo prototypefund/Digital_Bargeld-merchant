@@ -160,7 +160,6 @@ history_cb (void *cls,
             enum TALER_ErrorCode ec,
             const json_t *json)
 {
-
   struct HistoryState *hs = cls;
   unsigned int nresult;
   struct GNUNET_TIME_Absolute last_timestamp;
@@ -176,7 +175,7 @@ history_cb (void *cls,
   {
     /* 0 was caused intentionally by the tests,
      * move on without further checking. */
-    TALER_TESTING_interpreter_next (hs->is); 
+    TALER_TESTING_interpreter_next (hs->is);
     return;
   }
 
@@ -192,31 +191,33 @@ history_cb (void *cls,
   }
 
   last_timestamp = GNUNET_TIME_absolute_get ();
-  last_timestamp = GNUNET_TIME_absolute_add
-    (last_timestamp, GNUNET_TIME_UNIT_DAYS);
-  json_t *entry;
-  json_t *timestamp;
-  size_t index;
-  json_array_foreach (json, index, entry)
+  last_timestamp = GNUNET_TIME_absolute_add (last_timestamp,
+                                             GNUNET_TIME_UNIT_DAYS);
   {
-    timestamp = json_object_get (entry, "timestamp");
-    if (GNUNET_OK != parse_abs_time (timestamp, &entry_timestamp))
-      TALER_TESTING_FAIL (hs->is);
-
-    if (last_timestamp.abs_value_us < entry_timestamp.abs_value_us)
+    json_t *entry;
+    size_t index;
+    json_array_foreach (json, index, entry)
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "History entries are NOT"
-                  " sorted from younger to older\n");
-      TALER_TESTING_interpreter_fail (hs->is);
-      return;
+      json_t *timestamp;
+
+      timestamp = json_object_get (entry, "timestamp");
+      if (GNUNET_OK != parse_abs_time (timestamp, &entry_timestamp))
+        TALER_TESTING_FAIL (hs->is);
+
+      if (last_timestamp.abs_value_us < entry_timestamp.abs_value_us)
+      {
+        GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                    "History entries are NOT"
+                    " sorted from younger to older\n");
+        TALER_TESTING_interpreter_fail (hs->is);
+        return;
+      }
+      last_timestamp = entry_timestamp;
     }
-
-    last_timestamp = entry_timestamp;
   }
-
   TALER_TESTING_interpreter_next (hs->is);
 }
+
 
 /**
  * Free the state for a "history" CMD, and possibly cancel
@@ -240,6 +241,7 @@ history_cleanup (void *cls,
   GNUNET_free (hs);
 }
 
+
 /**
  * Run a "history" CMD.
  *
@@ -253,7 +255,7 @@ history_run (void *cls,
              struct TALER_TESTING_Interpreter *is)
 {
   struct HistoryState *hs = cls;
-  
+
   hs->is = is;
   if (0 == hs->time.abs_value_us)
   {
@@ -341,7 +343,7 @@ cmd_history2 (const char *label,
     .run = &history_run,
     .cleanup = &history_cleanup
   };
-  
+
   return cmd;
 }
 

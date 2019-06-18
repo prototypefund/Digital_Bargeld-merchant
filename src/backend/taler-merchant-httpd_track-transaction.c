@@ -1049,7 +1049,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   struct TrackTransactionContext *tctx;
   const char *order_id;
   const char *instance;
-  int ret;
   enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_HashCode h_instance;
   struct json_t *contract_terms;
@@ -1070,6 +1069,8 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 
   if (0 != tctx->response_code)
   {
+    int ret;
+
     /* We are *done* processing the request, just queue the response (!) */
     if (UINT_MAX == tctx->response_code)
     {

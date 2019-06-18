@@ -63,7 +63,6 @@ check_products (json_t *products)
 {
   size_t index;
   json_t *value;
-  int res;
 
   if (! json_is_array (products))
   {
@@ -74,6 +73,7 @@ check_products (json_t *products)
     const char *description;
     const char *error_name;
     unsigned int error_line;
+    int res;
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_string ("description", &description),
       /* FIXME: there are other fields in the product specification
@@ -322,9 +322,9 @@ proposal_put (struct MHD_Connection *connection,
     /* The frontend either fully specifieds the "merchant" field,
      * or just gives the backend the "instance" name and lets it
      * fill out. */
-    struct MerchantInstance *mi = TMH_lookup_instance (instance);
+    struct MerchantInstance *my_mi = TMH_lookup_instance (instance);
 
-    if (NULL == mi)
+    if (NULL == my_mi)
     {
       TALER_LOG_WARNING ("Does 'default' instance exist?\n");
       return TMH_RESPONSE_reply_not_found
@@ -344,29 +344,27 @@ proposal_put (struct MHD_Connection *connection,
       const char *mj = NULL;
       const char *ma = NULL;
       json_t *locations;
-      json_t *locj;
-      json_t *loca;
-      json_t *merchant;
       char *label;
+      json_t *jmerchant;
 
-      merchant = json_object ();
-      json_object_set_new (merchant,
+      jmerchant = json_object ();
+      json_object_set_new (jmerchant,
                            "name",
-                           json_string (mi->name));
-      json_object_set_new (merchant,
+                           json_string (my_mi->name));
+      json_object_set_new (jmerchant,
                            "instance",
                            json_string (instance));
-      json_object_set_new (order,
-                           "merchant",
-                           merchant);
       locations = json_object_get (order,
                                    "locations");
       if (NULL != locations)
       {
+        json_t *loca;
+        json_t *locj;
+
         /* Handle merchant address */
         GNUNET_assert (0 < GNUNET_asprintf (&label,
                                             "%s-address",
-                                            mi->id));
+                                            my_mi->id));
         loca = json_object_get (default_locations,
                                 label);
         if (NULL != loca)
@@ -376,7 +374,7 @@ proposal_put (struct MHD_Connection *connection,
           json_object_set_new (locations,
                                ma,
                                loca);
-          json_object_set_new (merchant,
+          json_object_set_new (jmerchant,
                                "address",
                                json_string (ma));
         }
@@ -385,7 +383,7 @@ proposal_put (struct MHD_Connection *connection,
         /* Handle merchant jurisdiction */
         GNUNET_assert (0 < GNUNET_asprintf (&label,
                                             "%s-jurisdiction",
-                                            mi->id));
+                                            my_mi->id));
         locj = json_object_get (default_locations,
                                 label);
         if (NULL != locj)
@@ -411,8 +409,11 @@ proposal_put (struct MHD_Connection *connection,
         }
         GNUNET_free (label);
       } /* have locations */
+      json_object_set_new (order,
+                           "merchant",
+                           jmerchant);
     } /* needed to synthesize merchant info */
-  } /* scope of 'mi' */
+  } /* scope of 'my_mi' */
 
   /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection,

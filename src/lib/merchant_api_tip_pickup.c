@@ -118,14 +118,14 @@ check_ok (struct TALER_MERCHANT_TipPickupOperation *tpo,
     {
       json_t *pj = json_array_get (ja, i);
 
-      struct GNUNET_JSON_Specification spec[] = {
+      struct GNUNET_JSON_Specification ispec[] = {
         GNUNET_JSON_spec_fixed_auto ("reserve_sig", &reserve_sigs[i]),
         GNUNET_JSON_spec_end()
       };
 
       if (GNUNET_OK !=
           GNUNET_JSON_parse (pj,
-                             spec,
+                             ispec,
                              NULL, NULL))
       {
         GNUNET_break_op (0);

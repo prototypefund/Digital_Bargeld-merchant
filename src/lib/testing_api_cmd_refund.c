@@ -275,7 +275,6 @@ refund_lookup_cb (void *cls,
   char *coin_reference_dup;
   const char *icoin_reference;
   const struct TALER_TESTING_Command *pay_cmd;
-  const struct TALER_TESTING_Command *icoin_cmd;
   const struct TALER_TESTING_Command *increase_cmd;
   const char *refund_amount;
   struct TALER_Amount acc;
@@ -344,6 +343,7 @@ refund_lookup_cb (void *cls,
     struct TALER_CoinSpendPublicKeyP icoin_pub;
     struct GNUNET_HashCode h_icoin_pub;
     struct TALER_Amount *iamount;
+    const struct TALER_TESTING_Command *icoin_cmd;
 
     if ( NULL ==
        ( icoin_cmd = TALER_TESTING_interpreter_lookup_command
@@ -351,7 +351,7 @@ refund_lookup_cb (void *cls,
     {
       GNUNET_break (0);
       TALER_LOG_ERROR ("Bad reference `%s'\n",
-                       icoin_reference); 
+                       icoin_reference);
       TALER_TESTING_interpreter_fail (rls->is);
       return;
     }
@@ -362,11 +362,11 @@ refund_lookup_cb (void *cls,
      GNUNET_break (0);
      TALER_LOG_ERROR ("Command `%s' failed to give coin"
                       " priv trait\n",
-                      icoin_reference); 
+                      icoin_reference);
      TALER_TESTING_interpreter_fail (rls->is);
      return;
     }
-     
+
     GNUNET_CRYPTO_eddsa_key_get_public (&icoin_priv->eddsa_priv,
                                         &icoin_pub.eddsa_pub);
     GNUNET_CRYPTO_hash (&icoin_pub,
@@ -386,7 +386,7 @@ refund_lookup_cb (void *cls,
   }
 
   GNUNET_free (coin_reference_dup);
-  
+
   if (NULL !=
     (increase_cmd = TALER_TESTING_interpreter_lookup_command
       (rls->is, rls->increase_reference)))
@@ -443,7 +443,7 @@ refund_lookup_run (void *cls,
                    struct TALER_TESTING_Interpreter *is)
 {
   struct RefundLookupState *rls = cls;
-  
+
   rls->is = is;
   rls->rlo = TALER_MERCHANT_refund_lookup (is->ctx,
                                            rls->merchant_url,
@@ -472,7 +472,7 @@ refund_increase_traits (void *cls,
                         unsigned int index)
 {
   struct RefundIncreaseState *ris = cls;
-  
+
   struct TALER_TESTING_Trait traits[] = {
     TALER_TESTING_make_trait_amount (0, ris->refund_amount),
     TALER_TESTING_trait_end ()
