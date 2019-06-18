@@ -177,7 +177,6 @@ TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOpera
   }
   TALER_curl_easy_post_finished (&rio->post_ctx);
   GNUNET_free (rio->url);
-  GNUNET_free (rio->post_ctx.json_enc);
   GNUNET_free (rio);
 }
 

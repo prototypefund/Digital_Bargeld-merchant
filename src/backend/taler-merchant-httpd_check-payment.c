@@ -342,6 +342,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   {
     GNUNET_break (0);
     json_decref (contract_terms);
+    GNUNET_free (last_session_id);
     GNUNET_free (final_contract_url);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
@@ -381,6 +382,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       GNUNET_free_non_null (h_contract_terms_str);
       GNUNET_free (final_contract_url);
       json_decref (contract_terms);
+      GNUNET_free (last_session_id);
       return ret;
 
     }
@@ -401,6 +403,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       GNUNET_free_non_null (h_contract_terms_str);
       GNUNET_free (final_contract_url);
       json_decref (contract_terms);
+      GNUNET_free (last_session_id);
       return TMH_RESPONSE_reply_internal_error (connection,
                                                 TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
                                                 "Merchant database error (contract terms corrupted)");
@@ -426,6 +429,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     GNUNET_free_non_null (h_contract_terms_str);
     GNUNET_free (final_contract_url);
     json_decref (contract_terms);
+    GNUNET_free (last_session_id);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
                                               "Merchant database error");

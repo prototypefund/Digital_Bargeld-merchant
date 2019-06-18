@@ -844,12 +844,15 @@ check_payment_sufficient (struct PayContext *pc)
     if (-1 == TALER_amount_cmp (&acc_amount,
                                 &pc->amount))
     {
+      char *str;
+
       GNUNET_break_op (0);
+      str = TALER_amount_to_string (&acc_amount);
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "price vs. sent: %s vs. %s\n",
-                  TALER_amount_to_string (&pc->amount),
-                  TALER_amount_to_string (&acc_amount));
-
+                  TALER_amount2s (&pc->amount),
+                  str);
+      GNUNET_free (str);
       return TALER_EC_PAY_PAYMENT_INSUFFICIENT;
     }
   }

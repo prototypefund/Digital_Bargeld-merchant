@@ -1519,10 +1519,12 @@ find_tip_authorizations_cb (void *cls,
                             &amount))
       {
         GNUNET_break (0);
+        GNUNET_PQ_cleanup_result (rs);
         ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
         return;
       }
     }
+    GNUNET_PQ_cleanup_result (rs);
   }
 
   if (0 == i)

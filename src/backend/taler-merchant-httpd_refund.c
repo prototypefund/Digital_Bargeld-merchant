@@ -161,13 +161,14 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   if (GNUNET_NO == res)
   {
     GNUNET_break_op (0);
+    json_decref (root);
     return MHD_YES;
   }
-
   if (GNUNET_SYSERR == res)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Hard error from JSON parser\n");
+    json_decref (root);
     return MHD_NO;
   }
 
@@ -177,6 +178,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "No instance found\n");
     GNUNET_JSON_parse_free (spec);
+    json_decref (root);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_REFUND_INSTANCE_UNKNOWN,
                                          "Unknown instance given");
@@ -196,6 +198,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_REFUND_LOOKUP_DB_ERROR,
                                               "An error occurred while retrieving payment data from db");
@@ -205,6 +208,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown order id given: %s\n",
                 order_id);
+    json_decref (root);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_REFUND_ORDER_ID_UNKNOWN,
                                          "Order id not found in database");
@@ -218,8 +222,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   {
     GNUNET_break (0);
     GNUNET_JSON_parse_free (spec);
+    json_decref (contract_terms);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not hash contract terms\n");
+    json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_INTERNAL_LOGIC_ERROR,
                                               "Could not hash contract terms");
@@ -231,6 +237,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                    "increase refund"))
     {
       GNUNET_break (0);
+      json_decref (contract_terms);
+      json_decref (root);
       return GNUNET_DB_STATUS_HARD_ERROR;
     }
     qs = db->increase_refund_for_contract_NT (db->cls,
@@ -276,6 +284,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     GNUNET_JSON_parse_free (spec);
+    json_decref (contract_terms);
+    json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_REFUND_MERCHANT_DB_COMMIT_ERROR,
                                               "Internal database error or refund amount too big");
@@ -286,6 +296,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                 "Refunded amount lower or equal to previous refund: %s\n",
                 TALER_amount2s (&refund));
     GNUNET_JSON_parse_free (spec);
+    json_decref (contract_terms);
+    json_decref (root);
     return TMH_RESPONSE_reply_external_error (connection,
                                               TALER_EC_REFUND_INCONSISTENT_AMOUNT,
                                               "Amount incorrect: not larger than the previous one");
@@ -308,14 +320,14 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 
   if (GNUNET_OK !=
       GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
-				&confirmation.purpose,
-				&sig))
+                                &confirmation.purpose,
+                                &sig))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to sign successful refund confirmation\n");
     json_decref (contract_terms);
-    json_decref (root);
     GNUNET_JSON_parse_free (spec);
+    json_decref (root);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_REFUND_MERCHANT_SIGNING_FAILED,
                                               "Refund done, but failed to sign confirmation");
@@ -352,8 +364,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                                         contract_terms);
     GNUNET_free (refund_pickup_url);
     GNUNET_free (refund_redirect_url);
-    json_decref (root);
     GNUNET_JSON_parse_free (spec);
+    json_decref (root);
     return ret;
   }
 }
