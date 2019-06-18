@@ -957,7 +957,6 @@ TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *pay)
   TALER_curl_easy_post_finished (&pay->post_ctx);
   GNUNET_free (pay->coins);
   GNUNET_free (pay->url);
-  GNUNET_free (pay->post_ctx.json_enc);
   GNUNET_free (pay);
 }
 
