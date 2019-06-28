@@ -850,6 +850,20 @@ wireformat_iterator_cb (void *cls,
                    "url", payto,
                    "salt", salt_str);
     GNUNET_free (salt_str);
+
+    /* Make sure every path component exists.  */
+    if (GNUNET_OK != GNUNET_DISK_directory_create_for_file (fn))
+    {
+      GNUNET_log_strerror_file (GNUNET_ERROR_TYPE_ERROR,
+                                "mkdir",
+                                fn);
+      GNUNET_free (fn);
+      GNUNET_free (payto);
+      json_decref (j);
+      iic->ret = GNUNET_SYSERR;
+      return;
+    }
+
     if (0 != json_dump_file (j,
                              fn,
                              JSON_COMPACT | JSON_SORT_KEYS))
