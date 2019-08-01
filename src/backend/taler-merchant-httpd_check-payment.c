@@ -93,7 +93,7 @@ send_pay_request (struct MHD_Connection *connection,
   GNUNET_assert (NULL != url);
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:s, s:s, s:b, s:b}",
+                                      "{s:s, s:s, s:b}",
                                       "payment_redirect_url",
                                       url,
                                       "contract_url",
