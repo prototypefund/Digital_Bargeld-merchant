@@ -93,9 +93,11 @@ send_pay_request (struct MHD_Connection *connection,
   GNUNET_assert (NULL != url);
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:s, s:b}",
+                                      "{s:s, s:s, s:b}",
                                       "payment_redirect_url",
                                       url,
+                                      "contract_url",
+                                      final_contract_url,
                                       "paid",
                                       0);
   GNUNET_free (url);
@@ -257,21 +259,11 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   session_sig_str = MHD_lookup_connection_value (connection,
                                                 MHD_GET_ARGUMENT_KIND,
                                                 "session_sig");
-  if (NULL != session_id)
+  if ((NULL != session_id) && (NULL != session_sig_str))
   {
     struct GNUNET_CRYPTO_EddsaSignature sig;
     struct TALER_MerchantPaySessionSigPS mps;
-    /* If the session id is given, the frontend wants us
-       to verify the session signature. */
-    if (NULL == session_sig_str)
-    {
-      /* pay session signature required but missing */
-      GNUNET_break_op (0);
-      GNUNET_free (final_contract_url);
-      return TMH_RESPONSE_reply_bad_request (connection,
-                                             TALER_EC_PARAMETER_MISSING,
-                                             "session_sig required if session_id given");
-    }
+
     if (GNUNET_OK !=
         GNUNET_STRINGS_string_to_data (session_sig_str,
                                        strlen (session_sig_str),
