@@ -1,3 +1,7 @@
+Sat 17 Aug 2019 10:03:38 PM CEST
+    Remove "currency" field from exchange database, as we only
+    support one currency per merchant backend anyway. -CG
+
 Wed Apr  4 00:19:38 CEST 2018
 	Releasing taler-merchant-0.5.0 -FD
 
