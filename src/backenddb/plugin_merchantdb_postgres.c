@@ -35,6 +35,33 @@
 
 
 /**
+ * Wrapper macro to add the currency from the plugin's state
+ * when fetching amounts from the database.
+ *
+ * @param field name of the database field to fetch amount from
+ * @param amountp[out] pointer to amount to set
+ */
+#define TALER_PQ_RESULT_SPEC_AMOUNT(field,amountp) TALER_PQ_result_spec_amount(field,pg->currency,amountp)
+
+/**
+ * Wrapper macro to add the currency from the plugin's state
+ * when fetching amounts from the database.  NBO variant.
+ *
+ * @param field name of the database field to fetch amount from
+ * @param amountp[out] pointer to amount to set
+ */
+#define TALER_PQ_RESULT_SPEC_AMOUNT_NBO(field,amountp) TALER_PQ_result_spec_amount_nbo(field,pg->currency,amountp)
+/**
+ * Wrapper macro to add the currency from the plugin's state
+ * when fetching amounts from the database.
+ *
+ * @param field name of the database field to fetch amount from
+ * @param amountp[out] pointer to amount to set
+ */
+#define TALER_PQ_RESULT_SPEC_AMOUNT(field,amountp) TALER_PQ_result_spec_amount(field,pg->currency,amountp)
+
+
+/**
  * Type of the "cls" argument given to each of the functions in
  * our API.
  */
@@ -46,6 +73,11 @@ struct PostgresClosure
    */
   PGconn *conn;
 
+  /** 
+   * Which currency do we deal in?
+   */
+  char *currency;
+  
   /**
    * Underlying configuration.
    */
@@ -132,16 +164,12 @@ postgres_initialize (void *cls)
                             ",exchange_url VARCHAR NOT NULL"
                             ",amount_with_fee_val INT8 NOT NULL"
                             ",amount_with_fee_frac INT4 NOT NULL"
-                            ",amount_with_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",deposit_fee_val INT8 NOT NULL"
                             ",deposit_fee_frac INT4 NOT NULL"
-                            ",deposit_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",refund_fee_val INT8 NOT NULL"
                             ",refund_fee_frac INT4 NOT NULL"
-                            ",refund_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",wire_fee_val INT8 NOT NULL"
                             ",wire_fee_frac INT4 NOT NULL"
-                            ",wire_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
                             ",exchange_proof BYTEA NOT NULL"
                             ",PRIMARY KEY (h_contract_terms, coin_pub)"
@@ -173,10 +201,8 @@ postgres_initialize (void *cls)
                             ",h_wire_method BYTEA NOT NULL CHECK (length(h_wire_method)=64)"
                             ",wire_fee_val INT8 NOT NULL"
                             ",wire_fee_frac INT4 NOT NULL"
-                            ",wire_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",closing_fee_val INT8 NOT NULL"
                             ",closing_fee_frac INT4 NOT NULL"
-                            ",closing_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",start_date INT8 NOT NULL"
                             ",end_date INT8 NOT NULL"
                             ",exchange_sig BYTEA NOT NULL CHECK (length(exchange_sig)=64)"
@@ -190,10 +216,8 @@ postgres_initialize (void *cls)
                             ",reason VARCHAR NOT NULL"
                             ",refund_amount_val INT8 NOT NULL"
                             ",refund_amount_frac INT4 NOT NULL"
-                            ",refund_amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",refund_fee_val INT8 NOT NULL"
                             ",refund_fee_frac INT4 NOT NULL"
-                            ",refund_fee_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ");"),
     /* balances of the reserves available for tips */
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_reserves ("
@@ -201,7 +225,6 @@ postgres_initialize (void *cls)
                             ",expiration INT8 NOT NULL"
                             ",balance_val INT8 NOT NULL"
                             ",balance_frac INT4 NOT NULL"
-                            ",balance_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",PRIMARY KEY (reserve_priv)"
                             ");"),
     /* table where we remember when tipping reserves where established / enabled */
@@ -211,7 +234,6 @@ postgres_initialize (void *cls)
                             ",timestamp INT8 NOT NULL"
                             ",amount_val INT8 NOT NULL"
                             ",amount_frac INT4 NOT NULL"
-                            ",amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",PRIMARY KEY (credit_uuid)"
                             ");"),
     /* tips that have been authorized */
@@ -223,10 +245,8 @@ postgres_initialize (void *cls)
                             ",timestamp INT8 NOT NULL"
                             ",amount_val INT8 NOT NULL" /* overall tip amount */
                             ",amount_frac INT4 NOT NULL"
-                            ",amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",left_val INT8 NOT NULL" /* tip amount not yet picked up */
                             ",left_frac INT4 NOT NULL"
-                            ",left_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",PRIMARY KEY (tip_id)"
                             ");"),
     /* tips that have been picked up */
@@ -235,7 +255,6 @@ postgres_initialize (void *cls)
                             ",pickup_id BYTEA NOT NULL CHECK (LENGTH(pickup_id)=64)"
                             ",amount_val INT8 NOT NULL"
                             ",amount_frac INT4 NOT NULL"
-                            ",amount_curr VARCHAR(" TALER_CURRENCY_LEN_STR ") NOT NULL"
                             ",PRIMARY KEY (pickup_id)"
                             ");"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
@@ -249,20 +268,16 @@ postgres_initialize (void *cls)
                             ",exchange_url"
                             ",amount_with_fee_val"
                             ",amount_with_fee_frac"
-                            ",amount_with_fee_curr"
                             ",deposit_fee_val"
                             ",deposit_fee_frac"
-                            ",deposit_fee_curr"
                             ",refund_fee_val"
                             ",refund_fee_frac"
-                            ",refund_fee_curr"
                             ",wire_fee_val"
                             ",wire_fee_frac"
-                            ",wire_fee_curr"
                             ",signkey_pub"
                             ",exchange_proof) VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
-                            18),
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+                            14),
     GNUNET_PQ_make_prepare ("insert_transfer",
                             "INSERT INTO merchant_transfers"
                             "(h_contract_terms"
@@ -278,13 +293,11 @@ postgres_initialize (void *cls)
                             ",reason"
                             ",refund_amount_val"
                             ",refund_amount_frac"
-                            ",refund_amount_curr"
                             ",refund_fee_val"
                             ",refund_fee_frac"
-                            ",refund_fee_curr"
                             ") VALUES"
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-                            10),
+                            "($1, $2, $3, $4, $5, $6, $7, $8)",
+                            8),
     GNUNET_PQ_make_prepare ("insert_proof",
                             "INSERT INTO merchant_proofs"
                             "(exchange_url"
@@ -325,24 +338,20 @@ postgres_initialize (void *cls)
                             ",h_wire_method"
                             ",wire_fee_val"
                             ",wire_fee_frac"
-                            ",wire_fee_curr"
                             ",closing_fee_val"
                             ",closing_fee_frac"
-                            ",closing_fee_curr"
                             ",start_date"
                             ",end_date"
                             ",exchange_sig)"
                             " VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
-                            11),
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                            9),
     GNUNET_PQ_make_prepare ("lookup_wire_fee",
                             "SELECT"
                             " wire_fee_val"
                             ",wire_fee_frac"
-                            ",wire_fee_curr"
                             ",closing_fee_val"
                             ",closing_fee_frac"
-                            ",closing_fee_curr"
                             ",start_date"
                             ",end_date"
                             ",exchange_sig"
@@ -375,7 +384,6 @@ postgres_initialize (void *cls)
                             "SELECT"
                             " refund_amount_val"
                             ",refund_amount_frac"
-                            ",refund_amount_curr"
                             " FROM merchant_refunds"
                             " WHERE coin_pub=$1",
                             1),
@@ -424,10 +432,8 @@ postgres_initialize (void *cls)
                             ",rtransaction_id"
                             ",refund_amount_val"
                             ",refund_amount_frac"
-                            ",refund_amount_curr"
                             ",refund_fee_val"
                             ",refund_fee_frac"
-                            ",refund_fee_curr"
                             ",reason"
                             " FROM merchant_refunds"
                             " WHERE merchant_pub=$1"
@@ -495,16 +501,12 @@ postgres_initialize (void *cls)
                             ",exchange_url"
                             ",amount_with_fee_val"
                             ",amount_with_fee_frac"
-                            ",amount_with_fee_curr"
                             ",deposit_fee_val"
                             ",deposit_fee_frac"
-                            ",deposit_fee_curr"
                             ",refund_fee_val"
                             ",refund_fee_frac"
-                            ",refund_fee_curr"
                             ",wire_fee_val"
                             ",wire_fee_frac"
-                            ",wire_fee_curr"
                             ",exchange_proof"
                             " FROM merchant_deposits"
                             " WHERE h_contract_terms=$1"
@@ -514,16 +516,12 @@ postgres_initialize (void *cls)
                             "SELECT"
                             " amount_with_fee_val"
                             ",amount_with_fee_frac"
-                            ",amount_with_fee_curr"
                             ",deposit_fee_val"
                             ",deposit_fee_frac"
-                            ",deposit_fee_curr"
                             ",refund_fee_val"
                             ",refund_fee_frac"
-                            ",refund_fee_curr"
                             ",wire_fee_val"
                             ",wire_fee_frac"
-                            ",wire_fee_curr"
                             ",exchange_url"
                             ",exchange_proof"
                             " FROM merchant_deposits"
@@ -547,16 +545,12 @@ postgres_initialize (void *cls)
                             ",merchant_transfers.coin_pub"
                             ",merchant_deposits.amount_with_fee_val"
                             ",merchant_deposits.amount_with_fee_frac"
-                            ",merchant_deposits.amount_with_fee_curr"
                             ",merchant_deposits.deposit_fee_val"
                             ",merchant_deposits.deposit_fee_frac"
-                            ",merchant_deposits.deposit_fee_curr"
                             ",merchant_deposits.refund_fee_val"
                             ",merchant_deposits.refund_fee_frac"
-                            ",merchant_deposits.refund_fee_curr"
                             ",merchant_deposits.wire_fee_val"
                             ",merchant_deposits.wire_fee_frac"
-                            ",merchant_deposits.wire_fee_curr"
                             ",merchant_deposits.exchange_url"
                             ",merchant_deposits.exchange_proof"
                             " FROM merchant_transfers"
@@ -578,7 +572,6 @@ postgres_initialize (void *cls)
                             " expiration"
                             ",balance_val"
                             ",balance_frac"
-                            ",balance_curr"
                             " FROM merchant_tip_reserves"
                             " WHERE reserve_priv=$1",
                             1),
@@ -586,7 +579,6 @@ postgres_initialize (void *cls)
                             "SELECT"
                             " amount_val"
                             ",amount_frac"
-                            ",amount_curr"
                             ",justification"
                             ",tip_id"
                             " FROM merchant_tips"
@@ -597,19 +589,17 @@ postgres_initialize (void *cls)
                             " expiration=$2"
                             ",balance_val=$3"
                             ",balance_frac=$4"
-                            ",balance_curr=$5"
                             " WHERE reserve_priv=$1",
-                            5),
+                            4),
     GNUNET_PQ_make_prepare ("insert_tip_reserve_balance",
                             "INSERT INTO merchant_tip_reserves"
                             "(reserve_priv"
                             ",expiration"
                             ",balance_val"
                             ",balance_frac"
-                            ",balance_curr"
                             ") VALUES "
-                            "($1, $2, $3, $4, $5)",
-                            5),
+                            "($1, $2, $3, $4)",
+                            4),
     GNUNET_PQ_make_prepare ("insert_tip_justification",
                             "INSERT INTO merchant_tips"
                             "(reserve_priv"
@@ -619,19 +609,16 @@ postgres_initialize (void *cls)
                             ",timestamp"
                             ",amount_val"
                             ",amount_frac"
-                            ",amount_curr"
                             ",left_val"
                             ",left_frac"
-                            ",left_curr"
                             ") VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
-                            11),
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                            9),
     GNUNET_PQ_make_prepare ("lookup_reserve_by_tip_id",
                             "SELECT"
                             " reserve_priv"
                             ",left_val"
                             ",left_frac"
-                            ",left_curr"
                             " FROM merchant_tips"
                             " WHERE tip_id=$1",
                             1),
@@ -639,7 +626,6 @@ postgres_initialize (void *cls)
                             "SELECT"
                             " amount_val"
                             ",amount_frac"
-                            ",amount_curr"
                             " FROM merchant_tip_pickups"
                             " WHERE pickup_id=$1"
                             " AND tip_id=$2",
@@ -650,7 +636,6 @@ postgres_initialize (void *cls)
                             ",timestamp"
                             ",amount_val"
                             ",amount_frac"
-                            ",amount_curr"
                             " FROM merchant_tips"
                             " WHERE tip_id=$1",
                             1),
@@ -658,19 +643,17 @@ postgres_initialize (void *cls)
                             "UPDATE merchant_tips SET"
                             " left_val=$2"
                             ",left_frac=$3"
-                            ",left_curr=$4"
                             " WHERE tip_id=$1",
-                            4),
+                            3),
     GNUNET_PQ_make_prepare ("insert_pickup_id",
                             "INSERT INTO merchant_tip_pickups"
                             "(tip_id"
                             ",pickup_id"
                             ",amount_val"
                             ",amount_frac"
-                            ",amount_curr"
                             ") VALUES "
-                            "($1, $2, $3, $4, $5)",
-                            5),
+                            "($1, $2, $3, $4)",
+                            4),
     GNUNET_PQ_make_prepare ("insert_tip_credit_uuid",
                             "INSERT INTO merchant_tip_reserve_credits"
                             "(reserve_priv"
@@ -678,10 +661,9 @@ postgres_initialize (void *cls)
                             ",timestamp"
                             ",amount_val"
                             ",amount_frac"
-                            ",amount_curr)"
-                            " VALUES "
-                            "($1, $2, $3, $4, $5, $6)",
-                            6),
+                            ") VALUES "
+                            "($1, $2, $3, $4, $5)",
+                            5),
     GNUNET_PQ_make_prepare ("lookup_tip_credit_uuid",
                             "SELECT 1 "
                             "FROM merchant_tip_reserve_credits "
@@ -1463,6 +1445,11 @@ struct GetAuthorizedTipAmountContext
    */
   enum GNUNET_DB_QueryStatus qs;
 
+  /**
+   * Plugin context.
+   */
+  struct PostgresClosure *pg;
+
 };
 
 
@@ -1480,6 +1467,7 @@ find_tip_authorizations_cb (void *cls,
                             unsigned int num_results)
 {
   struct GetAuthorizedTipAmountContext *ctx = cls;
+  struct PostgresClosure *pg = ctx->pg;
   unsigned int i;
 
   for (i = 0; i < num_results; i++)
@@ -1492,7 +1480,7 @@ find_tip_authorizations_cb (void *cls,
                                     &just),
       GNUNET_PQ_result_spec_auto_from_type ("tip_id",
                                             &h),
-      TALER_PQ_result_spec_amount ("amount",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("amount",
                                     &amount),
       GNUNET_PQ_result_spec_end
     };
@@ -1561,7 +1549,9 @@ postgres_get_authorized_tip_amount (void *cls,
     GNUNET_PQ_query_param_end
   };
   enum GNUNET_DB_QueryStatus qs;
-  struct GetAuthorizedTipAmountContext ctx = { 0 };
+  struct GetAuthorizedTipAmountContext ctx = {
+    .pg = pg
+  };
 
   check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
@@ -1638,6 +1628,11 @@ struct FindPaymentsContext
   void *cb_cls;
 
   /**
+   * Plugin context.
+   */
+  struct PostgresClosure *pg;
+
+  /**
    * Contract term hash used for the search.
    */
   const struct GNUNET_HashCode *h_contract_terms;
@@ -1663,6 +1658,7 @@ find_payments_cb (void *cls,
                   unsigned int num_results)
 {
   struct FindPaymentsContext *fpc = cls;
+  struct PostgresClosure *pg = fpc->pg;
 
   for (unsigned int i=0;i<num_results;i++)
   {
@@ -1678,13 +1674,13 @@ find_payments_cb (void *cls,
                                             &coin_pub),
       GNUNET_PQ_result_spec_string ("exchange_url",
                                     &exchange_url),
-      TALER_PQ_result_spec_amount ("amount_with_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("amount_with_fee",
                                    &amount_with_fee),
-      TALER_PQ_result_spec_amount ("deposit_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("deposit_fee",
                                    &deposit_fee),
-      TALER_PQ_result_spec_amount ("refund_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("refund_fee",
                                    &refund_fee),
-      TALER_PQ_result_spec_amount ("wire_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("wire_fee",
                                    &wire_fee),
       TALER_PQ_result_spec_json ("exchange_proof",
                                  &exchange_proof),
@@ -1742,7 +1738,8 @@ postgres_find_payments (void *cls,
   struct FindPaymentsContext fpc = {
     .h_contract_terms = h_contract_terms,
     .cb = cb,
-    .cb_cls = cb_cls
+    .cb_cls = cb_cls,
+    .pg = pg
   };
   enum GNUNET_DB_QueryStatus qs;
 
@@ -1779,6 +1776,11 @@ struct FindPaymentsByCoinContext
   void *cb_cls;
 
   /**
+   * Plugin context.
+   */
+  struct PostgresClosure *pg;
+  
+  /**
    * Coin we are looking for.
    */
   const struct TALER_CoinSpendPublicKeyP *coin_pub;
@@ -1809,7 +1811,8 @@ find_payments_by_coin_cb (void *cls,
                           unsigned int num_results)
 {
   struct FindPaymentsByCoinContext *fpc = cls;
-
+  struct PostgresClosure *pg = fpc->pg;
+  
   for (unsigned int i=0;i<num_results;i++)
   {
     struct TALER_Amount amount_with_fee;
@@ -1819,13 +1822,13 @@ find_payments_by_coin_cb (void *cls,
     char *exchange_url;
     json_t *exchange_proof;
     struct GNUNET_PQ_ResultSpec rs[] = {
-      TALER_PQ_result_spec_amount ("amount_with_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("amount_with_fee",
                                    &amount_with_fee),
-      TALER_PQ_result_spec_amount ("deposit_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("deposit_fee",
                                    &deposit_fee),
-      TALER_PQ_result_spec_amount ("refund_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("refund_fee",
                                    &refund_fee),
-      TALER_PQ_result_spec_amount ("wire_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("wire_fee",
                                    &wire_fee),
       GNUNET_PQ_result_spec_string ("exchange_url",
 				    &exchange_url),
@@ -1887,6 +1890,7 @@ postgres_find_payments_by_hash_and_coin (void *cls,
   struct FindPaymentsByCoinContext fpc = {
     .cb = cb,
     .cb_cls = cb_cls,
+    .pg = pg,
     .h_contract_terms = h_contract_terms,
     .coin_pub = coin_pub
   };
@@ -1945,7 +1949,7 @@ find_transfers_cb (void *cls,
                    unsigned int num_results)
 {
   struct FindTransfersContext *ftc = cls;
-
+  
   for (unsigned int i=0;i<PQntuples (result);i++)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -2046,6 +2050,11 @@ struct FindDepositsContext
   void *cb_cls;
 
   /**
+   * Plugin context.
+   */
+  struct PostgresClosure *pg;
+  
+  /**
    * Transaction status (set).
    */
   enum GNUNET_DB_QueryStatus qs;
@@ -2066,6 +2075,7 @@ find_deposits_cb (void *cls,
                   unsigned int num_results)
 {
   struct FindDepositsContext *fdc = cls;
+  struct PostgresClosure *pg = fdc->pg;
 
   for (unsigned int i=0;i<PQntuples (result);i++)
   {
@@ -2082,13 +2092,13 @@ find_deposits_cb (void *cls,
                                             &h_contract_terms),
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
-      TALER_PQ_result_spec_amount ("amount_with_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("amount_with_fee",
                                    &amount_with_fee),
-      TALER_PQ_result_spec_amount ("deposit_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("deposit_fee",
                                    &deposit_fee),
-      TALER_PQ_result_spec_amount ("refund_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("refund_fee",
                                    &refund_fee),
-      TALER_PQ_result_spec_amount ("wire_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("wire_fee",
                                    &wire_fee),
       GNUNET_PQ_result_spec_string ("exchange_url",
 				    &exchange_url),
@@ -2143,7 +2153,8 @@ postgres_find_deposits_by_wtid (void *cls,
   };
   struct FindDepositsContext fdc = {
     .cb = cb,
-    .cb_cls = cb_cls
+    .cb_cls = cb_cls,
+    .pg = pg
   };
   enum GNUNET_DB_QueryStatus qs;
 
@@ -2175,6 +2186,11 @@ struct GetRefundsContext
   void *rc_cls;
 
   /**
+   * Plugin context.
+   */
+  struct PostgresClosure *pg;
+
+  /**
    * Transaction result.
    */
   enum GNUNET_DB_QueryStatus qs;
@@ -2195,6 +2211,7 @@ get_refunds_cb (void *cls,
                 unsigned int num_results)
 {
   struct GetRefundsContext *grc = cls;
+  struct PostgresClosure *pg = grc->pg;
 
   for (unsigned int i=0;i<num_results;i++)
   {
@@ -2208,9 +2225,9 @@ get_refunds_cb (void *cls,
                                             &coin_pub),
       GNUNET_PQ_result_spec_uint64 ("rtransaction_id",
                                     &rtransaction_id),
-      TALER_PQ_result_spec_amount ("refund_amount",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("refund_amount",
                                    &refund_amount),
-      TALER_PQ_result_spec_amount ("refund_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("refund_fee",
                                    &refund_fee),
       GNUNET_PQ_result_spec_string ("reason",
                                     &reason),
@@ -2263,7 +2280,8 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
   };
   struct GetRefundsContext grc = {
     .rc = rc,
-    .rc_cls = rc_cls
+    .rc_cls = rc_cls,
+    .pg = pg
   };
   enum GNUNET_DB_QueryStatus qs;
 
@@ -2273,10 +2291,10 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
                    TALER_B2S (merchant_pub));
   check_connection (pg);
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
-					     "find_refunds_from_contract_terms_hash",
-					     params,
-					     &get_refunds_cb,
-					     &grc);
+                                             "find_refunds_from_contract_terms_hash",
+                                             params,
+                                             &get_refunds_cb,
+                                             &grc);
   if (0 >= qs)
     return qs;
   return grc.qs;
@@ -2411,9 +2429,9 @@ postgres_lookup_wire_fee (void *cls,
     GNUNET_PQ_query_param_end
   };
   struct GNUNET_PQ_ResultSpec rs[] = {
-    TALER_PQ_result_spec_amount ("wire_fee",
+    TALER_PQ_RESULT_SPEC_AMOUNT ("wire_fee",
                                  wire_fee),
-    TALER_PQ_result_spec_amount ("closing_fee",
+    TALER_PQ_RESULT_SPEC_AMOUNT ("closing_fee",
                                  closing_fee),
     GNUNET_PQ_result_spec_absolute_time ("start_date",
                                          start_date),
@@ -2437,6 +2455,12 @@ postgres_lookup_wire_fee (void *cls,
  */
 struct FindRefundContext
 {
+
+  /**
+   * Plugin context.
+   */
+  struct PostgresClosure *pg;
+  
   /**
    * Updated to reflect total amount refunded so far.
    */
@@ -2463,13 +2487,14 @@ process_refund_cb (void *cls,
                    unsigned int num_results)
 {
   struct FindRefundContext *ictx = cls;
-
+  struct PostgresClosure *pg = ictx->pg;
+  
   for (unsigned int i=0; i<num_results; i++)
   {
     /* Sum up existing refunds */
     struct TALER_Amount acc;
     struct GNUNET_PQ_ResultSpec rs[] = {
-      TALER_PQ_result_spec_amount ("refund_amount",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("refund_amount",
                                    &acc),
       GNUNET_PQ_result_spec_end
     };
@@ -2550,6 +2575,7 @@ process_deposits_for_refund_cb (void *cls,
                                 unsigned int num_results)
 {
   struct InsertRefundContext *ctx = cls;
+  struct PostgresClosure *pg = ctx->pg;
   struct TALER_Amount current_refund;
   struct TALER_Amount deposit_refund[GNUNET_NZL(num_results)];
   struct TALER_CoinSpendPublicKeyP deposit_coin_pubs[GNUNET_NZL(num_results)];
@@ -2570,13 +2596,16 @@ process_deposits_for_refund_cb (void *cls,
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
-      TALER_PQ_result_spec_amount ("amount_with_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("amount_with_fee",
                                    &amount_with_fee),
-      TALER_PQ_result_spec_amount ("refund_fee",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("refund_fee",
                                    &refund_fee),
       GNUNET_PQ_result_spec_end
     };
-    struct FindRefundContext ictx;
+    struct FindRefundContext ictx = {
+      .err = GNUNET_OK,
+      .pg = pg
+    };
     enum GNUNET_DB_QueryStatus ires;
     struct GNUNET_PQ_QueryParam params[] = {
       GNUNET_PQ_query_param_auto_from_type (&coin_pub),
@@ -2595,7 +2624,6 @@ process_deposits_for_refund_cb (void *cls,
     GNUNET_assert (GNUNET_OK ==
                    TALER_amount_get_zero (ctx->refund->currency,
                                           &ictx.refunded_amount));
-    ictx.err = GNUNET_OK; /* no error so far */
     ires = GNUNET_PQ_eval_prepared_multi_select (ctx->pg->conn,
                                                  "find_refunds",
                                                  params,
@@ -2975,7 +3003,7 @@ postgres_enable_tip_reserve_TR (void *cls,
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_absolute_time ("expiration",
                                            &old_expiration),
-      TALER_PQ_result_spec_amount ("balance",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("balance",
                                    &old_balance),
       GNUNET_PQ_result_spec_end
     };
@@ -3094,7 +3122,7 @@ postgres_authorize_tip_TR (void *cls,
   struct GNUNET_PQ_ResultSpec rs[] = {
     GNUNET_PQ_result_spec_absolute_time ("expiration",
                                          &old_expiration),
-    TALER_PQ_result_spec_amount ("balance",
+    TALER_PQ_RESULT_SPEC_AMOUNT ("balance",
                                  &old_balance),
     GNUNET_PQ_result_spec_end
   };
@@ -3220,11 +3248,10 @@ postgres_lookup_tip_by_id (void *cls,
                            struct TALER_Amount *amount,
                            struct GNUNET_TIME_Absolute *timestamp)
 {
+  struct PostgresClosure *pg = cls;
   char *res_exchange_url;
   struct TALER_Amount res_amount;
   struct GNUNET_TIME_Absolute res_timestamp;
-
-  struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (tip_id),
     GNUNET_PQ_query_param_end
@@ -3234,7 +3261,7 @@ postgres_lookup_tip_by_id (void *cls,
                                   &res_exchange_url),
     GNUNET_PQ_result_spec_absolute_time ("timestamp",
                                          &res_timestamp),
-    TALER_PQ_result_spec_amount ("amount",
+    TALER_PQ_RESULT_SPEC_AMOUNT ("amount",
 				  &res_amount),
     GNUNET_PQ_result_spec_end
   };
@@ -3294,7 +3321,7 @@ postgres_pickup_tip_TR (void *cls,
   struct GNUNET_PQ_ResultSpec rs[] = {
     GNUNET_PQ_result_spec_auto_from_type ("reserve_priv",
                                           reserve_priv),
-    TALER_PQ_result_spec_amount ("left",
+    TALER_PQ_RESULT_SPEC_AMOUNT ("left",
                                  &left_amount),
     GNUNET_PQ_result_spec_end
   };
@@ -3340,7 +3367,7 @@ postgres_pickup_tip_TR (void *cls,
       GNUNET_PQ_query_param_end
     };
     struct GNUNET_PQ_ResultSpec rs[] = {
-      TALER_PQ_result_spec_amount ("amount",
+      TALER_PQ_RESULT_SPEC_AMOUNT ("amount",
                                    &existing_amount),
       GNUNET_PQ_result_spec_end
     };
@@ -3493,6 +3520,18 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
     GNUNET_free (pg);
     return NULL;
   }
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             "taler",
+                                             "CURRENCY",
+                                             &pg->currency))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "taler",
+                               "CURRENCY");
+    GNUNET_free (pg);
+    return NULL;
+  }
   plugin = GNUNET_new (struct TALER_MERCHANTDB_Plugin);
   plugin->cls = pg;
   plugin->drop_tables = &postgres_drop_tables;
@@ -3546,6 +3585,7 @@ libtaler_plugin_merchantdb_postgres_done (void *cls)
   struct PostgresClosure *pg = plugin->cls;
 
   PQfinish (pg->conn);
+  GNUNET_free (pg->currency);
   GNUNET_free (pg);
   GNUNET_free (plugin);
   return NULL;
