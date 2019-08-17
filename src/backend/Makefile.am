@@ -30,7 +30,8 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_track-transfer.c taler-merchant-httpd_track-transfer.h \
   taler-merchant-httpd_refund.c taler-merchant-httpd_refund.h \
   taler-merchant-httpd_check-payment.c taler-merchant-httpd_check-payment.h \
-  taler-merchant-httpd_trigger-pay.c taler-merchant-httpd_trigger-pay.h
+  taler-merchant-httpd_trigger-pay.c taler-merchant-httpd_trigger-pay.h \
+  taler-merchant-httpd_config.c taler-merchant-httpd_config.h
 
 
 taler_merchant_httpd_LDADD = \
