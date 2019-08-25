@@ -89,6 +89,9 @@ send_pay_request (struct MHD_Connection *connection,
   char *url;
   char *already_paid_order_id = NULL;
 
+  /* Check if resource_id has been paid for in the same session
+   * with another order_id.
+   */
   if ( (NULL != session_id) && (NULL != resource_url) )
   {
     qs = db->find_session_info (db->cls,
@@ -96,7 +99,7 @@ send_pay_request (struct MHD_Connection *connection,
                                 session_id,
                                 resource_url,
                                 &mi->pubkey);
-    if (0 > qs)
+    if (qs < 0)
     {
       /* single, read-only SQL statements should never cause
          serialization problems */
