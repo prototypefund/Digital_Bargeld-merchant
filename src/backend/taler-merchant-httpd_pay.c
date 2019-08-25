@@ -371,6 +371,12 @@ struct PayContext
    * Transaction ID given in @e root.
    */
   char *order_id;
+
+  /**
+   * Fulfillment URL from @e contract_terms.
+   */
+  char *fulfillment_url;
+
 };
 
 
@@ -610,6 +616,7 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
   }
   GNUNET_free_non_null (pc->order_id);
   GNUNET_free_non_null (pc->session_id);
+  GNUNET_free_non_null (pc->fulfillment_url);
   GNUNET_CONTAINER_DLL_remove (pc_head,
                                pc_tail,
                                pc);
@@ -1504,6 +1511,7 @@ parse_pay (struct MHD_Connection *connection,
               pc->mi->id);
 
   {
+    const char *fulfillment_url;
     struct GNUNET_JSON_Specification espec[] = {
       GNUNET_JSON_spec_absolute_time ("refund_deadline",
                                       &pc->refund_deadline),
@@ -1515,6 +1523,8 @@ parse_pay (struct MHD_Connection *connection,
                               &pc->max_fee),
       TALER_JSON_spec_amount ("amount",
                               &pc->amount),
+      GNUNET_JSON_spec_string ("fulfillment_url",
+                               &fulfillment_url),
       GNUNET_JSON_spec_fixed_auto ("H_wire",
                                    &pc->h_wire),
       GNUNET_JSON_spec_end()
@@ -1529,6 +1539,8 @@ parse_pay (struct MHD_Connection *connection,
       GNUNET_break (0);
       return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
     }
+
+    pc->fulfillment_url = GNUNET_strdup (fulfillment_url);
 
     /* Use the value from config as default.  */
     used_wire_transfer_delay = wire_transfer_delay;
@@ -2021,11 +2033,40 @@ begin_transaction (struct PayContext *pc)
                                ec);
       return;
     }
-    /* Payment succeeded, commit! */
+    /* Payment succeeded, save in database */
     qs = db->mark_proposal_paid (db->cls,
                                  &pc->h_contract_terms,
                                  &pc->mi->pubkey,
                                  pc->session_id);
+
+    if (qs < 0)
+    {
+      db->rollback (db->cls);
+      if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
+      {
+        begin_transaction (pc);
+        return;
+      }
+      resume_pay_with_error
+        (pc,
+         MHD_HTTP_INTERNAL_SERVER_ERROR,
+         TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
+         "Merchant database error: could not "
+         "mark proposal as 'paid'");
+      return;
+    }
+
+    if ( (NULL != pc->session_id) && (NULL != pc->fulfillment_url) )
+    {
+      qs = db->insert_session_info (db->cls,
+                                    pc->session_id,
+                                    pc->fulfillment_url,
+                                    pc->order_id,
+                                    &pc->mi->pubkey);
+    }
+
+    /* Now commit! */
+
     if (0 <= qs)
       qs = db->commit (db->cls);
     else
@@ -2045,6 +2086,8 @@ begin_transaction (struct PayContext *pc)
          "mark proposal as 'paid'");
       return;
     }
+
+
     resume_pay_with_response (pc,
                               MHD_HTTP_OK,
                               sign_success_response (pc));

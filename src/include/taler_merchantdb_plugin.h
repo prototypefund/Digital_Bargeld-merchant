@@ -250,6 +250,43 @@ struct TALER_MERCHANTDB_Plugin
                          const char *last_session_id);
 
   /**
+   * Store the order ID that was used to pay for a resource within a session.
+   *
+   * @param cls closure
+   * @param session_id session id
+   * @param resource_url URL that canonically identifies the resource
+   *        being paid for
+   * @param order_id the order ID that was used when paying for the resource URL
+   * @param merchant_pub public key of the merchant, identifying the instance
+   * @return transaction status
+   */
+  enum GNUNET_DB_QueryStatus
+  (*insert_session_info) (void *cls,
+                          const char *session_id,
+                          const char *resource_url,
+                          const char *order_id,
+                          const struct TALER_MerchantPublicKeyP *merchant_pub);
+
+  /**
+   * Retrieve the order ID that was used to pay for a resource within a session.
+   *
+   * @param cls closure
+   * @param[out] order_id location to store the order ID that was used when
+   *             paying for the resource URL
+   * @param session_id session id
+   * @param resource_url URL that canonically identifies the resource
+   *        being paid for
+   * @param merchant_pub public key of the merchant, identifying the instance
+   * @return transaction status
+   */
+  enum GNUNET_DB_QueryStatus
+  (*find_session_info) (void *cls,
+                        char **order_id,
+                        const char *session_id,
+                        const char *resource_url,
+                        const struct TALER_MerchantPublicKeyP *merchant_pub);
+
+  /**
    * Retrieve proposal data given its order ID.
    *
    * @param cls closure

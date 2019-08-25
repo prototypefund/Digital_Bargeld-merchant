@@ -114,6 +114,7 @@ postgres_drop_tables (void *cls)
     GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_tip_reserve_credits CASCADE;"),
     GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_tip_reserves CASCADE;"),
     GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_orders CASCADE;"),
+    GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_session_info CASCADE;"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
 
@@ -257,6 +258,16 @@ postgres_initialize (void *cls)
                             ",amount_frac INT4 NOT NULL"
                             ",PRIMARY KEY (pickup_id)"
                             ");"),
+    /* sessions and their order_id/resource_url mapping */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_session_info ("
+                            " session_id VARCHAR NOT NULL"
+                            ",resource_url VARCHAR NOT NULL"
+                            ",order_id VARCHAR NOT NULL"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+                            ",timestamp INT8 NOT NULL"
+                            ",PRIMARY KEY (session_id, resource_url, merchant_pub)"
+                            ",UNIQUE (session_id, resource_url, order_id, merchant_pub)"
+                            ");"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
   struct GNUNET_PQ_PreparedStatement ps[] = {
@@ -325,6 +336,16 @@ postgres_initialize (void *cls)
                             ",contract_terms)"
                             " VALUES "
                             "($1, $2, $3, $4)",
+                            4),
+    GNUNET_PQ_make_prepare ("insert_session_info",
+                            "INSERT INTO merchant_session_info"
+                            "(session_id"
+                            ",resource_url"
+                            ",order_id"
+                            ",merchant_pub"
+                            ",timestamp)"
+                            " VALUES "
+                            "($1, $2, $3, $4, $5)",
                             4),
     GNUNET_PQ_make_prepare ("mark_proposal_paid",
                             "UPDATE merchant_contract_terms SET"
@@ -412,6 +433,15 @@ postgres_initialize (void *cls)
                             " WHERE"
                             " order_id=$1"
                             " AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_session_info",
+                            "SELECT"
+                            " order_id"
+                            " FROM merchant_session_info"
+                            " WHERE"
+                            " resource_url=$1"
+                            " AND session_id=$2"
+                            " AND merchant_pub=$3",
                             2),
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date",
                             "SELECT"
@@ -1107,6 +1137,82 @@ postgres_mark_proposal_paid (void *cls,
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "mark_proposal_paid",
                                              params);
+}
+
+
+/**
+ * Store the order ID that was used to pay for a resource within a session.
+ *
+ * @param cls closure
+ * @param session_id session id
+ * @param resource_url URL that canonically identifies the resource
+ *        being paid for
+ * @param order_id the order ID that was used when paying for the resource URL
+ * @param merchant_pub public key of the merchant, identifying the instance
+ * @return transaction status
+ */
+enum GNUNET_DB_QueryStatus
+postgres_insert_session_info (void *cls,
+                              const char *session_id,
+                              const char *resource_url,
+                              const char *order_id,
+                              const struct TALER_MerchantPublicKeyP *merchant_pub)
+{
+  struct PostgresClosure *pg = cls;
+
+  struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (session_id),
+    GNUNET_PQ_query_param_auto_from_type (resource_url),
+    GNUNET_PQ_query_param_auto_from_type (order_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_absolute_time (&now),
+    GNUNET_PQ_query_param_end
+  };
+
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_session_info",
+                                             params);
+}
+
+/**
+ * Retrieve the order ID that was used to pay for a resource within a session.
+ *
+ * @param cls closure
+ * @param[out] order_id location to store the order ID that was used when
+ *             paying for the resource URL
+ * @param session_id session id
+ * @param resource_url URL that canonically identifies the resource
+ *        being paid for
+ * @param merchant_pub public key of the merchant, identifying the instance
+ * @return transaction status
+ */
+enum GNUNET_DB_QueryStatus
+postgres_find_session_info (void *cls,
+                            char **order_id,
+                            const char *session_id,
+                            const char *resource_url,
+                            const struct TALER_MerchantPublicKeyP *merchant_pub)
+{
+  struct PostgresClosure *pg = cls;
+
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (session_id),
+    GNUNET_PQ_query_param_auto_from_type (resource_url),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    GNUNET_PQ_result_spec_string ("order_id",
+                                  order_id),
+    GNUNET_PQ_result_spec_end
+  }; 
+  // We don't clean up the result spec since we want
+  // to keep around the memory for order_id.
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                   "find_contract_terms_history",
+                                                   params,
+                                                   rs);
 }
 
 
@@ -3559,6 +3665,8 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->lookup_wire_fee = &postgres_lookup_wire_fee;
   plugin->increase_refund_for_contract_NT = &postgres_increase_refund_for_contract_NT;
   plugin->mark_proposal_paid = &postgres_mark_proposal_paid;
+  plugin->insert_session_info = &postgres_insert_session_info;
+  plugin->find_session_info = &postgres_find_session_info;
   plugin->enable_tip_reserve_TR = &postgres_enable_tip_reserve_TR;
   plugin->authorize_tip_TR = &postgres_authorize_tip_TR;
   plugin->lookup_tip_by_id = &postgres_lookup_tip_by_id;

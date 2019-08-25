@@ -73,6 +73,7 @@ process_refunds_cb (void *cls,
  * @param session_id session of the client
  * @param resource_url where the resource will be (?), can be NULL!
  * @param h_contract_terms_str hash of the contract terms, stringified
+ * @param mi merchant instance
  * @return #MHD_YES on success
  */
 static int
@@ -80,26 +81,55 @@ send_pay_request (struct MHD_Connection *connection,
                   const char *final_contract_url,
                   const char *session_id,
                   const char *resource_url,
-                  const char *h_contract_terms_str)
+                  const char *h_contract_terms_str,
+                  const struct MerchantInstance *mi)
 {
   int ret;
-  char *url = TALER_url_absolute_mhd (connection,
-                                      "public/trigger-pay",
-                                      "contract_url", final_contract_url,
-                                      "session_id", session_id,
-                                      "resource_url", resource_url,
-                                      "h_contract_terms", h_contract_terms_str,
-                                      NULL);
+  int qs;
+  char *url;
+  char *already_paid_order_id = NULL;
+
+  if ( (NULL != session_id) && (NULL != resource_url) )
+  {
+    qs = db->find_session_info (db->cls,
+                                &already_paid_order_id,
+                                session_id,
+                                resource_url,
+                                &mi->pubkey);
+    if (0 > qs)
+    {
+      /* single, read-only SQL statements should never cause
+         serialization problems */
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
+                                                "db error fetching pay session info");
+    }
+  }
+
+  url = TALER_url_absolute_mhd (connection,
+                                "public/trigger-pay",
+                                "contract_url", final_contract_url,
+                                "session_id", session_id,
+                                "resource_url", resource_url,
+                                "h_contract_terms", h_contract_terms_str,
+                                NULL);
   GNUNET_assert (NULL != url);
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:s, s:s, s:b}",
+                                      "{s:s, s:s, s:b, s:s?}",
                                       "payment_redirect_url",
                                       url,
                                       "contract_url",
                                       final_contract_url,
                                       "paid",
-                                      0);
+                                      0,
+                                      "already_paid_order_id",
+                                      already_paid_order_id
+                                      );
+  GNUNET_free_non_null (already_paid_order_id);
   GNUNET_free (url);
   return ret;
 }
@@ -169,7 +199,8 @@ check_order_and_request_payment (struct MHD_Connection *connection,
                           final_contract_url,
                           session_id,
                           resource_url,
-                          h_contract_terms_str);
+                          h_contract_terms_str,
+                          mi);
   GNUNET_free_non_null (h_contract_terms_str);
   json_decref (contract_terms);
   return ret;
@@ -370,7 +401,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                               final_contract_url,
                               session_id,
                               resource_url,
-                              h_contract_terms_str);
+                              h_contract_terms_str,
+                              mi);
       GNUNET_free_non_null (h_contract_terms_str);
       GNUNET_free (final_contract_url);
       json_decref (contract_terms);
