@@ -92,10 +92,6 @@ MH_handler_trigger_pay (struct TMH_RequestHandler *rh,
                        response,
                        "Taler-Contract-Url");
   add_header_from_arg (connection,
-                       "h_contract_terms",
-                       response,
-                       "Taler-Contract-Hash");
-  add_header_from_arg (connection,
                        "tip_token",
                        response,
                        "Taler-Tip");
@@ -107,32 +103,6 @@ MH_handler_trigger_pay (struct TMH_RequestHandler *rh,
                        "resource_url",
                        response,
                        "Taler-Resource-Url");
-  /* FIXME: the X- variants should go away in the future, for now
-     preserved for backwards-compatibility only! */
-  add_header_from_arg (connection,
-                       "session_id",
-                       response,
-                       "X-Taler-Session-Id");
-  add_header_from_arg (connection,
-                       "contract_url",
-                       response,
-                       "X-Taler-Contract-Url");
-  add_header_from_arg (connection,
-                       "h_contract_terms",
-                       response,
-                       "X-Taler-Contract-Hash");
-  add_header_from_arg (connection,
-                       "tip_token",
-                       response,
-                       "X-Taler-Tip");
-  add_header_from_arg (connection,
-                       "refund_url",
-                       response,
-                       "X-Taler-Refund-Url");
-  add_header_from_arg (connection,
-                       "resource_url",
-                       response,
-                       "X-Taler-Resource-Url");
 
   MHD_queue_response (connection,
                       MHD_HTTP_PAYMENT_REQUIRED,
