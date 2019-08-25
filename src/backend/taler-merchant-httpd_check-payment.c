@@ -363,6 +363,22 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   GNUNET_assert (NULL != contract_terms);
   GNUNET_assert (NULL != last_session_id);
 
+  if (GNUNET_OK !=
+      TALER_JSON_hash (contract_terms,
+                       &h_contract_terms))
+  {
+    GNUNET_break (0);
+    json_decref (contract_terms);
+    GNUNET_free (last_session_id);
+    GNUNET_free (final_contract_url);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
+                                              "Failed to hash proposal");
+  }
+
+  h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
+                                                              sizeof (struct GNUNET_HashCode));
+
   if ( (NULL != session_id) && (0 != strcmp (session_id, last_session_id)) )
   {
 
@@ -379,21 +395,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     return ret;
   }
 
-  if (GNUNET_OK !=
-      TALER_JSON_hash (contract_terms,
-                       &h_contract_terms))
-  {
-    GNUNET_break (0);
-    json_decref (contract_terms);
-    GNUNET_free (last_session_id);
-    GNUNET_free (final_contract_url);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
-                                              "Failed to hash proposal");
-  }
-
-  h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
-                                                              sizeof (struct GNUNET_HashCode));
 
   /* Check if paid */
   {
