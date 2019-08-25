@@ -346,7 +346,7 @@ postgres_initialize (void *cls)
                             ",timestamp)"
                             " VALUES "
                             "($1, $2, $3, $4, $5)",
-                            4),
+                            5),
     GNUNET_PQ_make_prepare ("mark_proposal_paid",
                             "UPDATE merchant_contract_terms SET"
                             " paid=TRUE, last_session_id=$3"
