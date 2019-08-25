@@ -1197,8 +1197,8 @@ postgres_find_session_info (void *cls,
   struct PostgresClosure *pg = cls;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (session_id),
     GNUNET_PQ_query_param_auto_from_type (resource_url),
+    GNUNET_PQ_query_param_auto_from_type (session_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
@@ -1210,7 +1210,7 @@ postgres_find_session_info (void *cls,
   // We don't clean up the result spec since we want
   // to keep around the memory for order_id.
   return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-                                                   "find_contract_terms_history",
+                                                   "find_session_info",
                                                    params,
                                                    rs);
 }
