@@ -1162,9 +1162,9 @@ postgres_insert_session_info (void *cls,
 
   struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (session_id),
-    GNUNET_PQ_query_param_auto_from_type (resource_url),
-    GNUNET_PQ_query_param_auto_from_type (order_id),
+    GNUNET_PQ_query_param_string (session_id),
+    GNUNET_PQ_query_param_string (resource_url),
+    GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_absolute_time (&now),
     GNUNET_PQ_query_param_end
@@ -1197,8 +1197,8 @@ postgres_find_session_info (void *cls,
   struct PostgresClosure *pg = cls;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_auto_from_type (resource_url),
-    GNUNET_PQ_query_param_auto_from_type (session_id),
+    GNUNET_PQ_query_param_string (resource_url),
+    GNUNET_PQ_query_param_string (session_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
