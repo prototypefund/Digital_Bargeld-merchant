@@ -290,6 +290,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   session_id = MHD_lookup_connection_value (connection,
                                                 MHD_GET_ARGUMENT_KIND,
                                                 "session_id");
+
   session_sig_str = MHD_lookup_connection_value (connection,
                                                 MHD_GET_ARGUMENT_KIND,
                                                 "session_sig");
@@ -361,6 +362,22 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   GNUNET_assert (NULL != contract_terms);
   GNUNET_assert (NULL != last_session_id);
+
+  if ( (NULL != session_id) && (0 != strcmp (session_id, last_session_id)) )
+  {
+
+    ret = send_pay_request (connection,
+                            final_contract_url,
+                            session_id,
+                            resource_url,
+                            h_contract_terms_str,
+                            mi);
+
+    json_decref (contract_terms);
+    GNUNET_free (last_session_id);
+    GNUNET_free (final_contract_url);
+    return ret;
+  }
 
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,

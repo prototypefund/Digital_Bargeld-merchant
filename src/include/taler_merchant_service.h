@@ -963,7 +963,7 @@ struct TALER_MERCHANT_CheckPaymentOperation;
  *        #GNUNET_NO if refunded, #GNUNET_SYSERR or error
  * @param refunded_amount amount that was refunded, NULL if there
  *        was no refund
- * @param payment_redirect_url URL to redirect the browser to in order to
+ * @param fallback_request_payment_url URL to redirect the browser to in order to
  *        execute or re-play the payment (NULL if not applicable)
  */
 typedef void
@@ -973,7 +973,7 @@ typedef void
                                         int paid,
                                         int refunded,
                                         struct TALER_Amount *refund_amount,
-                                        const char *payment_redirect_url);
+                                        const char *fallback_request_payment_url);
 
 
 /**

@@ -303,7 +303,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_delete_object ("hack-check-payment-0",
                                      PROXY_MERCHANT_CONFIG_FILE,
-                                     "payment_redirect_url"),
+                                     "fallback_request_payment_url"),
     TALER_TESTING_cmd_check_payment
       ("check-payment-fail-invalid",
        twister_merchant_url,
