@@ -707,7 +707,6 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   enum GNUNET_DB_QueryStatus qs;
   json_t *contract_terms;
   struct MerchantInstance *mi;
-  char *last_session_id = NULL;
   struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
   const char *stored_nonce;
 
@@ -740,7 +739,6 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
-                                &last_session_id,
                                 order_id,
                                 &mi->pubkey);
   if (0 > qs)
@@ -818,7 +816,6 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   }
 
   GNUNET_assert (NULL != contract_terms);
-  GNUNET_free_non_null (last_session_id);
 
   stored_nonce
     = json_string_value (json_object_get (contract_terms,

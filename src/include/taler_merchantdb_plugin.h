@@ -239,15 +239,12 @@ struct TALER_MERCHANTDB_Plugin
    * @param cls closure
    * @param h_contract_terms hash of the contract that is now paid
    * @param merchant_pub merchant's public key
-   * @param last_session_id session id used for the payment, NULL
-   *        if payment was not session-bound
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
   (*mark_proposal_paid) (void *cls,
                          const struct GNUNET_HashCode *h_contract_terms,
-                         const struct TALER_MerchantPublicKeyP *merchant_pub,
-                         const char *last_session_id);
+                         const struct TALER_MerchantPublicKeyP *merchant_pub);
 
   /**
    * Store the order ID that was used to pay for a resource within a session.
@@ -291,7 +288,6 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls closure
    * @param[out] contract_terms where to store the result
-   * @param[out] last_session_id where to store the result
    * @param order_id order_id used to lookup.
    * @param merchant_pub instance's public key.
    * @return transaction status
@@ -299,7 +295,6 @@ struct TALER_MERCHANTDB_Plugin
   enum GNUNET_DB_QueryStatus
   (*find_contract_terms) (void *cls,
                          json_t **contract_terms,
-                         char **last_session_id,
                          const char *order_id,
                          const struct TALER_MerchantPublicKeyP *merchant_pub);
 

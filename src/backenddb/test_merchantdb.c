@@ -837,40 +837,14 @@ run (void *cls)
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->mark_proposal_paid (plugin->cls,
                                       &h_contract_terms,
-                                      &merchant_pub,
-                                      "my-session-123"));
+                                      &merchant_pub));
 
-
-  {
-    char *last_session_id;
-    FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-            plugin->find_contract_terms (plugin->cls,
-                                         &out,
-                                         &last_session_id,
-                                         order_id,
-                                         &merchant_pub));
-    FAILIF (0 != strcmp (last_session_id, "my-session-123"));
-    GNUNET_free (last_session_id);
-  }
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->mark_proposal_paid (plugin->cls,
                                       &h_contract_terms,
-                                      &merchant_pub,
-                                      NULL));
+                                      &merchant_pub));
 
-
-  {
-    char *last_session_id;
-    FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-            plugin->find_contract_terms (plugin->cls,
-                                         &out,
-                                         &last_session_id,
-                                         order_id,
-                                         &merchant_pub));
-    FAILIF (0 != strcmp (last_session_id, ""));
-    GNUNET_free (last_session_id);
-  }
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
 	  plugin->find_contract_terms_history (plugin->cls,
@@ -918,8 +892,7 @@ run (void *cls)
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->mark_proposal_paid (plugin->cls,
                                       &h_contract_terms_future,
-                                      &merchant_pub,
-                                      "hello"));
+                                      &merchant_pub));
   FAILIF (2 !=
           plugin->find_contract_terms_by_date_and_range (plugin->cls,
 							 fake_now,

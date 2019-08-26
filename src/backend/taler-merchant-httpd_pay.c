@@ -510,30 +510,6 @@ sign_success_response (struct PayContext *pc)
                     "refund_permissions",
                     refunds);
 
-  if (NULL != pc->session_id)
-  {
-    struct GNUNET_CRYPTO_EddsaSignature session_sig;
-    struct TALER_MerchantPaySessionSigPS mps = {
-      .purpose.size = htonl (sizeof (struct TALER_MerchantPaySessionSigPS)),
-      .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAY_SESSION)
-    };
-
-    GNUNET_assert (NULL != pc->order_id);
-    GNUNET_CRYPTO_hash (pc->order_id,
-                        strlen (pc->order_id),
-                        &mps.h_order_id);
-    GNUNET_CRYPTO_hash (pc->session_id,
-                        strlen (pc->session_id),
-                        &mps.h_session_id);
-
-    GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
-                              &mps.purpose,
-                              &session_sig);
-    json_object_set_new (resp,
-                         "session_sig",
-                         GNUNET_JSON_from_data_auto (&session_sig));
-  }
-
   mret = TMH_RESPONSE_make_json (resp);
   json_decref (resp);
   return mret;
@@ -1386,7 +1362,6 @@ parse_pay (struct MHD_Connection *connection,
   const char *mode;
   struct TALER_MerchantPublicKeyP merchant_pub;
   int res;
-  char *last_session_id;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_string ("mode",
                              &mode),
@@ -1419,7 +1394,6 @@ parse_pay (struct MHD_Connection *connection,
   GNUNET_assert (NULL == pc->contract_terms);
   qs = db->find_contract_terms (db->cls,
                                 &pc->contract_terms,
-                                &last_session_id,
                                 order_id,
                                 &merchant_pub);
   if (0 > qs)
@@ -1447,8 +1421,6 @@ parse_pay (struct MHD_Connection *connection,
     }
     return GNUNET_NO;
   }
-
-  GNUNET_free (last_session_id);
 
   if (GNUNET_OK !=
       TALER_JSON_hash (pc->contract_terms,
@@ -2036,8 +2008,7 @@ begin_transaction (struct PayContext *pc)
     /* Payment succeeded, save in database */
     qs = db->mark_proposal_paid (db->cls,
                                  &pc->h_contract_terms,
-                                 &pc->mi->pubkey,
-                                 pc->session_id);
+                                 &pc->mi->pubkey);
 
     if (qs < 0)
     {

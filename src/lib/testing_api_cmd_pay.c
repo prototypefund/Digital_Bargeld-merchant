@@ -390,7 +390,6 @@ check_payment_run (void *cls,
      order_id,
      NULL,
      NULL,
-     NULL,
      check_payment_cb,
      cps);
 

@@ -1052,7 +1052,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_HashCode h_instance;
   struct json_t *contract_terms;
-  char *last_session_id;
 
   if (NULL == *connection_cls)
   {
@@ -1133,7 +1132,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
-                                &last_session_id,
                                 order_id,
                                 &tctx->mi->pubkey);
   if (0 > qs)
@@ -1147,8 +1145,6 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
                                          "Given order_id doesn't map to any proposal");
-
-  GNUNET_free (last_session_id);
 
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,

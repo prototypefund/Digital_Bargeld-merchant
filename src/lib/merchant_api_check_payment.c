@@ -178,8 +178,6 @@ handle_check_payment_finished (void *cls,
  * @param order_id order id to identify the payment
  * @parem resource_url resource URL to identify duplicate payments (can be NULL)
  * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session) 
- * @parem session_id sesion signature for the payment (or NULL if the payment
- *        is not bound to a session or the session is not signed yet) 
  * @param check_payment_cb callback which will work the response gotten from the backend
  * @param check_payment_cb_cls closure to pass to @a check_payment_cb
  * @return handle for this operation, NULL upon errors
@@ -191,7 +189,6 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                               const char *order_id,
                               const char *resource_url,
                               const char *session_id,
-                              const char *session_sig,
                               TALER_MERCHANT_CheckPaymentCallback check_payment_cb,
                               void *check_payment_cb_cls)
 {
@@ -211,7 +208,6 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                              "order_id", order_id,
                              "resource_url", resource_url,
                              "session_id", session_id,
-                             "session_sig", session_sig,
                              NULL);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,

@@ -153,7 +153,6 @@ postgres_initialize (void *cls)
                             ",timestamp INT8 NOT NULL"
                             ",row_id BIGSERIAL UNIQUE"
                             ",paid boolean DEFAULT FALSE NOT NULL"
-                            ",last_session_id VARCHAR DEFAULT '' NOT NULL"
                             ",PRIMARY KEY (order_id, merchant_pub)"
                             ",UNIQUE (h_contract_terms, merchant_pub)"
                             ");"),
@@ -349,7 +348,7 @@ postgres_initialize (void *cls)
                             5),
     GNUNET_PQ_make_prepare ("mark_proposal_paid",
                             "UPDATE merchant_contract_terms SET"
-                            " paid=TRUE, last_session_id=$3"
+                            " paid=TRUE"
                             " WHERE h_contract_terms=$1"
                             " AND merchant_pub=$2",
                             2),
@@ -420,7 +419,6 @@ postgres_initialize (void *cls)
     GNUNET_PQ_make_prepare ("find_contract_terms",
                             "SELECT"
                             " contract_terms"
-                            ",last_session_id"
                             " FROM merchant_contract_terms"
                             " WHERE"
                             " order_id=$1"
@@ -937,14 +935,12 @@ postgres_find_paid_contract_terms_from_hash (void *cls,
  *
  * @param cls closure
  * @param[out] contract_terms where to store the retrieved contract terms
- * @param[out] last_session_id where to store the result
  * @param order id order id used to perform the lookup
  * @return transaction status
  */
 static enum GNUNET_DB_QueryStatus
 postgres_find_contract_terms (void *cls,
                               json_t **contract_terms,
-                              char **last_session_id,
                               const char *order_id,
                               const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
@@ -957,8 +953,6 @@ postgres_find_contract_terms (void *cls,
   struct GNUNET_PQ_ResultSpec rs[] = {
     TALER_PQ_result_spec_json ("contract_terms",
                                contract_terms),
-    GNUNET_PQ_result_spec_string ("last_session_id",
-                                  last_session_id),
     GNUNET_PQ_result_spec_end
   };
 
@@ -1112,21 +1106,17 @@ postgres_insert_order (void *cls,
  * @param cls closure
  * @param h_contract_terms hash of the contract that is now paid
  * @param merchant_pub merchant's public key
- * @param last_session_id session id used for the payment, NULL
- *        if payment was not session-bound
  * @return transaction status
  */
 static enum GNUNET_DB_QueryStatus
 postgres_mark_proposal_paid (void *cls,
                              const struct GNUNET_HashCode *h_contract_terms,
-                             const struct TALER_MerchantPublicKeyP *merchant_pub,
-                             const char *last_session_id)
+                             const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_string ((last_session_id == NULL) ? "" : last_session_id),
     GNUNET_PQ_query_param_end
   };
 

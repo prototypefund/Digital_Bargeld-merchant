@@ -303,7 +303,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   const char *order_id;
   const char *contract_url;
   const char *session_id;
-  const char *session_sig_str;
   const char *instance_str;
   const char *resource_url;
   char *final_contract_url;
@@ -313,7 +312,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   json_t *contract_terms;
   struct GNUNET_HashCode h_contract_terms;
   struct TALER_Amount refund_amount;
-  char *last_session_id;
   int ret;
   int refunded;
 
@@ -362,48 +360,9 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                                 MHD_GET_ARGUMENT_KIND,
                                                 "session_id");
 
-  session_sig_str = MHD_lookup_connection_value (connection,
-                                                MHD_GET_ARGUMENT_KIND,
-                                                "session_sig");
-  if ((NULL != session_id) && (NULL != session_sig_str))
-  {
-    struct GNUNET_CRYPTO_EddsaSignature sig;
-    struct TALER_MerchantPaySessionSigPS mps;
-
-    if (GNUNET_OK !=
-        GNUNET_STRINGS_string_to_data (session_sig_str,
-                                       strlen (session_sig_str),
-                                       &sig,
-                                       sizeof (struct GNUNET_CRYPTO_EddsaSignature)))
-    {
-      GNUNET_break_op (0);
-      GNUNET_free (final_contract_url);
-      return TMH_RESPONSE_reply_bad_request (connection,
-                                             TALER_EC_PARAMETER_MALFORMED,
-                                             "session_sig malformed");
-    }
-    mps.purpose.size = htonl (sizeof (struct TALER_MerchantPaySessionSigPS));
-    mps.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAY_SESSION);
-    GNUNET_CRYPTO_hash (order_id, strlen (order_id), &mps.h_order_id);
-    GNUNET_CRYPTO_hash (session_id, strlen (session_id), &mps.h_session_id);
-    if (GNUNET_OK != GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAY_SESSION,
-                                                 &mps.purpose,
-                                                 &sig,
-                                                 &mi->pubkey.eddsa_pub))
-    {
-      /* pay session signature invalid */
-      GNUNET_break_op (0);
-      GNUNET_free (final_contract_url);
-      return TMH_RESPONSE_reply_bad_request (connection,
-                                             TALER_EC_CHECK_PAYMENT_SESSION_SIGNATURE_INVALID,
-                                             "session_sig fails to verify");
-    }
-  }
-
   db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
-                                &last_session_id,
                                 order_id,
                                 &mi->pubkey);
   if (0 > qs)
@@ -432,7 +391,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   }
 
   GNUNET_assert (NULL != contract_terms);
-  GNUNET_assert (NULL != last_session_id);
 
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
@@ -440,7 +398,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   {
     GNUNET_break (0);
     json_decref (contract_terms);
-    GNUNET_free (last_session_id);
     GNUNET_free (final_contract_url);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
@@ -450,26 +407,51 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
                                                               sizeof (struct GNUNET_HashCode));
 
-  if ( (NULL != session_id) && (0 != strcmp (session_id, last_session_id)) )
+
+
+  /* Check if the order has been paid for. */
+  if (NULL != session_id)
   {
+    /* Check if paid within a session. */
 
-    ret = send_pay_request (connection,
-                            order_id,
-                            final_contract_url,
-                            session_id,
-                            resource_url,
-                            h_contract_terms_str,
-                            mi);
+    char *already_paid_order_id;
 
-    json_decref (contract_terms);
-    GNUNET_free (last_session_id);
-    GNUNET_free (final_contract_url);
-    return ret;
+    qs = db->find_session_info (db->cls,
+                                &already_paid_order_id,
+                                session_id,
+                                resource_url,
+                                &mi->pubkey);
+    if (qs < 0)
+    {
+      /* single, read-only SQL statements should never cause
+         serialization problems */
+      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+      /* Always report on hard error as well to enable diagnostics */
+      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
+                                                "db error fetching pay session info");
+    }
+    else if (0 == qs)
+    {
+      ret = send_pay_request (connection,
+                              order_id,
+                              final_contract_url,
+                              session_id,
+                              resource_url,
+                              h_contract_terms_str,
+                              mi);
+      GNUNET_free_non_null (already_paid_order_id);
+      return ret;
+    }
+    GNUNET_break (1 == qs);
+    GNUNET_break (0 == strcmp (order_id, already_paid_order_id));
+    GNUNET_free_non_null (already_paid_order_id);
   }
-
-
-  /* Check if paid */
+  else
   {
+    /* Check if paid regardless of session. */
+
     json_t *xcontract_terms = NULL;
 
     qs = db->find_paid_contract_terms_from_hash (db->cls,
@@ -500,7 +482,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       GNUNET_free_non_null (h_contract_terms_str);
       GNUNET_free (final_contract_url);
       json_decref (contract_terms);
-      GNUNET_free (last_session_id);
       return ret;
 
     }
@@ -509,6 +490,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     json_decref (xcontract_terms);
   }
 
+  /* Get the amount from the contract. */
   {
     struct TALER_Amount amount;
     struct GNUNET_JSON_Specification spec[] = {
@@ -521,7 +503,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       GNUNET_free_non_null (h_contract_terms_str);
       GNUNET_free (final_contract_url);
       json_decref (contract_terms);
-      GNUNET_free (last_session_id);
       return TMH_RESPONSE_reply_internal_error (connection,
                                                 TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
                                                 "Merchant database error (contract terms corrupted)");
@@ -529,6 +510,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     TALER_amount_get_zero (amount.currency, &refund_amount);
   }
 
+  /* Accumulate refunds, if any. */
   for (unsigned int i=0;i<MAX_RETRIES;i++)
   {
     qs = db->get_refunds_from_contract_terms_hash (db->cls,
@@ -547,7 +529,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     GNUNET_free_non_null (h_contract_terms_str);
     GNUNET_free (final_contract_url);
     json_decref (contract_terms);
-    GNUNET_free (last_session_id);
     return TMH_RESPONSE_reply_internal_error (connection,
                                               TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
                                               "Merchant database error");
@@ -558,13 +539,11 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:o, s:b, s:b, s:o, s:s}",
+                                      "{s:o, s:b, s:b, s:o}",
                                       "contract_terms", contract_terms,
                                       "paid", 1,
                                       "refunded", refunded,
-                                      "refund_amount", TALER_JSON_from_amount (&refund_amount),
-                                      "last_session_id", last_session_id);
+                                      "refund_amount", TALER_JSON_from_amount (&refund_amount));
   GNUNET_free (final_contract_url);
-  GNUNET_free (last_session_id);
   return ret;
 }
