@@ -257,15 +257,15 @@ postgres_initialize (void *cls)
                             ",amount_frac INT4 NOT NULL"
                             ",PRIMARY KEY (pickup_id)"
                             ");"),
-    /* sessions and their order_id/resource_url mapping */
+    /* sessions and their order_id/fulfillment_url mapping */
     GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_session_info ("
                             " session_id VARCHAR NOT NULL"
-                            ",resource_url VARCHAR NOT NULL"
+                            ",fulfillment_url VARCHAR NOT NULL"
                             ",order_id VARCHAR NOT NULL"
                             ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
                             ",timestamp INT8 NOT NULL"
-                            ",PRIMARY KEY (session_id, resource_url, merchant_pub)"
-                            ",UNIQUE (session_id, resource_url, order_id, merchant_pub)"
+                            ",PRIMARY KEY (session_id, fulfillment_url, merchant_pub)"
+                            ",UNIQUE (session_id, fulfillment_url, order_id, merchant_pub)"
                             ");"),
     GNUNET_PQ_EXECUTE_STATEMENT_END
   };
@@ -339,7 +339,7 @@ postgres_initialize (void *cls)
     GNUNET_PQ_make_prepare ("insert_session_info",
                             "INSERT INTO merchant_session_info"
                             "(session_id"
-                            ",resource_url"
+                            ",fulfillment_url"
                             ",order_id"
                             ",merchant_pub"
                             ",timestamp)"
@@ -437,7 +437,7 @@ postgres_initialize (void *cls)
                             " order_id"
                             " FROM merchant_session_info"
                             " WHERE"
-                            " resource_url=$1"
+                            " fulfillment_url=$1"
                             " AND session_id=$2"
                             " AND merchant_pub=$3",
                             2),
@@ -1135,7 +1135,7 @@ postgres_mark_proposal_paid (void *cls,
  *
  * @param cls closure
  * @param session_id session id
- * @param resource_url URL that canonically identifies the resource
+ * @param fulfillment_url URL that canonically identifies the resource
  *        being paid for
  * @param order_id the order ID that was used when paying for the resource URL
  * @param merchant_pub public key of the merchant, identifying the instance
@@ -1144,7 +1144,7 @@ postgres_mark_proposal_paid (void *cls,
 enum GNUNET_DB_QueryStatus
 postgres_insert_session_info (void *cls,
                               const char *session_id,
-                              const char *resource_url,
+                              const char *fulfillment_url,
                               const char *order_id,
                               const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
@@ -1153,7 +1153,7 @@ postgres_insert_session_info (void *cls,
   struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (session_id),
-    GNUNET_PQ_query_param_string (resource_url),
+    GNUNET_PQ_query_param_string (fulfillment_url),
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_absolute_time (&now),
@@ -1172,7 +1172,7 @@ postgres_insert_session_info (void *cls,
  * @param[out] order_id location to store the order ID that was used when
  *             paying for the resource URL
  * @param session_id session id
- * @param resource_url URL that canonically identifies the resource
+ * @param fulfillment_url URL that canonically identifies the resource
  *        being paid for
  * @param merchant_pub public key of the merchant, identifying the instance
  * @return transaction status
@@ -1181,13 +1181,13 @@ enum GNUNET_DB_QueryStatus
 postgres_find_session_info (void *cls,
                             char **order_id,
                             const char *session_id,
-                            const char *resource_url,
+                            const char *fulfillment_url,
                             const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
 
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (resource_url),
+    GNUNET_PQ_query_param_string (fulfillment_url),
     GNUNET_PQ_query_param_string (session_id),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end

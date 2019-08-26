@@ -251,7 +251,7 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls closure
    * @param session_id session id
-   * @param resource_url URL that canonically identifies the resource
+   * @param fulfillment_url URL that canonically identifies the resource
    *        being paid for
    * @param order_id the order ID that was used when paying for the resource URL
    * @param merchant_pub public key of the merchant, identifying the instance
@@ -260,7 +260,7 @@ struct TALER_MERCHANTDB_Plugin
   enum GNUNET_DB_QueryStatus
   (*insert_session_info) (void *cls,
                           const char *session_id,
-                          const char *resource_url,
+                          const char *fulfillment_url,
                           const char *order_id,
                           const struct TALER_MerchantPublicKeyP *merchant_pub);
 
@@ -271,7 +271,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param[out] order_id location to store the order ID that was used when
    *             paying for the resource URL
    * @param session_id session id
-   * @param resource_url URL that canonically identifies the resource
+   * @param fulfillment_url URL that canonically identifies the resource
    *        being paid for
    * @param merchant_pub public key of the merchant, identifying the instance
    * @return transaction status
@@ -280,7 +280,7 @@ struct TALER_MERCHANTDB_Plugin
   (*find_session_info) (void *cls,
                         char **order_id,
                         const char *session_id,
-                        const char *resource_url,
+                        const char *fulfillment_url,
                         const struct TALER_MerchantPublicKeyP *merchant_pub);
 
   /**

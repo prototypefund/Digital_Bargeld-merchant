@@ -389,7 +389,6 @@ check_payment_run (void *cls,
      "default", // only default instance for now.
      order_id,
      NULL,
-     NULL,
      check_payment_cb,
      cps);
 

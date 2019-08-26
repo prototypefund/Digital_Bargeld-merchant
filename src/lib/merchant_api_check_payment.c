@@ -176,7 +176,6 @@ handle_check_payment_finished (void *cls,
  * @param backend_url base URL of the merchant backend
  * @param instance instance used for the transaction
  * @param order_id order id to identify the payment
- * @parem resource_url resource URL to identify duplicate payments (can be NULL)
  * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session) 
  * @param check_payment_cb callback which will work the response gotten from the backend
  * @param check_payment_cb_cls closure to pass to @a check_payment_cb
@@ -187,7 +186,6 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                               const char *backend_url,
                               const char *instance,
                               const char *order_id,
-                              const char *resource_url,
                               const char *session_id,
                               TALER_MERCHANT_CheckPaymentCallback check_payment_cb,
                               void *check_payment_cb_cls)
@@ -206,7 +204,6 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
   cpo->url = TALER_url_join (backend_url, "/check-payment",
                              "instance", instance,
                              "order_id", order_id,
-                             "resource_url", resource_url,
                              "session_id", session_id,
                              NULL);
   eh = curl_easy_init ();

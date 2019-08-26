@@ -146,7 +146,7 @@ process_refunds_cb (void *cls,
  * @param order_id order ID for the payment
  * @param final_contract_url where to get the contract
  * @param session_id session of the client
- * @param resource_url where the resource will be (?), can be NULL!
+ * @param fulfillment_url fulfillment URL of the contract
  * @param h_contract_terms_str hash of the contract terms, stringified
  * @param mi merchant instance
  * @return #MHD_YES on success
@@ -156,7 +156,7 @@ send_pay_request (struct MHD_Connection *connection,
                   const char *order_id,
                   const char *final_contract_url,
                   const char *session_id,
-                  const char *resource_url,
+                  const char *fulfillment_url,
                   const char *h_contract_terms_str,
                   const struct MerchantInstance *mi)
 {
@@ -168,12 +168,12 @@ send_pay_request (struct MHD_Connection *connection,
   /* Check if resource_id has been paid for in the same session
    * with another order_id.
    */
-  if ( (NULL != session_id) && (NULL != resource_url) )
+  if ( (NULL != session_id) && (NULL != fulfillment_url) )
   {
     qs = db->find_session_info (db->cls,
                                 &already_paid_order_id,
                                 session_id,
-                                resource_url,
+                                fulfillment_url,
                                 &mi->pubkey);
     if (qs < 0)
     {
@@ -216,7 +216,7 @@ send_pay_request (struct MHD_Connection *connection,
  * @param mi the merchant's instance
  * @param final_contract_url where to redirect for the contract
  * @param session_id the session_id
- * @param resource_url where the resource will be (?), can be NULL!
+ * @param fulfillment_url fulfillment URL of the contract
  * @param order_id the order to look up
  * @return #MHD_YES on success
  */
@@ -225,7 +225,7 @@ check_order_and_request_payment (struct MHD_Connection *connection,
                                  struct MerchantInstance *mi,
                                  const char *final_contract_url,
                                  const char *session_id,
-                                 const char *resource_url,
+                                 const char *fulfillment_url,
                                  const char *order_id)
 {
   enum GNUNET_DB_QueryStatus qs;
@@ -272,7 +272,7 @@ check_order_and_request_payment (struct MHD_Connection *connection,
                           order_id,
                           final_contract_url,
                           session_id,
-                          resource_url,
+                          fulfillment_url,
                           h_contract_terms_str,
                           mi);
   GNUNET_free_non_null (h_contract_terms_str);
@@ -304,7 +304,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   const char *contract_url;
   const char *session_id;
   const char *instance_str;
-  const char *resource_url;
+  const char *fulfillment_url;
   char *final_contract_url;
   char *h_contract_terms_str;
   struct MerchantInstance *mi;
@@ -352,10 +352,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   {
     final_contract_url = GNUNET_strdup (contract_url);
   }
-  resource_url = MHD_lookup_connection_value (connection,
-                                              MHD_GET_ARGUMENT_KIND,
-                                              "resource_url");
-  /* NULL is allowed for resource_url! */
   session_id = MHD_lookup_connection_value (connection,
                                                 MHD_GET_ARGUMENT_KIND,
                                                 "session_id");
@@ -377,6 +373,28 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                               TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
                                               "db error fetching contract terms");
   }
+
+  /* Get the amount and fulfillment_url from the contract. */
+  {
+    struct TALER_Amount amount;
+    struct GNUNET_JSON_Specification spec[] = {
+      TALER_JSON_spec_amount ("amount", &amount),
+      GNUNET_JSON_spec_string ("fulfillment_url", &fulfillment_url),
+      GNUNET_JSON_spec_end ()
+    };
+
+    if (GNUNET_OK != GNUNET_JSON_parse (contract_terms, spec, NULL, NULL))
+    {
+      GNUNET_free (final_contract_url);
+      json_decref (contract_terms);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
+                                                "Merchant database error (contract terms corrupted)");
+    }
+    TALER_amount_get_zero (amount.currency, &refund_amount);
+  }
+
+
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     /* Check that we're at least aware of the order */
@@ -384,7 +402,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                            mi,
                                            final_contract_url,
                                            session_id,
-                                           resource_url,
+                                           fulfillment_url,
                                            order_id);
     GNUNET_free (final_contract_url);
     return ret;
@@ -419,7 +437,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     qs = db->find_session_info (db->cls,
                                 &already_paid_order_id,
                                 session_id,
-                                resource_url,
+                                fulfillment_url,
                                 &mi->pubkey);
     if (qs < 0)
     {
@@ -438,7 +456,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                               order_id,
                               final_contract_url,
                               session_id,
-                              resource_url,
+                              fulfillment_url,
                               h_contract_terms_str,
                               mi);
       GNUNET_free_non_null (already_paid_order_id);
@@ -476,7 +494,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                               order_id,
                               final_contract_url,
                               session_id,
-                              resource_url,
+                              fulfillment_url,
                               h_contract_terms_str,
                               mi);
       GNUNET_free_non_null (h_contract_terms_str);
@@ -488,26 +506,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs);
     GNUNET_assert (NULL != xcontract_terms);
     json_decref (xcontract_terms);
-  }
-
-  /* Get the amount from the contract. */
-  {
-    struct TALER_Amount amount;
-    struct GNUNET_JSON_Specification spec[] = {
-      TALER_JSON_spec_amount ("amount", &amount),
-      GNUNET_JSON_spec_end ()
-    };
-
-    if (GNUNET_OK != GNUNET_JSON_parse (contract_terms, spec, NULL, NULL))
-    {
-      GNUNET_free_non_null (h_contract_terms_str);
-      GNUNET_free (final_contract_url);
-      json_decref (contract_terms);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
-                                                "Merchant database error (contract terms corrupted)");
-    }
-    TALER_amount_get_zero (amount.currency, &refund_amount);
   }
 
   /* Accumulate refunds, if any. */
