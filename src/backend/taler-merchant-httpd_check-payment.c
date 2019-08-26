@@ -374,6 +374,21 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                               "db error fetching contract terms");
   }
 
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+  {
+    /* Check that we're at least aware of the order */
+    ret = check_order_and_request_payment (connection,
+                                           mi,
+                                           final_contract_url,
+                                           session_id,
+                                           fulfillment_url,
+                                           order_id);
+    GNUNET_free (final_contract_url);
+    return ret;
+  }
+
+  GNUNET_assert (NULL != contract_terms);
+
   /* Get the amount and fulfillment_url from the contract. */
   {
     struct TALER_Amount amount;
@@ -393,22 +408,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     }
     TALER_amount_get_zero (amount.currency, &refund_amount);
   }
-
-
-  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
-  {
-    /* Check that we're at least aware of the order */
-    ret = check_order_and_request_payment (connection,
-                                           mi,
-                                           final_contract_url,
-                                           session_id,
-                                           fulfillment_url,
-                                           order_id);
-    GNUNET_free (final_contract_url);
-    return ret;
-  }
-
-  GNUNET_assert (NULL != contract_terms);
 
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
