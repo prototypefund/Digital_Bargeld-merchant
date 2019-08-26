@@ -208,7 +208,7 @@ proposal_put (struct MHD_Connection *connection,
     }
     off = strftime (buf,
                     sizeof (buf),
-                    "%Y.%j.%H.%M.%S",
+                    "%Y.%j",
                     tm_info);
     buf[off++] = '-';
     rand = GNUNET_CRYPTO_random_u64 (GNUNET_CRYPTO_QUALITY_WEAK,
