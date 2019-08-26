@@ -41,8 +41,8 @@
 /**
  * Make a taler://pay URI
  *
- * @param MHD connection to take host and path from
- * @param merchant's instance
+ * @param connection MHD connection to take host and path from
+ * @param instance_id merchant's instance ID
  * @param order_id order ID to request a payment for
  * @param session_id session ID for the payment or NULL
  *                   if not a session-bound payment
@@ -50,14 +50,14 @@
  */
 char *
 make_taler_pay_uri (struct MHD_Connection *connection,
-                    const char *instance,
+                    const char *instance_id,
                     const char *order_id,
                     const char *session_id)
 {
   const char *host;
   const char *forwarded_host;
   const char *uri_path;
-  const char *uri_instance;
+  const char *uri_instance_id;
   char *result;
 
 
@@ -73,10 +73,10 @@ make_taler_pay_uri (struct MHD_Connection *connection,
   if (NULL != forwarded_host)
     host = forwarded_host;
 
-  if (0 == strcmp (instance, "default"))
-    uri_instance = "-";
+  if (0 == strcmp (instance_id, "default"))
+    uri_instance_id = "-";
   else
-    uri_instance = instance;
+    uri_instance_id = instance_id;
 
   if (NULL == host)
   {
@@ -93,7 +93,7 @@ make_taler_pay_uri (struct MHD_Connection *connection,
                                         "taler://pay/%s/%s/%s/%s",
                                         host,
                                         uri_path,
-                                        uri_instance,
+                                        uri_instance_id,
                                         order_id));
   }
   else
@@ -102,7 +102,7 @@ make_taler_pay_uri (struct MHD_Connection *connection,
                                         "taler://pay/%s/%s/%s/%s/%s",
                                         host,
                                         uri_path,
-                                        uri_instance,
+                                        uri_instance_id,
                                         order_id,
                                         session_id));
   }
@@ -188,7 +188,7 @@ send_pay_request (struct MHD_Connection *connection,
     }
   }
 
-  taler_pay_uri = make_taler_pay_uri (connection, mi->name, order_id, session_id);
+  taler_pay_uri = make_taler_pay_uri (connection, mi->id, order_id, session_id);
 
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
