@@ -316,8 +316,8 @@ check_payment_cleanup (void *cls,
  *        refunded (not refunded).
  * @param refund_amount the amount that was refunded to this
  *        contract.
- * @param fallback_request_payment_url URL where the payment has to be
- *        addressed.
+ * @param taler_pay_uri the URI that instructs the wallets to process
+ *                      the payment
  */
 static void
 check_payment_cb (void *cls,
@@ -326,7 +326,7 @@ check_payment_cb (void *cls,
                   int paid,
                   int refunded,
                   struct TALER_Amount *refund_amount,
-                  const char *fallback_request_payment_url)
+                  const char *taler_pay_uri)
 {
   struct CheckPaymentState *cps = cls;
 
@@ -341,7 +341,7 @@ check_payment_cb (void *cls,
               paid);
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "check payment: url: %s\n",
-              fallback_request_payment_url);
+              taler_pay_uri);
 
   if (paid != cps->expect_paid)
     TALER_TESTING_FAIL (cps->is);

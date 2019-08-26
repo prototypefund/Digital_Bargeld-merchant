@@ -47,7 +47,6 @@
 #include "taler-merchant-httpd_history.h"
 #include "taler-merchant-httpd_refund.h"
 #include "taler-merchant-httpd_check-payment.h"
-#include "taler-merchant-httpd_trigger-pay.h"
 #include "taler-merchant-httpd_config.h"
 
 /**
@@ -289,9 +288,6 @@ url_handler (void *cls,
       { "/check-payment", MHD_HTTP_METHOD_GET, "text/plain",
         NULL, 0,
         &MH_handler_check_payment, MHD_HTTP_OK},
-      { "/public/trigger-pay", MHD_HTTP_METHOD_GET, "text/plain",
-        NULL, 0,
-        &MH_handler_trigger_pay, MHD_HTTP_OK},
       { "/config", MHD_HTTP_METHOD_GET, "text/plain",
         NULL, 0,
         &MH_handler_config, MHD_HTTP_OK},

@@ -37,6 +37,80 @@
 #define MAX_RETRIES 5
 
 
+
+/**
+ * Make a taler://pay URI
+ *
+ * @param MHD connection to take host and path from
+ * @param merchant's instance
+ * @param order_id order ID to request a payment for
+ * @param session_id session ID for the payment or NULL
+ *                   if not a session-bound payment
+ * @returns the URI, must be freed with #GNUNET_free
+ */
+char *
+make_taler_pay_uri (struct MHD_Connection *connection,
+                    const char *instance,
+                    const char *order_id,
+                    const char *session_id)
+{
+  const char *host;
+  const char *forwarded_host;
+  const char *uri_path;
+  const char *uri_instance;
+  char *result;
+
+
+  host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
+  forwarded_host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
+                                                "X-Forwarded-Host");
+
+  uri_path = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
+                                      "X-Forwarded-Prefix");
+  if (NULL == uri_path)
+    uri_path = "-";
+
+  if (NULL != forwarded_host)
+    host = forwarded_host;
+
+  if (0 == strcmp (instance, "default"))
+    uri_instance = "-";
+  else
+    uri_instance = instance;
+
+  if (NULL == host)
+  {
+    /* Should never happen, at last the host header should be defined */
+    GNUNET_break (0);
+    return NULL;
+  }
+
+  GNUNET_assert (NULL != order_id);
+
+  if (NULL == session_id)
+  {
+    GNUNET_assert (0 < GNUNET_asprintf (&result,
+                                        "taler://pay/%s/%s/%s/%s",
+                                        host,
+                                        uri_path,
+                                        uri_instance,
+                                        order_id));
+  }
+  else
+  {
+    GNUNET_assert (0 < GNUNET_asprintf (&result,
+                                        "taler://pay/%s/%s/%s/%s/%s",
+                                        host,
+                                        uri_path,
+                                        uri_instance,
+                                        order_id,
+                                        session_id));
+  }
+  return result;
+}
+
+
+
 /**
  * Function called with information about a refund.
  * It is responsible for summing up the refund amount.
@@ -69,6 +143,7 @@ process_refunds_cb (void *cls,
  * The client did not yet pay, send it the payment request.
  *
  * @param connection connection to send on
+ * @param order_id order ID for the payment
  * @param final_contract_url where to get the contract
  * @param session_id session of the client
  * @param resource_url where the resource will be (?), can be NULL!
@@ -78,6 +153,7 @@ process_refunds_cb (void *cls,
  */
 static int
 send_pay_request (struct MHD_Connection *connection,
+                  const char *order_id,
                   const char *final_contract_url,
                   const char *session_id,
                   const char *resource_url,
@@ -86,8 +162,8 @@ send_pay_request (struct MHD_Connection *connection,
 {
   int ret;
   int qs;
-  char *url;
   char *already_paid_order_id = NULL;
+  char *taler_pay_uri;
 
   /* Check if resource_id has been paid for in the same session
    * with another order_id.
@@ -112,19 +188,13 @@ send_pay_request (struct MHD_Connection *connection,
     }
   }
 
-  url = TALER_url_absolute_mhd (connection,
-                                "public/trigger-pay",
-                                "contract_url", final_contract_url,
-                                "session_id", session_id,
-                                "resource_url", resource_url,
-                                "h_contract_terms", h_contract_terms_str,
-                                NULL);
-  GNUNET_assert (NULL != url);
+  taler_pay_uri = make_taler_pay_uri (connection, mi->name, order_id, session_id);
+
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
                                       "{s:s, s:s, s:b, s:s?}",
-                                      "fallback_request_payment_url",
-                                      url,
+                                      "taler_pay_uri",
+                                      taler_pay_uri,
                                       "contract_url",
                                       final_contract_url,
                                       "paid",
@@ -133,7 +203,7 @@ send_pay_request (struct MHD_Connection *connection,
                                       already_paid_order_id
                                       );
   GNUNET_free_non_null (already_paid_order_id);
-  GNUNET_free (url);
+  GNUNET_free (taler_pay_uri);
   return ret;
 }
 
@@ -199,6 +269,7 @@ check_order_and_request_payment (struct MHD_Connection *connection,
   h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
                                                               sizeof (struct GNUNET_HashCode));
   ret = send_pay_request (connection,
+                          order_id,
                           final_contract_url,
                           session_id,
                           resource_url,
@@ -383,6 +454,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   {
 
     ret = send_pay_request (connection,
+                            order_id,
                             final_contract_url,
                             session_id,
                             resource_url,
@@ -419,6 +491,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     {
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "not paid yet\n");
       ret = send_pay_request (connection,
+                              order_id,
                               final_contract_url,
                               session_id,
                               resource_url,

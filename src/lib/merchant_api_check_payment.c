@@ -111,11 +111,11 @@ handle_check_payment_finished (void *cls,
 
   if (! json_boolean_value (json_object_get (json, "paid")))
   {
-    const char *fallback_request_payment_url = json_string_value (json_object_get (json, "fallback_request_payment_url"));
-    if (NULL == fallback_request_payment_url)
+    const char *taler_pay_uri = json_string_value (json_object_get (json, "taler_pay_uri"));
+    if (NULL == taler_pay_uri)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "no fallback_request_payment_url in unpaid check-payment response\n");
+                  "no taler_pay_uri in unpaid check-payment response\n");
       GNUNET_break_op (0);
       cpo->cb (cpo->cb_cls,
                0,
@@ -131,7 +131,7 @@ handle_check_payment_finished (void *cls,
                GNUNET_NO,
                GNUNET_NO,
                &refund_amount,
-               fallback_request_payment_url);
+               taler_pay_uri);
     }
     TALER_MERCHANT_check_payment_cancel (cpo);
     return;

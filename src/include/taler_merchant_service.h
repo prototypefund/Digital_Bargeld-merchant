@@ -963,8 +963,8 @@ struct TALER_MERCHANT_CheckPaymentOperation;
  *        #GNUNET_NO if refunded, #GNUNET_SYSERR or error
  * @param refunded_amount amount that was refunded, NULL if there
  *        was no refund
- * @param fallback_request_payment_url URL to redirect the browser to in order to
- *        execute or re-play the payment (NULL if not applicable)
+ * @param taler_pay_uri the URI that instructs the wallets to process
+ *                      the payment
  */
 typedef void
 (*TALER_MERCHANT_CheckPaymentCallback) (void *cls,
@@ -973,7 +973,7 @@ typedef void
                                         int paid,
                                         int refunded,
                                         struct TALER_Amount *refund_amount,
-                                        const char *fallback_request_payment_url);
+                                        const char *taler_pay_uri);
 
 
 /**
