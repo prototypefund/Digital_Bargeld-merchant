@@ -431,7 +431,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   {
     /* Check if paid within a session. */
 
-    char *already_paid_order_id;
+    char *already_paid_order_id = NULL;
 
     qs = db->find_session_info (db->cls,
                                 &already_paid_order_id,
