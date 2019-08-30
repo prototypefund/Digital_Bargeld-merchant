@@ -282,7 +282,6 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   {
     json_t *tip_token;
     char *tip_token_str;
-    char *tip_redirect_url;
 
     tip_token = json_pack ("{s:o, s:o, s:o, s:s, s:s, s:s}",
                            "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
@@ -293,23 +292,14 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                            "pickup_url", tac->pickup_url);
     tip_token_str = json_dumps (tip_token, JSON_COMPACT);
     GNUNET_assert (NULL != tip_token_str);
-    tip_redirect_url = TALER_url_absolute_mhd (connection, "public/trigger-pay",
-                                               "tip_token", tip_token_str,
-                                               NULL);
-    GNUNET_assert (NULL != tip_redirect_url);
-    /* FIXME:  This is pretty redundant, but we want to support some older
-     * merchant implementations.  Newer ones should only get the
-     * tip_redirect_url. */
     res = TMH_RESPONSE_reply_json_pack (connection,
                                         MHD_HTTP_OK,
                                         "{s:o, s:o, s:s, s:o, s:s}",
                                         "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
                                         "expiration", GNUNET_JSON_from_time_abs (expiration),
                                         "exchange_url", mi->tip_exchange,
-                                        "tip_token", tip_token,
-                                        "tip_redirect_url", tip_redirect_url);
+                                        "tip_token", tip_token);
     GNUNET_free (tip_token_str);
-    GNUNET_free (tip_redirect_url);
     return res;
   }
 }
