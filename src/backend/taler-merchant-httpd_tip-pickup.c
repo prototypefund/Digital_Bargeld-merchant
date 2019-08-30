@@ -399,7 +399,7 @@ prepare_pickup (struct PickupContext *pc)
   qs = db->lookup_tip_by_id (db->cls,
                              &pc->tip_id,
                              &pc->exchange_url,
-                             NULL, NULL, NULL);
+                             NULL, NULL, NULL, NULL);
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
   {
     unsigned int response_code;
@@ -624,6 +624,7 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   json_t *extra;
   struct GNUNET_HashCode tip_id;
   struct TALER_Amount tip_amount;
+  struct TALER_Amount tip_amount_left;
   int ret;
   int qs;
 
@@ -665,7 +666,9 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
                              &tip_id,
                              &exchange_url,
                              &extra,
-                             &tip_amount, NULL);
+                             &tip_amount,
+                             &tip_amount_left,
+                             NULL);
 
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
   {
@@ -702,6 +705,7 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
                                       "{s:s, s:o}",
                                       "exchange_url", exchange_url,
                                       "amount", TALER_JSON_from_amount (&tip_amount),
+                                      "amount_left", TALER_JSON_from_amount (&tip_amount_left),
                                       "extra", extra);
 
   GNUNET_free (exchange_url);

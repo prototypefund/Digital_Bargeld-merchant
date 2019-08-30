@@ -753,6 +753,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param[out] exchange_url set to the URL of the exchange (unless NULL)
    * @param[out] extra extra data to pass to the wallet
    * @param[out] amount set to the authorized amount (unless NULL)
+   * @param[out] amount_left set to the amount left (unless NULL)
    * @param[out] timestamp set to the timestamp of the tip authorization (unless NULL)
    * @return transaction status, usually
    *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT for success
@@ -764,6 +765,7 @@ struct TALER_MERCHANTDB_Plugin
                       char **exchange_url,
                       json_t **extra,
                       struct TALER_Amount *amount,
+                      struct TALER_Amount *amount_left,
                       struct GNUNET_TIME_Absolute *timestamp);
 
 

@@ -24,7 +24,7 @@
 #include "taler-merchant-httpd.h"
 
 /**
- * Manages a /tip-pickup call, checking that the tip is authorized,
+ * Manages a POST /tip-pickup call, checking that the tip is authorized,
  * and if so, returning the withdrawal permissions.
  *
  * @param rh context of the handler
@@ -40,5 +40,23 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
                        void **connection_cls,
                        const char *upload_data,
                        size_t *upload_data_size);
+
+/**
+ * Manages a GET /tip-pickup call.
+ *
+ * @param rh context of the handler
+ * @param connection the MHD connection to handle
+ * @param[in,out] connection_cls the connection's closure (can be updated)
+ * @param upload_data upload data
+ * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @return MHD result code
+ */
+int
+MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
+                           struct MHD_Connection *connection,
+                           void **connection_cls,
+                           const char *upload_data,
+                           size_t *upload_data_size);
+
 
 #endif

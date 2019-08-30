@@ -668,6 +668,8 @@ postgres_initialize (void *cls)
                             ",timestamp"
                             ",amount_val"
                             ",amount_frac"
+                            ",left_val"
+                            ",left_frac"
                             " FROM merchant_tips"
                             " WHERE tip_id=$1",
                             1),
@@ -3343,6 +3345,7 @@ postgres_authorize_tip_TR (void *cls,
  * @param[out] exchange_url set to the URL of the exchange (unless NULL)
  * @param[out] extra extra data to pass to the wallet (unless NULL)
  * @param[out] amount set to the authorized amount (unless NULL)
+ * @param[out] amount_left set to the amount left (unless NULL)
  * @param[out] timestamp set to the timestamp of the tip authorization (unless NULL)
  * @return transaction status, usually
  *      #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT for success
@@ -3354,12 +3357,14 @@ postgres_lookup_tip_by_id (void *cls,
                            char **exchange_url,
                            json_t **extra,
                            struct TALER_Amount *amount,
+                           struct TALER_Amount *amount_left,
                            struct GNUNET_TIME_Absolute *timestamp)
 {
   struct PostgresClosure *pg = cls;
   char *res_exchange_url;
   json_t *res_extra;
   struct TALER_Amount res_amount;
+  struct TALER_Amount res_amount_left;
   struct GNUNET_TIME_Absolute res_timestamp;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (tip_id),
@@ -3374,6 +3379,8 @@ postgres_lookup_tip_by_id (void *cls,
                                &res_extra),
     TALER_PQ_RESULT_SPEC_AMOUNT ("amount",
 				  &res_amount),
+    TALER_PQ_RESULT_SPEC_AMOUNT ("left",
+				  &res_amount_left),
     GNUNET_PQ_result_spec_end
   };
   enum GNUNET_DB_QueryStatus qs;
@@ -3392,6 +3399,8 @@ postgres_lookup_tip_by_id (void *cls,
     *exchange_url = strdup (res_exchange_url);
   if (NULL != amount)
     *amount = res_amount;
+  if (NULL != amount_left)
+    *amount_left = res_amount_left;
   if (NULL != timestamp)
     *timestamp = res_timestamp;
   if (NULL != extra)

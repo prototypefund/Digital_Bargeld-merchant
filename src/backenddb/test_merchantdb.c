@@ -612,7 +612,7 @@ test_tipping ()
       plugin->lookup_tip_by_id (plugin->cls,
 				      &tip_id,
 				      &url,
-                                      NULL, NULL, NULL))
+                                      NULL, NULL, NULL, NULL))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
