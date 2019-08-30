@@ -78,6 +78,61 @@ struct TMH_JsonParseContext
 
 
 /**
+ * Make a taler://refund URI
+ *
+ * @param connection MHD connection to take host and path from
+ * @param instance_id merchant's instance ID
+ * @param order_id order ID to show a refund for
+ * @returns the URI, must be freed with #GNUNET_free
+ */
+char *
+make_taler_refund_uri (struct MHD_Connection *connection,
+                       const char *instance_id,
+                       const char *order_id)
+{
+  const char *host;
+  const char *forwarded_host;
+  const char *uri_path;
+  const char *uri_instance_id;
+  char *result;
+
+  host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
+  forwarded_host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
+                                                "X-Forwarded-Host");
+
+  uri_path = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
+                                          "X-Forwarded-Prefix");
+  if (NULL == uri_path)
+    uri_path = "-";
+
+  if (NULL != forwarded_host)
+    host = forwarded_host;
+
+  if (0 == strcmp (instance_id, "default"))
+    uri_instance_id = "-";
+  else
+    uri_instance_id = instance_id;
+
+  if (NULL == host)
+  {
+    /* Should never happen, at last the host header should be defined */
+    GNUNET_break (0);
+    return NULL;
+  }
+
+  GNUNET_assert (NULL != order_id);
+
+  GNUNET_assert (0 < GNUNET_asprintf (&result,
+                                      "taler://refund/%s/%s/%s/%s",
+                                      host,
+                                      uri_path,
+                                      uri_instance_id,
+                                      order_id));
+  return result;
+}
+
+
+/**
  * Custom cleanup routine for a `struct TMH_JsonParseContext`.
  *
  * @param hc the `struct TMH_JsonParseContext` to clean up.
@@ -332,34 +387,19 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
 
   {
     int ret;
-    char *refund_pickup_url;
-    char *refund_redirect_url;
+    char *taler_refund_uri;
 
-    refund_pickup_url = TALER_url_absolute_mhd (connection,
-                                                "/public/refund",
-                                                "instance",
-                                                mi->id,
-                                                "order_id",
-                                                order_id,
-                                                NULL);
-    GNUNET_assert (NULL != refund_pickup_url);
-    refund_redirect_url = TALER_url_absolute_mhd (connection,
-                                                  "public/trigger-pay",
-                                                  "refund_url",
-                                                  refund_pickup_url,
-                                                  NULL);
-    GNUNET_assert (NULL != refund_redirect_url);
+    taler_refund_uri = make_taler_refund_uri (connection, mi->id, order_id);
+
     ret = TMH_RESPONSE_reply_json_pack (connection,
                                         MHD_HTTP_OK,
-                                        "{s:o, s:s, s:o}",
+                                        "{s:o, s:o, s:s}",
                                         "sig",
                                         GNUNET_JSON_from_data_auto (&sig),
-                                        "refund_redirect_url",
-                                        refund_redirect_url,
                                         "contract_terms",
-                                        contract_terms);
-    GNUNET_free (refund_pickup_url);
-    GNUNET_free (refund_redirect_url);
+                                        contract_terms,
+                                        "taler_refund_uri", taler_refund_uri);
+    GNUNET_free (taler_refund_uri);
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
     return ret;
