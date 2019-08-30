@@ -704,6 +704,7 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls closure, typically a connection to the db
    * @param justification why was the tip approved
+   * @param extra extra data that will be given to the customer's wallet
    * @param amount how high is the tip (with fees)
    * @param reserve_priv which reserve is debited
    * @param exchange_url which exchange manages the tip
@@ -720,6 +721,7 @@ struct TALER_MERCHANTDB_Plugin
   enum TALER_ErrorCode
   (*authorize_tip_TR)(void *cls,
                       const char *justification,
+                      const json_t *extra,
                       const struct TALER_Amount *amount,
                       const struct TALER_ReservePrivateKeyP *reserve_priv,
                       const char *exchange_url,
@@ -749,6 +751,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param cls closure, typically a connection to the d
    * @param tip_id the unique ID for the tip
    * @param[out] exchange_url set to the URL of the exchange (unless NULL)
+   * @param[out] extra extra data to pass to the wallet
    * @param[out] amount set to the authorized amount (unless NULL)
    * @param[out] timestamp set to the timestamp of the tip authorization (unless NULL)
    * @return transaction status, usually
@@ -759,6 +762,7 @@ struct TALER_MERCHANTDB_Plugin
   (*lookup_tip_by_id)(void *cls,
                       const struct GNUNET_HashCode *tip_id,
                       char **exchange_url,
+                      json_t **extra,
                       struct TALER_Amount *amount,
                       struct GNUNET_TIME_Absolute *timestamp);
 

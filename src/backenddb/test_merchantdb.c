@@ -502,6 +502,7 @@ test_tipping ()
   if (TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS !=
       plugin->authorize_tip_TR (plugin->cls,
                                 "testing tips reserve unknown",
+                                json_object (),
                                 &amount,
                                 &tip_reserve_priv,
                                 "http://localhost:8081/",
@@ -545,6 +546,7 @@ test_tipping ()
   if (TALER_EC_TIP_AUTHORIZE_RESERVE_EXPIRED !=
       plugin->authorize_tip_TR (plugin->cls,
                                 "testing tips too late",
+                                json_object (),
                                 &amount,
                                 &tip_reserve_priv,
                                 "http://localhost:8081/",
@@ -591,6 +593,7 @@ test_tipping ()
   if (TALER_EC_NONE !=
       plugin->authorize_tip_TR (plugin->cls,
                                 "testing tips",
+                                json_object (),
                                 &amount,
                                 &tip_reserve_priv,
                                 "http://localhost:8081/",
@@ -609,7 +612,7 @@ test_tipping ()
       plugin->lookup_tip_by_id (plugin->cls,
 				      &tip_id,
 				      &url,
-                                      NULL, NULL))
+                                      NULL, NULL, NULL))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -625,6 +628,7 @@ test_tipping ()
   if (TALER_EC_NONE !=
       plugin->authorize_tip_TR (plugin->cls,
                                 "testing tips more",
+                                json_object (),
                                 &amount,
                                 &tip_reserve_priv,
                                 "http://localhost:8081/",
@@ -696,6 +700,7 @@ test_tipping ()
   if (TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS !=
       plugin->authorize_tip_TR (plugin->cls,
                                 "testing tips insufficient funds",
+                                json_object (),
                                 &amount,
                                 &tip_reserve_priv,
                                 "http://localhost:8081/",

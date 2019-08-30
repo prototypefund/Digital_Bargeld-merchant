@@ -209,9 +209,9 @@ struct TipAuthorizeState
   enum TALER_ErrorCode expected_ec;
 
   /**
-   * Base URL of the involved exchange.
+   * Tip taler:// URI.
    */
-  const char *exchange_url;
+  const char *tip_uri;
 
   /**
    * The tip id; set when the CMD succeeds.
@@ -242,18 +242,15 @@ struct TipAuthorizeState
  * @param cls closure
  * @param http_status HTTP status returned by the merchant backend
  * @param ec taler-specific error code
- * @param tip_id which tip ID should be used to pickup the tip
- * @param tip_expiration when does the tip expire (needs to be
- *        picked up before this time)
- * @param exchange_url at what exchange can the tip be picked up
+ * @param taler_tip_uri URI to let the wallet know about the tip
+ * @param tip_id unique identifier for the tip
  */
 static void
 tip_authorize_cb (void *cls,
                   unsigned int http_status,
                   enum TALER_ErrorCode ec,
-                  const struct GNUNET_HashCode *tip_id,
-                  struct GNUNET_TIME_Absolute tip_expiration,
-                  const char *exchange_url)
+                  const char *taler_tip_uri,
+                  struct GNUNET_HashCode *tip_id)
 {
   struct TipAuthorizeState *tas = cls;
 
@@ -286,19 +283,8 @@ tip_authorize_cb (void *cls,
   if ( (MHD_HTTP_OK == http_status) &&
        (TALER_EC_NONE == ec) )
   {
-    if (0 != strcmp (exchange_url,
-                     tas->exchange_url))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Unexpected exchange URL %s to command %s\n",
-                  exchange_url,
-                  TALER_TESTING_interpreter_get_current_label
-                    (tas->is));
-      TALER_TESTING_interpreter_fail (tas->is);
-      return;
-    }
+    tas->tip_uri = strdup (taler_tip_uri);
     tas->tip_id = *tip_id;
-    tas->tip_expiration = tip_expiration;
   }
 
   TALER_TESTING_interpreter_next (tas->is);
@@ -446,7 +432,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
 
   tas = GNUNET_new (struct TipAuthorizeState);
   tas->merchant_url = merchant_url;
-  tas->exchange_url = exchange_url;
   tas->instance = instance;
   tas->justification = justification;
   tas->amount = amount;
@@ -494,7 +479,6 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
 
   tas = GNUNET_new (struct TipAuthorizeState);
   tas->merchant_url = merchant_url;
-  tas->exchange_url = exchange_url;
   tas->instance = instance;
   tas->justification = justification;
   tas->amount = amount;

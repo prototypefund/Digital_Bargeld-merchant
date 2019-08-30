@@ -55,16 +55,6 @@ struct TipAuthContext
   const char *justification;
 
   /**
-   * Pickup URL to use.
-   */
-  const char *pickup_url;
-
-  /**
-   * URL to navigate to after tip.
-   */
-  const char *next_url;
-
-  /**
    * JSON request received.
    */
   json_t *root;
@@ -137,6 +127,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   enum TALER_ErrorCode ec;
   struct GNUNET_TIME_Absolute expiration;
   struct GNUNET_HashCode tip_id;
+  json_t *extra;
 
   if (NULL == *connection_cls)
   {
@@ -164,8 +155,6 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
       TALER_JSON_spec_amount ("amount", &tac->amount),
       GNUNET_JSON_spec_string ("instance", &tac->instance),
       GNUNET_JSON_spec_string ("justification", &tac->justification),
-      GNUNET_JSON_spec_string ("pickup_url", &tac->pickup_url),
-      GNUNET_JSON_spec_string ("next_url", &tac->next_url),
       GNUNET_JSON_spec_end()
     };
 
@@ -180,19 +169,6 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     if ( (GNUNET_NO == res) ||
          (NULL == tac->root) )
       return MHD_YES;
-
-    if (NULL == json_object_get (tac->root,
-                                 "pickup_url"))
-    {
-      char *pickup_url = TALER_url_absolute_mhd (connection,
-                                                 "/public/tip-pickup",
-                                                 NULL);
-      GNUNET_assert (NULL != pickup_url);
-      json_object_set_new (tac->root,
-                           "pickup_url",
-                           json_string (pickup_url));
-      GNUNET_free (pickup_url);
-    }
 
     res = TMH_PARSE_json_data (connection,
                                tac->root,
@@ -225,14 +201,23 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                                          "exchange for tipping not configured for the instance");
   }
   tac->ctr.reserve_priv = mi->tip_reserve;
+  extra = json_object_get (tac->root, "extra");
+  if (NULL == extra)
+    extra = json_object ();
+  else
+    json_incref (extra);
+
+
   db->preflight (db->cls);
   ec = db->authorize_tip_TR (db->cls,
                              tac->justification,
+                             extra,
                              &tac->amount,
                              &mi->tip_reserve,
                              mi->tip_exchange,
                              &expiration,
                              &tip_id);
+  json_decref (extra);
   /* If we have insufficient funds according to OUR database,
      check with exchange to see if the reserve has been topped up
      in the meantime (or if tips were not withdrawn yet). */
@@ -280,26 +265,52 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
 
   /* generate success response */
   {
-    json_t *tip_token;
-    char *tip_token_str;
+    char *taler_tip_uri;
+    const char *host;
+    const char *forwarded_host;
+    const char *uri_path;
+    const char *uri_instance_id;
+    struct GNUNET_CRYPTO_HashAsciiEncoded hash_enc;
 
-    tip_token = json_pack ("{s:o, s:o, s:o, s:s, s:s, s:s}",
-                           "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
-                           "expiration", GNUNET_JSON_from_time_abs (expiration),
-                           "amount", TALER_JSON_from_amount (&tac->amount),
-                           "exchange_url", mi->tip_exchange,
-                           "next_url", tac->next_url,
-                           "pickup_url", tac->pickup_url);
-    tip_token_str = json_dumps (tip_token, JSON_COMPACT);
-    GNUNET_assert (NULL != tip_token_str);
+    host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
+    forwarded_host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
+                                                  "X-Forwarded-Host");
+
+    uri_path = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
+                                        "X-Forwarded-Prefix");
+    if (NULL == uri_path)
+      uri_path = "-";
+
+    if (NULL != forwarded_host)
+      host = forwarded_host;
+
+    if (NULL == host)
+    {
+      /* Should never happen, at last the host header should be defined */
+      GNUNET_break (0);
+      return TMH_RESPONSE_reply_internal_error (connection, 0, "unable to identify backend host");
+    }
+
+    if (0 == strcmp (mi->id, "default"))
+      uri_instance_id = "-";
+    else
+      uri_instance_id = mi->id;
+
+    GNUNET_CRYPTO_hash_to_enc (&tip_id, &hash_enc);
+
+    GNUNET_assert (0 < GNUNET_asprintf (&taler_tip_uri,
+                                         "taler://tip/%s/%s/%s/%s",
+                                         host,
+                                         uri_path,
+                                         uri_instance_id,
+                                         hash_enc.encoding));
+
+
     res = TMH_RESPONSE_reply_json_pack (connection,
                                         MHD_HTTP_OK,
-                                        "{s:o, s:o, s:s, s:o}",
-                                        "tip_id", GNUNET_JSON_from_data_auto (&tip_id),
-                                        "expiration", GNUNET_JSON_from_time_abs (expiration),
-                                        "exchange_url", mi->tip_exchange,
-                                        "tip_token", tip_token);
-    GNUNET_free (tip_token_str);
+                                        "{s:s, s:s}",
+                                        "taler_tip_uri", taler_tip_uri,
+                                        "tip_id", hash_enc.encoding);
     return res;
   }
 }

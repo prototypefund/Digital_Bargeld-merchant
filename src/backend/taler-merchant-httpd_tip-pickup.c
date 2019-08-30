@@ -399,7 +399,7 @@ prepare_pickup (struct PickupContext *pc)
   qs = db->lookup_tip_by_id (db->cls,
                              &pc->tip_id,
                              &pc->exchange_url,
-                             NULL, NULL);
+                             NULL, NULL, NULL);
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
   {
     unsigned int response_code;
@@ -486,7 +486,7 @@ parse_planchet (struct MHD_Connection *connection,
 
 
 /**
- * Manages a /tip-pickup call, checking that the tip is authorized,
+ * Manages a POST /tip-pickup call, checking that the tip is authorized,
  * and if so, returning the withdrawal permissions.
  *
  * @param rh context of the handler
@@ -596,4 +596,115 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
   GNUNET_JSON_parse_free (spec);
   json_decref (root);
   return res;
+}
+
+
+/**
+ * Manages a GET /tip-pickup call, checking that the tip is authorized,
+ * and if so, returning the withdrawal permissions.
+ *
+ * @param rh context of the handler
+ * @param connection the MHD connection to handle
+ * @param[in,out] connection_cls the connection's closure (can be updated)
+ * @param upload_data upload data
+ * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @return MHD result code
+ */
+int
+MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
+                           struct MHD_Connection *connection,
+                           void **connection_cls,
+                           const char *upload_data,
+                           size_t *upload_data_size)
+{
+  struct MerchantInstance *mi;
+  const char *instance_str;
+  const char *tip_id_str;
+  char *exchange_url;
+  json_t *extra;
+  struct GNUNET_HashCode tip_id;
+  struct TALER_Amount tip_amount;
+  int ret;
+  int qs;
+
+  instance_str = MHD_lookup_connection_value (connection,
+                                              MHD_GET_ARGUMENT_KIND,
+                                              "instance");
+  if (NULL == instance_str)
+    instance_str = "default";
+  mi = TMH_lookup_instance (instance_str);
+  if (NULL == mi)
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           TALER_EC_TIP_INSTANCE_UNKNOWN,
+                                           "merchant instance unknown");
+
+  tip_id_str = MHD_lookup_connection_value (connection,
+                                            MHD_GET_ARGUMENT_KIND,
+                                            "tip_id");
+
+  if (NULL == tip_id_str)
+  {
+    /* tip_id is required but missing */
+    GNUNET_break_op (0);
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           TALER_EC_PARAMETER_MISSING,
+                                           "tip_id required");
+  }
+
+  if (GNUNET_OK != GNUNET_CRYPTO_hash_from_string (tip_id_str, &tip_id))
+  {
+    /* tip_id has wrong encoding */
+    GNUNET_break_op (0);
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           TALER_EC_PARAMETER_MALFORMED,
+                                           "tip_id malformed");
+  }
+
+  db->preflight (db->cls);
+  qs = db->lookup_tip_by_id (db->cls,
+                             &tip_id,
+                             &exchange_url,
+                             &extra,
+                             &tip_amount, NULL);
+
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
+  {
+    unsigned int response_code;
+    enum TALER_ErrorCode ec;
+
+    switch (qs)
+    {
+    case GNUNET_DB_STATUS_SUCCESS_NO_RESULTS:
+      ec = TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN;
+      response_code = MHD_HTTP_NOT_FOUND;
+      break;
+    case GNUNET_DB_STATUS_SOFT_ERROR:
+      ec = TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
+      response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      break;
+    case GNUNET_DB_STATUS_HARD_ERROR:
+      ec = TALER_EC_TIP_PICKUP_DB_ERROR_HARD;
+      response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      break;
+    default:
+      GNUNET_break (0);
+      ec = TALER_EC_INTERNAL_LOGIC_ERROR;
+      response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      break;
+    }
+    return TMH_RESPONSE_reply_rc (connection,
+                                  response_code,
+                                  ec,
+                                  "Could not determine exchange URL for the given tip id");
+  }
+  ret = TMH_RESPONSE_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
+                                      "{s:s, s:o}",
+                                      "exchange_url", exchange_url,
+                                      "amount", TALER_JSON_from_amount (&tip_amount),
+                                      "extra", extra);
+
+  GNUNET_free (exchange_url);
+  json_decref (extra);
+  return ret;
 }

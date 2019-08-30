@@ -83,13 +83,11 @@ static int
 check_ok (struct TALER_MERCHANT_TipAuthorizeOperation *tao,
           const json_t *json)
 {
+  const char *taler_tip_uri;
   struct GNUNET_HashCode tip_id;
-  struct GNUNET_TIME_Absolute tip_expiration;
-  const char *exchange_url;
   struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_absolute_time ("expiration", &tip_expiration),
+    GNUNET_JSON_spec_string ("taler_tip_uri", &taler_tip_uri),
     GNUNET_JSON_spec_fixed_auto ("tip_id", &tip_id),
-    GNUNET_JSON_spec_string ("exchange_url", &exchange_url),
     GNUNET_JSON_spec_end()
   };
 
@@ -99,14 +97,14 @@ check_ok (struct TALER_MERCHANT_TipAuthorizeOperation *tao,
                          NULL, NULL))
   {
     GNUNET_break_op (0);
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "JSON %s\n", json_dumps (json, 0));
     return GNUNET_SYSERR;
   }
   tao->cb (tao->cb_cls,
            MHD_HTTP_OK,
            TALER_JSON_get_error_code (json),
-           &tip_id,
-           tip_expiration,
-           exchange_url);
+           taler_tip_uri,
+           &tip_id);
   tao->cb = NULL; /* do not call twice */
   GNUNET_JSON_parse_free (spec);
   return GNUNET_OK;
@@ -163,9 +161,7 @@ handle_tip_authorize_finished (void *cls,
     tao->cb (tao->cb_cls,
              response_code,
              TALER_JSON_get_error_code (json),
-             NULL,
-             GNUNET_TIME_UNIT_ZERO_ABS,
-             NULL);
+             NULL, NULL);
   TALER_MERCHANT_tip_authorize_cancel (tao);
 }
 

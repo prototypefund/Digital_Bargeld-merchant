@@ -829,17 +829,15 @@ struct TALER_MERCHANT_TipAuthorizeOperation;
  * @param cls closure
  * @param http_status HTTP status returned by the merchant backend
  * @param ec taler-specific error code
+ * @param taler_tip_uri tip URI
  * @param tip_id which tip ID should be used to pickup the tip
- * @param tip_expiration when does the tip expire (needs to be picked up before this time)
- * @param exchange_url at what exchange can the tip be picked up
  */
 typedef void
 (*TALER_MERCHANT_TipAuthorizeCallback) (void *cls,
                                         unsigned int http_status,
                                         enum TALER_ErrorCode ec,
-                                        const struct GNUNET_HashCode *tip_id,
-                                        struct GNUNET_TIME_Absolute tip_expiration,
-                                        const char *exchange_url);
+                                        const char *taler_tip_uri,
+                                        struct GNUNET_HashCode *tip_id);
 
 
 /**

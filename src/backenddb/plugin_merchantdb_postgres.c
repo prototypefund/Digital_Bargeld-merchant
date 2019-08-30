@@ -242,6 +242,7 @@ postgres_initialize (void *cls)
                             ",tip_id BYTEA NOT NULL CHECK (LENGTH(tip_id)=64)"
                             ",exchange_url VARCHAR NOT NULL"
                             ",justification VARCHAR NOT NULL"
+                            ",extra BYTEA NOT NULL"
                             ",timestamp INT8 NOT NULL"
                             ",amount_val INT8 NOT NULL" /* overall tip amount */
                             ",amount_frac INT4 NOT NULL"
@@ -608,6 +609,7 @@ postgres_initialize (void *cls)
                             " amount_val"
                             ",amount_frac"
                             ",justification"
+                            ",extra"
                             ",tip_id"
                             " FROM merchant_tips"
                             " WHERE reserve_priv=$1",
@@ -634,14 +636,15 @@ postgres_initialize (void *cls)
                             ",tip_id"
                             ",exchange_url"
                             ",justification"
+                            ",extra"
                             ",timestamp"
                             ",amount_val"
                             ",amount_frac"
                             ",left_val"
                             ",left_frac"
                             ") VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-                            9),
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                            10),
     GNUNET_PQ_make_prepare ("lookup_reserve_by_tip_id",
                             "SELECT"
                             " reserve_priv"
@@ -661,6 +664,7 @@ postgres_initialize (void *cls)
     GNUNET_PQ_make_prepare ("find_tip_by_id",
                             "SELECT"
                             " exchange_url"
+                            ",extra"
                             ",timestamp"
                             ",amount_val"
                             ",amount_frac"
@@ -1570,6 +1574,7 @@ find_tip_authorizations_cb (void *cls,
   {
     struct TALER_Amount amount;
     char *just;
+    json_t *extra;
     struct GNUNET_HashCode h;
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_string ("justification",
@@ -1578,6 +1583,8 @@ find_tip_authorizations_cb (void *cls,
                                             &h),
       TALER_PQ_RESULT_SPEC_AMOUNT ("amount",
                                     &amount),
+      TALER_PQ_result_spec_json ("extra",
+                                 &extra),
       GNUNET_PQ_result_spec_end
     };
 
@@ -3186,6 +3193,7 @@ postgres_enable_tip_reserve_TR (void *cls,
  *
  * @param cls closure, typically a connection to the db
  * @param justification why was the tip approved
+ * @param extra extra data for the customer's wallet
  * @param amount how high is the tip (with fees)
  * @param reserve_priv which reserve is debited
  * @param exchange_url which exchange manages the tip
@@ -3202,6 +3210,7 @@ postgres_enable_tip_reserve_TR (void *cls,
 static enum TALER_ErrorCode
 postgres_authorize_tip_TR (void *cls,
                            const char *justification,
+                           const json_t *extra,
                            const struct TALER_Amount *amount,
                            const struct TALER_ReservePrivateKeyP *reserve_priv,
                            const char *exchange_url,
@@ -3298,6 +3307,7 @@ postgres_authorize_tip_TR (void *cls,
       GNUNET_PQ_query_param_auto_from_type (tip_id),
       GNUNET_PQ_query_param_string (exchange_url),
       GNUNET_PQ_query_param_string (justification),
+      TALER_PQ_query_param_json (extra),
       GNUNET_PQ_query_param_absolute_time (&now),
       TALER_PQ_query_param_amount (amount), /* overall amount */
       TALER_PQ_query_param_amount (amount), /* amount left */
@@ -3331,6 +3341,7 @@ postgres_authorize_tip_TR (void *cls,
  * @param cls closure, typically a connection to the d
  * @param tip_id the unique ID for the tip
  * @param[out] exchange_url set to the URL of the exchange (unless NULL)
+ * @param[out] extra extra data to pass to the wallet (unless NULL)
  * @param[out] amount set to the authorized amount (unless NULL)
  * @param[out] timestamp set to the timestamp of the tip authorization (unless NULL)
  * @return transaction status, usually
@@ -3341,11 +3352,13 @@ static enum GNUNET_DB_QueryStatus
 postgres_lookup_tip_by_id (void *cls,
                            const struct GNUNET_HashCode *tip_id,
                            char **exchange_url,
+                           json_t **extra,
                            struct TALER_Amount *amount,
                            struct GNUNET_TIME_Absolute *timestamp)
 {
   struct PostgresClosure *pg = cls;
   char *res_exchange_url;
+  json_t *res_extra;
   struct TALER_Amount res_amount;
   struct GNUNET_TIME_Absolute res_timestamp;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -3357,6 +3370,8 @@ postgres_lookup_tip_by_id (void *cls,
                                   &res_exchange_url),
     GNUNET_PQ_result_spec_absolute_time ("timestamp",
                                          &res_timestamp),
+    TALER_PQ_result_spec_json ("extra",
+                               &res_extra),
     TALER_PQ_RESULT_SPEC_AMOUNT ("amount",
 				  &res_amount),
     GNUNET_PQ_result_spec_end
@@ -3379,6 +3394,11 @@ postgres_lookup_tip_by_id (void *cls,
     *amount = res_amount;
   if (NULL != timestamp)
     *timestamp = res_timestamp;
+  if (NULL != extra)
+  {
+    json_incref (res_extra);
+    *extra = res_extra;
+  }
   GNUNET_PQ_cleanup_result (rs);
   return qs;
 }
