@@ -626,6 +626,7 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   struct TALER_Amount tip_amount;
   struct TALER_Amount tip_amount_left;
   struct GNUNET_TIME_Absolute timestamp;
+  struct GNUNET_TIME_Absolute timestamp_expire;
   int ret;
   int qs;
 
@@ -701,13 +702,17 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
                                   ec,
                                   "Could not determine exchange URL for the given tip id");
   }
+
+  timestamp_expire = GNUNET_TIME_absolute_add (timestamp, GNUNET_TIME_UNIT_DAYS);
+
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:s, s:o, s:o, s:o, s:o}",
+                                      "{s:s, s:o, s:o, s:o, s:o, s:o}",
                                       "exchange_url", exchange_url,
                                       "amount", TALER_JSON_from_amount (&tip_amount),
                                       "amount_left", TALER_JSON_from_amount (&tip_amount_left),
                                       "stamp_created", GNUNET_JSON_from_time_abs (timestamp),
+                                      "stamp_expire", GNUNET_JSON_from_time_abs (timestamp_expire),
                                       "extra", extra);
 
   GNUNET_free (exchange_url);
