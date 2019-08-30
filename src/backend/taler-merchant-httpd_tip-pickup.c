@@ -625,6 +625,7 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   struct GNUNET_HashCode tip_id;
   struct TALER_Amount tip_amount;
   struct TALER_Amount tip_amount_left;
+  struct GNUNET_TIME_Absolute timestamp;
   int ret;
   int qs;
 
@@ -668,7 +669,7 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
                              &extra,
                              &tip_amount,
                              &tip_amount_left,
-                             NULL);
+                             &timestamp);
 
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
   {
@@ -702,10 +703,11 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   }
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:s, s:o, s:o, s:o}",
+                                      "{s:s, s:o, s:o, s:o, s:o}",
                                       "exchange_url", exchange_url,
                                       "amount", TALER_JSON_from_amount (&tip_amount),
                                       "amount_left", TALER_JSON_from_amount (&tip_amount_left),
+                                      "stamp_created", GNUNET_JSON_from_time_abs (timestamp),
                                       "extra", extra);
 
   GNUNET_free (exchange_url);
