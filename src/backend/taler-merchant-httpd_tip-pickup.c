@@ -702,7 +702,7 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   }
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:s, s:o}",
+                                      "{s:s, s:o, s:o, s:o}",
                                       "exchange_url", exchange_url,
                                       "amount", TALER_JSON_from_amount (&tip_amount),
                                       "amount_left", TALER_JSON_from_amount (&tip_amount_left),
