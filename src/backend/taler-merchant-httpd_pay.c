@@ -1716,7 +1716,7 @@ check_coin_refunded (void *cls,
     struct DepositConfirmation *dc = &pc->dc[i];
 
     /* Get matching coin from results*/
-    if (0 != GNUNET_memcmp (coin_pub,
+    if (0 == GNUNET_memcmp (coin_pub,
                             &dc->coin_pub))
     {
       dc->refunded = GNUNET_YES;
