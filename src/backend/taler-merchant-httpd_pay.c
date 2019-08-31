@@ -680,7 +680,7 @@ check_payment_sufficient (struct PayContext *pc)
   }
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Amount received from wallet: %s\n"
+              "Amount received from wallet: %s\n",
               TALER_amount_to_string (&acc_amount));
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
@@ -688,8 +688,11 @@ check_payment_sufficient (struct PayContext *pc)
               TALER_amount_to_string (&acc_fee));
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Total wire fee: %s\nMax wire fee: %s\n",
-              TALER_amount_to_string (&total_wire_fee),
+              "Total wire fee: %s\n",
+              TALER_amount_to_string (&total_wire_fee));
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Max wire fee: %s\n",
               TALER_amount_to_string (&pc->max_wire_fee));
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
