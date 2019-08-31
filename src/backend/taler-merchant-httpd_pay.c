@@ -680,9 +680,11 @@ check_payment_sufficient (struct PayContext *pc)
   }
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Amount got by wallet: %s"
-              "\nDeposit fee for all coins: %s\n",
-              TALER_amount_to_string (&acc_amount),
+              "Amount received from wallet: %s\n"
+              TALER_amount_to_string (&acc_amount));
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Deposit fee for all coins: %s\n",
               TALER_amount_to_string (&acc_fee));
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
@@ -693,6 +695,10 @@ check_payment_sufficient (struct PayContext *pc)
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Deposit fee limit for merchant: %s\n",
               TALER_amount_to_string (&pc->max_fee));
+
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Total refunded amount: %s\n",
+              TALER_amount_to_string (&pc->total_refunded));
 
   /* Now compare exchange wire fee compared to
    * what we are willing to pay */
