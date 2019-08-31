@@ -733,14 +733,6 @@ check_payment_sufficient (struct PayContext *pc)
          &wire_fee_customer_contribution));
   }
 
-  /* Do not count any refunds towards the payment */
-  GNUNET_assert
-    (GNUNET_SYSERR != TALER_amount_subtract (&acc_amount,
-                                             &acc_amount,
-                                             &pc->total_refunded));
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Subtracting total refunds from paid amount: %s\n",
-              TALER_amount_to_string (&pc->total_refunded));
   /**
    * Deposit fees of *all* the coins are higher than
    * the fixed limit that the merchant is willing to
@@ -848,6 +840,15 @@ check_payment_sufficient (struct PayContext *pc)
       return TALER_EC_PAY_PAYMENT_INSUFFICIENT;
     }
   }
+
+  /* Do not count any refunds towards the payment */
+  GNUNET_assert
+    (GNUNET_SYSERR != TALER_amount_subtract (&acc_amount,
+                                             &acc_amount,
+                                             &pc->total_refunded));
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Subtracting total refunds from paid amount: %s\n",
+              TALER_amount_to_string (&pc->total_refunded));
 
   return TALER_EC_NONE;
 }
