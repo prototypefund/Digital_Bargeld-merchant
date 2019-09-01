@@ -49,11 +49,26 @@ MH_handler_config (struct TMH_RequestHandler *rh,
                    size_t *upload_data_size)
 {
   int ret;
+  const char *instance_str;
+  struct MerchantInstance *mi;
+
+  instance_str = MHD_lookup_connection_value (connection,
+                                              MHD_GET_ARGUMENT_KIND,
+                                              "instance");
+  if (NULL == instance_str)
+    instance_str = "default";
+
+  mi = TMH_lookup_instance (instance_str);
+
+  if (NULL == mi)
+    return TMH_RESPONSE_reply_bad_request (connection,
+                                           TALER_EC_CHECK_PAYMENT_INSTANCE_UNKNOWN,
+                                           "merchant instance unknown");
+
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
                                       "{s:s}",
                                       "currency", TMH_currency);
-
 
   return ret;
 }
