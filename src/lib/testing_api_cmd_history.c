@@ -164,9 +164,9 @@ history_cb (void *cls,
   unsigned int nresult;
   struct GNUNET_TIME_Absolute last_timestamp;
   struct GNUNET_TIME_Absolute entry_timestamp;
+  json_t *arr;
 
   hs->ho = NULL;
-
 
   if (hs->http_status != http_status)
       TALER_TESTING_FAIL (hs->is);
@@ -179,7 +179,8 @@ history_cb (void *cls,
     return;
   }
 
-  nresult = json_array_size (json);
+  arr = json_object_get (json, "history");
+  nresult = json_array_size (arr);
   if (hs->nresult != nresult)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -196,7 +197,7 @@ history_cb (void *cls,
   {
     json_t *entry;
     size_t index;
-    json_array_foreach (json, index, entry)
+    json_array_foreach (arr, index, entry)
     {
       json_t *timestamp;
 

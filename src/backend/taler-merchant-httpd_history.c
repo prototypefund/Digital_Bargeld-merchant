@@ -291,9 +291,10 @@ MH_handler_history (struct TMH_RequestHandler *rh,
 					      TALER_EC_HISTORY_DB_FETCH_ERROR,
 					      "db error to get history");
   }
-  ret = TMH_RESPONSE_reply_json (connection,
-                                 response,
-                                 MHD_HTTP_OK);
+  ret = TMH_RESPONSE_reply_json_pack (connection, MHD_HTTP_OK,
+                                      "{ s:o }",
+                                      "history",
+                                      response);
   LOG_INFO ("/history, http code: %d\n",
             MHD_HTTP_OK);
   json_decref (response);
