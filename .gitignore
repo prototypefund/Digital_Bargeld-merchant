@@ -26,6 +26,7 @@ INSTALL
 GPATH
 GRTAGS
 GTAGS
+tags
 *.swp
 src/backend/taler-merchant-httpd
 src/merchant-tools/taler-merchant-dbinit
