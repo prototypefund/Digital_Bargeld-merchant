@@ -376,7 +376,7 @@ check_payment_run (void *cls,
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_order_id (
-    proposal_cmd, 0, &order_id))
+        proposal_cmd, 0, &order_id))
     TALER_TESTING_FAIL (is);
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -384,13 +384,13 @@ check_payment_run (void *cls,
               order_id);
 
   cps->cpo = TALER_MERCHANT_check_payment
-    (is->ctx,
-     cps->merchant_url,
-     "default", // only default instance for now.
-     order_id,
-     NULL,
-     check_payment_cb,
-     cps);
+               (is->ctx,
+               cps->merchant_url,
+               "default", // only default instance for now.
+               order_id,
+               NULL,
+               check_payment_cb,
+               cps);
 
   GNUNET_assert (NULL != cps->cpo);
 }
@@ -479,8 +479,8 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
       *ctok = '\0';
       ctok++;
       if (1 != sscanf (ctok,
-		       "%u",
-		       &ci))
+                       "%u",
+                       &ci))
       {
         GNUNET_break (0);
         return GNUNET_SYSERR;
@@ -488,7 +488,7 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
     }
 
     coin_cmd = TALER_TESTING_interpreter_lookup_command
-      (is, token);
+                 (is, token);
 
     if (NULL == coin_cmd)
     {
@@ -500,7 +500,7 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
                        *npc,
                        (*npc) + 1);
 
-    icoin = &((*pc)[(*npc)-1]);
+    icoin = &((*pc)[(*npc) - 1]);
 
     {
       const struct TALER_CoinSpendPrivateKeyP *coin_priv;
@@ -510,19 +510,19 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
 
       GNUNET_assert
         (GNUNET_OK == TALER_TESTING_get_trait_coin_priv
-         (coin_cmd, 0, &coin_priv));
+          (coin_cmd, 0, &coin_priv));
 
       GNUNET_assert
         (GNUNET_OK == TALER_TESTING_get_trait_denom_pub
-         (coin_cmd, 0, &denom_pub));
+          (coin_cmd, 0, &denom_pub));
 
       GNUNET_assert
         (GNUNET_OK == TALER_TESTING_get_trait_denom_sig
-         (coin_cmd, 0, &denom_sig));
+          (coin_cmd, 0, &denom_sig));
 
       GNUNET_assert
         (GNUNET_OK == TALER_TESTING_get_trait_amount_obj
-         (coin_cmd, 0, &denom_value));
+          (coin_cmd, 0, &denom_value));
 
       icoin->coin_priv = *coin_priv;
       icoin->denom_pub = denom_pub->key;
@@ -531,12 +531,12 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
       icoin->amount_with_fee = *denom_value;
     }
     GNUNET_assert (NULL != (dpk = TALER_TESTING_find_pk
-      (is->keys, &icoin->denom_value)));
+                                    (is->keys, &icoin->denom_value)));
 
     GNUNET_assert (GNUNET_SYSERR != TALER_amount_subtract
-      (&icoin->amount_without_fee,
-       &icoin->denom_value,
-       &dpk->fee_deposit));
+                     (&icoin->amount_without_fee,
+                     &icoin->denom_value,
+                     &dpk->fee_deposit));
 
     GNUNET_assert
       (GNUNET_OK == TALER_TESTING_get_trait_url
@@ -597,15 +597,15 @@ pay_cb (void *cls,
       GNUNET_JSON_spec_fixed_auto ("sig",
                                    &sig),
       GNUNET_JSON_spec_fixed_auto ("h_contract_terms",
-				   &ps->h_contract_terms),
+                                   &ps->h_contract_terms),
       GNUNET_JSON_spec_end ()
     };
     const struct TALER_TESTING_Command *proposal_cmd;
 
     GNUNET_assert (GNUNET_OK == GNUNET_JSON_parse (
-      obj, spec,
-      &error_name,
-      &error_line));
+                     obj, spec,
+                     &error_name,
+                     &error_line));
 
     mr.purpose.purpose = htonl (
       TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
@@ -614,18 +614,18 @@ pay_cb (void *cls,
 
     /* proposal reference was used at least once, at this point */
     GNUNET_assert
-      ( NULL !=
-      ( proposal_cmd = TALER_TESTING_interpreter_lookup_command
-      (ps->is, ps->proposal_reference)));
+      (NULL !=
+      (proposal_cmd = TALER_TESTING_interpreter_lookup_command
+                        (ps->is, ps->proposal_reference)));
 
     if (GNUNET_OK != TALER_TESTING_get_trait_peer_key_pub
-        (proposal_cmd, 0, &merchant_pub))
+          (proposal_cmd, 0, &merchant_pub))
       TALER_TESTING_FAIL (ps->is);
 
     if (GNUNET_OK != GNUNET_CRYPTO_eddsa_verify (
-      TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
-      &mr.purpose, &sig,
-      merchant_pub))
+          TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
+          &mr.purpose, &sig,
+          merchant_pub))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Merchant signature given in response to /pay"
@@ -685,7 +685,7 @@ pay_abort_cb (void *cls,
     pas->num_refunds = num_refunds;
 
     pas->res = GNUNET_new_array
-      (num_refunds, struct TALER_MERCHANT_RefundEntry);
+                 (num_refunds, struct TALER_MERCHANT_RefundEntry);
 
     memcpy (pas->res,
             res,
@@ -733,8 +733,8 @@ _pay_run (const char *merchant_url,
           const char *amount_with_fee,
           const char *amount_without_fee,
           const char *refund_fee,
-          struct TALER_MERCHANT_Pay * (*api_func) (),
-          void (*api_cb) (),
+          struct TALER_MERCHANT_Pay * (*api_func)(),
+          void (*api_cb)(),
           void *cls)
 {
   const struct TALER_TESTING_Command *proposal_cmd;
@@ -757,7 +757,7 @@ _pay_run (const char *merchant_url,
   struct TALER_MERCHANT_Pay *ret;
 
   proposal_cmd = TALER_TESTING_interpreter_lookup_command (is,
-							   proposal_reference);
+                                                           proposal_reference);
 
   if (NULL == proposal_cmd)
   {
@@ -767,8 +767,8 @@ _pay_run (const char *merchant_url,
 
   if (GNUNET_OK !=
       TALER_TESTING_get_trait_contract_terms (proposal_cmd,
-					      0,
-					      &contract_terms))
+                                              0,
+                                              &contract_terms))
   {
     GNUNET_break (0);
     return NULL;
@@ -793,7 +793,7 @@ _pay_run (const char *merchant_url,
                             &total_amount),
     TALER_JSON_spec_amount ("max_fee",
                             &max_fee),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
 
   if (GNUNET_OK !=
@@ -805,12 +805,12 @@ _pay_run (const char *merchant_url,
     char *js;
 
     js = json_dumps (contract_terms,
-		     JSON_INDENT (1));
+                     JSON_INDENT (1));
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Parser failed on %s:%u for input `%s'\n",
                 error_name,
                 error_line,
-		js);
+                js);
     free (js);
     GNUNET_break_op (0);
     return NULL;
@@ -822,7 +822,7 @@ _pay_run (const char *merchant_url,
   if (GNUNET_OK !=
       build_coins (&pay_coins,
                    &npay_coins,
-	           cr,
+                   cr,
                    is,
                    amount_with_fee,
                    amount_without_fee,
@@ -830,7 +830,7 @@ _pay_run (const char *merchant_url,
   {
     GNUNET_array_grow (pay_coins,
                        npay_coins,
-		       0);
+                       0);
     GNUNET_free (cr);
     GNUNET_break (0);
     return NULL;
@@ -838,7 +838,7 @@ _pay_run (const char *merchant_url,
 
   GNUNET_free (cr);
   if (GNUNET_OK != TALER_TESTING_get_trait_merchant_sig
-    (proposal_cmd, 0, &merchant_sig))
+        (proposal_cmd, 0, &merchant_sig))
   {
     GNUNET_break (0);
     return NULL;
@@ -846,7 +846,7 @@ _pay_run (const char *merchant_url,
 
 
   if (GNUNET_OK != TALER_TESTING_get_trait_h_contract_terms
-    (proposal_cmd, 0, &h_proposal))
+        (proposal_cmd, 0, &h_proposal))
   {
     GNUNET_break (0);
     return NULL;
@@ -952,25 +952,25 @@ pay_traits (void *cls,
   struct GNUNET_CRYPTO_EddsaPublicKey *merchant_pub;
 
   if ( NULL ==
-     ( proposal_cmd = TALER_TESTING_interpreter_lookup_command
-       (ps->is, ps->proposal_reference)))
+       (proposal_cmd = TALER_TESTING_interpreter_lookup_command
+                         (ps->is, ps->proposal_reference)))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
 
   if (GNUNET_OK != TALER_TESTING_get_trait_order_id
-      (proposal_cmd, 0, &order_id))
+        (proposal_cmd, 0, &order_id))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
 
   if (GNUNET_OK != TALER_TESTING_get_trait_peer_key_pub
-      (proposal_cmd,
-       0,
-       (const struct GNUNET_CRYPTO_EddsaPublicKey **)
-         &merchant_pub))
+        (proposal_cmd,
+        0,
+        (const struct GNUNET_CRYPTO_EddsaPublicKey **)
+        &merchant_pub))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -1099,28 +1099,28 @@ pay_abort_run (void *cls,
 
   pas->is = is;
   pay_cmd = TALER_TESTING_interpreter_lookup_command
-    (is, pas->pay_reference);
+              (is, pas->pay_reference);
   if (NULL == pay_cmd)
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_proposal_reference
-      (pay_cmd, 0, &proposal_reference))
+        (pay_cmd, 0, &proposal_reference))
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_coin_reference
-      (pay_cmd, 0, &coin_reference))
+        (pay_cmd, 0, &coin_reference))
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_amount
-    (pay_cmd, AMOUNT_WITH_FEE, &amount_with_fee))
+        (pay_cmd, AMOUNT_WITH_FEE, &amount_with_fee))
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_amount
-    (pay_cmd, AMOUNT_WITHOUT_FEE, &amount_without_fee))
+        (pay_cmd, AMOUNT_WITHOUT_FEE, &amount_without_fee))
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_amount
-    (pay_cmd, REFUND_FEE, &refund_fee))
+        (pay_cmd, REFUND_FEE, &refund_fee))
     TALER_TESTING_FAIL (is);
 
   if (NULL == (pas->pao = _pay_run (pas->merchant_url,
@@ -1220,9 +1220,9 @@ TALER_TESTING_cmd_pay_abort (const char *label,
  */
 static void
 pay_again_cb (void *cls,
-	      unsigned int http_status,
-	      enum TALER_ErrorCode ec,
-	      const json_t *obj)
+              unsigned int http_status,
+              enum TALER_ErrorCode ec,
+              const json_t *obj)
 {
   struct PayAgainState *pas = cls;
   struct GNUNET_CRYPTO_EddsaSignature sig;
@@ -1245,8 +1245,8 @@ pay_again_cb (void *cls,
   }
 
   if ( NULL ==
-     ( pay_cmd = TALER_TESTING_interpreter_lookup_command
-       (pas->is, pas->pay_reference)))
+       (pay_cmd = TALER_TESTING_interpreter_lookup_command
+                    (pas->is, pas->pay_reference)))
     TALER_TESTING_FAIL (pas->is);
 
   if (MHD_HTTP_OK == http_status)
@@ -1255,9 +1255,9 @@ pay_again_cb (void *cls,
     /* Check signature */
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_fixed_auto ("sig",
-				   &sig),
+                                   &sig),
       GNUNET_JSON_spec_fixed_auto ("h_contract_terms",
-				   &mr.h_contract_terms),
+                                   &mr.h_contract_terms),
       GNUNET_JSON_spec_end ()
     };
 
@@ -1266,18 +1266,18 @@ pay_again_cb (void *cls,
                                                    &error_name,
                                                    &error_line));
     mr.purpose.purpose = htonl
-      (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
+                           (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
 
     if (GNUNET_OK != TALER_TESTING_get_trait_peer_key_pub
-        (pay_cmd, 0, &merchant_pub))
+          (pay_cmd, 0, &merchant_pub))
       TALER_TESTING_FAIL (pas->is);
 
     if (GNUNET_OK != GNUNET_CRYPTO_eddsa_verify
-      (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
-       &mr.purpose,
-       &sig,
-       merchant_pub))
+          (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
+          &mr.purpose,
+          &sig,
+          merchant_pub))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Merchant signature given in"
@@ -1310,20 +1310,20 @@ pay_again_run (void *cls,
 
   pas->is = is;
   pay_cmd = TALER_TESTING_interpreter_lookup_command
-    (is, pas->pay_reference);
+              (is, pas->pay_reference);
   if (NULL == pay_cmd)
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_proposal_reference
-      (pay_cmd, 0, &proposal_reference))
+        (pay_cmd, 0, &proposal_reference))
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_amount
-    (pay_cmd, AMOUNT_WITH_FEE, &amount_with_fee))
+        (pay_cmd, AMOUNT_WITH_FEE, &amount_with_fee))
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_amount
-    (pay_cmd, AMOUNT_WITHOUT_FEE, &amount_without_fee))
+        (pay_cmd, AMOUNT_WITHOUT_FEE, &amount_without_fee))
     TALER_TESTING_FAIL (is);
 
   if (NULL == (pas->pao = _pay_run (pas->merchant_url,
@@ -1422,10 +1422,10 @@ TALER_TESTING_cmd_pay_again (const char *label,
  */
 static void
 abort_refund_cb (void *cls,
-		 unsigned int http_status,
-		 enum TALER_ErrorCode ec,
-		 const struct TALER_ExchangePublicKeyP *sign_key,
-		 const json_t *obj)
+                 unsigned int http_status,
+                 enum TALER_ErrorCode ec,
+                 const struct TALER_ExchangePublicKeyP *sign_key,
+                 const json_t *obj)
 {
   struct PayAbortRefundState *pars = cls;
 
@@ -1492,45 +1492,45 @@ pay_abort_refund_run (void *cls,
   pars->is = is;
 
   if ( NULL ==
-     ( abort_cmd = TALER_TESTING_interpreter_lookup_command
-       (is, pars->abort_reference)) )
+       (abort_cmd = TALER_TESTING_interpreter_lookup_command
+                      (is, pars->abort_reference)) )
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_uint
-      (abort_cmd, 0, &num_refunds))
+        (abort_cmd, 0, &num_refunds))
     TALER_TESTING_FAIL (is);
 
   if (pars->num_coins >= *num_refunds)
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_h_contract_terms
-      (abort_cmd, 0, &h_contract_terms))
+        (abort_cmd, 0, &h_contract_terms))
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_peer_key_pub
-      (abort_cmd, 0, &merchant_pub))
+        (abort_cmd, 0, &merchant_pub))
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_refund_entry
-      (abort_cmd, 0, &refund_entry))
+        (abort_cmd, 0, &refund_entry))
     TALER_TESTING_FAIL (is);
 
   GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-    (pars->refund_amount, &refund_amount));
+                   (pars->refund_amount, &refund_amount));
   GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-    (pars->refund_fee, &refund_fee));
+                   (pars->refund_fee, &refund_fee));
 
   pars->rh = TALER_EXCHANGE_refund2
-    (is->exchange,
-     &refund_amount,
-     &refund_fee,
-     h_contract_terms,
-     &refund_entry->coin_pub,
-     refund_entry->rtransaction_id,
-     (const struct TALER_MerchantPublicKeyP *) merchant_pub,
-     &refund_entry->merchant_sig,
-     &abort_refund_cb,
-     pars);
+               (is->exchange,
+               &refund_amount,
+               &refund_fee,
+               h_contract_terms,
+               &refund_entry->coin_pub,
+               refund_entry->rtransaction_id,
+               (const struct TALER_MerchantPublicKeyP *) merchant_pub,
+               &refund_entry->merchant_sig,
+               &abort_refund_cb,
+               pars);
 
   GNUNET_assert (NULL != pars->rh);
 }
@@ -1553,11 +1553,11 @@ pay_abort_refund_run (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_pay_abort_refund
   (const char *label,
-   const char *abort_reference,
-   unsigned int num_coins,
-   const char *refund_amount,
-   const char *refund_fee,
-   unsigned int http_status)
+  const char *abort_reference,
+  unsigned int num_coins,
+  const char *refund_amount,
+  const char *refund_fee,
+  unsigned int http_status)
 {
   struct PayAbortRefundState *pars;
 

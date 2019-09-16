@@ -82,7 +82,8 @@ struct TALER_MERCHANT_TrackTransferHandle
  *         #GNUNET_SYSERR if the response was bogus
  */
 static int
-check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh,
+check_track_transfer_response_ok (struct
+                                  TALER_MERCHANT_TrackTransferHandle *wdh,
                                   const json_t *json)
 {
   json_t *deposits;
@@ -97,7 +98,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
     GNUNET_JSON_spec_fixed_auto ("H_wire", &h_wire),
     GNUNET_JSON_spec_json ("deposits_sums", &deposits),
     GNUNET_JSON_spec_fixed_auto ("exchange_pub", &exchange_pub),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
 
   if (GNUNET_OK !=
@@ -112,7 +113,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
   {
     struct TALER_MERCHANT_TrackTransferDetails details[num_details];
 
-    for (unsigned int i=0;i<num_details;i++)
+    for (unsigned int i = 0; i<num_details; i++)
     {
       struct TALER_MERCHANT_TrackTransferDetails *detail = &details[i];
       json_t *deposit = json_array_get (deposits, i);
@@ -120,7 +121,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
         GNUNET_JSON_spec_string ("order_id", &detail->order_id),
         TALER_JSON_spec_amount ("deposit_value", &detail->deposit_value),
         TALER_JSON_spec_amount ("deposit_fee", &detail->deposit_fee),
-        GNUNET_JSON_spec_end()
+        GNUNET_JSON_spec_end ()
       };
 
       if (GNUNET_OK !=
@@ -135,7 +136,7 @@ check_track_transfer_response_ok (struct TALER_MERCHANT_TrackTransferHandle *wdh
     }
     wdh->cb (wdh->cb_cls,
              MHD_HTTP_OK,
-	     TALER_EC_NONE,
+             TALER_EC_NONE,
              &exchange_pub,
              json,
              &h_wire,
@@ -181,7 +182,7 @@ handle_track_transfer_finished (void *cls,
     response_code = 0;
     break;
   case MHD_HTTP_FAILED_DEPENDENCY:
-    /* Not a reason to break execution.  */ 
+    /* Not a reason to break execution.  */
     break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
@@ -202,7 +203,7 @@ handle_track_transfer_finished (void *cls,
   }
   tdo->cb (tdo->cb_cls,
            response_code,
-	   TALER_JSON_get_error_code (json),
+           TALER_JSON_get_error_code (json),
            NULL,
            json,
            NULL,
@@ -230,10 +231,12 @@ struct TALER_MERCHANT_TrackTransferHandle *
 TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                const char *backend_url,
                                const char *instance,
-			       const char *wire_method,
-                               const struct TALER_WireTransferIdentifierRawP *wtid,
+                               const char *wire_method,
+                               const struct
+                               TALER_WireTransferIdentifierRawP *wtid,
                                const char *exchange_url,
-                               TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
+                               TALER_MERCHANT_TrackTransferCallback
+                               track_transfer_cb,
                                void *track_transfer_cb_cls)
 {
   struct TALER_MERCHANT_TrackTransferHandle *tdo;
@@ -241,7 +244,8 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   char *wtid_str;
 
   wtid_str = GNUNET_STRINGS_data_to_string_alloc (wtid,
-                                                  sizeof (struct TALER_WireTransferIdentifierRawP));
+                                                  sizeof (struct
+                                                          TALER_WireTransferIdentifierRawP));
   tdo = GNUNET_new (struct TALER_MERCHANT_TrackTransferHandle);
   tdo->ctx = ctx;
   tdo->cb = track_transfer_cb; // very last to be called
@@ -274,7 +278,8 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
  * @param tdo handle to the tracking operation being cancelled
  */
 void
-TALER_MERCHANT_track_transfer_cancel (struct TALER_MERCHANT_TrackTransferHandle *tdo)
+TALER_MERCHANT_track_transfer_cancel (struct
+                                      TALER_MERCHANT_TrackTransferHandle *tdo)
 {
   if (NULL != tdo->job)
   {

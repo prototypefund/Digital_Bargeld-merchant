@@ -162,7 +162,7 @@ proposal_traits (void *cls,
 
   struct ProposalState *ps = cls;
   #define MAKE_TRAIT_NONCE(ptr) \
-    TALER_TESTING_make_trait_peer_key_pub (1, ptr)
+  TALER_TESTING_make_trait_peer_key_pub (1, ptr)
 
   struct TALER_TESTING_Trait traits[] = {
     TALER_TESTING_make_trait_order_id (0, ps->order_id),
@@ -196,16 +196,21 @@ proposal_traits (void *cls,
 static void
 proposal_lookup_initial_cb
   (void *cls,
-   unsigned int http_status,
-   const json_t *json,
-   const json_t *contract_terms,
-   const struct TALER_MerchantSignatureP *sig,
-   const struct GNUNET_HashCode *hash)
+  unsigned int http_status,
+  const json_t *json,
+  const json_t *contract_terms,
+  const struct TALER_MerchantSignatureP *sig,
+  const struct GNUNET_HashCode *hash)
 {
   struct ProposalState *ps = cls;
   struct TALER_MerchantPublicKeyP merchant_pub;
   const char *error_name;
   unsigned int error_line;
+  struct GNUNET_JSON_Specification spec[] = {
+    GNUNET_JSON_spec_fixed_auto ("merchant_pub",
+                                 &merchant_pub),
+    GNUNET_JSON_spec_end ()
+  };
 
   ps->plo = NULL;
   if (ps->http_status != http_status)
@@ -215,27 +220,24 @@ proposal_lookup_initial_cb
   ps->h_contract_terms = *hash;
   ps->merchant_sig = *sig;
 
-
-  struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_fixed_auto ("merchant_pub",
-                                 &merchant_pub),
-    GNUNET_JSON_spec_end()
-  };
-
   if (GNUNET_OK !=
       GNUNET_JSON_parse (contract_terms,
                          spec,
                          &error_name,
                          &error_line))
   {
+    char *log;
+
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Parser failed on %s:%u\n",
                 error_name,
                 error_line);
+    log = json_dumps (ps->contract_terms,
+                      JSON_INDENT (1));
     fprintf (stderr,
              "%s\n",
-             json_dumps (ps->contract_terms,
-                         JSON_INDENT (1)));
+             log);
+    free (log);
     TALER_TESTING_FAIL (ps->is);
   }
 
@@ -262,7 +264,7 @@ proposal_lookup_initial_cb
 static void
 proposal_cb (void *cls,
              unsigned int http_status,
-	     enum TALER_ErrorCode ec,
+             enum TALER_ErrorCode ec,
              const json_t *obj,
              const char *order_id)
 {
@@ -291,35 +293,35 @@ proposal_cb (void *cls,
     ps->order_id = GNUNET_strdup (order_id);
     break;
   default:
-  {
-    char *s = json_dumps (obj, JSON_COMPACT);
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected status code from /proposal:" \
-                " %u (%d). Command %s, response: %s\n",
-                http_status,
-                ec,
-                TALER_TESTING_interpreter_get_current_label (
-                  ps->is),
-                s);
-    GNUNET_free_non_null (s);
-    /**
-     * Not failing, as test cases are _supposed_
-     * to create non 200 OK situations.
-     */
-    TALER_TESTING_interpreter_next (ps->is);
-  }
-  return;
+    {
+      char *s = json_dumps (obj, JSON_COMPACT);
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Unexpected status code from /proposal:" \
+                  " %u (%d). Command %s, response: %s\n",
+                  http_status,
+                  ec,
+                  TALER_TESTING_interpreter_get_current_label (
+                    ps->is),
+                  s);
+      GNUNET_free_non_null (s);
+      /**
+       * Not failing, as test cases are _supposed_
+       * to create non 200 OK situations.
+       */
+      TALER_TESTING_interpreter_next (ps->is);
+    }
+    return;
   }
 
   if (NULL ==
-     (ps->plo = TALER_MERCHANT_proposal_lookup
-       (ps->is->ctx,
-        ps->merchant_url,
-        ps->order_id,
-        ps->instance,
-        &ps->nonce,
-        &proposal_lookup_initial_cb,
-        ps)))
+      (ps->plo = TALER_MERCHANT_proposal_lookup
+                   (ps->is->ctx,
+                   ps->merchant_url,
+                   ps->order_id,
+                   ps->instance,
+                   &ps->nonce,
+                   &proposal_lookup_initial_cb,
+                   ps)))
     TALER_TESTING_FAIL (ps->is);
 }
 
@@ -362,8 +364,8 @@ proposal_run (void *cls,
     // FIXME: should probably use get_monotone() to ensure uniqueness!
     now = GNUNET_TIME_absolute_get ();
     order_id = GNUNET_STRINGS_data_to_string_alloc
-      (&now.abs_value_us,
-       sizeof (now.abs_value_us));
+                 (&now.abs_value_us,
+                 sizeof (now.abs_value_us));
     json_object_set_new (order,
                          "order_id",
                          json_string (order_id));
@@ -372,8 +374,8 @@ proposal_run (void *cls,
 
   GNUNET_CRYPTO_random_block
     (GNUNET_CRYPTO_QUALITY_WEAK,
-     &ps->nonce,
-     sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
+    &ps->nonce,
+    sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
   if (NULL != ps->instance)
   {
     json_t *merchant;
@@ -483,7 +485,7 @@ TALER_TESTING_cmd_proposal (const char *label,
   ps->order = order;
   ps->http_status = http_status;
   ps->merchant_url = merchant_url;
-  ps->instance = (NULL == instance) ? "default": instance;
+  ps->instance = (NULL == instance) ? "default" : instance;
 
   struct TALER_TESTING_Command cmd = {
     .cls = ps,
@@ -545,7 +547,7 @@ proposal_lookup_run (void *cls,
   /* Only used if we do NOT use the nonce from traits.  */
   struct GNUNET_CRYPTO_EddsaPublicKey dummy_nonce;
   #define GET_TRAIT_NONCE(cmd,ptr) \
-    TALER_TESTING_get_trait_peer_key_pub (cmd, 1, ptr)
+  TALER_TESTING_get_trait_peer_key_pub (cmd, 1, ptr)
 
   pls->is = is;
 
@@ -562,7 +564,7 @@ proposal_lookup_run (void *cls,
     const struct TALER_TESTING_Command *proposal_cmd;
 
     proposal_cmd = TALER_TESTING_interpreter_lookup_command
-      (is, pls->proposal_reference);
+                     (is, pls->proposal_reference);
 
     if (NULL == proposal_cmd)
       TALER_TESTING_FAIL (is);
@@ -572,7 +574,7 @@ proposal_lookup_run (void *cls,
       TALER_TESTING_FAIL (is);
 
     if (GNUNET_OK != TALER_TESTING_get_trait_order_id
-        (proposal_cmd, 0, &order_id))
+          (proposal_cmd, 0, &order_id))
       TALER_TESTING_FAIL (is);
   }
   pls->plo = TALER_MERCHANT_proposal_lookup (is->ctx,
@@ -601,10 +603,10 @@ proposal_lookup_run (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_proposal_lookup
   (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *proposal_reference,
-   const char *order_id)
+  const char *merchant_url,
+  unsigned int http_status,
+  const char *proposal_reference,
+  const char *order_id)
 {
   struct ProposalLookupState *pls;
 

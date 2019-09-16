@@ -88,7 +88,7 @@ check_ok (struct TALER_MERCHANT_TipAuthorizeOperation *tao,
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_string ("taler_tip_uri", &taler_tip_uri),
     GNUNET_JSON_spec_fixed_auto ("tip_id", &tip_id),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
 
   if (GNUNET_OK !=
@@ -96,8 +96,12 @@ check_ok (struct TALER_MERCHANT_TipAuthorizeOperation *tao,
                          spec,
                          NULL, NULL))
   {
+    char *log;
+
     GNUNET_break_op (0);
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "JSON %s\n", json_dumps (json, 0));
+    log = json_dumps (json, 0);
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "JSON %s\n", log);
+    free (log);
     return GNUNET_SYSERR;
   }
   tao->cb (tao->cb_cls,
@@ -132,7 +136,7 @@ handle_tip_authorize_finished (void *cls,
   {
   case MHD_HTTP_OK:
     if (GNUNET_OK != check_ok (tao,
-                              json))
+                               json))
     {
       GNUNET_break_op (0);
       response_code = 0;
@@ -255,7 +259,8 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
  * @param tao handle to the tracking operation being cancelled
  */
 void
-TALER_MERCHANT_tip_authorize_cancel (struct TALER_MERCHANT_TipAuthorizeOperation *tao)
+TALER_MERCHANT_tip_authorize_cancel (struct
+                                     TALER_MERCHANT_TipAuthorizeOperation *tao)
 {
   if (NULL != tao->job)
   {

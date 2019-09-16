@@ -124,7 +124,7 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_json ("refund_permissions", &refunds),
     GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
 
   if (GNUNET_OK !=
@@ -137,9 +137,9 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
   }
   num_refunds = json_array_size (refunds);
   {
-    struct TALER_MERCHANT_RefundEntry res[GNUNET_NZL(num_refunds)];
+    struct TALER_MERCHANT_RefundEntry res[GNUNET_NZL (num_refunds)];
 
-    for (unsigned int i=0;i<num_refunds;i++)
+    for (unsigned int i = 0; i<num_refunds; i++)
     {
       struct TALER_MerchantSignatureP *sig = &res[i].merchant_sig;
       json_t *refund = json_array_get (refunds, i);
@@ -150,7 +150,7 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
                                      &res[i].coin_pub),
         GNUNET_JSON_spec_uint64 ("rtransaction_id",
                                  &res[i].rtransaction_id),
-        GNUNET_JSON_spec_end()
+        GNUNET_JSON_spec_end ()
       };
       struct TALER_RefundRequestPS rr;
       int found;
@@ -166,53 +166,55 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
       }
 
       rr.purpose.purpose = htonl
-        (TALER_SIGNATURE_MERCHANT_REFUND);
+                             (TALER_SIGNATURE_MERCHANT_REFUND);
       rr.purpose.size = htonl
-        (sizeof (struct TALER_RefundRequestPS));
+                          (sizeof (struct TALER_RefundRequestPS));
       rr.h_contract_terms = ph->h_contract_terms;
       rr.coin_pub = res[i].coin_pub;
       rr.merchant = merchant_pub;
       rr.rtransaction_id = GNUNET_htonll (res[i].rtransaction_id);
       found = -1;
-      for (unsigned int j=0;j<ph->num_coins;j++)
+      for (unsigned int j = 0; j<ph->num_coins; j++)
       {
-	if (0 == memcmp (&ph->coins[j].coin_pub,
-			 &res[i].coin_pub,
-			 sizeof
-                           (struct TALER_CoinSpendPublicKeyP)))
-	{
-	  TALER_amount_hton (&rr.refund_amount,
-			     &ph->coins[j].amount_with_fee);
-	  TALER_amount_hton (&rr.refund_fee,
-			     &ph->coins[j].refund_fee);
-	  found = j;
-	}
+        if (0 == memcmp (&ph->coins[j].coin_pub,
+                         &res[i].coin_pub,
+                         sizeof
+                         (struct TALER_CoinSpendPublicKeyP)))
+        {
+          TALER_amount_hton (&rr.refund_amount,
+                             &ph->coins[j].amount_with_fee);
+          TALER_amount_hton (&rr.refund_fee,
+                             &ph->coins[j].refund_fee);
+          found = j;
+        }
       }
       if (-1 == found)
       {
         GNUNET_break_op (0);
+        GNUNET_JSON_parse_free (spec);
         return GNUNET_SYSERR;
       }
 
       if (GNUNET_OK !=
           GNUNET_CRYPTO_eddsa_verify
             (TALER_SIGNATURE_MERCHANT_REFUND,
-	     &rr.purpose,
-	     &sig->eddsa_sig,
-	     &merchant_pub.eddsa_pub))
+            &rr.purpose,
+            &sig->eddsa_sig,
+            &merchant_pub.eddsa_pub))
       {
         GNUNET_break_op (0);
+        GNUNET_JSON_parse_free (spec);
         return GNUNET_SYSERR;
       }
     }
     ph->abort_cb (ph->abort_cb_cls,
-		  MHD_HTTP_OK,
-		  TALER_EC_NONE,
-		  &merchant_pub,
-		  &ph->h_contract_terms,
-		  num_refunds,
-		  res,
-		  json);
+                  MHD_HTTP_OK,
+                  TALER_EC_NONE,
+                  &merchant_pub,
+                  &ph->h_contract_terms,
+                  num_refunds,
+                  res,
+                  json);
     ph->abort_cb = NULL;
   }
   GNUNET_JSON_parse_free (spec);
@@ -240,9 +242,9 @@ check_coin_history (const struct TALER_MERCHANT_PaidCoin *pc,
   if (GNUNET_OK !=
       TALER_EXCHANGE_verify_coin_history
         (pc->amount_with_fee.currency,
-         &pc->coin_pub,
-         json,
-         &spent))
+        &pc->coin_pub,
+        json,
+        &spent))
   {
     /* Exchange's history fails to verify */
     GNUNET_break_op (0);
@@ -290,7 +292,7 @@ check_forbidden (struct TALER_MERCHANT_Pay *ph,
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_json ("history", &history),
     GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin_pub),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
   int ret;
 
@@ -302,7 +304,7 @@ check_forbidden (struct TALER_MERCHANT_Pay *ph,
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
   }
-  for (unsigned int i=0;i<ph->num_coins;i++)
+  for (unsigned int i = 0; i<ph->num_coins; i++)
   {
     if (0 == memcmp (&ph->coins[i].coin_pub,
                      &coin_pub,
@@ -339,10 +341,10 @@ handle_pay_finished (void *cls,
 
   ph->job = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-	      "/pay completed with response code %u\n",
-	      (unsigned int) response_code);
+              "/pay completed with response code %u\n",
+              (unsigned int) response_code);
   if (0 == strcasecmp (ph->mode,
-		       "pay"))
+                       "pay"))
   {
     switch (response_code)
     {
@@ -361,7 +363,7 @@ handle_pay_finished (void *cls,
       break;
     case MHD_HTTP_FORBIDDEN:
       if (GNUNET_OK != check_forbidden (ph,
-					json))
+                                        json))
       {
         GNUNET_break_op (0);
         response_code = 0;
@@ -375,7 +377,7 @@ handle_pay_finished (void *cls,
       break;
     case MHD_HTTP_NOT_FOUND:
       /* Nothing really to verify, this should never
-	 happen, we should pass the JSON reply to the
+   happen, we should pass the JSON reply to the
          application */
       break;
     case MHD_HTTP_INTERNAL_SERVER_ERROR:
@@ -389,21 +391,21 @@ handle_pay_finished (void *cls,
     default:
       /* unexpected response code */
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		  "Unexpected response code %u\n",
-		  (unsigned int) response_code);
+                  "Unexpected response code %u\n",
+                  (unsigned int) response_code);
       GNUNET_break (0);
       response_code = 0;
       break;
     }
     ph->pay_cb (ph->pay_cb_cls,
-		response_code,
-		TALER_JSON_get_error_code (json),
-		json);
+                response_code,
+                TALER_JSON_get_error_code (json),
+                json);
   }
   else
   {
     GNUNET_assert (0 == strcasecmp (ph->mode,
-				    "abort-refund"));
+                                    "abort-refund"));
 
     switch (response_code)
     {
@@ -434,7 +436,7 @@ handle_pay_finished (void *cls,
       break;
     case MHD_HTTP_NOT_FOUND:
       /* Nothing really to verify, this should never
-	 happen, we should pass the JSON reply to the
+   happen, we should pass the JSON reply to the
          application */
       break;
     case MHD_HTTP_INTERNAL_SERVER_ERROR:
@@ -444,20 +446,20 @@ handle_pay_finished (void *cls,
     default:
       /* unexpected response code */
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		  "Unexpected response code %u\n",
-		  (unsigned int) response_code);
+                  "Unexpected response code %u\n",
+                  (unsigned int) response_code);
       GNUNET_break (0);
       response_code = 0;
       break;
     }
     ph->abort_cb (ph->abort_cb_cls,
-		  response_code,
-		  TALER_JSON_get_error_code (json),
-		  NULL,
-		  NULL,
-		  0,
-		  NULL,
-		  json);
+                  response_code,
+                  TALER_JSON_get_error_code (json),
+                  NULL,
+                  NULL,
+                  0,
+                  NULL,
+                  json);
   }
 
   TALER_MERCHANT_pay_cancel (ph);
@@ -484,16 +486,16 @@ handle_pay_finished (void *cls,
 static struct TALER_MERCHANT_Pay *
 request_pay_generic
   (struct GNUNET_CURL_Context *ctx,
-   const char *merchant_url,
-   const struct TALER_MerchantPublicKeyP *merchant_pub,
-   const char *order_id,
-   unsigned int num_coins,
-   const struct TALER_MERCHANT_PaidCoin *coins,
-   const char *mode,
-   TALER_MERCHANT_PayCallback pay_cb,
-   void *pay_cb_cls,
-   TALER_MERCHANT_PayRefundCallback abort_cb,
-   void *abort_cb_cls)
+  const char *merchant_url,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  const char *order_id,
+  unsigned int num_coins,
+  const struct TALER_MERCHANT_PaidCoin *coins,
+  const char *mode,
+  TALER_MERCHANT_PayCallback pay_cb,
+  void *pay_cb_cls,
+  TALER_MERCHANT_PayRefundCallback abort_cb,
+  void *abort_cb_cls)
 {
   struct TALER_MERCHANT_Pay *ph;
   json_t *pay_obj;
@@ -508,19 +510,19 @@ request_pay_generic
     return NULL;
   }
   j_coins = json_array ();
-  for (unsigned int i=0;i<num_coins;i++)
+  for (unsigned int i = 0; i<num_coins; i++)
   {
     json_t *j_coin;
     const struct TALER_MERCHANT_PaidCoin *pc = &coins[i];
     struct TALER_Amount fee;
 
     if (GNUNET_SYSERR ==
-	TALER_amount_subtract (&fee,
-			       &pc->amount_with_fee,
-			       &pc->amount_without_fee))
+        TALER_amount_subtract (&fee,
+                               &pc->amount_with_fee,
+                               &pc->amount_without_fee))
     {
       /* Integer underflow, fee larger than total amount?
-	 This should not happen (client violated API!) */
+   This should not happen (client violated API!) */
       GNUNET_break (0);
       json_decref (j_coins);
       return NULL;
@@ -533,36 +535,36 @@ request_pay_generic
     else
     {
       if ( (GNUNET_OK !=
-	    TALER_amount_add (&total_fee,
-			      &total_fee,
-			      &fee)) ||
-	   (GNUNET_OK !=
-	    TALER_amount_add (&total_amount,
-			      &total_amount,
-			      &pc->amount_with_fee)) )
+            TALER_amount_add (&total_fee,
+                              &total_fee,
+                              &fee)) ||
+           (GNUNET_OK !=
+            TALER_amount_add (&total_amount,
+                              &total_amount,
+                              &pc->amount_with_fee)) )
       {
-	/* integer overflow */
-	GNUNET_break (0);
-	json_decref (j_coins);
-	return NULL;
+        /* integer overflow */
+        GNUNET_break (0);
+        json_decref (j_coins);
+        return NULL;
       }
     }
 
     /* create JSON for this coin */
     j_coin = json_pack
-      ("{s:o, s:o," /* contribution/coin_pub */
-       " s:s, s:o," /* exchange_url / denom_pub */
-       " s:o, s:o}", /* ub_sig / coin_sig */
-       "contribution", TALER_JSON_from_amount
-         (&pc->amount_with_fee),
-       "coin_pub", GNUNET_JSON_from_data_auto
-         (&pc->coin_pub),
-       "exchange_url", pc->exchange_url,
-       "denom_pub", GNUNET_JSON_from_rsa_public_key
-         (pc->denom_pub.rsa_public_key),
-       "ub_sig", GNUNET_JSON_from_rsa_signature
-         (pc->denom_sig.rsa_signature),
-       "coin_sig", GNUNET_JSON_from_data_auto (&pc->coin_sig));
+               ("{s:o, s:o," /* contribution/coin_pub */
+               " s:s, s:o," /* exchange_url / denom_pub */
+               " s:o, s:o}", /* ub_sig / coin_sig */
+               "contribution", TALER_JSON_from_amount
+                 (&pc->amount_with_fee),
+               "coin_pub", GNUNET_JSON_from_data_auto
+                 (&pc->coin_pub),
+               "exchange_url", pc->exchange_url,
+               "denom_pub", GNUNET_JSON_from_rsa_public_key
+                 (pc->denom_pub.rsa_public_key),
+               "ub_sig", GNUNET_JSON_from_rsa_signature
+                 (pc->denom_sig.rsa_signature),
+               "coin_sig", GNUNET_JSON_from_data_auto (&pc->coin_sig));
     if (0 !=
         json_array_append_new (j_coins,
                                j_coin))
@@ -574,13 +576,13 @@ request_pay_generic
   }
 
   pay_obj = json_pack ("{"
-		       " s:s," /* mode */
+                       " s:s," /* mode */
                        " s:o," /* coins */
                        " s:s," /* order_id */
                        " s:o," /* merchant_pub */
                        "}",
-		       "mode", mode,
-		       "coins", j_coins,
+                       "mode", mode,
+                       "coins", j_coins,
                        "order_id", order_id,
                        "merchant_pub", GNUNET_JSON_from_data_auto
                          (merchant_pub));
@@ -665,25 +667,25 @@ request_pay_generic
  */
 static struct TALER_MERCHANT_Pay *
 prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
-		     const char *merchant_url,
-		     const char *instance,
-		     const struct GNUNET_HashCode *h_contract_terms,
-		     const struct TALER_Amount *amount,
-		     const struct TALER_Amount *max_fee,
-		     const struct TALER_MerchantPublicKeyP *merchant_pub,
-		     const struct TALER_MerchantSignatureP *merchant_sig,
-		     struct GNUNET_TIME_Absolute timestamp,
-		     struct GNUNET_TIME_Absolute refund_deadline,
-		     struct GNUNET_TIME_Absolute pay_deadline,
-		     const struct GNUNET_HashCode *h_wire,
-		     const char *order_id,
-		     unsigned int num_coins,
-		     const struct TALER_MERCHANT_PayCoin *coins,
-		     const char *mode,
-		     TALER_MERCHANT_PayCallback pay_cb,
-		     void *pay_cb_cls,
-		     TALER_MERCHANT_PayRefundCallback abort_cb,
-		     void *abort_cb_cls)
+                     const char *merchant_url,
+                     const char *instance,
+                     const struct GNUNET_HashCode *h_contract_terms,
+                     const struct TALER_Amount *amount,
+                     const struct TALER_Amount *max_fee,
+                     const struct TALER_MerchantPublicKeyP *merchant_pub,
+                     const struct TALER_MerchantSignatureP *merchant_sig,
+                     struct GNUNET_TIME_Absolute timestamp,
+                     struct GNUNET_TIME_Absolute refund_deadline,
+                     struct GNUNET_TIME_Absolute pay_deadline,
+                     const struct GNUNET_HashCode *h_wire,
+                     const char *order_id,
+                     unsigned int num_coins,
+                     const struct TALER_MERCHANT_PayCoin *coins,
+                     const char *mode,
+                     TALER_MERCHANT_PayCallback pay_cb,
+                     void *pay_cb_cls,
+                     TALER_MERCHANT_PayRefundCallback abort_cb,
+                     void *abort_cb_cls)
 {
   struct TALER_DepositRequestPS dr;
   struct TALER_MERCHANT_PaidCoin pc[num_coins];
@@ -708,7 +710,7 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
   dr.refund_deadline = GNUNET_TIME_absolute_hton (refund_deadline);
   dr.merchant = *merchant_pub;
 
-  for (unsigned int i=0;i<num_coins;i++)
+  for (unsigned int i = 0; i<num_coins; i++)
   {
     const struct TALER_MERCHANT_PayCoin *coin = &coins[i]; // coin priv.
     struct TALER_MERCHANT_PaidCoin *p = &pc[i]; // coin pub.
@@ -716,21 +718,21 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
 
     /* prepare 'dr' for this coin to generate coin signature */
     GNUNET_CRYPTO_eddsa_key_get_public (&coin->coin_priv.eddsa_priv,
-					&dr.coin_pub.eddsa_pub);
+                                        &dr.coin_pub.eddsa_pub);
     TALER_amount_hton (&dr.amount_with_fee,
-		       &coin->amount_with_fee);
+                       &coin->amount_with_fee);
     if (GNUNET_SYSERR ==
-	TALER_amount_subtract (&fee,
-			       &coin->amount_with_fee,
-			       &coin->amount_without_fee))
+        TALER_amount_subtract (&fee,
+                               &coin->amount_with_fee,
+                               &coin->amount_without_fee))
     {
       /* Integer underflow, fee larger than total amount?
-	 This should not happen (client violated API!) */
+   This should not happen (client violated API!) */
       GNUNET_break (0);
       return NULL;
     }
     TALER_amount_hton (&dr.deposit_fee,
-		       &fee);
+                       &fee);
     {
       TALER_LOG_DEBUG ("... amount_with_fee was %s\n",
                        TALER_amount2s (&coin->amount_with_fee));
@@ -739,8 +741,8 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
     }
 
     GNUNET_CRYPTO_eddsa_sign (&coin->coin_priv.eddsa_priv,
-			      &dr.purpose,
-			      &p->coin_sig.eddsa_signature);
+                              &dr.purpose,
+                              &p->coin_sig.eddsa_signature);
     p->denom_pub = coin->denom_pub;
     p->denom_sig = coin->denom_sig;
     p->denom_value = coin->denom_value;
@@ -751,16 +753,16 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
     p->exchange_url = coin->exchange_url;
   }
   return request_pay_generic (ctx,
-			      merchant_url,
-			      merchant_pub,
-			      order_id,
-			      num_coins,
-			      pc,
-			      mode,
-			      pay_cb,
-			      pay_cb_cls,
-			      abort_cb,
-			      abort_cb_cls);
+                              merchant_url,
+                              merchant_pub,
+                              order_id,
+                              num_coins,
+                              pc,
+                              mode,
+                              pay_cb,
+                              pay_cb_cls,
+                              abort_cb,
+                              abort_cb_cls);
 }
 
 
@@ -791,11 +793,11 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
-			   const char *merchant_url,
-			   const char *instance,
+                           const char *merchant_url,
+                           const char *instance,
                            const struct GNUNET_HashCode *h_contract_terms,
-			   const struct TALER_Amount *amount,
-			   const struct TALER_Amount *max_fee,
+                           const struct TALER_Amount *amount,
+                           const struct TALER_Amount *max_fee,
                            const struct TALER_MerchantPublicKeyP *merchant_pub,
                            const struct TALER_MerchantSignatureP *merchant_sig,
                            struct GNUNET_TIME_Absolute timestamp,
@@ -809,25 +811,25 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
                            void *pay_cb_cls)
 {
   return prepare_pay_generic (ctx,
-			      merchant_url,
-			      instance,
-			      h_contract_terms,
-			      amount,
-			      max_fee,
-			      merchant_pub,
-			      merchant_sig,
-			      timestamp,
-			      refund_deadline,
-			      pay_deadline,
-			      h_wire,
-			      order_id,
-			      num_coins,
-			      coins,
-			      "pay",
-			      pay_cb,
-			      pay_cb_cls,
-			      NULL,
-			      NULL);
+                              merchant_url,
+                              instance,
+                              h_contract_terms,
+                              amount,
+                              max_fee,
+                              merchant_pub,
+                              merchant_sig,
+                              timestamp,
+                              refund_deadline,
+                              pay_deadline,
+                              h_wire,
+                              order_id,
+                              num_coins,
+                              coins,
+                              "pay",
+                              pay_cb,
+                              pay_cb_cls,
+                              NULL,
+                              NULL);
 }
 
 
@@ -857,45 +859,45 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_abort (struct GNUNET_CURL_Context *ctx,
-			  const char *merchant_url,
-			  const char *instance,
-			  const struct GNUNET_HashCode *h_contract,
-			  const struct TALER_Amount *amount,
-			  const struct TALER_Amount *max_fee,
-			  const struct TALER_MerchantPublicKeyP *merchant_pub,
-			  const struct TALER_MerchantSignatureP *merchant_sig,
-			  struct GNUNET_TIME_Absolute timestamp,
-			  struct GNUNET_TIME_Absolute refund_deadline,
-			  struct GNUNET_TIME_Absolute pay_deadline,
-			  const struct GNUNET_HashCode *h_wire,
-			  const char *order_id,
-			  unsigned int num_coins,
-			  const struct TALER_MERCHANT_PayCoin *coins,
-			  TALER_MERCHANT_PayRefundCallback payref_cb,
-			  void *payref_cb_cls)
+                          const char *merchant_url,
+                          const char *instance,
+                          const struct GNUNET_HashCode *h_contract,
+                          const struct TALER_Amount *amount,
+                          const struct TALER_Amount *max_fee,
+                          const struct TALER_MerchantPublicKeyP *merchant_pub,
+                          const struct TALER_MerchantSignatureP *merchant_sig,
+                          struct GNUNET_TIME_Absolute timestamp,
+                          struct GNUNET_TIME_Absolute refund_deadline,
+                          struct GNUNET_TIME_Absolute pay_deadline,
+                          const struct GNUNET_HashCode *h_wire,
+                          const char *order_id,
+                          unsigned int num_coins,
+                          const struct TALER_MERCHANT_PayCoin *coins,
+                          TALER_MERCHANT_PayRefundCallback payref_cb,
+                          void *payref_cb_cls)
 {
   struct TALER_MERCHANT_Pay *ph;
 
   ph = prepare_pay_generic (ctx,
-			    merchant_url,
-			    instance,
-			    h_contract,
-			    amount,
-			    max_fee,
-			    merchant_pub,
-			    merchant_sig,
-			    timestamp,
-			    refund_deadline,
-			    pay_deadline,
-			    h_wire,
-			    order_id,
-			    num_coins,
-			    coins,
-			    "abort-refund",
-			    NULL,
-			    NULL,
-			    payref_cb,
-			    payref_cb_cls);
+                            merchant_url,
+                            instance,
+                            h_contract,
+                            amount,
+                            max_fee,
+                            merchant_pub,
+                            merchant_sig,
+                            timestamp,
+                            refund_deadline,
+                            pay_deadline,
+                            h_wire,
+                            order_id,
+                            num_coins,
+                            coins,
+                            "abort-refund",
+                            NULL,
+                            NULL,
+                            payref_cb,
+                            payref_cb_cls);
   ph->h_contract_terms = *h_contract;
   return ph;
 }
@@ -918,8 +920,9 @@ TALER_MERCHANT_pay_abort (struct GNUNET_CURL_Context *ctx,
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
-			     const char *merchant_url,
-                             const struct TALER_MerchantPublicKeyP *merchant_pub,
+                             const char *merchant_url,
+                             const struct
+                             TALER_MerchantPublicKeyP *merchant_pub,
                              const char *order_id,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
@@ -927,16 +930,16 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
                              void *pay_cb_cls)
 {
   return request_pay_generic (ctx,
-			      merchant_url,
-			      merchant_pub,
-			      order_id,
-			      num_coins,
-			      coins,
-			      "pay",
-			      pay_cb,
-			      pay_cb_cls,
-			      NULL,
-			      NULL);
+                              merchant_url,
+                              merchant_pub,
+                              order_id,
+                              num_coins,
+                              coins,
+                              "pay",
+                              pay_cb,
+                              pay_cb_cls,
+                              NULL,
+                              NULL);
 }
 
 

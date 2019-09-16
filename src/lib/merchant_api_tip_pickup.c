@@ -93,7 +93,7 @@ check_ok (struct TALER_MERCHANT_TipPickupOperation *tpo,
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_fixed_auto ("reserve_pub", &reserve_pub),
     GNUNET_JSON_spec_json ("reserve_sigs", &ja),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
   unsigned int ja_len;
 
@@ -109,18 +109,19 @@ check_ok (struct TALER_MERCHANT_TipPickupOperation *tpo,
   if (ja_len != tpo->num_planchets)
   {
     GNUNET_break_op (0);
+    GNUNET_JSON_parse_free (spec);
     return GNUNET_SYSERR;
   }
   {
     struct TALER_ReserveSignatureP reserve_sigs[ja_len];
 
-    for (unsigned int i=0;i<ja_len;i++)
+    for (unsigned int i = 0; i<ja_len; i++)
     {
       json_t *pj = json_array_get (ja, i);
 
       struct GNUNET_JSON_Specification ispec[] = {
         GNUNET_JSON_spec_fixed_auto ("reserve_sig", &reserve_sigs[i]),
-        GNUNET_JSON_spec_end()
+        GNUNET_JSON_spec_end ()
       };
 
       if (GNUNET_OK !=
@@ -129,6 +130,7 @@ check_ok (struct TALER_MERCHANT_TipPickupOperation *tpo,
                              NULL, NULL))
       {
         GNUNET_break_op (0);
+        GNUNET_JSON_parse_free (spec);
         return GNUNET_SYSERR;
       }
     }
@@ -240,7 +242,7 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
     return NULL;
   }
   pa = json_array ();
-  for (unsigned int i=0;i<num_planchets;i++)
+  for (unsigned int i = 0; i<num_planchets; i++)
   {
     const struct TALER_PlanchetDetail *planchet = &planchets[i];
     json_t *p;
@@ -249,7 +251,8 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
                    " s:o," /* denom_pub_hash */
                    " s:o," /* coin_ev */
                    "}",
-                   "denom_pub_hash", GNUNET_JSON_from_data_auto (&planchet->denom_pub_hash),
+                   "denom_pub_hash", GNUNET_JSON_from_data_auto (
+                     &planchet->denom_pub_hash),
                    "coin_ev", GNUNET_JSON_from_data (planchet->coin_ev,
                                                      planchet->coin_ev_size));
     if (NULL == p)

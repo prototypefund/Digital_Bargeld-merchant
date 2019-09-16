@@ -89,13 +89,13 @@ pd_cb (void *cls,
     summary = json_string (order_id);
 
   if (NULL == (entry =
-               json_pack ("{s:I, s:s, s:O, s:O, s:O, s:O}",
-                          "row_id", row_id,
-                          "order_id", order_id,
-                          "amount", amount,
-                          "timestamp", timestamp,
-                          "instance", instance,
-                          "summary", summary)))
+                 json_pack ("{s:I, s:s, s:O, s:O, s:O, s:O}",
+                            "row_id", row_id,
+                            "order_id", order_id,
+                            "amount", amount,
+                            "timestamp", timestamp,
+                            "instance", instance,
+                            "summary", summary)))
   {
     GNUNET_break (0);
     pcc->failure = GNUNET_SYSERR;
@@ -154,8 +154,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   if (NULL != str)
   {
     if (1 != sscanf (str,
-		     "%llu",
-		     &seconds))
+                     "%llu",
+                     &seconds))
     {
       json_decref (response);
       return TMH_RESPONSE_reply_arg_invalid (connection,
@@ -274,7 +274,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                                   &mi->pubkey,
                                                   start,
                                                   llabs (delta),
-                                                  (delta < 0) ? GNUNET_YES : GNUNET_NO,
+                                                  (delta < 0) ? GNUNET_YES :
+                                                  GNUNET_NO,
                                                   ascending,
                                                   &pd_cb,
                                                   &pcc);
@@ -288,16 +289,16 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     json_decref (response);
     return TMH_RESPONSE_reply_internal_error (connection,
-					      TALER_EC_HISTORY_DB_FETCH_ERROR,
-					      "db error to get history");
+                                              TALER_EC_HISTORY_DB_FETCH_ERROR,
+                                              "db error to get history");
   }
-  ret = TMH_RESPONSE_reply_json_pack (connection, MHD_HTTP_OK,
+  ret = TMH_RESPONSE_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
                                       "{ s:o }",
                                       "history",
-                                      response);
+                                      response /* consumes 'response' */);
   LOG_INFO ("/history, http code: %d\n",
             MHD_HTTP_OK);
-  json_decref (response);
   return ret;
 }
 
