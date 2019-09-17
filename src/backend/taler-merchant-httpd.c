@@ -163,7 +163,7 @@ is_valid_correlation_id (const char *correlation_id)
   if (strlen (correlation_id) >= 64)
     return GNUNET_NO;
   for (int i = 0; i < strlen (correlation_id); i++)
-    if (!(isalnum (correlation_id[i]) || correlation_id[i] == '-'))
+    if (! (isalnum (correlation_id[i]) ||(correlation_id[i] == '-')))
       return GNUNET_NO;
   return GNUNET_YES;
 }
@@ -218,86 +218,85 @@ url_handler (void *cls,
              size_t *upload_data_size,
              void **con_cls)
 {
-  static struct TMH_RequestHandler handlers[] =
-    {
-      /* Landing page, tell humans to go away. */
-      { "/", MHD_HTTP_METHOD_GET, "text/plain",
-        "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n", 0,
-        &TMH_MHD_handler_static_response, MHD_HTTP_OK },
-      { "/agpl", MHD_HTTP_METHOD_GET, "text/plain",
-        NULL, 0,
-        &TMH_MHD_handler_agpl_redirect, MHD_HTTP_FOUND },
-      { "/public/pay", MHD_HTTP_METHOD_POST, "application/json",
-        NULL, 0,
-        &MH_handler_pay, MHD_HTTP_OK },
-      { "/public/pay", NULL, "text/plain",
-        "Only POST is allowed", 0,
-        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
-      { "/track/transfer", MHD_HTTP_METHOD_GET, "application/json",
-        NULL, 0,
-        &MH_handler_track_transfer, MHD_HTTP_OK},
-      { "/track/transfer", NULL, "text/plain",
-        "Only GET is allowed", 0,
-        &TMH_MHD_handler_static_response, MHD_HTTP_OK},
-      { "/track/transaction", MHD_HTTP_METHOD_GET, "application/json",
-        NULL, 0,
-        &MH_handler_track_transaction, MHD_HTTP_OK},
-      { "/track/transaction", NULL, "text/plain",
-        "Only GET is allowed", 0,
-        &TMH_MHD_handler_static_response, MHD_HTTP_OK},
-      { "/history", MHD_HTTP_METHOD_GET, "text/plain",
-        "Only GET is allowed", 0,
-        &MH_handler_history, MHD_HTTP_OK},
-      { "/order", MHD_HTTP_METHOD_POST, "application/json",
-        NULL, 0,
-        &MH_handler_proposal_put, MHD_HTTP_OK },
-      { "/public/proposal", MHD_HTTP_METHOD_GET, "text/plain",
-        NULL, 0,
-        &MH_handler_proposal_lookup, MHD_HTTP_OK},
-      { "/proposal", NULL, "text/plain",
-        "Only GET/POST are allowed", 0,
-        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
-      { "/refund", MHD_HTTP_METHOD_POST, "application/json",
-        NULL, 0,
-        &MH_handler_refund_increase, MHD_HTTP_OK},
-      { "/public/refund", MHD_HTTP_METHOD_GET, "text/plain",
-        NULL, 0,
-        &MH_handler_refund_lookup, MHD_HTTP_OK},
-      { "/refund", NULL, "application/json",
-        "Only POST/GET are allowed", 0,
-        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
-      { "/tip-authorize", MHD_HTTP_METHOD_POST, "text/plain",
-        NULL, 0,
-        &MH_handler_tip_authorize, MHD_HTTP_OK},
-      { "/tip-authorize", NULL, "application/json",
-        "Only POST is allowed", 0,
-        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
-      { "/public/tip-pickup", MHD_HTTP_METHOD_POST, "text/plain",
-        NULL, 0,
-        &MH_handler_tip_pickup, MHD_HTTP_OK},
-      { "/public/tip-pickup", MHD_HTTP_METHOD_GET, "text/plain",
-        NULL, 0,
-        &MH_handler_tip_pickup_get, MHD_HTTP_OK},
-      { "/public/tip-pickup", NULL, "application/json",
-        "Only POST/GET are allowed", 0,
-        &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
-      { "/tip-query", MHD_HTTP_METHOD_GET, "text/plain",
-        NULL, 0,
-        &MH_handler_tip_query, MHD_HTTP_OK},
-      { "/check-payment", MHD_HTTP_METHOD_GET, "text/plain",
-        NULL, 0,
-        &MH_handler_check_payment, MHD_HTTP_OK},
-      { "/config", MHD_HTTP_METHOD_GET, "text/plain",
-        NULL, 0,
-        &MH_handler_config, MHD_HTTP_OK},
-      {NULL, NULL, NULL, NULL, 0, 0 }
-    };
-  static struct TMH_RequestHandler h404 =
-    {
-      "", NULL, "text/html",
-      "<html><title>404: not found</title></html>", 0,
-      &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
-    };
+  static struct TMH_RequestHandler handlers[] = {
+    /* Landing page, tell humans to go away. */
+    { "/", MHD_HTTP_METHOD_GET, "text/plain",
+      "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n",
+      0,
+      &TMH_MHD_handler_static_response, MHD_HTTP_OK },
+    { "/agpl", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &TMH_MHD_handler_agpl_redirect, MHD_HTTP_FOUND },
+    { "/public/pay", MHD_HTTP_METHOD_POST, "application/json",
+      NULL, 0,
+      &MH_handler_pay, MHD_HTTP_OK },
+    { "/public/pay", NULL, "text/plain",
+      "Only POST is allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
+    { "/track/transfer", MHD_HTTP_METHOD_GET, "application/json",
+      NULL, 0,
+      &MH_handler_track_transfer, MHD_HTTP_OK},
+    { "/track/transfer", NULL, "text/plain",
+      "Only GET is allowed", 0,
+      &TMH_MHD_handler_static_response, MHD_HTTP_OK},
+    { "/track/transaction", MHD_HTTP_METHOD_GET, "application/json",
+      NULL, 0,
+      &MH_handler_track_transaction, MHD_HTTP_OK},
+    { "/track/transaction", NULL, "text/plain",
+      "Only GET is allowed", 0,
+      &TMH_MHD_handler_static_response, MHD_HTTP_OK},
+    { "/history", MHD_HTTP_METHOD_GET, "text/plain",
+      "Only GET is allowed", 0,
+      &MH_handler_history, MHD_HTTP_OK},
+    { "/order", MHD_HTTP_METHOD_POST, "application/json",
+      NULL, 0,
+      &MH_handler_proposal_put, MHD_HTTP_OK },
+    { "/public/proposal", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_proposal_lookup, MHD_HTTP_OK},
+    { "/proposal", NULL, "text/plain",
+      "Only GET/POST are allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
+    { "/refund", MHD_HTTP_METHOD_POST, "application/json",
+      NULL, 0,
+      &MH_handler_refund_increase, MHD_HTTP_OK},
+    { "/public/refund", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_refund_lookup, MHD_HTTP_OK},
+    { "/refund", NULL, "application/json",
+      "Only POST/GET are allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+    { "/tip-authorize", MHD_HTTP_METHOD_POST, "text/plain",
+      NULL, 0,
+      &MH_handler_tip_authorize, MHD_HTTP_OK},
+    { "/tip-authorize", NULL, "application/json",
+      "Only POST is allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+    { "/public/tip-pickup", MHD_HTTP_METHOD_POST, "text/plain",
+      NULL, 0,
+      &MH_handler_tip_pickup, MHD_HTTP_OK},
+    { "/public/tip-pickup", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_tip_pickup_get, MHD_HTTP_OK},
+    { "/public/tip-pickup", NULL, "application/json",
+      "Only POST/GET are allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+    { "/tip-query", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_tip_query, MHD_HTTP_OK},
+    { "/check-payment", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_check_payment, MHD_HTTP_OK},
+    { "/config", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_config, MHD_HTTP_OK},
+    {NULL, NULL, NULL, NULL, 0, 0 }
+  };
+  static struct TMH_RequestHandler h404 = {
+    "", NULL, "text/html",
+    "<html><title>404: not found</title></html>", 0,
+    &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
+  };
 
   struct TM_HandlerContext *hc;
   struct GNUNET_AsyncScopeId aid;
@@ -315,8 +314,9 @@ url_handler (void *cls,
     if ((NULL != correlation_id) &&
         (GNUNET_YES != is_valid_correlation_id (correlation_id)))
     {
-        GNUNET_log (GNUNET_ERROR_TYPE_WARNING, "illegal incoming correlation ID\n");
-        correlation_id = NULL;
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "illegal incoming correlation ID\n");
+      correlation_id = NULL;
     }
   }
   else
@@ -338,12 +338,12 @@ url_handler (void *cls,
                 method,
                 url);
 
-  for (unsigned int i=0;NULL != handlers[i].url;i++)
+  for (unsigned int i = 0; NULL != handlers[i].url; i++)
   {
     struct TMH_RequestHandler *rh = &handlers[i];
 
-    if ( (0 == strcasecmp (url,
-                           rh->url)) &&
+    if ( (0 == strcmp (url,
+                       rh->url)) &&
          ( (NULL == rh->method) ||
            (0 == strcasecmp (method,
                              rh->method)) ) )
@@ -351,10 +351,10 @@ url_handler (void *cls,
       int ret;
 
       ret = rh->handler (rh,
-			 connection,
-			 con_cls,
-			 upload_data,
-			 upload_data_size);
+                         connection,
+                         con_cls,
+                         upload_data,
+                         upload_data_size);
       hc = *con_cls;
       if (NULL != hc)
       {
@@ -549,7 +549,7 @@ TMH_trigger_daemon ()
 static struct GNUNET_SCHEDULER_Task *
 prepare_daemon ()
 {
-  struct GNUNET_SCHEDULER_Task * ret;
+  struct GNUNET_SCHEDULER_Task *ret;
   fd_set rs;
   fd_set ws;
   fd_set es;
@@ -582,11 +582,11 @@ prepare_daemon ()
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Adding run_daemon select task\n");
   ret = GNUNET_SCHEDULER_add_select (GNUNET_SCHEDULER_PRIORITY_HIGH,
-				     tv,
-				     wrs,
-				     wws,
-				     &run_daemon,
-				     NULL);
+                                     tv,
+                                     wrs,
+                                     wws,
+                                     &run_daemon,
+                                     NULL);
   GNUNET_NETWORK_fdset_destroy (wrs);
   GNUNET_NETWORK_fdset_destroy (wws);
   return ret;
@@ -878,10 +878,10 @@ wireformat_iterator_cb (void *cls,
     }
 
     if (GNUNET_OK == GNUNET_CONFIGURATION_get_value_string
-      (iic->config,
-       section,
-       "WIRE_FILE_MODE",
-       &wire_file_mode))
+          (iic->config,
+          section,
+          "WIRE_FILE_MODE",
+          &wire_file_mode))
     {
       errno = 0;
       mode_t mode = (mode_t) strtoul (wire_file_mode, NULL, 8);
@@ -1293,16 +1293,16 @@ run (void *cls,
   }
 
   if (NULL ==
-     (by_id_map = GNUNET_CONTAINER_multihashmap_create (1,
-                                                        GNUNET_NO)))
+      (by_id_map = GNUNET_CONTAINER_multihashmap_create (1,
+                                                         GNUNET_NO)))
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
 
   if (NULL ==
-     (by_kpub_map = GNUNET_CONTAINER_multihashmap_create (1,
-                                                          GNUNET_NO)))
+      (by_kpub_map = GNUNET_CONTAINER_multihashmap_create (1,
+                                                           GNUNET_NO)))
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
@@ -1418,7 +1418,7 @@ run (void *cls,
       return;
     }
 
-    if (0 == strcmp (serve_type, "unix"))
+    if (0 == strcasecmp (serve_type, "unix"))
     {
       struct sockaddr_un *un;
       char *mode;
@@ -1532,7 +1532,7 @@ run (void *cls,
       }
       port = 0;
     }
-    else if (0 == strcmp (serve_type, "tcp"))
+    else if (0 == strcasecmp (serve_type, "tcp"))
     {
       char *bind_to;
 
@@ -1570,9 +1570,9 @@ run (void *cls,
         hints.ai_protocol = IPPROTO_TCP;
         hints.ai_flags = AI_PASSIVE
 #ifdef AI_IDN
-          | AI_IDN
+                         | AI_IDN
 #endif
-          ;
+        ;
         if (0 !=
             (ec = getaddrinfo (bind_to,
                                port_str,
@@ -1639,8 +1639,10 @@ run (void *cls,
                           NULL, NULL,
                           &url_handler, NULL,
                           MHD_OPTION_LISTEN_SOCKET, fh,
-                          MHD_OPTION_NOTIFY_COMPLETED, &handle_mhd_completion_callback, NULL,
-                          MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 10 /* 10s */,
+                          MHD_OPTION_NOTIFY_COMPLETED,
+                          &handle_mhd_completion_callback, NULL,
+                          MHD_OPTION_CONNECTION_TIMEOUT, (unsigned
+                                                          int) 10 /* 10s */,
                           MHD_OPTION_END);
   if (NULL == mhd)
   {
