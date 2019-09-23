@@ -301,6 +301,10 @@ url_handler (void *cls,
   struct TM_HandlerContext *hc;
   struct GNUNET_AsyncScopeId aid;
   const char *correlation_id = NULL;
+  char *instance_id;
+  char *effective_url;
+  int ret;
+
 
   hc = *con_cls;
 
@@ -338,23 +342,53 @@ url_handler (void *cls,
                 method,
                 url);
 
-  for (unsigned int i = 0; NULL != handlers[i].url; i++)
+  /* Find out the merchant backend instance for the request.
+   * If there is an instance, remove the instance specification
+   * from the beginning of the request URL. */
+  {
+    const char *instance_prefix = "/instances/";
+    if (0 == strncmp (url, instance_prefix, strlen (instance_prefix)))
+    {
+      // url starts with "/instance/"
+      instance_id = GNUNET_strdup (url + strlen (instance_prefix));
+      char *slash = strchr (instance_id, '/');
+      if (NULL == slash)
+      {
+        GNUNET_free (instance_id);
+        return TMH_MHD_handler_static_response (&h404,
+                                                connection,
+                                                con_cls,
+                                                upload_data,
+                                                upload_data_size,
+                                                NULL);
+      }
+      effective_url = GNUNET_strdup (slash);
+      *slash = '\0';
+    }
+    else
+    {
+      effective_url = GNUNET_strdup (url);
+      instance_id = NULL;
+    }
+  }
+
+
+  for (unsigned int i=0;NULL != handlers[i].url;i++)
   {
     struct TMH_RequestHandler *rh = &handlers[i];
 
-    if ( (0 == strcmp (url,
-                       rh->url)) &&
+    if ( (0 == strcasecmp (effective_url,
+                           rh->url)) &&
          ( (NULL == rh->method) ||
            (0 == strcasecmp (method,
                              rh->method)) ) )
     {
-      int ret;
-
       ret = rh->handler (rh,
-                         connection,
-                         con_cls,
-                         upload_data,
-                         upload_data_size);
+			 connection,
+			 con_cls,
+			 upload_data,
+			 upload_data_size,
+                         instance_id);
       hc = *con_cls;
       if (NULL != hc)
       {
@@ -363,14 +397,18 @@ url_handler (void *cls,
          * we get another callack for this request. */
         hc->async_scope_id = aid;
       }
+      GNUNET_free_non_null (instance_id);
       return ret;
     }
   }
-  return TMH_MHD_handler_static_response (&h404,
-                                          connection,
-                                          con_cls,
-                                          upload_data,
-                                          upload_data_size);
+  ret = TMH_MHD_handler_static_response (&h404,
+                                         connection,
+                                         con_cls,
+                                         upload_data,
+                                         upload_data_size,
+                                         instance_id);
+  GNUNET_free_non_null (instance_id);
+  return ret;
 }
 
 
@@ -1132,56 +1170,30 @@ instances_iterator_cb (void *cls,
 
 
 /**
- * Lookup a merchant instance by its name.
+ * Lookup a merchant instance by its instance ID.
  *
- * @param name name of the instance to resolve
+ * @param instance_id identifier of the instance to resolve
  * @return NULL if that instance is unknown to us
  */
 struct MerchantInstance *
-TMH_lookup_instance (const char *name)
+TMH_lookup_instance (const char *instance_id)
 {
   struct GNUNET_HashCode h_instance;
 
-  GNUNET_CRYPTO_hash (name,
-                      strlen (name),
+  if (NULL == instance_id)
+    instance_id = "default";
+
+  GNUNET_CRYPTO_hash (instance_id,
+                      strlen (instance_id),
                       &h_instance);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Looking for by-id key %s of '%s' in hashmap\n",
               GNUNET_h2s (&h_instance),
-              name);
+              instance_id);
   /* We're fine if that returns NULL, the calling routine knows how
      to handle that */
   return GNUNET_CONTAINER_multihashmap_get (by_id_map,
                                             &h_instance);
-}
-
-
-/**
- * Extract merchant instance from the given JSON; if not
- * 'instance' field was found, then "default" instance is
- * returned.
- *
- * @param json the JSON to inspect; it is not required to
- * comply with any particular format. It will only be checked
- * if the field "instance" is there.
- * @return a pointer to a `struct MerchantInstance`. This will be
- * the 'default' merchant if the frontend did not specify any
- * "instance" field. The user should not care to free the returned
- * value, as it is taken from a global array that will be freed
- * by the general shutdown routine. NULL if the frontend specified
- * a wrong instance
- */
-struct MerchantInstance *
-TMH_lookup_instance_json (struct json_t *json)
-{
-  struct json_t *instance;
-  const char *instance_str;
-
-  if (NULL == (instance = json_object_get (json, "instance")))
-    instance_str = "default";
-  else
-    instance_str = json_string_value (instance);
-  return TMH_lookup_instance (instance_str);
 }
 
 

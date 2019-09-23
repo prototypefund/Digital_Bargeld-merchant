@@ -155,6 +155,8 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -162,7 +164,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                             struct MHD_Connection *connection,
                             void **connection_cls,
                             const char *upload_data,
-                            size_t *upload_data_size)
+                            size_t *upload_data_size,
+                            const char *instance_id)
 {
   int res;
   struct TMH_JsonParseContext *ctx;
@@ -171,7 +174,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   json_t *contract_terms;
   const char *order_id;
   const char *reason;
-  const char *merchant;
   struct MerchantInstance *mi;
   struct GNUNET_HashCode h_contract_terms;
   struct TALER_MerchantRefundConfirmationPS confirmation;
@@ -180,7 +182,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     TALER_JSON_spec_amount ("refund", &refund),
     GNUNET_JSON_spec_string ("order_id", &order_id),
     GNUNET_JSON_spec_string ("reason", &reason),
-    GNUNET_JSON_spec_string ("instance", &merchant),
     GNUNET_JSON_spec_end ()
   };
   enum GNUNET_DB_QueryStatus qs;
@@ -226,11 +227,12 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     return MHD_NO;
   }
 
-  mi = TMH_lookup_instance (merchant);
+  mi = TMH_lookup_instance (instance_id);
   if (NULL == mi)
   {
+    GNUNET_assert (NULL != instance_id);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "No instance found\n");
+                "Instance '%s' not found\n", instance_id);
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
     return TMH_RESPONSE_reply_not_found (connection,
@@ -491,6 +493,8 @@ process_refunds_cb (void *cls,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -498,34 +502,23 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                           struct MHD_Connection *connection,
                           void **connection_cls,
                           const char *upload_data,
-                          size_t *upload_data_size)
+                          size_t *upload_data_size,
+                          const char *instance_id)
 {
   const char *order_id;
-  const char *instance;
   struct GNUNET_HashCode h_contract_terms;
   json_t *contract_terms;
   struct MerchantInstance *mi;
   enum GNUNET_DB_QueryStatus qs;
 
-  instance = MHD_lookup_connection_value (connection,
-                                          MHD_GET_ARGUMENT_KIND,
-                                          "instance");
-  if (NULL == instance)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Argument 'instance' not given\n");
-    return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
-                                           "instance");
-  }
-
-  mi = TMH_lookup_instance (instance);
+  mi = TMH_lookup_instance (instance_id);
 
   if (NULL == mi)
   {
+    GNUNET_assert (NULL != instance_id);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown instance given: %s\n",
-                instance);
+                instance_id);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_REFUND_INSTANCE_UNKNOWN,
                                          "Unknown instance given");

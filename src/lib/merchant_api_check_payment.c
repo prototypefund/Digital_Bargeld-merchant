@@ -174,7 +174,6 @@ handle_check_payment_finished (void *cls,
  *
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
- * @param instance instance used for the transaction
  * @param order_id order id to identify the payment
  * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session) 
  * @param check_payment_cb callback which will work the response gotten from the backend
@@ -184,7 +183,6 @@ handle_check_payment_finished (void *cls,
 struct TALER_MERCHANT_CheckPaymentOperation *
 TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                               const char *backend_url,
-                              const char *instance,
                               const char *order_id,
                               const char *session_id,
                               TALER_MERCHANT_CheckPaymentCallback check_payment_cb,
@@ -194,15 +192,13 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
   CURL *eh;
 
   GNUNET_assert (NULL != backend_url);
-  GNUNET_assert (NULL != instance);
   GNUNET_assert (NULL != order_id);
 
   cpo = GNUNET_new (struct TALER_MERCHANT_CheckPaymentOperation);
   cpo->ctx = ctx;
   cpo->cb = check_payment_cb;
   cpo->cb_cls = check_payment_cb_cls;
-  cpo->url = TALER_url_join (backend_url, "/check-payment",
-                             "instance", instance,
+  cpo->url = TALER_url_join (backend_url, "check-payment",
                              "order_id", order_id,
                              "session_id", session_id,
                              NULL);

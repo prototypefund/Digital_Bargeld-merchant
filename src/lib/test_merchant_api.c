@@ -62,6 +62,26 @@ static char *fakebank_url;
 static char *merchant_url;
 
 /**
+ * Merchant base URL for the tipping instance.
+ */
+static char *merchant_tip_instance_url;
+
+/**
+ * Merchant base URL for the tipping instance.
+ */
+static char *merchant_tip_instance_2_url;
+
+/**
+ * Merchant base URL for the tipping instance.
+ */
+static char *merchant_tip_instance_nulltip_url;
+
+/**
+ * Merchant base URL for a non-existent instance.
+ */
+static char *merchant_tip_unknown_instance_url;
+
+/**
  * Merchant process.
  */
 static struct GNUNET_OS_Process *merchantd;
@@ -212,8 +232,7 @@ run (void *cls,
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:5}\"} ] }"),
 
     TALER_TESTING_cmd_check_payment ("check-payment-1",
                                      merchant_url,
@@ -287,8 +306,7 @@ run (void *cls,
         \"summary\": \"useful product\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:5}\"} ] }"),
 
     TALER_TESTING_cmd_proposal_lookup ("fetch-proposal-2",
                                        merchant_url,
@@ -485,8 +503,7 @@ run (void *cls,
         \"summary\": \"useful product\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:5}\"} ] }"),
 
     /* Try to increase a non paid proposal.  */
     TALER_TESTING_cmd_refund_increase
@@ -551,8 +568,7 @@ run (void *cls,
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:5}\"} ] }"),
 
     TALER_TESTING_cmd_pay ("pay-unincreased-proposal",
                            merchant_url,
@@ -613,18 +629,16 @@ run (void *cls,
        "EUR:20.04", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-1",
-                                     merchant_url,
+                                     merchant_tip_instance_url,
                                      exchange_url,
                                      MHD_HTTP_OK,
-                                     "tip",
                                      "tip 1",
                                      "EUR:5.01"),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-2",
-                                     merchant_url,
+                                     merchant_tip_instance_url,
                                      exchange_url,
                                      MHD_HTTP_OK,
-                                     "tip",
                                      "tip 2",
                                      "EUR:5.01"),
 
@@ -635,51 +649,46 @@ run (void *cls,
      * actually create a reserve.  */
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-null",
-       merchant_url,
+       merchant_tip_instance_nulltip_url,
        exchange_url,
        MHD_HTTP_NOT_FOUND,
-       "nulltip",
        "tip 2",
        "EUR:5.01",
        TALER_EC_RESERVE_STATUS_UNKNOWN),
 
     TALER_TESTING_cmd_tip_query ("query-tip-1",
-                                 merchant_url,
-                                 MHD_HTTP_OK,
-                                 "tip"),
+                                 merchant_tip_instance_url,
+                                 MHD_HTTP_OK),
 
     TALER_TESTING_cmd_tip_query_with_amounts ("query-tip-2",
-                                              merchant_url,
+                                              merchant_tip_instance_url,
                                               MHD_HTTP_OK,
-                                              "tip",
                                               "EUR:0.0", // picked
                                               "EUR:10.02", // auth
                                               "EUR:20.04"),// ava
 
     TALER_TESTING_cmd_tip_pickup ("pickup-tip-1",
-                                  merchant_url,
+                                  merchant_tip_instance_url,
                                   MHD_HTTP_OK,
                                   "authorize-tip-1",
                                   pickup_amounts_1),
 
     TALER_TESTING_cmd_tip_query_with_amounts ("query-tip-3",
-                                              merchant_url,
+                                              merchant_tip_instance_url,
                                               MHD_HTTP_OK,
-                                              "tip",
                                               "EUR:5.01", // picked
                                               NULL, // auth
                                               "EUR:15.03"),// ava
 
     TALER_TESTING_cmd_tip_pickup ("pickup-tip-2",
-                                  merchant_url,
+                                  merchant_tip_instance_url,
                                   MHD_HTTP_OK,
                                   "authorize-tip-2",
                                   pickup_amounts_1),
 
     TALER_TESTING_cmd_tip_query_with_amounts ("query-tip-4",
-                                              merchant_url,
+                                              merchant_tip_instance_url,
                                               MHD_HTTP_OK,
-                                              "tip",
                                               "EUR:10.02", // pick
                                               "EUR:10.02", // auth
                                               "EUR:10.02"), // ava
@@ -708,20 +717,18 @@ run (void *cls,
 
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-3-insufficient-funds",
-       merchant_url,
+       merchant_tip_instance_2_url,
        exchange_url,
        MHD_HTTP_PRECONDITION_FAILED,
-       "dtip",
        "tip 3",
        "EUR:2.02",
        TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS),
 
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-4-unknown-instance",
-       merchant_url,
+       merchant_tip_unknown_instance_url,
        exchange_url,
        MHD_HTTP_NOT_FOUND,
-       "unknown",
        "tip 4",
        "EUR:5.01",
        TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN),
@@ -731,14 +738,13 @@ run (void *cls,
        merchant_url,
        exchange_url,
        MHD_HTTP_NOT_FOUND,
-       "default",
        "tip 5",
        "EUR:5.01",
        TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP),
 
     TALER_TESTING_cmd_tip_pickup_with_ec
       ("pickup-tip-3-too-much",
-       merchant_url,
+       merchant_tip_instance_url,
        MHD_HTTP_CONFLICT,
        "authorize-tip-1",
        pickup_amounts_1,
@@ -749,7 +755,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_tip_pickup_with_ec
       ("pickup-non-existent-id",
-       merchant_url,
+       merchant_tip_instance_url,
        MHD_HTTP_NOT_FOUND,
        "fake-tip-authorization",
        pickup_amounts_1,
@@ -757,7 +763,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-tip-1",
-       merchant_url,
+       merchant_tip_instance_url,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -773,11 +779,10 @@ run (void *cls,
         \"summary\": \"useful product\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:5}\"} ] }"),
 
     TALER_TESTING_cmd_pay ("deposit-tip-simple",
-                           merchant_url,
+                           merchant_tip_instance_url,
                            MHD_HTTP_OK,
                            "create-proposal-tip-1",
                            "pickup-tip-1",
@@ -849,8 +854,7 @@ run (void *cls,
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:10}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:10}\"} ] }"),
 
     TALER_TESTING_cmd_pay ("pay-fail-partial-double-10",
                            merchant_url,
@@ -929,8 +933,7 @@ run (void *cls,
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:10}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:10}\"} ] }"),
 
     TALER_TESTING_cmd_pay ("pay-fail-partial-double-11-good",
                            merchant_url,
@@ -1008,7 +1011,7 @@ run (void *cls,
        merchant_url,
        MHD_HTTP_OK,
        GNUNET_TIME_UNIT_ZERO_ABS,
-       5, /* Expected number of records */
+       4, /* Expected number of records */
        -100), /* Delta */
     /**
      * End the suite.  Fixme: better to have a label for this
@@ -1042,6 +1045,19 @@ main (int argc,
   if (NULL ==
       (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
     return 77;
+
+  merchant_tip_instance_url = TALER_url_join (merchant_url,
+                                              "instances/tip/",
+                                              NULL);
+  merchant_tip_instance_2_url = TALER_url_join (merchant_url,
+                                                "instances/dtip/",
+                                                NULL);
+  merchant_tip_instance_nulltip_url = TALER_url_join (merchant_url,
+                                                      "instances/nulltip/",
+                                                      NULL);
+  merchant_tip_unknown_instance_url = TALER_url_join (merchant_url,
+                                                      "instances/foo/",
+                                                      NULL);
 
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 

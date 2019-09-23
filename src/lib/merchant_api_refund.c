@@ -190,7 +190,6 @@ TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOpera
  * @param order_id id of the order whose refund is to be increased
  * @param refund amount to which increase the refund
  * @param reason human-readable reason justifying the refund
- * @param instance id of the merchant instance issuing the request
  * @param cb callback processing the response from /refund
  * @param cb_cls closure for cb
  */
@@ -200,7 +199,6 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                                 const char *order_id,
                                 const struct TALER_Amount *refund,
                                 const char *reason,
-                                const char *instance,
                                 TALER_MERCHANT_RefundIncreaseCallback cb,
                                 void *cb_cls)
 {
@@ -212,12 +210,11 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
   rio->ctx = ctx;
   rio->cb = cb;
   rio->cb_cls = cb_cls;
-  rio->url = TALER_url_join (backend_url, "/refund", NULL);
-  req = json_pack ("{s:o, s:s, s:s, s:s}",
+  rio->url = TALER_url_join (backend_url, "refund", NULL);
+  req = json_pack ("{s:o, s:s, s:s}",
                    "refund", TALER_JSON_from_amount (refund),
                    "order_id", order_id,
-                   "reason", reason,
-                   "instance", instance);
+                   "reason", reason);
   eh = curl_easy_init ();
 
   if (GNUNET_OK != TALER_curl_easy_post (&rio->post_ctx,
@@ -333,26 +330,18 @@ struct TALER_MERCHANT_RefundLookupOperation *
 TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
                               const char *backend_url,
                               const char *order_id,
-                              const char *instance,
                               TALER_MERCHANT_RefundLookupCallback cb,
                               void *cb_cls)
 {
   struct TALER_MERCHANT_RefundLookupOperation *rlo;
   CURL *eh;
-  char *base;
 
   rlo = GNUNET_new (struct TALER_MERCHANT_RefundLookupOperation);
   rlo->ctx = ctx;
   rlo->cb = cb;
   rlo->cb_cls = cb_cls;
 
-  base = TALER_url_join (backend_url, "/public/refund", NULL);
-  GNUNET_asprintf (&rlo->url,
-                   "%s?instance=%s&order_id=%s",
-                   base,
-                   instance,
-                   order_id);
-  GNUNET_free (base);
+  rlo->url = TALER_url_join (backend_url, "public/refund", "order_id", order_id, NULL);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,

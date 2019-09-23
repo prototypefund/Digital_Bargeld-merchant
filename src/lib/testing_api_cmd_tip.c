@@ -139,11 +139,6 @@ struct TipQueryState
   unsigned int http_status;
 
   /**
-   * Which merchant instance is running this CMD.
-   */
-  const char *instance;
-
-  /**
    * The handle to the current /tip-query request.
    */
   struct TALER_MERCHANT_TipQueryOperation *tqo;
@@ -186,11 +181,6 @@ struct TipAuthorizeState
    * Expected HTTP response code.
    */
   unsigned int http_status;
-
-  /**
-   * Merchant instance running this CMD.
-   */
-  const char *instance;
 
   /**
    * Human-readable justification for the
@@ -345,7 +335,6 @@ tip_authorize_run (void *cls,
      "http://merchant.com/pickup",
      "http://merchant.com/continue",
      &amount,
-     tas->instance,
      tas->justification,
      tip_authorize_cb,
      tas);
@@ -411,7 +400,6 @@ tip_authorize_cleanup (void *cls,
  *        the reserve from which the tip is going to be gotten.
  * @param http_status the HTTP response code which is expected
  *        for this operation.
- * @param instance which merchant instance is running this CMD.
  * @param justification human-readable justification for this
  *        tip authorization.
  * @param amount the amount to authorize for tipping.
@@ -423,7 +411,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
    const char *merchant_url,
    const char *exchange_url,
    unsigned int http_status,
-   const char *instance,
    const char *justification,
    const char *amount,
    enum TALER_ErrorCode ec)
@@ -432,7 +419,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
 
   tas = GNUNET_new (struct TipAuthorizeState);
   tas->merchant_url = merchant_url;
-  tas->instance = instance;
   tas->justification = justification;
   tas->amount = amount;
   tas->http_status = http_status;
@@ -461,7 +447,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
  *        the reserve from which the tip is going to be gotten.
  * @param http_status the HTTP response code which is expected
  *        for this operation.
- * @param instance which merchant instance is running this CMD.
  * @param justification human-readable justification for this
  *        tip authorization.
  * @param amount the amount to authorize for tipping.
@@ -471,7 +456,6 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
                                  const char *merchant_url,
                                  const char *exchange_url,
                                  unsigned int http_status,
-                                 const char *instance,
                                  const char *justification,
                                  const char *amount)
 {
@@ -479,7 +463,6 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
 
   tas = GNUNET_new (struct TipAuthorizeState);
   tas->merchant_url = merchant_url;
-  tas->instance = instance;
   tas->justification = justification;
   tas->amount = amount;
   tas->http_status = http_status;
@@ -631,7 +614,6 @@ tip_query_run (void *cls,
   tqs->is = is;
   tqs->tqo = TALER_MERCHANT_tip_query (is->ctx,
                                        tqs->merchant_url,
-                                       tqs->instance,
                                        &tip_query_cb,
                                        tqs);
   GNUNET_assert (NULL != tqs->tqo);
@@ -646,7 +628,6 @@ tip_query_run (void *cls,
  *        server the /tip-query request.
  * @param http_status expected HTTP response code for the
  *        /tip-query request.
- * @param instance the merchant instance running this CMD.
  * @param expected_amount_picked_up expected amount already
  *        picked up.
  * @param expected_amount_authorized expected amount that was
@@ -660,7 +641,6 @@ TALER_TESTING_cmd_tip_query_with_amounts
   (const char *label,
    const char *merchant_url,
    unsigned int http_status,
-   const char *instance,
    const char *expected_amount_picked_up,
    const char *expected_amount_authorized,
    const char *expected_amount_available)
@@ -669,7 +649,6 @@ TALER_TESTING_cmd_tip_query_with_amounts
 
   tqs = GNUNET_new (struct TipQueryState);
   tqs->merchant_url = merchant_url;
-  tqs->instance = instance;
   tqs->http_status = http_status;
   tqs->expected_amount_picked_up = expected_amount_picked_up;
   tqs->expected_amount_authorized = expected_amount_authorized;
@@ -694,19 +673,16 @@ TALER_TESTING_cmd_tip_query_with_amounts
  *        server the /tip-query request.
  * @param http_status expected HTTP response code for the
  *        /tip-query request.
- * @param instance the merchant instance running this CMD.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query (const char *label,
                              const char *merchant_url,
-                             unsigned int http_status,
-                             const char *instance)
+                             unsigned int http_status)
 {
   struct TipQueryState *tqs;
 
   tqs = GNUNET_new (struct TipQueryState);
   tqs->merchant_url = merchant_url;
-  tqs->instance = instance;
   tqs->http_status = http_status;
 
   struct TALER_TESTING_Command cmd = {

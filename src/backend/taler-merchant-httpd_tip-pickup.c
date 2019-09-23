@@ -494,6 +494,8 @@ parse_planchet (struct MHD_Connection *connection,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -501,7 +503,8 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
                        struct MHD_Connection *connection,
                        void **connection_cls,
                        const char *upload_data,
-                       size_t *upload_data_size)
+                       size_t *upload_data_size,
+                       const char *instance_id)
 {
   int res;
   struct GNUNET_HashCode tip_id;
@@ -608,6 +611,8 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -615,10 +620,10 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
                            struct MHD_Connection *connection,
                            void **connection_cls,
                            const char *upload_data,
-                           size_t *upload_data_size)
+                           size_t *upload_data_size,
+                           const char *instance_id)
 {
   struct MerchantInstance *mi;
-  const char *instance_str;
   const char *tip_id_str;
   char *exchange_url;
   json_t *extra;
@@ -630,12 +635,7 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   int ret;
   int qs;
 
-  instance_str = MHD_lookup_connection_value (connection,
-                                              MHD_GET_ARGUMENT_KIND,
-                                              "instance");
-  if (NULL == instance_str)
-    instance_str = "default";
-  mi = TMH_lookup_instance (instance_str);
+  mi = TMH_lookup_instance (instance_id);
   if (NULL == mi)
     return TMH_RESPONSE_reply_bad_request (connection,
                                            TALER_EC_TIP_INSTANCE_UNKNOWN,

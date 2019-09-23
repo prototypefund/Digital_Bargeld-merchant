@@ -45,11 +45,6 @@ struct TipAuthContext
   void *json_parse_context;
 
   /**
-   * Merchant instance to use.
-   */
-  const char *instance;
-
-  /**
    * Justification to use.
    */
   const char *justification;
@@ -112,6 +107,8 @@ cleanup_tac (struct TM_HandlerContext *hc)
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -119,7 +116,8 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                           struct MHD_Connection *connection,
                           void **connection_cls,
                           const char *upload_data,
-                          size_t *upload_data_size)
+                          size_t *upload_data_size,
+                          const char *instance_id)
 {
   struct TipAuthContext *tac;
   int res;
@@ -153,7 +151,6 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   {
     struct GNUNET_JSON_Specification spec[] = {
       TALER_JSON_spec_amount ("amount", &tac->amount),
-      GNUNET_JSON_spec_string ("instance", &tac->instance),
       GNUNET_JSON_spec_string ("justification", &tac->justification),
       GNUNET_JSON_spec_end()
     };
@@ -181,12 +178,13 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     tac->parsed_json = GNUNET_YES;
   }
 
-  mi = TMH_lookup_instance (tac->instance);
+  mi = TMH_lookup_instance (instance_id);
   if (NULL == mi)
   {
+    GNUNET_assert (NULL != instance_id);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Instance `%s' not configured\n",
-                tac->instance);
+                instance_id);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN,
                                          "unknown instance");
@@ -195,7 +193,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Instance `%s' not configured for tipping\n",
-                tac->instance);
+                (NULL != instance_id) ? instance_id : "default");
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
                                          "exchange for tipping not configured for the instance");

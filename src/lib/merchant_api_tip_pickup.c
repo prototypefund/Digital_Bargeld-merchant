@@ -288,7 +288,7 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
   tpo->cb_cls = pickup_cb_cls;
 
   tpo->url = TALER_url_join (backend_url,
-                             "/public/tip-pickup",
+                             "public/tip-pickup",
                              NULL);
   eh = curl_easy_init ();
   if (GNUNET_OK != TALER_curl_easy_post (&tpo->post_ctx,

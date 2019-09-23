@@ -52,6 +52,12 @@ struct TipQueryContext
   const char *instance;
 
   /**
+   * GNUNET_YES if the tip query has already been processed
+   * and we can queue the response.
+   */
+  int processed;
+
+  /**
    * Context for checking the tipping reserve's status.
    */
   struct CheckTipReserve ctr;
@@ -126,6 +132,8 @@ generate_final_response (struct TipQueryContext *tqc)
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -133,7 +141,8 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
                       struct MHD_Connection *connection,
                       void **connection_cls,
                       const char *upload_data,
-                      size_t *upload_data_size)
+                      size_t *upload_data_size,
+                      const char *instance_id)
 {
   struct TipQueryContext *tqc;
   struct MerchantInstance *mi;
@@ -172,28 +181,21 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
     return res;
   }
 
-  if (NULL != tqc->instance)
+  if (GNUNET_YES == tqc->processed)
   {
     /* We've been here before, so TMH_check_tip_reserve() must have
        finished and left the result for us. Finish processing. */
     return generate_final_response (tqc);
   }
 
-  /* No error yet, so first time here, let's query the exchange */
-  tqc->instance = MHD_lookup_connection_value (connection,
-                                               MHD_GET_ARGUMENT_KIND,
-                                               "instance");
-  if (NULL == tqc->instance)
-    return TMH_RESPONSE_reply_arg_missing (connection,
-                                           TALER_EC_PARAMETER_MISSING,
-                                           "instance");
 
-  mi = TMH_lookup_instance (tqc->instance);
+  mi = TMH_lookup_instance (instance_id);
   if (NULL == mi)
   {
+    GNUNET_assert (NULL != instance_id);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Instance `%s' not configured\n",
-                tqc->instance);
+                instance_id);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN,
                                          "unknown instance");
@@ -202,7 +204,7 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Instance `%s' not configured for tipping\n",
-                tqc->instance);
+                instance_id);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
                                          "exchange for tipping not configured for the instance");
@@ -236,6 +238,7 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
     }
   }
 
+  tqc->processed = GNUNET_YES;
   TMH_check_tip_reserve (&tqc->ctr,
                          mi->tip_exchange);
   return MHD_YES;

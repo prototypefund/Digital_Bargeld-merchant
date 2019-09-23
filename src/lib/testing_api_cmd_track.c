@@ -373,7 +373,6 @@ track_transfer_run (void *cls,
     TALER_TESTING_FAIL (is);
   tts->tth = TALER_MERCHANT_track_transfer (is->ctx,
                                             tts->merchant_url,
-                                            "default",
                                             "x-taler-bank",
                                             wtid,
                                             exchange_url,
@@ -412,7 +411,6 @@ track_transaction_run (void *cls,
   tts->tth = TALER_MERCHANT_track_transaction
     (is->ctx,
      tts->merchant_url,
-     "default",
      order_id,
      &track_transaction_cb,
      tts);

@@ -1471,27 +1471,6 @@ parse_pay (struct MHD_Connection *connection,
     pc->mode = PC_MODE_PAY;
   else
     pc->mode = PC_MODE_ABORT_REFUND;
-  pc->mi = TMH_lookup_instance_json (merchant);
-  if (NULL == pc->mi)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unable to find the specified instance\n");
-    GNUNET_JSON_parse_free (spec);
-    if (MHD_NO ==
-	TMH_RESPONSE_reply_not_found (connection,
-                                  TALER_EC_PAY_INSTANCE_UNKNOWN,
-                                  "Unknown instance given"))
-    {
-      GNUNET_break (0);
-      return GNUNET_SYSERR;
-    }
-    return GNUNET_NO;
-  }
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "/pay: picked instance %s\n",
-              pc->mi->id);
-
   {
     const char *fulfillment_url;
     struct GNUNET_JSON_Specification espec[] = {
@@ -2136,6 +2115,8 @@ handler_pay_json (struct MHD_Connection *connection,
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a
  *       upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -2143,7 +2124,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                 struct MHD_Connection *connection,
                 void **connection_cls,
                 const char *upload_data,
-                size_t *upload_data_size)
+                size_t *upload_data_size,
+                const char *instance_id)
 {
   struct PayContext *pc;
   int res;
@@ -2160,6 +2142,25 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     pc->hc.cc = &pay_context_cleanup;
     pc->connection = connection;
     *connection_cls = pc;
+    pc->mi = TMH_lookup_instance (instance_id);
+    if (NULL == pc->mi)
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Unable to find the specified instance\n");
+      if (MHD_NO ==
+          TMH_RESPONSE_reply_not_found (connection,
+                                    TALER_EC_PAY_INSTANCE_UNKNOWN,
+                                    "Unknown instance given"))
+      {
+        GNUNET_break (0);
+        return GNUNET_SYSERR;
+      }
+      return GNUNET_NO;
+    }
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "/pay: picked instance %s\n",
+                pc->mi->id);
+
   }
   else
   {

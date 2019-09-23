@@ -229,7 +229,7 @@ TALER_MERCHANT_order_put
   po->ctx = ctx;
   po->cb = proposal_cb;
   po->cb_cls = proposal_cb_cls;
-  po->url = TALER_url_join (backend_url, "/order", NULL);
+  po->url = TALER_url_join (backend_url, "order", NULL);
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
   eh = curl_easy_init ();
@@ -366,7 +366,6 @@ struct TALER_MERCHANT_ProposalLookupOperation *
 TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                                 const char *backend_url,
                                 const char *order_id,
-                                const char *instance,
                                 const struct
                                 GNUNET_CRYPTO_EddsaPublicKey *nonce,
                                 TALER_MERCHANT_ProposalLookupOperationCallback
@@ -375,38 +374,25 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
 {
   struct TALER_MERCHANT_ProposalLookupOperation *plo;
   CURL *eh;
-  char *base;
+  char *nonce_str = NULL;
 
   plo = GNUNET_new (struct TALER_MERCHANT_ProposalLookupOperation);
   plo->ctx = ctx;
   plo->cb = plo_cb;
   plo->cb_cls = plo_cb_cls;
-  base = TALER_url_join (backend_url, "/public/proposal", NULL);
   if (NULL != nonce)
   {
-    char *nonce_str;
     plo->has_nonce = GNUNET_YES;
     plo->nonce = *nonce;
     nonce_str = GNUNET_STRINGS_data_to_string_alloc (nonce, sizeof (struct
                                                                     GNUNET_CRYPTO_EddsaPublicKey));
-    GNUNET_assert (NULL != nonce_str);
-    GNUNET_asprintf (&plo->url,
-                     "%s?order_id=%s&instance=%s&nonce=%s",
-                     base,
-                     order_id,
-                     instance,
-                     nonce_str);
-    GNUNET_free (nonce_str);
   }
-  else
-  {
-    GNUNET_asprintf (&plo->url,
-                     "%s?order_id=%s&instance=%s",
-                     base,
-                     order_id,
-                     instance);
-  }
-  GNUNET_free (base);
+  plo->url = TALER_url_join (backend_url, "public/proposal",
+                             "order_id",
+                             order_id,
+                             "nonce",
+                             nonce_str,
+                             NULL);
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "looking up proposal from %s\n",
               plo->url);

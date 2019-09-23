@@ -75,6 +75,16 @@ static char *twister_exchange_url;
 static char *twister_merchant_url;
 
 /**
+ * Twister URL that proxies the merchant.
+ */
+static char *twister_merchant_url_instance_nonexistent;
+
+/**
+ * Twister URL that proxies the merchant.
+ */
+static char *twister_merchant_url_instance_tor;
+
+/**
  * URL of the fakebank.  Obtained from CONFIG_FILE's
  * "exchange-wire-test:BANK_URI" option.
  */
@@ -238,8 +248,7 @@ run (void *cls,
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"triggering bug 5719\",\
-                         \"value\":\"{EUR:1}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:1}\"} ] }"),
 
     /**
      * Instruct the Twister to malform the response given by
@@ -285,8 +294,7 @@ run (void *cls,
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:3}\"} ] }",
-       NULL),
+                         \"value\":\"{EUR:3}\"} ] }"),
 
     /* Need any response code != 200.  */
     TALER_TESTING_cmd_hack_response_code
@@ -344,8 +352,7 @@ run (void *cls,
        MHD_HTTP_BAD_REQUEST,
        /* giving a valid JSON to not make it fail before
         * data reaches the merchant.  */
-       "{\"not\": \"used\"}",
-       NULL),
+       "{\"not\": \"used\"}"),
   
     TALER_TESTING_cmd_hack_response_code
       ("proposal-500",
@@ -360,8 +367,7 @@ run (void *cls,
        MHD_HTTP_INTERNAL_SERVER_ERROR,
        /* giving a valid JSON to not make it fail before
         * data reaches the merchant.  */
-       "{\"not\": \"used\"}",
-       NULL),
+       "{\"not\": \"used\"}"),
   
     /**
      * Cause the PUT /proposal callback to be called
@@ -390,8 +396,7 @@ run (void *cls,
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:5}\"} ] }"),
     /**
      * Cause proposal to be invalid: this is achieved
      * by deleting the "order_id" field of it.
@@ -417,20 +422,18 @@ run (void *cls,
             \"fraction\":0},\
          \"summary\": \"merchant-lib testcase\",\
          \"products\": [ {\"description\":\"ice cream\",\
-                          \"value\":\"{EUR:5}\"} ] }",
-         NULL),
+                          \"value\":\"{EUR:5}\"} ] }"),
     /**
      * Cause a 404 Not Found response code,
      * due to a non existing merchant instance.
      */
     TALER_TESTING_cmd_proposal
       ("create-proposal-4",
-       twister_merchant_url,
+       twister_merchant_url_instance_nonexistent,
        MHD_HTTP_NOT_FOUND,
        "{\"amount\":\"EUR:5\",\
          \"fulfillment_url\": \"https://example.com/\",\
-         \"summary\": \"merchant-lib testcase\"}",
-       "non-existent-instance"),
+         \"summary\": \"merchant-lib testcase\"}"),
 
     /* Cause a 404 Not Found from /proposal/lookup,
      * due to a non existing order id being queried.  */
@@ -476,8 +479,7 @@ run (void *cls,
         \"fulfillment_url\": \"https://example.com/\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:5}\"} ] }"),
 
     /* Remove expected field.  */
     TALER_TESTING_cmd_delete_object ("remove-contract-terms",
@@ -569,7 +571,11 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-unaggregation",
-       twister_merchant_url,
+       /* Need a fresh instance in order to associate this
+        * proposal with a fresh h_wire;  this way, this proposal
+        * won't get hooked by the aggregator gathering same-H_wire'd
+        * transactions.  */
+       twister_merchant_url_instance_tor,
        MHD_HTTP_OK,
        "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -578,7 +584,6 @@ run (void *cls,
         \"refund_deadline\":\"\\/Date(2)\\/\",\
         \"pay_deadline\":\"\\/Date(1)\\/\",\
         \"wire_transfer_delay\":\"\\/Delay(30000)\\/\",\
-        \"instance\":\"tor\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
@@ -586,12 +591,7 @@ run (void *cls,
         \"summary\": \"unaggregated product\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"unaggregated cream\",\
-                         \"value\":\"{EUR:5}\"} ] }",
-        /* Need a fresh instance in order to associate this
-         * proposal with a fresh h_wire;  this way, this proposal
-         * won't get hooked by the aggregator gathering same-H_wire'd
-         * transactions.  */
-        "tor"),
+                         \"value\":\"{EUR:5}\"} ] }"),
 
     TALER_TESTING_cmd_pay
       ("pay-unaggregation",
@@ -652,8 +652,7 @@ run (void *cls,
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:2}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:2}\"} ] }"),
     TALER_TESTING_cmd_pay ("deposit-simple-5383",
                            twister_merchant_url,
                            MHD_HTTP_OK,
@@ -744,8 +743,7 @@ run (void *cls,
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:3}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:3}\"} ] }"),
 
     TALER_TESTING_cmd_check_payment ("check-payment-1",
                                      twister_merchant_url,
@@ -862,8 +860,7 @@ run (void *cls,
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:3}\"} ] }",
-        NULL),
+                         \"value\":\"{EUR:3}\"} ] }"),
 
     /* Will only pay _half_ the supposed price,
      * so we'll then have the right to abort.  */
@@ -948,8 +945,7 @@ run (void *cls,
            \"value\":1,\
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
-        \"products\": [ {\"description\": \"will succeed\"}] }",
-        NULL),
+        \"products\": [ {\"description\": \"will succeed\"}] }"),
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-double-spend-1",
@@ -968,8 +964,7 @@ run (void *cls,
            \"value\":1,\
            \"fraction\":0},\
         \"summary\": \"merchant-lib testcase\",\
-        \"products\": [ {\"description\": \"will fail\"}] }",
-        NULL),
+        \"products\": [ {\"description\": \"will fail\"}] }"),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-double-spend",
@@ -1086,6 +1081,9 @@ main (int argc,
   if (NULL == (twister_merchant_url = TALER_TESTING_prepare_twister
       (PROXY_MERCHANT_CONFIG_FILE)))
     return 77;
+
+  twister_merchant_url_instance_nonexistent = TALER_url_join (twister_exchange_url, "instances/foo/", NULL);
+  twister_merchant_url_instance_tor = TALER_url_join (twister_exchange_url, "instances/tor/", NULL);
 
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 

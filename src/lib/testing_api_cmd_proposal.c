@@ -79,11 +79,6 @@ struct ProposalState
   struct GNUNET_CRYPTO_EddsaPublicKey nonce;
 
   /**
-   * The merchant instance.
-   */
-  const char *instance;
-
-  /**
    * URL of the merchant backend.
    */
   const char *merchant_url;
@@ -318,7 +313,6 @@ proposal_cb (void *cls,
                    (ps->is->ctx,
                    ps->merchant_url,
                    ps->order_id,
-                   ps->instance,
                    &ps->nonce,
                    &proposal_lookup_initial_cb,
                    ps)))
@@ -376,18 +370,6 @@ proposal_run (void *cls,
     (GNUNET_CRYPTO_QUALITY_WEAK,
     &ps->nonce,
     sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
-  if (NULL != ps->instance)
-  {
-    json_t *merchant;
-
-    merchant = json_object ();
-    json_object_set_new (merchant,
-                         "instance",
-                         json_string (ps->instance));
-    json_object_set_new (order,
-                         "merchant",
-                         merchant);
-  }
 
   ps->po = TALER_MERCHANT_order_put (is->ctx,
                                      ps->merchant_url,
@@ -468,7 +450,6 @@ proposal_lookup_cleanup (void *cls,
  *        the proposal request.
  * @param http_status expected HTTP status.
  * @param order the order to PUT to the merchant.
- * @param instance merchant instance performing the operation.
  *
  * @return the command
  */
@@ -476,8 +457,7 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_proposal (const char *label,
                             const char *merchant_url,
                             unsigned int http_status,
-                            const char *order,
-                            const char *instance)
+                            const char *order)
 {
   struct ProposalState *ps;
 
@@ -485,7 +465,6 @@ TALER_TESTING_cmd_proposal (const char *label,
   ps->order = order;
   ps->http_status = http_status;
   ps->merchant_url = merchant_url;
-  ps->instance = (NULL == instance) ? "default" : instance;
 
   struct TALER_TESTING_Command cmd = {
     .cls = ps,
@@ -580,7 +559,6 @@ proposal_lookup_run (void *cls,
   pls->plo = TALER_MERCHANT_proposal_lookup (is->ctx,
                                              pls->merchant_url,
                                              order_id,
-                                             "default",
                                              nonce,
                                              &proposal_lookup_cb,
                                              pls);

@@ -43,11 +43,6 @@ struct HistoryState
   unsigned int http_status;
 
   /**
-   * The merchant instance executing this CMD.
-   */
-  const char *instance;
-
-  /**
    * URL of the merchant backend serving the /history request.
    */
   const char *merchant_url;
@@ -272,7 +267,6 @@ history_run (void *cls,
     hs->ho = TALER_MERCHANT_history_default_start
       (is->ctx,
        hs->merchant_url,
-       "default",
        hs->nrows,
        hs->time,
        &history_cb,
@@ -282,7 +276,6 @@ history_run (void *cls,
     case GNUNET_NO:
     hs->ho = TALER_MERCHANT_history (is->ctx,
                                      hs->merchant_url,
-                                     "default",
                                      hs->start,
                                      hs->nrows,
                                      hs->time,

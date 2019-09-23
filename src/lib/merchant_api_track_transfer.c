@@ -219,7 +219,6 @@ handle_track_transfer_finished (void *cls,
  *
  * @param ctx execution context
  * @param backend_url base URL of the backend
- * @param instance which merchant instance is going to be tracked
  * @param wire_method wire method used for the wire transfer
  * @param wtid base32 string indicating a wtid
  * @param exchange_url base URL of the exchange in charge of returning the wanted information
@@ -230,7 +229,6 @@ handle_track_transfer_finished (void *cls,
 struct TALER_MERCHANT_TrackTransferHandle *
 TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                const char *backend_url,
-                               const char *instance,
                                const char *wire_method,
                                const struct
                                TALER_WireTransferIdentifierRawP *wtid,
@@ -250,10 +248,9 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   tdo->ctx = ctx;
   tdo->cb = track_transfer_cb; // very last to be called
   tdo->cb_cls = track_transfer_cb_cls;
-  tdo->url = TALER_url_join (backend_url, "/track/transfer",
+  tdo->url = TALER_url_join (backend_url, "track/transfer",
                              "wtid", wtid_str,
                              "exchange", exchange_url,
-                             "instance", instance,
                              "wire_method", wire_method,
                              NULL);
   GNUNET_free (wtid_str);

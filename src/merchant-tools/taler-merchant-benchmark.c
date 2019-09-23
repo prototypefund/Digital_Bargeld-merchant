@@ -95,7 +95,12 @@ char *root_help_str = \
 /**
  * Alternative non default instance.
  */
-static char *alt_instance;
+static char *alt_instance_id;
+
+/**
+ * Base URL of the alternative non default instance.
+ */
+static char *alt_instance_url;
 
 /**
  * How many unaggregated payments we want to generate.
@@ -349,8 +354,7 @@ run (void *cls,
       ("create-proposal-1",
        merchant_url,
        MHD_HTTP_OK,
-       order_worth_5,
-       NULL),
+       order_worth_5),
 
     TALER_TESTING_cmd_pay
       ("deposit-simple",
@@ -375,8 +379,7 @@ run (void *cls,
       ("create-proposal-2",
        merchant_url,
        MHD_HTTP_OK,
-       order_worth_5_track,
-       NULL),
+       order_worth_5_track),
 
     TALER_TESTING_cmd_pay
       ("deposit-simple-2",
@@ -432,10 +435,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-unaggregated-proposal",
-       merchant_url,
+       alt_instance_url,
        MHD_HTTP_OK,
-       order_worth_5_unaggregated,
-       alt_instance),
+       order_worth_5_unaggregated),
 
     TALER_TESTING_cmd_pay
       ("deposit-unaggregated",
@@ -476,8 +478,7 @@ run (void *cls,
       ("create-twocoins-proposal",
        merchant_url,
        MHD_HTTP_OK,
-       order_worth_10_2coins,
-       NULL),
+       order_worth_10_2coins),
 
     TALER_TESTING_cmd_pay
       ("deposit-twocoins",
@@ -629,7 +630,7 @@ main (int argc,
        " never author now-deadlined transactions,"
        " as they would get those far future ones"
        " aggregated too.",
-       &alt_instance),
+       &alt_instance_id),
 
     GNUNET_GETOPT_option_string
       ('b',
@@ -755,7 +756,7 @@ main (int argc,
     return 1;
   }
 
-  if ((GNUNET_YES == corner) && (NULL == alt_instance))
+  if ((GNUNET_YES == corner) && (NULL == alt_instance_id))
   {
     fprintf (stderr, "option '-i' is mandatory"
                      " with sub-command 'corner'!\n");
@@ -775,6 +776,14 @@ main (int argc,
   {
     TALER_LOG_ERROR ("Option -m is mandatory!\n");
     return MISSING_MERCHANT_URL;
+  }
+
+  if (NULL != alt_instance_id)
+  {
+    GNUNET_assert (0 < GNUNET_asprintf (&alt_instance_url,
+                                        "%s/instances/%s/",
+                                        merchant_url,
+                                        &alt_instance_id));
   }
 
   if (NULL == (merchantd = TALER_TESTING_run_merchant

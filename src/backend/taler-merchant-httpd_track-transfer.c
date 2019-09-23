@@ -881,6 +881,8 @@ proof_cb (void *cls,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -888,12 +890,12 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                            struct MHD_Connection *connection,
                            void **connection_cls,
                            const char *upload_data,
-                           size_t *upload_data_size)
+                           size_t *upload_data_size,
+                           const char *instance_id)
 {
   struct TrackTransferContext *rctx;
   const char *str;
   const char *url;
-  const char *instance_str;
   const char *wire_method;
   int ret;
   enum GNUNET_DB_QueryStatus qs;
@@ -973,13 +975,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   }
   rctx->wire_method = GNUNET_strdup (wire_method);
 
-  instance_str = MHD_lookup_connection_value (connection,
-                                              MHD_GET_ARGUMENT_KIND,
-                                              "instance");
-  if (NULL == instance_str)
-    instance_str = "default";
-
-  rctx->mi = TMH_lookup_instance (instance_str);
+  rctx->mi = TMH_lookup_instance (instance_id);
   if (NULL == rctx->mi)
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_TRACK_TRANSFER_INSTANCE_UNKNOWN,

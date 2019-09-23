@@ -134,7 +134,6 @@ handle_track_transaction_finished (void *cls,
  *
  * @param ctx execution context
  * @param backend_url base URL of the backend
- * @param instance which merchant instance is going to be tracked
  * @param order_id order id pointing to the transaction being tracked
  * @param track_transaction_cb the callback to call when a reply for this request is available
  * @param track_transaction_cb_cls closure for @a track_transaction_cb
@@ -143,26 +142,19 @@ handle_track_transaction_finished (void *cls,
 struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                                   const char *backend_url,
-                                  const char *instance,
                                   const char *order_id,
                                   TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
                                   void *track_transaction_cb_cls)
 {
   struct TALER_MERCHANT_TrackTransactionHandle *tdo;
   CURL *eh;
-  char *base;
 
   tdo = GNUNET_new (struct TALER_MERCHANT_TrackTransactionHandle);
   tdo->ctx = ctx;
   tdo->cb = track_transaction_cb;
   tdo->cb_cls = track_transaction_cb_cls;
-  base = TALER_url_join (backend_url, "/track/transaction", NULL);
-  GNUNET_asprintf (&tdo->url,
-                   "%s?order_id=%s&instance=%s",
-                   base,
-                   order_id,
-                   instance);
-  GNUNET_free (base);
+  tdo->url = TALER_url_join (backend_url, "track/transaction",
+                             "order_id", order_id, NULL);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Requesting URL '%s'\n",
               tdo->url);

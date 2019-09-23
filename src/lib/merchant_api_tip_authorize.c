@@ -179,7 +179,6 @@ handle_tip_authorize_finished (void *cls,
  * @param pickup_url frontend URL for where the tip can be picked up
  * @param next_url where the browser should proceed after picking up the tip
  * @param amount amount to be handed out as a tip
- * @param instance which backend instance should create the tip (identifies the reserve and exchange)
  * @param justification which justification should be stored (human-readable reason for the tip)
  * @param authorize_cb callback which will work the response gotten from the backend
  * @param authorize_cb_cls closure to pass to @a authorize_cb
@@ -191,7 +190,6 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
                               const char *pickup_url,
                               const char *next_url,
                               const struct TALER_Amount *amount,
-                              const char *instance,
                               const char *justification,
                               TALER_MERCHANT_TipAuthorizeCallback authorize_cb,
                               void *authorize_cb_cls)
@@ -204,16 +202,14 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
   tao->ctx = ctx;
   tao->cb = authorize_cb;
   tao->cb_cls = authorize_cb_cls;
-  tao->url = TALER_url_join (backend_url, "/tip-authorize", NULL);
+  tao->url = TALER_url_join (backend_url, "tip-authorize", NULL);
   te_obj = json_pack ("{"
                       " s:o," /* amount */
-                      " s:s," /* instance */
                       " s:s," /* justification */
                       " s:s," /* pickup_url */
                       " s:s," /* next_url */
                       "}",
                       "amount", TALER_JSON_from_amount (amount),
-                      "instance", instance,
                       "justification", justification,
                       "pickup_url", pickup_url,
                       "next_url", next_url);

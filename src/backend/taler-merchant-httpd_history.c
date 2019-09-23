@@ -122,6 +122,8 @@ pd_cb (void *cls,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -129,7 +131,8 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                     struct MHD_Connection *connection,
                     void **connection_cls,
                     const char *upload_data,
-                    size_t *upload_data_size)
+                    size_t *upload_data_size,
+                    const char *instance_id)
 {
   #define LOG_INFO(...) GNUNET_log (GNUNET_ERROR_TYPE_INFO, __VA_ARGS__)
   const char *str;
@@ -172,10 +175,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     }
   }
 
-  str = MHD_lookup_connection_value (connection,
-                                     MHD_GET_ARGUMENT_KIND,
-                                     "instance");
-  mi = TMH_lookup_instance (NULL != str ? str : "default");
+  mi = TMH_lookup_instance (instance_id);
 
   if (NULL == mi)
   {

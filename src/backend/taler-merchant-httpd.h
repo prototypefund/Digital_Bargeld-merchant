@@ -203,13 +203,16 @@ struct TMH_RequestHandler
    * @param[in,out] connection_cls the connection's closure (can be updated)
    * @param upload_data upload data
    * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+   * @param instance_id mechant backend instance ID, or NULL if no explicit
+   *        instance has been specified
    * @return MHD result code
    */
   int (*handler)(struct TMH_RequestHandler *rh,
                  struct MHD_Connection *connection,
                  void **connection_cls,
                  const char *upload_data,
-                 size_t *upload_data_size);
+                 size_t *upload_data_size,
+                 const char *instance_id);
 
   /**
    * Default response code.
@@ -349,23 +352,6 @@ TMH_trigger_daemon (void);
  */
 struct MerchantInstance *
 TMH_lookup_instance (const char *name);
-
-
-/**
- * Extract merchant instance from the given JSON
- *
- * @param json the JSON to inspect; it is not required to
- * comply with any particular format. It will only be checked
- * if the field "instance" is there.
- * @return a pointer to a #struct MerchantInstance. This will be
- * the 'default' merchant if the frontend did not specif any
- * "instance" field. The user should not care to free the returned
- * value, as it is taken from a global array that will be freed
- * by the general shutdown routine. NULL if the frontend specified
- * a wrong instance
- */
-struct MerchantInstance *
-TMH_lookup_instance_json (struct json_t *json);
 
 
 #endif

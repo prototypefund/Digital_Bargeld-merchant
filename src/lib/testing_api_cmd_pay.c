@@ -386,7 +386,6 @@ check_payment_run (void *cls,
   cps->cpo = TALER_MERCHANT_check_payment
                (is->ctx,
                cps->merchant_url,
-               "default", // only default instance for now.
                order_id,
                NULL,
                check_payment_cb,
@@ -854,7 +853,6 @@ _pay_run (const char *merchant_url,
 
   ret = api_func (is->ctx,
                   merchant_url,
-                  "default", // instance
                   h_proposal,
                   &total_amount,
                   &max_fee,

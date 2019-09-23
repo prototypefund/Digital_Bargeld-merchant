@@ -1037,6 +1037,8 @@ find_exchange (struct TrackTransactionContext *tctx)
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -1044,13 +1046,12 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                               struct MHD_Connection *connection,
                               void **connection_cls,
                               const char *upload_data,
-                              size_t *upload_data_size)
+                              size_t *upload_data_size,
+                              const char *instance_id)
 {
   struct TrackTransactionContext *tctx;
   const char *order_id;
-  const char *instance;
   enum GNUNET_DB_QueryStatus qs;
-  struct GNUNET_HashCode h_instance;
   struct json_t *contract_terms;
 
   if (NULL == *connection_cls)
@@ -1105,26 +1106,16 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     return TMH_RESPONSE_reply_arg_missing (connection,
                                            TALER_EC_PARAMETER_MISSING,
                                            "order_id");
-  instance = MHD_lookup_connection_value (connection,
-                                          MHD_GET_ARGUMENT_KIND,
-                                          "instance");
-  if (NULL == instance)
-    instance = "default";
 
-  GNUNET_CRYPTO_hash (instance,
-                      strlen (instance),
-                      &h_instance);
-
-  tctx->mi = GNUNET_CONTAINER_multihashmap_get (by_id_map,
-                                                &h_instance);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Tracking on behalf of instance '%s'\n",
-              instance);
-
+  tctx->mi = TMH_lookup_instance (instance_id);
   if (NULL == tctx->mi)
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_TRACK_TRANSACTION_INSTANCE_UNKNOWN,
                                          "unknown instance");
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Tracking on behalf of instance '%s'\n",
+              instance_id);
+
 
   /* Map order id to contract terms; the objective is to get
      the contract term's hashcode so as to retrieve all the

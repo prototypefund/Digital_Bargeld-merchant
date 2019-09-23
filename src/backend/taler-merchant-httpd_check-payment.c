@@ -291,6 +291,8 @@ check_order_and_request_payment (struct MHD_Connection *connection,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -298,12 +300,12 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                           struct MHD_Connection *connection,
                           void **connection_cls,
                           const char *upload_data,
-                          size_t *upload_data_size)
+                          size_t *upload_data_size,
+                          const char *instance_id)
 {
   const char *order_id;
   const char *contract_url;
   const char *session_id;
-  const char *instance_str;
   const char *fulfillment_url;
   char *final_contract_url;
   char *h_contract_terms_str;
@@ -315,12 +317,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   int ret;
   int refunded;
 
-  instance_str = MHD_lookup_connection_value (connection,
-                                              MHD_GET_ARGUMENT_KIND,
-                                              "instance");
-  if (NULL == instance_str)
-    instance_str = "default";
-  mi = TMH_lookup_instance (instance_str);
+  mi = TMH_lookup_instance (instance_id);
   if (NULL == mi)
     return TMH_RESPONSE_reply_bad_request (connection,
                                            TALER_EC_CHECK_PAYMENT_INSTANCE_UNKNOWN,
@@ -343,7 +340,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   {
     final_contract_url = TALER_url_absolute_mhd (connection,
                                                  "/public/proposal",
-                                                 "instance", instance_str,
+                                                 "instance", instance_id,
                                                  "order_id", order_id,
                                                  NULL);
     GNUNET_assert (NULL != final_contract_url);

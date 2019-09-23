@@ -149,10 +149,10 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
  */
 static int
 proposal_put (struct MHD_Connection *connection,
-              json_t *order)
+              json_t *order,
+              const struct MerchantInstance *mi)
 {
   int res;
-  struct MerchantInstance *mi;
   struct TALER_Amount total;
   const char *order_id;
   const char *summary;
@@ -182,7 +182,6 @@ proposal_put (struct MHD_Connection *connection,
     GNUNET_JSON_spec_end ()
   };
   enum GNUNET_DB_QueryStatus qs;
-  const char *instance;
   struct WireMethod *wm;
 
   /* Add order_id if it doesn't exist. */
@@ -309,111 +308,81 @@ proposal_put (struct MHD_Connection *connection,
                          json_array ());
   }
 
-  instance = json_string_value (json_object_get (order,
-                                                 "instance"));
-  if (NULL == instance)
-  {
-    TALER_LOG_DEBUG ("Giving 'default' instance\n");
-    instance = "default";
-  }
-
   /* Fill in merchant information if necessary */
+  if (NULL == json_object_get (order, "merchant"))
   {
-    /* The frontend either fully specifieds the "merchant" field,
-     * or just gives the backend the "instance" name and lets it
-     * fill out. */
-    struct MerchantInstance *my_mi = TMH_lookup_instance (instance);
+    const char *mj = NULL;
+    const char *ma = NULL;
+    json_t *locations;
+    char *label;
+    json_t *jmerchant;
 
-    if (NULL == my_mi)
+    jmerchant = json_object ();
+    json_object_set_new (jmerchant,
+                         "name",
+                         json_string (mi->name));
+    json_object_set_new (jmerchant,
+                         "instance",
+                         json_string (mi->id));
+    locations = json_object_get (order,
+                                 "locations");
+    if (NULL != locations)
     {
-      TALER_LOG_WARNING ("Does 'default' instance exist?\n");
-      return TMH_RESPONSE_reply_not_found
-        (connection,
-         TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
-         "merchant instance (order:instance) not found");
-    }
+      json_t *loca;
+      json_t *locj;
 
-    /**
-     * Potential bug: if the outer 'instance' field is not
-     * given and the 'merchant' object is also missing, then
-     * is not possible to extract the instance!
-     */
-    if (NULL == json_object_get (order,
-                                 "merchant"))
-    {
-      const char *mj = NULL;
-      const char *ma = NULL;
-      json_t *locations;
-      char *label;
-      json_t *jmerchant;
-
-      jmerchant = json_object ();
-      json_object_set_new (jmerchant,
-                           "name",
-                           json_string (my_mi->name));
-      json_object_set_new (jmerchant,
-                           "instance",
-                           json_string (instance));
-      locations = json_object_get (order,
-                                   "locations");
-      if (NULL != locations)
+      /* Handle merchant address */
+      GNUNET_assert (0 < GNUNET_asprintf (&label,
+                                          "%s-address",
+                                          mi->id));
+      loca = json_object_get (default_locations,
+                              label);
+      if (NULL != loca)
       {
-        json_t *loca;
-        json_t *locj;
+        loca = json_deep_copy (loca);
+        ma = STANDARD_LABEL_MERCHANT_ADDRESS;
+        json_object_set_new (locations,
+                             ma,
+                             loca);
+        json_object_set_new (jmerchant,
+                             "address",
+                             json_string (ma));
+      }
+      GNUNET_free (label);
 
-        /* Handle merchant address */
-        GNUNET_assert (0 < GNUNET_asprintf (&label,
-                                            "%s-address",
-                                            my_mi->id));
-        loca = json_object_get (default_locations,
-                                label);
-        if (NULL != loca)
+      /* Handle merchant jurisdiction */
+      GNUNET_assert (0 < GNUNET_asprintf (&label,
+                                          "%s-jurisdiction",
+                                          mi->id));
+      locj = json_object_get (default_locations,
+                              label);
+      if (NULL != locj)
+      {
+        if ( (NULL != loca) &&
+             (1 == json_equal (locj,
+                               loca)) )
         {
-          loca = json_deep_copy (loca);
-          ma = STANDARD_LABEL_MERCHANT_ADDRESS;
+          /* addresses equal, re-use */
+          mj = ma;
+        }
+        else
+        {
+          locj = json_deep_copy (locj);
+          mj = STANDARD_LABEL_MERCHANT_JURISDICTION;
           json_object_set_new (locations,
-                               ma,
-                               loca);
-          json_object_set_new (jmerchant,
-                               "address",
-                               json_string (ma));
+                               mj,
+                               locj);
         }
-        GNUNET_free (label);
-
-        /* Handle merchant jurisdiction */
-        GNUNET_assert (0 < GNUNET_asprintf (&label,
-                                            "%s-jurisdiction",
-                                            my_mi->id));
-        locj = json_object_get (default_locations,
-                                label);
-        if (NULL != locj)
-        {
-          if ( (NULL != loca) &&
-               (1 == json_equal (locj,
-                                 loca)) )
-          {
-            /* addresses equal, re-use */
-            mj = ma;
-          }
-          else
-          {
-            locj = json_deep_copy (locj);
-            mj = STANDARD_LABEL_MERCHANT_JURISDICTION;
-            json_object_set_new (locations,
-                                 mj,
-                                 locj);
-          }
-          json_object_set_new (merchant,
-                               "jurisdiction",
-                               json_string (mj));
-        }
-        GNUNET_free (label);
-      } /* have locations */
-      json_object_set_new (order,
-                           "merchant",
-                           jmerchant);
-    } /* needed to synthesize merchant info */
-  } /* scope of 'my_mi' */
+        json_object_set_new (merchant,
+                             "jurisdiction",
+                             json_string (mj));
+      }
+      GNUNET_free (label);
+    } /* have locations */
+    json_object_set_new (order,
+                         "merchant",
+                         jmerchant);
+  } /* needed to synthesize merchant info */
 
   /* extract fields we need to sign separately */
   res = TMH_PARSE_json_data (connection,
@@ -444,45 +413,6 @@ proposal_put (struct MHD_Connection *connection,
        "order:products");
   }
 
-  mi = TMH_lookup_instance_json (merchant);
-
-  if (NULL == mi)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Not able to find the specified instance\n");
-    GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_not_found
-      (connection,
-       TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
-       "Unknown instance (order:merchant:instance) given");
-  }
-
-  /* The outer instance field, and the one included
-   * in the merchant object are different */
-  if (0 != strcmp (mi->id,
-                   instance))
-  {
-    TALER_LOG_ERROR
-      ("Inconsistent instance specified"
-       " by merchant ('%s' vs '%s')\n",
-       instance,
-       mi->id);
-
-    TALER_LOG_DEBUG ("Dump wrong order: %s\n",
-                     json_dumps (order,
-                                 JSON_INDENT (1)));
-
-    return TMH_RESPONSE_reply_not_found
-      (connection,
-       TALER_EC_CONTRACT_INSTANCE_INCONSISTENT,
-       "Inconsistent instance given");
-  }
-
-  /* Setting the instance on the order directly is just a shortcut,
-     the wallet shouldn't see that. */
-  json_object_del (order, "instance");
-  instance = NULL;
-
   /* add fields to the contract that the backend should provide */
   json_object_set (order,
                    "exchanges",
@@ -499,7 +429,7 @@ proposal_put (struct MHD_Connection *connection,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "No wire method available for"
-                " specified instance\n");
+                " instance '%s'\n", mi->id);
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_not_found
       (connection,
@@ -618,10 +548,12 @@ proposal_put (struct MHD_Connection *connection,
  *
  * @param connection the MHD connection to handle
  * @param[in,out] connection_cls the connection's closure
- * (can be updated)
+ *                (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in
- * @a upload_data
+ *                @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -629,10 +561,12 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                          struct MHD_Connection *connection,
                          void **connection_cls,
                          const char *upload_data,
-                         size_t *upload_data_size)
+                         size_t *upload_data_size,
+                         const char *instance_id)
 {
   int res;
   struct TMH_JsonParseContext *ctx;
+  struct MerchantInstance *mi;
   json_t *root;
   json_t *order;
 
@@ -662,6 +596,12 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
        (NULL == root) )
     return MHD_YES;
 
+  mi = TMH_lookup_instance (instance_id);
+  if (NULL == mi)
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
+                                         "instance");
+
   order = json_object_get (root,
                            "order");
   if (NULL == order)
@@ -672,8 +612,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
        "order");
   }
   else
-    res = proposal_put (connection,
-                        order);
+    res = proposal_put (connection, order, mi);
   json_decref (root);
   return res;
 }
@@ -691,6 +630,8 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param instance_id merchant backend instance ID or NULL is no instance
+ *        has been explicitly specified
  * @return MHD result code
  */
 int
@@ -698,10 +639,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                             struct MHD_Connection *connection,
                             void **connection_cls,
                             const char *upload_data,
-                            size_t *upload_data_size)
+                            size_t *upload_data_size,
+                            const char *instance_id)
 {
   const char *order_id;
-  const char *instance;
   const char *nonce;
   int res;
   enum GNUNET_DB_QueryStatus qs;
@@ -710,14 +651,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
   const char *stored_nonce;
 
-  instance = MHD_lookup_connection_value (connection,
-                                          MHD_GET_ARGUMENT_KIND,
-                                          "instance");
-  if (NULL == instance)
-    return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
-                                           "instance");
-  mi = TMH_lookup_instance (instance);
+  mi = TMH_lookup_instance (instance_id);
   if (NULL == mi)
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_CONTRACT_INSTANCE_UNKNOWN,

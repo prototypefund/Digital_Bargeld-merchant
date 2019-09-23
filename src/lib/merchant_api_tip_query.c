@@ -187,13 +187,11 @@ handle_tip_query_finished (void *cls,
  *
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
- * @param instance instance to query
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_TipQueryOperation *
 TALER_MERCHANT_tip_query (struct GNUNET_CURL_Context *ctx,
                           const char *backend_url,
-                          const char *instance,
                           TALER_MERCHANT_TipQueryCallback query_cb,
                           void *query_cb_cls)
 {
@@ -204,8 +202,7 @@ TALER_MERCHANT_tip_query (struct GNUNET_CURL_Context *ctx,
   tqo->ctx = ctx;
   tqo->cb = query_cb;
   tqo->cb_cls = query_cb_cls;
-  tqo->url = TALER_url_join (backend_url, "/tip-query",
-                             "instance", instance,
+  tqo->url = TALER_url_join (backend_url, "tip-query",
                              NULL);
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,

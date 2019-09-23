@@ -221,7 +221,6 @@ refund_increase_run (void *cls,
                                              ris->order_id,
                                              &refund_amount,
                                              ris->reason,
-                                             "default",
                                              &refund_increase_cb,
                                              ris);
   GNUNET_assert (NULL != ris->rio);
@@ -450,7 +449,6 @@ refund_lookup_run (void *cls,
   rls->rlo = TALER_MERCHANT_refund_lookup (is->ctx,
                                            rls->merchant_url,
                                            rls->order_id,
-                                           "default",
                                            &refund_lookup_cb,
                                            rls);
   GNUNET_assert (NULL != rls->rlo);

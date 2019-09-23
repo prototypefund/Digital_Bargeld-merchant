@@ -73,7 +73,6 @@ TALER_TESTING_run_merchant (const char *config_filename,
  *        the proposal request.
  * @param http_status expected HTTP status.
  * @param order the order to PUT to the merchant.
- * @param instance merchant instance performing the operation.
  *
  * @return the command
  */
@@ -81,8 +80,7 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_proposal (const char *label,
                             const char *merchant_url,
                             unsigned int http_status,
-                            const char *order,
-                            const char *instance);
+                            const char *order);
 /**
  * Make a "proposal lookup" command.
  *
@@ -600,7 +598,6 @@ TALER_TESTING_get_trait_refund_entry
  *        the reserve from which the tip is going to be gotten.
  * @param http_status the HTTP response code which is expected
  *        for this operation.
- * @param instance which merchant instance is running this CMD.
  * @param justification human-readable justification for this
  *        tip authorization.
  * @param amount the amount to authorize for tipping.
@@ -612,7 +609,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
    const char *merchant_url,
    const char *exchange_url,
    unsigned int http_status,
-   const char *instance,
    const char *justification,
    const char *amount,
    enum TALER_ErrorCode ec);
@@ -642,7 +638,6 @@ TALER_TESTING_cmd_tip_authorize_fake
  *        the reserve from which the tip is going to be gotten.
  * @param http_status the HTTP response code which is expected
  *        for this operation.
- * @param instance which merchant instance is running this CMD.
  * @param justification human-readable justification for this
  *        tip authorization.
  * @param amount the amount to authorize for tipping.
@@ -652,7 +647,6 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
                                  const char *merchant_url,
                                  const char *exchange_url,
                                  unsigned int http_status,
-                                 const char *instance,
                                  const char *justification,
                                  const char *amount);
 
@@ -664,13 +658,11 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
  *        server the /tip-query request.
  * @param http_status expected HTTP response code for the
  *        /tip-query request.
- * @param instance the merchant instance running this CMD.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query (const char *label,
                              const char *merchant_url,
-                             unsigned int http_status,
-                             const char *instance);
+                             unsigned int http_status);
 /**
  * Define a /tip-query CMD equipped with a expected amount.
  *
@@ -679,7 +671,6 @@ TALER_TESTING_cmd_tip_query (const char *label,
  *        server the /tip-query request.
  * @param http_status expected HTTP response code for the
  *        /tip-query request.
- * @param instance the merchant instance running this CMD.
  * @param expected_amount_picked_up expected amount already
  *        picked up.
  * @param expected_amount_authorized expected amount that was
@@ -691,7 +682,6 @@ TALER_TESTING_cmd_tip_query_with_amounts
   (const char *label,
    const char *merchant_url,
    unsigned int http_status,
-   const char *instance,
    const char *expected_amount_picked_up,
    const char *expected_amount_authorized,
    const char *expected_amount_available);

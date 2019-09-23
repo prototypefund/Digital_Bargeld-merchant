@@ -598,7 +598,7 @@ request_pay_generic
   ph->abort_cb_cls = abort_cb_cls;
   ph->pay_cb = pay_cb;
   ph->pay_cb_cls = pay_cb_cls;
-  ph->url = TALER_url_join (merchant_url, "/public/pay", NULL);
+  ph->url = TALER_url_join (merchant_url, "public/pay", NULL);
   ph->num_coins = num_coins;
   ph->coins = GNUNET_new_array (num_coins,
                                 struct TALER_MERCHANT_PaidCoin);
@@ -639,8 +639,6 @@ request_pay_generic
  *
  * @param ctx the execution loop context
  * @param merchant_url base URL of the merchant's backend
- * @param instance which merchant instance will receive this
- *        payment
  * @param h_contract_terms hashcode of the proposal being paid
  * @param amount total value of the contract to be paid to the
  *        merchant
@@ -668,7 +666,6 @@ request_pay_generic
 static struct TALER_MERCHANT_Pay *
 prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
                      const char *merchant_url,
-                     const char *instance,
                      const struct GNUNET_HashCode *h_contract_terms,
                      const struct TALER_Amount *amount,
                      const struct TALER_Amount *max_fee,
@@ -774,7 +771,6 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
  *
  * @param ctx the execution loop context
  * @param merchant_url base URL of the merchant's backend
- * @param instance which merchant instance will receive this payment
  * @param h_contract_terms hashcode of the proposal being paid
  * @param amount total value of the contract to be paid to the merchant
  * @param max_fee maximum fee covered by the merchant (according to the contract)
@@ -794,7 +790,6 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
                            const char *merchant_url,
-                           const char *instance,
                            const struct GNUNET_HashCode *h_contract_terms,
                            const struct TALER_Amount *amount,
                            const struct TALER_Amount *max_fee,
@@ -812,7 +807,6 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 {
   return prepare_pay_generic (ctx,
                               merchant_url,
-                              instance,
                               h_contract_terms,
                               amount,
                               max_fee,
@@ -839,7 +833,6 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
  *
  * @param ctx execution context
  * @param merchant_url base URL of the merchant
- * @param instance which merchant instance will receive this payment
  * @param h_wire hash of the merchant’s account details
  * @param h_contract hash of the contact of the merchant with the customer
  * @param transaction_id transaction id for the transaction between merchant and customer
@@ -860,7 +853,6 @@ TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_abort (struct GNUNET_CURL_Context *ctx,
                           const char *merchant_url,
-                          const char *instance,
                           const struct GNUNET_HashCode *h_contract,
                           const struct TALER_Amount *amount,
                           const struct TALER_Amount *max_fee,
@@ -880,7 +872,6 @@ TALER_MERCHANT_pay_abort (struct GNUNET_CURL_Context *ctx,
 
   ph = prepare_pay_generic (ctx,
                             merchant_url,
-                            instance,
                             h_contract,
                             amount,
                             max_fee,

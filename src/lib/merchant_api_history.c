@@ -153,7 +153,6 @@ history_raw_cb (void *cls,
  *
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
- * @param instance which merchant instance is performing this call
  * @param start return `delta` records starting from position `start`.
  *        If given as zero, then no initial skip of `start` records is done.
  * @param use_default_start do NOT include the 'start' argument in URL.
@@ -166,7 +165,6 @@ history_raw_cb (void *cls,
 static struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
                          const char *backend_url,
-                         const char *instance,
                          unsigned long long start,
                          int use_default_start,
                          long long delta,
@@ -184,21 +182,19 @@ TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
   ho->cb = history_cb;
   ho->cb_cls = history_cb_cls;
   seconds = date.abs_value_us / 1000LL / 1000LL;
-  base = TALER_url_join (backend_url, "/history", NULL);
+  base = TALER_url_join (backend_url, "history", NULL);
 
   if (GNUNET_YES == use_default_start)
     GNUNET_asprintf (&ho->url,
-                     "%s?date=%llu&instance=%s&delta=%lld",
+                     "%s?date=%llu&delta=%lld",
                      base,
                      seconds,
-                     instance,
                      delta);
   else
     GNUNET_asprintf (&ho->url,
-                     "%s?date=%llu&instance=%s&delta=%lld&start=%llu",
+                     "%s?date=%llu&delta=%lld&start=%llu",
                      base,
                      seconds,
-                     instance,
                      delta,
                      start);
     
@@ -232,7 +228,6 @@ TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
  *
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
- * @param instance which merchant instance is performing this call
  * @param start return `delta` records starting from position
  *        `start`.  If given as zero, then no initial skip of
  *        `start` records is done.
@@ -249,7 +244,6 @@ struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history_default_start
   (struct GNUNET_CURL_Context *ctx,
    const char *backend_url,
-   const char *instance,
    long long delta,
    struct GNUNET_TIME_Absolute date,
    TALER_MERCHANT_HistoryOperationCallback history_cb,
@@ -257,7 +251,6 @@ TALER_MERCHANT_history_default_start
 {
   return TALER_MERCHANT_history2 (ctx,
                                   backend_url,
-                                  instance,
                 /* fake 'start' argument: will NOT be used */
                                   -1, 
                 /* Specifies "no start argument" in final URL */
@@ -274,7 +267,6 @@ TALER_MERCHANT_history_default_start
  *
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
- * @param instance which merchant instance is performing this call
  * @param start return `delta` records starting from position
  *        `start`.  If given as zero, then no initial skip of
  *        `start` records is done.
@@ -291,7 +283,6 @@ struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history
   (struct GNUNET_CURL_Context *ctx,
    const char *backend_url,
-   const char *instance,
    unsigned long long start,
    long long delta,
    struct GNUNET_TIME_Absolute date,
@@ -300,7 +291,6 @@ TALER_MERCHANT_history
 {
   return TALER_MERCHANT_history2 (ctx,
                                   backend_url,
-                                  instance,
                                   start,
                                   GNUNET_NO,
                                   delta,
