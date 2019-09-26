@@ -122,8 +122,7 @@ pd_cb (void *cls,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -132,7 +131,7 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                     void **connection_cls,
                     const char *upload_data,
                     size_t *upload_data_size,
-                    const char *instance_id)
+                    struct MerchantInstance *mi)
 {
   #define LOG_INFO(...) GNUNET_log (GNUNET_ERROR_TYPE_INFO, __VA_ARGS__)
   const char *str;
@@ -141,7 +140,6 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   int ret;
   unsigned int ascending = GNUNET_NO;
   unsigned long long seconds;
-  struct MerchantInstance *mi;
   unsigned long long start = INT64_MAX;
   long long delta = -20;
   enum GNUNET_DB_QueryStatus qs;
@@ -173,16 +171,6 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                                              TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
                                              "Timestamp overflowed");
     }
-  }
-
-  mi = TMH_lookup_instance (instance_id);
-
-  if (NULL == mi)
-  {
-    json_decref (response);
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_HISTORY_INSTANCE_UNKNOWN,
-                                         "instance");
   }
 
   /* Sanity check that we don't have some odd stale transaction running */

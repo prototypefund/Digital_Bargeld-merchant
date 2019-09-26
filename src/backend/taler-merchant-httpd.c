@@ -152,10 +152,10 @@ static mode_t unixpath_mode;
 
 
 /**
- * Return GNUNET_YES if given a valid correlation ID and
- * GNUNET_NO otherwise.
+ * Return #GNUNET_YES if given a valid correlation ID and
+ * #GNUNET_NO otherwise.
  *
- * @returns GNUNET_YES iff given a valid correlation ID
+ * @returns #GNUNET_YES iff given a valid correlation ID
  */
 static int
 is_valid_correlation_id (const char *correlation_id)
@@ -166,249 +166,6 @@ is_valid_correlation_id (const char *correlation_id)
     if (! (isalnum (correlation_id[i]) ||(correlation_id[i] == '-')))
       return GNUNET_NO;
   return GNUNET_YES;
-}
-
-
-/**
- * A client has requested the given url using the given method
- * (#MHD_HTTP_METHOD_GET, #MHD_HTTP_METHOD_PUT,
- * #MHD_HTTP_METHOD_DELETE, #MHD_HTTP_METHOD_POST, etc).  The callback
- * must call MHD callbacks to provide content to give back to the
- * client and return an HTTP status code (i.e. #MHD_HTTP_OK,
- * #MHD_HTTP_NOT_FOUND, etc.).
- *
- * @param cls argument given together with the function
- *        pointer when the handler was registered with MHD
- * @param url the requested url
- * @param method the HTTP method used (#MHD_HTTP_METHOD_GET,
- *        #MHD_HTTP_METHOD_PUT, etc.)
- * @param version the HTTP version string (i.e.
- *        #MHD_HTTP_VERSION_1_1)
- * @param upload_data the data being uploaded (excluding HEADERS,
- *        for a POST that fits into memory and that is encoded
- *        with a supported encoding, the POST data will NOT be
- *        given in upload_data and is instead available as
- *        part of #MHD_get_connection_values; very large POST
- *        data *will* be made available incrementally in
- *        @a upload_data)
- * @param upload_data_size set initially to the size of the
- *        @a upload_data provided; the method must update this
- *        value to the number of bytes NOT processed;
- * @param con_cls pointer that the callback can set to some
- *        address and that will be preserved by MHD for future
- *        calls for this request; since the access handler may
- *        be called many times (i.e., for a PUT/POST operation
- *        with plenty of upload data) this allows the application
- *        to easily associate some request-specific state.
- *        If necessary, this state can be cleaned up in the
- *        global #MHD_RequestCompletedCallback (which
- *        can be set with the #MHD_OPTION_NOTIFY_COMPLETED).
- *        Initially, `*con_cls` will be NULL.
- * @return #MHD_YES if the connection was handled successfully,
- *         #MHD_NO if the socket must be closed due to a serios
- *         error while handling the request
- */
-static int
-url_handler (void *cls,
-             struct MHD_Connection *connection,
-             const char *url,
-             const char *method,
-             const char *version,
-             const char *upload_data,
-             size_t *upload_data_size,
-             void **con_cls)
-{
-  static struct TMH_RequestHandler handlers[] = {
-    /* Landing page, tell humans to go away. */
-    { "/", MHD_HTTP_METHOD_GET, "text/plain",
-      "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n",
-      0,
-      &TMH_MHD_handler_static_response, MHD_HTTP_OK },
-    { "/agpl", MHD_HTTP_METHOD_GET, "text/plain",
-      NULL, 0,
-      &TMH_MHD_handler_agpl_redirect, MHD_HTTP_FOUND },
-    { "/public/pay", MHD_HTTP_METHOD_POST, "application/json",
-      NULL, 0,
-      &MH_handler_pay, MHD_HTTP_OK },
-    { "/public/pay", NULL, "text/plain",
-      "Only POST is allowed", 0,
-      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
-    { "/track/transfer", MHD_HTTP_METHOD_GET, "application/json",
-      NULL, 0,
-      &MH_handler_track_transfer, MHD_HTTP_OK},
-    { "/track/transfer", NULL, "text/plain",
-      "Only GET is allowed", 0,
-      &TMH_MHD_handler_static_response, MHD_HTTP_OK},
-    { "/track/transaction", MHD_HTTP_METHOD_GET, "application/json",
-      NULL, 0,
-      &MH_handler_track_transaction, MHD_HTTP_OK},
-    { "/track/transaction", NULL, "text/plain",
-      "Only GET is allowed", 0,
-      &TMH_MHD_handler_static_response, MHD_HTTP_OK},
-    { "/history", MHD_HTTP_METHOD_GET, "text/plain",
-      "Only GET is allowed", 0,
-      &MH_handler_history, MHD_HTTP_OK},
-    { "/order", MHD_HTTP_METHOD_POST, "application/json",
-      NULL, 0,
-      &MH_handler_proposal_put, MHD_HTTP_OK },
-    { "/public/proposal", MHD_HTTP_METHOD_GET, "text/plain",
-      NULL, 0,
-      &MH_handler_proposal_lookup, MHD_HTTP_OK},
-    { "/proposal", NULL, "text/plain",
-      "Only GET/POST are allowed", 0,
-      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
-    { "/refund", MHD_HTTP_METHOD_POST, "application/json",
-      NULL, 0,
-      &MH_handler_refund_increase, MHD_HTTP_OK},
-    { "/public/refund", MHD_HTTP_METHOD_GET, "text/plain",
-      NULL, 0,
-      &MH_handler_refund_lookup, MHD_HTTP_OK},
-    { "/refund", NULL, "application/json",
-      "Only POST/GET are allowed", 0,
-      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
-    { "/tip-authorize", MHD_HTTP_METHOD_POST, "text/plain",
-      NULL, 0,
-      &MH_handler_tip_authorize, MHD_HTTP_OK},
-    { "/tip-authorize", NULL, "application/json",
-      "Only POST is allowed", 0,
-      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
-    { "/public/tip-pickup", MHD_HTTP_METHOD_POST, "text/plain",
-      NULL, 0,
-      &MH_handler_tip_pickup, MHD_HTTP_OK},
-    { "/public/tip-pickup", MHD_HTTP_METHOD_GET, "text/plain",
-      NULL, 0,
-      &MH_handler_tip_pickup_get, MHD_HTTP_OK},
-    { "/public/tip-pickup", NULL, "application/json",
-      "Only POST/GET are allowed", 0,
-      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
-    { "/tip-query", MHD_HTTP_METHOD_GET, "text/plain",
-      NULL, 0,
-      &MH_handler_tip_query, MHD_HTTP_OK},
-    { "/check-payment", MHD_HTTP_METHOD_GET, "text/plain",
-      NULL, 0,
-      &MH_handler_check_payment, MHD_HTTP_OK},
-    { "/config", MHD_HTTP_METHOD_GET, "text/plain",
-      NULL, 0,
-      &MH_handler_config, MHD_HTTP_OK},
-    {NULL, NULL, NULL, NULL, 0, 0 }
-  };
-  static struct TMH_RequestHandler h404 = {
-    "", NULL, "text/html",
-    "<html><title>404: not found</title></html>", 0,
-    &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
-  };
-
-  struct TM_HandlerContext *hc = *con_cls;
-  struct GNUNET_AsyncScopeId aid;
-  const char *correlation_id = NULL;
-  char *instance_id;
-  const char *effective_url;
-  int ret;
-
-  if (NULL == hc)
-  {
-    GNUNET_async_scope_fresh (&aid);
-    /* We only read the correlation ID on the first callback for every client */
-    correlation_id = MHD_lookup_connection_value (connection,
-                                                  MHD_HEADER_KIND,
-                                                  "Taler-Correlation-Id");
-    if ((NULL != correlation_id) &&
-        (GNUNET_YES != is_valid_correlation_id (correlation_id)))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "illegal incoming correlation ID\n");
-      correlation_id = NULL;
-    }
-  }
-  else
-  {
-    aid = hc->async_scope_id;
-  }
-
-  GNUNET_SCHEDULER_begin_async_scope (&aid);
-
-  if (NULL != correlation_id)
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Handling request for (%s) URL '%s', correlation_id=%s\n",
-                method,
-                url,
-                correlation_id);
-  else
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Handling request (%s) for URL '%s'\n",
-                method,
-                url);
-
-  /* Find out the merchant backend instance for the request.
-   * If there is an instance, remove the instance specification
-   * from the beginning of the request URL. */
-  {
-    const char *instance_prefix = "/instances/";
-
-    if (0 == strncmp (url,
-                      instance_prefix,
-                      strlen (instance_prefix)))
-    {
-      /* url starts with "/instances/" */
-      const char *istart = url + strlen (instance_prefix);
-      const char *slash = strchr (istart, '/');
-
-      if (NULL == slash)
-      {
-        return TMH_MHD_handler_static_response (&h404,
-                                                connection,
-                                                con_cls,
-                                                upload_data,
-                                                upload_data_size,
-                                                NULL);
-      }
-      instance_id = GNUNET_strndup (istart,
-                                    slash - istart);
-      effective_url = slash;
-    }
-    else
-    {
-      effective_url = url;
-      instance_id = NULL;
-    }
-  }
-
-  for (unsigned int i = 0; NULL != handlers[i].url; i++)
-  {
-    struct TMH_RequestHandler *rh = &handlers[i];
-
-    if ( (0 == strcasecmp (effective_url,
-                           rh->url)) &&
-         ( (NULL == rh->method) ||
-           (0 == strcasecmp (method,
-                             rh->method)) ) )
-    {
-      ret = rh->handler (rh,
-                         connection,
-                         con_cls,
-                         upload_data,
-                         upload_data_size,
-                         instance_id);
-      hc = *con_cls;
-      if (NULL != hc)
-      {
-        hc->rh = rh;
-        /* Store the async context ID, so we can restore it if
-         * we get another callack for this request. */
-        hc->async_scope_id = aid;
-      }
-      GNUNET_free_non_null (instance_id);
-      return ret;
-    }
-  }
-  ret = TMH_MHD_handler_static_response (&h404,
-                                         connection,
-                                         con_cls,
-                                         upload_data,
-                                         upload_data_size,
-                                         instance_id);
-  GNUNET_free_non_null (instance_id);
-  return ret;
 }
 
 
@@ -1175,8 +932,8 @@ instances_iterator_cb (void *cls,
  * @param instance_id identifier of the instance to resolve
  * @return NULL if that instance is unknown to us
  */
-struct MerchantInstance *
-TMH_lookup_instance (const char *instance_id)
+static struct MerchantInstance *
+lookup_instance (const char *instance_id)
 {
   struct GNUNET_HashCode h_instance;
 
@@ -1248,6 +1005,257 @@ iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config)
     return GNUNET_SYSERR;
   }
   return GNUNET_OK;
+}
+
+
+/**
+ * A client has requested the given url using the given method
+ * (#MHD_HTTP_METHOD_GET, #MHD_HTTP_METHOD_PUT,
+ * #MHD_HTTP_METHOD_DELETE, #MHD_HTTP_METHOD_POST, etc).  The callback
+ * must call MHD callbacks to provide content to give back to the
+ * client and return an HTTP status code (i.e. #MHD_HTTP_OK,
+ * #MHD_HTTP_NOT_FOUND, etc.).
+ *
+ * @param cls argument given together with the function
+ *        pointer when the handler was registered with MHD
+ * @param url the requested url
+ * @param method the HTTP method used (#MHD_HTTP_METHOD_GET,
+ *        #MHD_HTTP_METHOD_PUT, etc.)
+ * @param version the HTTP version string (i.e.
+ *        #MHD_HTTP_VERSION_1_1)
+ * @param upload_data the data being uploaded (excluding HEADERS,
+ *        for a POST that fits into memory and that is encoded
+ *        with a supported encoding, the POST data will NOT be
+ *        given in upload_data and is instead available as
+ *        part of #MHD_get_connection_values; very large POST
+ *        data *will* be made available incrementally in
+ *        @a upload_data)
+ * @param upload_data_size set initially to the size of the
+ *        @a upload_data provided; the method must update this
+ *        value to the number of bytes NOT processed;
+ * @param con_cls pointer that the callback can set to some
+ *        address and that will be preserved by MHD for future
+ *        calls for this request; since the access handler may
+ *        be called many times (i.e., for a PUT/POST operation
+ *        with plenty of upload data) this allows the application
+ *        to easily associate some request-specific state.
+ *        If necessary, this state can be cleaned up in the
+ *        global #MHD_RequestCompletedCallback (which
+ *        can be set with the #MHD_OPTION_NOTIFY_COMPLETED).
+ *        Initially, `*con_cls` will be NULL.
+ * @return #MHD_YES if the connection was handled successfully,
+ *         #MHD_NO if the socket must be closed due to a serios
+ *         error while handling the request
+ */
+static int
+url_handler (void *cls,
+             struct MHD_Connection *connection,
+             const char *url,
+             const char *method,
+             const char *version,
+             const char *upload_data,
+             size_t *upload_data_size,
+             void **con_cls)
+{
+  static struct TMH_RequestHandler handlers[] = {
+    /* Landing page, tell humans to go away. */
+    { "/", MHD_HTTP_METHOD_GET, "text/plain",
+      "Hello, I'm a merchant's Taler backend. This HTTP server is not for humans.\n",
+      0,
+      &TMH_MHD_handler_static_response, MHD_HTTP_OK },
+    { "/agpl", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &TMH_MHD_handler_agpl_redirect, MHD_HTTP_FOUND },
+    { "/public/pay", MHD_HTTP_METHOD_POST, "application/json",
+      NULL, 0,
+      &MH_handler_pay, MHD_HTTP_OK },
+    { "/public/pay", NULL, "text/plain",
+      "Only POST is allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
+    { "/track/transfer", MHD_HTTP_METHOD_GET, "application/json",
+      NULL, 0,
+      &MH_handler_track_transfer, MHD_HTTP_OK},
+    { "/track/transfer", NULL, "text/plain",
+      "Only GET is allowed", 0,
+      &TMH_MHD_handler_static_response, MHD_HTTP_OK},
+    { "/track/transaction", MHD_HTTP_METHOD_GET, "application/json",
+      NULL, 0,
+      &MH_handler_track_transaction, MHD_HTTP_OK},
+    { "/track/transaction", NULL, "text/plain",
+      "Only GET is allowed", 0,
+      &TMH_MHD_handler_static_response, MHD_HTTP_OK},
+    { "/history", MHD_HTTP_METHOD_GET, "text/plain",
+      "Only GET is allowed", 0,
+      &MH_handler_history, MHD_HTTP_OK},
+    { "/order", MHD_HTTP_METHOD_POST, "application/json",
+      NULL, 0,
+      &MH_handler_proposal_put, MHD_HTTP_OK },
+    { "/public/proposal", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_proposal_lookup, MHD_HTTP_OK},
+    { "/proposal", NULL, "text/plain",
+      "Only GET/POST are allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED },
+    { "/refund", MHD_HTTP_METHOD_POST, "application/json",
+      NULL, 0,
+      &MH_handler_refund_increase, MHD_HTTP_OK},
+    { "/public/refund", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_refund_lookup, MHD_HTTP_OK},
+    { "/refund", NULL, "application/json",
+      "Only POST/GET are allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+    { "/tip-authorize", MHD_HTTP_METHOD_POST, "text/plain",
+      NULL, 0,
+      &MH_handler_tip_authorize, MHD_HTTP_OK},
+    { "/tip-authorize", NULL, "application/json",
+      "Only POST is allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+    { "/public/tip-pickup", MHD_HTTP_METHOD_POST, "text/plain",
+      NULL, 0,
+      &MH_handler_tip_pickup, MHD_HTTP_OK},
+    { "/public/tip-pickup", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_tip_pickup_get, MHD_HTTP_OK},
+    { "/public/tip-pickup", NULL, "application/json",
+      "Only POST/GET are allowed", 0,
+      &TMH_MHD_handler_send_json_pack_error, MHD_HTTP_METHOD_NOT_ALLOWED},
+    { "/tip-query", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_tip_query, MHD_HTTP_OK},
+    { "/check-payment", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_check_payment, MHD_HTTP_OK},
+    { "/config", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_config, MHD_HTTP_OK},
+    {NULL, NULL, NULL, NULL, 0, 0 }
+  };
+  static struct TMH_RequestHandler h404 = {
+    "", NULL, "text/html",
+    "<html><title>404: not found</title></html>", 0,
+    &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
+  };
+
+  struct TM_HandlerContext *hc = *con_cls;
+  struct GNUNET_AsyncScopeId aid;
+  const char *correlation_id = NULL;
+  struct MerchantInstance *instance;
+  const char *effective_url;
+  int ret;
+
+  if (NULL == hc)
+  {
+    GNUNET_async_scope_fresh (&aid);
+    /* We only read the correlation ID on the first callback for every client */
+    correlation_id = MHD_lookup_connection_value (connection,
+                                                  MHD_HEADER_KIND,
+                                                  "Taler-Correlation-Id");
+    if ((NULL != correlation_id) &&
+        (GNUNET_YES != is_valid_correlation_id (correlation_id)))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "illegal incoming correlation ID\n");
+      correlation_id = NULL;
+    }
+  }
+  else
+  {
+    aid = hc->async_scope_id;
+  }
+
+  GNUNET_SCHEDULER_begin_async_scope (&aid);
+
+  if (NULL != correlation_id)
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Handling request for (%s) URL '%s', correlation_id=%s\n",
+                method,
+                url,
+                correlation_id);
+  else
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Handling request (%s) for URL '%s'\n",
+                method,
+                url);
+
+  /* Find out the merchant backend instance for the request.
+   * If there is an instance, remove the instance specification
+   * from the beginning of the request URL. */
+  {
+    const char *instance_prefix = "/instances/";
+
+    if (0 == strncmp (url,
+                      instance_prefix,
+                      strlen (instance_prefix)))
+    {
+      /* url starts with "/instances/" */
+      const char *istart = url + strlen (instance_prefix);
+      const char *slash = strchr (istart, '/');
+      char *instance_id;
+
+      if (NULL == slash)
+      {
+        return TMH_MHD_handler_static_response (&h404,
+                                                connection,
+                                                con_cls,
+                                                upload_data,
+                                                upload_data_size,
+                                                NULL);
+      }
+      instance_id = GNUNET_strndup (istart,
+                                    slash - istart);
+      instance = lookup_instance (instance_id);
+      GNUNET_free (instance_id);
+      effective_url = slash;
+    }
+    else
+    {
+      effective_url = url;
+      instance = lookup_instance (NULL);
+    }
+  }
+  if (NULL == instance)
+    return TMH_RESPONSE_reply_json_pack (connection,
+                                         MHD_HTTP_NOT_FOUND,
+                                         "{s:I, s:s}",
+                                         "code",
+                                         (json_int_t) TALER_EC_INSTANCE_UNKNOWN,
+                                         "error",
+                                         "merchant instance unknown");
+
+  for (unsigned int i = 0; NULL != handlers[i].url; i++)
+  {
+    struct TMH_RequestHandler *rh = &handlers[i];
+
+    if ( (0 == strcasecmp (effective_url,
+                           rh->url)) &&
+         ( (NULL == rh->method) ||
+           (0 == strcasecmp (method,
+                             rh->method)) ) )
+    {
+      ret = rh->handler (rh,
+                         connection,
+                         con_cls,
+                         upload_data,
+                         upload_data_size,
+                         instance);
+      hc = *con_cls;
+      if (NULL != hc)
+      {
+        hc->rh = rh;
+        /* Store the async context ID, so we can restore it if
+         * we get another callack for this request. */
+        hc->async_scope_id = aid;
+      }
+      return ret;
+    }
+  }
+  return TMH_MHD_handler_static_response (&h404,
+                                          connection,
+                                          con_cls,
+                                          upload_data,
+                                          upload_data_size,
+                                          instance);
 }
 
 
@@ -1412,7 +1420,6 @@ run (void *cls,
     const char *choices[] = {"tcp",
                              "unix",
                              NULL};
-
     const char *serve_type;
 
     if (GNUNET_OK !=

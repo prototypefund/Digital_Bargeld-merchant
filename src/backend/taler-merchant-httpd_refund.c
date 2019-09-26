@@ -49,7 +49,7 @@ struct ProcessRefundData
   /**
    * Both public and private key are needed by the callback
    */
-   const struct MerchantInstance *merchant;
+  const struct MerchantInstance *merchant;
 
   /**
    * Return code: #TALER_EC_NONE if successful.
@@ -85,7 +85,7 @@ struct TMH_JsonParseContext
  * @param order_id order ID to show a refund for
  * @returns the URI, must be freed with #GNUNET_free
  */
-char *
+static char *
 make_taler_refund_uri (struct MHD_Connection *connection,
                        const char *instance_id,
                        const char *order_id)
@@ -155,8 +155,7 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -165,7 +164,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                             void **connection_cls,
                             const char *upload_data,
                             size_t *upload_data_size,
-                            const char *instance_id)
+                            struct MerchantInstance *mi)
 {
   int res;
   struct TMH_JsonParseContext *ctx;
@@ -174,7 +173,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   json_t *contract_terms;
   const char *order_id;
   const char *reason;
-  struct MerchantInstance *mi;
   struct GNUNET_HashCode h_contract_terms;
   struct TALER_MerchantRefundConfirmationPS confirmation;
   struct GNUNET_CRYPTO_EddsaSignature sig;
@@ -227,19 +225,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     return MHD_NO;
   }
 
-  mi = TMH_lookup_instance (instance_id);
-  if (NULL == mi)
-  {
-    GNUNET_assert (NULL != instance_id);
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Instance '%s' not found\n", instance_id);
-    GNUNET_JSON_parse_free (spec);
-    json_decref (root);
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_REFUND_INSTANCE_UNKNOWN,
-                                         "Unknown instance given");
-  }
-
   db->preflight (db->cls);
   /* Convert order id to h_contract_terms */
   qs = db->find_contract_terms (db->cls,
@@ -283,7 +268,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                                               TALER_EC_INTERNAL_LOGIC_ERROR,
                                               "Could not hash contract terms");
   }
-  for (unsigned int i=0;i<MAX_RETRIES;i++)
+  for (unsigned int i = 0; i<MAX_RETRIES; i++)
   {
     if (GNUNET_OK !=
         db->start (db->cls,
@@ -366,7 +351,8 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
    * the information needed to generate the right response.
    */
   confirmation.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK);
-  confirmation.purpose.size = htonl (sizeof (struct TALER_MerchantRefundConfirmationPS));
+  confirmation.purpose.size = htonl (sizeof (struct
+                                             TALER_MerchantRefundConfirmationPS));
   GNUNET_CRYPTO_hash (order_id,
                       strlen (order_id),
                       &confirmation.h_order_id);
@@ -451,8 +437,8 @@ process_refunds_cb (void *cls,
 
   if (GNUNET_OK !=
       GNUNET_CRYPTO_eddsa_sign (&prd->merchant->privkey.eddsa_priv,
-				&rr.purpose,
-				&sig))
+                                &rr.purpose,
+                                &sig))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not sign refund request\n");
@@ -493,8 +479,7 @@ process_refunds_cb (void *cls,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -503,26 +488,12 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                           void **connection_cls,
                           const char *upload_data,
                           size_t *upload_data_size,
-                          const char *instance_id)
+                          struct MerchantInstance *mi)
 {
   const char *order_id;
   struct GNUNET_HashCode h_contract_terms;
   json_t *contract_terms;
-  struct MerchantInstance *mi;
   enum GNUNET_DB_QueryStatus qs;
-
-  mi = TMH_lookup_instance (instance_id);
-
-  if (NULL == mi)
-  {
-    GNUNET_assert (NULL != instance_id);
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unknown instance given: %s\n",
-                instance_id);
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_REFUND_INSTANCE_UNKNOWN,
-                                         "Unknown instance given");
-  }
 
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
@@ -532,7 +503,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Argument 'order_id' not given\n");
     return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
+                                           TALER_EC_PARAMETER_MISSING,
                                            "order_id");
   }
 
@@ -597,9 +568,11 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                          "refund_permissions",
                                          response,
                                          "merchant_pub",
-                                         GNUNET_JSON_from_data_auto (&mi->pubkey),
+                                         GNUNET_JSON_from_data_auto (
+                                           &mi->pubkey),
                                          "h_contract_terms",
-                                         GNUNET_JSON_from_data_auto (&h_contract_terms));
+                                         GNUNET_JSON_from_data_auto (
+                                           &h_contract_terms));
   }
 }
 
@@ -627,7 +600,7 @@ TM_get_refund_json (const struct MerchantInstance *mi,
   prd.merchant = mi;
   prd.ec = TALER_EC_NONE;
   db->preflight (db->cls);
-  for (unsigned int i=0;i<MAX_RETRIES;i++)
+  for (unsigned int i = 0; i<MAX_RETRIES; i++)
   {
     qs = db->get_refunds_from_contract_terms_hash (db->cls,
                                                    &mi->pubkey,
@@ -645,7 +618,7 @@ TM_get_refund_json (const struct MerchantInstance *mi,
     json_decref (prd.response);
     *ret_ec = TALER_EC_REFUND_LOOKUP_DB_ERROR;
     *ret_errmsg = ("database hard error: looking for "
-                  "h_contract_terms in merchant_refunds table");
+                   "h_contract_terms in merchant_refunds table");
   }
   if (TALER_EC_NONE != prd.ec)
   {

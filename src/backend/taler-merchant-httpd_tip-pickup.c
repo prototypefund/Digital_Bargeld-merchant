@@ -151,7 +151,7 @@ pickup_cleanup (struct TM_HandlerContext *hc)
 
   if (NULL != pc->planchets)
   {
-    for (unsigned int i=0;i<pc->planchets_len;i++)
+    for (unsigned int i = 0; i<pc->planchets_len; i++)
       GNUNET_free_non_null (pc->planchets[i].coin_ev);
     GNUNET_free (pc->planchets);
     pc->planchets = NULL;
@@ -237,21 +237,22 @@ run_pickup (struct MHD_Connection *connection,
   }
   GNUNET_CRYPTO_eddsa_key_get_public (&reserve_priv.eddsa_priv,
                                       &reserve_pub.eddsa_pub);
-  for (unsigned int i=0;i<pc->planchets_len;i++)
+  for (unsigned int i = 0; i<pc->planchets_len; i++)
   {
     struct PlanchetDetail *pd = &pc->planchets[i];
     struct TALER_ReserveSignatureP reserve_sig;
 
     pd->wr.reserve_pub = reserve_pub;
     GNUNET_assert (GNUNET_OK ==
-		   GNUNET_CRYPTO_eddsa_sign (&reserve_priv.eddsa_priv,
-					     &pd->wr.purpose,
-					     &reserve_sig.eddsa_signature));
+                   GNUNET_CRYPTO_eddsa_sign (&reserve_priv.eddsa_priv,
+                                             &pd->wr.purpose,
+                                             &reserve_sig.eddsa_signature));
     if (0 !=
         json_array_append_new (sigs,
                                json_pack ("{s:o}",
                                           "reserve_sig",
-                                          GNUNET_JSON_from_data_auto (&reserve_sig))))
+                                          GNUNET_JSON_from_data_auto (
+                                            &reserve_sig))))
     {
       GNUNET_break (0);
       json_decref (sigs);
@@ -264,8 +265,10 @@ run_pickup (struct MHD_Connection *connection,
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_OK,
                                        "{s:o, s:o}",
-                                       "reserve_pub", GNUNET_JSON_from_data_auto (&reserve_pub),
-				       "reserve_sigs", sigs);
+                                       "reserve_pub",
+                                       GNUNET_JSON_from_data_auto (
+                                         &reserve_pub),
+                                       "reserve_sigs", sigs);
 }
 
 
@@ -304,7 +307,8 @@ exchange_found_cb (void *cls,
   if (NULL == keys)
   {
     pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEYS;
-    pc->error_hint = "could not obtain denomination keys from exchange, check URL";
+    pc->error_hint =
+      "could not obtain denomination keys from exchange, check URL";
     pc->response_code = MHD_HTTP_FAILED_DEPENDENCY;
     TMH_trigger_daemon ();
     return;
@@ -318,7 +322,7 @@ exchange_found_cb (void *cls,
               "Calculating tip amount over %u planchets!\n",
               pc->planchets_len);
   hc = GNUNET_CRYPTO_hash_context_start ();
-  for (unsigned int i=0;i<pc->planchets_len;i++)
+  for (unsigned int i = 0; i<pc->planchets_len; i++)
   {
     struct PlanchetDetail *pd = &pc->planchets[i];
     const struct TALER_EXCHANGE_DenomPublicKey *dk;
@@ -468,7 +472,7 @@ parse_planchet (struct MHD_Connection *connection,
     GNUNET_JSON_spec_varsize ("coin_ev",
                               (void **) &pd->coin_ev,
                               &pd->coin_ev_size),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
 
   ret = TMH_PARSE_json_data (connection,
@@ -494,8 +498,7 @@ parse_planchet (struct MHD_Connection *connection,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -504,7 +507,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
                        void **connection_cls,
                        const char *upload_data,
                        size_t *upload_data_size,
-                       const char *instance_id)
+                       struct MerchantInstance *mi)
 {
   int res;
   struct GNUNET_HashCode tip_id;
@@ -514,7 +517,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
                                  &tip_id),
     GNUNET_JSON_spec_json ("planchets",
                            &planchets),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
   struct PickupContext *pc;
   json_t *root;
@@ -581,7 +584,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
   db->preflight (db->cls);
   pc->planchets = GNUNET_new_array (pc->planchets_len,
                                     struct PlanchetDetail);
-  for (unsigned int i=0;i<pc->planchets_len;i++)
+  for (unsigned int i = 0; i<pc->planchets_len; i++)
   {
     if (GNUNET_OK !=
         (res = parse_planchet (connection,
@@ -611,8 +614,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -621,9 +623,8 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
                            void **connection_cls,
                            const char *upload_data,
                            size_t *upload_data_size,
-                           const char *instance_id)
+                           struct MerchantInstance *mi)
 {
-  struct MerchantInstance *mi;
   const char *tip_id_str;
   char *exchange_url;
   json_t *extra;
@@ -634,12 +635,6 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   struct GNUNET_TIME_Absolute timestamp_expire;
   int ret;
   int qs;
-
-  mi = TMH_lookup_instance (instance_id);
-  if (NULL == mi)
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           TALER_EC_TIP_INSTANCE_UNKNOWN,
-                                           "merchant instance unknown");
 
   tip_id_str = MHD_lookup_connection_value (connection,
                                             MHD_GET_ARGUMENT_KIND,
@@ -703,16 +698,22 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
                                   "Could not determine exchange URL for the given tip id");
   }
 
-  timestamp_expire = GNUNET_TIME_absolute_add (timestamp, GNUNET_TIME_UNIT_DAYS);
+  timestamp_expire = GNUNET_TIME_absolute_add (timestamp,
+                                               GNUNET_TIME_UNIT_DAYS);
 
   ret = TMH_RESPONSE_reply_json_pack (connection,
                                       MHD_HTTP_OK,
                                       "{s:s, s:o, s:o, s:o, s:o, s:o}",
                                       "exchange_url", exchange_url,
-                                      "amount", TALER_JSON_from_amount (&tip_amount),
-                                      "amount_left", TALER_JSON_from_amount (&tip_amount_left),
-                                      "stamp_created", GNUNET_JSON_from_time_abs (timestamp),
-                                      "stamp_expire", GNUNET_JSON_from_time_abs (timestamp_expire),
+                                      "amount", TALER_JSON_from_amount (
+                                        &tip_amount),
+                                      "amount_left", TALER_JSON_from_amount (
+                                        &tip_amount_left),
+                                      "stamp_created",
+                                      GNUNET_JSON_from_time_abs (timestamp),
+                                      "stamp_expire",
+                                      GNUNET_JSON_from_time_abs (
+                                        timestamp_expire),
                                       "extra", extra);
 
   GNUNET_free (exchange_url);

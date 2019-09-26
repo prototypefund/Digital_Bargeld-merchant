@@ -79,7 +79,7 @@ check_products (json_t *products)
       /* FIXME: there are other fields in the product specification
          that are currently not labeled as optional. Maybe check
          those as well, or make them truly optional. */
-      GNUNET_JSON_spec_end()
+      GNUNET_JSON_spec_end ()
     };
 
     /* extract fields we need to sign separately */
@@ -191,7 +191,7 @@ proposal_put (struct MHD_Connection *connection,
   {
     char buf[256];
     time_t timer;
-    struct tm* tm_info;
+    struct tm*tm_info;
     size_t off;
     uint64_t rand;
     char *last;
@@ -201,9 +201,9 @@ proposal_put (struct MHD_Connection *connection,
     if (NULL == tm_info)
     {
       return TMH_RESPONSE_reply_internal_error
-        (connection,
-         TALER_EC_PROPOSAL_NO_LOCALTIME,
-         "failed to determine local time");
+               (connection,
+               TALER_EC_PROPOSAL_NO_LOCALTIME,
+               "failed to determine local time");
     }
     off = strftime (buf,
                     sizeof (buf),
@@ -280,9 +280,9 @@ proposal_put (struct MHD_Connection *connection,
   {
     json_object_set_new
       (order,
-       "wire_fee_amortization",
-       json_integer
-         ((json_int_t) default_wire_fee_amortization));
+      "wire_fee_amortization",
+      json_integer
+        ((json_int_t) default_wire_fee_amortization));
   }
 
   if (NULL == json_object_get (order,
@@ -398,9 +398,9 @@ proposal_put (struct MHD_Connection *connection,
   if (GNUNET_SYSERR == res)
   {
     return TMH_RESPONSE_reply_internal_error
-      (connection,
-       TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
-       "Impossible to parse the order");
+             (connection,
+             TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
+             "Impossible to parse the order");
   }
 
   /* check contract is well-formed */
@@ -408,9 +408,9 @@ proposal_put (struct MHD_Connection *connection,
   {
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_arg_invalid
-      (connection,
-       TALER_EC_PARAMETER_MALFORMED,
-       "order:products");
+             (connection,
+             TALER_EC_PARAMETER_MALFORMED,
+             "order:products");
   }
 
   /* add fields to the contract that the backend should provide */
@@ -428,30 +428,28 @@ proposal_put (struct MHD_Connection *connection,
   if (NULL == wm)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "No wire method available for"
-                " instance '%s'\n", mi->id);
+                "No wire method available for instance '%s'\n", mi->id);
     GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_not_found
-      (connection,
-       TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
-       "No wire method configured for instance");
+    return TMH_RESPONSE_reply_not_found (connection,
+                                         TALER_EC_PROPOSAL_INSTANCE_CONFIGURATION_LACKS_WIRE,
+                                         "No wire method configured for instance");
   }
   json_object_set_new (order,
                        "H_wire",
-		       GNUNET_JSON_from_data_auto (&wm->h_wire));
+                       GNUNET_JSON_from_data_auto (&wm->h_wire));
   json_object_set_new (order,
                        "wire_method",
-		       json_string (wm->wire_method));
+                       json_string (wm->wire_method));
   json_object_set_new (order,
                        "merchant_pub",
-		       GNUNET_JSON_from_data_auto (&mi->pubkey));
+                       GNUNET_JSON_from_data_auto (&mi->pubkey));
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Inserting order '%s' for instance '%s'\n",
               order_id,
               mi->id);
 
-  for (unsigned int i=0;i<MAX_RETRIES;i++)
+  for (unsigned int i = 0; i<MAX_RETRIES; i++)
   {
     db->preflight (db->cls);
     qs = db->insert_order (db->cls,
@@ -469,10 +467,10 @@ proposal_put (struct MHD_Connection *connection,
     {
       GNUNET_break (0);
       return TMH_RESPONSE_reply_internal_error
-        (connection,
-         TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
-         "db error: could not check for existing order"
-         " due to repeated soft transaction failure");
+               (connection,
+               TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
+               "db error: could not check for existing order"
+               " due to repeated soft transaction failure");
     }
 
     {
@@ -503,9 +501,9 @@ proposal_put (struct MHD_Connection *connection,
                            JSON_COMPACT);
           GNUNET_log
             (GNUNET_ERROR_TYPE_ERROR,
-             _("Order ID `%s' already exists with proposal `%s'\n"),
-             order_id,
-             js);
+            _ ("Order ID `%s' already exists with proposal `%s'\n"),
+            order_id,
+            js);
           free (js);
         }
         json_decref (contract_terms);
@@ -513,9 +511,9 @@ proposal_put (struct MHD_Connection *connection,
         /* contract_terms may be private, only expose
          * duplicate order_id to the network */
         rv = TMH_RESPONSE_reply_external_error
-          (connection,
-           TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
-           msg);
+               (connection,
+               TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
+               msg);
         GNUNET_free (msg);
         return rv;
       }
@@ -524,9 +522,9 @@ proposal_put (struct MHD_Connection *connection,
     /* Other hard transaction error (disk full, etc.) */
     GNUNET_JSON_parse_free (spec);
     return TMH_RESPONSE_reply_internal_error
-      (connection,
-       TALER_EC_PROPOSAL_STORE_DB_ERROR_HARD,
-       "db error: could not store this proposal's data into db");
+             (connection,
+             TALER_EC_PROPOSAL_STORE_DB_ERROR_HARD,
+             "db error: could not store this proposal's data into db");
   }
 
   /* DB transaction succeeded, generate positive response */
@@ -552,8 +550,7 @@ proposal_put (struct MHD_Connection *connection,
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in
  *                @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -562,11 +559,10 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
                          void **connection_cls,
                          const char *upload_data,
                          size_t *upload_data_size,
-                         const char *instance_id)
+                         struct MerchantInstance *mi)
 {
   int res;
   struct TMH_JsonParseContext *ctx;
-  struct MerchantInstance *mi;
   json_t *root;
   json_t *order;
 
@@ -592,24 +588,17 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
 
   /* A error response was already generated */
   if ( (GNUNET_NO == res) ||
-  /* or, need more data to accomplish parsing */
+       /* or, need more data to accomplish parsing */
        (NULL == root) )
     return MHD_YES;
-
-  mi = TMH_lookup_instance (instance_id);
-  if (NULL == mi)
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
-                                         "instance");
-
   order = json_object_get (root,
                            "order");
   if (NULL == order)
   {
     res = TMH_RESPONSE_reply_arg_missing
-      (connection,
-       TALER_EC_PARAMETER_MISSING,
-       "order");
+            (connection,
+            TALER_EC_PARAMETER_MISSING,
+            "order");
   }
   else
     res = proposal_put (connection, order, mi);
@@ -630,8 +619,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -640,35 +628,29 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                             void **connection_cls,
                             const char *upload_data,
                             size_t *upload_data_size,
-                            const char *instance_id)
+                            struct MerchantInstance *mi)
 {
   const char *order_id;
   const char *nonce;
   int res;
   enum GNUNET_DB_QueryStatus qs;
   json_t *contract_terms;
-  struct MerchantInstance *mi;
   struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
   const char *stored_nonce;
 
-  mi = TMH_lookup_instance (instance_id);
-  if (NULL == mi)
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_CONTRACT_INSTANCE_UNKNOWN,
-                                         "instance");
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
                                           "order_id");
   if (NULL == order_id)
     return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
+                                           TALER_EC_PARAMETER_MISSING,
                                            "order_id");
   nonce = MHD_lookup_connection_value (connection,
                                        MHD_GET_ARGUMENT_KIND,
                                        "nonce");
   if (NULL == nonce)
     return TMH_RESPONSE_reply_arg_missing (connection,
-					   TALER_EC_PARAMETER_MISSING,
+                                           TALER_EC_PARAMETER_MISSING,
                                            "nonce");
   db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
@@ -712,8 +694,8 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 
     /* extract fields we need to sign separately */
     res = TMH_PARSE_json_data (connection,
-			       contract_terms,
-			       spec);
+                               contract_terms,
+                               spec);
     if (GNUNET_NO == res)
     {
       return MHD_YES;
@@ -725,7 +707,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                                 "Impossible to parse the order");
     }
 
-    for (unsigned int i=0;i<MAX_RETRIES;i++)
+    for (unsigned int i = 0; i<MAX_RETRIES; i++)
     {
       db->preflight (db->cls);
       qs = db->insert_contract_terms (db->cls,
@@ -764,7 +746,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   }
 
   if (0 != strcmp (stored_nonce,
-		   nonce))
+                   nonce))
   {
     return TMH_RESPONSE_reply_bad_request (connection,
                                            TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
@@ -799,7 +781,8 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                       "contract_terms",
                                       contract_terms,
                                       "sig",
-                                      GNUNET_JSON_from_data_auto (&merchant_sig));
+                                      GNUNET_JSON_from_data_auto (
+                                        &merchant_sig));
   return res;
 }
 

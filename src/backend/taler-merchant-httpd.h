@@ -62,7 +62,7 @@ struct IterateInstancesCls
    * Tells if the parsing encountered any error. We need this
    * field since the iterator must return void
    */
-   unsigned int ret;
+  unsigned int ret;
 };
 
 
@@ -203,8 +203,7 @@ struct TMH_RequestHandler
    * @param[in,out] connection_cls the connection's closure (can be updated)
    * @param upload_data upload data
    * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
-   * @param instance_id mechant backend instance ID, or NULL if no explicit
-   *        instance has been specified
+   * @param mi merchant backend instance, never NULL
    * @return MHD result code
    */
   int (*handler)(struct TMH_RequestHandler *rh,
@@ -212,7 +211,7 @@ struct TMH_RequestHandler
                  void **connection_cls,
                  const char *upload_data,
                  size_t *upload_data_size,
-                 const char *instance_id);
+                 struct MerchantInstance *mi);
 
   /**
    * Default response code.
@@ -343,15 +342,5 @@ extern struct GNUNET_TIME_Relative default_pay_deadline;
  */
 void
 TMH_trigger_daemon (void);
-
-/**
- * Lookup a merchant instance by its name.
- *
- * @param name name of the instance to resolve
- * @return NULL if that instance is unknown to us
- */
-struct MerchantInstance *
-TMH_lookup_instance (const char *name);
-
 
 #endif

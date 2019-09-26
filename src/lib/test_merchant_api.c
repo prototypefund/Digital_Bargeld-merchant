@@ -128,7 +128,7 @@ static char *auditor_url;
  * @param label label to use for the command.
  */
 #define CMD_EXEC_WIREWATCH(label) \
-   TALER_TESTING_cmd_exec_wirewatch (label, CONFIG_FILE)
+  TALER_TESTING_cmd_exec_wirewatch (label, CONFIG_FILE)
 
 /**
  * Execute the taler-exchange-aggregator command with
@@ -137,7 +137,7 @@ static char *auditor_url;
  * @param label label to use for the command.
  */
 #define CMD_EXEC_AGGREGATOR(label) \
-   TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE)
+  TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE)
 
 /**
  * Run wire transfer of funds from some user's account to the
@@ -148,9 +148,11 @@ static char *auditor_url;
  * @param url exchange_url
  */
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
-   TALER_TESTING_cmd_fakebank_transfer (label, amount, \
-     fakebank_url, USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO, \
-     USER_LOGIN_NAME, USER_LOGIN_PASS, EXCHANGE_URL)
+  TALER_TESTING_cmd_fakebank_transfer (label, amount, \
+                                       fakebank_url, USER_ACCOUNT_NO, \
+                                       EXCHANGE_ACCOUNT_NO, \
+                                       USER_LOGIN_NAME, USER_LOGIN_PASS, \
+                                       EXCHANGE_URL)
 
 /**
  * Run wire transfer of funds from some user's account to the
@@ -160,10 +162,10 @@ static char *auditor_url;
  * @param amount amount to transfer, i.e. "EUR:1"
  */
 #define CMD_TRANSFER_TO_EXCHANGE_SUBJECT(label,amount,subject) \
-   TALER_TESTING_cmd_fakebank_transfer_with_subject \
-     (label, amount, fakebank_url, USER_ACCOUNT_NO, \
-      EXCHANGE_ACCOUNT_NO, USER_LOGIN_NAME, USER_LOGIN_PASS, \
-      subject)
+  TALER_TESTING_cmd_fakebank_transfer_with_subject \
+    (label, amount, fakebank_url, USER_ACCOUNT_NO, \
+    EXCHANGE_ACCOUNT_NO, USER_LOGIN_NAME, USER_LOGIN_PASS, \
+    subject)
 
 /**
  * Main function that will tell the interpreter what commands to
@@ -189,22 +191,22 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
-       EXCHANGE_URL,
-       "EUR:10.02",
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:10.02",
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
-       "create-reserve-1",
-       "EUR:5",
-       MHD_HTTP_OK),
+      "create-reserve-1",
+      "EUR:5",
+      MHD_HTTP_OK),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-2",
-       "create-reserve-1",
-       "EUR:5",
-       MHD_HTTP_OK),
+      "create-reserve-1",
+      "EUR:5",
+      MHD_HTTP_OK),
 
     /**
      * Check the reserve is depleted.
@@ -216,9 +218,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
-       merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -275,10 +277,10 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-498c",
-       EXCHANGE_URL,
-       "EUR:4.98",
-       EXCHANGE_ACCOUNT_NO,
-       MERCHANT_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:4.98",
+      EXCHANGE_ACCOUNT_NO,
+      MERCHANT_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-2"),
 
@@ -290,9 +292,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-2",
-       merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -326,17 +328,17 @@ run (void *cls,
     TALER_TESTING_cmd_history ("history-0",
                                merchant_url,
                                MHD_HTTP_OK,
-      /**
-       * all records to be returned; setting date as 0 lets the
-       * interpreter set it as 'now' + one hour delta, just to
-       * make sure it surpasses the proposal's timestamp.
-       */
+                               /**
+                                * all records to be returned; setting date as 0 lets the
+                                * interpreter set it as 'now' + one hour delta, just to
+                                * make sure it surpasses the proposal's timestamp.
+                                */
                                GNUNET_TIME_UNIT_ZERO_ABS,
-      /**
-       * We only expect ONE result (create-proposal-1) to be
-       * included in /history response, because create-proposal-3
-       * did NOT go through because of double spending.
-       */
+                               /**
+                                * We only expect ONE result (create-proposal-1) to be
+                                * included in /history response, because create-proposal-3
+                                * did NOT go through because of double spending.
+                                */
                                1, // nresult
                                10, // start
                                -10), // nrows
@@ -349,56 +351,56 @@ run (void *cls,
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
-       merchant_url,
-       MHD_HTTP_OK,
-       "deposit-simple"),
+      merchant_url,
+      MHD_HTTP_OK,
+      "deposit-simple"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-1",
-       merchant_url,
-       MHD_HTTP_OK,
-       "check_bank_transfer-498c"),
+      merchant_url,
+      MHD_HTTP_OK,
+      "check_bank_transfer-498c"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-again",
-       merchant_url,
-       MHD_HTTP_OK,
-       "check_bank_transfer-498c"),
+      merchant_url,
+      MHD_HTTP_OK,
+      "check_bank_transfer-498c"),
 
     TALER_TESTING_cmd_fakebank_transfer
       ("create-reserve-2",
-       "EUR:1",
-       fakebank_url,
-       USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
-       "user62",
-       "pass62",
-       EXCHANGE_URL),
+      "EUR:1",
+      fakebank_url,
+      USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
+      "user62",
+      "pass62",
+      EXCHANGE_URL),
 
     TALER_TESTING_cmd_fakebank_transfer_with_ref
       ("create-reserve-2b",
-       "EUR:4.01",
-       fakebank_url,
-       USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
-       "user62",
-       "pass62",
-       "create-reserve-2",
-       EXCHANGE_URL),
+      "EUR:4.01",
+      fakebank_url,
+      USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
+      "user62",
+      "pass62",
+      "create-reserve-2",
+      EXCHANGE_URL),
 
     CMD_EXEC_WIREWATCH ("wirewatch-2"),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2a",
-       EXCHANGE_URL,
-       "EUR:1",
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:1",
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2b",
-       EXCHANGE_URL,
-       "EUR:4.01",
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:4.01",
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
                                        "create-reserve-2",
@@ -418,40 +420,40 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-498c-2",
-       EXCHANGE_URL,
-       "EUR:4.98",
-       EXCHANGE_ACCOUNT_NO,
-       MERCHANT_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:4.98",
+      EXCHANGE_ACCOUNT_NO,
+      MERCHANT_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-2",
-       merchant_url,
-       MHD_HTTP_OK,
-       "check_bank_transfer-498c-2"),
+      merchant_url,
+      MHD_HTTP_OK,
+      "check_bank_transfer-498c-2"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-2-again",
-       merchant_url,
-       MHD_HTTP_OK,
-       "check_bank_transfer-498c-2"),
+      merchant_url,
+      MHD_HTTP_OK,
+      "check_bank_transfer-498c-2"),
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-2",
-       merchant_url,
-       MHD_HTTP_OK,
-       "deposit-simple-2"),
+      merchant_url,
+      MHD_HTTP_OK,
+      "deposit-simple-2"),
 
     TALER_TESTING_cmd_history ("history-1",
                                merchant_url,
                                MHD_HTTP_OK,
                                GNUNET_TIME_UNIT_ZERO_ABS,
-      /**
-       * Now we expect BOTH contracts (create-proposal-{1,2})
-       * to be included in /history response, because
-       * create-proposal-2 has now been correctly paid.
-       */
+                               /**
+                                * Now we expect BOTH contracts (create-proposal-{1,2})
+                                * to be included in /history response, because
+                                * create-proposal-2 has now been correctly paid.
+                                */
                                2,
                                10,
                                -10),
@@ -461,12 +463,12 @@ run (void *cls,
   struct TALER_TESTING_Command refund[] = {
     TALER_TESTING_cmd_refund_increase
       ("refund-increase-1",
-       merchant_url,
-       "refund test",
-       "1",
-       "EUR:0.1",
-       "EUR:0.01",
-       MHD_HTTP_OK),
+      merchant_url,
+      "refund test",
+      "1",
+      "EUR:0.1",
+      "EUR:0.01",
+      MHD_HTTP_OK),
 
     /* Ordinary refund.  */
     TALER_TESTING_cmd_refund_lookup ("refund-lookup-1",
@@ -487,9 +489,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-not-to-be-paid",
-       merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -508,22 +510,22 @@ run (void *cls,
     /* Try to increase a non paid proposal.  */
     TALER_TESTING_cmd_refund_increase
       ("refund-increase-unpaid-proposal",
-       merchant_url,
-       "refund test",
-       "1-unpaid",
-       "EUR:0.1",
-       "EUR:0.01",
-       MHD_HTTP_BAD_REQUEST),
+      merchant_url,
+      "refund test",
+      "1-unpaid",
+      "EUR:0.1",
+      "EUR:0.01",
+      MHD_HTTP_BAD_REQUEST),
 
     /* Try to increase a non existent proposal.  */
     TALER_TESTING_cmd_refund_increase
       ("refund-increase-unpaid-proposal",
-       merchant_url,
-       "refund test",
-       "non-existent-id",
-       "EUR:0.1",
-       "EUR:0.01",
-       MHD_HTTP_NOT_FOUND),
+      merchant_url,
+      "refund test",
+      "non-existent-id",
+      "EUR:0.1",
+      "EUR:0.01",
+      MHD_HTTP_NOT_FOUND),
 
     /**
      * The following block will (1) create a new
@@ -539,22 +541,22 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-unincreased-refund",
-       EXCHANGE_URL,
-       "EUR:5.01",
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:5.01",
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-unincreased-refund",
-       "create-reserve-unincreased-refund",
-       "EUR:5",
-       MHD_HTTP_OK),
+      "create-reserve-unincreased-refund",
+      "EUR:5",
+      MHD_HTTP_OK),
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-unincreased-refund",
-       merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -583,24 +585,24 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-unincreased-refund",
-       EXCHANGE_URL,
-       "EUR:4.98",
-       EXCHANGE_ACCOUNT_NO,
-       MERCHANT_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:4.98",
+      EXCHANGE_ACCOUNT_NO,
+      MERCHANT_ACCOUNT_NO),
 
     /* Actually try to pick up the refund from the
      * "unincreased proposal".  */
     TALER_TESTING_cmd_refund_lookup_with_amount
       ("refund-lookup-unincreased",
-       merchant_url,
-       NULL,
-       "pay-unincreased-proposal",
-       "unincreased-proposal",
-       MHD_HTTP_OK,
-       /* If a lookup is attempted on an unincreased proposal,
-        * the backend will simply respond with a empty refunded
-        * coin "set", but the HTTP response code is 200 OK.  */
-       "EUR:0"),
+      merchant_url,
+      NULL,
+      "pay-unincreased-proposal",
+      "unincreased-proposal",
+      MHD_HTTP_OK,
+      /* If a lookup is attempted on an unincreased proposal,
+       * the backend will simply respond with a empty refunded
+       * coin "set", but the HTTP response code is 200 OK.  */
+      "EUR:0"),
 
     TALER_TESTING_cmd_end ()
   };
@@ -611,22 +613,22 @@ run (void *cls,
     /* Test tipping.  */
     TALER_TESTING_cmd_fakebank_transfer_with_instance
       ("create-reserve-tip-1",
-       "EUR:20.04",
-       fakebank_url,
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO,
-       USER_LOGIN_NAME,
-       USER_LOGIN_PASS,
-       "tip",
-       EXCHANGE_URL,
-       CONFIG_FILE),
+      "EUR:20.04",
+      fakebank_url,
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO,
+      USER_LOGIN_NAME,
+      USER_LOGIN_PASS,
+      "tip",
+      EXCHANGE_URL,
+      CONFIG_FILE),
 
     CMD_EXEC_WIREWATCH ("wirewatch-3"),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-tip-1",
-       EXCHANGE_URL,
-       "EUR:20.04", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:20.04", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-1",
                                      merchant_tip_instance_url,
@@ -649,12 +651,12 @@ run (void *cls,
      * actually create a reserve.  */
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-null",
-       merchant_tip_instance_nulltip_url,
-       exchange_url,
-       MHD_HTTP_NOT_FOUND,
-       "tip 2",
-       "EUR:5.01",
-       TALER_EC_RESERVE_STATUS_UNKNOWN),
+      merchant_tip_instance_nulltip_url,
+      exchange_url,
+      MHD_HTTP_NOT_FOUND,
+      "tip 2",
+      "EUR:5.01",
+      TALER_EC_RESERVE_STATUS_UNKNOWN),
 
     TALER_TESTING_cmd_tip_query ("query-tip-1",
                                  merchant_tip_instance_url,
@@ -695,77 +697,77 @@ run (void *cls,
 
     TALER_TESTING_cmd_fakebank_transfer_with_instance
       ("create-reserve-insufficient-funds",
-       "EUR:1.01",
-       fakebank_url,
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO,
-       USER_LOGIN_NAME,
-       USER_LOGIN_PASS,
-       "dtip",
-       EXCHANGE_URL,
-       CONFIG_FILE),
+      "EUR:1.01",
+      fakebank_url,
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO,
+      USER_LOGIN_NAME,
+      USER_LOGIN_PASS,
+      "dtip",
+      EXCHANGE_URL,
+      CONFIG_FILE),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-insufficient-tip-funds",
-       EXCHANGE_URL,
-       "EUR:1.01",
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:1.01",
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO),
 
     CMD_EXEC_WIREWATCH
       ("wirewatch-insufficient-tip-funds"),
 
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-3-insufficient-funds",
-       merchant_tip_instance_2_url,
-       exchange_url,
-       MHD_HTTP_PRECONDITION_FAILED,
-       "tip 3",
-       "EUR:2.02",
-       TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS),
+      merchant_tip_instance_2_url,
+      exchange_url,
+      MHD_HTTP_PRECONDITION_FAILED,
+      "tip 3",
+      "EUR:2.02",
+      TALER_EC_TIP_AUTHORIZE_INSUFFICIENT_FUNDS),
 
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-4-unknown-instance",
-       merchant_tip_unknown_instance_url,
-       exchange_url,
-       MHD_HTTP_NOT_FOUND,
-       "tip 4",
-       "EUR:5.01",
-       TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN),
+      merchant_tip_unknown_instance_url,
+      exchange_url,
+      MHD_HTTP_NOT_FOUND,
+      "tip 4",
+      "EUR:5.01",
+      TALER_EC_INSTANCE_UNKNOWN),
 
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-5-notip-instance",
-       merchant_url,
-       exchange_url,
-       MHD_HTTP_NOT_FOUND,
-       "tip 5",
-       "EUR:5.01",
-       TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP),
+      merchant_url,
+      exchange_url,
+      MHD_HTTP_NOT_FOUND,
+      "tip 5",
+      "EUR:5.01",
+      TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP),
 
     TALER_TESTING_cmd_tip_pickup_with_ec
       ("pickup-tip-3-too-much",
-       merchant_tip_instance_url,
-       MHD_HTTP_CONFLICT,
-       "authorize-tip-1",
-       pickup_amounts_1,
-       TALER_EC_TIP_PICKUP_NO_FUNDS),
+      merchant_tip_instance_url,
+      MHD_HTTP_CONFLICT,
+      "authorize-tip-1",
+      pickup_amounts_1,
+      TALER_EC_TIP_PICKUP_NO_FUNDS),
 
     TALER_TESTING_cmd_tip_authorize_fake
       ("fake-tip-authorization"),
 
     TALER_TESTING_cmd_tip_pickup_with_ec
       ("pickup-non-existent-id",
-       merchant_tip_instance_url,
-       MHD_HTTP_NOT_FOUND,
-       "fake-tip-authorization",
-       pickup_amounts_1,
-       TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN),
+      merchant_tip_instance_url,
+      MHD_HTTP_NOT_FOUND,
+      "fake-tip-authorization",
+      pickup_amounts_1,
+      TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN),
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-tip-1",
-       merchant_tip_instance_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      merchant_tip_instance_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -793,12 +795,12 @@ run (void *cls,
     CMD_EXEC_AGGREGATOR ("aggregator-tip-1"),
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-tip-498c",
-       EXCHANGE_URL,
-       "EUR:4.98",
-       EXCHANGE_ACCOUNT_NO,
-       MERCHANT_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:4.98",
+      EXCHANGE_ACCOUNT_NO,
+      MERCHANT_ACCOUNT_NO),
     TALER_TESTING_cmd_check_bank_empty
-    ("check_bank_empty-at-tips"),
+      ("check_bank_empty-at-tips"),
 
     TALER_TESTING_cmd_end ()
   };
@@ -807,20 +809,20 @@ run (void *cls,
 
     TALER_TESTING_cmd_fakebank_transfer
       ("create-reserve-10",
-       "EUR:10.02",
-       fakebank_url,
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO,
-       USER_LOGIN_NAME,
-       USER_LOGIN_PASS,
-       EXCHANGE_URL),
+      "EUR:10.02",
+      fakebank_url,
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO,
+      USER_LOGIN_NAME,
+      USER_LOGIN_PASS,
+      EXCHANGE_URL),
 
     CMD_EXEC_WIREWATCH ("wirewatch-10"),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-10",
-       EXCHANGE_URL,
-       "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-10a",
                                        "create-reserve-10",
@@ -838,9 +840,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-10",
-       merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -867,20 +869,20 @@ run (void *cls,
 
     TALER_TESTING_cmd_pay_again
       ("pay-again-10",
-       merchant_url,
-       "pay-fail-partial-double-10",
-       "withdraw-coin-10a;withdraw-coin-10b",
-       "EUR:0.01",
-       MHD_HTTP_OK),
+      merchant_url,
+      "pay-fail-partial-double-10",
+      "withdraw-coin-10a;withdraw-coin-10b",
+      "EUR:0.01",
+      MHD_HTTP_OK),
 
     CMD_EXEC_AGGREGATOR ("run-aggregator-10"),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-9.97-10",
-       EXCHANGE_URL,
-       "EUR:9.97",
-       EXCHANGE_ACCOUNT_NO,
-       MERCHANT_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:9.97",
+      EXCHANGE_ACCOUNT_NO,
+      MERCHANT_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-10"),
 
@@ -895,10 +897,10 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-11",
-       EXCHANGE_URL,
-       "EUR:10.02",
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:10.02",
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-11a",
                                        "create-reserve-11",
@@ -917,9 +919,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-11",
-       merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -984,15 +986,15 @@ run (void *cls,
                              track),
     TALER_TESTING_cmd_history
       ("history-2",
-       merchant_url,
-       MHD_HTTP_OK,
-       GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
-                                 GNUNET_TIME_UNIT_MICROSECONDS),
-       /* zero results expected, there isn't any row with id
-        * bigger than 10. */
-       0,
-       10,
-       10),
+      merchant_url,
+      MHD_HTTP_OK,
+      GNUNET_TIME_absolute_add (GNUNET_TIME_UNIT_ZERO_ABS,
+                                GNUNET_TIME_UNIT_MICROSECONDS),
+      /* zero results expected, there isn't any row with id
+       * bigger than 10. */
+      0,
+      10,
+      10),
 
     TALER_TESTING_cmd_batch ("refund",
                              refund),
@@ -1008,11 +1010,11 @@ run (void *cls,
 
     TALER_TESTING_cmd_history_default_start
       ("history-default-start",
-       merchant_url,
-       MHD_HTTP_OK,
-       GNUNET_TIME_UNIT_ZERO_ABS,
-       4, /* Expected number of records */
-       -100), /* Delta */
+      merchant_url,
+      MHD_HTTP_OK,
+      GNUNET_TIME_UNIT_ZERO_ABS,
+      4,  /* Expected number of records */
+      -100),  /* Delta */
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.
@@ -1027,7 +1029,7 @@ run (void *cls,
 
 int
 main (int argc,
-      char * const *argv)
+      char *const *argv)
 {
   unsigned int ret;
   /* These environment variables get in the way... */
@@ -1039,8 +1041,8 @@ main (int argc,
                     NULL);
   if (NULL ==
       (fakebank_url = TALER_TESTING_prepare_fakebank
-        (CONFIG_FILE,
-         "account-exchange")))
+                        (CONFIG_FILE,
+                        "account-exchange")))
     return 77;
   if (NULL ==
       (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
@@ -1074,7 +1076,7 @@ main (int argc,
   case GNUNET_OK:
 
     if (NULL == (merchantd =
-        TALER_TESTING_run_merchant (CONFIG_FILE, merchant_url)))
+                   TALER_TESTING_run_merchant (CONFIG_FILE, merchant_url)))
       return 1;
 
     ret = TALER_TESTING_setup_with_exchange (&run,

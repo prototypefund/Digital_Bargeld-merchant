@@ -112,15 +112,20 @@ generate_final_response (struct TipQueryContext *tqc)
                                        MHD_HTTP_OK,
                                        "{s:o, s:o, s:o, s:o, s:o}",
                                        "reserve_pub",
-                                       GNUNET_JSON_from_data_auto (&reserve_pub),
+                                       GNUNET_JSON_from_data_auto (
+                                         &reserve_pub),
                                        "reserve_expiration",
-                                       GNUNET_JSON_from_time_abs (tqc->ctr.reserve_expiration),
+                                       GNUNET_JSON_from_time_abs (
+                                         tqc->ctr.reserve_expiration),
                                        "amount_authorized",
-                                       TALER_JSON_from_amount (&tqc->ctr.amount_authorized),
+                                       TALER_JSON_from_amount (
+                                         &tqc->ctr.amount_authorized),
                                        "amount_picked_up",
-                                       TALER_JSON_from_amount (&tqc->ctr.amount_withdrawn),
+                                       TALER_JSON_from_amount (
+                                         &tqc->ctr.amount_withdrawn),
                                        "amount_available",
-                                       TALER_JSON_from_amount (&amount_available));
+                                       TALER_JSON_from_amount (
+                                         &amount_available));
 }
 
 
@@ -132,8 +137,7 @@ generate_final_response (struct TipQueryContext *tqc)
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -142,10 +146,9 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
                       void **connection_cls,
                       const char *upload_data,
                       size_t *upload_data_size,
-                      const char *instance_id)
+                      struct MerchantInstance *mi)
 {
   struct TipQueryContext *tqc;
-  struct MerchantInstance *mi;
 
   if (NULL == *connection_cls)
   {
@@ -188,23 +191,11 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
     return generate_final_response (tqc);
   }
 
-
-  mi = TMH_lookup_instance (instance_id);
-  if (NULL == mi)
-  {
-    GNUNET_assert (NULL != instance_id);
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Instance `%s' not configured\n",
-                instance_id);
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN,
-                                         "unknown instance");
-  }
   if (NULL == mi->tip_exchange)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Instance `%s' not configured for tipping\n",
-                instance_id);
+                mi->id);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
                                          "exchange for tipping not configured for the instance");
@@ -213,7 +204,7 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
 
   {
     int qs;
-    for (unsigned int i=0;i<MAX_RETRIES;i++)
+    for (unsigned int i = 0; i<MAX_RETRIES; i++)
     {
       db->preflight (db->cls);
       qs = db->get_authorized_tip_amount (db->cls,

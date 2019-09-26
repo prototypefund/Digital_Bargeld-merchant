@@ -107,8 +107,7 @@ cleanup_tac (struct TM_HandlerContext *hc)
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -117,11 +116,10 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                           void **connection_cls,
                           const char *upload_data,
                           size_t *upload_data_size,
-                          const char *instance_id)
+                          struct MerchantInstance *mi)
 {
   struct TipAuthContext *tac;
   int res;
-  struct MerchantInstance *mi;
   enum TALER_ErrorCode ec;
   struct GNUNET_TIME_Absolute expiration;
   struct GNUNET_HashCode tip_id;
@@ -152,7 +150,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     struct GNUNET_JSON_Specification spec[] = {
       TALER_JSON_spec_amount ("amount", &tac->amount),
       GNUNET_JSON_spec_string ("justification", &tac->justification),
-      GNUNET_JSON_spec_end()
+      GNUNET_JSON_spec_end ()
     };
 
     res = TMH_PARSE_post_json (connection,
@@ -178,22 +176,11 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     tac->parsed_json = GNUNET_YES;
   }
 
-  mi = TMH_lookup_instance (instance_id);
-  if (NULL == mi)
-  {
-    GNUNET_assert (NULL != instance_id);
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Instance `%s' not configured\n",
-                instance_id);
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_TIP_AUTHORIZE_INSTANCE_UNKNOWN,
-                                         "unknown instance");
-  }
   if (NULL == mi->tip_exchange)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Instance `%s' not configured for tipping\n",
-                (NULL != instance_id) ? instance_id : "default");
+                mi->id);
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
                                          "exchange for tipping not configured for the instance");
@@ -275,7 +262,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                                                   "X-Forwarded-Host");
 
     uri_path = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
-                                        "X-Forwarded-Prefix");
+                                            "X-Forwarded-Prefix");
     if (NULL == uri_path)
       uri_path = "-";
 
@@ -286,7 +273,8 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     {
       /* Should never happen, at last the host header should be defined */
       GNUNET_break (0);
-      return TMH_RESPONSE_reply_internal_error (connection, 0, "unable to identify backend host");
+      return TMH_RESPONSE_reply_internal_error (connection, 0,
+                                                "unable to identify backend host");
     }
 
     if (0 == strcmp (mi->id, "default"))
@@ -297,11 +285,11 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     GNUNET_CRYPTO_hash_to_enc (&tip_id, &hash_enc);
 
     GNUNET_assert (0 < GNUNET_asprintf (&taler_tip_uri,
-                                         "taler://tip/%s/%s/%s/%s",
-                                         host,
-                                         uri_path,
-                                         uri_instance_id,
-                                         hash_enc.encoding));
+                                        "taler://tip/%s/%s/%s/%s",
+                                        host,
+                                        uri_path,
+                                        uri_instance_id,
+                                        hash_enc.encoding));
 
 
     res = TMH_RESPONSE_reply_json_pack (connection,

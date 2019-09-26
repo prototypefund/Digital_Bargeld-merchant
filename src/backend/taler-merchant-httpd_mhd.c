@@ -37,8 +37,7 @@
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, could be NULL in this specific case!
  * @return MHD result code
  */
 int
@@ -47,11 +46,12 @@ TMH_MHD_handler_static_response (struct TMH_RequestHandler *rh,
                                  void **connection_cls,
                                  const char *upload_data,
                                  size_t *upload_data_size,
-                                 const char *instance_id)
+                                 struct MerchantInstance *instance)
 {
   struct MHD_Response *response;
   int ret;
 
+  (void) instance;
   if (0 == rh->data_size)
     rh->data_size = strlen ((const char *) rh->data);
   response = MHD_create_response_from_buffer (rh->data_size,
@@ -84,23 +84,23 @@ TMH_MHD_handler_static_response (struct TMH_RequestHandler *rh,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL (but unused)
  * @return MHD result code
  */
 int
 TMH_MHD_handler_agpl_redirect (struct TMH_RequestHandler *rh,
-                                  struct MHD_Connection *connection,
-                                  void **connection_cls,
-                                  const char *upload_data,
-                                  size_t *upload_data_size,
-                                  const char *instance_id)
+                               struct MHD_Connection *connection,
+                               void **connection_cls,
+                               const char *upload_data,
+                               size_t *upload_data_size,
+                               struct MerchantInstance *mi)
 {
   const char *agpl =
     "This server is licensed under the Affero GPL. You will now be redirected to the source code.";
   struct MHD_Response *response;
   int ret;
 
+  (void) mi;
   response = MHD_create_response_from_buffer (strlen (agpl),
                                               (void *) agpl,
                                               MHD_RESPMEM_PERSISTENT);
@@ -142,17 +142,16 @@ TMH_MHD_handler_agpl_redirect (struct TMH_RequestHandler *rh,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
 TMH_MHD_handler_send_json_pack_error (struct TMH_RequestHandler *rh,
-                                         struct MHD_Connection *connection,
-                                         void **connection_cls,
-                                         const char *upload_data,
-                                         size_t *upload_data_size,
-                                         const char *instance_id)
+                                      struct MHD_Connection *connection,
+                                      void **connection_cls,
+                                      const char *upload_data,
+                                      size_t *upload_data_size,
+                                      struct MerchantInstance *mi)
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        rh->response_code,

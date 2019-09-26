@@ -48,7 +48,7 @@
  *                   if not a session-bound payment
  * @returns the URI, must be freed with #GNUNET_free
  */
-char *
+static char *
 make_taler_pay_uri (struct MHD_Connection *connection,
                     const char *instance_id,
                     const char *order_id,
@@ -66,7 +66,7 @@ make_taler_pay_uri (struct MHD_Connection *connection,
                                                 "X-Forwarded-Host");
 
   uri_path = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
-                                      "X-Forwarded-Prefix");
+                                          "X-Forwarded-Prefix");
   if (NULL == uri_path)
     uri_path = "-";
 
@@ -259,15 +259,16 @@ check_order_and_request_payment (struct MHD_Connection *connection,
       TALER_JSON_hash (contract_terms,
                        &h_contract_terms))
   {
-  GNUNET_break (0);
-  json_decref (contract_terms);
-  return TMH_RESPONSE_reply_internal_error (connection,
-                                            TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
-                                            "Failed to hash proposal");
+    GNUNET_break (0);
+    json_decref (contract_terms);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
+                                              "Failed to hash proposal");
   }
   /* Offer was not picked up yet, but we ensured that it exists */
   h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
-                                                              sizeof (struct GNUNET_HashCode));
+                                                              sizeof (struct
+                                                                      GNUNET_HashCode));
   ret = send_pay_request (connection,
                           order_id,
                           final_contract_url,
@@ -291,8 +292,7 @@ check_order_and_request_payment (struct MHD_Connection *connection,
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
  * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param instance_id merchant backend instance ID or NULL is no instance
- *        has been explicitly specified
+ * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
 int
@@ -301,7 +301,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                           void **connection_cls,
                           const char *upload_data,
                           size_t *upload_data_size,
-                          const char *instance_id)
+                          struct MerchantInstance *mi)
 {
   const char *order_id;
   const char *contract_url;
@@ -309,7 +309,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   const char *fulfillment_url;
   char *final_contract_url;
   char *h_contract_terms_str;
-  struct MerchantInstance *mi;
   enum GNUNET_DB_QueryStatus qs;
   json_t *contract_terms;
   struct GNUNET_HashCode h_contract_terms;
@@ -317,11 +316,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   int ret;
   int refunded;
 
-  mi = TMH_lookup_instance (instance_id);
-  if (NULL == mi)
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           TALER_EC_CHECK_PAYMENT_INSTANCE_UNKNOWN,
-                                           "merchant instance unknown");
   order_id = MHD_lookup_connection_value (connection,
                                           MHD_GET_ARGUMENT_KIND,
                                           "order_id");
@@ -340,7 +334,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   {
     final_contract_url = TALER_url_absolute_mhd (connection,
                                                  "/public/proposal",
-                                                 "instance", instance_id,
+                                                 "instance", mi->id,
                                                  "order_id", order_id,
                                                  NULL);
     GNUNET_assert (NULL != final_contract_url);
@@ -350,8 +344,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     final_contract_url = GNUNET_strdup (contract_url);
   }
   session_id = MHD_lookup_connection_value (connection,
-                                                MHD_GET_ARGUMENT_KIND,
-                                                "session_id");
+                                            MHD_GET_ARGUMENT_KIND,
+                                            "session_id");
 
   db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
@@ -419,7 +413,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   }
 
   h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
-                                                              sizeof (struct GNUNET_HashCode));
+                                                              sizeof (struct
+                                                                      GNUNET_HashCode));
 
 
 
@@ -505,7 +500,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   }
 
   /* Accumulate refunds, if any. */
-  for (unsigned int i=0;i<MAX_RETRIES;i++)
+  for (unsigned int i = 0; i<MAX_RETRIES; i++)
   {
     qs = db->get_refunds_from_contract_terms_hash (db->cls,
                                                    &mi->pubkey,
@@ -537,7 +532,8 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                       "contract_terms", contract_terms,
                                       "paid", 1,
                                       "refunded", refunded,
-                                      "refund_amount", TALER_JSON_from_amount (&refund_amount));
+                                      "refund_amount", TALER_JSON_from_amount (
+                                        &refund_amount));
   GNUNET_free (final_contract_url);
   return ret;
 }
