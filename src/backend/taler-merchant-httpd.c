@@ -298,15 +298,12 @@ url_handler (void *cls,
     &TMH_MHD_handler_static_response, MHD_HTTP_NOT_FOUND
   };
 
-  struct TM_HandlerContext *hc;
+  struct TM_HandlerContext *hc = *con_cls;
   struct GNUNET_AsyncScopeId aid;
   const char *correlation_id = NULL;
   char *instance_id;
-  char *effective_url;
+  const char *effective_url;
   int ret;
-
-
-  hc = *con_cls;
 
   if (NULL == hc)
   {
@@ -347,14 +344,17 @@ url_handler (void *cls,
    * from the beginning of the request URL. */
   {
     const char *instance_prefix = "/instances/";
-    if (0 == strncmp (url, instance_prefix, strlen (instance_prefix)))
+
+    if (0 == strncmp (url,
+                      instance_prefix,
+                      strlen (instance_prefix)))
     {
-      // url starts with "/instance/"
-      instance_id = GNUNET_strdup (url + strlen (instance_prefix));
-      char *slash = strchr (instance_id, '/');
+      /* url starts with "/instances/" */
+      const char *istart = url + strlen (instance_prefix);
+      const char *slash = strchr (istart, '/');
+
       if (NULL == slash)
       {
-        GNUNET_free (instance_id);
         return TMH_MHD_handler_static_response (&h404,
                                                 connection,
                                                 con_cls,
@@ -362,18 +362,18 @@ url_handler (void *cls,
                                                 upload_data_size,
                                                 NULL);
       }
-      effective_url = GNUNET_strdup (slash);
-      *slash = '\0';
+      instance_id = GNUNET_strndup (istart,
+                                    slash - istart);
+      effective_url = slash;
     }
     else
     {
-      effective_url = GNUNET_strdup (url);
+      effective_url = url;
       instance_id = NULL;
     }
   }
 
-
-  for (unsigned int i=0;NULL != handlers[i].url;i++)
+  for (unsigned int i = 0; NULL != handlers[i].url; i++)
   {
     struct TMH_RequestHandler *rh = &handlers[i];
 
@@ -384,10 +384,10 @@ url_handler (void *cls,
                              rh->method)) ) )
     {
       ret = rh->handler (rh,
-			 connection,
-			 con_cls,
-			 upload_data,
-			 upload_data_size,
+                         connection,
+                         con_cls,
+                         upload_data,
+                         upload_data_size,
                          instance_id);
       hc = *con_cls;
       if (NULL != hc)
