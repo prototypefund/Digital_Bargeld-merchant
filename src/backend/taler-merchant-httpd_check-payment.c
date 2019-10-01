@@ -216,7 +216,6 @@ send_pay_request (struct MHD_Connection *connection,
  * @param mi the merchant's instance
  * @param final_contract_url where to redirect for the contract
  * @param session_id the session_id
- * @param fulfillment_url fulfillment URL of the contract
  * @param order_id the order to look up
  * @return #MHD_YES on success
  */
@@ -225,7 +224,6 @@ check_order_and_request_payment (struct MHD_Connection *connection,
                                  struct MerchantInstance *mi,
                                  const char *final_contract_url,
                                  const char *session_id,
-                                 const char *fulfillment_url,
                                  const char *order_id)
 {
   enum GNUNET_DB_QueryStatus qs;
@@ -233,6 +231,7 @@ check_order_and_request_payment (struct MHD_Connection *connection,
   struct GNUNET_HashCode h_contract_terms;
   char *h_contract_terms_str;
   int ret;
+  const char *fulfillment_url;
 
   qs = db->find_order (db->cls,
                        &contract_terms,
@@ -254,6 +253,21 @@ check_order_and_request_payment (struct MHD_Connection *connection,
     return TMH_RESPONSE_reply_not_found (connection,
                                          TALER_EC_CHECK_PAYMENT_ORDER_ID_UNKNOWN,
                                          "unknown order_id");
+  }
+  {
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_string ("fulfillment_url", &fulfillment_url),
+      GNUNET_JSON_spec_end ()
+    };
+
+    if (GNUNET_OK != GNUNET_JSON_parse (contract_terms, spec, NULL, NULL))
+    {
+      GNUNET_break (0);
+      json_decref (contract_terms);
+      return TMH_RESPONSE_reply_internal_error (connection,
+                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
+                                                "Merchant database error (contract terms corrupted)");
+    }
   }
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
@@ -372,7 +386,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                            mi,
                                            final_contract_url,
                                            session_id,
-                                           fulfillment_url,
                                            order_id);
     GNUNET_free (final_contract_url);
     return ret;
@@ -391,6 +404,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
     if (GNUNET_OK != GNUNET_JSON_parse (contract_terms, spec, NULL, NULL))
     {
+      GNUNET_break (0);
       GNUNET_free (final_contract_url);
       json_decref (contract_terms);
       return TMH_RESPONSE_reply_internal_error (connection,
