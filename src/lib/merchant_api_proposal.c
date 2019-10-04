@@ -387,7 +387,7 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
     nonce_str = GNUNET_STRINGS_data_to_string_alloc (nonce, sizeof (struct
                                                                     GNUNET_CRYPTO_EddsaPublicKey));
   }
-  plo->url = TALER_url_join (backend_url, "public/proposal",
+  plo->url = TALER_url_join (backend_url, "proposal",
                              "order_id",
                              order_id,
                              "nonce",

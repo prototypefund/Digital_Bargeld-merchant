@@ -341,7 +341,7 @@ TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
   rlo->cb = cb;
   rlo->cb_cls = cb_cls;
 
-  rlo->url = TALER_url_join (backend_url, "public/refund", "order_id", order_id, NULL);
+  rlo->url = TALER_url_join (backend_url, "refund", "order_id", order_id, NULL);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,

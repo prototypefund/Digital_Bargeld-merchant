@@ -62,26 +62,6 @@ static char *fakebank_url;
 static char *merchant_url;
 
 /**
- * Merchant base URL for the tipping instance.
- */
-static char *merchant_tip_instance_url;
-
-/**
- * Merchant base URL for the tipping instance.
- */
-static char *merchant_tip_instance_2_url;
-
-/**
- * Merchant base URL for the tipping instance.
- */
-static char *merchant_tip_instance_nulltip_url;
-
-/**
- * Merchant base URL for a non-existent instance.
- */
-static char *merchant_tip_unknown_instance_url;
-
-/**
  * Merchant process.
  */
 static struct GNUNET_OS_Process *merchantd;
@@ -166,6 +146,57 @@ static char *auditor_url;
     (label, amount, fakebank_url, USER_ACCOUNT_NO, \
     EXCHANGE_ACCOUNT_NO, USER_LOGIN_NAME, USER_LOGIN_PASS, \
     subject)
+
+
+static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
+
+static const char *
+intern (const char *str)
+{
+  struct GNUNET_HashCode hash;
+  const char *hs;
+
+  if (NULL == interned_strings)
+    interned_strings = GNUNET_CONTAINER_multihashmap_create (32, GNUNET_NO);
+  GNUNET_assert (NULL != interned_strings);
+  GNUNET_CRYPTO_hash (str, strlen (str), &hash);
+  hs = GNUNET_CONTAINER_multihashmap_get (interned_strings, &hash);
+  if (NULL != hs)
+    return hs;
+  hs = GNUNET_strdup (str);
+  GNUNET_assert (GNUNET_OK == GNUNET_CONTAINER_multihashmap_put (interned_strings,
+                                                                 &hash,
+                                                                 (void *) hs,
+                                                                 GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY));
+  return hs;
+}
+
+
+#define BUF_SZ 512
+
+static const char *
+merchant_url_internal (const char *instance_id)
+{
+  char buf[BUF_SZ];
+  if (NULL == instance_id)
+    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%s", merchant_url));
+  else
+    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%sinstances/%s/", merchant_url, instance_id));
+  return intern (buf);
+}
+
+
+static const char *
+merchant_url_external (const char *instance_id)
+{
+  char buf[BUF_SZ];
+  if (NULL == instance_id)
+    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%spublic/", merchant_url));
+  else
+    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%spublic/instances/%s/", merchant_url, instance_id));
+  return intern (buf);
+}
+
 
 /**
  * Main function that will tell the interpreter what commands to
@@ -631,14 +662,14 @@ run (void *cls,
       "EUR:20.04", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-1",
-                                     merchant_tip_instance_url,
+                                     merchant_url_internal ("tip"),
                                      exchange_url,
                                      MHD_HTTP_OK,
                                      "tip 1",
                                      "EUR:5.01"),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-2",
-                                     merchant_tip_instance_url,
+                                     merchant_url_internal ("tip"),
                                      exchange_url,
                                      MHD_HTTP_OK,
                                      "tip 2",
@@ -651,7 +682,7 @@ run (void *cls,
      * actually create a reserve.  */
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-null",
-      merchant_tip_instance_nulltip_url,
+      merchant_url_internal ("nulltip"),
       exchange_url,
       MHD_HTTP_NOT_FOUND,
       "tip 2",
@@ -659,37 +690,37 @@ run (void *cls,
       TALER_EC_RESERVE_STATUS_UNKNOWN),
 
     TALER_TESTING_cmd_tip_query ("query-tip-1",
-                                 merchant_tip_instance_url,
+                                 merchant_url_internal ("tip"),
                                  MHD_HTTP_OK),
 
     TALER_TESTING_cmd_tip_query_with_amounts ("query-tip-2",
-                                              merchant_tip_instance_url,
+                                              merchant_url_internal ("tip"),
                                               MHD_HTTP_OK,
                                               "EUR:0.0", // picked
                                               "EUR:10.02", // auth
                                               "EUR:20.04"),// ava
 
     TALER_TESTING_cmd_tip_pickup ("pickup-tip-1",
-                                  merchant_tip_instance_url,
+                                  merchant_url_external ("tip"),
                                   MHD_HTTP_OK,
                                   "authorize-tip-1",
                                   pickup_amounts_1),
 
     TALER_TESTING_cmd_tip_query_with_amounts ("query-tip-3",
-                                              merchant_tip_instance_url,
+                                              merchant_url_internal ("tip"),
                                               MHD_HTTP_OK,
                                               "EUR:5.01", // picked
                                               NULL, // auth
                                               "EUR:15.03"),// ava
 
     TALER_TESTING_cmd_tip_pickup ("pickup-tip-2",
-                                  merchant_tip_instance_url,
+                                  merchant_url_external ("tip"),
                                   MHD_HTTP_OK,
                                   "authorize-tip-2",
                                   pickup_amounts_1),
 
     TALER_TESTING_cmd_tip_query_with_amounts ("query-tip-4",
-                                              merchant_tip_instance_url,
+                                              merchant_url_internal ("tip"),
                                               MHD_HTTP_OK,
                                               "EUR:10.02", // pick
                                               "EUR:10.02", // auth
@@ -719,7 +750,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-3-insufficient-funds",
-      merchant_tip_instance_2_url,
+      merchant_url_internal ("dtip"),
       exchange_url,
       MHD_HTTP_PRECONDITION_FAILED,
       "tip 3",
@@ -728,7 +759,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-4-unknown-instance",
-      merchant_tip_unknown_instance_url,
+      merchant_url_internal ("unknown"),
       exchange_url,
       MHD_HTTP_NOT_FOUND,
       "tip 4",
@@ -746,7 +777,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_tip_pickup_with_ec
       ("pickup-tip-3-too-much",
-      merchant_tip_instance_url,
+       merchant_url_external ("tip"),
       MHD_HTTP_CONFLICT,
       "authorize-tip-1",
       pickup_amounts_1,
@@ -757,7 +788,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_tip_pickup_with_ec
       ("pickup-non-existent-id",
-      merchant_tip_instance_url,
+      merchant_url_external ("tip"),
       MHD_HTTP_NOT_FOUND,
       "fake-tip-authorization",
       pickup_amounts_1,
@@ -765,7 +796,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-tip-1",
-      merchant_tip_instance_url,
+      merchant_url_internal ("tip"),
       MHD_HTTP_OK,
       "{\"max_fee\":\
           {\"currency\":\"EUR\",\
@@ -784,7 +815,7 @@ run (void *cls,
                          \"value\":\"{EUR:5}\"} ] }"),
 
     TALER_TESTING_cmd_pay ("deposit-tip-simple",
-                           merchant_tip_instance_url,
+                           merchant_url_external ("tip"),
                            MHD_HTTP_OK,
                            "create-proposal-tip-1",
                            "pickup-tip-1",
@@ -1047,19 +1078,6 @@ main (int argc,
   if (NULL ==
       (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
     return 77;
-
-  merchant_tip_instance_url = TALER_url_join (merchant_url,
-                                              "instances/tip/",
-                                              NULL);
-  merchant_tip_instance_2_url = TALER_url_join (merchant_url,
-                                                "instances/dtip/",
-                                                NULL);
-  merchant_tip_instance_nulltip_url = TALER_url_join (merchant_url,
-                                                      "instances/nulltip/",
-                                                      NULL);
-  merchant_tip_unknown_instance_url = TALER_url_join (merchant_url,
-                                                      "instances/foo/",
-                                                      NULL);
 
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 

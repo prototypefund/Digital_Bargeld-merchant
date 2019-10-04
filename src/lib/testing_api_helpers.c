@@ -54,6 +54,7 @@ TALER_TESTING_run_merchant (const char *config_filename,
                                NULL, NULL, NULL,
                                "taler-merchant-httpd",
                                "taler-merchant-httpd",
+                               "--log=INFO",
                                "-c", config_filename,
                                NULL);
   if (NULL == merchant_proc)
