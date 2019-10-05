@@ -43,7 +43,7 @@ TMH_RESPONSE_make_json (const json_t *json)
   char *json_str;
 
   json_str = json_dumps (json,
-                         JSON_INDENT(2));
+                         JSON_INDENT (2));
   if (NULL == json_str)
   {
     GNUNET_break (0);
@@ -111,9 +111,9 @@ TMH_RESPONSE_make_json_pack (const char *fmt,
 
   va_start (argp, fmt);
   json = json_vpack_ex (&jerror,
-			0,
-			fmt,
-			argp);
+                        0,
+                        fmt,
+                        argp);
   va_end (argp);
   if (NULL == json)
   {
@@ -273,7 +273,8 @@ TMH_RESPONSE_reply_invalid_json (struct MHD_Connection *connection)
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_BAD_REQUEST,
                                        "{s:I, s:s}",
-                                       "code", (json_int_t) TALER_EC_JSON_INVALID,
+                                       "code",
+                                       (json_int_t) TALER_EC_JSON_INVALID,
                                        "error", "invalid json");
 }
 

@@ -72,22 +72,22 @@ TALER_TESTING_run_merchant (const char *config_filename,
            "Waiting for `taler-merchant-httpd' to be ready\n");
   iter = 0;
   do
+  {
+    if (10 == iter)
     {
-      if (10 == iter)
-      {
-	fprintf (stderr,
-                 "Failed to launch"
-                 " `taler-merchant-httpd' (or `wget')\n");
-	GNUNET_OS_process_kill (merchant_proc,
-				SIGTERM);
-	GNUNET_OS_process_wait (merchant_proc);
-	GNUNET_OS_process_destroy (merchant_proc);
-	MERCHANT_FAIL ();
-      }
-      fprintf (stderr, ".\n");
-      sleep (1);
-      iter++;
+      fprintf (stderr,
+               "Failed to launch"
+               " `taler-merchant-httpd' (or `wget')\n");
+      GNUNET_OS_process_kill (merchant_proc,
+                              SIGTERM);
+      GNUNET_OS_process_wait (merchant_proc);
+      GNUNET_OS_process_destroy (merchant_proc);
+      MERCHANT_FAIL ();
     }
+    fprintf (stderr, ".\n");
+    sleep (1);
+    iter++;
+  }
   while (0 != system (wget_cmd));
   GNUNET_free (wget_cmd);
   fprintf (stderr, "\n");
@@ -141,20 +141,20 @@ TALER_TESTING_prepare_merchant (const char *config_filename)
   {
     fprintf (stderr,
              "Required port %llu not available, skipping.\n",
-	     port);
+             port);
     MERCHANT_FAIL ();
   }
 
   /* DB preparation */
   if (NULL == (dbinit_proc = GNUNET_OS_start_process
-    (GNUNET_NO,
-     GNUNET_OS_INHERIT_STD_ALL,
-     NULL, NULL, NULL,
-     "taler-merchant-dbinit",
-     "taler-merchant-dbinit",
-     "-c", config_filename,
-     "-r",
-     NULL)))
+                               (GNUNET_NO,
+                               GNUNET_OS_INHERIT_STD_ALL,
+                               NULL, NULL, NULL,
+                               "taler-merchant-dbinit",
+                               "taler-merchant-dbinit",
+                               "-c", config_filename,
+                               "-r",
+                               NULL)))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Failed to run taler-merchant-dbinit."

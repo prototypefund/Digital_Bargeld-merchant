@@ -34,7 +34,8 @@
 /**
  * Threshold after which exponential backoff should not increase.
  */
-#define RETRY_BACKOFF_THRESHOLD GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS, 60)
+#define RETRY_BACKOFF_THRESHOLD GNUNET_TIME_relative_multiply ( \
+    GNUNET_TIME_UNIT_SECONDS, 60)
 
 
 /**
@@ -44,7 +45,10 @@
  * @param r current backoff time, initially zero
  */
 #define RETRY_BACKOFF(r) GNUNET_TIME_relative_min (RETRY_BACKOFF_THRESHOLD, \
-   GNUNET_TIME_relative_multiply (GNUNET_TIME_relative_max (GNUNET_TIME_UNIT_MILLISECONDS, (r)), 2));
+                                                   GNUNET_TIME_relative_multiply ( \
+                                                     GNUNET_TIME_relative_max ( \
+                                                       GNUNET_TIME_UNIT_MILLISECONDS, \
+                                                       (r)), 2));
 
 
 /**
@@ -261,7 +265,7 @@ json_t *trusted_exchanges;
 static void
 keys_mgmt_cb (void *cls,
               const struct TALER_EXCHANGE_Keys *keys,
-	      enum TALER_EXCHANGE_VersionCompatibility compat);
+              enum TALER_EXCHANGE_VersionCompatibility compat);
 
 
 /**
@@ -349,36 +353,36 @@ process_wire_fees (struct Exchange *exchange,
     af = GNUNET_new (struct TALER_EXCHANGE_WireAggregateFees);
     *af = *fees;
     GNUNET_CRYPTO_hash (wire_method,
-			strlen (wire_method) + 1,
-			&h_wire_method);
+                        strlen (wire_method) + 1,
+                        &h_wire_method);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-		"Storing wire fee for `%s' and method `%s' at %s in DB; the fee is %s\n",
-		TALER_B2S (master_pub),
-		wire_method,
-		GNUNET_STRINGS_absolute_time_to_string (af->start_date),
-		TALER_amount2s (&af->wire_fee));
+                "Storing wire fee for `%s' and method `%s' at %s in DB; the fee is %s\n",
+                TALER_B2S (master_pub),
+                wire_method,
+                GNUNET_STRINGS_absolute_time_to_string (af->start_date),
+                TALER_amount2s (&af->wire_fee));
     db->preflight (db->cls);
     if (GNUNET_OK !=
         db->start (db->cls,
                    "store wire fee"))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		  "Failed to start database transaction!\n");
+                  "Failed to start database transaction!\n");
       GNUNET_free (af);
       return GNUNET_SYSERR;
     }
     qs = db->store_wire_fee_by_exchange (db->cls,
-					 master_pub,
-					 &h_wire_method,
-					 &af->wire_fee,
-					 &af->closing_fee,
-					 af->start_date,
-					 af->end_date,
-					 &af->master_sig);
+                                         master_pub,
+                                         &h_wire_method,
+                                         &af->wire_fee,
+                                         &af->closing_fee,
+                                         af->start_date,
+                                         af->end_date,
+                                         &af->master_sig);
     if (0 > qs)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		  "Failed to persist exchange wire fees in merchant DB!\n");
+                  "Failed to persist exchange wire fees in merchant DB!\n");
       GNUNET_free (af);
       fees = fees->next;
       db->rollback (db->cls);
@@ -388,7 +392,7 @@ process_wire_fees (struct Exchange *exchange,
     {
       /* Entry was already in DB, fine, continue as if we had succeeded */
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-		  "Fees already in DB, rolling back transaction attempt!\n");
+                  "Fees already in DB, rolling back transaction attempt!\n");
       db->rollback (db->cls);
     }
     if (0 < qs)
@@ -434,7 +438,7 @@ process_wire_accounts (struct Exchange *exchange,
                        unsigned int accounts_len,
                        const struct TALER_EXCHANGE_WireAccount *accounts)
 {
-  for (unsigned int i=0;i<accounts_len;i++)
+  for (unsigned int i = 0; i<accounts_len; i++)
   {
     char *method;
 
@@ -532,8 +536,9 @@ process_find_operations (struct Exchange *exchange)
         /* Disagreement on the current time */
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                     "Exchange's earliest fee is %s adhead of our time. Clock skew issue?\n",
-                    GNUNET_STRINGS_relative_time_to_string (GNUNET_TIME_absolute_get_remaining (af->start_date),
-                                                            GNUNET_YES));
+                    GNUNET_STRINGS_relative_time_to_string (
+                      GNUNET_TIME_absolute_get_remaining (af->start_date),
+                      GNUNET_YES));
         continue;
       }
       /* found fee, great! */
@@ -651,9 +656,10 @@ handle_wire_data (void *cls,
                 "Do not have sufficient wire data. Will re-request /wire in 1 minute\n");
 
     GNUNET_assert (NULL == exchange->wire_task);
-    exchange->wire_task = GNUNET_SCHEDULER_add_delayed (GNUNET_TIME_UNIT_MINUTES,
-                                                        &wire_task_cb,
-                                                        exchange);
+    exchange->wire_task = GNUNET_SCHEDULER_add_delayed (
+      GNUNET_TIME_UNIT_MINUTES,
+      &wire_task_cb,
+      exchange);
   }
 }
 
@@ -700,7 +706,7 @@ wire_task_cb (void *cls)
 static void
 keys_mgmt_cb (void *cls,
               const struct TALER_EXCHANGE_Keys *keys,
-	      enum TALER_EXCHANGE_VersionCompatibility compat)
+              enum TALER_EXCHANGE_VersionCompatibility compat)
 {
   struct Exchange *exchange = cls;
   struct GNUNET_TIME_Absolute expire;
@@ -723,8 +729,8 @@ keys_mgmt_cb (void *cls,
     {
       /* Give up, log hard error. */
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-		  "Exchange `%s' runs an incompatible more recent version of the Taler protocol. Will not retry. This client may need to be updated.\n",
-		  exchange->url);
+                  "Exchange `%s' runs an incompatible more recent version of the Taler protocol. Will not retry. This client may need to be updated.\n",
+                  exchange->url);
       return;
     }
     exchange->retry_delay = RETRY_BACKOFF (exchange->retry_delay);
@@ -748,8 +754,8 @@ keys_mgmt_cb (void *cls,
     {
       once = 1;
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-		  "Exchange `%s' runs a more recent version of the Taler protocol. You may want to update this client.\n",
-		  exchange->url);
+                  "Exchange `%s' runs a more recent version of the Taler protocol. You may want to update this client.\n",
+                  exchange->url);
     }
   }
   expire = TALER_EXCHANGE_check_keys_current (exchange->conn,
@@ -824,8 +830,8 @@ return_result (void *cls)
 struct TMH_EXCHANGES_FindOperation *
 TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                              const char *wire_method,
-			     TMH_EXCHANGES_FindContinuation fc,
-			     void *fc_cls)
+                             TMH_EXCHANGES_FindContinuation fc,
+                             void *fc_cls)
 {
   struct Exchange *exchange;
   struct TMH_EXCHANGES_FindOperation *fo;
@@ -843,8 +849,8 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
 
   /* Check if the exchange is known */
   for (exchange = exchange_head; NULL != exchange; exchange = exchange->next)
-    /* test it by checking public key --- FIXME: hostname or public key!?
-       Should probably be URL, not hostname anyway! */
+  /* test it by checking public key --- FIXME: hostname or public key!?
+     Should probably be URL, not hostname anyway! */
   {
     if (0 == strcmp (exchange->url,
                      chosen_exchange))
@@ -934,7 +940,7 @@ TMH_EXCHANGES_find_exchange_cancel (struct TMH_EXCHANGES_FindOperation *fo)
   {
     GNUNET_SCHEDULER_cancel (fo->at);
     fo->at = NULL;
-   }
+  }
   GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
                                exchange->fo_tail,
                                fo);
@@ -1008,7 +1014,8 @@ accept_exchanges (void *cls,
     if (GNUNET_OK ==
         GNUNET_CRYPTO_eddsa_public_key_from_string (mks,
                                                     strlen (mks),
-                                                    &exchange->master_pub.eddsa_pub))
+                                                    &exchange->master_pub.
+                                                    eddsa_pub))
     {
       exchange->trusted = GNUNET_YES;
     }
@@ -1017,7 +1024,7 @@ accept_exchanges (void *cls,
       GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
                                  section,
                                  "MASTER_KEY",
-                                 _("ill-formed key"));
+                                 _ ("ill-formed key"));
     }
     GNUNET_free (mks);
   }
@@ -1056,7 +1063,8 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
-  GNUNET_CURL_enable_async_scope_header (merchant_curl_ctx, "Taler-Correlation-Id");
+  GNUNET_CURL_enable_async_scope_header (merchant_curl_ctx,
+                                         "Taler-Correlation-Id");
   merchant_curl_rc = GNUNET_CURL_gnunet_rc_create (merchant_curl_ctx);
   /* get exchanges from the merchant configuration and try to connect to them */
   GNUNET_CONFIGURATION_iterate_sections (cfg,
@@ -1074,7 +1082,8 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
       continue;
     j_exchange = json_pack ("{s:s, s:o}",
                             "url", exchange->url,
-                            "master_pub", GNUNET_JSON_from_data_auto (&exchange->master_pub));
+                            "master_pub", GNUNET_JSON_from_data_auto (
+                              &exchange->master_pub));
     GNUNET_assert (0 ==
                    json_array_append_new (trusted_exchanges,
                                           j_exchange));

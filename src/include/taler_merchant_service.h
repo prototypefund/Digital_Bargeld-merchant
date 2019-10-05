@@ -48,9 +48,9 @@ struct TALER_MERCHANT_RefundLookupOperation;
  */
 typedef void
 (*TALER_MERCHANT_RefundLookupCallback) (void *cls,
-					unsigned int http_status,
-					enum TALER_ErrorCode ec,
-					const json_t *obj);
+                                        unsigned int http_status,
+                                        enum TALER_ErrorCode ec,
+                                        const json_t *obj);
 
 /**
  * Does a GET /refund.
@@ -75,7 +75,8 @@ TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
  * @param rlo the refund increasing operation to cancel
  */
 void
-TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation *rlo);
+TALER_MERCHANT_refund_lookup_cancel (struct
+                                     TALER_MERCHANT_RefundLookupOperation *rlo);
 
 
 /**
@@ -125,7 +126,9 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
  * @param rio the refund increasing operation to cancel
  */
 void
-TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOperation *rio);
+TALER_MERCHANT_refund_increase_cancel (struct
+                                       TALER_MERCHANT_RefundIncreaseOperation *
+                                       rio);
 
 
 /* *********************  /proposal *********************** */
@@ -150,7 +153,7 @@ struct TALER_MERCHANT_ProposalOperation;
 typedef void
 (*TALER_MERCHANT_ProposalCallback) (void *cls,
                                     unsigned int http_status,
-				    enum TALER_ErrorCode ec,
+                                    enum TALER_ErrorCode ec,
                                     const json_t *obj,
                                     const char *order_id);
 
@@ -203,8 +206,10 @@ typedef void
                                                    unsigned int http_status,
                                                    const json_t *body,
                                                    const json_t *contract_terms,
-                                                   const struct TALER_MerchantSignatureP *sig,
-                                                   const struct GNUNET_HashCode *hash);
+                                                   const struct
+                                                   TALER_MerchantSignatureP *sig,
+                                                   const struct
+                                                   GNUNET_HashCode *hash);
 
 
 /**
@@ -224,8 +229,10 @@ struct TALER_MERCHANT_ProposalLookupOperation *
 TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                                 const char *backend_url,
                                 const char *order_id,
-                                const struct GNUNET_CRYPTO_EddsaPublicKey *nonce,
-                                TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
+                                const struct
+                                GNUNET_CRYPTO_EddsaPublicKey *nonce,
+                                TALER_MERCHANT_ProposalLookupOperationCallback
+                                plo_cb,
                                 void *plo_cb_cls);
 
 
@@ -235,7 +242,9 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
  * @param plo handle to the request to be canceled
  */
 void
-TALER_MERCHANT_proposal_lookup_cancel (struct TALER_MERCHANT_ProposalLookupOperation *plo);
+TALER_MERCHANT_proposal_lookup_cancel (struct
+                                       TALER_MERCHANT_ProposalLookupOperation *
+                                       plo);
 
 
 
@@ -269,7 +278,7 @@ struct TALER_MERCHANT_Pay;
 typedef void
 (*TALER_MERCHANT_PayCallback) (void *cls,
                                unsigned int http_status,
-			       enum TALER_ErrorCode ec,
+                               enum TALER_ErrorCode ec,
                                const json_t *obj);
 
 
@@ -346,7 +355,7 @@ struct TALER_MERCHANT_PayCoin
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_wallet (struct GNUNET_CURL_Context *ctx,
-			   const char *merchant_url,
+                           const char *merchant_url,
                            const struct GNUNET_HashCode *h_contract,
                            const struct TALER_Amount *amount,
                            const struct TALER_Amount *max_fee,
@@ -403,13 +412,15 @@ struct TALER_MERCHANT_RefundEntry
  */
 typedef void
 (*TALER_MERCHANT_PayRefundCallback) (void *cls,
-				     unsigned int http_status,
-				     enum TALER_ErrorCode ec,
-				     const struct TALER_MerchantPublicKeyP *merchant_pub,
-				     const struct GNUNET_HashCode *h_contract,
-				     unsigned int num_refunds,
-				     const struct TALER_MERCHANT_RefundEntry *res,
-				     const json_t *obj);
+                                     unsigned int http_status,
+                                     enum TALER_ErrorCode ec,
+                                     const struct
+                                     TALER_MerchantPublicKeyP *merchant_pub,
+                                     const struct GNUNET_HashCode *h_contract,
+                                     unsigned int num_refunds,
+                                     const struct
+                                     TALER_MERCHANT_RefundEntry *res,
+                                     const json_t *obj);
 
 
 /**
@@ -437,21 +448,21 @@ typedef void
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_abort (struct GNUNET_CURL_Context *ctx,
-			  const char *merchant_url,
-			  const struct GNUNET_HashCode *h_contract,
-			  const struct TALER_Amount *amount,
-			  const struct TALER_Amount *max_fee,
-			  const struct TALER_MerchantPublicKeyP *merchant_pub,
-			  const struct TALER_MerchantSignatureP *merchant_sig,
-			  struct GNUNET_TIME_Absolute timestamp,
-			  struct GNUNET_TIME_Absolute refund_deadline,
-			  struct GNUNET_TIME_Absolute pay_deadline,
-			  const struct GNUNET_HashCode *h_wire,
-			  const char *order_id,
-			  unsigned int num_coins,
-			  const struct TALER_MERCHANT_PayCoin *coins,
-			  TALER_MERCHANT_PayRefundCallback payref_cb,
-			  void *payref_cb_cls);
+                          const char *merchant_url,
+                          const struct GNUNET_HashCode *h_contract,
+                          const struct TALER_Amount *amount,
+                          const struct TALER_Amount *max_fee,
+                          const struct TALER_MerchantPublicKeyP *merchant_pub,
+                          const struct TALER_MerchantSignatureP *merchant_sig,
+                          struct GNUNET_TIME_Absolute timestamp,
+                          struct GNUNET_TIME_Absolute refund_deadline,
+                          struct GNUNET_TIME_Absolute pay_deadline,
+                          const struct GNUNET_HashCode *h_wire,
+                          const char *order_id,
+                          unsigned int num_coins,
+                          const struct TALER_MERCHANT_PayCoin *coins,
+                          TALER_MERCHANT_PayRefundCallback payref_cb,
+                          void *payref_cb_cls);
 
 
 /**
@@ -534,9 +545,10 @@ struct TALER_MERCHANT_PaidCoin
  */
 struct TALER_MERCHANT_Pay *
 TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
-			     const char *merchant_url,
-                             const struct TALER_MerchantPublicKeyP *merchant_pub,
-			     const char *order_id,
+                             const char *merchant_url,
+                             const struct
+                             TALER_MerchantPublicKeyP *merchant_pub,
+                             const char *order_id,
                              unsigned int num_coins,
                              const struct TALER_MERCHANT_PaidCoin *coins,
                              TALER_MERCHANT_PayCallback pay_cb,
@@ -607,13 +619,17 @@ struct TALER_MERCHANT_TrackTransferDetails
 typedef void
 (*TALER_MERCHANT_TrackTransferCallback) (void *cls,
                                          unsigned int http_status,
-					 enum TALER_ErrorCode ec,
-                                         const struct TALER_ExchangePublicKeyP *sign_key,
+                                         enum TALER_ErrorCode ec,
+                                         const struct
+                                         TALER_ExchangePublicKeyP *sign_key,
                                          const json_t *json,
                                          const struct GNUNET_HashCode *h_wire,
-                                         const struct TALER_Amount *total_amount,
+                                         const struct
+                                         TALER_Amount *total_amount,
                                          unsigned int details_length,
-                                         const struct TALER_MERCHANT_TrackTransferDetails *details);
+                                         const struct
+                                         TALER_MERCHANT_TrackTransferDetails *
+                                         details);
 
 
 /**
@@ -631,10 +647,12 @@ typedef void
 struct TALER_MERCHANT_TrackTransferHandle *
 TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                                const char *backend_url,
-			       const char *wire_method,
-                               const struct TALER_WireTransferIdentifierRawP *wtid,
+                               const char *wire_method,
+                               const struct
+                               TALER_WireTransferIdentifierRawP *wtid,
                                const char *exchange_url,
-                               TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
+                               TALER_MERCHANT_TrackTransferCallback
+                               track_transfer_cb,
                                void *track_transfer_cb_cls);
 
 
@@ -645,7 +663,8 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
  * @param co the deposit's tracking operation
  */
 void
-TALER_MERCHANT_track_transfer_cancel (struct TALER_MERCHANT_TrackTransferHandle *tdo);
+TALER_MERCHANT_track_transfer_cancel (struct
+                                      TALER_MERCHANT_TrackTransferHandle *tdo);
 
 
 /* ********************* /track/transaction *********************** */
@@ -694,7 +713,7 @@ struct TALER_MERCHANT_CoinWireTransfer
 typedef void
 (*TALER_MERCHANT_TrackTransactionCallback) (void *cls,
                                             unsigned int http_status,
-					    enum TALER_ErrorCode ec,
+                                            enum TALER_ErrorCode ec,
                                             const json_t *json);
 
 
@@ -712,7 +731,8 @@ struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                                   const char *backend_url,
                                   const char *order_id,
-                                  TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
+                                  TALER_MERCHANT_TrackTransactionCallback
+                                  track_transaction_cb,
                                   void *track_transaction_cb_cls);
 
 
@@ -723,7 +743,9 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
  * @param co the deposit's tracking operation
  */
 void
-TALER_MERCHANT_track_transaction_cancel (struct TALER_MERCHANT_TrackTransactionHandle *tdo);
+TALER_MERCHANT_track_transaction_cancel (struct
+                                         TALER_MERCHANT_TrackTransactionHandle *
+                                         tdo);
 
 /* ********************* /history *********************** */
 
@@ -742,7 +764,7 @@ struct TALER_MERCHANT_HistoryOperation;
 typedef void
 (*TALER_MERCHANT_HistoryOperationCallback) (void *cls,
                                             unsigned int http_status,
-					    enum TALER_ErrorCode ec,
+                                            enum TALER_ErrorCode ec,
                                             const json_t *json);
 
 /**
@@ -784,7 +806,8 @@ TALER_MERCHANT_history_default_start (struct GNUNET_CURL_Context *ctx,
                                       const char *backend_url,
                                       long long delta,
                                       struct GNUNET_TIME_Absolute date,
-                                      TALER_MERCHANT_HistoryOperationCallback history_cb,
+                                      TALER_MERCHANT_HistoryOperationCallback
+                                      history_cb,
                                       void *history_cb_cls);
 
 
@@ -855,7 +878,8 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
  * @param ta handle from the operation to cancel
  */
 void
-TALER_MERCHANT_tip_authorize_cancel (struct TALER_MERCHANT_TipAuthorizeOperation *ta);
+TALER_MERCHANT_tip_authorize_cancel (struct
+                                     TALER_MERCHANT_TipAuthorizeOperation *ta);
 
 /* ********************** /tip-pickup ************************* */
 
@@ -882,9 +906,11 @@ typedef void
 (*TALER_MERCHANT_TipPickupCallback) (void *cls,
                                      unsigned int http_status,
                                      enum TALER_ErrorCode ec,
-                                     const struct TALER_ReservePublicKeyP *reserve_pub,
+                                     const struct
+                                     TALER_ReservePublicKeyP *reserve_pub,
                                      unsigned int num_reserve_sigs,
-                                     const struct TALER_ReserveSignatureP *reserve_sigs,
+                                     const struct
+                                     TALER_ReserveSignatureP *reserve_sigs,
                                      const json_t *json);
 
 
@@ -947,8 +973,8 @@ struct TALER_MERCHANT_CheckPaymentOperation;
  */
 typedef void
 (*TALER_MERCHANT_CheckPaymentCallback) (void *cls,
-					unsigned int http_status,
-					const json_t *obj,
+                                        unsigned int http_status,
+                                        const json_t *obj,
                                         int paid,
                                         int refunded,
                                         struct TALER_Amount *refund_amount,
@@ -962,7 +988,7 @@ typedef void
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
  * @param order_id order id to identify the payment
- * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session) 
+ * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session)
  * @param check_payment_cb callback which will work the response gotten from the backend
  * @param check_payment_cb_cls closure to pass to @a check_payment_cb
  * @return handle for this operation, NULL upon errors
@@ -972,7 +998,8 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                               const char *backend_url,
                               const char *order_id,
                               const char *session_id,
-                              TALER_MERCHANT_CheckPaymentCallback check_payment_cb,
+                              TALER_MERCHANT_CheckPaymentCallback
+                              check_payment_cb,
                               void *check_payment_cls);
 
 /**
@@ -981,7 +1008,8 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
  * @param cpo handle to the request to be canceled
  */
 void
-TALER_MERCHANT_check_payment_cancel (struct TALER_MERCHANT_CheckPaymentOperation *cpo);
+TALER_MERCHANT_check_payment_cancel (struct
+                                     TALER_MERCHANT_CheckPaymentOperation *cpo);
 
 
 /* ********************** /tip-query ************************* */
@@ -1010,7 +1038,8 @@ typedef void
                                     unsigned int http_status,
                                     enum TALER_ErrorCode ec,
                                     const json_t *raw,
-                                    struct GNUNET_TIME_Absolute reserve_expiration,
+                                    struct GNUNET_TIME_Absolute
+                                    reserve_expiration,
                                     struct TALER_ReservePublicKeyP *reserve_pub,
                                     struct TALER_Amount *amount_authorized,
                                     struct TALER_Amount *amount_available,

@@ -330,14 +330,14 @@ tip_authorize_run (void *cls,
     TALER_TESTING_FAIL (is);
 
   tas->tao = TALER_MERCHANT_tip_authorize
-    (is->ctx,
-     tas->merchant_url,
-     "http://merchant.com/pickup",
-     "http://merchant.com/continue",
-     &amount,
-     tas->justification,
-     tip_authorize_cb,
-     tas);
+               (is->ctx,
+               tas->merchant_url,
+               "http://merchant.com/pickup",
+               "http://merchant.com/continue",
+               &amount,
+               tas->justification,
+               tip_authorize_cb,
+               tas);
 
   GNUNET_assert (NULL != tas->tao);
 }
@@ -408,12 +408,12 @@ tip_authorize_cleanup (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize_with_ec
   (const char *label,
-   const char *merchant_url,
-   const char *exchange_url,
-   unsigned int http_status,
-   const char *justification,
-   const char *amount,
-   enum TALER_ErrorCode ec)
+  const char *merchant_url,
+  const char *exchange_url,
+  unsigned int http_status,
+  const char *justification,
+  const char *amount,
+  enum TALER_ErrorCode ec)
 {
   struct TipAuthorizeState *tas;
 
@@ -522,7 +522,7 @@ tip_query_cb (void *cls,
   if (tqs->expected_amount_available)
   {
     GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-      (tqs->expected_amount_available, &a));
+                     (tqs->expected_amount_available, &a));
     {
       char *str;
 
@@ -539,7 +539,7 @@ tip_query_cb (void *cls,
   if (tqs->expected_amount_authorized)
   {
     GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-      (tqs->expected_amount_authorized, &a));
+                     (tqs->expected_amount_authorized, &a));
     {
       char *str;
 
@@ -556,7 +556,7 @@ tip_query_cb (void *cls,
   if (tqs->expected_amount_picked_up)
   {
     GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-      (tqs->expected_amount_picked_up, &a));
+                     (tqs->expected_amount_picked_up, &a));
     {
       char *str;
       str = TALER_amount_to_string (amount_picked_up);
@@ -639,11 +639,11 @@ tip_query_run (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query_with_amounts
   (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *expected_amount_picked_up,
-   const char *expected_amount_authorized,
-   const char *expected_amount_available)
+  const char *merchant_url,
+  unsigned int http_status,
+  const char *expected_amount_picked_up,
+  const char *expected_amount_authorized,
+  const char *expected_amount_available)
 {
   struct TipQueryState *tqs;
 
@@ -769,15 +769,16 @@ pickup_withdraw_cb (void *cls,
   }
   if (NULL == tps->sigs)
     tps->sigs = GNUNET_new_array
-      (tps->num_coins, struct TALER_DenominationSignature);
+                  (tps->num_coins, struct TALER_DenominationSignature);
 
   GNUNET_assert (NULL == tps->sigs[wh->off].rsa_signature);
   tps->sigs[wh->off].rsa_signature
     = GNUNET_CRYPTO_rsa_signature_dup (sig->rsa_signature);
 
-  for (unsigned int i=0; i<tps->num_coins; i++)
+  for (unsigned int i = 0; i<tps->num_coins; i++)
     if (NULL != tps->withdraws[wh->off].wsh)
-      return; /* still some ops ongoing */
+      return;
+  /* still some ops ongoing */
 
   GNUNET_free (tps->withdraws);
   tps->withdraws = NULL;
@@ -846,9 +847,9 @@ pickup_cb (void *cls,
 
   GNUNET_assert (NULL == tps->withdraws);
   tps->withdraws = GNUNET_new_array
-    (num_reserve_sigs, struct WithdrawHandle);
+                     (num_reserve_sigs, struct WithdrawHandle);
 
-  for (unsigned int i=0;i<num_reserve_sigs;i++)
+  for (unsigned int i = 0; i<num_reserve_sigs; i++)
   {
     struct WithdrawHandle *wh = &tps->withdraws[i];
 
@@ -857,18 +858,18 @@ pickup_cb (void *cls,
     wh->tps = tps;
     GNUNET_assert
       ( (NULL == wh->wsh) &&
-        ( (NULL == tps->sigs) ||
-          (NULL == tps->sigs[wh->off].rsa_signature) ) );
+      ( (NULL == tps->sigs) ||
+        (NULL == tps->sigs[wh->off].rsa_signature) ) );
     wh->wsh = TALER_EXCHANGE_reserve_withdraw2
-      (tps->is->exchange,
-       tps->dks[i],
-       &reserve_sigs[i],
-       reserve_pub,
-       &tps->psa[i],
-       &pickup_withdraw_cb,
-       wh);
-  if (NULL == wh->wsh)
-    TALER_TESTING_FAIL (tps->is);
+                (tps->is->exchange,
+                tps->dks[i],
+                &reserve_sigs[i],
+                reserve_pub,
+                &tps->psa[i],
+                &pickup_withdraw_cb,
+                wh);
+    if (NULL == wh->wsh)
+      TALER_TESTING_FAIL (tps->is);
   }
   if (0 == num_reserve_sigs)
     TALER_TESTING_interpreter_next (tps->is);
@@ -900,7 +901,7 @@ tip_pickup_run (void *cls,
     replay_cmd = NULL;
 
     /* Count planchets. */
-    for (num_planchets=0;
+    for (num_planchets = 0;
          NULL != tps->amounts[num_planchets];
          num_planchets++);
   }
@@ -908,19 +909,19 @@ tip_pickup_run (void *cls,
   {
     const unsigned int *np;
     if ( NULL == /* looking for "parent" tip-pickup command */
-       ( replay_cmd = TALER_TESTING_interpreter_lookup_command
-         (is, tps->replay_reference)) )
-    TALER_TESTING_FAIL (is);
+         (replay_cmd = TALER_TESTING_interpreter_lookup_command
+                         (is, tps->replay_reference)) )
+      TALER_TESTING_FAIL (is);
 
     if (GNUNET_OK != TALER_TESTING_get_trait_uint
-        (replay_cmd, 0, &np))
+          (replay_cmd, 0, &np))
       TALER_TESTING_FAIL (is);
     num_planchets = *np;
   }
 
   if (NULL ==
-     ( authorize_cmd = TALER_TESTING_interpreter_lookup_command
-       (is, tps->authorize_reference)) )
+      (authorize_cmd = TALER_TESTING_interpreter_lookup_command
+                         (is, tps->authorize_reference)) )
     TALER_TESTING_FAIL (is);
 
   tps->num_coins = num_planchets;
@@ -930,22 +931,22 @@ tip_pickup_run (void *cls,
     tps->psa = GNUNET_new_array (num_planchets,
                                  struct TALER_PlanchetSecretsP);
     tps->dks = GNUNET_new_array
-      (num_planchets,
-       const struct TALER_EXCHANGE_DenomPublicKey *);
+                 (num_planchets,
+                 const struct TALER_EXCHANGE_DenomPublicKey *);
 
     tps->amounts_obj = GNUNET_new_array
-      (num_planchets, struct TALER_Amount);
+                         (num_planchets, struct TALER_Amount);
 
-    for (unsigned int i=0;i<num_planchets;i++)
+    for (unsigned int i = 0; i<num_planchets; i++)
     {
       if (NULL == replay_cmd)
       {
         GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-          (tps->amounts[i], &tps->amounts_obj[i]));
+                         (tps->amounts[i], &tps->amounts_obj[i]));
 
         tps->dks[i] = TALER_TESTING_find_pk
-          (is->keys,
-           &tps->amounts_obj[i]);
+                        (is->keys,
+                        &tps->amounts_obj[i]);
 
         if (NULL == tps->dks[i])
           TALER_TESTING_FAIL (is);
@@ -955,13 +956,13 @@ tip_pickup_run (void *cls,
       else
       {
         if (GNUNET_OK != TALER_TESTING_get_trait_denom_pub
-            (replay_cmd, i, &tps->dks[i]))
+              (replay_cmd, i, &tps->dks[i]))
           TALER_TESTING_FAIL (is);
 
         struct TALER_PlanchetSecretsP *ps;
 
         if (GNUNET_OK != TALER_TESTING_get_trait_planchet_secrets
-            (replay_cmd, i, &ps))
+              (replay_cmd, i, &ps))
           TALER_TESTING_FAIL (is);
         tps->psa[i] = *ps;
       }
@@ -973,7 +974,7 @@ tip_pickup_run (void *cls,
     }
 
     if (GNUNET_OK != TALER_TESTING_get_trait_tip_id
-      (authorize_cmd, 0, &tip_id))
+          (authorize_cmd, 0, &tip_id))
       TALER_TESTING_FAIL (is);
 
     tps->tpo = TALER_MERCHANT_tip_pickup (is->ctx,
@@ -983,7 +984,7 @@ tip_pickup_run (void *cls,
                                           planchets,
                                           &pickup_cb,
                                           tps);
-    for (unsigned int i=0;i<num_planchets;i++)
+    for (unsigned int i = 0; i<num_planchets; i++)
     {
       GNUNET_free (planchets[i].coin_ev);
       planchets[i].coin_ev = NULL;
@@ -1012,7 +1013,7 @@ tip_pickup_cleanup (void *cls,
   GNUNET_free_non_null (tps->withdraws);
   if (NULL != tps->sigs)
   {
-    for (unsigned int i=0;i<tps->num_coins;i++)
+    for (unsigned int i = 0; i<tps->num_coins; i++)
       if (NULL != tps->sigs[i].rsa_signature)
         GNUNET_CRYPTO_rsa_signature_free (tps->sigs[i].rsa_signature);
     GNUNET_free (tps->sigs);
@@ -1049,10 +1050,10 @@ tip_pickup_traits (void *cls,
   #define NUM_TRAITS (tps->num_coins * 5) + 2
   struct TALER_TESTING_Trait traits[NUM_TRAITS];
 
-  for (unsigned int i=0; i<tps->num_coins; i++)
+  for (unsigned int i = 0; i<tps->num_coins; i++)
   {
     traits[i] = TALER_TESTING_make_trait_planchet_secrets
-      (i, &tps->psa[i]);
+                  (i, &tps->psa[i]);
 
     traits[i + tps->num_coins] =
       TALER_TESTING_make_trait_coin_priv
@@ -1061,16 +1062,16 @@ tip_pickup_traits (void *cls,
     traits[i + (tps->num_coins * 2)] =
       TALER_TESTING_make_trait_denom_pub (i, tps->dks[i]);
 
-    traits[i + (tps->num_coins *3)] =
+    traits[i + (tps->num_coins * 3)] =
       TALER_TESTING_make_trait_denom_sig (i, &tps->sigs[i]);
 
-    traits[i + (tps->num_coins *4)] =
+    traits[i + (tps->num_coins * 4)] =
       TALER_TESTING_make_trait_amount_obj
         (i, &tps->amounts_obj[i]);
 
   }
   traits[NUM_TRAITS - 2] = TALER_TESTING_make_trait_url
-    (0, tps->exchange_url);
+                             (0, tps->exchange_url);
   traits[NUM_TRAITS - 1] = TALER_TESTING_trait_end ();
 
   return TALER_TESTING_get_trait (traits,
@@ -1099,11 +1100,11 @@ tip_pickup_traits (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup_with_ec
   (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *authorize_reference,
-   const char **amounts,
-   enum TALER_ErrorCode ec)
+  const char *merchant_url,
+  unsigned int http_status,
+  const char *authorize_reference,
+  const char **amounts,
+  enum TALER_ErrorCode ec)
 {
   struct TipPickupState *tps;
 
@@ -1140,10 +1141,10 @@ TALER_TESTING_cmd_tip_pickup_with_ec
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_pickup
   (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *authorize_reference,
-   const char **amounts)
+  const char *merchant_url,
+  unsigned int http_status,
+  const char *authorize_reference,
+  const char **amounts)
 {
   struct TipPickupState *tps;
 

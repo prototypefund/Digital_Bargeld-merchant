@@ -164,10 +164,11 @@ intern (const char *str)
   if (NULL != hs)
     return hs;
   hs = GNUNET_strdup (str);
-  GNUNET_assert (GNUNET_OK == GNUNET_CONTAINER_multihashmap_put (interned_strings,
-                                                                 &hash,
-                                                                 (void *) hs,
-                                                                 GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY));
+  GNUNET_assert (GNUNET_OK == GNUNET_CONTAINER_multihashmap_put (
+                   interned_strings,
+                   &hash,
+                   (void *) hs,
+                   GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY));
   return hs;
 }
 
@@ -181,7 +182,8 @@ merchant_url_internal (const char *instance_id)
   if (NULL == instance_id)
     GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%s", merchant_url));
   else
-    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%sinstances/%s/", merchant_url, instance_id));
+    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%sinstances/%s/", merchant_url,
+                                 instance_id));
   return intern (buf);
 }
 
@@ -193,7 +195,8 @@ merchant_url_external (const char *instance_id)
   if (NULL == instance_id)
     GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%spublic/", merchant_url));
   else
-    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%spublic/instances/%s/", merchant_url, instance_id));
+    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%spublic/instances/%s/",
+                                 merchant_url, instance_id));
   return intern (buf);
 }
 
@@ -777,7 +780,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_tip_pickup_with_ec
       ("pickup-tip-3-too-much",
-       merchant_url_external ("tip"),
+      merchant_url_external ("tip"),
       MHD_HTTP_CONFLICT,
       "authorize-tip-1",
       pickup_amounts_1,

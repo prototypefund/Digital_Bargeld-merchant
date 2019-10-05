@@ -29,7 +29,7 @@
 
 #define FAILIF(cond)                            \
   do {                                          \
-    if (!(cond)){ break;}                       \
+    if (! (cond)) { break;}                       \
     GNUNET_break (0);                           \
     goto drop;                                  \
   } while (0)
@@ -206,14 +206,14 @@ static json_t *contract_terms_future;
  */
 static void
 refund_cb (void *cls,
-	   const struct TALER_CoinSpendPublicKeyP *coin_pub,
-	   uint64_t rtransaction_id,
-	   const char *reason,
-	   const struct TALER_Amount *refund_amount,
-	   const struct TALER_Amount *refund_fee)
+           const struct TALER_CoinSpendPublicKeyP *coin_pub,
+           uint64_t rtransaction_id,
+           const char *reason,
+           const struct TALER_Amount *refund_amount,
+           const struct TALER_Amount *refund_fee)
 {
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-	      "refund_cb\n");
+              "refund_cb\n");
   /* FIXME, more logic here? */
 }
 
@@ -363,9 +363,9 @@ test_wire_fee ()
   date1 = GNUNET_TIME_absolute_get ();
   (void) GNUNET_TIME_round_abs (&date1);
   date2 = GNUNET_TIME_absolute_add (date1,
-				    GNUNET_TIME_UNIT_DAYS);
+                                    GNUNET_TIME_UNIT_DAYS);
   date3 = GNUNET_TIME_absolute_add (date2,
-				    GNUNET_TIME_UNIT_DAYS);
+                                    GNUNET_TIME_UNIT_DAYS);
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":5",
                                          &closing_fee1));
@@ -380,26 +380,26 @@ test_wire_fee ()
                                          &wire_fee2));
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
       plugin->store_wire_fee_by_exchange (plugin->cls,
-					  &exchange_pub,
-					  &h_wire_method,
-					  &wire_fee1,
-					  &closing_fee1,
-					  date1,
-					  date2,
-					  &exchange_sig))
+                                          &exchange_pub,
+                                          &h_wire_method,
+                                          &wire_fee1,
+                                          &closing_fee1,
+                                          date1,
+                                          date2,
+                                          &exchange_sig))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
       plugin->store_wire_fee_by_exchange (plugin->cls,
-					  &exchange_pub,
-					  &h_wire_method,
-					  &wire_fee2,
-					  &closing_fee2,
-					  date2,
-					  date3,
-					  &exchange_sig))
+                                          &exchange_pub,
+                                          &h_wire_method,
+                                          &wire_fee2,
+                                          &closing_fee2,
+                                          date2,
+                                          date3,
+                                          &exchange_sig))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -407,14 +407,14 @@ test_wire_fee ()
   contract_date = date2; /* test inclusive/exclusive range */
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
       plugin->lookup_wire_fee (plugin->cls,
-			       &exchange_pub,
-			       &h_wire_method,
-			       contract_date,
-			       &wire_fee3,
-			       &closing_fee3,
-			       &start_date,
-			       &end_date,
-			       &exchange_sig2))
+                               &exchange_pub,
+                               &h_wire_method,
+                               contract_date,
+                               &wire_fee3,
+                               &closing_fee3,
+                               &start_date,
+                               &end_date,
+                               &exchange_sig2))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -424,25 +424,25 @@ test_wire_fee ()
        (0 != GNUNET_memcmp (&exchange_sig,
                             &exchange_sig2)) ||
        (0 != TALER_amount_cmp (&wire_fee2,
-			       &wire_fee3)) ||
+                               &wire_fee3)) ||
        (0 != TALER_amount_cmp (&closing_fee2,
-			       &closing_fee3)) )
+                               &closing_fee3)) )
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
   contract_date = GNUNET_TIME_absolute_add (date1,
-					    GNUNET_TIME_UNIT_SECONDS);
+                                            GNUNET_TIME_UNIT_SECONDS);
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
       plugin->lookup_wire_fee (plugin->cls,
-			       &exchange_pub,
-			       &h_wire_method,
-			       contract_date,
-			       &wire_fee3,
-			       &closing_fee3,
-			       &start_date,
-			       &end_date,
-			       &exchange_sig2))
+                               &exchange_pub,
+                               &h_wire_method,
+                               contract_date,
+                               &wire_fee3,
+                               &closing_fee3,
+                               &start_date,
+                               &end_date,
+                               &exchange_sig2))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -452,9 +452,9 @@ test_wire_fee ()
        (0 != GNUNET_memcmp (&exchange_sig,
                             &exchange_sig2)) ||
        (0 != TALER_amount_cmp (&wire_fee1,
-			       &wire_fee3)) ||
+                               &wire_fee3)) ||
        (0 != TALER_amount_cmp (&closing_fee1,
-			       &closing_fee3)) )
+                               &closing_fee3)) )
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -462,14 +462,14 @@ test_wire_fee ()
   contract_date = date3; /* outside of valid range! */
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
       plugin->lookup_wire_fee (plugin->cls,
-			       &exchange_pub,
-			       &h_wire_method,
-			       contract_date,
-			       &wire_fee3,
-			       &closing_fee3,
-			       &start_date,
-			       &end_date,
-			       &exchange_sig2))
+                               &exchange_pub,
+                               &h_wire_method,
+                               contract_date,
+                               &wire_fee3,
+                               &closing_fee3,
+                               &start_date,
+                               &end_date,
+                               &exchange_sig2))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -518,8 +518,9 @@ test_tipping ()
                                          &total));
   /* Pick short expiration, but long enough to
      run 2 DB interactions even on very slow systems. */
-  reserve_expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS,
-                                                                                        2));
+  reserve_expiration = GNUNET_TIME_relative_to_absolute (
+    GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS,
+                                   2));
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
       plugin->enable_tip_reserve_TR (plugin->cls,
                                      &tip_reserve_priv,
@@ -559,8 +560,9 @@ test_tipping ()
 
   /* Re-add some funds again */
   RND_BLK (&tip_credit_uuid);
-  reserve_expiration = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS,
-                                                                                        2));
+  reserve_expiration = GNUNET_TIME_relative_to_absolute (
+    GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_SECONDS,
+                                   2));
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
       plugin->enable_tip_reserve_TR (plugin->cls,
                                      &tip_reserve_priv,
@@ -610,15 +612,15 @@ test_tipping ()
   }
   if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
       plugin->lookup_tip_by_id (plugin->cls,
-				      &tip_id,
-				      &url,
-                                      NULL, NULL, NULL, NULL))
+                                &tip_id,
+                                &url,
+                                NULL, NULL, NULL, NULL))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
   if (0 != strcmp ("http://localhost:8081/",
-		   url))
+                   url))
   {
     GNUNET_free (url);
     GNUNET_break (0);
@@ -773,7 +775,7 @@ run (void *cls)
   (void) GNUNET_TIME_round_abs (&timestamp);
   delta = GNUNET_TIME_UNIT_MINUTES;
   fake_now = GNUNET_TIME_absolute_add (timestamp, delta);
-  refund_deadline = GNUNET_TIME_absolute_get();
+  refund_deadline = GNUNET_TIME_absolute_get ();
   (void) GNUNET_TIME_round_abs (&refund_deadline);
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (CURRENCY ":5",
@@ -829,10 +831,10 @@ run (void *cls)
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->insert_contract_terms (plugin->cls,
-					 order_id,
-					 &merchant_pub,
-					 timestamp,
-					 contract_terms));
+                                         order_id,
+                                         &merchant_pub,
+                                         timestamp,
+                                         contract_terms));
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
           plugin->find_paid_contract_terms_from_hash (plugin->cls,
@@ -852,11 +854,11 @@ run (void *cls)
 
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
-	  plugin->find_contract_terms_history (plugin->cls,
-					       order_id,
-					       &merchant_pub,
-					       &pd_cb,
-					       NULL));
+          plugin->find_contract_terms_history (plugin->cls,
+                                               order_id,
+                                               &merchant_pub,
+                                               &pd_cb,
+                                               NULL));
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_paid_contract_terms_from_hash (plugin->cls,
@@ -865,28 +867,28 @@ run (void *cls)
                                                       &merchant_pub));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->find_contract_terms_from_hash (plugin->cls,
-						 &out,
-						 &h_contract_terms,
-						 &merchant_pub));
+                                                 &out,
+                                                 &h_contract_terms,
+                                                 &merchant_pub));
   FAILIF (1 !=
           plugin->find_contract_terms_by_date_and_range (plugin->cls,
-							 fake_now,
-							 &merchant_pub,
-							 2,
-							 1,
-							 GNUNET_YES,
-							 GNUNET_NO,
-							 &pd_cb,
-							 NULL));
+                                                         fake_now,
+                                                         &merchant_pub,
+                                                         2,
+                                                         1,
+                                                         GNUNET_YES,
+                                                         GNUNET_NO,
+                                                         &pd_cb,
+                                                         NULL));
   timestamp = GNUNET_TIME_absolute_get ();
   (void) GNUNET_TIME_round_abs (&timestamp);
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->insert_contract_terms (plugin->cls,
-					 order_id_future,
-					 &merchant_pub,
-					 timestamp,
-					 contract_terms_future));
+                                         order_id_future,
+                                         &merchant_pub,
+                                         timestamp,
+                                         contract_terms_future));
 
   fake_now = GNUNET_TIME_absolute_subtract (timestamp, delta);
 
@@ -900,33 +902,33 @@ run (void *cls)
                                       &merchant_pub));
   FAILIF (2 !=
           plugin->find_contract_terms_by_date_and_range (plugin->cls,
-							 fake_now,
-							 &merchant_pub,
-							 0,
-							 5,
-							 GNUNET_NO,
-							 GNUNET_NO,
-							 &pd_cb,
-							 NULL));
+                                                         fake_now,
+                                                         &merchant_pub,
+                                                         0,
+                                                         5,
+                                                         GNUNET_NO,
+                                                         GNUNET_NO,
+                                                         &pd_cb,
+                                                         NULL));
 
   FAILIF (0 !=
           plugin->find_contract_terms_by_date (plugin->cls,
-					       fake_now,
-					       &merchant_pub,
-					       1,
-					       &pd_cb,
-					       NULL));
+                                               fake_now,
+                                               &merchant_pub,
+                                               1,
+                                               &pd_cb,
+                                               NULL));
 
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->store_deposit (plugin->cls,
                                  &h_contract_terms,
-				 &merchant_pub,
+                                 &merchant_pub,
                                  &coin_pub,
-				 EXCHANGE_URL,
+                                 EXCHANGE_URL,
                                  &amount_with_fee,
                                  &deposit_fee,
                                  &refund_fee,
-				 &wire_fee,
+                                 &wire_fee,
                                  &signkey_pub,
                                  deposit_proof));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
@@ -1008,17 +1010,17 @@ run (void *cls)
                                                    " to too big refund amount"));
 
   FAILIF (GNUNET_OK !=
-	  test_wire_fee ());
+          test_wire_fee ());
   FAILIF (GNUNET_OK !=
-	  test_tipping ());
+          test_tipping ());
 
 
   if (-1 == result)
     result = 0;
 
- drop:
+drop:
   GNUNET_break (GNUNET_OK ==
-		plugin->drop_tables (plugin->cls));
+                plugin->drop_tables (plugin->cls));
   TALER_MERCHANTDB_plugin_unload (plugin);
   plugin = NULL;
   if (NULL != deposit_proof)

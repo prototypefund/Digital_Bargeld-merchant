@@ -36,7 +36,7 @@
 #if (GNUNET_EXTRA_LOGGING >= 1)
 #define VERBOSE(cmd) cmd
 #else
-#define VERBOSE(cmd) do { break; }while(0)
+#define VERBOSE(cmd) do { break; } while (0)
 #endif
 
 /* Include the features available for GNU source */

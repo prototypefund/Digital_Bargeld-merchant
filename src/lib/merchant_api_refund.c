@@ -140,16 +140,16 @@ handle_refund_increase_finished (void *cls,
      * need a link to error objects at docs)
      */
     if (-1 == json_unpack
-        ((json_t *) json,
-         "{s:s, s:I, s:s}",
-         "error", &error,
-         "code", &code,
-         "hint", &hint))
+          ((json_t *) json,
+          "{s:s, s:I, s:s}",
+          "error", &error,
+          "code", &code,
+          "hint", &hint))
 
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "/refund failed (HTTP code: %lu), backend did "
-                "not give a valid error object\n", response_code);
+                  "/refund failed (HTTP code: %lu), backend did "
+                  "not give a valid error object\n", response_code);
       break;
     }
 
@@ -169,7 +169,9 @@ handle_refund_increase_finished (void *cls,
  * @param rio the refund increasing operation to cancel
  */
 void
-TALER_MERCHANT_refund_increase_cancel (struct TALER_MERCHANT_RefundIncreaseOperation *rio)
+TALER_MERCHANT_refund_increase_cancel (struct
+                                       TALER_MERCHANT_RefundIncreaseOperation *
+                                       rio)
 {
   if (NULL != rio->job)
   {
@@ -232,11 +234,11 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                                                CURLOPT_URL,
                                                rio->url));
   rio->job = GNUNET_CURL_job_add2
-    (ctx,
-     eh,
-     rio->post_ctx.headers,
-     &handle_refund_increase_finished,
-     rio);
+               (ctx,
+               eh,
+               rio->post_ctx.headers,
+               &handle_refund_increase_finished,
+               rio);
 
   return rio;
 }
@@ -248,7 +250,8 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
  * @param
  */
 void
-TALER_MERCHANT_refund_lookup_cancel (struct TALER_MERCHANT_RefundLookupOperation *rlo)
+TALER_MERCHANT_refund_lookup_cancel (struct
+                                     TALER_MERCHANT_RefundLookupOperation *rlo)
 {
   if (NULL != rlo->job)
   {
@@ -296,9 +299,9 @@ handle_refund_lookup_finished (void *cls,
      * need a link to error objects at docs)
      */
     if (-1 == json_unpack ((json_t *) json,
-        "{s:s, s:I, s:s}",
-        "error", &error,
-        "code", &code))
+                           "{s:s, s:I, s:s}",
+                           "error", &error,
+                           "code", &code))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Failed GET /refund, error: %s, code: %d\n",

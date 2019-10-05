@@ -39,7 +39,8 @@
 #include "taler_merchant_testing_lib.h"
 
 /* Error codes.  */
-enum PaymentGeneratorError {
+enum PaymentGeneratorError
+{
 
   MISSING_MERCHANT_URL = 2,
   FAILED_TO_LAUNCH_MERCHANT,
@@ -65,9 +66,11 @@ enum PaymentGeneratorError {
 #define TWOCOINS_INSTRUCTION 5
 
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
-   TALER_TESTING_cmd_fakebank_transfer (label, amount, \
-     bank_url, USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO, \
-     USER_LOGIN_NAME, USER_LOGIN_PASS, EXCHANGE_URL)
+  TALER_TESTING_cmd_fakebank_transfer (label, amount, \
+                                       bank_url, USER_ACCOUNT_NO, \
+                                       EXCHANGE_ACCOUNT_NO, \
+                                       USER_LOGIN_NAME, USER_LOGIN_PASS, \
+                                       EXCHANGE_URL)
 
 /**
  * Help string shown if NO subcommand is given on command line.
@@ -223,7 +226,7 @@ static char *currency;
   \
   GNUNET_asprintf \
     (&order_worth_5, \
-     "{\"max_fee\":\
+    "{\"max_fee\":\
        {\"currency\":\"%s\",\
         \"value\":0,\
         \"fraction\":50000000},\
@@ -237,12 +240,12 @@ static char *currency;
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{%s:5}\"} ] }", \
-     currency, \
-     currency, \
-     currency); \
+    currency, \
+    currency, \
+    currency); \
   GNUNET_asprintf \
     (&order_worth_5_track, \
-     "{\"max_fee\":\
+    "{\"max_fee\":\
        {\"currency\":\"%s\",\
         \"value\":0,\
         \"fraction\":50000000},\
@@ -256,12 +259,12 @@ static char *currency;
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice track cream\",\
                          \"value\":\"{%s:5}\"} ] }", \
-     currency, \
-     currency, \
-     currency); \
+    currency, \
+    currency, \
+    currency); \
   GNUNET_asprintf \
     (&order_worth_5_unaggregated, \
-     "{\"max_fee\":\
+    "{\"max_fee\":\
        {\"currency\":\"%s\",\
         \"value\":0,\
         \"fraction\":50000000},\
@@ -276,12 +279,12 @@ static char *currency;
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"unaggregated cream\",\
                          \"value\":\"{%s:5}\"} ] }", \
-     currency, \
-     currency, \
-     currency); \
+    currency, \
+    currency, \
+    currency); \
   GNUNET_asprintf \
     (&order_worth_10_2coins, \
-     "{\"max_fee\":\
+    "{\"max_fee\":\
        {\"currency\":\"%s\",\
         \"value\":0,\
         \"fraction\":50000000},\
@@ -295,9 +298,9 @@ static char *currency;
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"2-coins payment\",\
                          \"value\":\"{%s:10}\"} ] }", \
-     currency, \
-     currency, \
-     currency);
+    currency, \
+    currency, \
+    currency);
 
 
 /**
@@ -314,62 +317,62 @@ run (void *cls,
       (is->ctx, APIKEY_SANDBOX));
 
   ALLOCATE_AMOUNTS
-      (CURRENCY_10_02,
-       CURRENCY_9_98,
-       CURRENCY_5_01,
-       CURRENCY_5,
-       CURRENCY_4_99,
-       CURRENCY_0_02,
-       CURRENCY_0_01);
+    (CURRENCY_10_02,
+    CURRENCY_9_98,
+    CURRENCY_5_01,
+    CURRENCY_5,
+    CURRENCY_4_99,
+    CURRENCY_0_02,
+    CURRENCY_0_01);
 
   ALLOCATE_ORDERS
     (order_worth_5,
-     order_worth_5_track,
-     order_worth_5_unaggregated,
-     order_worth_10_2coins);
+    order_worth_5_track,
+    order_worth_5_unaggregated,
+    order_worth_10_2coins);
 
   struct TALER_TESTING_Command ordinary_commands[] = {
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-1",
-       CURRENCY_10_02),
+      CURRENCY_10_02),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
-       cfg_filename),
+      cfg_filename),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
-       "create-reserve-1",
-       CURRENCY_5,
-       MHD_HTTP_OK),
+      "create-reserve-1",
+      CURRENCY_5,
+      MHD_HTTP_OK),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-2",
-       "create-reserve-1",
-       CURRENCY_5,
-       MHD_HTTP_OK),
+      "create-reserve-1",
+      CURRENCY_5,
+      MHD_HTTP_OK),
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
-       merchant_url,
-       MHD_HTTP_OK,
-       order_worth_5),
+      merchant_url,
+      MHD_HTTP_OK,
+      order_worth_5),
 
     TALER_TESTING_cmd_pay
       ("deposit-simple",
-       merchant_url,
-       MHD_HTTP_OK,
-       "create-proposal-1",
-       "withdraw-coin-1",
-       CURRENCY_5,
-       CURRENCY_4_99,
-       CURRENCY_0_01),
+      merchant_url,
+      MHD_HTTP_OK,
+      "create-proposal-1",
+      "withdraw-coin-1",
+      CURRENCY_5,
+      CURRENCY_4_99,
+      CURRENCY_0_01),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-payments",
-       FIRST_INSTRUCTION,
-       &payments_number),
+      FIRST_INSTRUCTION,
+      &payments_number),
 
     /* Next proposal-pay cycle will be used by /track CMDs
      * and so it will not have to be looped over, only /track
@@ -377,42 +380,42 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-2",
-       merchant_url,
-       MHD_HTTP_OK,
-       order_worth_5_track),
+      merchant_url,
+      MHD_HTTP_OK,
+      order_worth_5_track),
 
     TALER_TESTING_cmd_pay
       ("deposit-simple-2",
-       merchant_url,
-       MHD_HTTP_OK,
-       "create-proposal-2",
-       "withdraw-coin-2",
-       CURRENCY_5,
-       CURRENCY_4_99,
-       CURRENCY_0_01),
+      merchant_url,
+      MHD_HTTP_OK,
+      "create-proposal-2",
+      "withdraw-coin-2",
+      CURRENCY_5,
+      CURRENCY_4_99,
+      CURRENCY_0_01),
 
     /* /track/transaction over deposit-simple-2 */
 
     TALER_TESTING_cmd_exec_aggregator
       ("aggregate-1",
-       cfg_filename),
+      cfg_filename),
 
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
-       merchant_url,
-       MHD_HTTP_OK,
-       "deposit-simple-2"),
+      merchant_url,
+      MHD_HTTP_OK,
+      "deposit-simple-2"),
 
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-1",
-       merchant_url,
-       MHD_HTTP_OK,
-       "track-transaction-1"),
+      merchant_url,
+      MHD_HTTP_OK,
+      "track-transaction-1"),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-tracks",
-       TRACKS_INSTRUCTION,
-       &tracks_number),
+      TRACKS_INSTRUCTION,
+      &tracks_number),
 
     TALER_TESTING_cmd_end ()
   };
@@ -421,83 +424,83 @@ run (void *cls,
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-1",
-       CURRENCY_5_01),
+      CURRENCY_5_01),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
-       cfg_filename),
+      cfg_filename),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
-       "create-reserve-1",
-       CURRENCY_5,
-       MHD_HTTP_OK),
+      "create-reserve-1",
+      CURRENCY_5,
+      MHD_HTTP_OK),
 
     TALER_TESTING_cmd_proposal
       ("create-unaggregated-proposal",
-       alt_instance_url,
-       MHD_HTTP_OK,
-       order_worth_5_unaggregated),
+      alt_instance_url,
+      MHD_HTTP_OK,
+      order_worth_5_unaggregated),
 
     TALER_TESTING_cmd_pay
       ("deposit-unaggregated",
-       merchant_url,
-       MHD_HTTP_OK,
-       "create-unaggregated-proposal",
-       "withdraw-coin-1",
-       CURRENCY_5,
-       CURRENCY_4_99,
-       CURRENCY_0_01),
+      merchant_url,
+      MHD_HTTP_OK,
+      "create-unaggregated-proposal",
+      "withdraw-coin-1",
+      CURRENCY_5,
+      CURRENCY_4_99,
+      CURRENCY_0_01),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-unaggregated",
-       FIRST_INSTRUCTION,
-       &unaggregated_number),
+      FIRST_INSTRUCTION,
+      &unaggregated_number),
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-2",
-       CURRENCY_10_02),
+      CURRENCY_10_02),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-2",
-       cfg_filename),
+      cfg_filename),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-2",
-       "create-reserve-2",
-       CURRENCY_5,
-       MHD_HTTP_OK),
+      "create-reserve-2",
+      CURRENCY_5,
+      MHD_HTTP_OK),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-3",
-       "create-reserve-2",
-       CURRENCY_5,
-       MHD_HTTP_OK),
+      "create-reserve-2",
+      CURRENCY_5,
+      MHD_HTTP_OK),
 
     TALER_TESTING_cmd_proposal
       ("create-twocoins-proposal",
-       merchant_url,
-       MHD_HTTP_OK,
-       order_worth_10_2coins),
+      merchant_url,
+      MHD_HTTP_OK,
+      order_worth_10_2coins),
 
     TALER_TESTING_cmd_pay
       ("deposit-twocoins",
-       merchant_url,
-       MHD_HTTP_OK,
-       "create-twocoins-proposal",
-       "withdraw-coin-2;withdraw-coin-3",
-       CURRENCY_10,
-       CURRENCY_9_98,
-       CURRENCY_0_02),
+      merchant_url,
+      MHD_HTTP_OK,
+      "create-twocoins-proposal",
+      "withdraw-coin-2;withdraw-coin-3",
+      CURRENCY_10,
+      CURRENCY_9_98,
+      CURRENCY_0_02),
 
     TALER_TESTING_cmd_exec_aggregator
       ("aggregate-twocoins",
-       cfg_filename),
+      cfg_filename),
 
     TALER_TESTING_cmd_rewind_ip
       ("rewind-twocoins",
-       TWOCOINS_INSTRUCTION,
-       &twocoins_number),
+      TWOCOINS_INSTRUCTION,
+      &twocoins_number),
 
     TALER_TESTING_cmd_end ()
   };
@@ -515,7 +518,7 @@ run (void *cls,
                        corner_commands);
     return;
   }
-  
+
   /* Should never get here, as the control on subcommands
    * happens earlier at launch time.  */
   fprintf (stderr,
@@ -549,7 +552,7 @@ main (int argc,
       char *const *argv)
 {
   default_config_file = GNUNET_OS_project_data_get
-    ()->user_config_file;
+                          ()->user_config_file;
 
   loglev = NULL;
   GNUNET_log_setup ("taler-merchant-benchmark",
@@ -568,9 +571,9 @@ main (int argc,
 
     GNUNET_GETOPT_option_flag
       ('h',
-       "help",
-       NULL,
-       &root_help),
+      "help",
+      NULL,
+      &root_help),
 
     GNUNET_GETOPT_OPTION_END
   };
@@ -585,17 +588,17 @@ main (int argc,
 
     GNUNET_GETOPT_option_uint
       ('u',
-       "unaggregated-number",
-       "UN",
-       "will generate UN unaggregated payments, defaults to 1",
-       &unaggregated_number),
+      "unaggregated-number",
+      "UN",
+      "will generate UN unaggregated payments, defaults to 1",
+      &unaggregated_number),
 
     GNUNET_GETOPT_option_uint
       ('t',
-       "two-coins",
-       "TC",
-       "will perform TC 2-coins payments, defaults to 1",
-       &twocoins_number),
+      "two-coins",
+      "TC",
+      "will perform TC 2-coins payments, defaults to 1",
+      &twocoins_number),
 
     /**
      * NOTE: useful when the setup serves merchant
@@ -606,45 +609,45 @@ main (int argc,
      */
     GNUNET_GETOPT_option_string
       ('m',
-       "merchant-url",
-       "MU",
-       "merchant base url, mandatory",
-       &merchant_url),
+      "merchant-url",
+      "MU",
+      "merchant base url, mandatory",
+      &merchant_url),
 
     GNUNET_GETOPT_option_string
       ('k',
-       "currency",
-       "K",
-       "Used currency, mandatory",
-       &currency),
+      "currency",
+      "K",
+      "Used currency, mandatory",
+      &currency),
 
     GNUNET_GETOPT_option_string
       ('i',
-       "alt-instance",
-       "AI",
-       "alternative (non default) instance,"
-       " used to provide fresh wire details to"
-       " make unaggregated transactions stay so."
-       " Note, this instance will be given far"
-       " future wire deadline, and so it should"
-       " never author now-deadlined transactions,"
-       " as they would get those far future ones"
-       " aggregated too.",
-       &alt_instance_id),
+      "alt-instance",
+      "AI",
+      "alternative (non default) instance,"
+      " used to provide fresh wire details to"
+      " make unaggregated transactions stay so."
+      " Note, this instance will be given far"
+      " future wire deadline, and so it should"
+      " never author now-deadlined transactions,"
+      " as they would get those far future ones"
+      " aggregated too.",
+      &alt_instance_id),
 
     GNUNET_GETOPT_option_string
       ('b',
-       "bank-url",
-       "BU",
-       "bank base url, mandatory",
-       &bank_url),
+      "bank-url",
+      "BU",
+      "bank base url, mandatory",
+      &bank_url),
 
     GNUNET_GETOPT_option_string
       ('l',
-       "logfile",
-       "LF",
-       "will log to file LF",
-       &logfile),
+      "logfile",
+      "LF",
+      "will log to file LF",
+      &logfile),
 
     GNUNET_GETOPT_OPTION_END
   };
@@ -659,24 +662,24 @@ main (int argc,
 
     GNUNET_GETOPT_option_help
       ("Generate Taler ordinary payments"
-       " to populate the databases"),
+      " to populate the databases"),
 
     GNUNET_GETOPT_option_loglevel
       (&loglev),
 
     GNUNET_GETOPT_option_uint
       ('p',
-       "payments-number",
-       "PN",
-       "will generate PN payments, defaults to 1",
-       &payments_number),
+      "payments-number",
+      "PN",
+      "will generate PN payments, defaults to 1",
+      &payments_number),
 
     GNUNET_GETOPT_option_uint
       ('t',
-       "tracks-number",
-       "TN",
-       "will perform TN /track operations, defaults to 1",
-       &tracks_number),
+      "tracks-number",
+      "TN",
+      "will perform TN /track operations, defaults to 1",
+      &tracks_number),
 
     /**
      * NOTE: useful when the setup serves merchant
@@ -687,28 +690,28 @@ main (int argc,
      */
     GNUNET_GETOPT_option_string
       ('m',
-       "merchant-url",
-       "MU",
-       "merchant base url, mandatory",
-       &merchant_url),
+      "merchant-url",
+      "MU",
+      "merchant base url, mandatory",
+      &merchant_url),
 
     GNUNET_GETOPT_option_string
       ('b',
-       "bank-url",
-       "BU",
-       "bank base url, mandatory",
-       &bank_url),
+      "bank-url",
+      "BU",
+      "bank base url, mandatory",
+      &bank_url),
 
     GNUNET_GETOPT_option_string
       ('l',
-       "logfile",
-       "LF",
-       "will log to file LF",
-       &logfile),
+      "logfile",
+      "LF",
+      "will log to file LF",
+      &logfile),
 
     GNUNET_GETOPT_OPTION_END
   };
-  
+
   options = root_options;
 
   if (NULL != argv[1])
@@ -726,10 +729,10 @@ main (int argc,
   }
 
   if (GNUNET_SYSERR != (result = GNUNET_GETOPT_run
-      ("taler-merchant-benchmark",
-       options,
-       argc,
-       argv))) 
+                                   ("taler-merchant-benchmark",
+                                   options,
+                                   argc,
+                                   argv)))
   {
 
     if (GNUNET_YES == root_help)
@@ -740,7 +743,7 @@ main (int argc,
     }
 
     /* --help was given.  */
-    if (0 == result) 
+    if (0 == result)
       return 0;
   }
 
@@ -752,14 +755,14 @@ main (int argc,
   if ((GNUNET_YES != ordinary) && (GNUNET_YES != corner))
   {
     fprintf (stderr,
-             "Please use 'ordinary' or 'corner' subcommands.\n"); 
+             "Please use 'ordinary' or 'corner' subcommands.\n");
     return 1;
   }
 
   if ((GNUNET_YES == corner) && (NULL == alt_instance_id))
   {
     fprintf (stderr, "option '-i' is mandatory"
-                     " with sub-command 'corner'!\n");
+             " with sub-command 'corner'!\n");
     return 1;
   }
 
@@ -787,7 +790,7 @@ main (int argc,
   }
 
   if (NULL == (merchantd = TALER_TESTING_run_merchant
-    (cfg_filename, merchant_url)))
+                             (cfg_filename, merchant_url)))
   {
     TALER_LOG_ERROR ("Failed to launch the merchant\n");
     return FAILED_TO_LAUNCH_MERCHANT;
@@ -801,8 +804,8 @@ main (int argc,
   }
 
   if ( NULL == (bankd = TALER_TESTING_run_bank
-    (cfg_filename,
-     bank_url)))
+                          (cfg_filename,
+                          bank_url)))
   {
     TALER_LOG_ERROR ("Failed to run the bank\n");
     terminate_process (merchantd);
@@ -810,9 +813,9 @@ main (int argc,
   }
 
   result = TALER_TESTING_setup_with_exchange
-    (run,
-     NULL,
-     cfg_filename);
+             (run,
+             NULL,
+             cfg_filename);
 
   terminate_process (merchantd);
   terminate_process (bankd);

@@ -119,17 +119,17 @@ history_raw_cb (void *cls,
   case MHD_HTTP_OK:
     ho->cb (ho->cb_cls,
             MHD_HTTP_OK,
-	    TALER_EC_NONE,
+            TALER_EC_NONE,
             json);
     TALER_MERCHANT_history_cancel (ho);
     return;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-		"/history URL not found\n");
+                "/history URL not found\n");
     break;
   case MHD_HTTP_BAD_REQUEST:
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-		"Wrong/missing URL parameter\n");
+                "Wrong/missing URL parameter\n");
     break;
   default:
     /* unexpected response code */
@@ -143,7 +143,7 @@ history_raw_cb (void *cls,
 
   ho->cb (ho->cb_cls,
           response_code,
-	  TALER_JSON_get_error_code (json),
+          TALER_JSON_get_error_code (json),
           json);
   TALER_MERCHANT_history_cancel (ho);
 }
@@ -197,7 +197,7 @@ TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
                      seconds,
                      delta,
                      start);
-    
+
 
 
   GNUNET_free (base);
@@ -243,18 +243,18 @@ TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
 struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history_default_start
   (struct GNUNET_CURL_Context *ctx,
-   const char *backend_url,
-   long long delta,
-   struct GNUNET_TIME_Absolute date,
-   TALER_MERCHANT_HistoryOperationCallback history_cb,
-   void *history_cb_cls)
+  const char *backend_url,
+  long long delta,
+  struct GNUNET_TIME_Absolute date,
+  TALER_MERCHANT_HistoryOperationCallback history_cb,
+  void *history_cb_cls)
 {
   return TALER_MERCHANT_history2 (ctx,
                                   backend_url,
-                /* fake 'start' argument: will NOT be used */
-                                  -1, 
-                /* Specifies "no start argument" in final URL */
-                                  GNUNET_YES, 
+                                  /* fake 'start' argument: will NOT be used */
+                                  -1,
+                                  /* Specifies "no start argument" in final URL */
+                                  GNUNET_YES,
                                   delta,
                                   date,
                                   history_cb,
@@ -282,12 +282,12 @@ TALER_MERCHANT_history_default_start
 struct TALER_MERCHANT_HistoryOperation *
 TALER_MERCHANT_history
   (struct GNUNET_CURL_Context *ctx,
-   const char *backend_url,
-   unsigned long long start,
-   long long delta,
-   struct GNUNET_TIME_Absolute date,
-   TALER_MERCHANT_HistoryOperationCallback history_cb,
-   void *history_cb_cls)
+  const char *backend_url,
+  unsigned long long start,
+  long long delta,
+  struct GNUNET_TIME_Absolute date,
+  TALER_MERCHANT_HistoryOperationCallback history_cb,
+  void *history_cb_cls)
 {
   return TALER_MERCHANT_history2 (ctx,
                                   backend_url,

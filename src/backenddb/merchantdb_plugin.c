@@ -105,7 +105,7 @@ plugin_init ()
   if (err > 0)
   {
     fprintf (stderr,
-             _("Initialization of plugin mechanism failed: %s!\n"),
+             _ ("Initialization of plugin mechanism failed: %s!\n"),
              lt_dlerror ());
     return;
   }

@@ -124,7 +124,7 @@ TMH_RESPONSE_reply_rc (struct MHD_Connection *connection,
  */
 int
 TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
-			      enum TALER_ErrorCode ec,
+                              enum TALER_ErrorCode ec,
                               const char *object);
 
 
@@ -138,7 +138,7 @@ TMH_RESPONSE_reply_not_found (struct MHD_Connection *connection,
  */
 int
 TMH_RESPONSE_reply_bad_request (struct MHD_Connection *connection,
-				enum TALER_ErrorCode ec,
+                                enum TALER_ErrorCode ec,
                                 const char *issue);
 
 
@@ -151,7 +151,7 @@ TMH_RESPONSE_reply_bad_request (struct MHD_Connection *connection,
  */
 struct MHD_Response *
 TMH_RESPONSE_make_internal_error (enum TALER_ErrorCode ec,
-				  const char *hint);
+                                  const char *hint);
 
 
 /**
@@ -164,7 +164,7 @@ TMH_RESPONSE_make_internal_error (enum TALER_ErrorCode ec,
  */
 int
 TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
-				   enum TALER_ErrorCode ec,
+                                   enum TALER_ErrorCode ec,
                                    const char *hint);
 
 
@@ -178,7 +178,7 @@ TMH_RESPONSE_reply_external_error (struct MHD_Connection *connection,
  */
 int
 TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
-				   enum TALER_ErrorCode ec,
+                                   enum TALER_ErrorCode ec,
                                    const char *hint);
 
 
@@ -191,7 +191,7 @@ TMH_RESPONSE_reply_internal_error (struct MHD_Connection *connection,
  */
 struct MHD_Response *
 TMH_RESPONSE_make_error (enum TALER_ErrorCode ec,
-			 const char *hint);
+                         const char *hint);
 
 
 /**
@@ -225,7 +225,7 @@ TMH_RESPONSE_add_global_headers (struct MHD_Response *response);
  */
 int
 TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
-				enum TALER_ErrorCode ec,
+                                enum TALER_ErrorCode ec,
                                 const char *param_name);
 
 
@@ -239,7 +239,7 @@ TMH_RESPONSE_reply_arg_missing (struct MHD_Connection *connection,
  */
 int
 TMH_RESPONSE_reply_arg_invalid (struct MHD_Connection *connection,
-				enum TALER_ErrorCode ec,
+                                enum TALER_ErrorCode ec,
                                 const char *param_name);
 
 #endif

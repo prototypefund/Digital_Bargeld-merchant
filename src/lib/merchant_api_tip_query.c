@@ -96,7 +96,7 @@ check_ok (struct TALER_MERCHANT_TipQueryOperation *tqo,
     TALER_JSON_spec_amount ("amount_authorized", &amount_authorized),
     TALER_JSON_spec_amount ("amount_available", &amount_available),
     TALER_JSON_spec_amount ("amount_picked_up", &amount_picked_up),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
 
   if (GNUNET_OK !=
@@ -130,8 +130,8 @@ check_ok (struct TALER_MERCHANT_TipQueryOperation *tqo,
  */
 static void
 handle_tip_query_finished (void *cls,
-                            long response_code,
-                            const void *response)
+                           long response_code,
+                           const void *response)
 {
   struct TALER_MERCHANT_TipQueryOperation *tqo = cls;
   const json_t *json = response;

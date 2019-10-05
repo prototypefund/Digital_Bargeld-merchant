@@ -123,7 +123,7 @@ handle_track_transaction_finished (void *cls,
   }
   tdo->cb (tdo->cb_cls,
            response_code,
-	   TALER_JSON_get_error_code (json),
+           TALER_JSON_get_error_code (json),
            json);
   TALER_MERCHANT_track_transaction_cancel (tdo);
 }
@@ -143,7 +143,8 @@ struct TALER_MERCHANT_TrackTransactionHandle *
 TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
                                   const char *backend_url,
                                   const char *order_id,
-                                  TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
+                                  TALER_MERCHANT_TrackTransactionCallback
+                                  track_transaction_cb,
                                   void *track_transaction_cb_cls)
 {
   struct TALER_MERCHANT_TrackTransactionHandle *tdo;
@@ -179,7 +180,9 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
  * @param tdo handle to the tracking operation being cancelled
  */
 void
-TALER_MERCHANT_track_transaction_cancel (struct TALER_MERCHANT_TrackTransactionHandle *tdo)
+TALER_MERCHANT_track_transaction_cancel (struct
+                                         TALER_MERCHANT_TrackTransactionHandle *
+                                         tdo)
 {
   if (NULL != tdo->job)
   {

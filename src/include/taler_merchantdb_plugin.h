@@ -40,11 +40,11 @@ struct TALER_MERCHANTDB_Plugin;
  * @param row_id serial numer of the transaction in the table,
  * @param contract_terms proposal data related to order id
  */
- typedef void
- (*TALER_MERCHANTDB_ProposalDataCallback)(void *cls,
-                                          const char *order_id,
-                                          uint64_t row_id,
-                                          const json_t *contract_terms);
+typedef void
+(*TALER_MERCHANTDB_ProposalDataCallback)(void *cls,
+                                         const char *order_id,
+                                         uint64_t row_id,
+                                         const json_t *contract_terms);
 
 /**
  * Function called with information about a transaction.
@@ -59,12 +59,15 @@ struct TALER_MERCHANTDB_Plugin;
  */
 typedef void
 (*TALER_MERCHANTDB_TransactionCallback)(void *cls,
-                                        const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                        const struct GNUNET_HashCode *h_contract_terms,
+                                        const struct
+                                        TALER_MerchantPublicKeyP *merchant_pub,
+                                        const struct
+                                        GNUNET_HashCode *h_contract_terms,
                                         const struct GNUNET_HashCode *h_wire,
                                         struct GNUNET_TIME_Absolute timestamp,
                                         struct GNUNET_TIME_Absolute refund,
-                                        const struct TALER_Amount *total_amount);
+                                        const struct
+                                        TALER_Amount *total_amount);
 
 
 /**
@@ -83,10 +86,13 @@ typedef void
  */
 typedef void
 (*TALER_MERCHANTDB_CoinDepositCallback)(void *cls,
-                                        const struct GNUNET_HashCode *h_contract_terms,
-                                        const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                        const struct
+                                        GNUNET_HashCode *h_contract_terms,
+                                        const struct
+                                        TALER_CoinSpendPublicKeyP *coin_pub,
                                         const char *exchange_url,
-                                        const struct TALER_Amount *amount_with_fee,
+                                        const struct
+                                        TALER_Amount *amount_with_fee,
                                         const struct TALER_Amount *deposit_fee,
                                         const struct TALER_Amount *refund_fee,
                                         const struct TALER_Amount *wire_fee,
@@ -112,9 +118,12 @@ typedef void
  */
 typedef void
 (*TALER_MERCHANTDB_TransferCallback)(void *cls,
-                                     const struct GNUNET_HashCode *h_contract_terms,
-                                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                                     const struct TALER_WireTransferIdentifierRawP *wtid,
+                                     const struct
+                                     GNUNET_HashCode *h_contract_terms,
+                                     const struct
+                                     TALER_CoinSpendPublicKeyP *coin_pub,
+                                     const struct
+                                     TALER_WireTransferIdentifierRawP *wtid,
                                      struct GNUNET_TIME_Absolute execution_time,
                                      const json_t *exchange_proof);
 
@@ -142,7 +151,8 @@ typedef void
  */
 typedef void
 (*TALER_MERCHANTDB_RefundCallback)(void *cls,
-                                   const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                                   const struct
+                                   TALER_CoinSpendPublicKeyP *coin_pub,
                                    uint64_t rtransaction_id,
                                    const char *reason,
                                    const struct TALER_Amount *refund_amount,
@@ -201,11 +211,11 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*insert_order) (void *cls,
-                   const char *order_id,
-                   const struct TALER_MerchantPublicKeyP *merchant_pub,
-                   struct GNUNET_TIME_Absolute timestamp,
-                   const json_t *contract_terms);
+  (*insert_order)(void *cls,
+                  const char *order_id,
+                  const struct TALER_MerchantPublicKeyP *merchant_pub,
+                  struct GNUNET_TIME_Absolute timestamp,
+                  const json_t *contract_terms);
 
 
   /**
@@ -220,11 +230,11 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*insert_contract_terms) (void *cls,
-                            const char *order_id,
-                            const struct TALER_MerchantPublicKeyP *merchant_pub,
-                            struct GNUNET_TIME_Absolute timestamp,
-                            const json_t *contract_terms);
+  (*insert_contract_terms)(void *cls,
+                           const char *order_id,
+                           const struct TALER_MerchantPublicKeyP *merchant_pub,
+                           struct GNUNET_TIME_Absolute timestamp,
+                           const json_t *contract_terms);
 
   /**
    * Mark contract terms as payed.  Needed by /history as only payed
@@ -242,9 +252,9 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*mark_proposal_paid) (void *cls,
-                         const struct GNUNET_HashCode *h_contract_terms,
-                         const struct TALER_MerchantPublicKeyP *merchant_pub);
+  (*mark_proposal_paid)(void *cls,
+                        const struct GNUNET_HashCode *h_contract_terms,
+                        const struct TALER_MerchantPublicKeyP *merchant_pub);
 
   /**
    * Store the order ID that was used to pay for a resource within a session.
@@ -258,11 +268,11 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*insert_session_info) (void *cls,
-                          const char *session_id,
-                          const char *fulfillment_url,
-                          const char *order_id,
-                          const struct TALER_MerchantPublicKeyP *merchant_pub);
+  (*insert_session_info)(void *cls,
+                         const char *session_id,
+                         const char *fulfillment_url,
+                         const char *order_id,
+                         const struct TALER_MerchantPublicKeyP *merchant_pub);
 
   /**
    * Retrieve the order ID that was used to pay for a resource within a session.
@@ -277,11 +287,11 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_session_info) (void *cls,
-                        char **order_id,
-                        const char *session_id,
-                        const char *fulfillment_url,
-                        const struct TALER_MerchantPublicKeyP *merchant_pub);
+  (*find_session_info)(void *cls,
+                       char **order_id,
+                       const char *session_id,
+                       const char *fulfillment_url,
+                       const struct TALER_MerchantPublicKeyP *merchant_pub);
 
   /**
    * Retrieve proposal data given its order ID.
@@ -293,7 +303,7 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_contract_terms) (void *cls,
+  (*find_contract_terms)(void *cls,
                          json_t **contract_terms,
                          const char *order_id,
                          const struct TALER_MerchantPublicKeyP *merchant_pub);
@@ -308,10 +318,10 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_order) (void *cls,
-                 json_t **contract_terms,
-                 const char *order_id,
-                 const struct TALER_MerchantPublicKeyP *merchant_pub);
+  (*find_order)(void *cls,
+                json_t **contract_terms,
+                const char *order_id,
+                const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
   /**
@@ -324,10 +334,12 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_contract_terms_from_hash) (void *cls,
+  (*find_contract_terms_from_hash)(void *cls,
                                    json_t **contract_terms,
-                                   const struct GNUNET_HashCode *h_contract_terms,
-                                   const struct TALER_MerchantPublicKeyP *merchant_pub);
+                                   const struct
+                                   GNUNET_HashCode *h_contract_terms,
+                                   const struct
+                                   TALER_MerchantPublicKeyP *merchant_pub);
 
 
   /**
@@ -340,10 +352,12 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_paid_contract_terms_from_hash) (void *cls,
-                                         json_t **contract_terms,
-                                         const struct GNUNET_HashCode *h_contract_terms,
-                                         const struct TALER_MerchantPublicKeyP *merchant_pub);
+  (*find_paid_contract_terms_from_hash)(void *cls,
+                                        json_t **contract_terms,
+                                        const struct
+                                        GNUNET_HashCode *h_contract_terms,
+                                        const struct
+                                        TALER_MerchantPublicKeyP *merchant_pub);
 
 
   /**
@@ -366,15 +380,18 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_contract_terms_by_date_and_range) (void *cls,
-                                            struct GNUNET_TIME_Absolute date,
-                                            const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                            uint64_t start,
-                                            uint64_t nrows,
-                                            int past,
-                                            unsigned int ascending,
-                                            TALER_MERCHANTDB_ProposalDataCallback cb,
-                                            void *cb_cls);
+  (*find_contract_terms_by_date_and_range)(void *cls,
+                                           struct GNUNET_TIME_Absolute date,
+                                           const struct
+                                           TALER_MerchantPublicKeyP *
+                                           merchant_pub,
+                                           uint64_t start,
+                                           uint64_t nrows,
+                                           int past,
+                                           unsigned int ascending,
+                                           TALER_MERCHANTDB_ProposalDataCallback
+                                           cb,
+                                           void *cb_cls);
 
   /**
    * Lookup for a proposal, respecting the signature used by the
@@ -388,9 +405,10 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_contract_terms_history) (void *cls,
+  (*find_contract_terms_history)(void *cls,
                                  const char *order_id,
-                                 const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                 const struct
+                                 TALER_MerchantPublicKeyP *merchant_pub,
                                  TALER_MERCHANTDB_ProposalDataCallback cb,
                                  void *cb_cls);
 
@@ -409,12 +427,13 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_contract_terms_by_date) (void *cls,
-                                  struct GNUNET_TIME_Absolute date,
-                                  const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                  uint64_t nrows,
-                                  TALER_MERCHANTDB_ProposalDataCallback cb,
-                                  void *cb_cls);
+  (*find_contract_terms_by_date)(void *cls,
+                                 struct GNUNET_TIME_Absolute date,
+                                 const struct
+                                 TALER_MerchantPublicKeyP *merchant_pub,
+                                 uint64_t nrows,
+                                 TALER_MERCHANTDB_ProposalDataCallback cb,
+                                 void *cb_cls);
 
 
   /**
@@ -433,17 +452,17 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*store_deposit) (void *cls,
-                    const struct GNUNET_HashCode *h_contract_terms,
-                    const struct TALER_MerchantPublicKeyP *merchant_pub,
-                    const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                    const char *exchange_url,
-                    const struct TALER_Amount *amount_with_fee,
-                    const struct TALER_Amount *deposit_fee,
-                    const struct TALER_Amount *refund_fee,
-                    const struct TALER_Amount *wire_fee,
-                    const struct TALER_ExchangePublicKeyP *signkey_pub,
-                    const json_t *exchange_proof);
+  (*store_deposit)(void *cls,
+                   const struct GNUNET_HashCode *h_contract_terms,
+                   const struct TALER_MerchantPublicKeyP *merchant_pub,
+                   const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                   const char *exchange_url,
+                   const struct TALER_Amount *amount_with_fee,
+                   const struct TALER_Amount *deposit_fee,
+                   const struct TALER_Amount *refund_fee,
+                   const struct TALER_Amount *wire_fee,
+                   const struct TALER_ExchangePublicKeyP *signkey_pub,
+                   const json_t *exchange_proof);
 
 
   /**
@@ -458,10 +477,11 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*store_coin_to_transfer) (void *cls,
-                             const struct GNUNET_HashCode *h_contract_terms,
-                             const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                             const struct TALER_WireTransferIdentifierRawP *wtid);
+  (*store_coin_to_transfer)(void *cls,
+                            const struct GNUNET_HashCode *h_contract_terms,
+                            const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                            const struct
+                            TALER_WireTransferIdentifierRawP *wtid);
 
 
   /**
@@ -476,12 +496,13 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*store_transfer_to_proof) (void *cls,
-                              const char *exchange_url,
-                              const struct TALER_WireTransferIdentifierRawP *wtid,
-                              struct GNUNET_TIME_Absolute execution_time,
-                              const struct TALER_ExchangePublicKeyP *signkey_pub,
-                              const json_t *exchange_proof);
+  (*store_transfer_to_proof)(void *cls,
+                             const char *exchange_url,
+                             const struct
+                             TALER_WireTransferIdentifierRawP *wtid,
+                             struct GNUNET_TIME_Absolute execution_time,
+                             const struct TALER_ExchangePublicKeyP *signkey_pub,
+                             const json_t *exchange_proof);
 
 
   /**
@@ -500,14 +521,16 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status code
    */
   enum GNUNET_DB_QueryStatus
-  (*store_wire_fee_by_exchange) (void *cls,
-                                 const struct TALER_MasterPublicKeyP *exchange_pub,
-                                 const struct GNUNET_HashCode *h_wire_method,
-                                 const struct TALER_Amount *wire_fee,
-                                 const struct TALER_Amount *closing_fee,
-                                 struct GNUNET_TIME_Absolute start_date,
-                                 struct GNUNET_TIME_Absolute end_date,
-                                 const struct TALER_MasterSignatureP *exchange_sig);
+  (*store_wire_fee_by_exchange)(void *cls,
+                                const struct
+                                TALER_MasterPublicKeyP *exchange_pub,
+                                const struct GNUNET_HashCode *h_wire_method,
+                                const struct TALER_Amount *wire_fee,
+                                const struct TALER_Amount *closing_fee,
+                                struct GNUNET_TIME_Absolute start_date,
+                                struct GNUNET_TIME_Absolute end_date,
+                                const struct
+                                TALER_MasterSignatureP *exchange_sig);
 
 
 
@@ -523,11 +546,11 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_payments) (void *cls,
-                    const struct GNUNET_HashCode *h_contract_terms,
-                    const struct TALER_MerchantPublicKeyP *merchant_pub,
-                    TALER_MERCHANTDB_CoinDepositCallback cb,
-                    void *cb_cls);
+  (*find_payments)(void *cls,
+                   const struct GNUNET_HashCode *h_contract_terms,
+                   const struct TALER_MerchantPublicKeyP *merchant_pub,
+                   TALER_MERCHANTDB_CoinDepositCallback cb,
+                   void *cb_cls);
 
 
   /**
@@ -543,12 +566,15 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_payments_by_hash_and_coin) (void *cls,
-                                     const struct GNUNET_HashCode *h_contract_terms,
-                                     const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                                     TALER_MERCHANTDB_CoinDepositCallback cb,
-                                     void *cb_cls);
+  (*find_payments_by_hash_and_coin)(void *cls,
+                                    const struct
+                                    GNUNET_HashCode *h_contract_terms,
+                                    const struct
+                                    TALER_MerchantPublicKeyP *merchant_pub,
+                                    const struct
+                                    TALER_CoinSpendPublicKeyP *coin_pub,
+                                    TALER_MERCHANTDB_CoinDepositCallback cb,
+                                    void *cb_cls);
 
 
   /**
@@ -565,10 +591,10 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_transfers_by_hash) (void *cls,
-                             const struct GNUNET_HashCode *h_contract_terms,
-                             TALER_MERCHANTDB_TransferCallback cb,
-                             void *cb_cls);
+  (*find_transfers_by_hash)(void *cls,
+                            const struct GNUNET_HashCode *h_contract_terms,
+                            TALER_MERCHANTDB_TransferCallback cb,
+                            void *cb_cls);
 
 
   /**
@@ -581,10 +607,10 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_deposits_by_wtid) (void *cls,
-                            const struct TALER_WireTransferIdentifierRawP *wtid,
-                            TALER_MERCHANTDB_CoinDepositCallback cb,
-                            void *cb_cls);
+  (*find_deposits_by_wtid)(void *cls,
+                           const struct TALER_WireTransferIdentifierRawP *wtid,
+                           TALER_MERCHANTDB_CoinDepositCallback cb,
+                           void *cb_cls);
 
 
   /**
@@ -598,11 +624,11 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
-  (*find_proof_by_wtid) (void *cls,
-                         const char *exchange_url,
-                         const struct TALER_WireTransferIdentifierRawP *wtid,
-                         TALER_MERCHANTDB_ProofCallback cb,
-                         void *cb_cls);
+  (*find_proof_by_wtid)(void *cls,
+                        const char *exchange_url,
+                        const struct TALER_WireTransferIdentifierRawP *wtid,
+                        TALER_MERCHANTDB_ProofCallback cb,
+                        void *cb_cls);
 
 
   /**
@@ -622,15 +648,15 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status code
    */
   enum GNUNET_DB_QueryStatus
-  (*lookup_wire_fee) (void *cls,
-                      const struct TALER_MasterPublicKeyP *exchange_pub,
-                      const struct GNUNET_HashCode *h_wire_method,
-                      struct GNUNET_TIME_Absolute contract_date,
-                      struct TALER_Amount *wire_fee,
-                      struct TALER_Amount *closing_fee,
-                      struct GNUNET_TIME_Absolute *start_date,
-                      struct GNUNET_TIME_Absolute *end_date,
-                      struct TALER_MasterSignatureP *exchange_sig);
+  (*lookup_wire_fee)(void *cls,
+                     const struct TALER_MasterPublicKeyP *exchange_pub,
+                     const struct GNUNET_HashCode *h_wire_method,
+                     struct GNUNET_TIME_Absolute contract_date,
+                     struct TALER_Amount *wire_fee,
+                     struct TALER_Amount *closing_fee,
+                     struct GNUNET_TIME_Absolute *start_date,
+                     struct GNUNET_TIME_Absolute *end_date,
+                     struct TALER_MasterSignatureP *exchange_sig);
 
 
   /**
@@ -650,8 +676,10 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*increase_refund_for_contract_NT)(void *cls,
-                                     const struct GNUNET_HashCode *h_contract_terms,
-                                     const struct TALER_MerchantPublicKeyP *merchant_pub,
+                                     const struct
+                                     GNUNET_HashCode *h_contract_terms,
+                                     const struct
+                                     TALER_MerchantPublicKeyP *merchant_pub,
                                      const struct TALER_Amount *refund,
                                      const char *reason);
 
@@ -668,8 +696,10 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*get_refunds_from_contract_terms_hash)(void *cls,
-                                          const struct TALER_MerchantPublicKeyP *merchant_pub,
-                                          const struct GNUNET_HashCode *h_contract_terms,
+                                          const struct
+                                          TALER_MerchantPublicKeyP *merchant_pub,
+                                          const struct
+                                          GNUNET_HashCode *h_contract_terms,
                                           TALER_MERCHANTDB_RefundCallback rc,
                                           void *rc_cls);
 
@@ -741,7 +771,8 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*get_authorized_tip_amount)(void *cls,
-                               const struct TALER_ReservePrivateKeyP *reserve_priv,
+                               const struct
+                               TALER_ReservePrivateKeyP *reserve_priv,
                                struct TALER_Amount *authorized_amount);
 
 
@@ -833,7 +864,7 @@ struct TALER_MERCHANTDB_Plugin
    * @return transaction status code
    */
   enum GNUNET_DB_QueryStatus
-  (*commit) (void *cls);
+  (*commit)(void *cls);
 
 };
 

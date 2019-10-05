@@ -48,8 +48,8 @@
 int
 TALER_TESTING_get_trait_tip_id
   (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   struct GNUNET_HashCode **tip_id)
+  unsigned int index,
+  struct GNUNET_HashCode **tip_id)
 {
   return cmd->traits (cmd->cls,
                       (const void **) tip_id,
@@ -69,7 +69,7 @@ TALER_TESTING_get_trait_tip_id
 struct TALER_TESTING_Trait
 TALER_TESTING_make_trait_tip_id
   (unsigned int index,
-   const struct GNUNET_HashCode *tip_id)
+  const struct GNUNET_HashCode *tip_id)
 {
   struct TALER_TESTING_Trait ret = {
     .index = index,
@@ -92,8 +92,8 @@ TALER_TESTING_make_trait_tip_id
 int
 TALER_TESTING_get_trait_h_contract_terms
   (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   const struct GNUNET_HashCode **h_contract_terms)
+  unsigned int index,
+  const struct GNUNET_HashCode **h_contract_terms)
 {
   return cmd->traits (cmd->cls,
                       (const void **) h_contract_terms,
@@ -115,7 +115,7 @@ TALER_TESTING_get_trait_h_contract_terms
 struct TALER_TESTING_Trait
 TALER_TESTING_make_trait_h_contract_terms
   (unsigned int index,
-   const struct GNUNET_HashCode *h_contract_terms)
+  const struct GNUNET_HashCode *h_contract_terms)
 {
   struct TALER_TESTING_Trait ret = {
     .index = index,

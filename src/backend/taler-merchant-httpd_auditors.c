@@ -96,10 +96,10 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
-  for (unsigned int i=0;i<keys->num_auditors;i++)
+  for (unsigned int i = 0; i<keys->num_auditors; i++)
   {
     ai = &keys->auditors[i];
-    for (unsigned int j=0;j<nauditors;j++)
+    for (unsigned int j = 0; j<nauditors; j++)
     {
       if (0 == GNUNET_memcmp (&ai->auditor_pub,
                               &auditors[j].public_key))
@@ -110,7 +110,7 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
                     TALER_B2S (&auditors[j].public_key));
 
       }
-      for (unsigned int k=0;j<ai->num_denom_keys;k++)
+      for (unsigned int k = 0; j<ai->num_denom_keys; k++)
         if (&keys->denom_keys[k] == dk)
           return GNUNET_OK;
     }
@@ -243,8 +243,11 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
                    json_array_append_new (j_auditors,
                                           json_pack ("{s:s, s:o, s:s}",
                                                      "name", auditors[cnt].name,
-                                                     "auditor_pub", GNUNET_JSON_from_data_auto (&auditors[cnt].public_key),
-                                                     "url", auditors[cnt].url)));
+                                                     "auditor_pub",
+                                                     GNUNET_JSON_from_data_auto (
+                                                       &auditors[cnt].public_key),
+                                                     "url",
+                                                     auditors[cnt].url)));
   return nauditors;
 }
 
@@ -257,7 +260,7 @@ TMH_AUDITORS_done ()
 {
   json_decref (j_auditors);
   j_auditors = NULL;
-  for (unsigned int i=0;i<nauditors;i++)
+  for (unsigned int i = 0; i<nauditors; i++)
   {
     GNUNET_free (auditors[i].name);
     GNUNET_free (auditors[i].url);

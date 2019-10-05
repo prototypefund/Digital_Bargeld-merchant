@@ -47,8 +47,8 @@
 int
 TALER_TESTING_get_trait_proposal_reference
   (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   const char **proposal_reference)
+  unsigned int index,
+  const char **proposal_reference)
 {
   return cmd->traits (cmd->cls,
                       (const void **) proposal_reference,
@@ -69,7 +69,7 @@ TALER_TESTING_get_trait_proposal_reference
 struct TALER_TESTING_Trait
 TALER_TESTING_make_trait_proposal_reference
   (unsigned int index,
-   const char *proposal_reference)
+  const char *proposal_reference)
 {
   struct TALER_TESTING_Trait ret = {
     .index = index,
@@ -100,8 +100,8 @@ TALER_TESTING_make_trait_proposal_reference
 int
 TALER_TESTING_get_trait_coin_reference
   (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   const char **coin_reference)
+  unsigned int index,
+  const char **coin_reference)
 {
   return cmd->traits (cmd->cls,
                       (const void **) coin_reference,
@@ -122,7 +122,7 @@ TALER_TESTING_get_trait_coin_reference
 struct TALER_TESTING_Trait
 TALER_TESTING_make_trait_coin_reference
   (unsigned int index,
-   const char *coin_reference)
+  const char *coin_reference)
 {
   struct TALER_TESTING_Trait ret = {
     .index = index,

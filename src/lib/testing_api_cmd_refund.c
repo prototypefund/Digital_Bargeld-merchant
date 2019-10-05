@@ -299,7 +299,7 @@ refund_lookup_cb (void *cls,
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount *irefund_amount = GNUNET_new
-      (struct TALER_Amount);
+                                            (struct TALER_Amount);
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin_pub),
       TALER_JSON_spec_amount ("refund_amount", irefund_amount),
@@ -307,28 +307,28 @@ refund_lookup_cb (void *cls,
     };
 
     GNUNET_assert (GNUNET_OK == GNUNET_JSON_parse (elem,
-			                           spec,
+                                                   spec,
                                                    &error_name,
                                                    &error_line));
     GNUNET_CRYPTO_hash (&coin_pub,
-			sizeof (struct TALER_CoinSpendPublicKeyP),
-			&h_coin_pub);
+                        sizeof (struct TALER_CoinSpendPublicKeyP),
+                        &h_coin_pub);
     GNUNET_assert (GNUNET_OK == GNUNET_CONTAINER_multihashmap_put
-      (map,
-       &h_coin_pub, // which
-       irefund_amount, // how much
-       GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY));
+                     (map,
+                     &h_coin_pub, // which
+                     irefund_amount, // how much
+                     GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY));
   };
 
   /* Compare spent coins with refunded, and if they match,
    * increase an accumulator.  */
   if ( NULL ==
-     ( pay_cmd = TALER_TESTING_interpreter_lookup_command
-       (rls->is, rls->pay_reference)))
+       (pay_cmd = TALER_TESTING_interpreter_lookup_command
+                    (rls->is, rls->pay_reference)))
     TALER_TESTING_FAIL (rls->is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_coin_reference
-      (pay_cmd, 0, &coin_reference))
+        (pay_cmd, 0, &coin_reference))
     TALER_TESTING_FAIL (rls->is);
 
   GNUNET_assert (GNUNET_OK == TALER_amount_get_zero ("EUR",
@@ -345,8 +345,8 @@ refund_lookup_cb (void *cls,
     const struct TALER_TESTING_Command *icoin_cmd;
 
     if ( NULL ==
-       ( icoin_cmd = TALER_TESTING_interpreter_lookup_command
-         (rls->is, icoin_reference)) )
+         (icoin_cmd = TALER_TESTING_interpreter_lookup_command
+                        (rls->is, icoin_reference)) )
     {
       GNUNET_break (0);
       TALER_LOG_ERROR ("Bad reference `%s'\n",
@@ -356,16 +356,16 @@ refund_lookup_cb (void *cls,
       return;
     }
 
-   if (GNUNET_OK != TALER_TESTING_get_trait_coin_priv
-      (icoin_cmd, 0, &icoin_priv))
-   {
-     GNUNET_break (0);
-     TALER_LOG_ERROR ("Command `%s' failed to give coin"
-                      " priv trait\n",
-                      icoin_reference);
-     TALER_TESTING_interpreter_fail (rls->is);
-     GNUNET_CONTAINER_multihashmap_destroy (map);
-     return;
+    if (GNUNET_OK != TALER_TESTING_get_trait_coin_priv
+          (icoin_cmd, 0, &icoin_priv))
+    {
+      GNUNET_break (0);
+      TALER_LOG_ERROR ("Command `%s' failed to give coin"
+                       " priv trait\n",
+                       icoin_reference);
+      TALER_TESTING_interpreter_fail (rls->is);
+      GNUNET_CONTAINER_multihashmap_destroy (map);
+      return;
     }
 
     GNUNET_CRYPTO_eddsa_key_get_public (&icoin_priv->eddsa_priv,
@@ -375,7 +375,7 @@ refund_lookup_cb (void *cls,
                         &h_icoin_pub);
 
     iamount = GNUNET_CONTAINER_multihashmap_get
-      (map, &h_icoin_pub);
+                (map, &h_icoin_pub);
 
     /* Can be NULL: not all coins are involved in refund */
     if (NULL == iamount)
@@ -389,15 +389,15 @@ refund_lookup_cb (void *cls,
   GNUNET_free (coin_reference_dup);
 
   if (NULL !=
-    (increase_cmd = TALER_TESTING_interpreter_lookup_command
-      (rls->is, rls->increase_reference)))
+      (increase_cmd = TALER_TESTING_interpreter_lookup_command
+                        (rls->is, rls->increase_reference)))
   {
     if (GNUNET_OK != TALER_TESTING_get_trait_amount
-        (increase_cmd, 0, &refund_amount))
+          (increase_cmd, 0, &refund_amount))
       TALER_TESTING_FAIL (rls->is);
 
     if (GNUNET_OK != TALER_string_to_amount
-        (refund_amount, &ra))
+          (refund_amount, &ra))
       TALER_TESTING_FAIL (rls->is);
   }
   else
@@ -405,7 +405,7 @@ refund_lookup_cb (void *cls,
     GNUNET_assert (NULL != rls->refund_amount);
 
     if (GNUNET_OK != TALER_string_to_amount
-        (rls->refund_amount, &ra))
+          (rls->refund_amount, &ra))
       TALER_TESTING_FAIL (rls->is);
   }
 
@@ -503,12 +503,12 @@ refund_increase_traits (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_increase
   (const char *label,
-   const char *merchant_url,
-   const char *reason,
-   const char *order_id,
-   const char *refund_amount,
-   const char *refund_fee,
-   unsigned int http_code)
+  const char *merchant_url,
+  const char *reason,
+  const char *order_id,
+  const char *refund_amount,
+  const char *refund_fee,
+  unsigned int http_code)
 {
   struct RefundIncreaseState *ris;
 
@@ -551,11 +551,11 @@ TALER_TESTING_cmd_refund_increase
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup
   (const char *label,
-   const char *merchant_url,
-   const char *increase_reference,
-   const char *pay_reference,
-   const char *order_id,
-   unsigned int http_code)
+  const char *merchant_url,
+  const char *increase_reference,
+  const char *pay_reference,
+  const char *order_id,
+  unsigned int http_code)
 {
   struct RefundLookupState *rls;
 
@@ -601,12 +601,12 @@ TALER_TESTING_cmd_refund_lookup
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_refund_lookup_with_amount
   (const char *label,
-   const char *merchant_url,
-   const char *increase_reference,
-   const char *pay_reference,
-   const char *order_id,
-   unsigned int http_code,
-   const char *refund_amount)
+  const char *merchant_url,
+  const char *increase_reference,
+  const char *pay_reference,
+  const char *order_id,
+  unsigned int http_code,
+  const char *refund_amount)
 {
   struct RefundLookupState *rls;
 

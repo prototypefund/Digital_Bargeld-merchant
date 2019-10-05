@@ -94,12 +94,11 @@ TALER_TESTING_cmd_proposal (const char *label,
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_proposal_lookup
-  (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *proposal_reference,
-   const char *order_id);
+TALER_TESTING_cmd_proposal_lookup (const char *label,
+                                   const char *merchant_url,
+                                   unsigned int http_status,
+                                   const char *proposal_reference,
+                                   const char *order_id);
 
 /**
  * Make a "check payment" test command.
@@ -198,13 +197,12 @@ TALER_TESTING_cmd_pay_abort (const char *label,
  * @param http_status expected HTTP response code.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_pay_abort_refund
-  (const char *label,
-   const char *abort_reference,
-   unsigned int num_coins,
-   const char *refund_amount,
-   const char *refund_fee,
-   unsigned int http_status);
+TALER_TESTING_cmd_pay_abort_refund (const char *label,
+                                    const char *abort_reference,
+                                    unsigned int num_coins,
+                                    const char *refund_amount,
+                                    const char *refund_fee,
+                                    unsigned int http_status);
 
 /**
  * Define a "refund lookup" CMD.
@@ -224,13 +222,12 @@ TALER_TESTING_cmd_pay_abort_refund
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_refund_lookup
-  (const char *label,
-   const char *merchant_url,
-   const char *increase_reference,
-   const char *pay_reference,
-   const char *order_id,
-   unsigned int http_code);
+TALER_TESTING_cmd_refund_lookup (const char *label,
+                                 const char *merchant_url,
+                                 const char *increase_reference,
+                                 const char *pay_reference,
+                                 const char *order_id,
+                                 unsigned int http_code);
 
 /**
  * Define a "refund lookup" CMD, equipped with a expected refund
@@ -254,14 +251,13 @@ TALER_TESTING_cmd_refund_lookup
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_refund_lookup_with_amount
-  (const char *label,
-   const char *merchant_url,
-   const char *increase_reference,
-   const char *pay_reference,
-   const char *order_id,
-   unsigned int http_code,
-   const char *refund_amount);
+TALER_TESTING_cmd_refund_lookup_with_amount (const char *label,
+                                             const char *merchant_url,
+                                             const char *increase_reference,
+                                             const char *pay_reference,
+                                             const char *order_id,
+                                             unsigned int http_code,
+                                             const char *refund_amount);
 
 
 /**
@@ -279,14 +275,13 @@ TALER_TESTING_cmd_refund_lookup_with_amount
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_refund_increase
-  (const char *label,
-   const char *merchant_url,
-   const char *reason,
-   const char *order_id,
-   const char *refund_amount,
-   const char *refund_fee,
-   unsigned int http_code);
+TALER_TESTING_cmd_refund_increase (const char *label,
+                                   const char *merchant_url,
+                                   const char *reason,
+                                   const char *order_id,
+                                   const char *refund_amount,
+                                   const char *refund_fee,
+                                   unsigned int http_code);
 
 /**
  * Make a "history" command.
@@ -301,13 +296,12 @@ TALER_TESTING_cmd_refund_increase
  * @param nrows how many row we want to receive, at most.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_history_default_start
-  (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   struct GNUNET_TIME_Absolute time,
-   unsigned int nresult,
-   long long nrows);
+TALER_TESTING_cmd_history_default_start (const char *label,
+                                         const char *merchant_url,
+                                         unsigned int http_status,
+                                         struct GNUNET_TIME_Absolute time,
+                                         unsigned int nresult,
+                                         long long nrows);
 
 /**
  * Make a "history" command.
@@ -341,11 +335,10 @@ TALER_TESTING_cmd_history (const char *label,
  * @param pay_reference used to retrieve the order id to track.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_merchant_track_transaction
-  (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *pay_reference);
+TALER_TESTING_cmd_merchant_track_transaction (const char *label,
+                                              const char *merchant_url,
+                                              unsigned int http_status,
+                                              const char *pay_reference);
 
 /**
  * Define a "track transfer" CMD.
@@ -360,11 +353,10 @@ TALER_TESTING_cmd_merchant_track_transaction
  * @param pay_reference FIXME not used.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_merchant_track_transfer
-  (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *check_bank_reference);
+TALER_TESTING_cmd_merchant_track_transfer (const char *label,
+                                           const char *merchant_url,
+                                           unsigned int http_status,
+                                           const char *check_bank_reference);
 
 /* ****** Specific traits supported by this component ******* */
 
@@ -378,9 +370,9 @@ TALER_TESTING_cmd_merchant_track_transfer
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_merchant_sig
-  (unsigned int index,
-   const struct TALER_MerchantSignatureP *merchant_sig);
+TALER_TESTING_make_trait_merchant_sig (unsigned int index,
+                                       const struct
+                                       TALER_MerchantSignatureP *merchant_sig);
 
 /**
  * Obtain a merchant signature over a contract from a @a cmd.
@@ -393,10 +385,10 @@ TALER_TESTING_make_trait_merchant_sig
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_merchant_sig
-  (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   struct TALER_MerchantSignatureP **merchant_sig);
+TALER_TESTING_get_trait_merchant_sig (const struct TALER_TESTING_Command *cmd,
+                                      unsigned int index,
+                                      struct TALER_MerchantSignatureP **
+                                      merchant_sig);
 
 /**
  * Obtain a reference to a proposal command.  Any command that
@@ -414,10 +406,10 @@ TALER_TESTING_get_trait_merchant_sig
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_proposal_reference
-  (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   const char **proposal_reference);
+TALER_TESTING_get_trait_proposal_reference (const struct
+                                            TALER_TESTING_Command *cmd,
+                                            unsigned int index,
+                                            const char **proposal_reference);
 
 /**
  * Offer a proposal reference.
@@ -429,9 +421,8 @@ TALER_TESTING_get_trait_proposal_reference
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_proposal_reference
-  (unsigned int index,
-   const char *proposal_reference);
+TALER_TESTING_make_trait_proposal_reference (unsigned int index,
+                                             const char *proposal_reference);
 
 /**
  * Offer a coin reference.
@@ -443,9 +434,8 @@ TALER_TESTING_make_trait_proposal_reference
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_coin_reference
-  (unsigned int index,
-   const char *coin_reference);
+TALER_TESTING_make_trait_coin_reference (unsigned int index,
+                                         const char *coin_reference);
 
 /**
  * Obtain a reference to any command that can provide coins as
@@ -465,10 +455,9 @@ TALER_TESTING_make_trait_coin_reference
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_coin_reference
-  (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   const char **coin_reference);
+TALER_TESTING_get_trait_coin_reference (const struct TALER_TESTING_Command *cmd,
+                                        unsigned int index,
+                                        const char **coin_reference);
 
 
 /**
@@ -481,10 +470,11 @@ TALER_TESTING_get_trait_coin_reference
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_planchet_secrets
-  (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   struct TALER_PlanchetSecretsP **planchet_secrets);
+TALER_TESTING_get_trait_planchet_secrets (const struct
+                                          TALER_TESTING_Command *cmd,
+                                          unsigned int index,
+                                          struct TALER_PlanchetSecretsP **
+                                          planchet_secrets);
 
 /**
  * Offer planchet secrets.
@@ -495,9 +485,10 @@ TALER_TESTING_get_trait_planchet_secrets
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_planchet_secrets
-  (unsigned int index,
-   const struct TALER_PlanchetSecretsP *planchet_secrets);
+TALER_TESTING_make_trait_planchet_secrets (unsigned int index,
+                                           const struct
+                                           TALER_PlanchetSecretsP *
+                                           planchet_secrets);
 
 /**
  * Offer tip id.
@@ -508,9 +499,8 @@ TALER_TESTING_make_trait_planchet_secrets
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_tip_id
-  (unsigned int index,
-   const struct GNUNET_HashCode *tip_id);
+TALER_TESTING_make_trait_tip_id (unsigned int index,
+                                 const struct GNUNET_HashCode *tip_id);
 
 /**
  * Obtain tip id from a @a cmd.
@@ -523,10 +513,9 @@ TALER_TESTING_make_trait_tip_id
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_tip_id
-  (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   const struct GNUNET_HashCode **tip_id);
+TALER_TESTING_get_trait_tip_id (const struct TALER_TESTING_Command *cmd,
+                                unsigned int index,
+                                const struct GNUNET_HashCode **tip_id);
 
 /**
  * Offer contract terms hash code.
@@ -539,9 +528,9 @@ TALER_TESTING_get_trait_tip_id
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_h_contract_terms
-  (unsigned int index,
-   const struct GNUNET_HashCode *h_contract_terms);
+TALER_TESTING_make_trait_h_contract_terms (unsigned int index,
+                                           const struct
+                                           GNUNET_HashCode *h_contract_terms);
 
 /**
  * Obtain contract terms hash from a @a cmd.
@@ -553,10 +542,11 @@ TALER_TESTING_make_trait_h_contract_terms
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_h_contract_terms
-  (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   const struct GNUNET_HashCode **h_contract_terms);
+TALER_TESTING_get_trait_h_contract_terms (const struct
+                                          TALER_TESTING_Command *cmd,
+                                          unsigned int index,
+                                          const struct
+                                          GNUNET_HashCode **h_contract_terms);
 
 /**
  * Offer refund entry.
@@ -567,9 +557,9 @@ TALER_TESTING_get_trait_h_contract_terms
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_refund_entry
-  (unsigned int index,
-   const struct TALER_MERCHANT_RefundEntry *refund_entry);
+TALER_TESTING_make_trait_refund_entry (unsigned int index,
+                                       const struct
+                                       TALER_MERCHANT_RefundEntry *refund_entry);
 
 
 /**
@@ -582,10 +572,10 @@ TALER_TESTING_make_trait_refund_entry
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_refund_entry
-  (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   const struct TALER_MERCHANT_RefundEntry **refund_entry);
+TALER_TESTING_get_trait_refund_entry (const struct TALER_TESTING_Command *cmd,
+                                      unsigned int index,
+                                      const struct
+                                      TALER_MERCHANT_RefundEntry **refund_entry);
 
 /**
  * Create a /tip-authorize CMD, specifying the Taler error code
@@ -604,14 +594,13 @@ TALER_TESTING_get_trait_refund_entry
  * @param ec expected Taler-defined error code.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_tip_authorize_with_ec
-  (const char *label,
-   const char *merchant_url,
-   const char *exchange_url,
-   unsigned int http_status,
-   const char *justification,
-   const char *amount,
-   enum TALER_ErrorCode ec);
+TALER_TESTING_cmd_tip_authorize_with_ec (const char *label,
+                                         const char *merchant_url,
+                                         const char *exchange_url,
+                                         unsigned int http_status,
+                                         const char *justification,
+                                         const char *amount,
+                                         enum TALER_ErrorCode ec);
 
 
 /**
@@ -625,8 +614,7 @@ TALER_TESTING_cmd_tip_authorize_with_ec
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_tip_authorize_fake
-  (const char *label);
+TALER_TESTING_cmd_tip_authorize_fake (const char *label);
 
 /**
  * Create a /tip-authorize CMD.
@@ -678,13 +666,12 @@ TALER_TESTING_cmd_tip_query (const char *label,
  * @param expected_amount_available FIXME what is this?
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_tip_query_with_amounts
-  (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *expected_amount_picked_up,
-   const char *expected_amount_authorized,
-   const char *expected_amount_available);
+TALER_TESTING_cmd_tip_query_with_amounts (const char *label,
+                                          const char *merchant_url,
+                                          unsigned int http_status,
+                                          const char *expected_amount_picked_up,
+                                          const char *expected_amount_authorized,
+                                          const char *expected_amount_available);
 
 /**
  * Define a /tip-pickup CMD, equipped with the expected error
@@ -701,13 +688,12 @@ TALER_TESTING_cmd_tip_query_with_amounts
  * @param ec expected Taler error code.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_tip_pickup_with_ec
-  (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *authorize_reference,
-   const char **amounts,
-   enum TALER_ErrorCode ec);
+TALER_TESTING_cmd_tip_pickup_with_ec (const char *label,
+                                      const char *merchant_url,
+                                      unsigned int http_status,
+                                      const char *authorize_reference,
+                                      const char **amounts,
+                                      enum TALER_ErrorCode ec);
 
 /**
  * Define a /tip-pickup CMD.
@@ -722,12 +708,11 @@ TALER_TESTING_cmd_tip_pickup_with_ec
  *        which denominations will be accepted for tipping.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_tip_pickup
-  (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   const char *authorize_reference,
-   const char **amounts);
+TALER_TESTING_cmd_tip_pickup (const char *label,
+                              const char *merchant_url,
+                              unsigned int http_status,
+                              const char *authorize_reference,
+                              const char **amounts);
 
 /**
  * Make the instruction pointer point to @a new_ip
@@ -743,9 +728,8 @@ TALER_TESTING_cmd_tip_pickup
  * to happen.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_rewind_ip
-  (const char *label,
-   int new_ip,
-   unsigned int *counter);
+TALER_TESTING_cmd_rewind_ip (const char *label,
+                             int new_ip,
+                             unsigned int *counter);
 
 #endif

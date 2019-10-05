@@ -164,7 +164,7 @@ history_cb (void *cls,
   hs->ho = NULL;
 
   if (hs->http_status != http_status)
-      TALER_TESTING_FAIL (hs->is);
+    TALER_TESTING_FAIL (hs->is);
 
   if (0 == hs->http_status)
   {
@@ -256,24 +256,24 @@ history_run (void *cls,
   if (0 == hs->time.abs_value_us)
   {
     hs->time = GNUNET_TIME_absolute_add
-      (GNUNET_TIME_absolute_get (),
-       GNUNET_TIME_UNIT_HOURS);
+                 (GNUNET_TIME_absolute_get (),
+                 GNUNET_TIME_UNIT_HOURS);
     GNUNET_TIME_round_abs (&hs->time);
   }
 
   switch (hs->use_default_start)
   {
-    case GNUNET_YES:
+  case GNUNET_YES:
     hs->ho = TALER_MERCHANT_history_default_start
-      (is->ctx,
-       hs->merchant_url,
-       hs->nrows,
-       hs->time,
-       &history_cb,
-       hs);
+               (is->ctx,
+               hs->merchant_url,
+               hs->nrows,
+               hs->time,
+               &history_cb,
+               hs);
     break;
 
-    case GNUNET_NO:
+  case GNUNET_NO:
     hs->ho = TALER_MERCHANT_history (is->ctx,
                                      hs->merchant_url,
                                      hs->start,
@@ -282,9 +282,9 @@ history_run (void *cls,
                                      &history_cb,
                                      hs);
     break;
-    default:
-      TALER_LOG_ERROR ("Bad value for 'use_default_start'\n");
-      TALER_TESTING_FAIL (is);
+  default:
+    TALER_LOG_ERROR ("Bad value for 'use_default_start'\n");
+    TALER_TESTING_FAIL (is);
   }
 
   if (NULL == hs->ho)
@@ -357,11 +357,11 @@ cmd_history2 (const char *label,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_history_default_start
   (const char *label,
-   const char *merchant_url,
-   unsigned int http_status,
-   struct GNUNET_TIME_Absolute time,
-   unsigned int nresult,
-   long long nrows)
+  const char *merchant_url,
+  unsigned int http_status,
+  struct GNUNET_TIME_Absolute time,
+  unsigned int nresult,
+  long long nrows)
 {
   return cmd_history2 (label,
                        merchant_url,

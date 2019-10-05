@@ -152,7 +152,7 @@ static struct GNUNET_OS_Process *twistermerchantd;
  * @param label label to use for the command.
  */
 #define CMD_EXEC_WIREWATCH(label) \
-   TALER_TESTING_cmd_exec_wirewatch (label, CONFIG_FILE)
+  TALER_TESTING_cmd_exec_wirewatch (label, CONFIG_FILE)
 
 /**
  * Execute the taler-exchange-aggregator command with
@@ -161,7 +161,7 @@ static struct GNUNET_OS_Process *twistermerchantd;
  * @param label label to use for the command.
  */
 #define CMD_EXEC_AGGREGATOR(label) \
-   TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE)
+  TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE)
 
 /**
  * Run wire transfer of funds from some user's account to the
@@ -172,9 +172,11 @@ static struct GNUNET_OS_Process *twistermerchantd;
  * @param url exchange_url
  */
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
-   TALER_TESTING_cmd_fakebank_transfer (label, amount, \
-     fakebank_url, USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO, \
-     USER_LOGIN_NAME, USER_LOGIN_PASS, EXCHANGE_URL)
+  TALER_TESTING_cmd_fakebank_transfer (label, amount, \
+                                       fakebank_url, USER_ACCOUNT_NO, \
+                                       EXCHANGE_ACCOUNT_NO, \
+                                       USER_LOGIN_NAME, USER_LOGIN_PASS, \
+                                       EXCHANGE_URL)
 
 /**
  * Run wire transfer of funds from some user's account to the
@@ -184,10 +186,10 @@ static struct GNUNET_OS_Process *twistermerchantd;
  * @param amount amount to transfer, i.e. "EUR:1"
  */
 #define CMD_TRANSFER_TO_EXCHANGE_SUBJECT(label,amount,subject) \
-   TALER_TESTING_cmd_fakebank_transfer_with_subject \
-     (label, amount, fakebank_url, USER_ACCOUNT_NO, \
-      EXCHANGE_ACCOUNT_NO, USER_LOGIN_NAME, USER_LOGIN_PASS, \
-      subject)
+  TALER_TESTING_cmd_fakebank_transfer_with_subject \
+    (label, amount, fakebank_url, USER_ACCOUNT_NO, \
+    EXCHANGE_ACCOUNT_NO, USER_LOGIN_NAME, USER_LOGIN_PASS, \
+    subject)
 
 /**
  * Main function that will tell the interpreter what commands to
@@ -216,10 +218,10 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("5719-check-transfer",
-       EXCHANGE_URL,
-       "EUR:1.01",
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:1.01",
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("5719-withdraw",
                                        "5719-create-reserve",
@@ -232,9 +234,9 @@ run (void *cls,
                               MHD_HTTP_OK),
     TALER_TESTING_cmd_proposal
       ("5719-create-proposal",
-       twister_merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -259,7 +261,7 @@ run (void *cls,
      */
     TALER_TESTING_cmd_malform_response
       ("5719-malform-xcg-resp",
-       PROXY_EXCHANGE_CONFIG_FILE),
+      PROXY_EXCHANGE_CONFIG_FILE),
 
     TALER_TESTING_cmd_pay ("5719-deposit",
                            twister_merchant_url,
@@ -271,16 +273,16 @@ run (void *cls,
                            "EUR:0.01"), // no sense now
     TALER_TESTING_cmd_end ()
   };
-  
+
 
   /**** Covering /check-payment ****/
   struct TALER_TESTING_Command check_payment[] = {
 
     TALER_TESTING_cmd_proposal
       ("proposal-for-check-payment",
-       twister_merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -299,38 +301,38 @@ run (void *cls,
     /* Need any response code != 200.  */
     TALER_TESTING_cmd_hack_response_code
       ("non-200-response-code",
-       PROXY_MERCHANT_CONFIG_FILE,
-       MHD_HTTP_MULTIPLE_CHOICES),
+      PROXY_MERCHANT_CONFIG_FILE,
+      MHD_HTTP_MULTIPLE_CHOICES),
 
     TALER_TESTING_cmd_check_payment
       ("check-payment-fail",
-       twister_merchant_url,
-       MHD_HTTP_MULTIPLE_CHOICES,
-       "proposal-for-check-payment",
-       GNUNET_SYSERR), // any response != 200 gives "syserr"
+      twister_merchant_url,
+      MHD_HTTP_MULTIPLE_CHOICES,
+      "proposal-for-check-payment",
+      GNUNET_SYSERR),  // any response != 200 gives "syserr"
 
     TALER_TESTING_cmd_delete_object ("hack-check-payment-0",
                                      PROXY_MERCHANT_CONFIG_FILE,
                                      "taler_pay_uri"),
     TALER_TESTING_cmd_check_payment
       ("check-payment-fail-invalid",
-       twister_merchant_url,
-       0,
-       "proposal-for-check-payment",
-       GNUNET_SYSERR),
+      twister_merchant_url,
+      0,
+      "proposal-for-check-payment",
+      GNUNET_SYSERR),
 
     TALER_TESTING_cmd_modify_object_dl
       ("paid-true-for-unpaid",
-       PROXY_MERCHANT_CONFIG_FILE,
-       "paid",
-       "true"),
+      PROXY_MERCHANT_CONFIG_FILE,
+      "paid",
+      "true"),
 
     TALER_TESTING_cmd_check_payment
       ("check-payment-fail-invalid-0",
-       twister_merchant_url,
-       0,
-       "proposal-for-check-payment",
-       GNUNET_SYSERR),
+      twister_merchant_url,
+      0,
+      "proposal-for-check-payment",
+      GNUNET_SYSERR),
 
     TALER_TESTING_cmd_end ()
   };
@@ -344,31 +346,31 @@ run (void *cls,
      */
     TALER_TESTING_cmd_malform_request
       ("malform-order",
-       PROXY_MERCHANT_CONFIG_FILE),
-  
+      PROXY_MERCHANT_CONFIG_FILE),
+
     TALER_TESTING_cmd_proposal
       ("create-proposal-0",
-       twister_merchant_url,
-       MHD_HTTP_BAD_REQUEST,
-       /* giving a valid JSON to not make it fail before
-        * data reaches the merchant.  */
-       "{\"not\": \"used\"}"),
-  
+      twister_merchant_url,
+      MHD_HTTP_BAD_REQUEST,
+      /* giving a valid JSON to not make it fail before
+       * data reaches the merchant.  */
+      "{\"not\": \"used\"}"),
+
     TALER_TESTING_cmd_hack_response_code
       ("proposal-500",
-       PROXY_MERCHANT_CONFIG_FILE,
-       MHD_HTTP_INTERNAL_SERVER_ERROR),
-  
+      PROXY_MERCHANT_CONFIG_FILE,
+      MHD_HTTP_INTERNAL_SERVER_ERROR),
+
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
-       twister_merchant_url,
-       /* This status code == 0 is gotten via a 500 Internal Server
-        * Error handed to the library.  */
-       MHD_HTTP_INTERNAL_SERVER_ERROR,
-       /* giving a valid JSON to not make it fail before
-        * data reaches the merchant.  */
-       "{\"not\": \"used\"}"),
-  
+      twister_merchant_url,
+      /* This status code == 0 is gotten via a 500 Internal Server
+       * Error handed to the library.  */
+      MHD_HTTP_INTERNAL_SERVER_ERROR,
+      /* giving a valid JSON to not make it fail before
+       * data reaches the merchant.  */
+      "{\"not\": \"used\"}"),
+
     /**
      * Cause the PUT /proposal callback to be called
      * with a response code == 0.  We achieve this by malforming
@@ -377,13 +379,13 @@ run (void *cls,
 
     TALER_TESTING_cmd_malform_response
       ("malform-proposal",
-       PROXY_MERCHANT_CONFIG_FILE),
+      PROXY_MERCHANT_CONFIG_FILE),
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-2",
-       twister_merchant_url,
-       0,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      0,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -406,9 +408,9 @@ run (void *cls,
                                      "order_id"),
     TALER_TESTING_cmd_proposal
       ("create-proposal-3",
-       twister_merchant_url,
-       0,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      0,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -429,9 +431,9 @@ run (void *cls,
      */
     TALER_TESTING_cmd_proposal
       ("create-proposal-4",
-       twister_merchant_url_instance_nonexistent,
-       MHD_HTTP_NOT_FOUND,
-       "{\"amount\":\"EUR:5\",\
+      twister_merchant_url_instance_nonexistent,
+      MHD_HTTP_NOT_FOUND,
+      "{\"amount\":\"EUR:5\",\
          \"fulfillment_url\": \"https://example.com/\",\
          \"summary\": \"merchant-lib testcase\"}"),
 
@@ -445,7 +447,7 @@ run (void *cls,
     /* Cause a unparsable response to be returned.  */
     TALER_TESTING_cmd_malform_response
       ("malform-proposal-lookup",
-       PROXY_MERCHANT_CONFIG_FILE),
+      PROXY_MERCHANT_CONFIG_FILE),
     /* To be short, we'll make a _error_ response to be
      * unparsable.  */
     TALER_TESTING_cmd_proposal_lookup ("lookup-1",
@@ -463,9 +465,9 @@ run (void *cls,
      * we can lookup for it later.  */
     TALER_TESTING_cmd_proposal
       ("create-proposal-5",
-       twister_merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -496,7 +498,7 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
-    /**** Covering /history lib ****/
+  /**** Covering /history lib ****/
   struct TALER_TESTING_Command history[] = {
 
     /**
@@ -508,8 +510,8 @@ run (void *cls,
      */
     TALER_TESTING_cmd_hack_response_code
       ("twist-history",
-       PROXY_MERCHANT_CONFIG_FILE,
-       MHD_HTTP_GONE),
+      PROXY_MERCHANT_CONFIG_FILE,
+      MHD_HTTP_GONE),
 
     TALER_TESTING_cmd_history ("history-0",
                                twister_merchant_url,
@@ -525,7 +527,7 @@ run (void *cls,
      */
     TALER_TESTING_cmd_malform_response
       ("malform-history",
-       PROXY_MERCHANT_CONFIG_FILE),
+      PROXY_MERCHANT_CONFIG_FILE),
 
     TALER_TESTING_cmd_history ("history-1",
                                twister_merchant_url,
@@ -548,36 +550,36 @@ run (void *cls,
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-unaggregation",
-       "EUR:5.01"),
+      "EUR:5.01"),
 
     CMD_EXEC_WIREWATCH
       ("wirewatch-unaggregation"),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-unaggregation",
-       EXCHANGE_URL,
-       "EUR:5.01",
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:5.01",
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_empty
       ("check_bank_unaggregated-a"),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-unaggregation",
-       "create-reserve-unaggregation",
-       "EUR:5",
-       MHD_HTTP_OK),
+      "create-reserve-unaggregation",
+      "EUR:5",
+      MHD_HTTP_OK),
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-unaggregation",
-       /* Need a fresh instance in order to associate this
-        * proposal with a fresh h_wire;  this way, this proposal
-        * won't get hooked by the aggregator gathering same-H_wire'd
-        * transactions.  */
-       twister_merchant_url_instance_tor,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      /* Need a fresh instance in order to associate this
+       * proposal with a fresh h_wire;  this way, this proposal
+       * won't get hooked by the aggregator gathering same-H_wire'd
+       * transactions.  */
+      twister_merchant_url_instance_tor,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -595,13 +597,13 @@ run (void *cls,
 
     TALER_TESTING_cmd_pay
       ("pay-unaggregation",
-       merchant_url,
-       MHD_HTTP_OK,
-       "create-proposal-unaggregation",
-       "withdraw-coin-unaggregation",
-       "EUR:5", // amount + fee
-       "EUR:4.99", // amount - fee
-       "EUR:0.01"), // refund fee
+      merchant_url,
+      MHD_HTTP_OK,
+      "create-proposal-unaggregation",
+      "withdraw-coin-unaggregation",
+      "EUR:5",  // amount + fee
+      "EUR:4.99",  // amount - fee
+      "EUR:0.01"),  // refund fee
 
     CMD_EXEC_AGGREGATOR
       ("aggregation-attempt"),
@@ -620,25 +622,25 @@ run (void *cls,
     CMD_EXEC_WIREWATCH ("wirewatch-5383"),
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-5383",
-       EXCHANGE_URL,
-       "EUR:2.02",
-       USER_ACCOUNT_NO,
-       EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:2.02",
+      USER_ACCOUNT_NO,
+      EXCHANGE_ACCOUNT_NO),
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-5383a",
-       "create-reserve-5383",
-       "EUR:1",
-       MHD_HTTP_OK),
+      "create-reserve-5383",
+      "EUR:1",
+      MHD_HTTP_OK),
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-5383b",
-       "create-reserve-5383",
-       "EUR:1",
-       MHD_HTTP_OK),
+      "create-reserve-5383",
+      "EUR:1",
+      MHD_HTTP_OK),
     TALER_TESTING_cmd_proposal
       ("create-proposal-5383",
-       twister_merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -665,25 +667,25 @@ run (void *cls,
     CMD_EXEC_AGGREGATOR ("run-aggregator-5383"),
     TALER_TESTING_cmd_check_bank_transfer
       ("check_aggregation_transfer-5383",
-       twister_exchange_url, /* has the 8888-port thing.  */
-       /* paid,         1.97 =
-          brutto        2.00 -
-          deposit fee   0.01 * 2 -
-          wire fee      0.01
-       */
-       "EUR:1.97",
-       EXCHANGE_ACCOUNT_NO,
-       MERCHANT_ACCOUNT_NO),
+      twister_exchange_url,  /* has the 8888-port thing.  */
+      /* paid,         1.97 =
+         brutto        2.00 -
+         deposit fee   0.01 * 2 -
+         wire fee      0.01
+      */
+      "EUR:1.97",
+      EXCHANGE_ACCOUNT_NO,
+      MERCHANT_ACCOUNT_NO),
     TALER_TESTING_cmd_modify_object_dl
       ("hack-5383",
-       PROXY_EXCHANGE_CONFIG_FILE,
-       "total",
-       "EUR:0.98"),
+      PROXY_EXCHANGE_CONFIG_FILE,
+      "total",
+      "EUR:0.98"),
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-5383",
-       twister_merchant_url,
-       MHD_HTTP_FAILED_DEPENDENCY,
-       "check_aggregation_transfer-5383"),
+      twister_merchant_url,
+      MHD_HTTP_FAILED_DEPENDENCY,
+      "check_aggregation_transfer-5383"),
 
     TALER_TESTING_cmd_end ()
   };
@@ -706,8 +708,8 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
-       EXCHANGE_URL,
-       "EUR:2.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:2.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_check_bank_empty
       ("track_chunk_check_empty-a"),
@@ -727,9 +729,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-6",
-       twister_merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -769,15 +771,15 @@ run (void *cls,
     CMD_EXEC_AGGREGATOR ("run-aggregator"),
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-1",
-       twister_exchange_url, /* has the 8888-port thing.  */
-       /* paid,         1.97 =
-          brutto        2.00 -
-          deposit fee   0.01 * 2 -
-          wire fee      0.01
-       */
-       "EUR:1.97",
-       EXCHANGE_ACCOUNT_NO,
-       MERCHANT_ACCOUNT_NO),
+      twister_exchange_url,  /* has the 8888-port thing.  */
+      /* paid,         1.97 =
+         brutto        2.00 -
+         deposit fee   0.01 * 2 -
+         wire fee      0.01
+      */
+      "EUR:1.97",
+      EXCHANGE_ACCOUNT_NO,
+      MERCHANT_ACCOUNT_NO),
 
     /**
      * Fake total to include only one coin.  Math: each 1-EUR
@@ -795,18 +797,18 @@ run (void *cls,
      * issued below by the test case (to the merchant backend.) */
     TALER_TESTING_cmd_modify_object_dl
       ("hack-0",
-       PROXY_EXCHANGE_CONFIG_FILE,
-       "total",
-       "EUR:0.98"),
+      PROXY_EXCHANGE_CONFIG_FILE,
+      "total",
+      "EUR:0.98"),
     TALER_TESTING_cmd_delete_object
       ("hack-1",
-       PROXY_EXCHANGE_CONFIG_FILE,
-       "deposits.0"),
+      PROXY_EXCHANGE_CONFIG_FILE,
+      "deposits.0"),
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
-       twister_merchant_url,
-       MHD_HTTP_FAILED_DEPENDENCY,
-       "deposit-simple"),
+      twister_merchant_url,
+      MHD_HTTP_FAILED_DEPENDENCY,
+      "deposit-simple"),
 
     TALER_TESTING_cmd_end ()
   };
@@ -829,8 +831,8 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-abort-1",
-       EXCHANGE_URL,
-       "EUR:1.01", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+      EXCHANGE_URL,
+      "EUR:1.01", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-abort-1",
                                        "create-reserve-abort-1",
@@ -844,9 +846,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-abort-1",
-       twister_merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -884,8 +886,8 @@ run (void *cls,
 
     TALER_TESTING_cmd_delete_object
       ("hack-abort-2",
-       PROXY_MERCHANT_CONFIG_FILE,
-       "refund_permissions.0.rtransaction_id"),
+      PROXY_MERCHANT_CONFIG_FILE,
+      "refund_permissions.0.rtransaction_id"),
 
     TALER_TESTING_cmd_pay_abort ("pay-abort-2",
                                  twister_merchant_url,
@@ -894,10 +896,10 @@ run (void *cls,
 
     TALER_TESTING_cmd_modify_object_dl
       ("hack-abort-3",
-       PROXY_MERCHANT_CONFIG_FILE,
-       "refund_permissions.0.coin_pub",
-       /* dummy coin.  */
-       "8YX10E41ZWHX0X2RK4XFAXB2D3M05M1HNG14ZFZZB8M7SA4QCKCG"),
+      PROXY_MERCHANT_CONFIG_FILE,
+      "refund_permissions.0.coin_pub",
+      /* dummy coin.  */
+      "8YX10E41ZWHX0X2RK4XFAXB2D3M05M1HNG14ZFZZB8M7SA4QCKCG"),
 
     TALER_TESTING_cmd_pay_abort ("pay-abort-3",
                                  twister_merchant_url,
@@ -906,8 +908,8 @@ run (void *cls,
 
     TALER_TESTING_cmd_flip_download
       ("hack-abort-4",
-       PROXY_MERCHANT_CONFIG_FILE,
-       "refund_permissions.0.merchant_sig"),
+      PROXY_MERCHANT_CONFIG_FILE,
+      "refund_permissions.0.merchant_sig"),
 
     TALER_TESTING_cmd_pay_abort ("pay-abort-4",
                                  twister_merchant_url,
@@ -916,7 +918,7 @@ run (void *cls,
     /* just malforming the response.  */
     TALER_TESTING_cmd_malform_response
       ("malform-abortion",
-       PROXY_MERCHANT_CONFIG_FILE),
+      PROXY_MERCHANT_CONFIG_FILE),
 
     TALER_TESTING_cmd_pay_abort ("pay-abort-5",
                                  twister_merchant_url,
@@ -930,9 +932,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-double-spend",
-       twister_merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -949,9 +951,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_proposal
       ("create-proposal-double-spend-1",
-       twister_merchant_url,
-       MHD_HTTP_OK,
-       "{\"max_fee\":\
+      twister_merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
@@ -968,9 +970,9 @@ run (void *cls,
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-double-spend",
-       "create-reserve-double-spend",
-       "EUR:1",
-       MHD_HTTP_OK),
+      "create-reserve-double-spend",
+      "EUR:1",
+      MHD_HTTP_OK),
 
     TALER_TESTING_cmd_pay ("deposit-simple-ok",
                            twister_merchant_url,
@@ -983,8 +985,8 @@ run (void *cls,
 
     TALER_TESTING_cmd_flip_download
       ("hack-coin-history",
-       PROXY_MERCHANT_CONFIG_FILE,
-       "history.0.coin_sig"),
+      PROXY_MERCHANT_CONFIG_FILE,
+      "history.0.coin_sig"),
 
     /* Coin history check will fail,
      * due to coin's bad signature.  */
@@ -1056,7 +1058,7 @@ purge_process (struct GNUNET_OS_Process *process)
 
 int
 main (int argc,
-      char * const *argv)
+      char *const *argv)
 {
   unsigned int ret;
   /* These environment variables get in the way... */
@@ -1066,24 +1068,26 @@ main (int argc,
                     "DEBUG", NULL);
 
   if (NULL == (fakebank_url = TALER_TESTING_prepare_fakebank
-               (CONFIG_FILE,
-                "account-exchange")))
+                                (CONFIG_FILE,
+                                "account-exchange")))
     return 77;
 
   if (NULL == (merchant_url = TALER_TESTING_prepare_merchant
-      (CONFIG_FILE)))
+                                (CONFIG_FILE)))
     return 77;
 
   if (NULL == (twister_exchange_url = TALER_TESTING_prepare_twister
-      (PROXY_EXCHANGE_CONFIG_FILE)))
+                                        (PROXY_EXCHANGE_CONFIG_FILE)))
     return 77;
 
   if (NULL == (twister_merchant_url = TALER_TESTING_prepare_twister
-      (PROXY_MERCHANT_CONFIG_FILE)))
+                                        (PROXY_MERCHANT_CONFIG_FILE)))
     return 77;
 
-  twister_merchant_url_instance_nonexistent = TALER_url_join (twister_exchange_url, "instances/foo/", NULL);
-  twister_merchant_url_instance_tor = TALER_url_join (twister_exchange_url, "instances/tor/", NULL);
+  twister_merchant_url_instance_nonexistent = TALER_url_join (
+    twister_exchange_url, "instances/foo/", NULL);
+  twister_merchant_url_instance_tor = TALER_url_join (twister_exchange_url,
+                                                      "instances/tor/", NULL);
 
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
@@ -1100,16 +1104,16 @@ main (int argc,
   case GNUNET_OK:
 
     if (NULL == (merchantd = TALER_TESTING_run_merchant
-        (CONFIG_FILE, merchant_url)))
+                               (CONFIG_FILE, merchant_url)))
       // 1 is fine; after all this is merchant test cases.
       return 1;
 
     if (NULL == (twisterexchanged = TALER_TESTING_run_twister
-        (PROXY_EXCHANGE_CONFIG_FILE)))
+                                      (PROXY_EXCHANGE_CONFIG_FILE)))
       return 77;
 
     if (NULL == (twistermerchantd = TALER_TESTING_run_twister
-        (PROXY_MERCHANT_CONFIG_FILE)))
+                                      (PROXY_MERCHANT_CONFIG_FILE)))
       return 77;
 
     /* Run the exchange and schedule 'run()' */

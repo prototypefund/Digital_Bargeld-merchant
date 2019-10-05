@@ -81,13 +81,13 @@ handle_check_payment_finished (void *cls,
   struct TALER_Amount refund_amount = { 0 };
   int refunded;
   const json_t *json = response;
-  
+
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_boolean ("refunded",
                               &refunded),
     TALER_JSON_spec_amount ("refund_amount",
                             &refund_amount),
-    GNUNET_JSON_spec_end()
+    GNUNET_JSON_spec_end ()
   };
 
   cpo->job = NULL;
@@ -111,7 +111,8 @@ handle_check_payment_finished (void *cls,
 
   if (! json_boolean_value (json_object_get (json, "paid")))
   {
-    const char *taler_pay_uri = json_string_value (json_object_get (json, "taler_pay_uri"));
+    const char *taler_pay_uri = json_string_value (json_object_get (json,
+                                                                    "taler_pay_uri"));
     if (NULL == taler_pay_uri)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
@@ -124,7 +125,8 @@ handle_check_payment_finished (void *cls,
                GNUNET_SYSERR,
                &refund_amount,
                NULL);
-    } else {
+    }
+    else {
       cpo->cb (cpo->cb_cls,
                response_code,
                json,
@@ -175,7 +177,7 @@ handle_check_payment_finished (void *cls,
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
  * @param order_id order id to identify the payment
- * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session) 
+ * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session)
  * @param check_payment_cb callback which will work the response gotten from the backend
  * @param check_payment_cb_cls closure to pass to @a check_payment_cb
  * @return handle for this operation, NULL upon errors
@@ -185,7 +187,8 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                               const char *backend_url,
                               const char *order_id,
                               const char *session_id,
-                              TALER_MERCHANT_CheckPaymentCallback check_payment_cb,
+                              TALER_MERCHANT_CheckPaymentCallback
+                              check_payment_cb,
                               void *check_payment_cb_cls)
 {
   struct TALER_MERCHANT_CheckPaymentOperation *cpo;
@@ -234,7 +237,8 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
  * @param cph handle to the request to be canceled
  */
 void
-TALER_MERCHANT_check_payment_cancel (struct TALER_MERCHANT_CheckPaymentOperation *cph)
+TALER_MERCHANT_check_payment_cancel (struct
+                                     TALER_MERCHANT_CheckPaymentOperation *cph)
 {
   if (NULL != cph->job)
   {

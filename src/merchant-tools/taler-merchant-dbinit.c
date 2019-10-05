@@ -90,9 +90,9 @@ main (int argc,
   struct GNUNET_GETOPT_CommandLineOption options[] = {
 
     GNUNET_GETOPT_option_flag ('r',
-                                  "reset",
-                                  "reset database (DANGEROUS: all existing data is lost!)",
-                                  &reset_db),
+                               "reset",
+                               "reset database (DANGEROUS: all existing data is lost!)",
+                               &reset_db),
 
     GNUNET_GETOPT_OPTION_END
   };
@@ -108,9 +108,9 @@ main (int argc,
   if (GNUNET_OK !=
       GNUNET_PROGRAM_run (argc, argv,
                           "taler-merchant-dbinit",
-			  "Initialize Taler merchant database",
-			  options,
-			  &run, NULL))
+                          "Initialize Taler merchant database",
+                          options,
+                          &run, NULL))
     return 1;
   return global_ret;
 }

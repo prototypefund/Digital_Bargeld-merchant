@@ -56,7 +56,8 @@ struct RewindIpState
 static void
 rewind_ip_cleanup (void *cls,
                    const struct TALER_TESTING_Command *cmd)
-{}
+{
+}
 
 
 /**
@@ -76,7 +77,7 @@ rewind_ip_run (void *cls,
   if (1 < *ris->counter)
   {
     is->ip = ris->new_ip;
-    *ris->counter -= 1; 
+    *ris->counter -= 1;
   }
 
   TALER_TESTING_interpreter_next (is);
@@ -98,8 +99,8 @@ rewind_ip_run (void *cls,
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_rewind_ip
   (const char *label,
-   int new_ip,
-   unsigned int *counter)
+  int new_ip,
+  unsigned int *counter)
 {
   struct RewindIpState *ris;
 

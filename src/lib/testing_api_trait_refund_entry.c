@@ -43,8 +43,8 @@
 int
 TALER_TESTING_get_trait_refund_entry
   (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   const struct TALER_MERCHANT_RefundEntry **refund_entry)
+  unsigned int index,
+  const struct TALER_MERCHANT_RefundEntry **refund_entry)
 {
   return cmd->traits (cmd->cls,
                       (const void **) refund_entry,
@@ -63,7 +63,7 @@ TALER_TESTING_get_trait_refund_entry
 struct TALER_TESTING_Trait
 TALER_TESTING_make_trait_refund_entry
   (unsigned int index,
-   const struct TALER_MERCHANT_RefundEntry *refund_entry)
+  const struct TALER_MERCHANT_RefundEntry *refund_entry)
 {
   struct TALER_TESTING_Trait ret = {
     .index = index,

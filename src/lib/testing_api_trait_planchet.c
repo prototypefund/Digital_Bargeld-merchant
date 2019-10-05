@@ -40,8 +40,8 @@
 int
 TALER_TESTING_get_trait_planchet_secrets
   (const struct TALER_TESTING_Command *cmd,
-   unsigned int index,
-   struct TALER_PlanchetSecretsP **planchet_secrets)
+  unsigned int index,
+  struct TALER_PlanchetSecretsP **planchet_secrets)
 {
   return cmd->traits (cmd->cls,
                       (const void **) planchet_secrets,
@@ -60,7 +60,7 @@ TALER_TESTING_get_trait_planchet_secrets
 struct TALER_TESTING_Trait
 TALER_TESTING_make_trait_planchet_secrets
   (unsigned int index,
-   const struct TALER_PlanchetSecretsP *planchet_secrets)
+  const struct TALER_PlanchetSecretsP *planchet_secrets)
 {
   struct TALER_TESTING_Trait ret = {
     .index = index,
