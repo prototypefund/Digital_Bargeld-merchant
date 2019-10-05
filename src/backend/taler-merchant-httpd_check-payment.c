@@ -58,6 +58,7 @@ make_taler_pay_uri (struct MHD_Connection *connection,
   const char *forwarded_host;
   const char *uri_path;
   const char *uri_instance_id;
+  const char *query;
   char *result;
 
 
@@ -85,27 +86,22 @@ make_taler_pay_uri (struct MHD_Connection *connection,
     return NULL;
   }
 
+  if (GNUNET_YES == TALER_mhd_is_https (connection))
+    query = "";
+  else
+    query = "?insecure=1";
+
   GNUNET_assert (NULL != order_id);
 
-  if (NULL == session_id)
-  {
-    GNUNET_assert (0 < GNUNET_asprintf (&result,
-                                        "taler://pay/%s/%s/%s/%s",
-                                        host,
-                                        uri_path,
-                                        uri_instance_id,
-                                        order_id));
-  }
-  else
-  {
-    GNUNET_assert (0 < GNUNET_asprintf (&result,
-                                        "taler://pay/%s/%s/%s/%s/%s",
-                                        host,
-                                        uri_path,
-                                        uri_instance_id,
-                                        order_id,
-                                        session_id));
-  }
+  GNUNET_assert (0 < GNUNET_asprintf (&result,
+                                      "taler://pay/%s/%s/%s/%s%s%s%s",
+                                      host,
+                                      uri_path,
+                                      uri_instance_id,
+                                      order_id,
+                                      (session_id == NULL) ? "" : "/",
+                                      (session_id == NULL) ? "" : session_id,
+                                      query));
   return result;
 }
 
