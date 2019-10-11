@@ -60,17 +60,11 @@ run (void *cls,
     return;
   }
   if (reset_db)
-    (void) plugin->drop_tables (plugin->cls);
-  if (GNUNET_OK !=
-      plugin->initialize (plugin->cls))
   {
-    fprintf (stderr,
-             "Failed to initialize database.\n");
+    (void) plugin->drop_tables (plugin->cls);
     TALER_MERCHANTDB_plugin_unload (plugin);
-    global_ret = 1;
-    return;
+    plugin = TALER_MERCHANTDB_plugin_load (cfg);
   }
-
   TALER_MERCHANTDB_plugin_unload (plugin);
 }
 

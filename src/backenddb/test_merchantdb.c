@@ -749,7 +749,6 @@ run (void *cls)
     result = 77;
     return;
   }
-
   if (GNUNET_OK != plugin->drop_tables (plugin->cls))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -757,7 +756,8 @@ run (void *cls)
     result = 77;
     return;
   }
-  if (GNUNET_OK != plugin->initialize (plugin->cls))
+  TALER_MERCHANTDB_plugin_unload (plugin);
+  if (NULL == (plugin = TALER_MERCHANTDB_plugin_load (cfg)))
   {
     result = 77;
     return;

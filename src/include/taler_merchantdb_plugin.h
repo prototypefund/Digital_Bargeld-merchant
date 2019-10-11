@@ -192,15 +192,6 @@ struct TALER_MERCHANTDB_Plugin
   (*drop_tables) (void *cls);
 
   /**
-   * Initialize merchant tables
-   *
-   * @param cls closure
-   * @return #GNUNET_OK upon success; #GNUNET_SYSERR upon failure
-   */
-  int
-  (*initialize) (void *cls);
-
-  /**
    * Insert order into db.
    *
    * @param cls closure

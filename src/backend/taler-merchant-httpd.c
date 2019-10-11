@@ -1452,14 +1452,6 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-  if (GNUNET_OK !=
-      db->initialize (db->cls))
-  {
-    GNUNET_break (0);
-    GNUNET_SCHEDULER_shutdown ();
-    return;
-  }
-
 
   {
     const char *choices[] = {"tcp",

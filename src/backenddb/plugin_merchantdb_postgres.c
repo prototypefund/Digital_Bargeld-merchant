@@ -54,6 +54,8 @@
 #define TALER_PQ_RESULT_SPEC_AMOUNT_NBO(field, \
                                         amountp) TALER_PQ_result_spec_amount_nbo ( \
     field,pg->currency,amountp)
+
+
 /**
  * Wrapper macro to add the currency from the plugin's state
  * when fetching amounts from the database.
@@ -75,7 +77,7 @@ struct PostgresClosure
   /**
    * Postgres connection handle.
    */
-  PGconn *conn;
+  struct GNUNET_PQ_Context *conn;
 
   /**
    * Which currency do we deal in?
@@ -140,611 +142,6 @@ postgres_drop_tables (void *cls)
 
 
 /**
- * Initialize merchant tables
- *
- * @param cls closure our `struct Plugin`
- * @return #GNUNET_OK upon success; #GNUNET_SYSERR upon failure
- */
-static int
-postgres_initialize (void *cls)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_ExecuteStatement es[] = {
-    /* Orders created by the frontend, not signed or given a nonce yet.
-       The contract terms will change (nonce will be added) when moved to the
-       contract terms table */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_orders ("
-                            "order_id VARCHAR NOT NULL"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",contract_terms BYTEA NOT NULL"
-                            ",timestamp INT8 NOT NULL"
-                            ",PRIMARY KEY (order_id, merchant_pub)"
-                            ");"),
-    /* Offers we made to customers */
-    GNUNET_PQ_make_execute (
-      "CREATE TABLE IF NOT EXISTS merchant_contract_terms ("
-      "order_id VARCHAR NOT NULL"
-      ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-      ",contract_terms BYTEA NOT NULL"
-      ",h_contract_terms BYTEA NOT NULL CHECK (LENGTH(h_contract_terms)=64)"
-      ",timestamp INT8 NOT NULL"
-      ",row_id BIGSERIAL UNIQUE"
-      ",paid boolean DEFAULT FALSE NOT NULL"
-      ",PRIMARY KEY (order_id, merchant_pub)"
-      ",UNIQUE (h_contract_terms, merchant_pub)"
-      ");"),
-    /* Table with the proofs for each coin we deposited at the exchange */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_deposits ("
-                            " h_contract_terms BYTEA NOT NULL"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-                            ",exchange_url VARCHAR NOT NULL"
-                            ",amount_with_fee_val INT8 NOT NULL"
-                            ",amount_with_fee_frac INT4 NOT NULL"
-                            ",deposit_fee_val INT8 NOT NULL"
-                            ",deposit_fee_frac INT4 NOT NULL"
-                            ",refund_fee_val INT8 NOT NULL"
-                            ",refund_fee_frac INT4 NOT NULL"
-                            ",wire_fee_val INT8 NOT NULL"
-                            ",wire_fee_frac INT4 NOT NULL"
-                            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
-                            ",exchange_proof BYTEA NOT NULL"
-                            ",PRIMARY KEY (h_contract_terms, coin_pub)"
-                            ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)"
-                            ");"),
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
-                            " exchange_url VARCHAR NOT NULL"
-                            ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
-                            ",execution_time INT8 NOT NULL"
-                            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
-                            ",proof BYTEA NOT NULL"
-                            ",PRIMARY KEY (wtid, exchange_url)"
-                            ");"),
-    /* Note that h_contract_terms + coin_pub may actually be unknown to
-       us, e.g. someone else deposits something for us at the exchange.
-       Hence those cannot be foreign keys into deposits/transactions! */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transfers ("
-                            " h_contract_terms BYTEA NOT NULL"
-                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-                            ",wtid BYTEA NOT NULL CHECK (LENGTH(wtid)=32)"
-                            ",PRIMARY KEY (h_contract_terms, coin_pub)"
-                            ");"),
-    GNUNET_PQ_make_try_execute (
-      "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin"
-      " ON merchant_transfers (h_contract_terms, coin_pub)"),
-    GNUNET_PQ_make_try_execute (
-      "CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid"
-      " ON merchant_transfers (wtid)"),
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS exchange_wire_fees ("
-                            " exchange_pub BYTEA NOT NULL CHECK (length(exchange_pub)=32)"
-                            ",h_wire_method BYTEA NOT NULL CHECK (length(h_wire_method)=64)"
-                            ",wire_fee_val INT8 NOT NULL"
-                            ",wire_fee_frac INT4 NOT NULL"
-                            ",closing_fee_val INT8 NOT NULL"
-                            ",closing_fee_frac INT4 NOT NULL"
-                            ",start_date INT8 NOT NULL"
-                            ",end_date INT8 NOT NULL"
-                            ",exchange_sig BYTEA NOT NULL CHECK (length(exchange_sig)=64)"
-                            ",PRIMARY KEY (exchange_pub,h_wire_method,start_date,end_date)"
-                            ");"),
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
-                            " rtransaction_id BIGSERIAL UNIQUE"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",h_contract_terms BYTEA NOT NULL"
-                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-                            ",reason VARCHAR NOT NULL"
-                            ",refund_amount_val INT8 NOT NULL"
-                            ",refund_amount_frac INT4 NOT NULL"
-                            ",refund_fee_val INT8 NOT NULL"
-                            ",refund_fee_frac INT4 NOT NULL"
-                            ");"),
-    /* balances of the reserves available for tips */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_reserves ("
-                            " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
-                            ",expiration INT8 NOT NULL"
-                            ",balance_val INT8 NOT NULL"
-                            ",balance_frac INT4 NOT NULL"
-                            ",PRIMARY KEY (reserve_priv)"
-                            ");"),
-    /* table where we remember when tipping reserves where established / enabled */
-    GNUNET_PQ_make_execute (
-      "CREATE TABLE IF NOT EXISTS merchant_tip_reserve_credits ("
-      " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
-      ",credit_uuid BYTEA UNIQUE NOT NULL CHECK (LENGTH(credit_uuid)=64)"
-      ",timestamp INT8 NOT NULL"
-      ",amount_val INT8 NOT NULL"
-      ",amount_frac INT4 NOT NULL"
-      ",PRIMARY KEY (credit_uuid)"
-      ");"),
-    /* tips that have been authorized */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tips ("
-                            " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
-                            ",tip_id BYTEA NOT NULL CHECK (LENGTH(tip_id)=64)"
-                            ",exchange_url VARCHAR NOT NULL"
-                            ",justification VARCHAR NOT NULL"
-                            ",extra BYTEA NOT NULL"
-                            ",timestamp INT8 NOT NULL"
-                            ",amount_val INT8 NOT NULL" /* overall tip amount */
-                            ",amount_frac INT4 NOT NULL"
-                            ",left_val INT8 NOT NULL" /* tip amount not yet picked up */
-                            ",left_frac INT4 NOT NULL"
-                            ",PRIMARY KEY (tip_id)"
-                            ");"),
-    /* tips that have been picked up */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_pickups ("
-                            " tip_id BYTEA NOT NULL REFERENCES merchant_tips (tip_id) ON DELETE CASCADE"
-                            ",pickup_id BYTEA NOT NULL CHECK (LENGTH(pickup_id)=64)"
-                            ",amount_val INT8 NOT NULL"
-                            ",amount_frac INT4 NOT NULL"
-                            ",PRIMARY KEY (pickup_id)"
-                            ");"),
-    /* sessions and their order_id/fulfillment_url mapping */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_session_info ("
-                            " session_id VARCHAR NOT NULL"
-                            ",fulfillment_url VARCHAR NOT NULL"
-                            ",order_id VARCHAR NOT NULL"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",timestamp INT8 NOT NULL"
-                            ",PRIMARY KEY (session_id, fulfillment_url, merchant_pub)"
-                            ",UNIQUE (session_id, fulfillment_url, order_id, merchant_pub)"
-                            ");"),
-    GNUNET_PQ_EXECUTE_STATEMENT_END
-  };
-  struct GNUNET_PQ_PreparedStatement ps[] = {
-    GNUNET_PQ_make_prepare ("insert_deposit",
-                            "INSERT INTO merchant_deposits"
-                            "(h_contract_terms"
-                            ",merchant_pub"
-                            ",coin_pub"
-                            ",exchange_url"
-                            ",amount_with_fee_val"
-                            ",amount_with_fee_frac"
-                            ",deposit_fee_val"
-                            ",deposit_fee_frac"
-                            ",refund_fee_val"
-                            ",refund_fee_frac"
-                            ",wire_fee_val"
-                            ",wire_fee_frac"
-                            ",signkey_pub"
-                            ",exchange_proof) VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
-                            14),
-    GNUNET_PQ_make_prepare ("insert_transfer",
-                            "INSERT INTO merchant_transfers"
-                            "(h_contract_terms"
-                            ",coin_pub"
-                            ",wtid) VALUES "
-                            "($1, $2, $3)",
-                            3),
-    GNUNET_PQ_make_prepare ("insert_refund",
-                            "INSERT INTO merchant_refunds"
-                            "(merchant_pub"
-                            ",h_contract_terms"
-                            ",coin_pub"
-                            ",reason"
-                            ",refund_amount_val"
-                            ",refund_amount_frac"
-                            ",refund_fee_val"
-                            ",refund_fee_frac"
-                            ") VALUES"
-                            "($1, $2, $3, $4, $5, $6, $7, $8)",
-                            8),
-    GNUNET_PQ_make_prepare ("insert_proof",
-                            "INSERT INTO merchant_proofs"
-                            "(exchange_url"
-                            ",wtid"
-                            ",execution_time"
-                            ",signkey_pub"
-                            ",proof) VALUES "
-                            "($1, $2, $3, $4, $5)",
-                            5),
-    GNUNET_PQ_make_prepare ("insert_contract_terms",
-                            "INSERT INTO merchant_contract_terms"
-                            "(order_id"
-                            ",merchant_pub"
-                            ",timestamp"
-                            ",contract_terms"
-                            ",h_contract_terms)"
-                            " VALUES "
-                            "($1, $2, $3, $4, $5)",
-                            5),
-    GNUNET_PQ_make_prepare ("insert_order",
-                            "INSERT INTO merchant_orders"
-                            "(order_id"
-                            ",merchant_pub"
-                            ",timestamp"
-                            ",contract_terms)"
-                            " VALUES "
-                            "($1, $2, $3, $4)",
-                            4),
-    GNUNET_PQ_make_prepare ("insert_session_info",
-                            "INSERT INTO merchant_session_info"
-                            "(session_id"
-                            ",fulfillment_url"
-                            ",order_id"
-                            ",merchant_pub"
-                            ",timestamp)"
-                            " VALUES "
-                            "($1, $2, $3, $4, $5)",
-                            5),
-    GNUNET_PQ_make_prepare ("mark_proposal_paid",
-                            "UPDATE merchant_contract_terms SET"
-                            " paid=TRUE"
-                            " WHERE h_contract_terms=$1"
-                            " AND merchant_pub=$2",
-                            2),
-    GNUNET_PQ_make_prepare ("insert_wire_fee",
-                            "INSERT INTO exchange_wire_fees"
-                            "(exchange_pub"
-                            ",h_wire_method"
-                            ",wire_fee_val"
-                            ",wire_fee_frac"
-                            ",closing_fee_val"
-                            ",closing_fee_frac"
-                            ",start_date"
-                            ",end_date"
-                            ",exchange_sig)"
-                            " VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-                            9),
-    GNUNET_PQ_make_prepare ("lookup_wire_fee",
-                            "SELECT"
-                            " wire_fee_val"
-                            ",wire_fee_frac"
-                            ",closing_fee_val"
-                            ",closing_fee_frac"
-                            ",start_date"
-                            ",end_date"
-                            ",exchange_sig"
-                            " FROM exchange_wire_fees"
-                            " WHERE exchange_pub=$1"
-                            "   AND h_wire_method=$2"
-                            "   AND start_date <= $3"
-                            "   AND end_date > $3",
-                            1),
-    GNUNET_PQ_make_prepare ("find_contract_terms_from_hash",
-                            "SELECT"
-                            " contract_terms"
-                            " FROM merchant_contract_terms"
-                            " WHERE h_contract_terms=$1"
-                            "   AND merchant_pub=$2",
-                            2),
-    GNUNET_PQ_make_prepare ("find_paid_contract_terms_from_hash",
-                            "SELECT"
-                            " contract_terms"
-                            " FROM merchant_contract_terms"
-                            " WHERE h_contract_terms=$1"
-                            "   AND merchant_pub=$2"
-                            "   AND paid=TRUE",
-                            2),
-    GNUNET_PQ_make_prepare ("end_transaction",
-                            "COMMIT",
-                            0),
-
-    GNUNET_PQ_make_prepare ("find_refunds",
-                            "SELECT"
-                            " refund_amount_val"
-                            ",refund_amount_frac"
-                            " FROM merchant_refunds"
-                            " WHERE coin_pub=$1",
-                            1),
-    GNUNET_PQ_make_prepare ("find_contract_terms_history",
-                            "SELECT"
-                            " contract_terms"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " order_id=$1"
-                            " AND merchant_pub=$2"
-                            " AND paid=TRUE",
-                            2),
-    GNUNET_PQ_make_prepare ("find_contract_terms",
-                            "SELECT"
-                            " contract_terms"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " order_id=$1"
-                            " AND merchant_pub=$2",
-                            2),
-    GNUNET_PQ_make_prepare ("find_order",
-                            "SELECT"
-                            " contract_terms"
-                            " FROM merchant_orders"
-                            " WHERE"
-                            " order_id=$1"
-                            " AND merchant_pub=$2",
-                            2),
-    GNUNET_PQ_make_prepare ("find_session_info",
-                            "SELECT"
-                            " order_id"
-                            " FROM merchant_session_info"
-                            " WHERE"
-                            " fulfillment_url=$1"
-                            " AND session_id=$2"
-                            " AND merchant_pub=$3",
-                            2),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp<$1"
-                            " AND merchant_pub=$2"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id DESC, timestamp DESC"
-                            " LIMIT $3",
-                            3),
-    GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
-                            "SELECT"
-                            " coin_pub"
-                            ",rtransaction_id"
-                            ",refund_amount_val"
-                            ",refund_amount_frac"
-                            ",refund_fee_val"
-                            ",refund_fee_frac"
-                            ",reason"
-                            " FROM merchant_refunds"
-                            " WHERE merchant_pub=$1"
-                            " AND h_contract_terms=$2",
-                            2),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_asc",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp>$1"
-                            " AND merchant_pub=$2"
-                            " AND row_id>$3"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id ASC, timestamp ASC"
-                            " LIMIT $4",
-                            4),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp>$1"
-                            " AND merchant_pub=$2"
-                            " AND row_id>$3"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id DESC, timestamp DESC"
-                            " LIMIT $4",
-                            4),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past_asc",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp<$1"
-                            " AND merchant_pub=$2"
-                            " AND row_id<$3"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id ASC, timestamp ASC"
-                            " LIMIT $4",
-                            4),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp<$1"
-                            " AND merchant_pub=$2"
-                            " AND row_id<$3"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id DESC, timestamp DESC"
-                            " LIMIT $4",
-                            4),
-    GNUNET_PQ_make_prepare ("find_deposits",
-                            "SELECT"
-                            " coin_pub"
-                            ",exchange_url"
-                            ",amount_with_fee_val"
-                            ",amount_with_fee_frac"
-                            ",deposit_fee_val"
-                            ",deposit_fee_frac"
-                            ",refund_fee_val"
-                            ",refund_fee_frac"
-                            ",wire_fee_val"
-                            ",wire_fee_frac"
-                            ",exchange_proof"
-                            " FROM merchant_deposits"
-                            " WHERE h_contract_terms=$1"
-                            " AND merchant_pub=$2",
-                            2),
-    GNUNET_PQ_make_prepare ("find_deposits_by_hash_and_coin",
-                            "SELECT"
-                            " amount_with_fee_val"
-                            ",amount_with_fee_frac"
-                            ",deposit_fee_val"
-                            ",deposit_fee_frac"
-                            ",refund_fee_val"
-                            ",refund_fee_frac"
-                            ",wire_fee_val"
-                            ",wire_fee_frac"
-                            ",exchange_url"
-                            ",exchange_proof"
-                            " FROM merchant_deposits"
-                            " WHERE h_contract_terms=$1"
-                            " AND merchant_pub=$2"
-                            " AND coin_pub=$3",
-                            3),
-    GNUNET_PQ_make_prepare ("find_transfers_by_hash",
-                            "SELECT"
-                            " coin_pub"
-                            ",wtid"
-                            ",merchant_proofs.execution_time"
-                            ",merchant_proofs.proof"
-                            " FROM merchant_transfers"
-                            "   JOIN merchant_proofs USING (wtid)"
-                            " WHERE h_contract_terms=$1",
-                            1),
-    GNUNET_PQ_make_prepare ("find_deposits_by_wtid",
-                            "SELECT"
-                            " merchant_transfers.h_contract_terms"
-                            ",merchant_transfers.coin_pub"
-                            ",merchant_deposits.amount_with_fee_val"
-                            ",merchant_deposits.amount_with_fee_frac"
-                            ",merchant_deposits.deposit_fee_val"
-                            ",merchant_deposits.deposit_fee_frac"
-                            ",merchant_deposits.refund_fee_val"
-                            ",merchant_deposits.refund_fee_frac"
-                            ",merchant_deposits.wire_fee_val"
-                            ",merchant_deposits.wire_fee_frac"
-                            ",merchant_deposits.exchange_url"
-                            ",merchant_deposits.exchange_proof"
-                            " FROM merchant_transfers"
-                            "   JOIN merchant_deposits"
-                            "     ON (merchant_deposits.h_contract_terms = merchant_transfers.h_contract_terms"
-                            "       AND"
-                            "         merchant_deposits.coin_pub = merchant_transfers.coin_pub)"
-                            " WHERE wtid=$1",
-                            1),
-    GNUNET_PQ_make_prepare ("find_proof_by_wtid",
-                            "SELECT"
-                            " proof"
-                            " FROM merchant_proofs"
-                            " WHERE wtid=$1"
-                            "  AND exchange_url=$2",
-                            2),
-    GNUNET_PQ_make_prepare ("lookup_tip_reserve_balance",
-                            "SELECT"
-                            " expiration"
-                            ",balance_val"
-                            ",balance_frac"
-                            " FROM merchant_tip_reserves"
-                            " WHERE reserve_priv=$1",
-                            1),
-    GNUNET_PQ_make_prepare ("find_tip_authorizations",
-                            "SELECT"
-                            " amount_val"
-                            ",amount_frac"
-                            ",justification"
-                            ",extra"
-                            ",tip_id"
-                            " FROM merchant_tips"
-                            " WHERE reserve_priv=$1",
-                            1),
-    GNUNET_PQ_make_prepare ("update_tip_reserve_balance",
-                            "UPDATE merchant_tip_reserves SET"
-                            " expiration=$2"
-                            ",balance_val=$3"
-                            ",balance_frac=$4"
-                            " WHERE reserve_priv=$1",
-                            4),
-    GNUNET_PQ_make_prepare ("insert_tip_reserve_balance",
-                            "INSERT INTO merchant_tip_reserves"
-                            "(reserve_priv"
-                            ",expiration"
-                            ",balance_val"
-                            ",balance_frac"
-                            ") VALUES "
-                            "($1, $2, $3, $4)",
-                            4),
-    GNUNET_PQ_make_prepare ("insert_tip_justification",
-                            "INSERT INTO merchant_tips"
-                            "(reserve_priv"
-                            ",tip_id"
-                            ",exchange_url"
-                            ",justification"
-                            ",extra"
-                            ",timestamp"
-                            ",amount_val"
-                            ",amount_frac"
-                            ",left_val"
-                            ",left_frac"
-                            ") VALUES "
-                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-                            10),
-    GNUNET_PQ_make_prepare ("lookup_reserve_by_tip_id",
-                            "SELECT"
-                            " reserve_priv"
-                            ",left_val"
-                            ",left_frac"
-                            " FROM merchant_tips"
-                            " WHERE tip_id=$1",
-                            1),
-    GNUNET_PQ_make_prepare ("lookup_amount_by_pickup",
-                            "SELECT"
-                            " amount_val"
-                            ",amount_frac"
-                            " FROM merchant_tip_pickups"
-                            " WHERE pickup_id=$1"
-                            " AND tip_id=$2",
-                            2),
-    GNUNET_PQ_make_prepare ("find_tip_by_id",
-                            "SELECT"
-                            " exchange_url"
-                            ",extra"
-                            ",timestamp"
-                            ",amount_val"
-                            ",amount_frac"
-                            ",left_val"
-                            ",left_frac"
-                            " FROM merchant_tips"
-                            " WHERE tip_id=$1",
-                            1),
-    GNUNET_PQ_make_prepare ("update_tip_balance",
-                            "UPDATE merchant_tips SET"
-                            " left_val=$2"
-                            ",left_frac=$3"
-                            " WHERE tip_id=$1",
-                            3),
-    GNUNET_PQ_make_prepare ("insert_pickup_id",
-                            "INSERT INTO merchant_tip_pickups"
-                            "(tip_id"
-                            ",pickup_id"
-                            ",amount_val"
-                            ",amount_frac"
-                            ") VALUES "
-                            "($1, $2, $3, $4)",
-                            4),
-    GNUNET_PQ_make_prepare ("insert_tip_credit_uuid",
-                            "INSERT INTO merchant_tip_reserve_credits"
-                            "(reserve_priv"
-                            ",credit_uuid"
-                            ",timestamp"
-                            ",amount_val"
-                            ",amount_frac"
-                            ") VALUES "
-                            "($1, $2, $3, $4, $5)",
-                            5),
-    GNUNET_PQ_make_prepare ("lookup_tip_credit_uuid",
-                            "SELECT 1 "
-                            "FROM merchant_tip_reserve_credits "
-                            "WHERE credit_uuid=$1 AND reserve_priv=$2",
-                            2),
-    GNUNET_PQ_PREPARED_STATEMENT_END
-  };
-
-  if (GNUNET_OK !=
-      GNUNET_PQ_exec_statements (pg->conn,
-                                 es))
-  {
-    GNUNET_break (0);
-    return GNUNET_SYSERR;
-  }
-  if (GNUNET_OK !=
-      GNUNET_PQ_prepare_statements (pg->conn,
-                                    ps))
-  {
-    GNUNET_break (0);
-    return GNUNET_SYSERR;
-  }
-  return GNUNET_OK;
-}
-
-
-/**
  * Check that the database connection is still up.
  *
  * @param pg connection to check
@@ -752,14 +149,7 @@ postgres_initialize (void *cls)
 static void
 check_connection (struct PostgresClosure *pg)
 {
-  if (CONNECTION_BAD != PQstatus (pg->conn))
-    return;
-  PQfinish (pg->conn);
-  pg->conn = GNUNET_PQ_connect_with_cfg (pg->cfg,
-                                         "merchantdb-postgres");
-  GNUNET_break (NULL != pg->conn);
-  GNUNET_break (GNUNET_OK ==
-                postgres_initialize (pg));
+  GNUNET_PQ_reconnect_if_down (pg->conn);
 }
 
 
@@ -774,15 +164,16 @@ static void
 postgres_preflight (void *cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  ExecStatusType status;
+  struct GNUNET_PQ_ExecuteStatement es[] = {
+    GNUNET_PQ_make_execute ("COMMIT"),
+    GNUNET_PQ_EXECUTE_STATEMENT_END
+  };
 
   if (NULL == pg->transaction_name)
     return; /* all good */
-  result = PQexec (pg->conn,
-                   "COMMIT");
-  status = PQresultStatus (result);
-  if (PGRES_COMMAND_OK == status)
+  if (GNUNET_OK ==
+      GNUNET_PQ_exec_statements (pg->conn,
+                                 es))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "BUG: Preflight check committed transaction `%s'!\n",
@@ -795,7 +186,6 @@ postgres_preflight (void *cls)
                 pg->transaction_name);
   }
   pg->transaction_name = NULL;
-  PQclear (result);
 }
 
 
@@ -812,26 +202,23 @@ postgres_start (void *cls,
                 const char *name)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
-  ExecStatusType ex;
+  struct GNUNET_PQ_ExecuteStatement es[] = {
+    GNUNET_PQ_make_execute ("START TRANSACTION ISOLATION LEVEL SERIALIZABLE"),
+    GNUNET_PQ_EXECUTE_STATEMENT_END
+  };
 
   check_connection (pg);
   postgres_preflight (pg);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Starting merchant DB transaction\n");
-  result = PQexec (pg->conn,
-                   "START TRANSACTION ISOLATION LEVEL SERIALIZABLE");
-  if (PGRES_COMMAND_OK !=
-      (ex = PQresultStatus (result)))
+  if (GNUNET_OK !=
+      GNUNET_PQ_exec_statements (pg->conn,
+                                 es))
   {
-    TALER_LOG_ERROR ("Failed to start transaction (%s): %s\n",
-                     PQresStatus (ex),
-                     PQerrorMessage (pg->conn));
+    TALER_LOG_ERROR ("Failed to start transaction\n");
     GNUNET_break (0);
-    PQclear (result);
     return GNUNET_SYSERR;
   }
-  PQclear (result);
   pg->transaction_name = name;
   return GNUNET_OK;
 }
@@ -847,15 +234,16 @@ static void
 postgres_rollback (void *cls)
 {
   struct PostgresClosure *pg = cls;
-  PGresult *result;
+  struct GNUNET_PQ_ExecuteStatement es[] = {
+    GNUNET_PQ_make_execute ("ROLLBACK"),
+    GNUNET_PQ_EXECUTE_STATEMENT_END
+  };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Rolling back merchant DB transaction\n");
-  result = PQexec (pg->conn,
-                   "ROLLBACK");
-  GNUNET_break (PGRES_COMMAND_OK ==
-                PQresultStatus (result));
-  PQclear (result);
+  GNUNET_break (GNUNET_OK ==
+                GNUNET_PQ_exec_statements (pg->conn,
+                                           es));
   pg->transaction_name = NULL;
 }
 
@@ -3669,6 +3057,582 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   struct PostgresClosure *pg;
   struct TALER_MERCHANTDB_Plugin *plugin;
   const char *ec;
+  struct GNUNET_PQ_ExecuteStatement es[] = {
+    /* Orders created by the frontend, not signed or given a nonce yet.
+       The contract terms will change (nonce will be added) when moved to the
+       contract terms table */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_orders ("
+                            "order_id VARCHAR NOT NULL"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+                            ",contract_terms BYTEA NOT NULL"
+                            ",timestamp INT8 NOT NULL"
+                            ",PRIMARY KEY (order_id, merchant_pub)"
+                            ");"),
+    /* Offers we made to customers */
+    GNUNET_PQ_make_execute (
+      "CREATE TABLE IF NOT EXISTS merchant_contract_terms ("
+      "order_id VARCHAR NOT NULL"
+      ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+      ",contract_terms BYTEA NOT NULL"
+      ",h_contract_terms BYTEA NOT NULL CHECK (LENGTH(h_contract_terms)=64)"
+      ",timestamp INT8 NOT NULL"
+      ",row_id BIGSERIAL UNIQUE"
+      ",paid boolean DEFAULT FALSE NOT NULL"
+      ",PRIMARY KEY (order_id, merchant_pub)"
+      ",UNIQUE (h_contract_terms, merchant_pub)"
+      ");"),
+    /* Table with the proofs for each coin we deposited at the exchange */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_deposits ("
+                            " h_contract_terms BYTEA NOT NULL"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                            ",exchange_url VARCHAR NOT NULL"
+                            ",amount_with_fee_val INT8 NOT NULL"
+                            ",amount_with_fee_frac INT4 NOT NULL"
+                            ",deposit_fee_val INT8 NOT NULL"
+                            ",deposit_fee_frac INT4 NOT NULL"
+                            ",refund_fee_val INT8 NOT NULL"
+                            ",refund_fee_frac INT4 NOT NULL"
+                            ",wire_fee_val INT8 NOT NULL"
+                            ",wire_fee_frac INT4 NOT NULL"
+                            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
+                            ",exchange_proof BYTEA NOT NULL"
+                            ",PRIMARY KEY (h_contract_terms, coin_pub)"
+                            ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)"
+                            ");"),
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
+                            " exchange_url VARCHAR NOT NULL"
+                            ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
+                            ",execution_time INT8 NOT NULL"
+                            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
+                            ",proof BYTEA NOT NULL"
+                            ",PRIMARY KEY (wtid, exchange_url)"
+                            ");"),
+    /* Note that h_contract_terms + coin_pub may actually be unknown to
+       us, e.g. someone else deposits something for us at the exchange.
+       Hence those cannot be foreign keys into deposits/transactions! */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transfers ("
+                            " h_contract_terms BYTEA NOT NULL"
+                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                            ",wtid BYTEA NOT NULL CHECK (LENGTH(wtid)=32)"
+                            ",PRIMARY KEY (h_contract_terms, coin_pub)"
+                            ");"),
+    GNUNET_PQ_make_try_execute (
+      "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin"
+      " ON merchant_transfers (h_contract_terms, coin_pub)"),
+    GNUNET_PQ_make_try_execute (
+      "CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid"
+      " ON merchant_transfers (wtid)"),
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS exchange_wire_fees ("
+                            " exchange_pub BYTEA NOT NULL CHECK (length(exchange_pub)=32)"
+                            ",h_wire_method BYTEA NOT NULL CHECK (length(h_wire_method)=64)"
+                            ",wire_fee_val INT8 NOT NULL"
+                            ",wire_fee_frac INT4 NOT NULL"
+                            ",closing_fee_val INT8 NOT NULL"
+                            ",closing_fee_frac INT4 NOT NULL"
+                            ",start_date INT8 NOT NULL"
+                            ",end_date INT8 NOT NULL"
+                            ",exchange_sig BYTEA NOT NULL CHECK (length(exchange_sig)=64)"
+                            ",PRIMARY KEY (exchange_pub,h_wire_method,start_date,end_date)"
+                            ");"),
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
+                            " rtransaction_id BIGSERIAL UNIQUE"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+                            ",h_contract_terms BYTEA NOT NULL"
+                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
+                            ",reason VARCHAR NOT NULL"
+                            ",refund_amount_val INT8 NOT NULL"
+                            ",refund_amount_frac INT4 NOT NULL"
+                            ",refund_fee_val INT8 NOT NULL"
+                            ",refund_fee_frac INT4 NOT NULL"
+                            ");"),
+    /* balances of the reserves available for tips */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_reserves ("
+                            " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
+                            ",expiration INT8 NOT NULL"
+                            ",balance_val INT8 NOT NULL"
+                            ",balance_frac INT4 NOT NULL"
+                            ",PRIMARY KEY (reserve_priv)"
+                            ");"),
+    /* table where we remember when tipping reserves where established / enabled */
+    GNUNET_PQ_make_execute (
+      "CREATE TABLE IF NOT EXISTS merchant_tip_reserve_credits ("
+      " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
+      ",credit_uuid BYTEA UNIQUE NOT NULL CHECK (LENGTH(credit_uuid)=64)"
+      ",timestamp INT8 NOT NULL"
+      ",amount_val INT8 NOT NULL"
+      ",amount_frac INT4 NOT NULL"
+      ",PRIMARY KEY (credit_uuid)"
+      ");"),
+    /* tips that have been authorized */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tips ("
+                            " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
+                            ",tip_id BYTEA NOT NULL CHECK (LENGTH(tip_id)=64)"
+                            ",exchange_url VARCHAR NOT NULL"
+                            ",justification VARCHAR NOT NULL"
+                            ",extra BYTEA NOT NULL"
+                            ",timestamp INT8 NOT NULL"
+                            ",amount_val INT8 NOT NULL" /* overall tip amount */
+                            ",amount_frac INT4 NOT NULL"
+                            ",left_val INT8 NOT NULL" /* tip amount not yet picked up */
+                            ",left_frac INT4 NOT NULL"
+                            ",PRIMARY KEY (tip_id)"
+                            ");"),
+    /* tips that have been picked up */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_pickups ("
+                            " tip_id BYTEA NOT NULL REFERENCES merchant_tips (tip_id) ON DELETE CASCADE"
+                            ",pickup_id BYTEA NOT NULL CHECK (LENGTH(pickup_id)=64)"
+                            ",amount_val INT8 NOT NULL"
+                            ",amount_frac INT4 NOT NULL"
+                            ",PRIMARY KEY (pickup_id)"
+                            ");"),
+    /* sessions and their order_id/fulfillment_url mapping */
+    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_session_info ("
+                            " session_id VARCHAR NOT NULL"
+                            ",fulfillment_url VARCHAR NOT NULL"
+                            ",order_id VARCHAR NOT NULL"
+                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
+                            ",timestamp INT8 NOT NULL"
+                            ",PRIMARY KEY (session_id, fulfillment_url, merchant_pub)"
+                            ",UNIQUE (session_id, fulfillment_url, order_id, merchant_pub)"
+                            ");"),
+    GNUNET_PQ_EXECUTE_STATEMENT_END
+  };
+  struct GNUNET_PQ_PreparedStatement ps[] = {
+    GNUNET_PQ_make_prepare ("insert_deposit",
+                            "INSERT INTO merchant_deposits"
+                            "(h_contract_terms"
+                            ",merchant_pub"
+                            ",coin_pub"
+                            ",exchange_url"
+                            ",amount_with_fee_val"
+                            ",amount_with_fee_frac"
+                            ",deposit_fee_val"
+                            ",deposit_fee_frac"
+                            ",refund_fee_val"
+                            ",refund_fee_frac"
+                            ",wire_fee_val"
+                            ",wire_fee_frac"
+                            ",signkey_pub"
+                            ",exchange_proof) VALUES "
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+                            14),
+    GNUNET_PQ_make_prepare ("insert_transfer",
+                            "INSERT INTO merchant_transfers"
+                            "(h_contract_terms"
+                            ",coin_pub"
+                            ",wtid) VALUES "
+                            "($1, $2, $3)",
+                            3),
+    GNUNET_PQ_make_prepare ("insert_refund",
+                            "INSERT INTO merchant_refunds"
+                            "(merchant_pub"
+                            ",h_contract_terms"
+                            ",coin_pub"
+                            ",reason"
+                            ",refund_amount_val"
+                            ",refund_amount_frac"
+                            ",refund_fee_val"
+                            ",refund_fee_frac"
+                            ") VALUES"
+                            "($1, $2, $3, $4, $5, $6, $7, $8)",
+                            8),
+    GNUNET_PQ_make_prepare ("insert_proof",
+                            "INSERT INTO merchant_proofs"
+                            "(exchange_url"
+                            ",wtid"
+                            ",execution_time"
+                            ",signkey_pub"
+                            ",proof) VALUES "
+                            "($1, $2, $3, $4, $5)",
+                            5),
+    GNUNET_PQ_make_prepare ("insert_contract_terms",
+                            "INSERT INTO merchant_contract_terms"
+                            "(order_id"
+                            ",merchant_pub"
+                            ",timestamp"
+                            ",contract_terms"
+                            ",h_contract_terms)"
+                            " VALUES "
+                            "($1, $2, $3, $4, $5)",
+                            5),
+    GNUNET_PQ_make_prepare ("insert_order",
+                            "INSERT INTO merchant_orders"
+                            "(order_id"
+                            ",merchant_pub"
+                            ",timestamp"
+                            ",contract_terms)"
+                            " VALUES "
+                            "($1, $2, $3, $4)",
+                            4),
+    GNUNET_PQ_make_prepare ("insert_session_info",
+                            "INSERT INTO merchant_session_info"
+                            "(session_id"
+                            ",fulfillment_url"
+                            ",order_id"
+                            ",merchant_pub"
+                            ",timestamp)"
+                            " VALUES "
+                            "($1, $2, $3, $4, $5)",
+                            5),
+    GNUNET_PQ_make_prepare ("mark_proposal_paid",
+                            "UPDATE merchant_contract_terms SET"
+                            " paid=TRUE"
+                            " WHERE h_contract_terms=$1"
+                            " AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("insert_wire_fee",
+                            "INSERT INTO exchange_wire_fees"
+                            "(exchange_pub"
+                            ",h_wire_method"
+                            ",wire_fee_val"
+                            ",wire_fee_frac"
+                            ",closing_fee_val"
+                            ",closing_fee_frac"
+                            ",start_date"
+                            ",end_date"
+                            ",exchange_sig)"
+                            " VALUES "
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+                            9),
+    GNUNET_PQ_make_prepare ("lookup_wire_fee",
+                            "SELECT"
+                            " wire_fee_val"
+                            ",wire_fee_frac"
+                            ",closing_fee_val"
+                            ",closing_fee_frac"
+                            ",start_date"
+                            ",end_date"
+                            ",exchange_sig"
+                            " FROM exchange_wire_fees"
+                            " WHERE exchange_pub=$1"
+                            "   AND h_wire_method=$2"
+                            "   AND start_date <= $3"
+                            "   AND end_date > $3",
+                            1),
+    GNUNET_PQ_make_prepare ("find_contract_terms_from_hash",
+                            "SELECT"
+                            " contract_terms"
+                            " FROM merchant_contract_terms"
+                            " WHERE h_contract_terms=$1"
+                            "   AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_paid_contract_terms_from_hash",
+                            "SELECT"
+                            " contract_terms"
+                            " FROM merchant_contract_terms"
+                            " WHERE h_contract_terms=$1"
+                            "   AND merchant_pub=$2"
+                            "   AND paid=TRUE",
+                            2),
+    GNUNET_PQ_make_prepare ("end_transaction",
+                            "COMMIT",
+                            0),
+
+    GNUNET_PQ_make_prepare ("find_refunds",
+                            "SELECT"
+                            " refund_amount_val"
+                            ",refund_amount_frac"
+                            " FROM merchant_refunds"
+                            " WHERE coin_pub=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("find_contract_terms_history",
+                            "SELECT"
+                            " contract_terms"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " order_id=$1"
+                            " AND merchant_pub=$2"
+                            " AND paid=TRUE",
+                            2),
+    GNUNET_PQ_make_prepare ("find_contract_terms",
+                            "SELECT"
+                            " contract_terms"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " order_id=$1"
+                            " AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_order",
+                            "SELECT"
+                            " contract_terms"
+                            " FROM merchant_orders"
+                            " WHERE"
+                            " order_id=$1"
+                            " AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_session_info",
+                            "SELECT"
+                            " order_id"
+                            " FROM merchant_session_info"
+                            " WHERE"
+                            " fulfillment_url=$1"
+                            " AND session_id=$2"
+                            " AND merchant_pub=$3",
+                            2),
+    GNUNET_PQ_make_prepare ("find_contract_terms_by_date",
+                            "SELECT"
+                            " contract_terms"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " timestamp<$1"
+                            " AND merchant_pub=$2"
+                            " AND paid=TRUE"
+                            " ORDER BY row_id DESC, timestamp DESC"
+                            " LIMIT $3",
+                            3),
+    GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
+                            "SELECT"
+                            " coin_pub"
+                            ",rtransaction_id"
+                            ",refund_amount_val"
+                            ",refund_amount_frac"
+                            ",refund_fee_val"
+                            ",refund_fee_frac"
+                            ",reason"
+                            " FROM merchant_refunds"
+                            " WHERE merchant_pub=$1"
+                            " AND h_contract_terms=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_asc",
+                            "SELECT"
+                            " contract_terms"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " timestamp>$1"
+                            " AND merchant_pub=$2"
+                            " AND row_id>$3"
+                            " AND paid=TRUE"
+                            " ORDER BY row_id ASC, timestamp ASC"
+                            " LIMIT $4",
+                            4),
+    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range",
+                            "SELECT"
+                            " contract_terms"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " timestamp>$1"
+                            " AND merchant_pub=$2"
+                            " AND row_id>$3"
+                            " AND paid=TRUE"
+                            " ORDER BY row_id DESC, timestamp DESC"
+                            " LIMIT $4",
+                            4),
+    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past_asc",
+                            "SELECT"
+                            " contract_terms"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " timestamp<$1"
+                            " AND merchant_pub=$2"
+                            " AND row_id<$3"
+                            " AND paid=TRUE"
+                            " ORDER BY row_id ASC, timestamp ASC"
+                            " LIMIT $4",
+                            4),
+    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past",
+                            "SELECT"
+                            " contract_terms"
+                            ",order_id"
+                            ",row_id"
+                            " FROM merchant_contract_terms"
+                            " WHERE"
+                            " timestamp<$1"
+                            " AND merchant_pub=$2"
+                            " AND row_id<$3"
+                            " AND paid=TRUE"
+                            " ORDER BY row_id DESC, timestamp DESC"
+                            " LIMIT $4",
+                            4),
+    GNUNET_PQ_make_prepare ("find_deposits",
+                            "SELECT"
+                            " coin_pub"
+                            ",exchange_url"
+                            ",amount_with_fee_val"
+                            ",amount_with_fee_frac"
+                            ",deposit_fee_val"
+                            ",deposit_fee_frac"
+                            ",refund_fee_val"
+                            ",refund_fee_frac"
+                            ",wire_fee_val"
+                            ",wire_fee_frac"
+                            ",exchange_proof"
+                            " FROM merchant_deposits"
+                            " WHERE h_contract_terms=$1"
+                            " AND merchant_pub=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_deposits_by_hash_and_coin",
+                            "SELECT"
+                            " amount_with_fee_val"
+                            ",amount_with_fee_frac"
+                            ",deposit_fee_val"
+                            ",deposit_fee_frac"
+                            ",refund_fee_val"
+                            ",refund_fee_frac"
+                            ",wire_fee_val"
+                            ",wire_fee_frac"
+                            ",exchange_url"
+                            ",exchange_proof"
+                            " FROM merchant_deposits"
+                            " WHERE h_contract_terms=$1"
+                            " AND merchant_pub=$2"
+                            " AND coin_pub=$3",
+                            3),
+    GNUNET_PQ_make_prepare ("find_transfers_by_hash",
+                            "SELECT"
+                            " coin_pub"
+                            ",wtid"
+                            ",merchant_proofs.execution_time"
+                            ",merchant_proofs.proof"
+                            " FROM merchant_transfers"
+                            "   JOIN merchant_proofs USING (wtid)"
+                            " WHERE h_contract_terms=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("find_deposits_by_wtid",
+                            "SELECT"
+                            " merchant_transfers.h_contract_terms"
+                            ",merchant_transfers.coin_pub"
+                            ",merchant_deposits.amount_with_fee_val"
+                            ",merchant_deposits.amount_with_fee_frac"
+                            ",merchant_deposits.deposit_fee_val"
+                            ",merchant_deposits.deposit_fee_frac"
+                            ",merchant_deposits.refund_fee_val"
+                            ",merchant_deposits.refund_fee_frac"
+                            ",merchant_deposits.wire_fee_val"
+                            ",merchant_deposits.wire_fee_frac"
+                            ",merchant_deposits.exchange_url"
+                            ",merchant_deposits.exchange_proof"
+                            " FROM merchant_transfers"
+                            "   JOIN merchant_deposits"
+                            "     ON (merchant_deposits.h_contract_terms = merchant_transfers.h_contract_terms"
+                            "       AND"
+                            "         merchant_deposits.coin_pub = merchant_transfers.coin_pub)"
+                            " WHERE wtid=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("find_proof_by_wtid",
+                            "SELECT"
+                            " proof"
+                            " FROM merchant_proofs"
+                            " WHERE wtid=$1"
+                            "  AND exchange_url=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("lookup_tip_reserve_balance",
+                            "SELECT"
+                            " expiration"
+                            ",balance_val"
+                            ",balance_frac"
+                            " FROM merchant_tip_reserves"
+                            " WHERE reserve_priv=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("find_tip_authorizations",
+                            "SELECT"
+                            " amount_val"
+                            ",amount_frac"
+                            ",justification"
+                            ",extra"
+                            ",tip_id"
+                            " FROM merchant_tips"
+                            " WHERE reserve_priv=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("update_tip_reserve_balance",
+                            "UPDATE merchant_tip_reserves SET"
+                            " expiration=$2"
+                            ",balance_val=$3"
+                            ",balance_frac=$4"
+                            " WHERE reserve_priv=$1",
+                            4),
+    GNUNET_PQ_make_prepare ("insert_tip_reserve_balance",
+                            "INSERT INTO merchant_tip_reserves"
+                            "(reserve_priv"
+                            ",expiration"
+                            ",balance_val"
+                            ",balance_frac"
+                            ") VALUES "
+                            "($1, $2, $3, $4)",
+                            4),
+    GNUNET_PQ_make_prepare ("insert_tip_justification",
+                            "INSERT INTO merchant_tips"
+                            "(reserve_priv"
+                            ",tip_id"
+                            ",exchange_url"
+                            ",justification"
+                            ",extra"
+                            ",timestamp"
+                            ",amount_val"
+                            ",amount_frac"
+                            ",left_val"
+                            ",left_frac"
+                            ") VALUES "
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+                            10),
+    GNUNET_PQ_make_prepare ("lookup_reserve_by_tip_id",
+                            "SELECT"
+                            " reserve_priv"
+                            ",left_val"
+                            ",left_frac"
+                            " FROM merchant_tips"
+                            " WHERE tip_id=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("lookup_amount_by_pickup",
+                            "SELECT"
+                            " amount_val"
+                            ",amount_frac"
+                            " FROM merchant_tip_pickups"
+                            " WHERE pickup_id=$1"
+                            " AND tip_id=$2",
+                            2),
+    GNUNET_PQ_make_prepare ("find_tip_by_id",
+                            "SELECT"
+                            " exchange_url"
+                            ",extra"
+                            ",timestamp"
+                            ",amount_val"
+                            ",amount_frac"
+                            ",left_val"
+                            ",left_frac"
+                            " FROM merchant_tips"
+                            " WHERE tip_id=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("update_tip_balance",
+                            "UPDATE merchant_tips SET"
+                            " left_val=$2"
+                            ",left_frac=$3"
+                            " WHERE tip_id=$1",
+                            3),
+    GNUNET_PQ_make_prepare ("insert_pickup_id",
+                            "INSERT INTO merchant_tip_pickups"
+                            "(tip_id"
+                            ",pickup_id"
+                            ",amount_val"
+                            ",amount_frac"
+                            ") VALUES "
+                            "($1, $2, $3, $4)",
+                            4),
+    GNUNET_PQ_make_prepare ("insert_tip_credit_uuid",
+                            "INSERT INTO merchant_tip_reserve_credits"
+                            "(reserve_priv"
+                            ",credit_uuid"
+                            ",timestamp"
+                            ",amount_val"
+                            ",amount_frac"
+                            ") VALUES "
+                            "($1, $2, $3, $4, $5)",
+                            5),
+    GNUNET_PQ_make_prepare ("lookup_tip_credit_uuid",
+                            "SELECT 1 "
+                            "FROM merchant_tip_reserve_credits "
+                            "WHERE credit_uuid=$1 AND reserve_priv=$2",
+                            2),
+    GNUNET_PQ_PREPARED_STATEMENT_END
+  };
 
   pg = GNUNET_new (struct PostgresClosure);
   ec = getenv ("TALER_MERCHANTDB_POSTGRES_CONFIG");
@@ -3694,7 +3658,9 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   }
   pg->cfg = cfg;
   pg->conn = GNUNET_PQ_connect_with_cfg (cfg,
-                                         "merchantdb-postgres");
+                                         "merchantdb-postgres",
+                                         es,
+                                         ps);
   if (NULL == pg->conn)
   {
     GNUNET_free (pg);
@@ -3709,13 +3675,13 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "taler",
                                "CURRENCY");
+    GNUNET_PQ_disconnect (pg->conn);
     GNUNET_free (pg);
     return NULL;
   }
   plugin = GNUNET_new (struct TALER_MERCHANTDB_Plugin);
   plugin->cls = pg;
   plugin->drop_tables = &postgres_drop_tables;
-  plugin->initialize = &postgres_initialize;
   plugin->store_deposit = &postgres_store_deposit;
   plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
@@ -3772,7 +3738,7 @@ libtaler_plugin_merchantdb_postgres_done (void *cls)
   struct TALER_MERCHANTDB_Plugin *plugin = cls;
   struct PostgresClosure *pg = plugin->cls;
 
-  PQfinish (pg->conn);
+  GNUNET_PQ_disconnect (pg->conn);
   GNUNET_free (pg->currency);
   GNUNET_free (pg);
   GNUNET_free (plugin);
