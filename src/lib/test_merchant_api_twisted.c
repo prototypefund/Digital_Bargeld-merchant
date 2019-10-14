@@ -260,7 +260,7 @@ run (void *cls,
      * mentioned in the bug report #5719.
      */
     TALER_TESTING_cmd_malform_response
-      ("5719-malform-xcg-resp",
+      ("5719-malform-exchange-resp",
       PROXY_EXCHANGE_CONFIG_FILE),
 
     TALER_TESTING_cmd_pay ("5719-deposit",
@@ -1085,9 +1085,9 @@ main (int argc,
     return 77;
 
   twister_merchant_url_instance_nonexistent = TALER_url_join (
-    twister_exchange_url, "instances/foo/", NULL);
-  twister_merchant_url_instance_tor = TALER_url_join (twister_exchange_url,
-                                                      "instances/tor/", NULL);
+    twister_merchant_url, "instances/foo/", NULL);
+  twister_merchant_url_instance_tor = TALER_url_join (
+    twister_merchant_url, "instances/tor/", NULL);
 
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
