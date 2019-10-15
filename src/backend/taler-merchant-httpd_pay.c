@@ -1406,9 +1406,8 @@ parse_pay (struct MHD_Connection *connection,
   session_id = json_string_value (json_object_get (root,
                                                    "session_id"));
 
-  if (0 != memcmp (&merchant_pub,
-                   &pc->mi->pubkey,
-                   sizeof (struct GNUNET_CRYPTO_EddsaPublicKey)))
+  if (0 != GNUNET_memcmp (&merchant_pub,
+                          &pc->mi->pubkey))
   {
     TALER_LOG_INFO ("Unknown merchant public key included in payment (usually wrong instance chosen)\n");
     TMH_RESPONSE_reply_rc (connection,
