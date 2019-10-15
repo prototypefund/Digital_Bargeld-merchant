@@ -1405,6 +1405,19 @@ parse_pay (struct MHD_Connection *connection,
 
   session_id = json_string_value (json_object_get (root,
                                                    "session_id"));
+
+  if (0 != memcmp (&merchant_pub,
+                   &pc->mi->pubkey,
+                   sizeof (struct GNUNET_CRYPTO_EddsaPublicKey)))
+  {
+    TALER_LOG_INFO ("Unknown merchant public key included in payment (usually wrong instance chosen)\n");
+    TMH_RESPONSE_reply_rc (connection,
+                           MHD_HTTP_NOT_FOUND,
+                           TALER_EC_PAY_WRONG_INSTANCE,
+                           "Payment sent to wrong instance (merchant_pub unknown to the merchant)");
+    return GNUNET_NO;
+  }
+
   if (NULL != session_id)
     pc->session_id = GNUNET_strdup (session_id);
   pc->order_id = GNUNET_strdup (order_id);
