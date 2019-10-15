@@ -597,7 +597,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_pay
       ("pay-unaggregation",
-      merchant_url,
+      twister_merchant_url_instance_tor,
       MHD_HTTP_OK,
       "create-proposal-unaggregation",
       "withdraw-coin-unaggregation",
