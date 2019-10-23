@@ -75,22 +75,22 @@ enum PaymentGeneratorError
 /**
  * Help string shown if NO subcommand is given on command line.
  */
-int root_help;
+static int root_help;
 
 /**
  * Witnesses if the ordinary cases payment suite should be run.
  */
-unsigned int ordinary;
+static unsigned int ordinary;
 
 /**
  * Witnesses if the corner cases payment suite should be run.
  */
-unsigned int corner;
+static unsigned int corner;
 
 /**
  * Root help string.
  */
-char *root_help_str = \
+static const char *root_help_str = \
   "taler-merchant-benchmark\nPopulates production database"
   " with fake payments.\nMust be used with either 'ordinary'"
   " or 'corner' sub-commands.\n";
@@ -738,6 +738,7 @@ main (int argc,
     if (GNUNET_YES == root_help)
     {
       fprintf (stdout,
+               "%s",
                root_help_str);
       return 0;
     }
