@@ -120,6 +120,11 @@ int TMH_merchant_connection_close;
 char *TMH_currency;
 
 /**
+ * Inform the auditor for all deposit confirmations (global option)
+ */
+int TMH_force_audit;
+
+/**
  * Task running the HTTP server.
  */
 static struct GNUNET_SCHEDULER_Task *mhd_task;
@@ -1343,7 +1348,11 @@ run (void *cls,
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-
+  if (GNUNET_YES ==
+      GNUNET_CONFIGURATION_get_value_yesno (config,
+                                            "merchant",
+                                            "FORCE_AUDIT"))
+    TMH_force_audit = GNUNET_YES;
   if (GNUNET_SYSERR ==
       TMH_EXCHANGES_init (config))
   {

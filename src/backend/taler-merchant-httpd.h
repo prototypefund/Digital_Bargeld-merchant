@@ -296,6 +296,11 @@ extern unsigned long long default_wire_fee_amortization;
 extern char *TMH_currency;
 
 /**
+ * Inform the auditor for all deposit confirmations (global option)
+ */
+extern int TMH_force_audit;
+
+/**
  * Hash of our wire format details as given in #j_wire.
  */
 extern struct GNUNET_HashCode h_wire;

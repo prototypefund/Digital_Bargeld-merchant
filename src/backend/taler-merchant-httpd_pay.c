@@ -1203,7 +1203,8 @@ process_pay_with_exchange (void *cls,
           "coin_idx", i));
       return;
     }
-
+    if (TMH_force_audit)
+      TALER_EXCHANGE_deposit_force_dc (dc->dh);
     pc->pending_at_ce++;
   }
 }
@@ -1409,7 +1410,8 @@ parse_pay (struct MHD_Connection *connection,
   if (0 != GNUNET_memcmp (&merchant_pub,
                           &pc->mi->pubkey))
   {
-    TALER_LOG_INFO ("Unknown merchant public key included in payment (usually wrong instance chosen)\n");
+    TALER_LOG_INFO (
+      "Unknown merchant public key included in payment (usually wrong instance chosen)\n");
     TMH_RESPONSE_reply_rc (connection,
                            MHD_HTTP_NOT_FOUND,
                            TALER_EC_PAY_WRONG_INSTANCE,
