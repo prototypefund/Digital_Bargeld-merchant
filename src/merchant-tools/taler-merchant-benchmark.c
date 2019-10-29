@@ -118,7 +118,7 @@ static unsigned int twocoins_number = 1;
 /**
  * Exit code.
  */
-static unsigned int result;
+static int result;
 
 /**
  * Bank process.
@@ -551,55 +551,37 @@ int
 main (int argc,
       char *const *argv)
 {
-  default_config_file = GNUNET_OS_project_data_get
-                          ()->user_config_file;
-
-  loglev = NULL;
-  GNUNET_log_setup ("taler-merchant-benchmark",
-                    loglev,
-                    logfile);
-
   struct GNUNET_GETOPT_CommandLineOption *options;
-
   struct GNUNET_GETOPT_CommandLineOption root_options[] = {
-
     GNUNET_GETOPT_option_cfgfile
       (&cfg_filename),
-
     GNUNET_GETOPT_option_version
       (PACKAGE_VERSION " " VCS_VERSION),
-
     GNUNET_GETOPT_option_flag
       ('h',
       "help",
       NULL,
       &root_help),
-
     GNUNET_GETOPT_OPTION_END
   };
 
   struct GNUNET_GETOPT_CommandLineOption corner_options[] = {
-
     GNUNET_GETOPT_option_help
       ("Populate databases with corner case payments"),
-
     GNUNET_GETOPT_option_loglevel
       (&loglev),
-
     GNUNET_GETOPT_option_uint
       ('u',
       "unaggregated-number",
       "UN",
       "will generate UN unaggregated payments, defaults to 1",
       &unaggregated_number),
-
     GNUNET_GETOPT_option_uint
       ('t',
       "two-coins",
       "TC",
       "will perform TC 2-coins payments, defaults to 1",
       &twocoins_number),
-
     /**
      * NOTE: useful when the setup serves merchant
      * backends via unix domain sockets, since there
@@ -613,14 +595,12 @@ main (int argc,
       "MU",
       "merchant base url, mandatory",
       &merchant_url),
-
     GNUNET_GETOPT_option_string
       ('k',
       "currency",
       "K",
       "Used currency, mandatory",
       &currency),
-
     GNUNET_GETOPT_option_string
       ('i',
       "alt-instance",
@@ -634,53 +614,43 @@ main (int argc,
       " as they would get those far future ones"
       " aggregated too.",
       &alt_instance_id),
-
     GNUNET_GETOPT_option_string
       ('b',
       "bank-url",
       "BU",
       "bank base url, mandatory",
       &bank_url),
-
     GNUNET_GETOPT_option_string
       ('l',
       "logfile",
       "LF",
       "will log to file LF",
       &logfile),
-
     GNUNET_GETOPT_OPTION_END
   };
 
   struct GNUNET_GETOPT_CommandLineOption ordinary_options[] = {
-
     GNUNET_GETOPT_option_cfgfile
       (&cfg_filename),
-
     GNUNET_GETOPT_option_version
       (PACKAGE_VERSION " " VCS_VERSION),
-
     GNUNET_GETOPT_option_help
       ("Generate Taler ordinary payments"
       " to populate the databases"),
-
     GNUNET_GETOPT_option_loglevel
       (&loglev),
-
     GNUNET_GETOPT_option_uint
       ('p',
       "payments-number",
       "PN",
       "will generate PN payments, defaults to 1",
       &payments_number),
-
     GNUNET_GETOPT_option_uint
       ('t',
       "tracks-number",
       "TN",
       "will perform TN /track operations, defaults to 1",
       &tracks_number),
-
     /**
      * NOTE: useful when the setup serves merchant
      * backends via unix domain sockets, since there
@@ -694,26 +664,29 @@ main (int argc,
       "MU",
       "merchant base url, mandatory",
       &merchant_url),
-
     GNUNET_GETOPT_option_string
       ('b',
       "bank-url",
       "BU",
       "bank base url, mandatory",
       &bank_url),
-
     GNUNET_GETOPT_option_string
       ('l',
       "logfile",
       "LF",
       "will log to file LF",
       &logfile),
-
     GNUNET_GETOPT_OPTION_END
   };
 
-  options = root_options;
+  default_config_file = GNUNET_OS_project_data_get
+                          ()->user_config_file;
 
+  loglev = NULL;
+  GNUNET_log_setup ("taler-merchant-benchmark",
+                    loglev,
+                    logfile);
+  options = root_options;
   if (NULL != argv[1])
   {
     if (0 == strcmp ("ordinary", argv[1]))
@@ -728,11 +701,12 @@ main (int argc,
     }
   }
 
-  if (GNUNET_SYSERR != (result = GNUNET_GETOPT_run
-                                   ("taler-merchant-benchmark",
-                                   options,
-                                   argc,
-                                   argv)))
+  if (GNUNET_SYSERR !=
+      (result = GNUNET_GETOPT_run
+                  ("taler-merchant-benchmark",
+                  options,
+                  argc,
+                  argv)))
   {
 
     if (GNUNET_YES == root_help)
@@ -747,35 +721,30 @@ main (int argc,
     if (0 == result)
       return 0;
   }
-
   if (-1 == result)
-  {
     return 1;
-  }
-
-  if ((GNUNET_YES != ordinary) && (GNUNET_YES != corner))
+  if ( (GNUNET_YES != ordinary) &&
+       (GNUNET_YES != corner) )
   {
     fprintf (stderr,
              "Please use 'ordinary' or 'corner' subcommands.\n");
     return 1;
   }
 
-  if ((GNUNET_YES == corner) && (NULL == alt_instance_id))
+  if ( (GNUNET_YES == corner) &&
+       (NULL == alt_instance_id) )
   {
-    fprintf (stderr, "option '-i' is mandatory"
-             " with sub-command 'corner'!\n");
+    fprintf (stderr,
+             "option '-i' is mandatory with sub-command 'corner'!\n");
     return 1;
   }
-
   if (NULL == cfg_filename)
     cfg_filename = (char *) default_config_file;
-
   if (NULL == currency)
   {
     TALER_LOG_ERROR ("Option -k is mandatory!\n");
     return MISSING_CURRENCY;
   }
-
   if (NULL == merchant_url)
   {
     TALER_LOG_ERROR ("Option -m is mandatory!\n");
