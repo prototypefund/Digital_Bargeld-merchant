@@ -167,7 +167,7 @@ is_valid_correlation_id (const char *correlation_id)
 {
   if (strlen (correlation_id) >= 64)
     return GNUNET_NO;
-  for (int i = 0; i < strlen (correlation_id); i++)
+  for (size_t i = 0; i < strlen (correlation_id); i++)
     if (! (isalnum (correlation_id[i]) ||(correlation_id[i] == '-')))
       return GNUNET_NO;
   return GNUNET_YES;
@@ -1142,6 +1142,8 @@ url_handler (void *cls,
   int ret;
   struct TMH_RequestHandler *selected_handler = NULL;
 
+  (void) cls;
+  (void) version;
   if (NULL == hc)
   {
     GNUNET_async_scope_fresh (&aid);
@@ -1330,6 +1332,9 @@ run (void *cls,
 {
   int fh;
 
+  (void) cls;
+  (void) args;
+  (void) cfgfile;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Starting taler-merchant-httpd\n");
 

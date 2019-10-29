@@ -1486,7 +1486,7 @@ find_transfers_cb (void *cls,
 {
   struct FindTransfersContext *ftc = cls;
 
-  for (unsigned int i = 0; i<PQntuples (result); i++)
+  for (unsigned int i = 0; i<num_results; i++)
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_WireTransferIdentifierRawP wtid;
@@ -1613,7 +1613,7 @@ find_deposits_cb (void *cls,
   struct FindDepositsContext *fdc = cls;
   struct PostgresClosure *pg = fdc->pg;
 
-  for (unsigned int i = 0; i<PQntuples (result); i++)
+  for (unsigned int i = 0; i<num_results; i++)
   {
     struct GNUNET_HashCode h_contract_terms;
     struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -2475,7 +2475,7 @@ postgres_enable_tip_reserve_TR (void *cls,
 
   retries = 0;
   check_connection (pg);
-RETRY:
+  RETRY:
   if (MAX_RETRIES < ++retries)
     return GNUNET_DB_STATUS_SOFT_ERROR;
   if (GNUNET_OK !=
@@ -2682,7 +2682,7 @@ postgres_authorize_tip_TR (void *cls,
 
   retries = 0;
   check_connection (pg);
-RETRY:
+  RETRY:
   if (MAX_RETRIES < ++retries)
     return TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
   if (GNUNET_OK !=
@@ -2898,7 +2898,7 @@ postgres_pickup_tip_TR (void *cls,
 
   retries = 0;
   check_connection (pg);
-RETRY:
+  RETRY:
   if (MAX_RETRIES < ++retries)
     return TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
   if (GNUNET_OK !=
