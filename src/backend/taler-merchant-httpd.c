@@ -286,6 +286,7 @@ do_shutdown (void *cls)
 {
   struct TMH_SuspendedConnection *sc;
 
+  (void) cls;
   MH_force_pc_resume ();
   MH_force_trh_resume ();
   if (NULL != mhd_task)
