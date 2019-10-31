@@ -155,6 +155,18 @@ static char *serve_unixpath;
  */
 static mode_t unixpath_mode;
 
+/**
+ * MIN-Heap of suspended connections to resume when the timeout expires,
+ * ordered by timeout. Values are of type `struct MHD_Connection`
+ */
+struct GNUNET_CONTAINER_Heap *resume_timeout_heap;
+
+/**
+ * Hash map from H(order_id,merchant_pub) to `struct MHD_Connection`
+ * entries to resume when a payment is made for the given order.
+ */
+struct GNUNET_CONTAINER_MultiHashMap *payment_trigger_map;
+
 
 /**
  * Return #GNUNET_YES if given a valid correlation ID and
@@ -189,6 +201,8 @@ hashmap_free (void *cls,
   struct MerchantInstance *mi = value;
   struct WireMethod *wm;
 
+  (void) cls;
+  (void) key;
   while (NULL != (wm = (mi->wm_head)))
   {
     GNUNET_CONTAINER_DLL_remove (mi->wm_head,
@@ -209,6 +223,59 @@ hashmap_free (void *cls,
 
 
 /**
+ * Callback that frees all the elements in the #payment_trigger_map.
+ * This function should actually never be called, as by the time we
+ * get to it, all payment triggers should have been cleaned up!
+ *
+ * @param cls closure, NULL
+ * @param key current key
+ * @param value a `struct TMH_SuspendedConnection`
+ * @return #GNUNET_OK
+ */
+static int
+payment_trigger_free (void *cls,
+                      const struct GNUNET_HashCode *key,
+                      void *value)
+{
+  struct TMH_SuspendedConnection *sc = value;
+
+  (void) cls;
+  (void) key;
+  (void) sc; /* cannot really 'clean up' */
+  GNUNET_break (0);
+  return GNUNET_OK;
+}
+
+
+/**
+ * Compute @a key to use for @a order_id and @a mpub in our
+ * #payment_trigger_map.
+ *
+ * @param order_id an order ID
+ * @param mpub an instance public key
+ * @param key[out] set to the hash map key to use
+ */
+void
+TMH_compute_pay_key (const char *order_id,
+                     const struct TALER_MerchantPublicKeyP *mpub,
+                     struct GNUNET_HashCode *key)
+{
+  size_t olen = strlen (order_id);
+  char buf[sizeof (*mpub) + olen];
+
+  memcpy (buf,
+          mpub,
+          sizeof (*mpub));
+  memcpy (&buf[sizeof (*mpub)],
+          order_id,
+          olen);
+  GNUNET_CRYPTO_hash (buf,
+                      sizeof (buf),
+                      key);
+}
+
+
+/**
  * Shutdown task (magically invoked when the application is being
  * quit)
  *
@@ -217,12 +284,30 @@ hashmap_free (void *cls,
 static void
 do_shutdown (void *cls)
 {
+  struct TMH_SuspendedConnection *sc;
+
   MH_force_pc_resume ();
   MH_force_trh_resume ();
   if (NULL != mhd_task)
   {
     GNUNET_SCHEDULER_cancel (mhd_task);
     mhd_task = NULL;
+  }
+  /* resume all suspended connections, must be done before stopping #mhd */
+  if (NULL != resume_timeout_heap)
+  {
+    while (NULL != (sc = GNUNET_CONTAINER_heap_remove_root (
+                      resume_timeout_heap)))
+    {
+      sc->hn = NULL;
+      GNUNET_assert (GNUNET_YES ==
+                     GNUNET_CONTAINER_multihashmap_remove (payment_trigger_map,
+                                                           &sc->key,
+                                                           sc));
+      MHD_resume_connection (sc->con);
+    }
+    GNUNET_CONTAINER_heap_destroy (resume_timeout_heap);
+    resume_timeout_heap = NULL;
   }
   if (NULL != mhd)
   {
@@ -236,12 +321,19 @@ do_shutdown (void *cls)
   }
   TMH_EXCHANGES_done ();
   TMH_AUDITORS_done ();
-
-  GNUNET_CONTAINER_multihashmap_iterate (by_id_map,
-                                         &hashmap_free,
-                                         NULL);
+  if (NULL != payment_trigger_map)
+  {
+    GNUNET_CONTAINER_multihashmap_iterate (payment_trigger_map,
+                                           &payment_trigger_free,
+                                           NULL);
+    GNUNET_CONTAINER_multihashmap_destroy (payment_trigger_map);
+    payment_trigger_map = NULL;
+  }
   if (NULL != by_id_map)
   {
+    GNUNET_CONTAINER_multihashmap_iterate (by_id_map,
+                                           &hashmap_free,
+                                           NULL);
     GNUNET_CONTAINER_multihashmap_destroy (by_id_map);
     by_id_map = NULL;
   }
@@ -291,6 +383,7 @@ handle_mhd_completion_callback (void *cls,
  * starts the task waiting for them.
  */
 static struct GNUNET_SCHEDULER_Task *
+
 prepare_daemon (void);
 
 
@@ -347,6 +440,8 @@ TMH_trigger_daemon ()
  * @param daemon_handle HTTP server to prepare to run
  */
 static struct GNUNET_SCHEDULER_Task *
+
+
 prepare_daemon ()
 {
   struct GNUNET_SCHEDULER_Task *ret;
@@ -938,6 +1033,8 @@ instances_iterator_cb (void *cls,
  * @return NULL if that instance is unknown to us
  */
 static struct MerchantInstance *
+
+
 lookup_instance (const char *instance_id)
 {
   struct GNUNET_HashCode h_instance;
@@ -1704,6 +1801,11 @@ run (void *cls,
       GNUNET_assert (0);
     }
   }
+  resume_timeout_heap
+    = GNUNET_CONTAINER_heap_create (GNUNET_CONTAINER_HEAP_ORDER_MIN);
+  payment_trigger_map
+    = GNUNET_CONTAINER_multihashmap_create (16,
+                                            GNUNET_YES);
   mhd = MHD_start_daemon (MHD_USE_SUSPEND_RESUME | MHD_USE_DUAL_STACK,
                           port,
                           NULL, NULL,

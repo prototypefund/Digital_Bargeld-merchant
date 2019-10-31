@@ -267,6 +267,29 @@ struct TM_HandlerContext
 
 
 /**
+ * Entry in a #resume_timeout_heap.
+ */
+struct TMH_SuspendedConnection
+{
+  /**
+   * Which connection was suspended.
+   */
+  struct MHD_Connection *con;
+
+  /**
+   * Key of this entry in the #payment_trigger_map
+   */
+  struct GNUNET_HashCode key;
+
+  /**
+   * Associated heap node.
+   */
+  struct GNUNET_CONTAINER_HeapNode *hn;
+
+};
+
+
+/**
  * Locations from the configuration.  Mapping from
  * label to location data.
  */
@@ -289,6 +312,18 @@ extern struct TALER_Amount default_max_deposit_fee;
  * Default factor for wire fee amortization.
  */
 extern unsigned long long default_wire_fee_amortization;
+
+/**
+ * MIN-Heap of suspended connections to resume when the timeout expires,
+ * ordered by timeout. Values are of type `struct TMH_SuspendedConnection`
+ */
+extern struct GNUNET_CONTAINER_Heap *resume_timeout_heap;
+
+/**
+ * Hash map from H(order_id,merchant_pub) to `struct TMH_SuspendedConnection`
+ * entries to resume when a payment is made for the given order.
+ */
+extern struct GNUNET_CONTAINER_MultiHashMap *payment_trigger_map;
 
 /**
  * Which currency do we use?
@@ -347,5 +382,19 @@ extern struct GNUNET_TIME_Relative default_pay_deadline;
  */
 void
 TMH_trigger_daemon (void);
+
+/**
+ * Compute @a key to use for @a order_id and @a mpub in our
+ * #payment_trigger_map.
+ *
+ * @param order_id an order ID
+ * @param mpub an instance public key
+ * @param key[out] set to the hash map key to use
+ */
+void
+TMH_compute_pay_key (const char *order_id,
+                     const struct TALER_MerchantPublicKeyP *mpub,
+                     struct GNUNET_HashCode *key);
+
 
 #endif

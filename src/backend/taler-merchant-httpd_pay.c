@@ -413,6 +413,57 @@ MH_force_pc_resume ()
 
 
 /**
+ * Function called to resume suspended connections.
+ *
+ * @param cls NULL
+ * @param key key in the #payment_trigger_map
+ * @param value a `struct TMH_SuspendedConnection` to resume
+ * @return #GNUNET_OK (continue to iterate)
+ */
+static int
+resume_operation (void *cls,
+                  const struct GNUNET_HashCode *key,
+                  void *value)
+{
+  struct TMH_SuspendedConnection *sc = value;
+
+  (void) cls;
+  GNUNET_assert (GNUNET_YES ==
+                 GNUNET_CONTAINER_multihashmap_remove (payment_trigger_map,
+                                                       key,
+                                                       sc));
+  GNUNET_assert (sc ==
+                 GNUNET_CONTAINER_heap_remove_node (sc->hn));
+  sc->hn = NULL;
+  MHD_resume_connection (sc->con);
+  return GNUNET_OK;
+}
+
+
+/**
+ * Find out if we have any clients long-polling for @a order_id to be
+ * confirmed at merchant @a mpub, and if so, tell them to resume.
+ *
+ * @param order_id the order that was paid
+ * @param mpub the merchant's public key of the instance where the payment happened
+ */
+static void
+resume_suspended_payment_checks (const char *order_id,
+                                 const struct TALER_MerchantPublicKeyP *mpub)
+{
+  struct GNUNET_HashCode key;
+
+  TMH_compute_pay_key (order_id,
+                       mpub,
+                       &key);
+  GNUNET_CONTAINER_multihashmap_get_multiple (payment_trigger_map,
+                                              &key,
+                                              &resume_operation,
+                                              NULL);
+}
+
+
+/**
  * Resume the given pay context and send the given response.
  * Stores the response in the @a pc and signals MHD to resume
  * the connection.  Also ensures MHD runs immediately.
@@ -473,6 +524,8 @@ abort_deposit (struct PayContext *pc)
  * @return the mhd response
  */
 static struct MHD_Response *
+
+
 sign_success_response (struct PayContext *pc)
 {
   json_t *refunds;
@@ -609,6 +662,8 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
  * @return taler error code, #TALER_EC_NONE if amount is sufficient
  */
 static enum TALER_ErrorCode
+
+
 check_payment_sufficient (struct PayContext *pc)
 {
   struct TALER_Amount acc_fee;
@@ -920,7 +975,6 @@ generate_error_response (struct PayContext *pc,
  */
 static void
 find_next_exchange (struct PayContext *pc);
-
 
 /**
  * Begin of the DB transaction.  If required (from
@@ -2058,7 +2112,6 @@ begin_transaction (struct PayContext *pc)
     }
 
     /* Now commit! */
-
     if (0 <= qs)
       qs = db->commit (db->cls);
     else
@@ -2079,7 +2132,8 @@ begin_transaction (struct PayContext *pc)
       return;
     }
 
-
+    resume_suspended_payment_checks (pc->order_id,
+                                     &pc->mi->pubkey);
     resume_pay_with_response (pc,
                               MHD_HTTP_OK,
                               sign_success_response (pc));
