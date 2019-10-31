@@ -287,4 +287,5 @@ TALER_MERCHANT_track_transfer_cancel (struct
   GNUNET_free (tdo);
 }
 
+
 /* end of merchant_api_track_transfer.c */

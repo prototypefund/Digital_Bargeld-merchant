@@ -242,4 +242,5 @@ TALER_MERCHANT_tip_query_cancel (struct TALER_MERCHANT_TipQueryOperation *tqo)
   GNUNET_free (tqo);
 }
 
+
 /* end of merchant_api_tip_query.c */

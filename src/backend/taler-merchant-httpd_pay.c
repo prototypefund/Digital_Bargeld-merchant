@@ -738,8 +738,7 @@ check_payment_sufficient (struct PayContext *pc)
    * Deposit fees of *all* the coins are higher than
    * the fixed limit that the merchant is willing to
    * pay.  The fees difference must be paid by the customer.
-   */
-  if (-1 == TALER_amount_cmp (&pc->max_fee,
+   */if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
   {
     struct TALER_Amount excess_fee;
@@ -783,8 +782,7 @@ check_payment_sufficient (struct PayContext *pc)
    * fraction, and check that the remaining paid amount is
    * enough to pay both the remaining wire fee customer's
    * fraction AND the price of the contract itself.
-   */
-  else
+   */else
   {
     struct TALER_Amount deposit_fee_savings;
 
@@ -2229,5 +2227,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     return MHD_NO;
   return MHD_YES;
 }
+
 
 /* end of taler-merchant-httpd_pay.c */

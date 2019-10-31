@@ -290,4 +290,5 @@ MH_handler_history (struct TMH_RequestHandler *rh,
   return ret;
 }
 
+
 /* end of taler-merchant-httpd_history.c */

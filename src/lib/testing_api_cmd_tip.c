@@ -280,6 +280,7 @@ tip_authorize_cb (void *cls,
   TALER_TESTING_interpreter_next (tas->is);
 }
 
+
 /**
  * Offers information from the /tip-authorize CMD state to other
  * commands.
@@ -436,7 +437,6 @@ TALER_TESTING_cmd_tip_authorize_with_ec
 }
 
 
-
 /**
  * Create a /tip-authorize CMD.
  *
@@ -477,6 +477,7 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
 
   return cmd;
 }
+
 
 /**
  * Callback to process a GET /tip-query request, it mainly
@@ -575,6 +576,7 @@ tip_query_cb (void *cls,
   TALER_TESTING_interpreter_next (tqs->is);
 }
 
+
 /**
  * Free the state from a /tip-query CMD, and possibly cancel
  * a pending /tip-query request.
@@ -596,6 +598,7 @@ tip_query_cleanup (void *cls,
   }
   GNUNET_free (tqs);
 }
+
 
 /**
  * Run a /tip-query CMD.
@@ -694,6 +697,7 @@ TALER_TESTING_cmd_tip_query (const char *label,
 
   return cmd;
 }
+
 
 /**
  * Internal withdraw handle used when withdrawing tips.
@@ -903,14 +907,15 @@ tip_pickup_run (void *cls,
     /* Count planchets. */
     for (num_planchets = 0;
          NULL != tps->amounts[num_planchets];
-         num_planchets++);
+         num_planchets++)
+      ;
   }
   else
   {
     const unsigned int *np;
-    if ( NULL == /* looking for "parent" tip-pickup command */
-         (replay_cmd = TALER_TESTING_interpreter_lookup_command
-                         (is, tps->replay_reference)) )
+    if (NULL ==  /* looking for "parent" tip-pickup command */
+        (replay_cmd = TALER_TESTING_interpreter_lookup_command
+                        (is, tps->replay_reference)) )
       TALER_TESTING_FAIL (is);
 
     if (GNUNET_OK != TALER_TESTING_get_trait_uint
@@ -993,6 +998,7 @@ tip_pickup_run (void *cls,
     GNUNET_assert (NULL != tps->tpo);
   }
 }
+
 
 /**
  * Free a /tip-pickup CMD state, and possibly cancel a
@@ -1126,6 +1132,7 @@ TALER_TESTING_cmd_tip_pickup_with_ec
   return cmd;
 }
 
+
 /**
  * Define a /tip-pickup CMD.
  *
@@ -1165,6 +1172,7 @@ TALER_TESTING_cmd_tip_pickup
   return cmd;
 }
 
+
 /**
  * This commands does not query the backend at all,
  * but just makes up a fake authorization id that will
@@ -1192,5 +1200,6 @@ TALER_TESTING_cmd_tip_authorize_fake (const char *label)
 
   return cmd;
 }
+
 
 /* end of testing_api_cmd_tip.c */

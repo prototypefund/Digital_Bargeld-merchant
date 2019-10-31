@@ -50,6 +50,7 @@ TALER_TESTING_get_trait_merchant_sig
                       index);
 }
 
+
 /**
  * Offer a merchant signature over a contract.
  *
@@ -71,5 +72,6 @@ TALER_TESTING_make_trait_merchant_sig
   };
   return ret;
 }
+
 
 /* end of testing_api_trait_merchant_sig.c */

@@ -188,7 +188,6 @@ TALER_TESTING_prepare_merchant (const char *config_filename)
   GNUNET_OS_process_destroy (dbinit_proc);
 
 
-
   GNUNET_asprintf (&base_url,
                    "http://localhost:%llu/",
                    port);

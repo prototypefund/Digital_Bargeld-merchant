@@ -458,4 +458,5 @@ TALER_MERCHANT_proposal_lookup_cancel
   GNUNET_free (plo);
 }
 
+
 /* end of merchant_api_contract.c */

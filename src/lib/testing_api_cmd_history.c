@@ -30,7 +30,6 @@
 #include "taler_merchant_testing_lib.h"
 
 
-
 /**
  * State for a "history" CMD.
  */
@@ -340,6 +339,7 @@ cmd_history2 (const char *label,
 
   return cmd;
 }
+
 
 /**
  * Make a "history" command.

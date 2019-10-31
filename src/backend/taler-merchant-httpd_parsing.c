@@ -67,8 +67,6 @@ struct Buffer
 };
 
 
-
-
 /**
  * Free the data in a buffer.  Does *not* free
  * the buffer object itself.
@@ -81,7 +79,6 @@ buffer_deinit (struct Buffer *buf)
   GNUNET_free_non_null (buf->data);
   buf->data = NULL;
 }
-
 
 
 /**
@@ -218,7 +215,6 @@ TMH_PARSE_json_data (struct MHD_Connection *connection,
   }
   return GNUNET_YES;
 }
-
 
 
 /**

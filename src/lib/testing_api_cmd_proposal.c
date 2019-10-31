@@ -418,6 +418,7 @@ proposal_cleanup (void *cls,
   GNUNET_free (ps);
 }
 
+
 /**
  * Free the state of a "proposal lookup" CMD, and possibly
  * cancel it if it did not complete.
@@ -476,6 +477,7 @@ TALER_TESTING_cmd_proposal (const char *label,
 
   return cmd;
 }
+
 
 /**
  * Callback for "proposal lookup" operation, to check the

@@ -138,8 +138,7 @@ handle_refund_increase_finished (void *cls,
      * The backend gave response, but it's error, log it.
      * NOTE that json must be a Taler-specific error object (FIXME,
      * need a link to error objects at docs)
-     */
-    if (-1 == json_unpack
+     */if (-1 == json_unpack
           ((json_t *) json,
           "{s:s, s:I, s:s}",
           "error", &error,
@@ -297,8 +296,7 @@ handle_refund_lookup_finished (void *cls,
      * The backend gave response, but it's error, log it.
      * NOTE that json must be a Taler-specific error object (FIXME,
      * need a link to error objects at docs)
-     */
-    if (-1 == json_unpack ((json_t *) json,
+     */if (-1 == json_unpack ((json_t *) json,
                            "{s:s, s:I, s:s}",
                            "error", &error,
                            "code", &code))

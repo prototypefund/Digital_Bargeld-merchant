@@ -527,6 +527,7 @@ run (void *cls,
   result = 1;
 }
 
+
 /**
  * Send SIGTERM and wait for process termination.
  *
@@ -539,6 +540,7 @@ terminate_process (struct GNUNET_OS_Process *process)
   GNUNET_OS_process_wait (process);
   GNUNET_OS_process_destroy (process);
 }
+
 
 /**
  * The main function of the serve tool
@@ -588,8 +590,7 @@ main (int argc,
      * is no way - yet? - to get the merchant base url.
      * Clearly, we could introduce a merchant_base_url
      * value into the configuration.
-     */
-    GNUNET_GETOPT_option_string
+     */GNUNET_GETOPT_option_string
       ('m',
       "merchant-url",
       "MU",
@@ -657,8 +658,7 @@ main (int argc,
      * is no way - yet? - to get the merchant base url.
      * Clearly, we could introduce a merchant_base_url
      * value into the configuration.
-     */
-    GNUNET_GETOPT_option_string
+     */GNUNET_GETOPT_option_string
       ('m',
       "merchant-url",
       "MU",
@@ -773,9 +773,9 @@ main (int argc,
     return MISSING_BANK_URL;
   }
 
-  if ( NULL == (bankd = TALER_TESTING_run_bank
-                          (cfg_filename,
-                          bank_url)))
+  if (NULL == (bankd = TALER_TESTING_run_bank
+                         (cfg_filename,
+                         bank_url)))
   {
     TALER_LOG_ERROR ("Failed to run the bank\n");
     terminate_process (merchantd);

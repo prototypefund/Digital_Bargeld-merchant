@@ -81,6 +81,7 @@ TALER_TESTING_cmd_proposal (const char *label,
                             const char *merchant_url,
                             unsigned int http_status,
                             const char *order);
+
 /**
  * Make a "proposal lookup" command.
  *
@@ -119,6 +120,7 @@ TALER_TESTING_cmd_check_payment (const char *label,
                                  unsigned int http_status,
                                  const char *proposal_reference,
                                  unsigned int expect_paid);
+
 /**
  * Make a "pay" test command.
  *
@@ -145,6 +147,7 @@ TALER_TESTING_cmd_pay (const char *label,
                        const char *amount_with_fee,
                        const char *amount_without_fee,
                        const char *refund_fee);
+
 /**
  * Make a "pay again" test command.  Its purpose is to
  * take all the data from a aborted "pay" CMD, and use
@@ -166,6 +169,7 @@ TALER_TESTING_cmd_pay_again (const char *label,
                              const char *coin_reference,
                              const char *refund_fee,
                              unsigned int http_status);
+
 /**
  * Make a "pay abort" test command.
  *
@@ -651,6 +655,7 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_query (const char *label,
                              const char *merchant_url,
                              unsigned int http_status);
+
 /**
  * Define a /tip-query CMD equipped with a expected amount.
  *

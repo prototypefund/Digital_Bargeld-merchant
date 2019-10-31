@@ -49,6 +49,7 @@ TALER_TESTING_get_trait_planchet_secrets
                       index);
 }
 
+
 /**
  * Offer planchet secrets.
  *
@@ -69,5 +70,6 @@ TALER_TESTING_make_trait_planchet_secrets
   };
   return ret;
 }
+
 
 /* end of testing_api_trait_planchet.c */

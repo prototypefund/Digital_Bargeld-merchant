@@ -184,6 +184,7 @@ track_transaction_cb (void *cls,
   TALER_TESTING_interpreter_next (tts->is);
 }
 
+
 /**
  * Callback for a /track/transfer operation, only checks if
  * response code is the expected one.
@@ -341,7 +342,6 @@ track_transfer_cb
 }
 
 
-
 /**
  * Run the "track transfer" CMD.
  *
@@ -381,6 +381,7 @@ track_transfer_run (void *cls,
   GNUNET_assert (NULL != tts->tth);
 }
 
+
 /**
  * Run the "track transaction" CMD.
  *
@@ -399,9 +400,9 @@ track_transaction_run (void *cls,
   const struct TALER_TESTING_Command *pay_cmd;
 
   tts->is = is;
-  if ( NULL ==
-       (pay_cmd = TALER_TESTING_interpreter_lookup_command
-                    (is, tts->pay_reference)))
+  if (NULL ==
+      (pay_cmd = TALER_TESTING_interpreter_lookup_command
+                   (is, tts->pay_reference)))
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_order_id
@@ -441,6 +442,7 @@ track_transfer_cleanup (void *cls,
   }
   GNUNET_free (tts);
 }
+
 
 /**
  * Free the state of a "track transaction" CMD, and possibly
@@ -513,6 +515,7 @@ track_transaction_traits (void *cls,
   return GNUNET_SYSERR;
 }
 
+
 /**
  * Define a "track transaction" CMD.
  *
@@ -584,5 +587,6 @@ TALER_TESTING_cmd_merchant_track_transfer
 
   return cmd;
 }
+
 
 /* end of testing_api_cmd_track.c */

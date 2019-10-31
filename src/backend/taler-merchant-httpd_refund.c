@@ -349,8 +349,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
    *
    * Just a "200 OK" should be fine here, as the frontend has all
    * the information needed to generate the right response.
-   */
-  confirmation.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK);
+   */confirmation.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK);
   confirmation.purpose.size = htonl (sizeof (struct
                                              TALER_MerchantRefundConfirmationPS));
   GNUNET_CRYPTO_hash (order_id,

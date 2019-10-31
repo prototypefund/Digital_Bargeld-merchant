@@ -172,6 +172,7 @@ refund_lookup_cleanup (void *cls,
   GNUNET_free (rls);
 }
 
+
 /**
  * Process POST /refund (increase) response; just checking
  * if the HTTP response code is the one expected.
@@ -225,6 +226,7 @@ refund_increase_run (void *cls,
                                              ris);
   GNUNET_assert (NULL != ris->rio);
 }
+
 
 /**
  * Callback that frees all the elements in the hashmap
@@ -322,9 +324,9 @@ refund_lookup_cb (void *cls,
 
   /* Compare spent coins with refunded, and if they match,
    * increase an accumulator.  */
-  if ( NULL ==
-       (pay_cmd = TALER_TESTING_interpreter_lookup_command
-                    (rls->is, rls->pay_reference)))
+  if (NULL ==
+      (pay_cmd = TALER_TESTING_interpreter_lookup_command
+                   (rls->is, rls->pay_reference)))
     TALER_TESTING_FAIL (rls->is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_coin_reference
@@ -344,9 +346,9 @@ refund_lookup_cb (void *cls,
     struct TALER_Amount *iamount;
     const struct TALER_TESTING_Command *icoin_cmd;
 
-    if ( NULL ==
-         (icoin_cmd = TALER_TESTING_interpreter_lookup_command
-                        (rls->is, icoin_reference)) )
+    if (NULL ==
+        (icoin_cmd = TALER_TESTING_interpreter_lookup_command
+                       (rls->is, icoin_reference)) )
     {
       GNUNET_break (0);
       TALER_LOG_ERROR ("Bad reference `%s'\n",
@@ -486,6 +488,7 @@ refund_increase_traits (void *cls,
   return GNUNET_SYSERR;
 }
 
+
 /**
  * Define a "refund increase" CMD.
  *
@@ -530,6 +533,7 @@ TALER_TESTING_cmd_refund_increase
 
   return cmd;
 }
+
 
 /**
  * Define a "refund lookup" CMD.
@@ -627,5 +631,6 @@ TALER_TESTING_cmd_refund_lookup_with_amount
 
   return cmd;
 }
+
 
 /* end of testing_api_cmd_refund.c */

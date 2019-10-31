@@ -56,4 +56,5 @@ MH_handler_config (struct TMH_RequestHandler *rh,
                                        "currency", TMH_currency);
 }
 
+
 /* end of taler-merchant-httpd_config.c */

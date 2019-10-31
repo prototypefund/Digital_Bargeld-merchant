@@ -301,4 +301,5 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   }
 }
 
+
 /* end of taler-merchant-httpd_tip-authorize.c */

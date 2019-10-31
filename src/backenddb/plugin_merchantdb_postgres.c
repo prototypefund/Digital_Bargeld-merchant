@@ -588,6 +588,7 @@ postgres_insert_session_info (void *cls,
                                              params);
 }
 
+
 /**
  * Retrieve the order ID that was used to pay for a resource within a session.
  *
@@ -2316,8 +2317,7 @@ process_deposits_for_refund_cb (void *cls,
    * Although this should be checked as the business should never
    * issue a refund bigger than the contract's actual price, we cannot
    * rely upon the frontend being correct.
-   */
-  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+   */GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
               "The refund of %s is bigger than the order's value\n",
               TALER_amount2s (ctx->refund));
 
@@ -2475,7 +2475,7 @@ postgres_enable_tip_reserve_TR (void *cls,
 
   retries = 0;
   check_connection (pg);
-  RETRY:
+RETRY:
   if (MAX_RETRIES < ++retries)
     return GNUNET_DB_STATUS_SOFT_ERROR;
   if (GNUNET_OK !=
@@ -2682,7 +2682,7 @@ postgres_authorize_tip_TR (void *cls,
 
   retries = 0;
   check_connection (pg);
-  RETRY:
+RETRY:
   if (MAX_RETRIES < ++retries)
     return TALER_EC_TIP_AUTHORIZE_DB_SOFT_ERROR;
   if (GNUNET_OK !=
@@ -2898,7 +2898,7 @@ postgres_pickup_tip_TR (void *cls,
 
   retries = 0;
   check_connection (pg);
-  RETRY:
+RETRY:
   if (MAX_RETRIES < ++retries)
     return TALER_EC_TIP_PICKUP_DB_ERROR_SOFT;
   if (GNUNET_OK !=
@@ -3744,5 +3744,6 @@ libtaler_plugin_merchantdb_postgres_done (void *cls)
   GNUNET_free (plugin);
   return NULL;
 }
+
 
 /* end of plugin_merchantdb_postgres.c */

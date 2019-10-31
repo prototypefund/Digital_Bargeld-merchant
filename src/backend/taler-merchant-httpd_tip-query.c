@@ -235,4 +235,5 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
   return MHD_YES;
 }
 
+
 /* end of taler-merchant-httpd_tip-query.c */

@@ -197,6 +197,7 @@ free_transfer_track_context (struct TrackTransferContext *rctx)
   GNUNET_free (rctx);
 }
 
+
 /**
  * Callback that frees all the elements in the hashmap
  *
@@ -688,8 +689,7 @@ wire_transfer_cb (void *cls,
    *
    * details_length is how many (Taler coin) deposits have been
    * aggregated into _this_ wire transfer.
-   */
-  for (unsigned int i = 0; i<details_length; i++)
+   */for (unsigned int i = 0; i<details_length; i++)
   {
     rctx->current_offset = i;
     rctx->current_detail = &details[i];
@@ -1078,5 +1078,6 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                     rctx);
   return MHD_YES;
 }
+
 
 /* end of taler-merchant-httpd_track-transfer.c */

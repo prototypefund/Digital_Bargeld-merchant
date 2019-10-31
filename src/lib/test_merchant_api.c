@@ -366,14 +366,12 @@ run (void *cls,
                                 * all records to be returned; setting date as 0 lets the
                                 * interpreter set it as 'now' + one hour delta, just to
                                 * make sure it surpasses the proposal's timestamp.
-                                */
-                               GNUNET_TIME_UNIT_ZERO_ABS,
+                                */GNUNET_TIME_UNIT_ZERO_ABS,
                                /**
                                 * We only expect ONE result (create-proposal-1) to be
                                 * included in /history response, because create-proposal-3
                                 * did NOT go through because of double spending.
-                                */
-                               1, // nresult
+                                */1, // nresult
                                10, // start
                                -10), // nrows
 
@@ -487,8 +485,7 @@ run (void *cls,
                                 * Now we expect BOTH contracts (create-proposal-{1,2})
                                 * to be included in /history response, because
                                 * create-proposal-2 has now been correctly paid.
-                                */
-                               2,
+                                */2,
                                10,
                                -10),
     TALER_TESTING_cmd_end ()
@@ -567,8 +564,7 @@ run (void *cls,
      * it, and finally (4) attempt to pick up a refund
      * from it without any increasing taking place
      * in the first place.
-     **/
-    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-unincreased-refund",
+     **/CMD_TRANSFER_TO_EXCHANGE ("create-reserve-unincreased-refund",
                               "EUR:5.01"),
 
     CMD_EXEC_WIREWATCH ("wirewatch-unincreased-refund"),
@@ -682,8 +678,7 @@ run (void *cls,
      * against a reserve that does not exist.  This is
      * implemented by passing a "tip instance" that
      * specifies a reserve key that was never used to
-     * actually create a reserve.  */
-    TALER_TESTING_cmd_tip_authorize_with_ec
+     * actually create a reserve.  */TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-null",
       merchant_url_internal ("nulltip"),
       exchange_url,
@@ -1061,6 +1056,7 @@ run (void *cls,
                                    fakebank_url);
 }
 
+
 int
 main (int argc,
       char *const *argv)
@@ -1118,5 +1114,6 @@ main (int argc,
   }
   return 0;
 }
+
 
 /* end of test_merchant_api_new.c */

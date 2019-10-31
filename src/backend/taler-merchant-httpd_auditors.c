@@ -270,4 +270,5 @@ TMH_AUDITORS_done ()
   nauditors = 0;
 }
 
+
 /* end of taler-merchant-httpd_auditors.c */

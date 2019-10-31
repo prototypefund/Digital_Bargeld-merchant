@@ -83,6 +83,7 @@ rewind_ip_run (void *cls,
   TALER_TESTING_interpreter_next (is);
 }
 
+
 /**
  * Make the instruction pointer point to @a new_ip
  * only if @a counter is greater than zero.

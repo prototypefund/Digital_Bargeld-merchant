@@ -37,7 +37,6 @@
 #define MAX_RETRIES 5
 
 
-
 /**
  * Make a taler://pay URI
  *
@@ -104,7 +103,6 @@ make_taler_pay_uri (struct MHD_Connection *connection,
                                       query));
   return result;
 }
-
 
 
 /**
@@ -425,7 +423,6 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   h_contract_terms_str = GNUNET_STRINGS_data_to_string_alloc (&h_contract_terms,
                                                               sizeof (struct
                                                                       GNUNET_HashCode));
-
 
 
   /* Check if the order has been paid for. */

@@ -52,6 +52,7 @@ TALER_TESTING_get_trait_refund_entry
                       index);
 }
 
+
 /**
  * Offer refund entry.
  *

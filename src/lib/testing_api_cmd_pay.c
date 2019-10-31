@@ -352,6 +352,7 @@ check_payment_cb (void *cls,
   TALER_TESTING_interpreter_next (cps->is);
 }
 
+
 /**
  * Run a /check-payment CMD.
  *
@@ -394,6 +395,7 @@ check_payment_run (void *cls,
   GNUNET_assert (NULL != cps->cpo);
 }
 
+
 /**
  * Make a "check payment" test command.
  *
@@ -432,6 +434,7 @@ TALER_TESTING_cmd_check_payment (const char *label,
   return cmd;
 
 }
+
 
 /**
  * Parse the @a coins specification and grow the @a pc
@@ -635,6 +638,7 @@ pay_cb (void *cls,
 
   TALER_TESTING_interpreter_next (ps->is);
 }
+
 
 /**
  * Callback for a "pay abort" operation.  Mainly, check HTTP
@@ -874,6 +878,7 @@ _pay_run (const char *merchant_url,
   return ret;
 }
 
+
 /**
  * Run a "pay" CMD.
  *
@@ -902,6 +907,7 @@ pay_run (void *cls,
                                   ps)))
     TALER_TESTING_FAIL (is);
 }
+
 
 /**
  * Free a "pay" CMD, and cancel it if need be.
@@ -949,9 +955,9 @@ pay_traits (void *cls,
   const struct TALER_TESTING_Command *proposal_cmd;
   struct GNUNET_CRYPTO_EddsaPublicKey *merchant_pub;
 
-  if ( NULL ==
-       (proposal_cmd = TALER_TESTING_interpreter_lookup_command
-                         (ps->is, ps->proposal_reference)))
+  if (NULL ==
+      (proposal_cmd = TALER_TESTING_interpreter_lookup_command
+                        (ps->is, ps->proposal_reference)))
   {
     GNUNET_break (0);
     return GNUNET_SYSERR;
@@ -997,6 +1003,7 @@ pay_traits (void *cls,
 
   return GNUNET_SYSERR;
 }
+
 
 /**
  * Make a "pay" test command.
@@ -1073,6 +1080,7 @@ pay_abort_cleanup (void *cls,
   GNUNET_free (pas);
 }
 
+
 /**
  * Run a "pay abort" CMD.
  *
@@ -1134,6 +1142,7 @@ pay_abort_run (void *cls,
     TALER_TESTING_FAIL (is);
 }
 
+
 /**
  * Offer internal data useful to other commands.
  *
@@ -1170,6 +1179,7 @@ pay_abort_traits (void *cls,
   return GNUNET_SYSERR;
 }
 
+
 /**
  * Make a "pay abort" test command.
  *
@@ -1203,6 +1213,7 @@ TALER_TESTING_cmd_pay_abort (const char *label,
 
   return cmd;
 }
+
 
 /**
  * Function called with the result of a /pay again operation,
@@ -1242,9 +1253,9 @@ pay_again_cb (void *cls,
     return;
   }
 
-  if ( NULL ==
-       (pay_cmd = TALER_TESTING_interpreter_lookup_command
-                    (pas->is, pas->pay_reference)))
+  if (NULL ==
+      (pay_cmd = TALER_TESTING_interpreter_lookup_command
+                   (pas->is, pas->pay_reference)))
     TALER_TESTING_FAIL (pas->is);
 
   if (MHD_HTTP_OK == http_status)
@@ -1286,6 +1297,7 @@ pay_again_cb (void *cls,
 
   TALER_TESTING_interpreter_next (pas->is);
 }
+
 
 /**
  * Run a "pay again" CMD.
@@ -1337,6 +1349,7 @@ pay_again_run (void *cls,
     TALER_TESTING_FAIL (is);
 }
 
+
 /**
  * Free and possibly cancel a "pay again" CMD.
  *
@@ -1360,6 +1373,7 @@ pay_again_cleanup (void *cls,
 
   GNUNET_free (pas);
 }
+
 
 /**
  * Make a "pay again" test command.  Its purpose is to
@@ -1442,6 +1456,7 @@ abort_refund_cb (void *cls,
   TALER_TESTING_interpreter_next (pars->is);
 }
 
+
 /**
  * Free the state of a "pay abort refund" CMD, and possibly
  * cancel a pending operation.
@@ -1466,6 +1481,7 @@ pay_abort_refund_cleanup (void *cls,
   GNUNET_free (pars);
 }
 
+
 /**
  * Run a "pay abort refund" CMD.
  *
@@ -1489,9 +1505,9 @@ pay_abort_refund_run (void *cls,
 
   pars->is = is;
 
-  if ( NULL ==
-       (abort_cmd = TALER_TESTING_interpreter_lookup_command
-                      (is, pars->abort_reference)) )
+  if (NULL ==
+      (abort_cmd = TALER_TESTING_interpreter_lookup_command
+                     (is, pars->abort_reference)) )
     TALER_TESTING_FAIL (is);
 
   if (GNUNET_OK != TALER_TESTING_get_trait_uint
@@ -1575,5 +1591,6 @@ TALER_TESTING_cmd_pay_abort_refund
 
   return cmd;
 }
+
 
 /* end of testing_api_cmd_pay.c */

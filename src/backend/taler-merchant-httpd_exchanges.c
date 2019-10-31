@@ -25,7 +25,6 @@
 #include "taler-merchant-httpd_exchanges.h"
 
 
-
 /**
  * Delay after which we'll re-fetch key information from the exchange.
  */
@@ -1152,5 +1151,6 @@ TMH_EXCHANGES_done ()
   json_decref (trusted_exchanges);
   trusted_exchanges = NULL;
 }
+
 
 /* end of taler-merchant-httpd_exchanges.c */

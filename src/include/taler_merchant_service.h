@@ -247,7 +247,6 @@ TALER_MERCHANT_proposal_lookup_cancel (struct
                                        plo);
 
 
-
 /* *********************  /pay *********************** */
 
 
@@ -869,7 +868,6 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
                               const char *justification,
                               TALER_MERCHANT_TipAuthorizeCallback authorize_cb,
                               void *authorize_cb_cls);
-
 
 
 /**

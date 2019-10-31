@@ -126,7 +126,8 @@ handle_check_payment_finished (void *cls,
                &refund_amount,
                NULL);
     }
-    else {
+    else
+    {
       cpo->cb (cpo->cb_cls,
                response_code,
                json,
@@ -248,5 +249,6 @@ TALER_MERCHANT_check_payment_cancel (struct
   GNUNET_free (cph->url);
   GNUNET_free (cph);
 }
+
 
 /* end of merchant_api_check_payment.c */

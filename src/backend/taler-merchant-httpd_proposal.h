@@ -65,4 +65,5 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                             const char *upload_data,
                             size_t *upload_data_size,
                             struct MerchantInstance *mi);
+
 #endif

@@ -148,6 +148,7 @@ history_raw_cb (void *cls,
   TALER_MERCHANT_history_cancel (ho);
 }
 
+
 /**
  * Issue a /history request to the backend.
  *
@@ -197,7 +198,6 @@ TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
                      seconds,
                      delta,
                      start);
-
 
 
   GNUNET_free (base);

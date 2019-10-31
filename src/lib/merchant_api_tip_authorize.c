@@ -268,4 +268,5 @@ TALER_MERCHANT_tip_authorize_cancel (struct
   GNUNET_free (tao);
 }
 
+
 /* end of merchant_api_tip_authorize.c */

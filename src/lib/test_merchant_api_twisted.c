@@ -258,8 +258,7 @@ run (void *cls,
      * not manage to pass the callback a valid JSON and will
      * instead pass a NULL pointer.  This should trigger the path
      * mentioned in the bug report #5719.
-     */
-    TALER_TESTING_cmd_malform_response
+     */TALER_TESTING_cmd_malform_response
       ("5719-malform-exchange-resp",
       PROXY_EXCHANGE_CONFIG_FILE),
 
@@ -375,9 +374,7 @@ run (void *cls,
      * Cause the PUT /proposal callback to be called
      * with a response code == 0.  We achieve this by malforming
      * the response body.
-     */
-
-    TALER_TESTING_cmd_malform_response
+     */TALER_TESTING_cmd_malform_response
       ("malform-proposal",
       PROXY_MERCHANT_CONFIG_FILE),
 
@@ -507,8 +504,7 @@ run (void *cls,
      * code, that is then expected to trigger some
      * emergency behaviour, like setting the response
      * code to zero before calling the callback.
-     */
-    TALER_TESTING_cmd_hack_response_code
+     */TALER_TESTING_cmd_hack_response_code
       ("twist-history",
       PROXY_MERCHANT_CONFIG_FILE,
       MHD_HTTP_GONE),
@@ -524,8 +520,7 @@ run (void *cls,
      * Making the returned response malformed, in order
      * to make the JSON downloader+parser fail and call
      * the lib passing a response code as zero.
-     */
-    TALER_TESTING_cmd_malform_response
+     */TALER_TESTING_cmd_malform_response
       ("malform-history",
       PROXY_MERCHANT_CONFIG_FILE),
 
@@ -545,8 +540,7 @@ run (void *cls,
    * This block tests whether a refund_deadline and/or
    * wire_transfer_deadline very far in the future do NOT
    * result in any wire transfer from the aggregator (#5366).
-   */
-  struct TALER_TESTING_Command unaggregation[] = {
+   */struct TALER_TESTING_Command unaggregation[] = {
 
     CMD_TRANSFER_TO_EXCHANGE
       ("create-reserve-unaggregation",
@@ -672,8 +666,7 @@ run (void *cls,
          brutto        2.00 -
          deposit fee   0.01 * 2 -
          wire fee      0.01
-      */
-      "EUR:1.97",
+      */"EUR:1.97",
       EXCHANGE_ACCOUNT_NO,
       MERCHANT_ACCOUNT_NO),
     TALER_TESTING_cmd_modify_object_dl
@@ -776,8 +769,7 @@ run (void *cls,
          brutto        2.00 -
          deposit fee   0.01 * 2 -
          wire fee      0.01
-      */
-      "EUR:1.97",
+      */"EUR:1.97",
       EXCHANGE_ACCOUNT_NO,
       MERCHANT_ACCOUNT_NO),
 
@@ -786,16 +778,13 @@ run (void *cls,
      * coin contributes 0.99 to the final wire transfer.  The
      * wire transfer itself drains 0.01-EUR from the total amount.
      * Therefore, wire transferring 1-EUR coin results in a net
-     * of: 0.99 - 0.01 = 0.98. */
-
-    /**
+     * of: 0.99 - 0.01 = 0.98. *//**
      * NOTE: the following two hacks aim at modifying the
      * communication between the merchant and the exchange.
      * In particular, they are supposed to modify the call
      * to /track/transfer issued from the merchant to the
      * exchange that happens _before_ the call to /track/transaction
-     * issued below by the test case (to the merchant backend.) */
-    TALER_TESTING_cmd_modify_object_dl
+     * issued below by the test case (to the merchant backend.) */TALER_TESTING_cmd_modify_object_dl
       ("hack-0",
       PROXY_EXCHANGE_CONFIG_FILE,
       "total",
@@ -1042,6 +1031,7 @@ run (void *cls,
                                    fakebank_url);
 }
 
+
 /**
  * Kill, wait, and destroy convenience function.
  *
@@ -1136,5 +1126,6 @@ main (int argc,
   }
   return 0;
 }
+
 
 /* end of test_merchant_api_twisted.c */

@@ -337,4 +337,5 @@ TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tpo)
   GNUNET_free (tpo);
 }
 
+
 /* end of merchant_api_tip_pickup.c */

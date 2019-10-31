@@ -524,7 +524,6 @@ struct TALER_MERCHANTDB_Plugin
                                 TALER_MasterSignatureP *exchange_sig);
 
 
-
   /**
    * Lookup information about coin payments by proposal data's hashcode.
    *
