@@ -262,8 +262,8 @@ deposit_cb (void *cls,
             const struct TALER_Amount *awire_fee,
             const json_t *aexchange_proof)
 {
-  CHECK ((0 == GNUNET_memcmp (ah_contract_terms,
-                              &h_contract_terms)));
+  CHECK (0 == GNUNET_memcmp (ah_contract_terms,
+                             &h_contract_terms));
   CHECK (0 == GNUNET_memcmp (acoin_pub,
                              &coin_pub));
   CHECK (0 == strcmp (aexchange_url,
