@@ -176,13 +176,19 @@ make_merchant_base_url (struct MHD_Connection *connection, const
 
   uri_path = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
                                           "X-Forwarded-Prefix");
-
   if (NULL != uri_path)
-    TALER_buffer_write_path (&buf, uri_path);
+  {
+    /* Currently the merchant backend is only supported at the root of the path,
+     * this might change in the future.
+     */
+    GNUNET_assert (0);
+  }
+
+  TALER_buffer_write_path (&buf, "public");
 
   if (0 != strcmp (instance_id, "default"))
   {
-    TALER_buffer_write_path (&buf, "/instance/");
+    TALER_buffer_write_path (&buf, "/instances/");
     TALER_buffer_write_str (&buf, instance_id);
   }
   TALER_buffer_write_path (&buf, "");
