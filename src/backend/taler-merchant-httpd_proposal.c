@@ -179,8 +179,7 @@ make_merchant_base_url (struct MHD_Connection *connection, const
   if (NULL != uri_path)
   {
     /* Currently the merchant backend is only supported at the root of the path,
-     * this might change in the future.
-     */
+       this might change in the future.  */
     GNUNET_assert (0);
   }
 
