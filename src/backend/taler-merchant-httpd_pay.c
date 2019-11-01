@@ -287,8 +287,7 @@ struct PayContext
 
   /**
    * Wire transfer deadline. How soon would the merchant like the
-   * wire transfer to be executed? (Can be given by the frontend
-   * or be determined by our configuration via #wire_transfer_delay.)
+   * wire transfer to be executed?
    */
   struct GNUNET_TIME_Absolute wire_transfer_deadline;
 
@@ -1445,7 +1444,6 @@ parse_pay (struct MHD_Connection *connection,
   };
   enum GNUNET_DB_QueryStatus qs;
   const char *session_id;
-  struct GNUNET_TIME_Relative used_wire_transfer_delay;
 
   res = TMH_PARSE_json_data (connection,
                              root,
@@ -1551,6 +1549,8 @@ parse_pay (struct MHD_Connection *connection,
                                       &pc->refund_deadline),
       GNUNET_JSON_spec_absolute_time ("pay_deadline",
                                       &pc->pay_deadline),
+      GNUNET_JSON_spec_absolute_time ("wire_transfer_deadline",
+                                      &pc->wire_transfer_deadline),
       GNUNET_JSON_spec_absolute_time ("timestamp",
                                       &pc->timestamp),
       TALER_JSON_spec_amount ("max_fee",
@@ -1576,39 +1576,10 @@ parse_pay (struct MHD_Connection *connection,
 
     pc->fulfillment_url = GNUNET_strdup (fulfillment_url);
 
-    /* Use the value from config as default.  */
-    used_wire_transfer_delay = wire_transfer_delay;
-
-    if (NULL != json_object_get (pc->contract_terms,
-                                 "wire_transfer_delay"))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "Frontend specified wire transfer delay\n");
-
-      struct GNUNET_JSON_Specification wspec[] = {
-        GNUNET_JSON_spec_relative_time ("wire_transfer_delay",
-                                        &used_wire_transfer_delay),
-        GNUNET_JSON_spec_end ()
-      };
-
-      res = TMH_PARSE_json_data (connection,
-                                 pc->contract_terms,
-                                 wspec);
-      if (GNUNET_YES != res)
-      {
-        GNUNET_JSON_parse_free (spec);
-        GNUNET_break (0);
-        return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
-      }
-    }
-
-    pc->wire_transfer_deadline
-      = GNUNET_TIME_absolute_add (pc->timestamp,
-                                  used_wire_transfer_delay);
-
     if (pc->wire_transfer_deadline.abs_value_us <
         pc->refund_deadline.abs_value_us)
     {
+      /* This should already have been checked when creating the order! */
       GNUNET_break (0);
       GNUNET_JSON_parse_free (spec);
       return TMH_RESPONSE_reply_external_error (connection,

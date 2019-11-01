@@ -366,7 +366,7 @@ extern struct TALER_MERCHANTDB_Plugin *db;
  * executing the wire transfer?  This delay is added to the current
  * time when we generate the advisory execution time for the exchange.
  */
-extern struct GNUNET_TIME_Relative wire_transfer_delay;
+extern struct GNUNET_TIME_Relative default_wire_transfer_delay;
 
 /**
  * If the frontend does NOT specify a payment deadline, how long should

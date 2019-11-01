@@ -202,11 +202,13 @@ make_merchant_base_url (struct MHD_Connection *connection, const
  * of a MHD connection.
  *
  * @param connection connection to write the result or error to
+ * @param root root of the request
  * @param order[in] order to process (can be modified)
  * @return MHD result code
  */
 static int
 proposal_put (struct MHD_Connection *connection,
+              json_t *root,
               json_t *order,
               const struct MerchantInstance *mi)
 {
@@ -312,6 +314,18 @@ proposal_put (struct MHD_Connection *connection,
     (void) GNUNET_TIME_round_abs (&t);
     json_object_set_new (order,
                          "pay_deadline",
+                         GNUNET_JSON_from_time_abs (t));
+  }
+
+  if (NULL == json_object_get (order,
+                               "wire_transfer_deadline"))
+  {
+    struct GNUNET_TIME_Absolute t;
+
+    t = GNUNET_TIME_relative_to_absolute (default_wire_transfer_delay);
+    (void) GNUNET_TIME_round_abs (&t);
+    json_object_set_new (order,
+                         "wire_transfer_deadline",
                          GNUNET_JSON_from_time_abs (t));
   }
 
@@ -656,7 +670,7 @@ MH_handler_proposal_put (struct TMH_RequestHandler *rh,
             "order");
   }
   else
-    res = proposal_put (connection, order, mi);
+    res = proposal_put (connection, root, order, mi);
   json_decref (root);
   return res;
 }

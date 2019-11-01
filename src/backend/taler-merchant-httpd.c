@@ -77,7 +77,7 @@ static long long unsigned port;
  * This value tells the exchange by which date this merchant would like
  * to receive the funds for a deposited payment
  */
-struct GNUNET_TIME_Relative wire_transfer_delay;
+struct GNUNET_TIME_Relative default_wire_transfer_delay;
 
 /**
  * Locations from the configuration.  Mapping from
@@ -1489,7 +1489,7 @@ run (void *cls,
       GNUNET_CONFIGURATION_get_value_time (config,
                                            "merchant",
                                            "WIRE_TRANSFER_DELAY",
-                                           &wire_transfer_delay))
+                                           &default_wire_transfer_delay))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "merchant",
