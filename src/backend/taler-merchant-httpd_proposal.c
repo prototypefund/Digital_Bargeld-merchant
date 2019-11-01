@@ -139,6 +139,59 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
 
 
 /**
+ * Generate the base URL for the given merchant instance.
+ *
+ * @param connection the MHD connection
+ * @param instance_id the merchant instance ID
+ * @returns the merchant instance's base URL
+ */
+static char *
+make_merchant_base_url (struct MHD_Connection *connection, const
+                        char *instance_id)
+{
+  const char *host;
+  const char *forwarded_host;
+  const char *uri_path;
+  struct TALER_Buffer buf = { 0 };
+
+  if (GNUNET_YES == TALER_mhd_is_https (connection))
+    TALER_buffer_write_str (&buf, "https://");
+  else
+    TALER_buffer_write_str (&buf, "http://");
+
+
+  host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
+  forwarded_host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
+                                                "X-Forwarded-Host");
+
+  if (NULL != forwarded_host)
+  {
+    TALER_buffer_write_str (&buf, forwarded_host);
+  }
+  else
+  {
+    GNUNET_assert (NULL != host);
+    TALER_buffer_write_str (&buf, host);
+  }
+
+  uri_path = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
+                                          "X-Forwarded-Prefix");
+
+  if (NULL != uri_path)
+    TALER_buffer_write_path (&buf, uri_path);
+
+  if (0 != strcmp (instance_id, "default"))
+  {
+    TALER_buffer_write_path (&buf, "/instance/");
+    TALER_buffer_write_str (&buf, instance_id);
+  }
+  TALER_buffer_write_path (&buf, "");
+
+  return TALER_buffer_reap_str (&buf);
+}
+
+
+/**
  * Transform an order into a proposal and store it in the
  * database. Write the resulting proposal or an error message
  * of a MHD connection.
@@ -286,16 +339,13 @@ proposal_put (struct MHD_Connection *connection,
   }
 
   if (NULL == json_object_get (order,
-                               "pay_url"))
+                               "merchant_base_url"))
   {
     char *url;
 
-    url = TALER_url_absolute_mhd (connection,
-                                  "/public/pay",
-                                  NULL);
-
+    url = make_merchant_base_url (connection, mi->id);
     json_object_set_new (order,
-                         "pay_url",
+                         "merchant_base_url",
                          json_string (url));
     GNUNET_free (url);
   }
