@@ -60,7 +60,6 @@ make_taler_pay_uri (struct MHD_Connection *connection,
   const char *query;
   char *result;
 
-
   host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
   forwarded_host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
                                                 "X-Forwarded-Host");
@@ -80,7 +79,7 @@ make_taler_pay_uri (struct MHD_Connection *connection,
 
   if (NULL == host)
   {
-    /* Should never happen, at last the host header should be defined */
+    /* Should never happen, at least the host header should be defined */
     GNUNET_break (0);
     return NULL;
   }

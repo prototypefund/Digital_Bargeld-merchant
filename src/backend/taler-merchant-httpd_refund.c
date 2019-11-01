@@ -115,7 +115,7 @@ make_taler_refund_uri (struct MHD_Connection *connection,
 
   if (NULL == host)
   {
-    /* Should never happen, at last the host header should be defined */
+    /* Should never happen, at least the host header should be defined */
     GNUNET_break (0);
     return NULL;
   }
