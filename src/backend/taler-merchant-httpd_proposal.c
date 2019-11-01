@@ -479,6 +479,13 @@ proposal_put (struct MHD_Connection *connection,
       refund_deadline.abs_value_us)
   {
     GNUNET_JSON_parse_free (spec);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "invariant failed: wire_transfer_deadline >= refund_deadline\n");
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "wire_transfer_deadline: %s\n",
+                GNUNET_STRINGS_absolute_time_to_string (
+                  wire_transfer_deadline));
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "refund_deadline: %s\n",
+                GNUNET_STRINGS_absolute_time_to_string (refund_deadline));
     return TMH_RESPONSE_reply_arg_invalid
              (connection,
              TALER_EC_PARAMETER_MALFORMED,
