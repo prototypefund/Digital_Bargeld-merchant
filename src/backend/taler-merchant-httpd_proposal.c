@@ -221,6 +221,7 @@ proposal_put (struct MHD_Connection *connection,
   json_t *merchant;
   struct GNUNET_TIME_Absolute timestamp;
   struct GNUNET_TIME_Absolute refund_deadline;
+  struct GNUNET_TIME_Absolute wire_transfer_deadline;
   struct GNUNET_TIME_Absolute pay_deadline;
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
@@ -239,6 +240,8 @@ proposal_put (struct MHD_Connection *connection,
                                     &refund_deadline),
     GNUNET_JSON_spec_absolute_time ("pay_deadline",
                                     &pay_deadline),
+    GNUNET_JSON_spec_absolute_time ("wire_transfer_deadline",
+                                    &wire_transfer_deadline),
     GNUNET_JSON_spec_end ()
   };
   enum GNUNET_DB_QueryStatus qs;
@@ -471,6 +474,17 @@ proposal_put (struct MHD_Connection *connection,
              TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
              "Impossible to parse the order");
   }
+
+  if (wire_transfer_deadline.abs_value_us <
+      refund_deadline.abs_value_us)
+  {
+    GNUNET_JSON_parse_free (spec);
+    return TMH_RESPONSE_reply_arg_invalid
+             (connection,
+             TALER_EC_PARAMETER_MALFORMED,
+             "order:wire_transfer_deadline;order:refund_deadline");
+  }
+
 
   /* check contract is well-formed */
   if (GNUNET_OK != check_products (products))
