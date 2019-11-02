@@ -54,6 +54,11 @@ struct CheckPaymentRequestContext
   struct MHD_Connection *connection;
 
   /**
+   * Which merchant instance is this for?
+   */
+  struct MerchantInstance *mi;
+
+  /**
    * URL where the final contract can be found for this payment.
    */
   char *final_contract_url;
@@ -139,13 +144,11 @@ cprc_cleanup (struct TM_HandlerContext *hc)
 /**
  * Make a taler://pay URI
  *
- * @param instance_id merchant's instance ID
  * @param cprc payment request context
  * @returns the URI, must be freed with #GNUNET_free
  */
 static char *
-make_taler_pay_uri (const char *instance_id,
-                    const struct CheckPaymentRequestContext *cprc)
+make_taler_pay_uri (const struct CheckPaymentRequestContext *cprc)
 {
   const char *host;
   const char *forwarded_host;
@@ -168,11 +171,11 @@ make_taler_pay_uri (const char *instance_id,
     uri_path = "-";
   if (NULL != forwarded_host)
     host = forwarded_host;
-  if (0 == strcmp (instance_id,
+  if (0 == strcmp (cprc->mi->id,
                    "default"))
     uri_instance_id = "-";
   else
-    uri_instance_id = instance_id;
+    uri_instance_id = cprc->mi->id;
   if (NULL == host)
   {
     /* Should never happen, at least the host header should be defined */
@@ -237,12 +240,10 @@ process_refunds_cb (void *cls,
  * The client did not yet pay, send it the payment request.
  *
  * @param cprc check pay request context
- * @param mi merchant instance
  * @return #MHD_YES on success
  */
 static int
-send_pay_request (const struct CheckPaymentRequestContext *cprc,
-                  const struct MerchantInstance *mi)
+send_pay_request (const struct CheckPaymentRequestContext *cprc)
 {
   int ret;
   char *already_paid_order_id = NULL;
@@ -260,7 +261,7 @@ send_pay_request (const struct CheckPaymentRequestContext *cprc,
                                 &already_paid_order_id,
                                 cprc->session_id,
                                 cprc->fulfillment_url,
-                                &mi->pubkey);
+                                &cprc->mi->pubkey);
     if (qs < 0)
     {
       /* single, read-only SQL statements should never cause
@@ -273,8 +274,7 @@ send_pay_request (const struct CheckPaymentRequestContext *cprc,
                                                 "db error fetching pay session info");
     }
   }
-  taler_pay_uri = make_taler_pay_uri (mi->id,
-                                      cprc);
+  taler_pay_uri = make_taler_pay_uri (cprc);
   ret = TMH_RESPONSE_reply_json_pack (cprc->connection,
                                       MHD_HTTP_OK,
                                       "{s:s, s:s, s:b, s:s?}",
@@ -340,13 +340,11 @@ parse_contract_terms (struct CheckPaymentRequestContext *cprc)
  * Check that we are aware of @a order_id and if so request the payment,
  * otherwise generate an error response.
  *
- * @param mi the merchant's instance
  * @param cprc session state
  * @return status code to return to MHD for @a connection
  */
 static int
-check_order_and_request_payment (struct MerchantInstance *mi,
-                                 struct CheckPaymentRequestContext *cprc)
+check_order_and_request_payment (struct CheckPaymentRequestContext *cprc)
 {
   enum GNUNET_DB_QueryStatus qs;
 
@@ -360,7 +358,7 @@ check_order_and_request_payment (struct MerchantInstance *mi,
   qs = db->find_order (db->cls,
                        &cprc->contract_terms,
                        cprc->order_id,
-                       &mi->pubkey);
+                       &cprc->mi->pubkey);
   if (0 > qs)
   {
     /* single, read-only SQL statements should never cause
@@ -383,8 +381,7 @@ check_order_and_request_payment (struct MerchantInstance *mi,
       parse_contract_terms (cprc))
     return cprc->ret;
   /* Offer was not picked up yet, but we ensured that it exists */
-  return send_pay_request (cprc,
-                           mi);
+  return send_pay_request (cprc);
 }
 
 
@@ -422,6 +419,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     cprc->hc.cc = &cprc_cleanup;
     cprc->ret = GNUNET_SYSERR;
     cprc->connection = connection;
+    cprc->mi = mi;
     *connection_cls = cprc;
 
     cprc->order_id = MHD_lookup_connection_value (connection,
@@ -500,17 +498,16 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     {
       /* Check that we're at least aware of the order */
-      return check_order_and_request_payment (mi,
-                                              cprc);
+      return check_order_and_request_payment (cprc);
     }
-
     GNUNET_assert (NULL != cprc->contract_terms);
+
+    if (GNUNET_OK !=
+        parse_contract_terms (cprc))
+      return cprc->ret;
   }
 
-
-  if (GNUNET_OK !=
-      parse_contract_terms (cprc))
-    return cprc->ret;
+  GNUNET_assert (NULL != cprc->contract_terms);
 
   /* Check if the order has been paid for. */
   if (NULL != cprc->session_id)
@@ -536,8 +533,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     }
     else if (0 == qs)
     {
-      ret = send_pay_request (cprc,
-                              mi);
+      ret = send_pay_request (cprc);
       GNUNET_free_non_null (already_paid_order_id);
       return ret;
     }
@@ -567,8 +563,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     {
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                   "not paid yet\n");
-      return send_pay_request (cprc,
-                               mi);
+      return send_pay_request (cprc);
     }
     GNUNET_break (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs);
     GNUNET_assert (NULL != xcontract_terms);
