@@ -204,6 +204,7 @@ TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
   char *h_contract_s;
   char *timeout_s;
   unsigned int ts;
+  long tlong;
 
   GNUNET_assert (NULL != backend_url);
   GNUNET_assert (NULL != order_id);
@@ -211,6 +212,12 @@ TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
                                                       sizeof (*h_contract));
   ts = (unsigned int) (timeout.rel_value_us
                        / GNUNET_TIME_UNIT_SECONDS.rel_value_us);
+  /* set curl timeout to *our* long poll timeout plus one minute
+     (for network latency and processing delays) */
+  tlong = (long) (GNUNET_TIME_relative_add (timeout,
+                                            GNUNET_TIME_UNIT_MINUTES).
+                  rel_value_us
+                  / GNUNET_TIME_UNIT_MILLISECONDS.rel_value_us);
   GNUNET_asprintf (&timeout_s,
                    "%u",
                    ts);
@@ -232,6 +239,13 @@ TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,
                                     cpo->url))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+  if (CURLE_OK != curl_easy_setopt (eh,
+                                    CURLOPT_TIMEOUT_MS,
+                                    tlong))
   {
     GNUNET_break (0);
     return NULL;
