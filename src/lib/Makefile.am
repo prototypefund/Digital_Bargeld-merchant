@@ -42,6 +42,7 @@ libtalermerchant_la_LIBADD = \
   $(XLIB)
 
 libtalermerchanttesting_la_SOURCES = \
+  testing_api_cmd_check_payment.c \
   testing_api_cmd_history.c \
   testing_api_cmd_pay.c \
   testing_api_cmd_proposal.c \

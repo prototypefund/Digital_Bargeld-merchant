@@ -95,45 +95,6 @@ struct PayState
 
 
 /**
- * State for a /check-payment CMD.
- */
-struct CheckPaymentState
-{
-
-  /**
-   * Operation handle.
-   */
-  struct TALER_MERCHANT_CheckPaymentOperation *cpo;
-
-  /**
-   * The interpreter state.
-   */
-  struct TALER_TESTING_Interpreter *is;
-
-  /**
-   * Expected HTTP response status code.
-   */
-  unsigned int http_status;
-
-  /**
-   * Reference to a command that can provide a order id,
-   * typically a /proposal test command.
-   */
-  const char *proposal_reference;
-
-  /**
-   * GNUNET_YES if we expect the proposal was paid.
-   */
-  unsigned int expect_paid;
-
-  /**
-   * The merchant base URL.
-   */
-  const char *merchant_url;
-};
-
-
-/**
  * State for a "pay again" CMD.
  */
 struct PayAgainState
@@ -207,7 +168,6 @@ struct PayAbortState
    */
   struct TALER_TESTING_Interpreter *is;
 
-
   /**
    * How many refund permissions this CMD got
    * the right for.  Roughly, there is one refund
@@ -277,163 +237,6 @@ struct PayAbortRefundState
    */
   unsigned int http_status;
 };
-
-
-/**
- * Free a /check-payment CMD, and possibly cancel a pending
- * operation thereof.
- *
- * @param cls closure
- * @param cmd the command currently getting freed.
- */
-static void
-check_payment_cleanup (void *cls,
-                       const struct TALER_TESTING_Command *cmd)
-{
-  struct CheckPaymentState *cps = cls;
-
-  if (NULL != cps->cpo)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Command `%s' was not terminated\n",
-                TALER_TESTING_interpreter_get_current_label (
-                  cps->is));
-    TALER_MERCHANT_check_payment_cancel (cps->cpo);
-  }
-  GNUNET_free (cps);
-}
-
-
-/**
- * Callback for a /check-payment request.
- *
- * @param cls closure.
- * @param http_status HTTP status code we got.
- * @param json full response we got.
- * @param paid GNUNET_YES (GNUNET_NO) if the contract was paid
- *        (not paid).
- * @param refunded GNUNET_YES (GNUNET_NO) if the contract was
- *        refunded (not refunded).
- * @param refund_amount the amount that was refunded to this
- *        contract.
- * @param taler_pay_uri the URI that instructs the wallets to process
- *                      the payment
- */
-static void
-check_payment_cb (void *cls,
-                  unsigned int http_status,
-                  const json_t *obj,
-                  int paid,
-                  int refunded,
-                  struct TALER_Amount *refund_amount,
-                  const char *taler_pay_uri)
-{
-  struct CheckPaymentState *cps = cls;
-
-  cps->cpo = NULL;
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "check payment: expected paid: %s: %d\n",
-              TALER_TESTING_interpreter_get_current_label (
-                cps->is),
-              cps->expect_paid);
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "check payment: paid: %d\n",
-              paid);
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "check payment: url: %s\n",
-              taler_pay_uri);
-
-  if (paid != cps->expect_paid)
-    TALER_TESTING_FAIL (cps->is);
-
-  if (cps->http_status != http_status)
-    TALER_TESTING_FAIL (cps->is);
-
-  TALER_TESTING_interpreter_next (cps->is);
-}
-
-
-/**
- * Run a /check-payment CMD.
- *
- * @param cmd the command currenly being run.
- * @param cls closure.
- * @param is interpreter state.
- */
-static void
-check_payment_run (void *cls,
-                   const struct TALER_TESTING_Command *cmd,
-                   struct TALER_TESTING_Interpreter *is)
-{
-  struct CheckPaymentState *cps = cls;
-  const struct TALER_TESTING_Command *proposal_cmd;
-  const char *order_id;
-
-  cps->is = is;
-  proposal_cmd = TALER_TESTING_interpreter_lookup_command (
-    is, cps->proposal_reference);
-
-  if (NULL == proposal_cmd)
-    TALER_TESTING_FAIL (is);
-
-  if (GNUNET_OK != TALER_TESTING_get_trait_order_id (
-        proposal_cmd, 0, &order_id))
-    TALER_TESTING_FAIL (is);
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Checking for order id `%s'\n",
-              order_id);
-
-  cps->cpo = TALER_MERCHANT_check_payment
-               (is->ctx,
-               cps->merchant_url,
-               order_id,
-               NULL,
-               check_payment_cb,
-               cps);
-
-  GNUNET_assert (NULL != cps->cpo);
-}
-
-
-/**
- * Make a "check payment" test command.
- *
- * @param label command label.
- * @param merchant_url merchant base url
- * @param http_status expected HTTP response code.
- * @param proposal_reference the proposal whose payment status
- *        is going to be checked.
- * @param expect_paid GNUNET_YES if we expect the proposal to be
- *        paid, GNUNET_NO otherwise.
- *
- * @return the command
- */
-struct TALER_TESTING_Command
-TALER_TESTING_cmd_check_payment (const char *label,
-                                 const char *merchant_url,
-                                 unsigned int http_status,
-                                 const char *proposal_reference,
-                                 unsigned int expect_paid)
-{
-  struct CheckPaymentState *cps;
-
-  cps = GNUNET_new (struct CheckPaymentState);
-  cps->http_status = http_status;
-  cps->proposal_reference = proposal_reference;
-  cps->expect_paid = expect_paid;
-  cps->merchant_url = merchant_url;
-
-  struct TALER_TESTING_Command cmd = {
-    .cls = cps,
-    .label = label,
-    .run = &check_payment_run,
-    .cleanup = &check_payment_cleanup
-  };
-
-  return cmd;
-
-}
 
 
 /**
@@ -979,29 +782,28 @@ pay_traits (void *cls,
     GNUNET_break (0);
     return GNUNET_SYSERR;
   }
+  {
+    struct TALER_TESTING_Trait traits[] = {
+      TALER_TESTING_make_trait_amount
+        (AMOUNT_WITH_FEE, ps->amount_with_fee),
+      TALER_TESTING_make_trait_amount
+        (AMOUNT_WITHOUT_FEE, ps->amount_without_fee),
+      TALER_TESTING_make_trait_amount
+        (REFUND_FEE, ps->refund_fee),
+      TALER_TESTING_make_trait_proposal_reference
+        (0, ps->proposal_reference),
+      TALER_TESTING_make_trait_coin_reference
+        (0, ps->coin_reference),
+      TALER_TESTING_make_trait_order_id (0, order_id),
+      TALER_TESTING_make_trait_peer_key_pub (0, merchant_pub),
+      TALER_TESTING_trait_end ()
+    };
 
-  struct TALER_TESTING_Trait traits[] = {
-    TALER_TESTING_make_trait_amount
-      (AMOUNT_WITH_FEE, ps->amount_with_fee),
-    TALER_TESTING_make_trait_amount
-      (AMOUNT_WITHOUT_FEE, ps->amount_without_fee),
-    TALER_TESTING_make_trait_amount
-      (REFUND_FEE, ps->refund_fee),
-    TALER_TESTING_make_trait_proposal_reference
-      (0, ps->proposal_reference),
-    TALER_TESTING_make_trait_coin_reference
-      (0, ps->coin_reference),
-    TALER_TESTING_make_trait_order_id (0, order_id),
-    TALER_TESTING_make_trait_peer_key_pub (0, merchant_pub),
-    TALER_TESTING_trait_end ()
-  };
-
-  return TALER_TESTING_get_trait (traits,
-                                  ret,
-                                  trait,
-                                  index);
-
-  return GNUNET_SYSERR;
+    return TALER_TESTING_get_trait (traits,
+                                    ret,
+                                    trait,
+                                    index);
+  }
 }
 
 
@@ -1042,17 +844,17 @@ TALER_TESTING_cmd_pay (const char *label,
   ps->amount_with_fee = amount_with_fee;
   ps->amount_without_fee = amount_without_fee;
   ps->refund_fee = refund_fee;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = ps,
+      .label = label,
+      .run = &pay_run,
+      .cleanup = &pay_cleanup,
+      .traits = &pay_traits
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = ps,
-    .label = label,
-    .run = &pay_run,
-    .cleanup = &pay_cleanup,
-    .traits = &pay_traits
-  };
-
-  return cmd;
-
+    return cmd;
+  }
 }
 
 
@@ -1159,7 +961,6 @@ pay_abort_traits (void *cls,
                   unsigned int index)
 {
   struct PayAbortState *pas = cls;
-
   struct TALER_TESTING_Trait traits[] = {
     TALER_TESTING_make_trait_peer_key_pub
       (0, &pas->merchant_pub.eddsa_pub),
@@ -1175,8 +976,6 @@ pay_abort_traits (void *cls,
                                   ret,
                                   trait,
                                   index);
-
-  return GNUNET_SYSERR;
 }
 
 
@@ -1202,16 +1001,17 @@ TALER_TESTING_cmd_pay_abort (const char *label,
   pas->http_status = http_status;
   pas->pay_reference = pay_reference;
   pas->merchant_url = merchant_url;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = pas,
+      .label = label,
+      .run = &pay_abort_run,
+      .cleanup = &pay_abort_cleanup,
+      .traits = &pay_abort_traits
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = pas,
-    .label = label,
-    .run = &pay_abort_run,
-    .cleanup = &pay_abort_cleanup,
-    .traits = &pay_abort_traits
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 
@@ -1370,7 +1170,6 @@ pay_again_cleanup (void *cls,
                   pas->is));
     TALER_MERCHANT_pay_cancel (pas->pao);
   }
-
   GNUNET_free (pas);
 }
 
@@ -1397,7 +1196,6 @@ TALER_TESTING_cmd_pay_again (const char *label,
                              const char *refund_fee,
                              unsigned int http_status)
 {
-
   struct PayAgainState *pas;
 
   pas = GNUNET_new (struct PayAgainState);
@@ -1406,15 +1204,16 @@ TALER_TESTING_cmd_pay_again (const char *label,
   pas->coin_reference = coin_reference;
   pas->merchant_url = merchant_url;
   pas->refund_fee = refund_fee;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = pas,
+      .label = label,
+      .run = &pay_again_run,
+      .cleanup = &pay_again_cleanup
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = pas,
-    .label = label,
-    .run = &pay_again_run,
-    .cleanup = &pay_again_cleanup
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 
@@ -1504,7 +1303,6 @@ pay_abort_refund_run (void *cls,
   const struct GNUNET_HashCode *h_contract_terms;
 
   pars->is = is;
-
   if (NULL ==
       (abort_cmd = TALER_TESTING_interpreter_lookup_command
                      (is, pars->abort_reference)) )
@@ -1581,15 +1379,16 @@ TALER_TESTING_cmd_pay_abort_refund
   pars->refund_amount = refund_amount;
   pars->refund_fee = refund_fee;
   pars->http_status = http_status;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = pars,
+      .label = label,
+      .run = &pay_abort_refund_run,
+      .cleanup = &pay_abort_refund_cleanup
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = pars,
-    .label = label,
-    .run = &pay_abort_refund_run,
-    .cleanup = &pay_abort_refund_cleanup
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 
