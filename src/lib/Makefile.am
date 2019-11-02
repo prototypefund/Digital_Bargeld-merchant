@@ -19,16 +19,17 @@ libtalermerchanttesting_la_LDFLAGS = \
   -no-undefined
 
 libtalermerchant_la_SOURCES = \
+  merchant_api_check_payment.c \
+  merchant_api_history.c \
   merchant_api_proposal.c \
   merchant_api_pay.c \
+  merchant_api_poll_payment.c \
+  merchant_api_refund.c \
   merchant_api_tip_authorize.c \
   merchant_api_tip_pickup.c \
+  merchant_api_tip_query.c \
   merchant_api_track_transaction.c \
-  merchant_api_track_transfer.c \
-  merchant_api_history.c \
-  merchant_api_refund.c \
-  merchant_api_check_payment.c \
-  merchant_api_tip_query.c
+  merchant_api_track_transfer.c
 libtalermerchant_la_LIBADD = \
   -ltalerexchange \
   -ltalercurl \

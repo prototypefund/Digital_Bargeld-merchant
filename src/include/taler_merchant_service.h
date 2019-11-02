@@ -1077,4 +1077,78 @@ void
 TALER_MERCHANT_tip_query_cancel (struct TALER_MERCHANT_TipQueryOperation *tqh);
 
 
+/* ********************** /public/poll-payment ************************* */
+
+
+/**
+ * Handle for a /public/poll-payment operation.
+ */
+struct TALER_MERCHANT_PollPaymentOperation;
+
+
+/**
+ * Callback to process a GET /poll-payment request
+ *
+ * @param cls closure
+ * @param http_status HTTP status code for this request
+ * @param obj raw response body
+ * @param paid #GNUNET_YES if the payment is settled, #GNUNET_NO if not
+ *        settled, $GNUNET_SYSERR on error
+ *        (note that refunded payments are returned as paid!)
+ * @param refunded #GNUNET_YES if there is at least on refund on this payment,
+ *        #GNUNET_NO if refunded, #GNUNET_SYSERR or error
+ * @param refunded_amount amount that was refunded, NULL if there
+ *        was no refund
+ * @param taler_pay_uri the URI that instructs the wallets to process
+ *                      the payment
+ */
+typedef void
+(*TALER_MERCHANT_PollPaymentCallback) (void *cls,
+                                       unsigned int http_status,
+                                       const json_t *obj,
+                                       int paid,
+                                       int refunded,
+                                       struct TALER_Amount *refund_amount,
+                                       const char *taler_pay_uri);
+
+
+/**
+ * Issue a /poll-payment request to the backend.  Polls the status
+ * of a payment.
+ *
+ * @param ctx execution context
+ * @param backend_url base URL of the merchant backend
+ * @param order_id order id to identify the payment
+ * @param h_contract hash of the contract for @a order_id
+ * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session)
+ * @param timeout timeout to use in long polling (how long may the server wait to reply
+ *        before generating an unpaid response). Note that this is just provided to
+ *        the server, we as client will block until the response comes back or until
+ *        #TALER_MERCHANT_poll_payment_cancel() is called.
+ * @param poll_payment_cb callback which will work the response gotten from the backend
+ * @param poll_payment_cb_cls closure to pass to @a poll_payment_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_PollPaymentOperation *
+TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
+                             const char *backend_url,
+                             const char *order_id,
+                             const struct GNUNET_HashCode *h_contract,
+                             const char *session_id,
+                             struct GNUNET_TIME_Relative timeout,
+                             TALER_MERCHANT_PollPaymentCallback
+                             poll_payment_cb,
+                             void *poll_payment_cls);
+
+
+/**
+ * Cancel a GET /public/poll-payment request.
+ *
+ * @param cpo handle to the request to be canceled
+ */
+void
+TALER_MERCHANT_poll_payment_cancel (struct
+                                    TALER_MERCHANT_PollPaymentOperation *cpo);
+
+
 #endif  /* _TALER_MERCHANT_SERVICE_H */
