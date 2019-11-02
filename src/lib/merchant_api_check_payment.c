@@ -79,12 +79,10 @@ handle_check_payment_finished (void *cls,
 {
   struct TALER_MERCHANT_CheckPaymentOperation *cpo = cls;
   struct TALER_Amount refund_amount = { 0 };
-  int refunded;
   const json_t *json = response;
+  const json_t *refunded;
 
   struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_boolean ("refunded",
-                              &refunded),
     TALER_JSON_spec_amount ("refund_amount",
                             &refund_amount),
     GNUNET_JSON_spec_end ()
@@ -103,7 +101,7 @@ handle_check_payment_finished (void *cls,
              json,
              GNUNET_SYSERR,
              GNUNET_SYSERR,
-             &refund_amount,
+             NULL,
              NULL);
     TALER_MERCHANT_check_payment_cancel (cpo);
     return;
@@ -123,7 +121,7 @@ handle_check_payment_finished (void *cls,
                json,
                GNUNET_SYSERR,
                GNUNET_SYSERR,
-               &refund_amount,
+               NULL,
                NULL);
     }
     else
@@ -133,17 +131,19 @@ handle_check_payment_finished (void *cls,
                json,
                GNUNET_NO,
                GNUNET_NO,
-               &refund_amount,
+               NULL,
                taler_pay_uri);
     }
     TALER_MERCHANT_check_payment_cancel (cpo);
     return;
   }
 
-  if (GNUNET_OK !=
-      GNUNET_JSON_parse (json,
-                         spec,
-                         NULL, NULL))
+  if ( (NULL == (refunded = json_object_get (json, "refunded"))) ||
+       ( (json_true () == refunded) &&
+         (GNUNET_OK !=
+          GNUNET_JSON_parse (json,
+                             spec,
+                             NULL, NULL)) ) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "check payment failed to parse JSON\n");
@@ -153,7 +153,7 @@ handle_check_payment_finished (void *cls,
              json,
              GNUNET_SYSERR,
              GNUNET_SYSERR,
-             &refund_amount,
+             NULL,
              NULL);
     TALER_MERCHANT_check_payment_cancel (cpo);
     return;
@@ -163,10 +163,9 @@ handle_check_payment_finished (void *cls,
            MHD_HTTP_OK,
            json,
            GNUNET_YES,
-           refunded,
-           &refund_amount,
+           (json_true () == refunded),
+           (json_true () == refunded) ? &refund_amount : NULL,
            NULL);
-  GNUNET_JSON_parse_free (spec);
   TALER_MERCHANT_check_payment_cancel (cpo);
 }
 
