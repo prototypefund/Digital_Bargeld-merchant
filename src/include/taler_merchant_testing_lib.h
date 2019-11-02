@@ -109,9 +109,8 @@ TALER_TESTING_cmd_proposal_lookup (const char *label,
  * @param http_status expected HTTP response code.
  * @param proposal_reference the proposal whose payment status
  *        is going to be checked.
- * @param expect_paid GNUNET_YES if we expect the proposal to be
- *        paid, GNUNET_NO otherwise.
- *
+ * @param expect_paid #GNUNET_YES if we expect the proposal to be
+ *        paid, #GNUNET_NO otherwise.
  * @return the command
  */
 struct TALER_TESTING_Command
@@ -120,6 +119,42 @@ TALER_TESTING_cmd_check_payment (const char *label,
                                  unsigned int http_status,
                                  const char *proposal_reference,
                                  unsigned int expect_paid);
+
+/**
+ * Start a long-polled "poll-payment" test command.
+ *
+ * @param label command label.
+ * @param merchant_url merchant base url
+ * @param proposal_reference the proposal whose payment status
+ *        is going to be checked.
+ * @param timeout which timeout to use
+ * @return the command
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_poll_payment_start (const char *label,
+                                      const char *merchant_url,
+                                      const char *proposal_reference,
+                                      struct GNUNET_TIME_Relative timeout);
+
+
+/**
+ * Expect completion of a long-polled "poll payment" test command.
+ *
+ * @param label command label.
+ * @param poll_start_reference payment start operation that should have
+ *                   completed
+ * @param http_status expected HTTP response code.
+ * @param expect_paid #GNUNET_YES if we expect the proposal to be
+ *        paid, #GNUNET_NO otherwise.
+ * @return the command
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_check_payment (const char *label,
+                                 const char *merchant_url,
+                                 unsigned int http_status,
+                                 const char *proposal_reference,
+                                 unsigned int expect_paid);
+
 
 /**
  * Make a "pay" test command.
@@ -135,7 +170,6 @@ TALER_TESTING_cmd_check_payment (const char *label,
  *        fee
  * @param amount_without_fee amount to pay, no fees included.
  * @param refund_fee fee for refunding this payment.
- *
  * @return the command
  */
 struct TALER_TESTING_Command

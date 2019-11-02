@@ -46,7 +46,8 @@ libtalermerchanttesting_la_SOURCES = \
   testing_api_cmd_pay.c \
   testing_api_cmd_refund.c \
   testing_api_cmd_tip.c \
-  testing_api_cmd_track.c \
+  testing_api_cmd_track_transaction.c \
+  testing_api_cmd_track_transfer.c \
   testing_api_cmd_history.c \
   testing_api_cmd_rewind.c \
   testing_api_helpers.c \
