@@ -42,14 +42,17 @@ libtalermerchant_la_LIBADD = \
   $(XLIB)
 
 libtalermerchanttesting_la_SOURCES = \
-  testing_api_cmd_proposal.c \
+  testing_api_cmd_history.c \
   testing_api_cmd_pay.c \
-  testing_api_cmd_refund.c \
-  testing_api_cmd_tip.c \
+  testing_api_cmd_proposal.c \
+  testing_api_cmd_refund_increase.c \
+  testing_api_cmd_refund_lookup.c \
+  testing_api_cmd_rewind.c \
+  testing_api_cmd_tip_authorize.c \
+  testing_api_cmd_tip_pickup.c \
+  testing_api_cmd_tip_query.c \
   testing_api_cmd_track_transaction.c \
   testing_api_cmd_track_transfer.c \
-  testing_api_cmd_history.c \
-  testing_api_cmd_rewind.c \
   testing_api_helpers.c \
   testing_api_trait_merchant_sig.c \
   testing_api_trait_string.c \
