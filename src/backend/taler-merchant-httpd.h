@@ -277,14 +277,20 @@ struct TMH_SuspendedConnection
   struct MHD_Connection *con;
 
   /**
+   * Associated heap node.
+   */
+  struct GNUNET_CONTAINER_HeapNode *hn;
+
+  /**
    * Key of this entry in the #payment_trigger_map
    */
   struct GNUNET_HashCode key;
 
   /**
-   * Associated heap node.
+   * At what time does this request expire? If set in the future, we
+   * may wait this long for a payment to arrive before responding.
    */
-  struct GNUNET_CONTAINER_HeapNode *hn;
+  struct GNUNET_TIME_Absolute long_poll_timeout;
 
 };
 
@@ -318,6 +324,11 @@ extern unsigned long long default_wire_fee_amortization;
  * ordered by timeout. Values are of type `struct TMH_SuspendedConnection`
  */
 extern struct GNUNET_CONTAINER_Heap *resume_timeout_heap;
+
+/**
+ * Task responsible for timeouts in the #resume_timeout_heap.
+ */
+extern struct GNUNET_SCHEDULER_Task *resume_timeout_task;
 
 /**
  * Hash map from H(order_id,merchant_pub) to `struct TMH_SuspendedConnection`
@@ -396,5 +407,21 @@ TMH_compute_pay_key (const char *order_id,
                      const struct TALER_MerchantPublicKeyP *mpub,
                      struct GNUNET_HashCode *key);
 
+
+/**
+ * Create a taler://pay/ URI for the given @a con and @a order_id
+ * and @a session_id and @a instance_id.
+ *
+ * @param con HTTP connection
+ * @param order_id the order id
+ * @param session_id session, may be NULL
+ * @param instance_id instance, may be "default"
+ * @return corresponding taler://pay/ URI, or NULL on missing "host"
+ */
+char *
+TMH_make_taler_pay_uri (struct MHD_Connection *con,
+                        const char *order_id,
+                        const char *session_id,
+                        const char *instance_id);
 
 #endif

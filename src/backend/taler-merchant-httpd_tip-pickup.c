@@ -649,7 +649,9 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
                                            "tip_id required");
   }
 
-  if (GNUNET_OK != GNUNET_CRYPTO_hash_from_string (tip_id_str, &tip_id))
+  if (GNUNET_OK !=
+      GNUNET_CRYPTO_hash_from_string (tip_id_str,
+                                      &tip_id))
   {
     /* tip_id has wrong encoding */
     GNUNET_break_op (0);

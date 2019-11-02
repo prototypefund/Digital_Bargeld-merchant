@@ -14,26 +14,25 @@ bin_PROGRAMS = \
 
 taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd.c taler-merchant-httpd.h \
-  taler-merchant-httpd_parsing.c taler-merchant-httpd_parsing.h \
-  taler-merchant-httpd_responses.c taler-merchant-httpd_responses.h \
-  taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
   taler-merchant-httpd_auditors.c taler-merchant-httpd_auditors.h \
+  taler-merchant-httpd_config.c taler-merchant-httpd_config.h \
+  taler-merchant-httpd_check-payment.c taler-merchant-httpd_check-payment.h \
   taler-merchant-httpd_exchanges.c taler-merchant-httpd_exchanges.h \
-  taler-merchant-httpd_order.c taler-merchant-httpd_order.h \
-  taler-merchant-httpd_proposal.c taler-merchant-httpd_proposal.h \
-  taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h \
   taler-merchant-httpd_history.c taler-merchant-httpd_history.h \
+  taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
+  taler-merchant-httpd_order.c taler-merchant-httpd_order.h \
+  taler-merchant-httpd_parsing.c taler-merchant-httpd_parsing.h \
+  taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h \
+  taler-merchant-httpd_poll-payment.c taler-merchant-httpd_poll-payment.h \
+  taler-merchant-httpd_proposal.c taler-merchant-httpd_proposal.h \
+  taler-merchant-httpd_refund.c taler-merchant-httpd_refund.h \
+  taler-merchant-httpd_responses.c taler-merchant-httpd_responses.h \
   taler-merchant-httpd_tip-authorize.c taler-merchant-httpd_tip-authorize.h \
   taler-merchant-httpd_tip-pickup.c taler-merchant-httpd_tip-pickup.h \
   taler-merchant-httpd_tip-query.c taler-merchant-httpd_tip-query.h \
   taler-merchant-httpd_tip-reserve-helper.c taler-merchant-httpd_tip-reserve-helper.h \
   taler-merchant-httpd_track-transaction.c taler-merchant-httpd_track-transaction.h \
-  taler-merchant-httpd_track-transfer.c taler-merchant-httpd_track-transfer.h \
-  taler-merchant-httpd_refund.c taler-merchant-httpd_refund.h \
-  taler-merchant-httpd_check-payment.c taler-merchant-httpd_check-payment.h \
-  taler-merchant-httpd_config.c taler-merchant-httpd_config.h
-
-
+  taler-merchant-httpd_track-transfer.c taler-merchant-httpd_track-transfer.h
 taler_merchant_httpd_LDADD = \
   $(top_builddir)/src/backenddb/libtalermerchantdb.la \
   -ltalerexchange \

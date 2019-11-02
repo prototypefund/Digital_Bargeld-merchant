@@ -48,6 +48,7 @@
 #include "taler-merchant-httpd_history.h"
 #include "taler-merchant-httpd_refund.h"
 #include "taler-merchant-httpd_check-payment.h"
+#include "taler-merchant-httpd_poll-payment.h"
 #include "taler-merchant-httpd_config.h"
 
 /**
@@ -168,6 +169,11 @@ struct GNUNET_CONTAINER_Heap *resume_timeout_heap;
  */
 struct GNUNET_CONTAINER_MultiHashMap *payment_trigger_map;
 
+/**
+ * Task responsible for timeouts in the #resume_timeout_heap.
+ */
+struct GNUNET_SCHEDULER_Task *resume_timeout_task;
+
 
 /**
  * Return #GNUNET_YES if given a valid correlation ID and
@@ -277,6 +283,73 @@ TMH_compute_pay_key (const char *order_id,
 
 
 /**
+ * Create a taler://pay/ URI for the given @a con and @a order_id
+ * and @a session_id and @a instance_id.
+ *
+ * @param con HTTP connection
+ * @param order_id the order id
+ * @param session_id session, may be NULL
+ * @param instance_id instance, may be "default"
+ * @return corresponding taler://pay/ URI, or NULL on missing "host"
+ */
+char *
+TMH_make_taler_pay_uri (struct MHD_Connection *con,
+                        const char *order_id,
+                        const char *session_id,
+                        const char *instance_id)
+{
+  const char *host;
+  const char *forwarded_host;
+  const char *uri_path;
+  const char *uri_instance_id;
+  const char *query;
+  char *result;
+
+  host = MHD_lookup_connection_value (con,
+                                      MHD_HEADER_KIND,
+                                      "Host");
+  forwarded_host = MHD_lookup_connection_value (con,
+                                                MHD_HEADER_KIND,
+                                                "X-Forwarded-Host");
+
+  uri_path = MHD_lookup_connection_value (con,
+                                          MHD_HEADER_KIND,
+                                          "X-Forwarded-Prefix");
+  if (NULL == uri_path)
+    uri_path = "-";
+  if (NULL != forwarded_host)
+    host = forwarded_host;
+  if (0 == strcmp (instance_id,
+                   "default"))
+    uri_instance_id = "-";
+  else
+    uri_instance_id = instance_id;
+  if (NULL == host)
+  {
+    /* Should never happen, at least the host header should be defined */
+    GNUNET_break (0);
+    return NULL;
+  }
+
+  if (GNUNET_YES == TALER_mhd_is_https (con))
+    query = "";
+  else
+    query = "?insecure=1";
+  GNUNET_assert (NULL != order_id);
+  GNUNET_assert (0 < GNUNET_asprintf (&result,
+                                      "taler://pay/%s/%s/%s/%s%s%s%s",
+                                      host,
+                                      uri_path,
+                                      uri_instance_id,
+                                      order_id,
+                                      (NULL == session_id) ? "" : "/",
+                                      (NULL == session_id) ? "" : session_id,
+                                      query));
+  return result;
+}
+
+
+/**
  * Shutdown task (magically invoked when the application is being
  * quit)
  *
@@ -310,6 +383,11 @@ do_shutdown (void *cls)
     }
     GNUNET_CONTAINER_heap_destroy (resume_timeout_heap);
     resume_timeout_heap = NULL;
+  }
+  if (NULL != resume_timeout_task)
+  {
+    GNUNET_SCHEDULER_cancel (resume_timeout_task);
+    resume_timeout_task = NULL;
   }
   if (NULL != mhd)
   {
@@ -1196,6 +1274,9 @@ url_handler (void *cls,
     { "/check-payment", MHD_HTTP_METHOD_GET, "text/plain",
       NULL, 0,
       &MH_handler_check_payment, MHD_HTTP_OK},
+    { "/public/poll-payment", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_poll_payment, MHD_HTTP_OK},
     { "/config", MHD_HTTP_METHOD_GET, "text/plain",
       NULL, 0,
       &MH_handler_config, MHD_HTTP_OK},
