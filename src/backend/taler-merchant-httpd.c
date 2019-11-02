@@ -36,6 +36,7 @@
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
+#include "taler-merchant-httpd_order.h"
 #include "taler-merchant-httpd_proposal.h"
 #include "taler-merchant-httpd_pay.h"
 #include "taler-merchant-httpd_track-transaction.h"
@@ -441,8 +442,6 @@ TMH_trigger_daemon ()
  * @param daemon_handle HTTP server to prepare to run
  */
 static struct GNUNET_SCHEDULER_Task *
-
-
 prepare_daemon ()
 {
   struct GNUNET_SCHEDULER_Task *ret;
@@ -1034,8 +1033,6 @@ instances_iterator_cb (void *cls,
  * @return NULL if that instance is unknown to us
  */
 static struct MerchantInstance *
-
-
 lookup_instance (const char *instance_id)
 {
   struct GNUNET_HashCode h_instance;
@@ -1186,7 +1183,7 @@ url_handler (void *cls,
       &MH_handler_history, MHD_HTTP_OK},
     { "/order", MHD_HTTP_METHOD_POST, "application/json",
       NULL, 0,
-      &MH_handler_proposal_put, MHD_HTTP_OK },
+      &MH_handler_order_post, MHD_HTTP_OK },
     { "/refund", MHD_HTTP_METHOD_POST, "application/json",
       NULL, 0,
       &MH_handler_refund_increase, MHD_HTTP_OK},

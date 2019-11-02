@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015 INRIA
+  (C) 2014, 2015, 2019 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -14,21 +14,21 @@
   TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_propose.h
- * @brief headers for /contract handler
+ * @file backend/taler-merchant-httpd_order.h
+ * @brief headers for /order handler
  * @author Marcello Stanisci
  */
-#ifndef TALER_MERCHANT_HTTPD_CONTRACT_H
-#define TALER_MERCHANT_HTTPD_CONTRACT_H
+#ifndef TALER_MERCHANT_HTTPD_ORDER_H
+#define TALER_MERCHANT_HTTPD_ORDER_H
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 
 /**
- * Manage a GET /proposal request. Query the db and returns the
- * proposal's data related to the transaction id given as the URL's
- * parameter.
+ * Generate a proposal, given its order. In practical terms, it adds the
+ * fields  'exchanges', 'merchant_pub', and 'H_wire' to the order gotten
+ * from the frontend. Finally, it signs this data, and returns it to the
+ * frontend.
  *
- * @param rh context of the handler
  * @param connection the MHD connection to handle
  * @param[in,out] connection_cls the connection's closure (can be updated)
  * @param upload_data upload data
@@ -37,11 +37,12 @@
  * @return MHD result code
  */
 int
-MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
-                            struct MHD_Connection *connection,
-                            void **connection_cls,
-                            const char *upload_data,
-                            size_t *upload_data_size,
-                            struct MerchantInstance *mi);
+MH_handler_order_post (struct TMH_RequestHandler *rh,
+                       struct MHD_Connection *connection,
+                       void **connection_cls,
+                       const char *upload_data,
+                       size_t *upload_data_size,
+                       struct MerchantInstance *mi);
+
 
 #endif

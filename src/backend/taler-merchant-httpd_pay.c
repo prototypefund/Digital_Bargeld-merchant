@@ -523,8 +523,6 @@ abort_deposit (struct PayContext *pc)
  * @return the mhd response
  */
 static struct MHD_Response *
-
-
 sign_success_response (struct PayContext *pc)
 {
   json_t *refunds;
@@ -661,8 +659,6 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
  * @return taler error code, #TALER_EC_NONE if amount is sufficient
  */
 static enum TALER_ErrorCode
-
-
 check_payment_sufficient (struct PayContext *pc)
 {
   struct TALER_Amount acc_fee;
@@ -2202,7 +2198,6 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "/pay: picked instance %s\n",
                 mi->id);
-
   }
   else
   {
