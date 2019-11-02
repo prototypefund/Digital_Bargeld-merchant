@@ -45,7 +45,9 @@ libtalermerchanttesting_la_SOURCES = \
   testing_api_cmd_check_payment.c \
   testing_api_cmd_history.c \
   testing_api_cmd_pay.c \
+  testing_api_cmd_pay_abort_refund.c \
   testing_api_cmd_proposal.c \
+  testing_api_cmd_proposal_lookup.c \
   testing_api_cmd_refund_increase.c \
   testing_api_cmd_refund_lookup.c \
   testing_api_cmd_rewind.c \

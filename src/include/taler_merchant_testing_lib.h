@@ -149,11 +149,10 @@ TALER_TESTING_cmd_poll_payment_start (const char *label,
  * @return the command
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_check_payment (const char *label,
-                                 const char *merchant_url,
-                                 unsigned int http_status,
-                                 const char *proposal_reference,
-                                 unsigned int expect_paid);
+TALER_TESTING_cmd_poll_payment_conclude (const char *label,
+                                         unsigned int http_status,
+                                         const char *poll_start_reference,
+                                         unsigned int expect_paid);
 
 
 /**
@@ -412,6 +411,7 @@ TALER_TESTING_make_trait_merchant_sig (unsigned int index,
                                        const struct
                                        TALER_MerchantSignatureP *merchant_sig);
 
+
 /**
  * Obtain a merchant signature over a contract from a @a cmd.
  *
@@ -555,6 +555,7 @@ TALER_TESTING_get_trait_tip_id (const struct TALER_TESTING_Command *cmd,
                                 unsigned int index,
                                 const struct GNUNET_HashCode **tip_id);
 
+
 /**
  * Offer contract terms hash code.
  *
@@ -562,7 +563,6 @@ TALER_TESTING_get_trait_tip_id (const struct TALER_TESTING_Command *cmd,
  *        offer if there are multiple on offer
  * @param h_contract_terms set to the offered hashed
  *        contract terms.
- *
  * @return the trait
  */
 struct TALER_TESTING_Trait
@@ -570,13 +570,13 @@ TALER_TESTING_make_trait_h_contract_terms (unsigned int index,
                                            const struct
                                            GNUNET_HashCode *h_contract_terms);
 
+
 /**
  * Obtain contract terms hash from a @a cmd.
  *
  * @param cmd command to extract the trait from.
  * @param index index number of the trait to fetch.
  * @param h_contract_terms[out] set to the wanted data.
- *
  * @return #GNUNET_OK on success
  */
 int
@@ -591,7 +591,6 @@ TALER_TESTING_get_trait_h_contract_terms (const struct
  *
  * @param index index number of the trait to offer.
  * @param refund_entry set to the offered refund entry.
- *
  * @return the trait
  */
 struct TALER_TESTING_Trait
