@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2018 Taler Systems SA
+  Copyright (C) 2014-2019 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as
@@ -16,15 +16,13 @@
   License along with TALER; see the file COPYING.  If not, see
   <http://www.gnu.org/licenses/>
 */
-
 /**
- * @file exchange/test_merchant_api_new.c
+ * @file exchange/test_merchant_api.c
  * @brief testcase to test exchange's HTTP API interface
  * @author Sree Harsha Totakura <sreeharsha@totakura.in>
  * @author Christian Grothoff
  * @author Marcello Stanisci
  */
-
 #include "platform.h"
 #include <taler/taler_util.h>
 #include <taler/taler_signatures.h>
@@ -75,6 +73,11 @@ static char *exchange_url;
  * Auditor base URL; only used to fix FTBFS.
  */
 static char *auditor_url;
+
+/**
+ * Map for #intern()
+ */
+static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
 
 /**
  * Account number of the exchange at the bank.
@@ -148,8 +151,6 @@ static char *auditor_url;
     subject)
 
 
-static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
-
 static const char *
 intern (const char *str)
 {
@@ -179,11 +180,18 @@ static const char *
 merchant_url_internal (const char *instance_id)
 {
   char buf[BUF_SZ];
+
   if (NULL == instance_id)
-    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%s", merchant_url));
+    GNUNET_snprintf (buf,
+                     BUF_SZ,
+                     "%s",
+                     merchant_url);
   else
-    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%sinstances/%s/", merchant_url,
-                                 instance_id));
+    GNUNET_snprintf (buf,
+                     BUF_SZ,
+                     "%sinstances/%s/",
+                     merchant_url,
+                     instance_id);
   return intern (buf);
 }
 
@@ -193,10 +201,16 @@ merchant_url_external (const char *instance_id)
 {
   char buf[BUF_SZ];
   if (NULL == instance_id)
-    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%spublic/", merchant_url));
+    GNUNET_snprintf (buf,
+                     BUF_SZ,
+                     "%spublic/",
+                     merchant_url);
   else
-    GNUNET_assert (0 < snprintf (buf, BUF_SZ, "%spublic/instances/%s/",
-                                 merchant_url, instance_id));
+    GNUNET_snprintf (buf,
+                     BUF_SZ,
+                     "%spublic/instances/%s/",
+                     merchant_url,
+                     instance_id);
   return intern (buf);
 }
 
@@ -222,26 +236,22 @@ run (void *cls,
      * transfer.
      */
     CMD_EXEC_WIREWATCH ("wirewatch-1"),
-
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
       EXCHANGE_URL,
       "EUR:10.02",
       USER_ACCOUNT_NO,
       EXCHANGE_ACCOUNT_NO),
-
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
       "create-reserve-1",
       "EUR:5",
       MHD_HTTP_OK),
-
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-2",
       "create-reserve-1",
       "EUR:5",
       MHD_HTTP_OK),
-
     /**
      * Check the reserve is depleted.
      */
@@ -249,7 +259,6 @@ run (void *cls,
                               "create-reserve-1",
                               "EUR:0",
                               MHD_HTTP_OK),
-
     TALER_TESTING_cmd_proposal
       ("create-proposal-1",
       merchant_url,
@@ -269,7 +278,6 @@ run (void *cls,
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:5}\"} ] }"),
-
     TALER_TESTING_cmd_check_payment ("check-payment-1",
                                      merchant_url,
                                      MHD_HTTP_OK,
@@ -283,7 +291,6 @@ run (void *cls,
                            "EUR:5",
                            "EUR:4.99",
                            "EUR:0.01"),
-
     TALER_TESTING_cmd_check_payment ("check-payment-2",
                                      merchant_url,
                                      MHD_HTTP_OK,
@@ -294,7 +301,6 @@ run (void *cls,
                                  merchant_url,
                                  "deposit-simple",
                                  MHD_HTTP_FORBIDDEN),
-
     TALER_TESTING_cmd_pay ("replay-simple",
                            merchant_url,
                            MHD_HTTP_OK,
@@ -303,27 +309,21 @@ run (void *cls,
                            "EUR:5",
                            "EUR:4.99",
                            "EUR:0.01"),
-
     TALER_TESTING_cmd_check_bank_empty
       ("check_bank_empty-1"),
-
     CMD_EXEC_AGGREGATOR ("run-aggregator"),
-
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-498c",
       EXCHANGE_URL,
       "EUR:4.98",
       EXCHANGE_ACCOUNT_NO,
       MERCHANT_ACCOUNT_NO),
-
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-2"),
-
     TALER_TESTING_cmd_end ()
   };
 
 
   struct TALER_TESTING_Command double_spending[] = {
-
     TALER_TESTING_cmd_proposal
       ("create-proposal-2",
       merchant_url,
@@ -378,27 +378,22 @@ run (void *cls,
 
     TALER_TESTING_cmd_end ()
   };
-
   struct TALER_TESTING_Command track[] = {
-
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-1",
       merchant_url,
       MHD_HTTP_OK,
       "deposit-simple"),
-
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-1",
       merchant_url,
       MHD_HTTP_OK,
       "check_bank_transfer-498c"),
-
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-again",
       merchant_url,
       MHD_HTTP_OK,
       "check_bank_transfer-498c"),
-
     TALER_TESTING_cmd_fakebank_transfer
       ("create-reserve-2",
       "EUR:1",
@@ -407,7 +402,6 @@ run (void *cls,
       "user62",
       "pass62",
       EXCHANGE_URL),
-
     TALER_TESTING_cmd_fakebank_transfer_with_ref
       ("create-reserve-2b",
       "EUR:4.01",
@@ -417,28 +411,23 @@ run (void *cls,
       "pass62",
       "create-reserve-2",
       EXCHANGE_URL),
-
     CMD_EXEC_WIREWATCH ("wirewatch-2"),
-
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2a",
       EXCHANGE_URL,
       "EUR:1",
       USER_ACCOUNT_NO,
       EXCHANGE_ACCOUNT_NO),
-
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2b",
       EXCHANGE_URL,
       "EUR:4.01",
       USER_ACCOUNT_NO,
       EXCHANGE_ACCOUNT_NO),
-
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
                                        "create-reserve-2",
                                        "EUR:5",
                                        MHD_HTTP_OK),
-
     TALER_TESTING_cmd_pay ("deposit-simple-2",
                            merchant_url,
                            MHD_HTTP_OK,
@@ -447,36 +436,29 @@ run (void *cls,
                            "EUR:5",
                            "EUR:4.99",
                            "EUR:0.01"),
-
     CMD_EXEC_AGGREGATOR ("run-aggregator-2"),
-
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-498c-2",
       EXCHANGE_URL,
       "EUR:4.98",
       EXCHANGE_ACCOUNT_NO,
       MERCHANT_ACCOUNT_NO),
-
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty"),
-
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-2",
       merchant_url,
       MHD_HTTP_OK,
       "check_bank_transfer-498c-2"),
-
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-2-again",
       merchant_url,
       MHD_HTTP_OK,
       "check_bank_transfer-498c-2"),
-
     TALER_TESTING_cmd_merchant_track_transaction
       ("track-transaction-2",
       merchant_url,
       MHD_HTTP_OK,
       "deposit-simple-2"),
-
     TALER_TESTING_cmd_history ("history-1",
                                merchant_url,
                                MHD_HTTP_OK,
