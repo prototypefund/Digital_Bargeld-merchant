@@ -283,6 +283,18 @@ run (void *cls,
                                      MHD_HTTP_OK,
                                      "create-proposal-1",
                                      GNUNET_NO),
+    TALER_TESTING_cmd_poll_payment_start ("poll-payment-1",
+                                          merchant_url,
+                                          "create-proposal-1",
+                                          GNUNET_TIME_UNIT_MILLISECONDS),
+    TALER_TESTING_cmd_poll_payment_conclude ("poll-payment-conclude-1",
+                                             MHD_HTTP_OK,
+                                             "poll-payment-1",
+                                             GNUNET_NO),
+    TALER_TESTING_cmd_poll_payment_start ("poll-payment-2",
+                                          merchant_url,
+                                          "create-proposal-1",
+                                          GNUNET_TIME_UNIT_MINUTES),
     TALER_TESTING_cmd_pay ("deposit-simple",
                            merchant_url,
                            MHD_HTTP_OK,
@@ -291,6 +303,10 @@ run (void *cls,
                            "EUR:5",
                            "EUR:4.99",
                            "EUR:0.01"),
+    TALER_TESTING_cmd_poll_payment_conclude ("poll-payment-conclude-2",
+                                             MHD_HTTP_OK,
+                                             "poll-payment-2",
+                                             GNUNET_YES),
     TALER_TESTING_cmd_check_payment ("check-payment-2",
                                      merchant_url,
                                      MHD_HTTP_OK,
@@ -1048,7 +1064,7 @@ main (int argc,
   unsetenv ("XDG_DATA_HOME");
   unsetenv ("XDG_CONFIG_HOME");
 
-  GNUNET_log_setup ("test-merchant-api-new",
+  GNUNET_log_setup ("test-merchant-api",
                     "DEBUG",
                     NULL);
   if (NULL ==
@@ -1098,4 +1114,4 @@ main (int argc,
 }
 
 
-/* end of test_merchant_api_new.c */
+/* end of test_merchant_api.c */

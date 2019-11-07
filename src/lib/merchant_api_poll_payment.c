@@ -90,8 +90,22 @@ handle_poll_payment_finished (void *cls,
 
   cpo->job = NULL;
 
-  if (MHD_HTTP_OK != response_code)
+  switch (response_code)
   {
+  case MHD_HTTP_NOT_FOUND:
+    cpo->cb (cpo->cb_cls,
+             response_code,
+             json,
+             GNUNET_NO,
+             GNUNET_NO,
+             NULL,
+             NULL);
+    TALER_MERCHANT_poll_payment_cancel (cpo);
+    return;
+  case MHD_HTTP_OK:
+    /* see below */
+    break;
+  default:
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Polling payment failed with HTTP status code %u\n",
                 (unsigned int) response_code);
@@ -107,6 +121,7 @@ handle_poll_payment_finished (void *cls,
     return;
   }
 
+  /* HTTP OK */
   if (! json_boolean_value (json_object_get (json, "paid")))
   {
     const char *taler_pay_uri = json_string_value (json_object_get (json,
@@ -233,6 +248,11 @@ TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
                              (0 != ts) ? "timeout" : NULL,
                              timeout_s,
                              NULL);
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Long poll timeout is %s/%llu, url is %s\n",
+              timeout_s,
+              (unsigned long long) timeout.rel_value_us,
+              cpo->url);
   GNUNET_free (h_contract_s);
   GNUNET_free (timeout_s);
   eh = curl_easy_init ();

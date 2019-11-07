@@ -218,10 +218,10 @@ send_pay_request (struct PollPaymentRequestContext *pprc)
   int ret;
   char *already_paid_order_id = NULL;
   char *taler_pay_uri;
+  struct GNUNET_TIME_Relative remaining;
 
-  if (0 !=
-      GNUNET_TIME_absolute_get_remaining (
-        pprc->sc.long_poll_timeout).rel_value_us)
+  remaining = GNUNET_TIME_absolute_get_remaining (pprc->sc.long_poll_timeout);
+  if (0 != remaining.rel_value_us)
   {
     struct TMH_SuspendedConnection *sc;
 
@@ -427,8 +427,6 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
     }
     if (0 == qs)
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "Contract unknown\n");
       return TMH_RESPONSE_reply_not_found (connection,
                                            TALER_EC_POLL_PAYMENT_CONTRACT_NOT_FOUND,
                                            "Given order_id doesn't map to any proposal");
@@ -511,8 +509,6 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
     }
     if (0 == qs)
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "not paid yet\n");
       return send_pay_request (pprc);
     }
     GNUNET_break (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs);

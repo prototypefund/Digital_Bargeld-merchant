@@ -191,7 +191,9 @@ conclude_task (void *cls)
   }
   now = GNUNET_TIME_absolute_get ();
   if ( (GNUNET_NO == cps->paid) &&
-       (cps->deadline.abs_value_us < now.abs_value_us) )
+       (GNUNET_TIME_absolute_add (cps->deadline,
+                                  GNUNET_TIME_UNIT_SECONDS).abs_value_us <
+        now.abs_value_us) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Expected answer to be delayed until %llu, but got response at %llu\n",
@@ -236,6 +238,17 @@ poll_payment_cb (void *cls,
 {
   struct PollPaymentStartState *cps = cls;
 
+  if (MHD_HTTP_OK != http_status)
+  {
+    char *log = json_dumps (obj,
+                            JSON_COMPACT);
+
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Poll payment returned %u: %s\n",
+                http_status,
+                log);
+    free (log);
+  }
   cps->cpo = NULL;
   cps->paid = paid;
   cps->http_status = http_status;
@@ -380,6 +393,7 @@ poll_payment_conclude_run (void *cls,
   const struct TALER_TESTING_Command *poll_cmd;
   struct PollPaymentStartState *cps;
 
+  ppc->is = is;
   poll_cmd =
     TALER_TESTING_interpreter_lookup_command (is,
                                               ppc->start_reference);
