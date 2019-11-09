@@ -393,16 +393,27 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                              "nonce",
                              nonce_str,
                              NULL);
+  GNUNET_free_non_null (nonce_str);
+  if (NULL == plo->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL. Is `%s' valid?\n",
+                backend_url);
+    GNUNET_free (plo);
+    return NULL;
+  }
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "looking up proposal from %s\n",
               plo->url);
-
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,
                                     plo->url))
   {
     GNUNET_break (0);
+    curl_easy_cleanup (eh);
+    GNUNET_free (plo->url);
+    GNUNET_free (plo);
     return NULL;
   }
 
@@ -413,6 +424,8 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
                                                plo)))
   {
     GNUNET_break (0);
+    GNUNET_free (plo->url);
+    GNUNET_free (plo);
     return NULL;
   }
   return plo;
