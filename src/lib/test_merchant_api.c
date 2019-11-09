@@ -1091,7 +1091,8 @@ main (int argc,
   case GNUNET_OK:
 
     if (NULL == (merchantd =
-                   TALER_TESTING_run_merchant (CONFIG_FILE, merchant_url)))
+                   TALER_TESTING_run_merchant (CONFIG_FILE,
+                                               merchant_url)))
       return 1;
 
     ret = TALER_TESTING_setup_with_exchange (&run,

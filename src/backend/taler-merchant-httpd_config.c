@@ -32,6 +32,24 @@
 
 
 /**
+ * Taler protocol version in the format CURRENT:REVISION:AGE
+ * as used by GNU libtool.  See
+ * https://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
+ *
+ * Please be very careful when updating and follow
+ * https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html#Updating-version-info
+ * precisely.  Note that this version has NOTHING to do with the
+ * release version, and the format is NOT the same that semantic
+ * versioning uses either.
+ *
+ * When changing this version, you likely want to also update
+ * #TALER_PROTOCOL_CURRENT and #TALER_PROTOCOL_AGE in
+ * TBD.c! // FIXME: update comment once libtalermerchant looks at version!
+ */
+#define TALER_PROTOCOL_VERSION "0:0:0"
+
+
+/**
  * Handle a "/config" request.
  *
  * @param rh context of the handler
@@ -52,8 +70,9 @@ MH_handler_config (struct TMH_RequestHandler *rh,
 {
   return TMH_RESPONSE_reply_json_pack (connection,
                                        MHD_HTTP_OK,
-                                       "{s:s}",
-                                       "currency", TMH_currency);
+                                       "{s:s, s:s}",
+                                       "currency", TMH_currency,
+                                       "version", TALER_PROTOCOL_VERSION);
 }
 
 
