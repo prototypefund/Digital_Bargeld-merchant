@@ -225,6 +225,13 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                              (0 != ts) ? "timeout" : NULL,
                              timeout_s,
                              NULL);
+  if (NULL == cpo->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    GNUNET_free (cpo);
+    return NULL;
+  }
   GNUNET_free (timeout_s);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
@@ -232,6 +239,9 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                                     cpo->url))
   {
     GNUNET_break (0);
+    curl_easy_cleanup (eh);
+    GNUNET_free (cpo->url);
+    GNUNET_free (cpo);
     return NULL;
   }
   if (CURLE_OK != curl_easy_setopt (eh,
@@ -239,6 +249,9 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                                     tlong))
   {
     GNUNET_break (0);
+    curl_easy_cleanup (eh);
+    GNUNET_free (cpo->url);
+    GNUNET_free (cpo);
     return NULL;
   }
 
@@ -252,6 +265,8 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                                                cpo)))
   {
     GNUNET_break (0);
+    GNUNET_free (cpo->url);
+    GNUNET_free (cpo);
     return NULL;
   }
   return cpo;

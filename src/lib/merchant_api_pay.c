@@ -522,7 +522,7 @@ request_pay_generic
                                &pc->amount_without_fee))
     {
       /* Integer underflow, fee larger than total amount?
-   This should not happen (client violated API!) */
+         This should not happen (client violated API!) */
       GNUNET_break (0);
       json_decref (j_coins);
       return NULL;
@@ -599,6 +599,14 @@ request_pay_generic
   ph->pay_cb = pay_cb;
   ph->pay_cb_cls = pay_cb_cls;
   ph->url = TALER_url_join (merchant_url, "pay", NULL);
+  if (NULL == ph->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    json_decref (pay_obj);
+    GNUNET_free (ph);
+    return NULL;
+  }
   ph->num_coins = num_coins;
   ph->coins = GNUNET_new_array (num_coins,
                                 struct TALER_MERCHANT_PaidCoin);
@@ -613,6 +621,7 @@ request_pay_generic
                                          pay_obj))
   {
     GNUNET_break (0);
+    json_decref (pay_obj);
     GNUNET_free (ph);
     return NULL;
   }
@@ -724,7 +733,7 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
                                &coin->amount_without_fee))
     {
       /* Integer underflow, fee larger than total amount?
-   This should not happen (client violated API!) */
+         This should not happen (client violated API!) */
       GNUNET_break (0);
       return NULL;
     }

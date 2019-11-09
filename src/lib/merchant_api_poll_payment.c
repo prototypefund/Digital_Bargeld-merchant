@@ -250,6 +250,13 @@ TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
                              NULL);
   GNUNET_free (h_contract_s);
   GNUNET_free (timeout_s);
+  if (NULL == cpo->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    GNUNET_free (cpo);
+    return NULL;
+  }
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,

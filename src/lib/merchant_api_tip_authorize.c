@@ -203,6 +203,13 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
   tao->cb = authorize_cb;
   tao->cb_cls = authorize_cb_cls;
   tao->url = TALER_url_join (backend_url, "tip-authorize", NULL);
+  if (NULL == tao->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    GNUNET_free (tao);
+    return NULL;
+  }
   te_obj = json_pack ("{"
                       " s:o," /* amount */
                       " s:s," /* justification */
@@ -227,6 +234,8 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
                                          te_obj))
   {
     GNUNET_break (0);
+    json_decref (te_obj);
+    GNUNET_free (tao->url);
     GNUNET_free (tao);
     return NULL;
   }

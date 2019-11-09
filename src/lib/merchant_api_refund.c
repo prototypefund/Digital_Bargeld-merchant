@@ -212,6 +212,14 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
   rio->cb = cb;
   rio->cb_cls = cb_cls;
   rio->url = TALER_url_join (backend_url, "refund", NULL);
+  if (NULL == rio->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    GNUNET_free (rio);
+    return NULL;
+  }
+
   req = json_pack ("{s:o, s:s, s:s}",
                    "refund", TALER_JSON_from_amount (refund),
                    "order_id", order_id,
@@ -223,10 +231,11 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
                                          req))
   {
     GNUNET_break (0);
+    json_decref (req);
+    GNUNET_free (rio->url);
     GNUNET_free (rio);
     return NULL;
   }
-
   json_decref (req);
 
   GNUNET_assert (CURLE_OK == curl_easy_setopt (eh,

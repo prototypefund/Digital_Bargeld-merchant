@@ -154,8 +154,17 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
   tdo->ctx = ctx;
   tdo->cb = track_transaction_cb;
   tdo->cb_cls = track_transaction_cb_cls;
-  tdo->url = TALER_url_join (backend_url, "track/transaction",
-                             "order_id", order_id, NULL);
+  tdo->url = TALER_url_join (backend_url,
+                             "track/transaction",
+                             "order_id", order_id,
+                             NULL);
+  if (NULL == tdo->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    GNUNET_free (tdo);
+    return NULL;
+  }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Requesting URL '%s'\n",
               tdo->url);

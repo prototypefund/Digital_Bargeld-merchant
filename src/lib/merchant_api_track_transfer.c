@@ -254,6 +254,13 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
                              "wire_method", wire_method,
                              NULL);
   GNUNET_free (wtid_str);
+  if (NULL == tdo->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    GNUNET_free (tdo);
+    return NULL;
+  }
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,

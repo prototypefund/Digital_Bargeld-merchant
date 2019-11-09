@@ -178,12 +178,18 @@ TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
   CURL *eh;
   char *base;
 
+  base = TALER_url_join (backend_url, "history", NULL);
+  if (NULL == base)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    return NULL;
+  }
   ho = GNUNET_new (struct TALER_MERCHANT_HistoryOperation);
   ho->ctx = ctx;
   ho->cb = history_cb;
   ho->cb_cls = history_cb_cls;
   seconds = date.abs_value_us / 1000LL / 1000LL;
-  base = TALER_url_join (backend_url, "history", NULL);
 
   if (GNUNET_YES == use_default_start)
     GNUNET_asprintf (&ho->url,
@@ -198,8 +204,6 @@ TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
                      seconds,
                      delta,
                      start);
-
-
   GNUNET_free (base);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,

@@ -202,8 +202,16 @@ TALER_MERCHANT_tip_query (struct GNUNET_CURL_Context *ctx,
   tqo->ctx = ctx;
   tqo->cb = query_cb;
   tqo->cb_cls = query_cb_cls;
-  tqo->url = TALER_url_join (backend_url, "tip-query",
+  tqo->url = TALER_url_join (backend_url,
+                             "tip-query",
                              NULL);
+  if (NULL == tqo->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    GNUNET_free (tqo);
+    return NULL;
+  }
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Requesting URL '%s'\n",

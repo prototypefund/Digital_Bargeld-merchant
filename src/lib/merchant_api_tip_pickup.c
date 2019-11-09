@@ -290,16 +290,24 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
   tpo->url = TALER_url_join (backend_url,
                              "tip-pickup",
                              NULL);
+  if (NULL == tpo->url)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not construct request URL.\n");
+    json_decref (tp_obj);
+    GNUNET_free (tpo);
+    return NULL;
+  }
   eh = curl_easy_init ();
   if (GNUNET_OK != TALER_curl_easy_post (&tpo->post_ctx,
                                          eh,
                                          tp_obj))
   {
     GNUNET_break (0);
+    json_decref (tp_obj);
     GNUNET_free (tpo);
     return NULL;
   }
-
   json_decref (tp_obj);
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,

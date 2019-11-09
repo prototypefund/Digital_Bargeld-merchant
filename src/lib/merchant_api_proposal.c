@@ -238,6 +238,7 @@ TALER_MERCHANT_order_put
                                          req))
   {
     GNUNET_break (0);
+    json_decref (req);
     GNUNET_free (po);
     return NULL;
   }
@@ -397,8 +398,7 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
   if (NULL == plo->url)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not construct request URL. Is `%s' valid?\n",
-                backend_url);
+                "Could not construct request URL.\n");
     GNUNET_free (plo);
     return NULL;
   }
