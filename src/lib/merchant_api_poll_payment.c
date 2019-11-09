@@ -248,11 +248,6 @@ TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
                              (0 != ts) ? "timeout" : NULL,
                              timeout_s,
                              NULL);
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Long poll timeout is %s/%llu, url is %s\n",
-              timeout_s,
-              (unsigned long long) timeout.rel_value_us,
-              cpo->url);
   GNUNET_free (h_contract_s);
   GNUNET_free (timeout_s);
   eh = curl_easy_init ();

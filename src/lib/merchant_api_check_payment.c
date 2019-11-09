@@ -198,10 +198,23 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
 {
   struct TALER_MERCHANT_CheckPaymentOperation *cpo;
   CURL *eh;
+  char *timeout_s;
+  unsigned int ts;
+  long tlong;
 
   GNUNET_assert (NULL != backend_url);
   GNUNET_assert (NULL != order_id);
-
+  ts = (unsigned int) (timeout.rel_value_us
+                       / GNUNET_TIME_UNIT_SECONDS.rel_value_us);
+  /* set curl timeout to *our* long poll timeout plus one minute
+     (for network latency and processing delays) */
+  tlong = (long) (GNUNET_TIME_relative_add (timeout,
+                                            GNUNET_TIME_UNIT_MINUTES).
+                  rel_value_us
+                  / GNUNET_TIME_UNIT_MILLISECONDS.rel_value_us);
+  GNUNET_asprintf (&timeout_s,
+                   "%u",
+                   ts);
   cpo = GNUNET_new (struct TALER_MERCHANT_CheckPaymentOperation);
   cpo->ctx = ctx;
   cpo->cb = check_payment_cb;
@@ -209,7 +222,10 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
   cpo->url = TALER_url_join (backend_url, "check-payment",
                              "order_id", order_id,
                              "session_id", session_id,
+                             (0 != ts) ? "timeout" : NULL,
+                             timeout_s,
                              NULL);
+  GNUNET_free (timeout_s);
   eh = curl_easy_init ();
   if (CURLE_OK != curl_easy_setopt (eh,
                                     CURLOPT_URL,
@@ -218,11 +234,17 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
     GNUNET_break (0);
     return NULL;
   }
+  if (CURLE_OK != curl_easy_setopt (eh,
+                                    CURLOPT_TIMEOUT_MS,
+                                    tlong))
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
 
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "checking payment from %s\n",
+              "Checking payment from %s\n",
               cpo->url);
-
   if (NULL == (cpo->job = GNUNET_CURL_job_add (ctx,
                                                eh,
                                                GNUNET_YES,
