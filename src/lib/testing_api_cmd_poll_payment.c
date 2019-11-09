@@ -181,6 +181,12 @@ conclude_task (void *cls)
     TALER_TESTING_interpreter_lookup_command (ppc->is,
                                               ppc->start_reference);
   cps = poll_cmd->cls;
+  if (NULL != cps->cpo)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Expected /poll/payment to have completed, but it did not!\n");
+    TALER_TESTING_FAIL (ppc->is);
+  }
   if (cps->http_status != ppc->expected_http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -238,7 +244,9 @@ poll_payment_cb (void *cls,
 {
   struct PollPaymentStartState *cps = cls;
 
-  if (MHD_HTTP_OK != http_status)
+  cps->cpo = NULL;
+  if ( (MHD_HTTP_OK != http_status) &&
+       (NULL != obj) )
   {
     char *log = json_dumps (obj,
                             JSON_COMPACT);
@@ -249,7 +257,14 @@ poll_payment_cb (void *cls,
                 log);
     free (log);
   }
-  cps->cpo = NULL;
+  else
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Poll payment returned %u (%d/%d)\n",
+                http_status,
+                paid,
+                refunded);
+  }
   cps->paid = paid;
   cps->http_status = http_status;
   cps->refunded = refunded;
@@ -301,7 +316,10 @@ poll_payment_start_run (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Polling for order id `%s'\n",
               order_id);
-  cps->deadline = GNUNET_TIME_relative_to_absolute (cps->timeout);
+  /* add 1s grace time to timeout */
+  cps->deadline
+    = GNUNET_TIME_absolute_add (GNUNET_TIME_relative_to_absolute (cps->timeout),
+                                GNUNET_TIME_UNIT_SECONDS);
   cps->cpo = TALER_MERCHANT_poll_payment (is->ctx,
                                           cps->merchant_url,
                                           order_id,

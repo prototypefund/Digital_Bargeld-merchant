@@ -122,23 +122,15 @@ check_payment_cb (void *cls,
 
   cps->cpo = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "check payment: expected paid: %s: %d\n",
-              TALER_TESTING_interpreter_get_current_label (
-                cps->is),
-              cps->expect_paid);
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "check payment: paid: %d\n",
-              paid);
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "check payment: url: %s\n",
+              "check payment (%s): expected paid: %d, paid: %d, url: %s\n",
+              TALER_TESTING_interpreter_get_current_label (cps->is),
+              cps->expect_paid,
+              paid,
               taler_pay_uri);
-
   if (paid != cps->expect_paid)
     TALER_TESTING_FAIL (cps->is);
-
   if (cps->http_status != http_status)
     TALER_TESTING_FAIL (cps->is);
-
   TALER_TESTING_interpreter_next (cps->is);
 }
 
@@ -175,7 +167,7 @@ check_payment_run (void *cls,
                                            order_id,
                                            NULL,
                                            GNUNET_TIME_UNIT_ZERO,
-                                           check_payment_cb,
+                                           &check_payment_cb,
                                            cps);
   GNUNET_assert (NULL != cps->cpo);
 }

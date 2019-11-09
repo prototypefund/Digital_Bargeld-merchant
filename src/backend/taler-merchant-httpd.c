@@ -283,6 +283,73 @@ TMH_compute_pay_key (const char *order_id,
 
 
 /**
+ * Resume processing all suspended connections past timeout.
+ *
+ * @param cls unused
+ */
+static void
+do_resume (void *cls)
+{
+  struct TMH_SuspendedConnection *sc;
+
+  (void) cls;
+  resume_timeout_task = NULL;
+  while (1)
+  {
+    sc = GNUNET_CONTAINER_heap_peek (resume_timeout_heap);
+    if (NULL == sc)
+      return;
+    if  (0 !=
+         GNUNET_TIME_absolute_get_remaining (
+           sc->long_poll_timeout).rel_value_us)
+      break;
+    GNUNET_assert (sc ==
+                   GNUNET_CONTAINER_heap_remove_root (resume_timeout_heap));
+    sc->hn = NULL;
+    GNUNET_assert (GNUNET_YES ==
+                   GNUNET_CONTAINER_multihashmap_remove (payment_trigger_map,
+                                                         &sc->key,
+                                                         sc));
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Resuming long polled job due to timeout\n");
+    MHD_resume_connection (sc->con);
+  }
+  resume_timeout_task = GNUNET_SCHEDULER_add_at (sc->long_poll_timeout,
+                                                 &do_resume,
+                                                 NULL);
+}
+
+
+/**
+ * Suspend connection from @a sc until payment has been received.
+ *
+ * @param sc connection to suspend
+ */
+void
+TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc)
+{
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_CONTAINER_multihashmap_put (payment_trigger_map,
+                                                    &sc->key,
+                                                    sc,
+                                                    GNUNET_CONTAINER_MULTIHASHMAPOPTION_MULTIPLE));
+  sc->hn = GNUNET_CONTAINER_heap_insert (resume_timeout_heap,
+                                         sc,
+                                         sc->long_poll_timeout.abs_value_us);
+  MHD_suspend_connection (sc->con);
+  if (NULL != resume_timeout_task)
+  {
+    GNUNET_SCHEDULER_cancel (resume_timeout_task);
+    resume_timeout_task = NULL;
+  }
+  sc = GNUNET_CONTAINER_heap_peek (resume_timeout_heap);
+  resume_timeout_task = GNUNET_SCHEDULER_add_at (sc->long_poll_timeout,
+                                                 &do_resume,
+                                                 NULL);
+}
+
+
+/**
  * Create a taler://pay/ URI for the given @a con and @a order_id
  * and @a session_id and @a instance_id.
  *

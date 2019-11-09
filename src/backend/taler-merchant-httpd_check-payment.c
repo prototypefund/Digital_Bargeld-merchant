@@ -48,7 +48,11 @@ struct CheckPaymentRequestContext
    */
   struct TM_HandlerContext hc;
 
-  struct MHD_Connection *connection;
+  /**
+   * Entry in the #resume_timeout_heap for this check payment, if we are
+   * suspended.
+   */
+  struct TMH_SuspendedConnection sc;
 
   /**
    * Which merchant instance is this for?
@@ -173,11 +177,25 @@ process_refunds_cb (void *cls,
  * @return #MHD_YES on success
  */
 static int
-send_pay_request (const struct CheckPaymentRequestContext *cprc)
+send_pay_request (struct CheckPaymentRequestContext *cprc)
 {
   int ret;
   char *already_paid_order_id = NULL;
   char *taler_pay_uri;
+  struct GNUNET_TIME_Relative remaining;
+
+  remaining = GNUNET_TIME_absolute_get_remaining (cprc->sc.long_poll_timeout);
+  if (0 != remaining.rel_value_us)
+  {
+    /* long polling: do not queue a response, suspend connection instead */
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Suspending /check-payment\n");
+    TMH_compute_pay_key (cprc->order_id,
+                         &cprc->mi->pubkey,
+                         &cprc->sc.key);
+    TMH_long_poll_suspend (&cprc->sc);
+    return MHD_YES;
+  }
 
   /* Check if resource_id has been paid for in the same session
    * with another order_id.
@@ -199,16 +217,16 @@ send_pay_request (const struct CheckPaymentRequestContext *cprc)
       GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-      return TMH_RESPONSE_reply_internal_error (cprc->connection,
+      return TMH_RESPONSE_reply_internal_error (cprc->sc.con,
                                                 TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
                                                 "db error fetching pay session info");
     }
   }
-  taler_pay_uri = TMH_make_taler_pay_uri (cprc->connection,
+  taler_pay_uri = TMH_make_taler_pay_uri (cprc->sc.con,
                                           cprc->order_id,
                                           cprc->session_id,
                                           cprc->mi->id);
-  ret = TMH_RESPONSE_reply_json_pack (cprc->connection,
+  ret = TMH_RESPONSE_reply_json_pack (cprc->sc.con,
                                       MHD_HTTP_OK,
                                       "{s:s, s:s, s:b, s:s?}",
                                       "taler_pay_uri", taler_pay_uri,
@@ -249,7 +267,7 @@ parse_contract_terms (struct CheckPaymentRequestContext *cprc)
   {
     GNUNET_break (0);
     cprc->ret
-      = TMH_RESPONSE_reply_internal_error (cprc->connection,
+      = TMH_RESPONSE_reply_internal_error (cprc->sc.con,
                                            TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
                                            "Merchant database error (contract terms corrupted)");
     return GNUNET_SYSERR;
@@ -260,7 +278,7 @@ parse_contract_terms (struct CheckPaymentRequestContext *cprc)
   {
     GNUNET_break (0);
     cprc->ret
-      = TMH_RESPONSE_reply_internal_error (cprc->connection,
+      = TMH_RESPONSE_reply_internal_error (cprc->sc.con,
                                            TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
                                            "Failed to hash proposal");
     return GNUNET_SYSERR;
@@ -299,13 +317,13 @@ check_order_and_request_payment (struct CheckPaymentRequestContext *cprc)
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    return TMH_RESPONSE_reply_internal_error (cprc->connection,
+    return TMH_RESPONSE_reply_internal_error (cprc->sc.con,
                                               TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
                                               "db error fetching order");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    return TMH_RESPONSE_reply_not_found (cprc->connection,
+    return TMH_RESPONSE_reply_not_found (cprc->sc.con,
                                          TALER_EC_CHECK_PAYMENT_ORDER_ID_UNKNOWN,
                                          "unknown order_id");
   }
@@ -345,11 +363,13 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 
   if (NULL == cprc)
   {
+    const char *long_poll_timeout_s;
+
     /* First time here, parse request and check order is known */
     cprc = GNUNET_new (struct CheckPaymentRequestContext);
     cprc->hc.cc = &cprc_cleanup;
     cprc->ret = GNUNET_SYSERR;
-    cprc->connection = connection;
+    cprc->sc.con = connection;
     cprc->mi = mi;
     *connection_cls = cprc;
 
@@ -384,6 +404,31 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     cprc->session_id = MHD_lookup_connection_value (connection,
                                                     MHD_GET_ARGUMENT_KIND,
                                                     "session_id");
+    long_poll_timeout_s = MHD_lookup_connection_value (connection,
+                                                       MHD_GET_ARGUMENT_KIND,
+                                                       "timeout");
+    if (NULL != long_poll_timeout_s)
+    {
+      unsigned int timeout;
+
+      if (1 != sscanf (long_poll_timeout_s,
+                       "%u",
+                       &timeout))
+      {
+        GNUNET_break_op (0);
+        return TMH_RESPONSE_reply_bad_request (connection,
+                                               TALER_EC_PARAMETER_MALFORMED,
+                                               "timeout must be non-negative number");
+      }
+      cprc->sc.long_poll_timeout
+        = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_multiply (
+                                              GNUNET_TIME_UNIT_SECONDS,
+                                              timeout));
+    }
+    else
+    {
+      cprc->sc.long_poll_timeout = GNUNET_TIME_UNIT_ZERO_ABS;
+    }
     db->preflight (db->cls);
     qs = db->find_contract_terms (db->cls,
                                   &cprc->contract_terms,

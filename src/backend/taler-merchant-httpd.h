@@ -394,6 +394,7 @@ extern struct GNUNET_TIME_Relative default_pay_deadline;
 void
 TMH_trigger_daemon (void);
 
+
 /**
  * Compute @a key to use for @a order_id and @a mpub in our
  * #payment_trigger_map.
@@ -406,6 +407,15 @@ void
 TMH_compute_pay_key (const char *order_id,
                      const struct TALER_MerchantPublicKeyP *mpub,
                      struct GNUNET_HashCode *key);
+
+
+/**
+ * Suspend connection from @a sc until payment has been received.
+ *
+ * @param sc connection to suspend
+ */
+void
+TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc);
 
 
 /**
@@ -423,5 +433,6 @@ TMH_make_taler_pay_uri (struct MHD_Connection *con,
                         const char *order_id,
                         const char *session_id,
                         const char *instance_id);
+
 
 #endif

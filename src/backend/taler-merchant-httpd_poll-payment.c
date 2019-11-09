@@ -171,42 +171,6 @@ process_refunds_cb (void *cls,
 
 
 /**
- * Resume processing all suspended connections past timeout.
- *
- * @param cls unused
- */
-static void
-do_resume (void *cls)
-{
-  struct TMH_SuspendedConnection *sc;
-
-  (void) cls;
-  resume_timeout_task = NULL;
-  while (1)
-  {
-    sc = GNUNET_CONTAINER_heap_peek (resume_timeout_heap);
-    if (NULL == sc)
-      return;
-    if  (0 !=
-         GNUNET_TIME_absolute_get_remaining (
-           sc->long_poll_timeout).rel_value_us)
-      break;
-    GNUNET_assert (sc ==
-                   GNUNET_CONTAINER_heap_remove_root (resume_timeout_heap));
-    sc->hn = NULL;
-    GNUNET_assert (GNUNET_YES ==
-                   GNUNET_CONTAINER_multihashmap_remove (payment_trigger_map,
-                                                         &sc->key,
-                                                         sc));
-    MHD_resume_connection (sc->con);
-  }
-  resume_timeout_task = GNUNET_SCHEDULER_add_at (sc->long_poll_timeout,
-                                                 &do_resume,
-                                                 NULL);
-}
-
-
-/**
  * The client did not yet pay, send it the payment request.
  *
  * @param pprc check pay request context
@@ -223,31 +187,13 @@ send_pay_request (struct PollPaymentRequestContext *pprc)
   remaining = GNUNET_TIME_absolute_get_remaining (pprc->sc.long_poll_timeout);
   if (0 != remaining.rel_value_us)
   {
-    struct TMH_SuspendedConnection *sc;
-
     /* long polling: do not queue a response, suspend connection instead */
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Suspending /poll-payment\n");
     TMH_compute_pay_key (pprc->order_id,
                          &pprc->mi->pubkey,
                          &pprc->sc.key);
-    GNUNET_assert (GNUNET_OK ==
-                   GNUNET_CONTAINER_multihashmap_put (payment_trigger_map,
-                                                      &pprc->sc.key,
-                                                      &pprc->sc,
-                                                      GNUNET_CONTAINER_MULTIHASHMAPOPTION_MULTIPLE));
-    pprc->sc.hn = GNUNET_CONTAINER_heap_insert (resume_timeout_heap,
-                                                &pprc->sc,
-                                                pprc->sc.long_poll_timeout.
-                                                abs_value_us);
-    MHD_suspend_connection (pprc->sc.con);
-    if (NULL != resume_timeout_task)
-    {
-      GNUNET_SCHEDULER_cancel (resume_timeout_task);
-      resume_timeout_task = NULL;
-    }
-    sc = GNUNET_CONTAINER_heap_peek (resume_timeout_heap);
-    resume_timeout_task = GNUNET_SCHEDULER_add_at (sc->long_poll_timeout,
-                                                   &do_resume,
-                                                   NULL);
+    TMH_long_poll_suspend (&pprc->sc);
     return MHD_YES;
   }
 
@@ -276,6 +222,8 @@ send_pay_request (struct PollPaymentRequestContext *pprc)
                                                 "db error fetching pay session info");
     }
   }
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Sending payment request in /poll-payment\n");
   taler_pay_uri = TMH_make_taler_pay_uri (pprc->sc.con,
                                           pprc->order_id,
                                           pprc->session_id,
@@ -451,7 +399,6 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
                                                   "Merchant database error (contract terms corrupted)");
       }
     }
-
   } /* end of first-time initialization / sanity checks */
 
 
