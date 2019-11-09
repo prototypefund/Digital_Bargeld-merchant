@@ -162,26 +162,21 @@ check_payment_run (void *cls,
   cps->is = is;
   proposal_cmd = TALER_TESTING_interpreter_lookup_command (
     is, cps->proposal_reference);
-
   if (NULL == proposal_cmd)
     TALER_TESTING_FAIL (is);
-
   if (GNUNET_OK != TALER_TESTING_get_trait_order_id (
         proposal_cmd, 0, &order_id))
     TALER_TESTING_FAIL (is);
-
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Checking for order id `%s'\n",
               order_id);
-
-  cps->cpo = TALER_MERCHANT_check_payment
-               (is->ctx,
-               cps->merchant_url,
-               order_id,
-               NULL,
-               check_payment_cb,
-               cps);
-
+  cps->cpo = TALER_MERCHANT_check_payment (is->ctx,
+                                           cps->merchant_url,
+                                           order_id,
+                                           NULL,
+                                           GNUNET_TIME_UNIT_ZERO,
+                                           check_payment_cb,
+                                           cps);
   GNUNET_assert (NULL != cps->cpo);
 }
 

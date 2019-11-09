@@ -28,7 +28,6 @@
 #include <gnunet/gnunet_curl_lib.h>
 #include <jansson.h>
 
-#define APIKEY_SANDBOX "Authorization: ApiKey sandbox"
 
 /* ********************* /refund ************************** */
 
@@ -987,6 +986,10 @@ typedef void
  * @param backend_url base URL of the merchant backend
  * @param order_id order id to identify the payment
  * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session)
+ * @param timeout timeout to use in long polling (how long may the server wait to reply
+ *        before generating an unpaid response). Note that this is just provided to
+ *        the server, we as client will block until the response comes back or until
+ *        #TALER_MERCHANT_check_payment_cancel() is called.
  * @param check_payment_cb callback which will work the response gotten from the backend
  * @param check_payment_cb_cls closure to pass to @a check_payment_cb
  * @return handle for this operation, NULL upon errors
@@ -996,6 +999,7 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
                               const char *backend_url,
                               const char *order_id,
                               const char *session_id,
+                              struct GNUNET_TIME_Relative timeout,
                               TALER_MERCHANT_CheckPaymentCallback
                               check_payment_cb,
                               void *check_payment_cls);

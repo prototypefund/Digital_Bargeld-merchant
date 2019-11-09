@@ -23,7 +23,6 @@
  * communication with the exchange
  * @author Marcello Stanisci
  */
-
 #include "platform.h"
 #include <taler/taler_util.h>
 #include <taler/taler_signatures.h>
@@ -37,6 +36,10 @@
 #include <taler/taler_testing_bank_lib.h>
 #include <taler/taler_error_codes.h>
 #include "taler_merchant_testing_lib.h"
+
+
+#define APIKEY_SANDBOX "Authorization: ApiKey sandbox"
+
 
 /* Error codes.  */
 enum PaymentGeneratorError
