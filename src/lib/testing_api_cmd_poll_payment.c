@@ -268,7 +268,7 @@ poll_payment_cb (void *cls,
   cps->paid = paid;
   cps->http_status = http_status;
   cps->refunded = refunded;
-  if (refunded)
+  if (GNUNET_YES == refunded)
     cps->refund = *refund_amount;
   if (NULL != cps->cs)
   {
@@ -415,6 +415,7 @@ poll_payment_conclude_run (void *cls,
   poll_cmd =
     TALER_TESTING_interpreter_lookup_command (is,
                                               ppc->start_reference);
+  GNUNET_assert (poll_cmd->run == &poll_payment_start_run);
   cps = poll_cmd->cls;
   if (NULL == cps->cpo)
     ppc->task = GNUNET_SCHEDULER_add_now (&conclude_task,

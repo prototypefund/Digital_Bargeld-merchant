@@ -120,6 +120,42 @@ TALER_TESTING_cmd_check_payment (const char *label,
                                  const char *proposal_reference,
                                  unsigned int expect_paid);
 
+
+/**
+ * Make a "check payment" test command with long polling support.
+ *
+ * @param label command label.
+ * @param merchant_url merchant base url
+ * @param proposal_reference the proposal whose payment status
+ *        is going to be checked.
+ * @param timeout how long to wait during long polling for the reply
+ * @return the command
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_check_payment_start (const char *label,
+                                       const char *merchant_url,
+                                       const char *proposal_reference,
+                                       struct GNUNET_TIME_Relative timeout);
+
+
+/**
+ * Expect completion of a long-polled "check payment" test command.
+ *
+ * @param label command label.
+ * @param check_start_reference payment start operation that should have
+ *                   completed
+ * @param http_status expected HTTP response code.
+ * @param expect_paid #GNUNET_YES if we expect the proposal to be
+ *        paid, #GNUNET_NO otherwise.
+ * @return the command
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_check_payment_conclude (const char *label,
+                                          unsigned int http_status,
+                                          const char *poll_start_reference,
+                                          unsigned int expect_paid);
+
+
 /**
  * Start a long-polled "poll-payment" test command.
  *
