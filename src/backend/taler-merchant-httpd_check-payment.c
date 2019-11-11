@@ -188,11 +188,12 @@ send_pay_request (struct CheckPaymentRequestContext *cprc)
   if (0 != remaining.rel_value_us)
   {
     /* long polling: do not queue a response, suspend connection instead */
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Suspending /check-payment\n");
     TMH_compute_pay_key (cprc->order_id,
                          &cprc->mi->pubkey,
                          &cprc->sc.key);
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Suspending /check-payment on key %s\n",
+                GNUNET_h2s (&cprc->sc.key));
     TMH_long_poll_suspend (&cprc->sc);
     return MHD_YES;
   }

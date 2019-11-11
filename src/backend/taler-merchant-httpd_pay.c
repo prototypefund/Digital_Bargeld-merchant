@@ -427,6 +427,9 @@ resume_operation (void *cls,
   struct TMH_SuspendedConnection *sc = value;
 
   (void) cls;
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Resuming operation suspended pending payment on key %s\n",
+              GNUNET_h2s (key));
   GNUNET_assert (GNUNET_YES ==
                  GNUNET_CONTAINER_multihashmap_remove (payment_trigger_map,
                                                        key,
@@ -455,10 +458,16 @@ resume_suspended_payment_checks (const char *order_id,
   TMH_compute_pay_key (order_id,
                        mpub,
                        &key);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Resuming operations suspended pending payment on key %s\n",
+              GNUNET_h2s (&key));
   GNUNET_CONTAINER_multihashmap_get_multiple (payment_trigger_map,
                                               &key,
                                               &resume_operation,
                                               NULL);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "%u operations remain suspended pending payment\n",
+              GNUNET_CONTAINER_multihashmap_size (payment_trigger_map));
 }
 
 
