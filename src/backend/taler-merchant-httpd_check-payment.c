@@ -434,41 +434,43 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                 "Starting /check-payment processing with timeout %s\n",
                 GNUNET_STRINGS_absolute_time_to_string (
                   cprc->sc.long_poll_timeout));
-    db->preflight (db->cls);
-    qs = db->find_contract_terms (db->cls,
-                                  &cprc->contract_terms,
-                                  cprc->order_id,
-                                  &mi->pubkey);
-    if (0 > qs)
-    {
-      /* single, read-only SQL statements should never cause
-         serialization problems */
-      GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
-      /* Always report on hard error as well to enable diagnostics */
-      GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
-                                                "db error fetching contract terms");
-    }
-
-    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
-    {
-      /* Check that we're at least aware of the order */
-      return check_order_and_request_payment (cprc);
-    }
-    GNUNET_assert (NULL != cprc->contract_terms);
-
-    if (GNUNET_OK !=
-        parse_contract_terms (cprc))
-      return cprc->ret;
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Order `%s' matches contract %s\n",
-                cprc->order_id,
-                GNUNET_h2s (&cprc->h_contract_terms));
   }
+  if (NULL != cprc->contract_terms)
+  {
+    json_decref (cprc->contract_terms);
+    cprc->contract_terms = NULL;
+  }
+  db->preflight (db->cls);
+  qs = db->find_contract_terms (db->cls,
+                                &cprc->contract_terms,
+                                cprc->order_id,
+                                &mi->pubkey);
+  if (0 > qs)
+  {
+    /* single, read-only SQL statements should never cause
+       serialization problems */
+    GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
+    /* Always report on hard error as well to enable diagnostics */
+    GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
+    return TMH_RESPONSE_reply_internal_error (connection,
+                                              TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
+                                              "db error fetching contract terms");
+  }
+
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+  {
+    /* Check that we're at least aware of the order */
+    return check_order_and_request_payment (cprc);
+  }
+  GNUNET_assert (NULL != cprc->contract_terms);
+
+  if (GNUNET_OK !=
+      parse_contract_terms (cprc))
+    return cprc->ret;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Checking payment status for order `%s'\n",
-              cprc->order_id);
+              "Checkig payment status for order `%s' with contract %s\n",
+              cprc->order_id,
+              GNUNET_h2s (&cprc->h_contract_terms));
   GNUNET_assert (NULL != cprc->contract_terms);
 
   /* Check if the order has been paid for. */
