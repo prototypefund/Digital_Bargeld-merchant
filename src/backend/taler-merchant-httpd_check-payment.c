@@ -429,6 +429,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     {
       cprc->sc.long_poll_timeout = GNUNET_TIME_UNIT_ZERO_ABS;
     }
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Starting /check-payment processing with timeout %s\n",
+                GNUNET_STRINGS_absolute_time_to_string (
+                  cprc->sc.long_poll_timeout));
     db->preflight (db->cls);
     qs = db->find_contract_terms (db->cls,
                                   &cprc->contract_terms,
