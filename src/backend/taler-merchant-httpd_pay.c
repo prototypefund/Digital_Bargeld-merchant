@@ -980,6 +980,7 @@ generate_error_response (struct PayContext *pc,
 static void
 find_next_exchange (struct PayContext *pc);
 
+
 /**
  * Begin of the DB transaction.  If required (from
  * soft/serialization errors), the transaction can be
@@ -1524,6 +1525,10 @@ parse_pay (struct MHD_Connection *connection,
     }
     return GNUNET_NO;
   }
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Handling /pay for order `%s' with contract hash `%s'\n",
+              order_id,
+              GNUNET_h2s (&pc->h_contract_terms));
 
   merchant = json_object_get (pc->contract_terms,
                               "merchant");

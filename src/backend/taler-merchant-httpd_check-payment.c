@@ -461,6 +461,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     if (GNUNET_OK !=
         parse_contract_terms (cprc))
       return cprc->ret;
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Order `%s' matches contract %s\n",
+                cprc->order_id,
+                GNUNET_h2s (&cprc->h_contract_terms));
   }
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Checking payment status for order `%s'\n",
