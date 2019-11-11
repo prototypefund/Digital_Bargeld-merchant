@@ -2057,6 +2057,9 @@ begin_transaction (struct PayContext *pc)
       return;
     }
     /* Payment succeeded, save in database */
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Contract `%s' was fully paid\n",
+                GNUNET_h2s (&pc->h_contract_terms));
     qs = db->mark_proposal_paid (db->cls,
                                  &pc->h_contract_terms,
                                  &pc->mi->pubkey);

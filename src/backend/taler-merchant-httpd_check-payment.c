@@ -462,7 +462,9 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
         parse_contract_terms (cprc))
       return cprc->ret;
   }
-
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Checking payment status for order `%s'\n",
+              cprc->order_id);
   GNUNET_assert (NULL != cprc->contract_terms);
 
   /* Check if the order has been paid for. */
@@ -489,6 +491,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     }
     else if (0 == qs)
     {
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "Order `%s' was not yet paid for session `%s'\n",
+                  cprc->order_id,
+                  cprc->session_id);
       ret = send_pay_request (cprc);
       GNUNET_free_non_null (already_paid_order_id);
       return ret;
@@ -517,8 +523,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     }
     if (0 == qs)
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "not paid yet\n");
+      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                  "Order `%s' (contract `%s') was not yet paid\n",
+                  cprc->order_id,
+                  GNUNET_h2s (&cprc->h_contract_terms));
       return send_pay_request (cprc);
     }
     GNUNET_break (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs);
