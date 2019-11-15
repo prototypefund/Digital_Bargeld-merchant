@@ -579,7 +579,7 @@ run (void *cls,
            \"fraction\":50000000},\
         \"refund_deadline\":\"\\/Date(2)\\/\",\
         \"pay_deadline\":\"\\/Date(1)\\/\",\
-        \"wire_transfer_delay\":\"\\/Delay(30000)\\/\",\
+        \"wire_transfer_deadline\":\"\\/Delay(30000)\\/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\

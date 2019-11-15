@@ -222,6 +222,7 @@ proposal_put (struct MHD_Connection *connection,
   struct GNUNET_TIME_Absolute timestamp;
   struct GNUNET_TIME_Absolute refund_deadline;
   struct GNUNET_TIME_Absolute wire_transfer_deadline;
+  struct GNUNET_TIME_Relative wire_transfer_deadline_rel;
   struct GNUNET_TIME_Absolute pay_deadline;
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
@@ -240,8 +241,8 @@ proposal_put (struct MHD_Connection *connection,
                                     &refund_deadline),
     GNUNET_JSON_spec_absolute_time ("pay_deadline",
                                     &pay_deadline),
-    GNUNET_JSON_spec_absolute_time ("wire_transfer_deadline",
-                                    &wire_transfer_deadline),
+    GNUNET_JSON_spec_relative_time ("wire_transfer_deadline",
+                                    &wire_transfer_deadline_rel),
     GNUNET_JSON_spec_end ()
   };
   enum GNUNET_DB_QueryStatus qs;
@@ -323,13 +324,9 @@ proposal_put (struct MHD_Connection *connection,
   if (NULL == json_object_get (order,
                                "wire_transfer_deadline"))
   {
-    struct GNUNET_TIME_Absolute t;
-
-    t = GNUNET_TIME_relative_to_absolute (default_wire_transfer_delay);
-    (void) GNUNET_TIME_round_abs (&t);
     json_object_set_new (order,
                          "wire_transfer_deadline",
-                         GNUNET_JSON_from_time_abs (t));
+                         GNUNET_JSON_from_time_rel (default_wire_transfer_delay));
   }
 
   if (NULL == json_object_get (order,
@@ -474,6 +471,8 @@ proposal_put (struct MHD_Connection *connection,
              TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
              "Impossible to parse the order");
   }
+
+  wire_transfer_deadline = GNUNET_TIME_relative_to_absolute (wire_transfer_deadline_rel);
 
   if (wire_transfer_deadline.abs_value_us <
       refund_deadline.abs_value_us)

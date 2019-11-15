@@ -1437,6 +1437,7 @@ parse_pay (struct MHD_Connection *connection,
   const char *mode;
   struct TALER_MerchantPublicKeyP merchant_pub;
   int res;
+  struct GNUNET_TIME_Relative wire_transfer_deadline_rel;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_string ("mode",
                              &mode),
@@ -1559,8 +1560,8 @@ parse_pay (struct MHD_Connection *connection,
                                       &pc->refund_deadline),
       GNUNET_JSON_spec_absolute_time ("pay_deadline",
                                       &pc->pay_deadline),
-      GNUNET_JSON_spec_absolute_time ("wire_transfer_deadline",
-                                      &pc->wire_transfer_deadline),
+      GNUNET_JSON_spec_relative_time ("wire_transfer_deadline",
+                                      &wire_transfer_deadline_rel),
       GNUNET_JSON_spec_absolute_time ("timestamp",
                                       &pc->timestamp),
       TALER_JSON_spec_amount ("max_fee",
@@ -1585,6 +1586,8 @@ parse_pay (struct MHD_Connection *connection,
     }
 
     pc->fulfillment_url = GNUNET_strdup (fulfillment_url);
+
+    pc->wire_transfer_deadline = GNUNET_TIME_relative_to_absolute (wire_transfer_deadline_rel);
 
     if (pc->wire_transfer_deadline.abs_value_us <
         pc->refund_deadline.abs_value_us)
