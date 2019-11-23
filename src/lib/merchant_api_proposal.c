@@ -167,9 +167,9 @@ handle_proposal_finished (void *cls,
        the merchant is buggy (or API version conflict);
        just pass JSON reply to the application */
     break;
-  case MHD_HTTP_FORBIDDEN:
+  case MHD_HTTP_CONFLICT:
     break;
-  case MHD_HTTP_UNAUTHORIZED:
+  case MHD_HTTP_FORBIDDEN:
     /* Nothing really to verify, merchant says one
        of the signatures is invalid; as we checked them,
        this should never happen, we should pass the JSON

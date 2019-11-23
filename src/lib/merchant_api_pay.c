@@ -274,7 +274,7 @@ check_coin_history (const struct TALER_MERCHANT_PaidCoin *pc,
 
 
 /**
- * We got a 403 response back from the exchange (or the merchant).
+ * We got a 409 response back from the exchange (or the merchant).
  * Now we need to check the provided cryptographic proof that the
  * coin was actually already spent!
  *
@@ -284,8 +284,8 @@ check_coin_history (const struct TALER_MERCHANT_PaidCoin *pc,
  * @return #GNUNET_OK if proof checks out
  */
 static int
-check_forbidden (struct TALER_MERCHANT_Pay *ph,
-                 const json_t *json)
+check_conflict (struct TALER_MERCHANT_Pay *ph,
+                const json_t *json)
 {
   json_t *history;
   struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -361,15 +361,15 @@ handle_pay_finished (void *cls,
        * or the merchant is buggy (or API version conflict);
        * just pass JSON reply to the application */
       break;
-    case MHD_HTTP_FORBIDDEN:
-      if (GNUNET_OK != check_forbidden (ph,
-                                        json))
+    case MHD_HTTP_CONFLICT:
+      if (GNUNET_OK != check_conflict (ph,
+                                       json))
       {
         GNUNET_break_op (0);
         response_code = 0;
       }
       break;
-    case MHD_HTTP_UNAUTHORIZED:
+    case MHD_HTTP_FORBIDDEN:
       /* Nothing really to verify, merchant says one of the
        * signatures is invalid; as we checked them, this
        * should never happen, we should pass the JSON reply
@@ -426,9 +426,9 @@ handle_pay_finished (void *cls,
          merchant is buggy (or API version conflict); just
          pass JSON reply to the application */
       break;
-    case MHD_HTTP_FORBIDDEN:
+    case MHD_HTTP_CONFLICT:
       break;
-    case MHD_HTTP_UNAUTHORIZED:
+    case MHD_HTTP_FORBIDDEN:
       /* Nothing really to verify, merchant says one of
          the signatures is invalid; as we checked them,
          this should never happen, we should pass the JSON

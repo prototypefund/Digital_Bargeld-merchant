@@ -332,11 +332,7 @@ TMH_RESPONSE_reply_bad_request (struct MHD_Connection *connection,
 void
 TMH_RESPONSE_add_global_headers (struct MHD_Response *response)
 {
-  if (TMH_merchant_connection_close)
-    GNUNET_break (MHD_YES ==
-                  MHD_add_response_header (response,
-                                           MHD_HTTP_HEADER_CONNECTION,
-                                           "close"));
+  TALER_MHD_add_global_headers (response);
 }
 
 

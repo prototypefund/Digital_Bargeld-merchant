@@ -26,6 +26,7 @@
 #include <gnunet/gnunet_util_lib.h>
 #include <taler/taler_util.h>
 #include <taler/taler_json_lib.h>
+#include <taler/taler_mhd_lib.h>
 #include <taler/taler_exchange_service.h>
 #include <taler/taler_wire_plugin.h>
 #include <taler/taler_wire_lib.h>
@@ -72,7 +73,7 @@ struct GNUNET_CONTAINER_MultiHashMap *by_kpub_map;
 /**
  * The port we are running on
  */
-static long long unsigned port;
+static uint16_t port;
 
 /**
  * This value tells the exchange by which date this merchant would like
@@ -113,7 +114,7 @@ unsigned long long default_wire_fee_amortization;
 /**
  * Should a "Connection: close" header be added to each HTTP response?
  */
-int TMH_merchant_connection_close;
+static int TMH_merchant_connection_close;
 
 /**
  * Which currency do we use?
@@ -1573,12 +1574,18 @@ run (void *cls,
      const struct GNUNET_CONFIGURATION_Handle *config)
 {
   int fh;
+  enum TALER_MHD_GlobalOptions go;
+  char *bind_to;
 
   (void) cls;
   (void) args;
   (void) cfgfile;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Starting taler-merchant-httpd\n");
+  go = TALER_MHD_GO_NONE;
+  if (TMH_merchant_connection_close)
+    go |= TALER_MHD_GO_FORCE_CONNECTION_CLOSE;
+  TALER_MHD_setup (go);
 
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
@@ -1709,243 +1716,103 @@ run (void *cls,
     return;
   }
 
+  if (GNUNET_OK !=
+      TALER_MHD_parse_config (config,
+                              "merchant",
+                              &port,
+                              &serve_unixpath,
+                              &unixpath_mode))
   {
-    const char *choices[] = {"tcp",
-                             "unix",
-                             NULL};
-    const char *serve_type;
-
-    if (GNUNET_OK !=
-        GNUNET_CONFIGURATION_get_value_choice (config,
-                                               "merchant",
-                                               "serve",
-                                               choices,
-                                               &serve_type))
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  fh = -1;
+  if (NULL != serve_unixpath)
+  {
+    fh = TALER_MHD_open_unix_path (serve_unixpath,
+                                   unixpath_mode);
+    if (-1 == fh)
     {
-      GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
-                                 "merchant",
-                                 "serve",
-                                 "serve type required");
       GNUNET_SCHEDULER_shutdown ();
       return;
     }
-
-    if (0 == strcasecmp (serve_type, "unix"))
-    {
-      struct sockaddr_un *un;
-      char *mode;
-      struct GNUNET_NETWORK_Handle *nh;
-
-      if (GNUNET_OK !=
-          GNUNET_CONFIGURATION_get_value_filename (config,
-                                                   "merchant",
-                                                   "unixpath",
-                                                   &serve_unixpath))
-      {
-        GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
-                                   "merchant",
-                                   "unixpath",
-                                   "unixpath required");
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-
-      if (strlen (serve_unixpath) >= sizeof (un->sun_path))
-      {
-        fprintf (stderr,
-                 "Invalid configuration: unix path too long\n");
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-
-      if (GNUNET_OK !=
-          GNUNET_CONFIGURATION_get_value_string (config,
-                                                 "merchant",
-                                                 "UNIXPATH_MODE",
-                                                 &mode))
-      {
-        GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                                   "merchant",
-                                   "UNIXPATH_MODE");
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-      errno = 0;
-      unixpath_mode = (mode_t) strtoul (mode, NULL, 8);
-      if (0 != errno)
-      {
-        GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
-                                   "merchant",
-                                   "UNIXPATH_MODE",
-                                   "must be octal number");
-        GNUNET_free (mode);
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-      GNUNET_free (mode);
-
-      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "Creating listen socket '%s' with mode %o\n",
-                  serve_unixpath, unixpath_mode);
-
-      if (GNUNET_OK != GNUNET_DISK_directory_create_for_file (serve_unixpath))
-      {
-        GNUNET_log_strerror_file (GNUNET_ERROR_TYPE_ERROR,
-                                  "mkdir",
-                                  serve_unixpath);
-      }
-
-      un = GNUNET_new (struct sockaddr_un);
-      un->sun_family = AF_UNIX;
-      strncpy (un->sun_path,
-               serve_unixpath,
-               sizeof (un->sun_path) - 1);
-
-      GNUNET_NETWORK_unix_precheck (un);
-
-      if (NULL == (nh = GNUNET_NETWORK_socket_create (AF_UNIX,
-                                                      SOCK_STREAM,
-                                                      0)))
-      {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                             "socket(AF_UNIX)");
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-      if (GNUNET_OK !=
-          GNUNET_NETWORK_socket_bind (nh,
-                                      (void *) un,
-                                      sizeof (struct sockaddr_un)))
-      {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                             "bind(AF_UNIX)");
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-      if (GNUNET_OK !=
-          GNUNET_NETWORK_socket_listen (nh,
-                                        UNIX_BACKLOG))
-      {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                             "listen(AF_UNIX)");
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-
-      fh = GNUNET_NETWORK_get_fd (nh);
-      GNUNET_NETWORK_socket_free_memory_only_ (nh);
-      if (0 != chmod (serve_unixpath,
-                      unixpath_mode))
-      {
-        GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                             "chmod");
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-      port = 0;
-    }
-    else if (0 == strcasecmp (serve_type, "tcp"))
-    {
-      char *bind_to;
-
-      if (GNUNET_SYSERR ==
-          GNUNET_CONFIGURATION_get_value_number (config,
-                                                 "merchant",
-                                                 "PORT",
-                                                 &port))
-      {
-        GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                                   "merchant",
-                                   "PORT");
-        GNUNET_SCHEDULER_shutdown ();
-        return;
-      }
-      if (GNUNET_OK ==
-          GNUNET_CONFIGURATION_get_value_string (config,
-                                                 "merchant",
-                                                 "BIND_TO",
-                                                 &bind_to))
-      {
-        char port_str[6];
-        struct addrinfo hints;
-        struct addrinfo *res;
-        int ec;
-        struct GNUNET_NETWORK_Handle *nh;
-
-        GNUNET_snprintf (port_str,
-                         sizeof (port_str),
-                         "%u",
-                         (uint16_t) port);
-        memset (&hints, 0, sizeof (hints));
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-        hints.ai_flags = AI_PASSIVE
-#ifdef AI_IDN
-                         | AI_IDN
-#endif
-        ;
-        if (0 !=
-            (ec = getaddrinfo (bind_to,
-                               port_str,
-                               &hints,
-                               &res)))
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Failed to resolve BIND_TO address `%s': %s\n",
-                      bind_to,
-                      gai_strerror (ec));
-          GNUNET_free (bind_to);
-          GNUNET_SCHEDULER_shutdown ();
-          return;
-        }
-        GNUNET_free (bind_to);
-
-        if (NULL == (nh = GNUNET_NETWORK_socket_create (res->ai_family,
-                                                        res->ai_socktype,
-                                                        res->ai_protocol)))
-        {
-          GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                               "socket");
-          freeaddrinfo (res);
-          GNUNET_SCHEDULER_shutdown ();
-          return;
-        }
-        if (GNUNET_OK !=
-            GNUNET_NETWORK_socket_bind (nh,
-                                        res->ai_addr,
-                                        res->ai_addrlen))
-        {
-          GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                               "bind");
-          freeaddrinfo (res);
-          GNUNET_SCHEDULER_shutdown ();
-          return;
-        }
-        freeaddrinfo (res);
-        if (GNUNET_OK !=
-            GNUNET_NETWORK_socket_listen (nh,
-                                          UNIX_BACKLOG))
-        {
-          GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                               "listen");
-          GNUNET_SCHEDULER_shutdown ();
-          return;
-        }
-        fh = GNUNET_NETWORK_get_fd (nh);
-        GNUNET_NETWORK_socket_free_memory_only_ (nh);
-      }
-      else
-      {
-        fh = -1;
-      }
-    }
-    else
-    {
-      // not reached
-      GNUNET_assert (0);
-    }
   }
+  else if (GNUNET_OK ==
+           GNUNET_CONFIGURATION_get_value_string (config,
+                                                  "merchant",
+                                                  "BIND_TO",
+                                                  &bind_to))
+  {
+    char port_str[6];
+    struct addrinfo hints;
+    struct addrinfo *res;
+    int ec;
+    struct GNUNET_NETWORK_Handle *nh;
+
+    GNUNET_snprintf (port_str,
+                     sizeof (port_str),
+                     "%u",
+                     (uint16_t) port);
+    memset (&hints, 0, sizeof (hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    hints.ai_flags = AI_PASSIVE
+#ifdef AI_IDN
+                     | AI_IDN
+#endif
+    ;
+    if (0 !=
+        (ec = getaddrinfo (bind_to,
+                           port_str,
+                           &hints,
+                           &res)))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed to resolve BIND_TO address `%s': %s\n",
+                  bind_to,
+                  gai_strerror (ec));
+      GNUNET_free (bind_to);
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+    GNUNET_free (bind_to);
+
+    if (NULL == (nh = GNUNET_NETWORK_socket_create (res->ai_family,
+                                                    res->ai_socktype,
+                                                    res->ai_protocol)))
+    {
+      GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                           "socket");
+      freeaddrinfo (res);
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+    if (GNUNET_OK !=
+        GNUNET_NETWORK_socket_bind (nh,
+                                    res->ai_addr,
+                                    res->ai_addrlen))
+    {
+      GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                           "bind");
+      freeaddrinfo (res);
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+    freeaddrinfo (res);
+    if (GNUNET_OK !=
+        GNUNET_NETWORK_socket_listen (nh,
+                                      UNIX_BACKLOG))
+    {
+      GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
+                           "listen");
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
+    fh = GNUNET_NETWORK_get_fd (nh);
+    GNUNET_NETWORK_socket_free_memory_only_ (nh);
+  }
+
   resume_timeout_heap
     = GNUNET_CONTAINER_heap_create (GNUNET_CONTAINER_HEAP_ORDER_MIN);
   payment_trigger_map
@@ -1985,7 +1852,6 @@ main (int argc,
       char *const *argv)
 {
   struct GNUNET_GETOPT_CommandLineOption options[] = {
-
     GNUNET_GETOPT_option_flag ('C',
                                "connection-close",
                                "force HTTP connections to be closed after each request",

@@ -363,11 +363,6 @@ extern struct TALER_MerchantPrivateKeyP privkey;
 extern struct TALER_MerchantPublicKeyP pubkey;
 
 /**
- * Should a "Connection: close" header be added to each HTTP response?
- */
-extern int TMH_merchant_connection_close;
-
-/**
  * Handle to the database backend.
  */
 extern struct TALER_MERCHANTDB_Plugin *db;
