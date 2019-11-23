@@ -25,7 +25,6 @@
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
-#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
@@ -472,24 +471,24 @@ check_transfer (void *cls,
     /* Build the `TrackTransferConflictDetails` */
     rctx->response
       = TMH_RESPONSE_make_json_pack (
-          "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
-          "code",
-          (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
-          "hint",
-          "disagreement about deposit valuation",
-          "exchange_deposit_proof", exchange_proof,
-          "conflict_offset",
-          (json_int_t) rctx->current_offset,
-          "exchange_transfer_proof",
-          rctx->original_response,
-          "coin_pub", GNUNET_JSON_from_data_auto (
-            coin_pub),
-          "h_contract_terms",
-          GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
-          "amount_with_fee", TALER_JSON_from_amount (
-            amount_with_fee),
-          "deposit_fee", TALER_JSON_from_amount (
-            deposit_fee));
+      "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
+      "code",
+      (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
+      "hint",
+      "disagreement about deposit valuation",
+      "exchange_deposit_proof", exchange_proof,
+      "conflict_offset",
+      (json_int_t) rctx->current_offset,
+      "exchange_transfer_proof",
+      rctx->original_response,
+      "coin_pub", GNUNET_JSON_from_data_auto (
+        coin_pub),
+      "h_contract_terms",
+      GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
+      "amount_with_fee", TALER_JSON_from_amount (
+        amount_with_fee),
+      "deposit_fee", TALER_JSON_from_amount (
+        deposit_fee));
     return;
   }
   rctx->check_transfer_result = GNUNET_OK;

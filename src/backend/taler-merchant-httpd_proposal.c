@@ -28,7 +28,6 @@
 #include <taler/taler_signatures.h>
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
-#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
@@ -125,9 +124,9 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                          json_string (nonce));
 
     /* extract fields we need to sign separately */
-    res = TMH_PARSE_json_data (connection,
-                               contract_terms,
-                               spec);
+    res = TALER_MHD_parse_json_data (connection,
+                                     contract_terms,
+                                     spec);
     if (GNUNET_NO == res)
     {
       return MHD_YES;

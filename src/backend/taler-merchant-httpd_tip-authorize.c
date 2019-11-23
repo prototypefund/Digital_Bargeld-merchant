@@ -24,7 +24,6 @@
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
-#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_tip-authorize.h"
@@ -40,7 +39,7 @@ struct TipAuthContext
   struct TM_HandlerContext hc;
 
   /**
-   * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
+   * Placeholder for #TALER_MHD_parse_post_json() to keep its internal state.
    */
   void *json_parse_context;
 
@@ -94,7 +93,7 @@ cleanup_tac (struct TM_HandlerContext *hc)
     tac->root = NULL;
   }
   TMH_check_tip_reserve_cleanup (&tac->ctr);
-  TMH_PARSE_post_cleanup_callback (tac->json_parse_context);
+  TALER_MHD_parse_post_cleanup_callback (tac->json_parse_context);
   GNUNET_free (tac);
 }
 
@@ -153,11 +152,11 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
       GNUNET_JSON_spec_end ()
     };
 
-    res = TMH_PARSE_post_json (connection,
-                               &tac->json_parse_context,
-                               upload_data,
-                               upload_data_size,
-                               &tac->root);
+    res = TALER_MHD_parse_post_json (connection,
+                                     &tac->json_parse_context,
+                                     upload_data,
+                                     upload_data_size,
+                                     &tac->root);
     if (GNUNET_SYSERR == res)
       return MHD_NO;
     /* the POST's body has to be further fetched */
@@ -165,9 +164,9 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
          (NULL == tac->root) )
       return MHD_YES;
 
-    res = TMH_PARSE_json_data (connection,
-                               tac->root,
-                               spec);
+    res = TALER_MHD_parse_json_data (connection,
+                                     tac->root,
+                                     spec);
     if (GNUNET_YES != res)
     {
       GNUNET_break_op (0);

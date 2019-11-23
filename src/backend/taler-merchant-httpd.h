@@ -24,6 +24,7 @@
 #include "platform.h"
 #include "taler_merchantdb_lib.h"
 #include <microhttpd.h>
+#include <taler/taler_mhd_lib.h>
 
 /**
  * Shorthand for exit jumps.

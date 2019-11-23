@@ -31,7 +31,6 @@
 #include <taler/taler_json_lib.h>
 #include <taler/taler_exchange_service.h>
 #include "taler-merchant-httpd.h"
-#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
@@ -216,7 +215,7 @@ struct PayContext
   const char *current_exchange;
 
   /**
-   * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
+   * Placeholder for #TALER_MHD_parse_post_json() to keep its internal state.
    */
   void *json_parse_context;
 
@@ -612,7 +611,7 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
     GNUNET_SCHEDULER_cancel (pc->timeout_task);
     pc->timeout_task = NULL;
   }
-  TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
+  TALER_MHD_parse_post_cleanup_callback (pc->json_parse_context);
   for (unsigned int i = 0; i<pc->coins_cnt; i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
@@ -1452,9 +1451,9 @@ parse_pay (struct MHD_Connection *connection,
   enum GNUNET_DB_QueryStatus qs;
   const char *session_id;
 
-  res = TMH_PARSE_json_data (connection,
-                             root,
-                             spec);
+  res = TALER_MHD_parse_json_data (connection,
+                                   root,
+                                   spec);
   if (GNUNET_YES != res)
   {
     GNUNET_break (0);
@@ -1575,9 +1574,9 @@ parse_pay (struct MHD_Connection *connection,
       GNUNET_JSON_spec_end ()
     };
 
-    res = TMH_PARSE_json_data (connection,
-                               pc->contract_terms,
-                               espec);
+    res = TALER_MHD_parse_json_data (connection,
+                                     pc->contract_terms,
+                                     espec);
     if (GNUNET_YES != res)
     {
       GNUNET_JSON_parse_free (spec);
@@ -1587,7 +1586,8 @@ parse_pay (struct MHD_Connection *connection,
 
     pc->fulfillment_url = GNUNET_strdup (fulfillment_url);
 
-    pc->wire_transfer_deadline = GNUNET_TIME_relative_to_absolute (wire_transfer_deadline_rel);
+    pc->wire_transfer_deadline = GNUNET_TIME_relative_to_absolute (
+      wire_transfer_deadline_rel);
 
     if (pc->wire_transfer_deadline.abs_value_us <
         pc->refund_deadline.abs_value_us)
@@ -1630,9 +1630,9 @@ parse_pay (struct MHD_Connection *connection,
       GNUNET_JSON_spec_end ()
     };
 
-    res = TMH_PARSE_json_data (connection,
-                               pc->contract_terms,
-                               espec);
+    res = TALER_MHD_parse_json_data (connection,
+                                     pc->contract_terms,
+                                     espec);
     if (GNUNET_YES != res)
     {
       GNUNET_break_op (0); /* invalid input, use default */
@@ -1658,9 +1658,9 @@ parse_pay (struct MHD_Connection *connection,
       GNUNET_JSON_spec_end ()
     };
 
-    res = TMH_PARSE_json_data (connection,
-                               pc->contract_terms,
-                               espec);
+    res = TALER_MHD_parse_json_data (connection,
+                                     pc->contract_terms,
+                                     espec);
     if ( (GNUNET_YES != res) ||
          (0 == pc->wire_fee_amortization) )
     {
@@ -1707,9 +1707,9 @@ parse_pay (struct MHD_Connection *connection,
       GNUNET_JSON_spec_end ()
     };
 
-    res = TMH_PARSE_json_data (connection,
-                               coin,
-                               ispec);
+    res = TALER_MHD_parse_json_data (connection,
+                                     coin,
+                                     ispec);
     if (GNUNET_YES != res)
     {
       GNUNET_JSON_parse_free (spec);
@@ -2245,11 +2245,11 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     return res;
   }
 
-  res = TMH_PARSE_post_json (connection,
-                             &pc->json_parse_context,
-                             upload_data,
-                             upload_data_size,
-                             &root);
+  res = TALER_MHD_parse_post_json (connection,
+                                   &pc->json_parse_context,
+                                   upload_data,
+                                   upload_data_size,
+                                   &root);
   if (GNUNET_SYSERR == res)
   {
     GNUNET_break (0);

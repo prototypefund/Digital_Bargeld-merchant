@@ -32,7 +32,6 @@
 #include "taler-merchant-httpd_responses.h"
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
-#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"

@@ -25,7 +25,6 @@
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
-#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_tip-query.h"

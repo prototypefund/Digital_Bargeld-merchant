@@ -23,7 +23,6 @@
 #include <taler/taler_signatures.h>
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
-#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_refund.h"
 
@@ -71,7 +70,7 @@ struct TMH_JsonParseContext
   struct TM_HandlerContext hc;
 
   /**
-   * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
+   * Placeholder for #TALER_MHD_parse_post_json() to keep its internal state.
    */
   void *json_parse_context;
 };
@@ -142,7 +141,7 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
 {
   struct TMH_JsonParseContext *jpc = (struct TMH_JsonParseContext *) hc;
 
-  TMH_PARSE_post_cleanup_callback (jpc->json_parse_context);
+  TALER_MHD_parse_post_cleanup_callback (jpc->json_parse_context);
   GNUNET_free (jpc);
 }
 
@@ -196,11 +195,11 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     ctx = *connection_cls;
   }
 
-  res = TMH_PARSE_post_json (connection,
-                             &ctx->json_parse_context,
-                             upload_data,
-                             upload_data_size,
-                             &root);
+  res = TALER_MHD_parse_post_json (connection,
+                                   &ctx->json_parse_context,
+                                   upload_data,
+                                   upload_data_size,
+                                   &root);
   if (GNUNET_SYSERR == res)
     return MHD_NO;
   /* the POST's body has to be further fetched */
@@ -208,9 +207,9 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
        (NULL == root) )
     return MHD_YES;
 
-  res = TMH_PARSE_json_data (connection,
-                             root,
-                             spec);
+  res = TALER_MHD_parse_json_data (connection,
+                                   root,
+                                   spec);
   if (GNUNET_NO == res)
   {
     GNUNET_break_op (0);

@@ -28,7 +28,6 @@
 #include <taler/taler_signatures.h>
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
-#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
@@ -117,7 +116,7 @@ struct TMH_JsonParseContext
   struct TM_HandlerContext hc;
 
   /**
-   * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
+   * Placeholder for #TALER_MHD_parse_post_json() to keep its internal state.
    */
   void *json_parse_context;
 };
@@ -133,7 +132,7 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
 {
   struct TMH_JsonParseContext *jpc = (struct TMH_JsonParseContext *) hc;
 
-  TMH_PARSE_post_cleanup_callback (jpc->json_parse_context);
+  TALER_MHD_parse_post_cleanup_callback (jpc->json_parse_context);
   GNUNET_free (jpc);
 }
 
@@ -326,7 +325,8 @@ proposal_put (struct MHD_Connection *connection,
   {
     json_object_set_new (order,
                          "wire_transfer_deadline",
-                         GNUNET_JSON_from_time_rel (default_wire_transfer_delay));
+                         GNUNET_JSON_from_time_rel (
+                           default_wire_transfer_delay));
   }
 
   if (NULL == json_object_get (order,
@@ -454,9 +454,9 @@ proposal_put (struct MHD_Connection *connection,
   } /* needed to synthesize merchant info */
 
   /* extract fields we need to sign separately */
-  res = TMH_PARSE_json_data (connection,
-                             order,
-                             spec);
+  res = TALER_MHD_parse_json_data (connection,
+                                   order,
+                                   spec);
   /* json is malformed */
   if (GNUNET_NO == res)
   {
@@ -472,7 +472,8 @@ proposal_put (struct MHD_Connection *connection,
              "Impossible to parse the order");
   }
 
-  wire_transfer_deadline = GNUNET_TIME_relative_to_absolute (wire_transfer_deadline_rel);
+  wire_transfer_deadline = GNUNET_TIME_relative_to_absolute (
+    wire_transfer_deadline_rel);
 
   if (wire_transfer_deadline.abs_value_us <
       refund_deadline.abs_value_us)
@@ -666,11 +667,11 @@ MH_handler_order_post (struct TMH_RequestHandler *rh,
     ctx = *connection_cls;
   }
 
-  res = TMH_PARSE_post_json (connection,
-                             &ctx->json_parse_context,
-                             upload_data,
-                             upload_data_size,
-                             &root);
+  res = TALER_MHD_parse_post_json (connection,
+                                   &ctx->json_parse_context,
+                                   upload_data,
+                                   upload_data_size,
+                                   &root);
 
   if (GNUNET_SYSERR == res)
     return MHD_NO;

@@ -25,7 +25,6 @@
 #include <taler/taler_signatures.h>
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
-#include "taler-merchant-httpd_parsing.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_tip-pickup.h"
@@ -73,7 +72,7 @@ struct PickupContext
   struct TM_HandlerContext hc;
 
   /**
-   * Placeholder for #TMH_PARSE_post_json() to keep its internal state.
+   * Placeholder for #TALER_MHD_parse_post_json() to keep its internal state.
    */
 
   void *json_parse_context;
@@ -161,7 +160,7 @@ pickup_cleanup (struct TM_HandlerContext *hc)
     TMH_EXCHANGES_find_exchange_cancel (pc->fo);
     pc->fo = NULL;
   }
-  TMH_PARSE_post_cleanup_callback (pc->json_parse_context);
+  TALER_MHD_parse_post_cleanup_callback (pc->json_parse_context);
   GNUNET_free_non_null (pc->exchange_url);
   GNUNET_free (pc);
 }
@@ -475,9 +474,9 @@ parse_planchet (struct MHD_Connection *connection,
     GNUNET_JSON_spec_end ()
   };
 
-  ret = TMH_PARSE_json_data (connection,
-                             planchet,
-                             spec);
+  ret = TALER_MHD_parse_json_data (connection,
+                                   planchet,
+                                   spec);
   if (GNUNET_OK != ret)
     return ret;
   pd->wr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_RESERVE_WITHDRAW);
@@ -541,11 +540,11 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
     return run_pickup (connection,
                        pc);
   }
-  res = TMH_PARSE_post_json (connection,
-                             &pc->json_parse_context,
-                             upload_data,
-                             upload_data_size,
-                             &root);
+  res = TALER_MHD_parse_post_json (connection,
+                                   &pc->json_parse_context,
+                                   upload_data,
+                                   upload_data_size,
+                                   &root);
   if (GNUNET_SYSERR == res)
     return MHD_NO;
   /* the POST's body has to be further fetched */
@@ -553,9 +552,9 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
        (NULL == root) )
     return MHD_YES;
 
-  res = TMH_PARSE_json_data (connection,
-                             root,
-                             spec);
+  res = TALER_MHD_parse_json_data (connection,
+                                   root,
+                                   spec);
   if (GNUNET_YES != res)
   {
     GNUNET_break_op (0);

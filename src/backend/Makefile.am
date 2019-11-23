@@ -21,7 +21,6 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_history.c taler-merchant-httpd_history.h \
   taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
   taler-merchant-httpd_order.c taler-merchant-httpd_order.h \
-  taler-merchant-httpd_parsing.c taler-merchant-httpd_parsing.h \
   taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h \
   taler-merchant-httpd_poll-payment.c taler-merchant-httpd_poll-payment.h \
   taler-merchant-httpd_proposal.c taler-merchant-httpd_proposal.h \
@@ -36,6 +35,7 @@ taler_merchant_httpd_SOURCES = \
 taler_merchant_httpd_LDADD = \
   $(top_builddir)/src/backenddb/libtalermerchantdb.la \
   -ltalerexchange \
+  -ltalermhd \
   -ltalerwire \
   -ltalerjson \
   -ltalerutil \
