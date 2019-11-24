@@ -28,7 +28,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_check-payment.h"
 
 /**
@@ -217,23 +216,24 @@ send_pay_request (struct CheckPaymentRequestContext *cprc)
       GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-      return TMH_RESPONSE_reply_internal_error (cprc->sc.con,
-                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
-                                                "db error fetching pay session info");
+      return TALER_MHD_reply_with_error (cprc->sc.con,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
+                                         "db error fetching pay session info");
     }
   }
   taler_pay_uri = TMH_make_taler_pay_uri (cprc->sc.con,
                                           cprc->order_id,
                                           cprc->session_id,
                                           cprc->mi->id);
-  ret = TMH_RESPONSE_reply_json_pack (cprc->sc.con,
-                                      MHD_HTTP_OK,
-                                      "{s:s, s:s, s:b, s:s?}",
-                                      "taler_pay_uri", taler_pay_uri,
-                                      "contract_url", cprc->final_contract_url,
-                                      "paid", 0,
-                                      "already_paid_order_id",
-                                      already_paid_order_id);
+  ret = TALER_MHD_reply_json_pack (cprc->sc.con,
+                                   MHD_HTTP_OK,
+                                   "{s:s, s:s, s:b, s:s?}",
+                                   "taler_pay_uri", taler_pay_uri,
+                                   "contract_url", cprc->final_contract_url,
+                                   "paid", 0,
+                                   "already_paid_order_id",
+                                   already_paid_order_id);
   GNUNET_free (taler_pay_uri);
   GNUNET_free_non_null (already_paid_order_id);
   return ret;
@@ -267,9 +267,10 @@ parse_contract_terms (struct CheckPaymentRequestContext *cprc)
   {
     GNUNET_break (0);
     cprc->ret
-      = TMH_RESPONSE_reply_internal_error (cprc->sc.con,
-                                           TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
-                                           "Merchant database error (contract terms corrupted)");
+      = TALER_MHD_reply_with_error (cprc->sc.con,
+                                    MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                    TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
+                                    "Merchant database error (contract terms corrupted)");
     return GNUNET_SYSERR;
   }
   if (GNUNET_OK !=
@@ -278,9 +279,10 @@ parse_contract_terms (struct CheckPaymentRequestContext *cprc)
   {
     GNUNET_break (0);
     cprc->ret
-      = TMH_RESPONSE_reply_internal_error (cprc->sc.con,
-                                           TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
-                                           "Failed to hash proposal");
+      = TALER_MHD_reply_with_error (cprc->sc.con,
+                                    MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                    TALER_EC_CHECK_PAYMENT_FAILED_COMPUTE_PROPOSAL_HASH,
+                                    "Failed to hash proposal");
     return GNUNET_SYSERR;
   }
   return GNUNET_OK;
@@ -317,15 +319,17 @@ check_order_and_request_payment (struct CheckPaymentRequestContext *cprc)
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    return TMH_RESPONSE_reply_internal_error (cprc->sc.con,
-                                              TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
-                                              "db error fetching order");
+    return TALER_MHD_reply_with_error (cprc->sc.con,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
+                                       "db error fetching order");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    return TMH_RESPONSE_reply_not_found (cprc->sc.con,
-                                         TALER_EC_CHECK_PAYMENT_ORDER_ID_UNKNOWN,
-                                         "unknown order_id");
+    return TALER_MHD_reply_with_error (cprc->sc.con,
+                                       MHD_HTTP_NOT_FOUND,
+                                       TALER_EC_CHECK_PAYMENT_ORDER_ID_UNKNOWN,
+                                       "unknown order_id");
   }
 
   if (GNUNET_OK !=
@@ -380,9 +384,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     {
       /* order_id is required but missing */
       GNUNET_break_op (0);
-      return TMH_RESPONSE_reply_bad_request (connection,
-                                             TALER_EC_PARAMETER_MISSING,
-                                             "order_id required");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_BAD_REQUEST,
+                                         TALER_EC_PARAMETER_MISSING,
+                                         "order_id required");
     }
     cprc->contract_url = MHD_lookup_connection_value (connection,
                                                       MHD_GET_ARGUMENT_KIND,
@@ -416,9 +421,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                        &timeout))
       {
         GNUNET_break_op (0);
-        return TMH_RESPONSE_reply_bad_request (connection,
-                                               TALER_EC_PARAMETER_MALFORMED,
-                                               "timeout must be non-negative number");
+        return TALER_MHD_reply_with_error (connection,
+                                           MHD_HTTP_BAD_REQUEST,
+                                           TALER_EC_PARAMETER_MALFORMED,
+                                           "timeout must be non-negative number");
       }
       cprc->sc.long_poll_timeout
         = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_multiply (
@@ -451,9 +457,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
-                                              "db error fetching contract terms");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_CHECK_PAYMENT_DB_FETCH_CONTRACT_TERMS_ERROR,
+                                       "db error fetching contract terms");
   }
 
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
@@ -490,9 +497,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
       GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
-                                                "db error fetching pay session info");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_CHECK_PAYMENT_DB_FETCH_ORDER_ERROR,
+                                         "db error fetching pay session info");
     }
     else if (0 == qs)
     {
@@ -522,9 +530,10 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     {
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
-                                                "Merchant database error");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
+                                         "Merchant database error");
     }
     if (0 == qs)
     {
@@ -555,24 +564,25 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Database hard error on refunds_from_contract_terms_hash lookup: %s\n",
                 GNUNET_h2s (&cprc->h_contract_terms));
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
-                                              "Merchant database error");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
+                                       "Merchant database error");
   }
   if (cprc->refunded)
-    return TMH_RESPONSE_reply_json_pack (connection,
-                                         MHD_HTTP_OK,
-                                         "{s:o, s:b, s:b, s:o}",
-                                         "contract_terms", cprc->contract_terms,
-                                         "paid", 1,
-                                         "refunded", cprc->refunded,
-                                         "refund_amount",
-                                         TALER_JSON_from_amount (
-                                           &cprc->refund_amount));
-  return TMH_RESPONSE_reply_json_pack (connection,
-                                       MHD_HTTP_OK,
-                                       "{s:o, s:b, s:b }",
-                                       "contract_terms", cprc->contract_terms,
-                                       "paid", 1,
-                                       "refunded", 0);
+    return TALER_MHD_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
+                                      "{s:o, s:b, s:b, s:o}",
+                                      "contract_terms", cprc->contract_terms,
+                                      "paid", 1,
+                                      "refunded", cprc->refunded,
+                                      "refund_amount",
+                                      TALER_JSON_from_amount (
+                                        &cprc->refund_amount));
+  return TALER_MHD_reply_json_pack (connection,
+                                    MHD_HTTP_OK,
+                                    "{s:o, s:b, s:b }",
+                                    "contract_terms", cprc->contract_terms,
+                                    "paid", 1,
+                                    "refunded", 0);
 }

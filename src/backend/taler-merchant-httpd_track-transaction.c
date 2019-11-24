@@ -24,10 +24,10 @@
 #include <taler/taler_signatures.h>
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
+#include "taler_merchant_service.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_track-transaction.h"
 
 
@@ -129,7 +129,7 @@ make_track_transaction_ok (unsigned int num_transfers,
                                                      TALER_JSON_from_amount (
                                                        &sum))));
   }
-  ret = TMH_RESPONSE_make_json (j_transfers);
+  ret = TALER_MHD_make_json (j_transfers);
   json_decref (j_transfers);
   return ret;
 }
@@ -470,14 +470,14 @@ wire_deposits_cb (void *cls,
     resume_track_transaction_with_response
       (tctx,
       MHD_HTTP_FAILED_DEPENDENCY,
-      TMH_RESPONSE_make_json_pack ("{s:I, s:I, s:I, s:O}",
-                                   "code",
-                                   (json_int_t)
-                                   TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
-                                   "exchange-http-status",
-                                   (json_int_t) http_status,
-                                   "exchange-code", (json_int_t) ec,
-                                   "details", json));
+      TALER_MHD_make_json_pack ("{s:I, s:I, s:I, s:O}",
+                                "code",
+                                (json_int_t)
+                                TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
+                                "exchange-http-status",
+                                (json_int_t) http_status,
+                                "exchange-code", (json_int_t) ec,
+                                "details", json));
     return;
   }
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
@@ -625,7 +625,7 @@ wtid_cb (void *cls,
         (tcc->tctx,
         MHD_HTTP_ACCEPTED,
         /* Return verbatim what the exchange said.  */
-        TMH_RESPONSE_make_json (json));
+        TALER_MHD_make_json (json));
 
       return;
     }
@@ -635,7 +635,7 @@ wtid_cb (void *cls,
     resume_track_transaction_with_response
       (tcc->tctx,
       MHD_HTTP_FAILED_DEPENDENCY,
-      TMH_RESPONSE_make_json_pack
+      TALER_MHD_make_json_pack
         ("{s:I, s:I, s:I, s:O}",
         "code",
         (json_int_t) TALER_EC_TRACK_TRANSACTION_COIN_TRACE_ERROR,
@@ -670,7 +670,7 @@ wtid_cb (void *cls,
     resume_track_transaction_with_response
       (tcc->tctx,
       MHD_HTTP_INTERNAL_SERVER_ERROR,
-      TMH_RESPONSE_make_error
+      TALER_MHD_make_error
         (TALER_EC_TRACK_TRANSACTION_DB_FETCH_FAILED,
         "Fail to query database about proofs"));
     return;
@@ -686,16 +686,16 @@ wtid_cb (void *cls,
     resume_track_transaction_with_response
       (tcc->tctx,
       MHD_HTTP_FAILED_DEPENDENCY,
-      TMH_RESPONSE_make_json_pack ("{s:I, s:s, s:O, s:o, s:o}",
-                                   "code",
-                                   (json_int_t)
-                                   TALER_EC_TRACK_TRANSACTION_CONFLICTING_REPORTS,
-                                   "error",
-                                   "conflicting transfer data from exchange",
-                                   "transaction_tracking_claim", json,
-                                   "wtid_tracking_claim", pcc.p_ret,
-                                   "coin_pub", GNUNET_JSON_from_data_auto (
-                                     &tcc->coin_pub)));
+      TALER_MHD_make_json_pack ("{s:I, s:s, s:O, s:o, s:o}",
+                                "code",
+                                (json_int_t)
+                                TALER_EC_TRACK_TRANSACTION_CONFLICTING_REPORTS,
+                                "error",
+                                "conflicting transfer data from exchange",
+                                "transaction_tracking_claim", json,
+                                "wtid_tracking_claim", pcc.p_ret,
+                                "coin_pub", GNUNET_JSON_from_data_auto (
+                                  &tcc->coin_pub)));
     return;
   }
 
@@ -920,7 +920,7 @@ handle_track_transaction_timeout (void *cls)
   }
   resume_track_transaction_with_response (tctx,
                                           MHD_HTTP_SERVICE_UNAVAILABLE,
-                                          TMH_RESPONSE_make_error (
+                                          TALER_MHD_make_error (
                                             TALER_EC_PAY_EXCHANGE_TIMEOUT,
                                             "exchange not reachable"));
 }
@@ -1119,9 +1119,10 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                           MHD_GET_ARGUMENT_KIND,
                                           "order_id");
   if (NULL == order_id)
-    return TMH_RESPONSE_reply_arg_missing (connection,
-                                           TALER_EC_PARAMETER_MISSING,
-                                           "order_id");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MISSING,
+                                       "order_id");
 
   tctx->mi = mi;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -1140,23 +1141,26 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   if (0 > qs)
   {
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
-                                              "Database error finding contract terms");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
+                                       "Database error finding contract terms");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
-                                         "Given order_id doesn't map to any proposal");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_NOT_FOUND,
+                                       TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
+                                       "Given order_id doesn't map to any proposal");
 
   if (GNUNET_OK !=
       TALER_JSON_hash (contract_terms,
                        &tctx->h_contract_terms))
   {
     json_decref (contract_terms);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_INTERNAL_LOGIC_ERROR,
-                                              "Failed to hash contract terms");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_INTERNAL_LOGIC_ERROR,
+                                       "Failed to hash contract terms");
   }
 
   {
@@ -1180,9 +1184,10 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
       GNUNET_break (0);
       GNUNET_JSON_parse_free (spec);
       json_decref (contract_terms);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_INTERNAL_LOGIC_ERROR,
-                                                "Failed to parse contract terms from DB");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_INTERNAL_LOGIC_ERROR,
+                                         "Failed to parse contract terms from DB");
     }
     json_decref (contract_terms);
   }
@@ -1202,15 +1207,17 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
   {
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != tctx->qs);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_TRACK_TRANSACTION_DB_FETCH_PAYMENT_ERROR,
-                                              "Database error: failed to find payment data");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_TRACK_TRANSACTION_DB_FETCH_PAYMENT_ERROR,
+                                       "Database error: failed to find payment data");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_TRACK_TRANSACTION_DB_NO_DEPOSITS_ERROR,
-                                         "deposit data not found");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_NOT_FOUND,
+                                       TALER_EC_TRACK_TRANSACTION_DB_NO_DEPOSITS_ERROR,
+                                       "deposit data not found");
   }
   *connection_cls = tctx;
 

@@ -25,7 +25,6 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_poll-payment.c taler-merchant-httpd_poll-payment.h \
   taler-merchant-httpd_proposal.c taler-merchant-httpd_proposal.h \
   taler-merchant-httpd_refund.c taler-merchant-httpd_refund.h \
-  taler-merchant-httpd_responses.c taler-merchant-httpd_responses.h \
   taler-merchant-httpd_tip-authorize.c taler-merchant-httpd_tip-authorize.h \
   taler-merchant-httpd_tip-pickup.c taler-merchant-httpd_tip-pickup.h \
   taler-merchant-httpd_tip-query.c taler-merchant-httpd_tip-query.h \

@@ -102,8 +102,8 @@ handle_status (void *cls,
   {
     resume_with_response (ctr,
                           MHD_HTTP_NOT_FOUND,
-                          TMH_RESPONSE_make_error (ec,
-                                                   "Reserve unknown at exchange"));
+                          TALER_MHD_make_error (ec,
+                                                "Reserve unknown at exchange"));
     return;
   }
   if (MHD_HTTP_OK != http_status)
@@ -111,8 +111,8 @@ handle_status (void *cls,
     GNUNET_break_op (0);
     resume_with_response (ctr,
                           MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (ec,
-                                                   "Exchange returned error code for reserve status"));
+                          TALER_MHD_make_error (ec,
+                                                "Exchange returned error code for reserve status"));
     return;
   }
 
@@ -121,7 +121,7 @@ handle_status (void *cls,
     GNUNET_break_op (0);
     resume_with_response (ctr,
                           MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (
+                          TALER_MHD_make_error (
                             TALER_EC_TIP_QUERY_RESERVE_HISTORY_FAILED_EMPTY,
                             "Exchange returned empty reserve history"));
     return;
@@ -132,7 +132,7 @@ handle_status (void *cls,
     GNUNET_break_op (0);
     resume_with_response (ctr,
                           MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (
+                          TALER_MHD_make_error (
                             TALER_EC_TIP_QUERY_RESERVE_HISTORY_INVALID_NO_DEPOSIT,
                             "Exchange returned invalid reserve history"));
     return;
@@ -145,7 +145,7 @@ handle_status (void *cls,
     GNUNET_break_op (0);
     resume_with_response (ctr,
                           MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (
+                          TALER_MHD_make_error (
                             TALER_EC_TIP_QUERY_RESERVE_HISTORY_INVALID_CURRENCY,
                             "Exchange returned invalid reserve history"));
     return;
@@ -157,7 +157,7 @@ handle_status (void *cls,
     GNUNET_break_op (0);
     resume_with_response (ctr,
                           MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (
+                          TALER_MHD_make_error (
                             TALER_EC_TIP_QUERY_RESERVE_CURRENCY_MISSMATCH,
                             "Exchange currency unexpected"));
     return;
@@ -204,7 +204,7 @@ handle_status (void *cls,
           GNUNET_break_op (0);
           resume_with_response (ctr,
                                 MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                TMH_RESPONSE_make_error (
+                                TALER_MHD_make_error (
                                   TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_DEPOSIT,
                                   "Exchange returned invalid reserve history (amount overflow)"));
           return;
@@ -228,7 +228,7 @@ handle_status (void *cls,
         GNUNET_break_op (0);
         resume_with_response (ctr,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TMH_RESPONSE_make_error (
+                              TALER_MHD_make_error (
                                 TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_WITHDRAW,
                                 "Exchange returned invalid reserve history (amount overflow)"));
         return;
@@ -250,7 +250,7 @@ handle_status (void *cls,
         GNUNET_break_op (0);
         resume_with_response (ctr,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TMH_RESPONSE_make_error (
+                              TALER_MHD_make_error (
                                 TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_CLOSED,
                                 "Exchange returned invalid reserve history (amount overflow)"));
         return;
@@ -293,7 +293,7 @@ exchange_cont (void *cls,
                 _ ("Failed to contact exchange configured for tipping!\n"));
     resume_with_response (ctr,
                           MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TMH_RESPONSE_make_error (
+                          TALER_MHD_make_error (
                             TALER_EC_TIP_QUERY_RESERVE_STATUS_FAILED_EXCHANGE_DOWN,
                             "Unable to obtain /keys from exchange"));
     return;
@@ -339,7 +339,7 @@ TMH_check_tip_reserve (struct CheckTipReserve *ctr,
     GNUNET_break (0);
     resume_with_response (ctr,
                           MHD_HTTP_INTERNAL_SERVER_ERROR,
-                          TMH_RESPONSE_make_error (
+                          TALER_MHD_make_error (
                             TALER_EC_INTERNAL_INVARIANT_FAILURE,
                             "Unable to find exchange handle"));
   }

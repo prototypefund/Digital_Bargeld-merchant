@@ -25,7 +25,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_tip-authorize.h"
 #include "taler-merchant-httpd_tip-reserve-helper.h"
 
@@ -180,9 +179,10 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Instance `%s' not configured for tipping\n",
                 mi->id);
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
-                                         "exchange for tipping not configured for the instance");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_NOT_FOUND,
+                                       TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
+                                       "exchange for tipping not configured for the instance");
   }
   tac->ctr.reserve_priv = mi->tip_reserve;
   extra = json_object_get (tac->root, "extra");
@@ -241,10 +241,10 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
       break;
     }
 
-    return TMH_RESPONSE_reply_rc (connection,
-                                  rc,
-                                  ec,
-                                  msg);
+    return TALER_MHD_reply_with_error (connection,
+                                       rc,
+                                       ec,
+                                       msg);
   }
 
   /* generate success response */
@@ -272,8 +272,10 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
     {
       /* Should never happen, at last the host header should be defined */
       GNUNET_break (0);
-      return TMH_RESPONSE_reply_internal_error (connection, 0,
-                                                "unable to identify backend host");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_INTERNAL_INVARIANT_FAILURE,
+                                         "unable to identify backend host");
     }
 
     if (0 == strcmp (mi->id, "default"))
@@ -291,11 +293,11 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                                         hash_enc.encoding));
 
 
-    res = TMH_RESPONSE_reply_json_pack (connection,
-                                        MHD_HTTP_OK,
-                                        "{s:s, s:s}",
-                                        "taler_tip_uri", taler_tip_uri,
-                                        "tip_id", hash_enc.encoding);
+    res = TALER_MHD_reply_json_pack (connection,
+                                     MHD_HTTP_OK,
+                                     "{s:s, s:s}",
+                                     "taler_tip_uri", taler_tip_uri,
+                                     "tip_id", hash_enc.encoding);
     return res;
   }
 }

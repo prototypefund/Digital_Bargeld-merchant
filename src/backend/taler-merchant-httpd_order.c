@@ -30,7 +30,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_responses.h"
 
 
 /**
@@ -263,8 +262,9 @@ proposal_put (struct MHD_Connection *connection,
     tm_info = localtime (&timer);
     if (NULL == tm_info)
     {
-      return TMH_RESPONSE_reply_internal_error
+      return TALER_MHD_reply_with_error
                (connection,
+               MHD_HTTP_INTERNAL_SERVER_ERROR,
                TALER_EC_PROPOSAL_NO_LOCALTIME,
                "failed to determine local time");
     }
@@ -466,8 +466,9 @@ proposal_put (struct MHD_Connection *connection,
   /* other internal errors might have occurred */
   if (GNUNET_SYSERR == res)
   {
-    return TMH_RESPONSE_reply_internal_error
+    return TALER_MHD_reply_with_error
              (connection,
+             MHD_HTTP_INTERNAL_SERVER_ERROR,
              TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
              "Impossible to parse the order");
   }
@@ -486,8 +487,9 @@ proposal_put (struct MHD_Connection *connection,
                   wire_transfer_deadline));
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG, "refund_deadline: %s\n",
                 GNUNET_STRINGS_absolute_time_to_string (refund_deadline));
-    return TMH_RESPONSE_reply_arg_invalid
+    return TALER_MHD_reply_with_error
              (connection,
+             MHD_HTTP_BAD_REQUEST,
              TALER_EC_PARAMETER_MALFORMED,
              "order:wire_transfer_deadline;order:refund_deadline");
   }
@@ -497,8 +499,9 @@ proposal_put (struct MHD_Connection *connection,
   if (GNUNET_OK != check_products (products))
   {
     GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_arg_invalid
+    return TALER_MHD_reply_with_error
              (connection,
+             MHD_HTTP_BAD_REQUEST,
              TALER_EC_PARAMETER_MALFORMED,
              "order:products");
   }
@@ -520,9 +523,10 @@ proposal_put (struct MHD_Connection *connection,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "No wire method available for instance '%s'\n", mi->id);
     GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_PROPOSAL_INSTANCE_CONFIGURATION_LACKS_WIRE,
-                                         "No wire method configured for instance");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_NOT_FOUND,
+                                       TALER_EC_PROPOSAL_INSTANCE_CONFIGURATION_LACKS_WIRE,
+                                       "No wire method configured for instance");
   }
   json_object_set_new (order,
                        "H_wire",
@@ -556,8 +560,9 @@ proposal_put (struct MHD_Connection *connection,
     if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
     {
       GNUNET_break (0);
-      return TMH_RESPONSE_reply_internal_error
+      return TALER_MHD_reply_with_error
                (connection,
+               MHD_HTTP_INTERNAL_SERVER_ERROR,
                TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
                "db error: could not check for existing order"
                " due to repeated soft transaction failure");
@@ -600,8 +605,9 @@ proposal_put (struct MHD_Connection *connection,
 
         /* contract_terms may be private, only expose
          * duplicate order_id to the network */
-        rv = TMH_RESPONSE_reply_external_error
+        rv = TALER_MHD_reply_with_error
                (connection,
+               MHD_HTTP_BAD_REQUEST,  /* or conflict? */
                TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
                msg);
         GNUNET_free (msg);
@@ -611,18 +617,19 @@ proposal_put (struct MHD_Connection *connection,
 
     /* Other hard transaction error (disk full, etc.) */
     GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_internal_error
+    return TALER_MHD_reply_with_error
              (connection,
+             MHD_HTTP_INTERNAL_SERVER_ERROR,
              TALER_EC_PROPOSAL_STORE_DB_ERROR_HARD,
              "db error: could not store this proposal's data into db");
   }
 
   /* DB transaction succeeded, generate positive response */
-  res = TMH_RESPONSE_reply_json_pack (connection,
-                                      MHD_HTTP_OK,
-                                      "{s:s}",
-                                      "order_id",
-                                      order_id);
+  res = TALER_MHD_reply_json_pack (connection,
+                                   MHD_HTTP_OK,
+                                   "{s:s}",
+                                   "order_id",
+                                   order_id);
   GNUNET_JSON_parse_free (spec);
   return res;
 }
@@ -685,8 +692,9 @@ MH_handler_order_post (struct TMH_RequestHandler *rh,
                            "order");
   if (NULL == order)
   {
-    res = TMH_RESPONSE_reply_arg_missing
+    res = TALER_MHD_reply_with_error
             (connection,
+            MHD_HTTP_BAD_REQUEST,
             TALER_EC_PARAMETER_MISSING,
             "order");
   }

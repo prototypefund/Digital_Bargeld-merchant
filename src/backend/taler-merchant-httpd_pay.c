@@ -31,7 +31,6 @@
 #include <taler/taler_json_lib.h>
 #include <taler/taler_exchange_service.h>
 #include "taler-merchant-httpd.h"
-#include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_refund.h"
@@ -545,8 +544,8 @@ sign_success_response (struct PayContext *pc)
                                 &ec,
                                 &errmsg);
   if (NULL == refunds)
-    return TMH_RESPONSE_make_error (ec,
-                                    errmsg);
+    return TALER_MHD_make_error (ec,
+                                 errmsg);
   {
     struct PaymentResponsePS mr = {
       .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK),
@@ -569,7 +568,7 @@ sign_success_response (struct PayContext *pc)
                     "refund_permissions",
                     refunds);
 
-  mret = TMH_RESPONSE_make_json (resp);
+  mret = TALER_MHD_make_json (resp);
   json_decref (resp);
   return mret;
 }
@@ -591,8 +590,8 @@ resume_pay_with_error (struct PayContext *pc,
 {
   resume_pay_with_response (pc,
                             http_status,
-                            TMH_RESPONSE_make_error (ec,
-                                                     msg));
+                            TALER_MHD_make_error (ec,
+                                                  msg));
 }
 
 
@@ -1037,7 +1036,7 @@ deposit_cb (void *cls,
       /* We can't do anything meaningful here, the exchange did something wrong */
       resume_pay_with_response (pc,
                                 MHD_HTTP_SERVICE_UNAVAILABLE,
-                                TMH_RESPONSE_make_json_pack (
+                                TALER_MHD_make_json_pack (
                                   "{s:s, s:I, s:I, s:I, s:s}",
                                   "error",
                                   "exchange failed",
@@ -1062,7 +1061,7 @@ deposit_cb (void *cls,
                            GNUNET_JSON_from_data_auto (&dc->coin_pub));
       resume_pay_with_response (pc,
                                 http_status,
-                                TMH_RESPONSE_make_json (eproof));
+                                TALER_MHD_make_json (eproof));
       json_decref (eproof);
     }
     return;
@@ -1186,7 +1185,7 @@ process_pay_with_exchange (void *cls,
       resume_pay_with_response
         (pc,
         MHD_HTTP_BAD_REQUEST,
-        TMH_RESPONSE_make_json_pack
+        TALER_MHD_make_json_pack
           ("{s:s, s:I, s:o, s:o}",
           "error", "denomination not found",
           "code", TALER_EC_PAY_DENOMINATION_KEY_NOT_FOUND,
@@ -1204,7 +1203,7 @@ process_pay_with_exchange (void *cls,
       resume_pay_with_response
         (pc,
         MHD_HTTP_BAD_REQUEST,
-        TMH_RESPONSE_make_json_pack
+        TALER_MHD_make_json_pack
           ("{s:s, s:I, s:o}",
           "error", "invalid denomination",
           "code", (json_int_t)
@@ -1251,7 +1250,7 @@ process_pay_with_exchange (void *cls,
       resume_pay_with_response
         (pc,
         MHD_HTTP_UNAUTHORIZED,
-        TMH_RESPONSE_make_json_pack
+        TALER_MHD_make_json_pack
           ("{s:s, s:I, s:i}",
           "hint", "Coin signature invalid.",
           "code", (json_int_t)
@@ -1468,11 +1467,13 @@ parse_pay (struct MHD_Connection *connection,
   {
     TALER_LOG_INFO (
       "Unknown merchant public key included in payment (usually wrong instance chosen)\n");
-    TMH_RESPONSE_reply_rc (connection,
-                           MHD_HTTP_NOT_FOUND,
-                           TALER_EC_PAY_WRONG_INSTANCE,
-                           "Payment sent to wrong instance (merchant_pub unknown to the merchant)");
-    return GNUNET_NO;
+    if (MHD_YES ==
+        TALER_MHD_reply_with_error (connection,
+                                    MHD_HTTP_NOT_FOUND,
+                                    TALER_EC_PAY_WRONG_INSTANCE,
+                                    "Payment sent to wrong instance (merchant_pub unknown to the merchant)"))
+      return GNUNET_NO;
+    return GNUNET_SYSERR;
   }
 
   if (NULL != session_id)
@@ -1490,18 +1491,20 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_PAY_DB_FETCH_PAY_ERROR,
-                                              "db error to previous /pay data");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_PAY_DB_FETCH_PAY_ERROR,
+                                       "db error to previous /pay data");
 
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     GNUNET_JSON_parse_free (spec);
     if (MHD_YES !=
-        TMH_RESPONSE_reply_not_found (connection,
-                                      TALER_EC_PAY_DB_STORE_PAY_ERROR,
-                                      "Proposal not found"))
+        TALER_MHD_reply_with_error (connection,
+                                    MHD_HTTP_NOT_FOUND,
+                                    TALER_EC_PAY_DB_STORE_PAY_ERROR,
+                                    "Proposal not found"))
     {
       GNUNET_break (0);
       return GNUNET_SYSERR;
@@ -1516,9 +1519,10 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_break (0);
     GNUNET_JSON_parse_free (spec);
     if (MHD_YES !=
-        TMH_RESPONSE_reply_internal_error (connection,
-                                           TALER_EC_PAY_FAILED_COMPUTE_PROPOSAL_HASH,
-                                           "Failed to hash proposal"))
+        TALER_MHD_reply_with_error (connection,
+                                    MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                    TALER_EC_PAY_FAILED_COMPUTE_PROPOSAL_HASH,
+                                    "Failed to hash proposal"))
     {
       GNUNET_break (0);
       return GNUNET_SYSERR;
@@ -1538,9 +1542,10 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_break (0);
     GNUNET_JSON_parse_free (spec);
     if (MHD_YES !=
-        TMH_RESPONSE_reply_internal_error (connection,
-                                           TALER_EC_PAY_MERCHANT_FIELD_MISSING,
-                                           "No merchant field in proposal"))
+        TALER_MHD_reply_with_error (connection,
+                                    MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                    TALER_EC_PAY_MERCHANT_FIELD_MISSING,
+                                    "No merchant field in proposal"))
     {
       GNUNET_break (0);
       return GNUNET_SYSERR;
@@ -1595,9 +1600,10 @@ parse_pay (struct MHD_Connection *connection,
       /* This should already have been checked when creating the order! */
       GNUNET_break (0);
       GNUNET_JSON_parse_free (spec);
-      return TMH_RESPONSE_reply_external_error (connection,
-                                                TALER_EC_PAY_REFUND_DEADLINE_PAST_WIRE_TRANSFER_DEADLINE,
-                                                "refund deadline after wire transfer deadline");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_BAD_REQUEST,
+                                         TALER_EC_PAY_REFUND_DEADLINE_PAST_WIRE_TRANSFER_DEADLINE,
+                                         "refund deadline after wire transfer deadline");
     }
   }
 
@@ -1613,9 +1619,10 @@ parse_pay (struct MHD_Connection *connection,
     {
       GNUNET_break (0);
       GNUNET_JSON_parse_free (spec);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PAY_WIRE_HASH_UNKNOWN,
-                                                "Did not find matching wire details");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_PAY_WIRE_HASH_UNKNOWN,
+                                         "Did not find matching wire details");
     }
     pc->wm = wm;
   }
@@ -1678,9 +1685,10 @@ parse_pay (struct MHD_Connection *connection,
   if (0 == pc->coins_cnt)
   {
     GNUNET_JSON_parse_free (spec);
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-                                           TALER_EC_PAY_COINS_ARRAY_EMPTY,
-                                           "coins");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_NOT_FOUND,
+                                       TALER_EC_PAY_COINS_ARRAY_EMPTY,
+                                       "coins");
   }
   /* note: 1 coin = 1 deposit confirmation expected */
   pc->dc = GNUNET_new_array (pc->coins_cnt,
@@ -1785,12 +1793,12 @@ begin_transaction (struct PayContext *pc)
     GNUNET_break (0);
     resume_pay_with_response (pc,
                               MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-                                                           "code",
-                                                           (json_int_t)
-                                                           TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
-                                                           "hint",
-                                                           "Soft merchant database error: retry counter exceeded"));
+                              TALER_MHD_make_json_pack ("{s:I, s:s}",
+                                                        "code",
+                                                        (json_int_t)
+                                                        TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+                                                        "hint",
+                                                        "Soft merchant database error: retry counter exceeded"));
     return;
   }
 
@@ -2034,7 +2042,7 @@ begin_transaction (struct PayContext *pc)
       resume_pay_with_response
         (pc,
         MHD_HTTP_OK,
-        TMH_RESPONSE_make_json_pack
+        TALER_MHD_make_json_pack
           ("{s:o, s:o, s:o}",
           /* Refunds pack.  */
           "refund_permissions", refunds,
@@ -2253,7 +2261,10 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
   if (GNUNET_SYSERR == res)
   {
     GNUNET_break (0);
-    return TMH_RESPONSE_reply_invalid_json (connection);
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_JSON_INVALID,
+                                       "could not parse JSON");
   }
   if ( (GNUNET_NO == res) ||
        (NULL == root) )

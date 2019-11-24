@@ -26,7 +26,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_tip-reserve-helper.h"
 
 

@@ -30,7 +30,6 @@
 #include <taler/taler_exchange_service.h>
 #include <taler/taler_wire_plugin.h>
 #include <taler/taler_wire_lib.h>
-#include "taler-merchant-httpd_responses.h"
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
@@ -1475,13 +1474,13 @@ url_handler (void *cls,
     }
   }
   if (NULL == instance)
-    return TMH_RESPONSE_reply_json_pack (connection,
-                                         MHD_HTTP_NOT_FOUND,
-                                         "{s:I, s:s}",
-                                         "code",
-                                         (json_int_t) TALER_EC_INSTANCE_UNKNOWN,
-                                         "error",
-                                         "merchant instance unknown");
+    return TALER_MHD_reply_json_pack (connection,
+                                      MHD_HTTP_NOT_FOUND,
+                                      "{s:I, s:s}",
+                                      "code",
+                                      (json_int_t) TALER_EC_INSTANCE_UNKNOWN,
+                                      "error",
+                                      "merchant instance unknown");
 
   if (GNUNET_NO == is_public)
   {
@@ -1523,11 +1522,11 @@ url_handler (void *cls,
                   "invalid request: method '%s' for '%s' not allowed\n",
                   method,
                   url);
-      return TMH_RESPONSE_reply_json_pack (connection,
-                                           MHD_HTTP_METHOD_NOT_ALLOWED,
-                                           "{s:s}",
-                                           "error",
-                                           "method not allowed");
+      return TALER_MHD_reply_json_pack (connection,
+                                        MHD_HTTP_METHOD_NOT_ALLOWED,
+                                        "{s:s}",
+                                        "error",
+                                        "method not allowed");
     }
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "invalid request: URL '%s' not handled\n",

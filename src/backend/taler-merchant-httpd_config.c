@@ -25,7 +25,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_tip-query.h"
 #include "taler-merchant-httpd_tip-reserve-helper.h"
 
@@ -67,11 +66,16 @@ MH_handler_config (struct TMH_RequestHandler *rh,
                    size_t *upload_data_size,
                    struct MerchantInstance *mi)
 {
-  return TMH_RESPONSE_reply_json_pack (connection,
-                                       MHD_HTTP_OK,
-                                       "{s:s, s:s}",
-                                       "currency", TMH_currency,
-                                       "version", TALER_PROTOCOL_VERSION);
+  (void) rh;
+  (void) connection_cls;
+  (void) upload_data;
+  (void) upload_data_size;
+  (void) mi;
+  return TALER_MHD_reply_json_pack (connection,
+                                    MHD_HTTP_OK,
+                                    "{s:s, s:s}",
+                                    "currency", TMH_currency,
+                                    "version", TALER_PROTOCOL_VERSION);
 }
 
 

@@ -23,7 +23,6 @@
 #include <taler/taler_signatures.h>
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
-#include "taler-merchant-httpd_responses.h"
 
 
 /**
@@ -159,17 +158,19 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                      &seconds))
     {
       json_decref (response);
-      return TMH_RESPONSE_reply_arg_invalid (connection,
-                                             TALER_EC_PARAMETER_MALFORMED,
-                                             "date");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_BAD_REQUEST,
+                                         TALER_EC_PARAMETER_MALFORMED,
+                                         "date");
     }
     date.abs_value_us = seconds * 1000LL * 1000LL;
     if (date.abs_value_us / 1000LL / 1000LL != seconds)
     {
       json_decref (response);
-      return TMH_RESPONSE_reply_bad_request (connection,
-                                             TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
-                                             "Timestamp overflowed");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_BAD_REQUEST,
+                                         TALER_EC_HISTORY_TIMESTAMP_OVERFLOW,
+                                         "Timestamp overflowed");
     }
   }
 
@@ -198,13 +199,14 @@ MH_handler_history (struct TMH_RequestHandler *rh,
          (GNUNET_SYSERR == pcc.failure) )
     {
       json_decref (response);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_HISTORY_DB_FETCH_ERROR,
-                                                "db error to get history");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_HISTORY_DB_FETCH_ERROR,
+                                         "db error to get history");
     }
-    ret = TMH_RESPONSE_reply_json (connection,
-                                   response,
-                                   MHD_HTTP_OK);
+    ret = TALER_MHD_reply_json (connection,
+                                response,
+                                MHD_HTTP_OK);
     json_decref (response);
     return ret;
   }
@@ -221,9 +223,10 @@ MH_handler_history (struct TMH_RequestHandler *rh,
                      &start))
     {
       json_decref (response);
-      return TMH_RESPONSE_reply_arg_invalid (connection,
-                                             TALER_EC_PARAMETER_MALFORMED,
-                                             "start");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_BAD_REQUEST,
+                                         TALER_EC_PARAMETER_MALFORMED,
+                                         "start");
     }
   }
 
@@ -236,9 +239,10 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     if (1 != sscanf (str,
                      "%lld",
                      &delta))
-      return TMH_RESPONSE_reply_arg_invalid (connection,
-                                             TALER_EC_PARAMETER_MALFORMED,
-                                             "delta");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_BAD_REQUEST,
+                                         TALER_EC_PARAMETER_MALFORMED,
+                                         "delta");
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Querying history back to %s, start: %llu, delta: %lld\n",
@@ -276,15 +280,16 @@ MH_handler_history (struct TMH_RequestHandler *rh,
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     json_decref (response);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_HISTORY_DB_FETCH_ERROR,
-                                              "db error to get history");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_HISTORY_DB_FETCH_ERROR,
+                                       "db error to get history");
   }
-  ret = TMH_RESPONSE_reply_json_pack (connection,
-                                      MHD_HTTP_OK,
-                                      "{ s:o }",
-                                      "history",
-                                      response /* consumes 'response' */);
+  ret = TALER_MHD_reply_json_pack (connection,
+                                   MHD_HTTP_OK,
+                                   "{ s:o }",
+                                   "history",
+                                   response /* consumes 'response' */);
   LOG_INFO ("/history, http code: %d\n",
             MHD_HTTP_OK);
   return ret;

@@ -30,7 +30,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_responses.h"
 
 
 /**
@@ -63,7 +62,6 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
 {
   const char *order_id;
   const char *nonce;
-  int res;
   enum GNUNET_DB_QueryStatus qs;
   json_t *contract_terms;
   struct GNUNET_CRYPTO_EddsaSignature merchant_sig;
@@ -73,16 +71,18 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                           MHD_GET_ARGUMENT_KIND,
                                           "order_id");
   if (NULL == order_id)
-    return TMH_RESPONSE_reply_arg_missing (connection,
-                                           TALER_EC_PARAMETER_MISSING,
-                                           "order_id");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MISSING,
+                                       "order_id");
   nonce = MHD_lookup_connection_value (connection,
                                        MHD_GET_ARGUMENT_KIND,
                                        "nonce");
   if (NULL == nonce)
-    return TMH_RESPONSE_reply_arg_missing (connection,
-                                           TALER_EC_PARAMETER_MISSING,
-                                           "nonce");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MISSING,
+                                       "nonce");
   db->preflight (db->cls);
   qs = db->find_contract_terms (db->cls,
                                 &contract_terms,
@@ -95,9 +95,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_PROPOSAL_LOOKUP_DB_ERROR,
-                                              "An error occurred while retrieving proposal data from db");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_PROPOSAL_LOOKUP_DB_ERROR,
+                                       "An error occurred while retrieving proposal data from db");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
@@ -106,6 +107,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
       GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
       GNUNET_JSON_spec_end ()
     };
+    int res;
 
     db->preflight (db->cls);
     qs = db->find_order (db->cls,
@@ -114,9 +116,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                          &mi->pubkey);
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
     {
-      return TMH_RESPONSE_reply_not_found (connection,
-                                           TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
-                                           "unknown order id");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_NOT_FOUND,
+                                         TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
+                                         "unknown order id");
     }
     GNUNET_assert (NULL != contract_terms);
     json_object_set_new (contract_terms,
@@ -133,9 +136,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
     }
     if (GNUNET_SYSERR == res)
     {
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
-                                                "Impossible to parse the order");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
+                                         "Impossible to parse the order");
     }
 
     for (unsigned int i = 0; i<MAX_RETRIES; i++)
@@ -155,9 +159,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
       GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_PROPOSAL_STORE_DB_ERROR,
-                                                "db error: could not store this proposal's data into db");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_PROPOSAL_STORE_DB_ERROR,
+                                         "db error: could not store this proposal's data into db");
     }
     // FIXME: now we can delete (merchant_pub, order_id) from the merchant_orders table
   }
@@ -171,17 +176,19 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
   if (NULL == stored_nonce)
   {
     GNUNET_break (0);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
-                                              "existing proposal has no nonce");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
+                                       "existing proposal has no nonce");
   }
 
   if (0 != strcmp (stored_nonce,
                    nonce))
   {
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
-                                           "mismatched nonce");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PROPOSAL_LOOKUP_NOT_FOUND,
+                                       "mismatched nonce");
   }
 
 
@@ -197,24 +204,24 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                          &pdps.hash))
     {
       GNUNET_break (0);
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                TALER_EC_INTERNAL_LOGIC_ERROR,
-                                                "Could not hash order");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_INTERNAL_LOGIC_ERROR,
+                                         "Could not hash order");
     }
 
     GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
                               &pdps.purpose,
                               &merchant_sig);
   }
-  res = TMH_RESPONSE_reply_json_pack (connection,
-                                      MHD_HTTP_OK,
-                                      "{ s:o, s:o }",
-                                      "contract_terms",
-                                      contract_terms,
-                                      "sig",
-                                      GNUNET_JSON_from_data_auto (
-                                        &merchant_sig));
-  return res;
+  return TALER_MHD_reply_json_pack (connection,
+                                    MHD_HTTP_OK,
+                                    "{ s:o, s:o }",
+                                    "contract_terms",
+                                    contract_terms,
+                                    "sig",
+                                    GNUNET_JSON_from_data_auto (
+                                      &merchant_sig));
 }
 
 

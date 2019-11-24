@@ -27,7 +27,6 @@
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_auditors.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_track-transfer.h"
 
 
@@ -470,7 +469,7 @@ check_transfer (void *cls,
     rctx->check_transfer_result = GNUNET_SYSERR;
     /* Build the `TrackTransferConflictDetails` */
     rctx->response
-      = TMH_RESPONSE_make_json_pack (
+      = TALER_MHD_make_json_pack (
       "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
       "code",
       (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
@@ -565,7 +564,7 @@ check_wire_fee (struct TrackTransferContext *rctx,
   resume_track_transfer_with_response
     (rctx,
     MHD_HTTP_INTERNAL_SERVER_ERROR,
-    TMH_RESPONSE_make_json_pack (
+    TALER_MHD_make_json_pack (
       "{s:I, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:O}",
       "code",
       (json_int_t) TALER_EC_TRACK_TRANSFER_JSON_BAD_WIRE_FEE,
@@ -633,14 +632,14 @@ wire_transfer_cb (void *cls,
     resume_track_transfer_with_response
       (rctx,
       MHD_HTTP_FAILED_DEPENDENCY,
-      TMH_RESPONSE_make_json_pack ("{s:I, s:I, s:I, s:O}",
-                                   "code",
-                                   (json_int_t)
-                                   TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
-                                   "exchange-code", (json_int_t) ec,
-                                   "exchange-http-status",
-                                   (json_int_t) http_status,
-                                   "details", json));
+      TALER_MHD_make_json_pack ("{s:I, s:I, s:I, s:O}",
+                                "code",
+                                (json_int_t)
+                                TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
+                                "exchange-code", (json_int_t) ec,
+                                "exchange-http-status",
+                                (json_int_t) http_status,
+                                "details", json));
     return;
   }
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
@@ -664,12 +663,12 @@ wire_transfer_cb (void *cls,
     resume_track_transfer_with_response
       (rctx,
       MHD_HTTP_INTERNAL_SERVER_ERROR,
-      TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-                                   "code",
-                                   (json_int_t)
-                                   TALER_EC_TRACK_TRANSFER_DB_STORE_TRANSFER_ERROR,
-                                   "details",
-                                   "failed to store response from exchange to local database"));
+      TALER_MHD_make_json_pack ("{s:I, s:s}",
+                                "code",
+                                (json_int_t)
+                                TALER_EC_TRACK_TRANSFER_DB_STORE_TRANSFER_ERROR,
+                                "details",
+                                "failed to store response from exchange to local database"));
     return;
   }
   rctx->original_response = json;
@@ -711,12 +710,12 @@ wire_transfer_cb (void *cls,
       resume_track_transfer_with_response
         (rctx,
         MHD_HTTP_INTERNAL_SERVER_ERROR,
-        TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-                                     "code",
-                                     (json_int_t)
-                                     TALER_EC_TRACK_TRANSFER_DB_FETCH_DEPOSIT_ERROR,
-                                     "details",
-                                     "failed to obtain deposit data from local database"));
+        TALER_MHD_make_json_pack ("{s:I, s:s}",
+                                  "code",
+                                  (json_int_t)
+                                  TALER_EC_TRACK_TRANSFER_DB_FETCH_DEPOSIT_ERROR,
+                                  "details",
+                                  "failed to obtain deposit data from local database"));
       return;
     }
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
@@ -736,13 +735,13 @@ wire_transfer_cb (void *cls,
       resume_track_transfer_with_response
         (rctx,
         MHD_HTTP_INTERNAL_SERVER_ERROR,
-        TMH_RESPONSE_make_json_pack ("{s:I, s:s, s:I, s:s}",
-                                     "code",
-                                     (json_int_t)
-                                     TALER_EC_TRACK_TRANSFER_DB_INTERNAL_LOGIC_ERROR,
-                                     "details", "internal logic error",
-                                     "line", (json_int_t) __LINE__,
-                                     "file", __FILE__));
+        TALER_MHD_make_json_pack ("{s:I, s:s, s:I, s:s}",
+                                  "code",
+                                  (json_int_t)
+                                  TALER_EC_TRACK_TRANSFER_DB_INTERNAL_LOGIC_ERROR,
+                                  "details", "internal logic error",
+                                  "line", (json_int_t) __LINE__,
+                                  "file", __FILE__));
       return;
     }
     if (GNUNET_SYSERR == rctx->check_transfer_result)
@@ -778,12 +777,12 @@ wire_transfer_cb (void *cls,
       resume_track_transfer_with_response
         (rctx,
         MHD_HTTP_INTERNAL_SERVER_ERROR,
-        TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-                                     "code",
-                                     (json_int_t)
-                                     TALER_EC_TRACK_TRANSFER_DB_STORE_COIN_ERROR,
-                                     "details",
-                                     "failed to store response from exchange to local database"));
+        TALER_MHD_make_json_pack ("{s:I, s:s}",
+                                  "code",
+                                  (json_int_t)
+                                  TALER_EC_TRACK_TRANSFER_DB_STORE_COIN_ERROR,
+                                  "details",
+                                  "failed to store response from exchange to local database"));
       return;
     }
   }
@@ -799,14 +798,14 @@ wire_transfer_cb (void *cls,
     resume_track_transfer_with_response
       (rctx,
       MHD_HTTP_INTERNAL_SERVER_ERROR,
-      TMH_RESPONSE_make_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
-                               "Fail to elaborate the response."));
+      TALER_MHD_make_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
+                            "Fail to elaborate the response."));
     return;
   }
 
   resume_track_transfer_with_response (rctx,
                                        MHD_HTTP_OK,
-                                       TMH_RESPONSE_make_json (jresponse));
+                                       TALER_MHD_make_json (jresponse));
   json_decref (jresponse);
 }
 
@@ -839,12 +838,12 @@ process_track_transfer_with_exchange (void *cls,
     resume_track_transfer_with_response
       (rctx,
       MHD_HTTP_INTERNAL_SERVER_ERROR,
-      TMH_RESPONSE_make_json_pack ("{s:I, s:s}",
-                                   "code",
-                                   (json_int_t)
-                                   TALER_EC_TRACK_TRANSFER_REQUEST_ERROR,
-                                   "error",
-                                   "failed to run /track/transfer on exchange"));
+      TALER_MHD_make_json_pack ("{s:I, s:s}",
+                                "code",
+                                (json_int_t)
+                                TALER_EC_TRACK_TRANSFER_REQUEST_ERROR,
+                                "error",
+                                "failed to run /track/transfer on exchange"));
   }
 }
 
@@ -870,7 +869,7 @@ handle_track_transfer_timeout (void *cls)
   }
   resume_track_transfer_with_response (rctx,
                                        MHD_HTTP_SERVICE_UNAVAILABLE,
-                                       TMH_RESPONSE_make_error (
+                                       TALER_MHD_make_error (
                                          TALER_EC_TRACK_TRANSFER_EXCHANGE_TIMEOUT,
                                          "exchange not reachable"));
 }
@@ -898,13 +897,13 @@ proof_cb (void *cls,
   {
     rctx->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
     rctx->response
-      = TMH_RESPONSE_make_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
-                                 "Fail to elaborate response.");
+      = TALER_MHD_make_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
+                              "Fail to elaborate response.");
     return;
   }
 
   rctx->response_code = MHD_HTTP_OK;
-  rctx->response = TMH_RESPONSE_make_json (transformed_response);
+  rctx->response = TALER_MHD_make_json (transformed_response);
   json_decref (transformed_response);
 }
 
@@ -985,9 +984,10 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                      MHD_GET_ARGUMENT_KIND,
                                      "exchange");
   if (NULL == url)
-    return TMH_RESPONSE_reply_arg_missing (connection,
-                                           TALER_EC_PARAMETER_MISSING,
-                                           "exchange");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MISSING,
+                                       "exchange");
   rctx->url = GNUNET_strdup (url);
 
   /* FIXME: change again: we probably don't want the wire_method
@@ -1006,9 +1006,10 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                   "Client needs fixing, see API change for #4943!\n");
     }
     else
-      return TMH_RESPONSE_reply_arg_missing (connection,
-                                             TALER_EC_PARAMETER_MISSING,
-                                             "wire_method");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_BAD_REQUEST,
+                                         TALER_EC_PARAMETER_MISSING,
+                                         "wire_method");
   }
   rctx->wire_method = GNUNET_strdup (wire_method);
   rctx->mi = mi;
@@ -1016,18 +1017,20 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                                      MHD_GET_ARGUMENT_KIND,
                                      "wtid");
   if (NULL == str)
-    return TMH_RESPONSE_reply_arg_missing (connection,
-                                           TALER_EC_PARAMETER_MISSING,
-                                           "wtid");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MISSING,
+                                       "wtid");
   if (GNUNET_OK !=
       GNUNET_STRINGS_string_to_data (str,
                                      strlen (str),
                                      &rctx->wtid,
                                      sizeof (rctx->wtid)))
   {
-    return TMH_RESPONSE_reply_arg_invalid (connection,
-                                           TALER_EC_PARAMETER_MALFORMED,
-                                           "wtid");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MALFORMED,
+                                       "wtid");
   }
 
   /* Check if reply is already in database! */
@@ -1043,9 +1046,10 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_TRACK_TRANSFER_DB_FETCH_FAILED,
-                                              "Fail to query database about proofs");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_TRACK_TRANSFER_DB_FETCH_FAILED,
+                                       "Fail to query database about proofs");
   }
   if (0 != rctx->response_code)
   {

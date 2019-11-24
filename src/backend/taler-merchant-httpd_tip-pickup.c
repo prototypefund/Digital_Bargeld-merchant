@@ -26,7 +26,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_tip-pickup.h"
 
 
@@ -189,10 +188,10 @@ run_pickup (struct MHD_Connection *connection,
 
   if (TALER_EC_NONE != pc->ec)
   {
-    return TMH_RESPONSE_reply_rc (connection,
-                                  pc->response_code,
-                                  pc->ec,
-                                  pc->error_hint);
+    return TALER_MHD_reply_with_error (connection,
+                                       pc->response_code,
+                                       pc->ec,
+                                       pc->error_hint);
   }
   db->preflight (db->cls);
   ec = db->pickup_tip_TR (db->cls,
@@ -220,19 +219,19 @@ run_pickup (struct MHD_Connection *connection,
       human = "database failure";
       break;
     }
-    return TMH_RESPONSE_reply_rc (connection,
-                                  response_code,
-                                  ec,
-                                  human);
+    return TALER_MHD_reply_with_error (connection,
+                                       response_code,
+                                       ec,
+                                       human);
   }
   sigs = json_array ();
   if (NULL == sigs)
   {
     GNUNET_break (0);
-    return TMH_RESPONSE_reply_rc (connection,
-                                  MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                  TALER_EC_JSON_ALLOCATION_FAILURE,
-                                  "could not create JSON array");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_JSON_ALLOCATION_FAILURE,
+                                       "could not create JSON array");
   }
   GNUNET_CRYPTO_eddsa_key_get_public (&reserve_priv.eddsa_priv,
                                       &reserve_pub.eddsa_pub);
@@ -255,19 +254,19 @@ run_pickup (struct MHD_Connection *connection,
     {
       GNUNET_break (0);
       json_decref (sigs);
-      return TMH_RESPONSE_reply_rc (connection,
-                                    MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                    TALER_EC_JSON_ALLOCATION_FAILURE,
-                                    "could not add element to JSON array");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_JSON_ALLOCATION_FAILURE,
+                                         "could not add element to JSON array");
     }
   }
-  return TMH_RESPONSE_reply_json_pack (connection,
-                                       MHD_HTTP_OK,
-                                       "{s:o, s:o}",
-                                       "reserve_pub",
-                                       GNUNET_JSON_from_data_auto (
-                                         &reserve_pub),
-                                       "reserve_sigs", sigs);
+  return TALER_MHD_reply_json_pack (connection,
+                                    MHD_HTTP_OK,
+                                    "{s:o, s:o}",
+                                    "reserve_pub",
+                                    GNUNET_JSON_from_data_auto (
+                                      &reserve_pub),
+                                    "reserve_sigs", sigs);
 }
 
 
@@ -428,10 +427,10 @@ prepare_pickup (struct PickupContext *pc)
       response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
       break;
     }
-    return TMH_RESPONSE_reply_rc (pc->connection,
-                                  response_code,
-                                  ec,
-                                  "Could not determine exchange URL for the given tip id");
+    return TALER_MHD_reply_with_error (pc->connection,
+                                       response_code,
+                                       ec,
+                                       "Could not determine exchange URL for the given tip id");
 
   }
   pc->fo = TMH_EXCHANGES_find_exchange (pc->exchange_url,
@@ -440,10 +439,10 @@ prepare_pickup (struct PickupContext *pc)
                                         pc);
   if (NULL == pc->fo)
   {
-    return TMH_RESPONSE_reply_rc (pc->connection,
-                                  MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                  TALER_EC_INTERNAL_INVARIANT_FAILURE,
-                                  "consult server logs");
+    return TALER_MHD_reply_with_error (pc->connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_INTERNAL_INVARIANT_FAILURE,
+                                       "consult server logs");
   }
   MHD_suspend_connection (pc->connection);
   return MHD_YES;
@@ -566,19 +565,19 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
   {
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
-    return TMH_RESPONSE_reply_rc (connection,
-                                  MHD_HTTP_BAD_REQUEST,
-                                  TALER_EC_TIP_PICKUP_EXCHANGE_TOO_MANY_PLANCHETS,
-                                  "limit of 1024 planchets exceeded by request");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_TIP_PICKUP_EXCHANGE_TOO_MANY_PLANCHETS,
+                                       "limit of 1024 planchets exceeded by request");
   }
   if (0 == pc->planchets_len)
   {
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
-    return TMH_RESPONSE_reply_rc (connection,
-                                  MHD_HTTP_BAD_REQUEST,
-                                  TALER_EC_PARAMETER_MALFORMED,
-                                  "no planchets specified");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MALFORMED,
+                                       "no planchets specified");
   }
   db->preflight (db->cls);
   pc->planchets = GNUNET_new_array (pc->planchets_len,
@@ -643,9 +642,10 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   {
     /* tip_id is required but missing */
     GNUNET_break_op (0);
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           TALER_EC_PARAMETER_MISSING,
-                                           "tip_id required");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MISSING,
+                                       "tip_id required");
   }
 
   if (GNUNET_OK !=
@@ -654,9 +654,10 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   {
     /* tip_id has wrong encoding */
     GNUNET_break_op (0);
-    return TMH_RESPONSE_reply_bad_request (connection,
-                                           TALER_EC_PARAMETER_MALFORMED,
-                                           "tip_id malformed");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MALFORMED,
+                                       "tip_id malformed");
   }
 
   db->preflight (db->cls);
@@ -693,29 +694,29 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
       response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
       break;
     }
-    return TMH_RESPONSE_reply_rc (connection,
-                                  response_code,
-                                  ec,
-                                  "Could not determine exchange URL for the given tip id");
+    return TALER_MHD_reply_with_error (connection,
+                                       response_code,
+                                       ec,
+                                       "Could not determine exchange URL for the given tip id");
   }
 
   timestamp_expire = GNUNET_TIME_absolute_add (timestamp,
                                                GNUNET_TIME_UNIT_DAYS);
 
-  ret = TMH_RESPONSE_reply_json_pack (connection,
-                                      MHD_HTTP_OK,
-                                      "{s:s, s:o, s:o, s:o, s:o, s:o}",
-                                      "exchange_url", exchange_url,
-                                      "amount", TALER_JSON_from_amount (
-                                        &tip_amount),
-                                      "amount_left", TALER_JSON_from_amount (
-                                        &tip_amount_left),
-                                      "stamp_created",
-                                      GNUNET_JSON_from_time_abs (timestamp),
-                                      "stamp_expire",
-                                      GNUNET_JSON_from_time_abs (
-                                        timestamp_expire),
-                                      "extra", extra);
+  ret = TALER_MHD_reply_json_pack (connection,
+                                   MHD_HTTP_OK,
+                                   "{s:s, s:o, s:o, s:o, s:o, s:o}",
+                                   "exchange_url", exchange_url,
+                                   "amount", TALER_JSON_from_amount (
+                                     &tip_amount),
+                                   "amount_left", TALER_JSON_from_amount (
+                                     &tip_amount_left),
+                                   "stamp_created",
+                                   GNUNET_JSON_from_time_abs (timestamp),
+                                   "stamp_expire",
+                                   GNUNET_JSON_from_time_abs (
+                                     timestamp_expire),
+                                   "extra", extra);
 
   GNUNET_free (exchange_url);
   json_decref (extra);

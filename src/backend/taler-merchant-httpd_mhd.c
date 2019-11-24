@@ -25,7 +25,6 @@
 #include "platform.h"
 #include <jansson.h>
 #include "taler-merchant-httpd_mhd.h"
-#include "taler-merchant-httpd_responses.h"
 
 
 /**
@@ -48,30 +47,18 @@ TMH_MHD_handler_static_response (struct TMH_RequestHandler *rh,
                                  size_t *upload_data_size,
                                  struct MerchantInstance *instance)
 {
-  struct MHD_Response *response;
-  int ret;
-
+  (void) instance;
+  (void) connection_cls;
+  (void) upload_data;
+  (void) upload_data_size;
   (void) instance;
   if (0 == rh->data_size)
     rh->data_size = strlen ((const char *) rh->data);
-  response = MHD_create_response_from_buffer (rh->data_size,
-                                              (void *) rh->data,
-                                              MHD_RESPMEM_PERSISTENT);
-  if (NULL == response)
-  {
-    GNUNET_break (0);
-    return MHD_NO;
-  }
-  TMH_RESPONSE_add_global_headers (response);
-  if (NULL != rh->mime_type)
-    (void) MHD_add_response_header (response,
-                                    MHD_HTTP_HEADER_CONTENT_TYPE,
-                                    rh->mime_type);
-  ret = MHD_queue_response (connection,
-                            rh->response_code,
-                            response);
-  MHD_destroy_response (response);
-  return ret;
+  return TALER_MHD_reply_static (connection,
+                                 rh->response_code,
+                                 rh->mime_type,
+                                 rh->data,
+                                 rh->data_size);
 }
 
 
@@ -95,69 +82,12 @@ TMH_MHD_handler_agpl_redirect (struct TMH_RequestHandler *rh,
                                size_t *upload_data_size,
                                struct MerchantInstance *mi)
 {
-  const char *agpl =
-    "This server is licensed under the Affero GPL. You will now be redirected to the source code.";
-  struct MHD_Response *response;
-  int ret;
-
   (void) mi;
-  response = MHD_create_response_from_buffer (strlen (agpl),
-                                              (void *) agpl,
-                                              MHD_RESPMEM_PERSISTENT);
-  if (NULL == response)
-  {
-    GNUNET_break (0);
-    return MHD_NO;
-  }
-  TMH_RESPONSE_add_global_headers (response);
-  if (NULL != rh->mime_type)
-    (void) MHD_add_response_header (response,
-                                    MHD_HTTP_HEADER_CONTENT_TYPE,
-                                    rh->mime_type);
-  if (MHD_NO ==
-      MHD_add_response_header (response,
-                               MHD_HTTP_HEADER_LOCATION,
-                               "http://www.git.taler.net/?p=exchange.git"))
-  {
-    GNUNET_break (0);
-    ret = MHD_NO;
-  }
-  else
-  {
-    ret = MHD_queue_response (connection,
-                              rh->response_code,
-                              response);
-  }
-  MHD_destroy_response (response);
-  return ret;
-}
-
-
-/**
- * Function to call to handle the request by building a JSON
- * reply with an error message from @a rh.
- *
- * @param rh context of the handler
- * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param mi merchant backend instance, never NULL
- * @return MHD result code
- */
-int
-TMH_MHD_handler_send_json_pack_error (struct TMH_RequestHandler *rh,
-                                      struct MHD_Connection *connection,
-                                      void **connection_cls,
-                                      const char *upload_data,
-                                      size_t *upload_data_size,
-                                      struct MerchantInstance *mi)
-{
-  return TMH_RESPONSE_reply_json_pack (connection,
-                                       rh->response_code,
-                                       "{s:s}",
-                                       "error",
-                                       rh->data);
+  (void) connection_cls;
+  (void) upload_data;
+  (void) upload_data_size;
+  return TALER_MHD_reply_agpl (connection,
+                               "http://www.git.taler.net/?p=merchant.git");
 }
 
 

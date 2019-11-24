@@ -23,7 +23,6 @@
 #include <taler/taler_signatures.h>
 #include <taler/taler_json_lib.h>
 #include "taler-merchant-httpd.h"
-#include "taler-merchant-httpd_responses.h"
 #include "taler-merchant-httpd_refund.h"
 
 /**
@@ -238,9 +237,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     json_decref (root);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_REFUND_LOOKUP_DB_ERROR,
-                                              "An error occurred while retrieving payment data from db");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_REFUND_LOOKUP_DB_ERROR,
+                                       "An error occurred while retrieving payment data from db");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
@@ -248,9 +248,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                 "Unknown order id given: %s\n",
                 order_id);
     json_decref (root);
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_REFUND_ORDER_ID_UNKNOWN,
-                                         "Order id not found in database");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_NOT_FOUND,
+                                       TALER_EC_REFUND_ORDER_ID_UNKNOWN,
+                                       "Order id not found in database");
   }
 
   if (GNUNET_OK !=
@@ -263,9 +264,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not hash contract terms\n");
     json_decref (root);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_INTERNAL_LOGIC_ERROR,
-                                              "Could not hash contract terms");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_INTERNAL_LOGIC_ERROR,
+                                       "Could not hash contract terms");
   }
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
   {
@@ -323,9 +325,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_JSON_parse_free (spec);
     json_decref (contract_terms);
     json_decref (root);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_REFUND_MERCHANT_DB_COMMIT_ERROR,
-                                              "Internal database error or refund amount too big");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_REFUND_MERCHANT_DB_COMMIT_ERROR,
+                                       "Internal database error or refund amount too big");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
@@ -335,9 +338,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_JSON_parse_free (spec);
     json_decref (contract_terms);
     json_decref (root);
-    return TMH_RESPONSE_reply_external_error (connection,
-                                              TALER_EC_REFUND_INCONSISTENT_AMOUNT,
-                                              "Amount incorrect: not larger than the previous one");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_CONFLICT,
+                                       TALER_EC_REFUND_INCONSISTENT_AMOUNT,
+                                       "Amount incorrect: not larger than the previous one");
   }
 
   /**
@@ -365,9 +369,10 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     json_decref (contract_terms);
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_REFUND_MERCHANT_SIGNING_FAILED,
-                                              "Refund done, but failed to sign confirmation");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_REFUND_MERCHANT_SIGNING_FAILED,
+                                       "Refund done, but failed to sign confirmation");
 
   }
 
@@ -376,15 +381,14 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     char *taler_refund_uri;
 
     taler_refund_uri = make_taler_refund_uri (connection, mi->id, order_id);
-
-    ret = TMH_RESPONSE_reply_json_pack (connection,
-                                        MHD_HTTP_OK,
-                                        "{s:o, s:o, s:s}",
-                                        "sig",
-                                        GNUNET_JSON_from_data_auto (&sig),
-                                        "contract_terms",
-                                        contract_terms,
-                                        "taler_refund_uri", taler_refund_uri);
+    ret = TALER_MHD_reply_json_pack (connection,
+                                     MHD_HTTP_OK,
+                                     "{s:o, s:o, s:s}",
+                                     "sig",
+                                     GNUNET_JSON_from_data_auto (&sig),
+                                     "contract_terms",
+                                     contract_terms,
+                                     "taler_refund_uri", taler_refund_uri);
     GNUNET_free (taler_refund_uri);
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
@@ -500,9 +504,10 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Argument 'order_id' not given\n");
-    return TMH_RESPONSE_reply_arg_missing (connection,
-                                           TALER_EC_PARAMETER_MISSING,
-                                           "order_id");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MISSING,
+                                       "order_id");
   }
 
   /* Convert order id to h_contract_terms */
@@ -519,9 +524,10 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_REFUND_LOOKUP_DB_ERROR,
-                                              "database error looking up order_id from merchant_contract_terms table");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_REFUND_LOOKUP_DB_ERROR,
+                                       "database error looking up order_id from merchant_contract_terms table");
   }
 
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
@@ -529,9 +535,10 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unknown order id given: %s\n",
                 order_id);
-    return TMH_RESPONSE_reply_not_found (connection,
-                                         TALER_EC_REFUND_ORDER_ID_UNKNOWN,
-                                         "Order id not found in database");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_NOT_FOUND,
+                                       TALER_EC_REFUND_ORDER_ID_UNKNOWN,
+                                       "Order id not found in database");
   }
 
   if (GNUNET_OK !=
@@ -542,9 +549,10 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not hash contract terms\n");
     json_decref (contract_terms);
-    return TMH_RESPONSE_reply_internal_error (connection,
-                                              TALER_EC_INTERNAL_LOGIC_ERROR,
-                                              "Could not hash contract terms");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                       TALER_EC_INTERNAL_LOGIC_ERROR,
+                                       "Could not hash contract terms");
   }
   json_decref (contract_terms);
 
@@ -558,19 +566,20 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                    &ec,
                                    &errmsg);
     if (NULL == response)
-      return TMH_RESPONSE_reply_internal_error (connection,
-                                                ec,
-                                                errmsg);
-    return TMH_RESPONSE_reply_json_pack (connection, MHD_HTTP_OK,
-                                         "{s:o, s:o, s:o}",
-                                         "refund_permissions",
-                                         response,
-                                         "merchant_pub",
-                                         GNUNET_JSON_from_data_auto (
-                                           &mi->pubkey),
-                                         "h_contract_terms",
-                                         GNUNET_JSON_from_data_auto (
-                                           &h_contract_terms));
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         ec,
+                                         errmsg);
+    return TALER_MHD_reply_json_pack (connection, MHD_HTTP_OK,
+                                      "{s:o, s:o, s:o}",
+                                      "refund_permissions",
+                                      response,
+                                      "merchant_pub",
+                                      GNUNET_JSON_from_data_auto (
+                                        &mi->pubkey),
+                                      "h_contract_terms",
+                                      GNUNET_JSON_from_data_auto (
+                                        &h_contract_terms));
   }
 }
 
