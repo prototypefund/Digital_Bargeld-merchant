@@ -146,17 +146,6 @@ struct TALER_MERCHANTDB_Plugin *db;
 static struct MHD_Daemon *mhd;
 
 /**
- * Path for the unix domain-socket
- * to run the daemon on.
- */
-static char *serve_unixpath;
-
-/**
- * File mode for unix-domain socket.
- */
-static mode_t unixpath_mode;
-
-/**
  * MIN-Heap of suspended connections to resume when the timeout expires,
  * ordered by timeout. Values are of type `struct MHD_Connection`
  */
@@ -1574,7 +1563,6 @@ run (void *cls,
 {
   int fh;
   enum TALER_MHD_GlobalOptions go;
-  char *bind_to;
 
   (void) cls;
   (void) args;
@@ -1715,103 +1703,15 @@ run (void *cls,
     return;
   }
 
-  if (GNUNET_OK !=
-      TALER_MHD_parse_config (config,
-                              "merchant",
-                              &port,
-                              &serve_unixpath,
-                              &unixpath_mode))
+  fh = TALER_MHD_bind (config,
+                       "merchant",
+                       &port);
+  if ( (0 == port) &&
+       (-1 == fh) )
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-  fh = -1;
-  if (NULL != serve_unixpath)
-  {
-    fh = TALER_MHD_open_unix_path (serve_unixpath,
-                                   unixpath_mode);
-    if (-1 == fh)
-    {
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    }
-  }
-  else if (GNUNET_OK ==
-           GNUNET_CONFIGURATION_get_value_string (config,
-                                                  "merchant",
-                                                  "BIND_TO",
-                                                  &bind_to))
-  {
-    char port_str[6];
-    struct addrinfo hints;
-    struct addrinfo *res;
-    int ec;
-    struct GNUNET_NETWORK_Handle *nh;
-
-    GNUNET_snprintf (port_str,
-                     sizeof (port_str),
-                     "%u",
-                     (uint16_t) port);
-    memset (&hints, 0, sizeof (hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = AI_PASSIVE
-#ifdef AI_IDN
-                     | AI_IDN
-#endif
-    ;
-    if (0 !=
-        (ec = getaddrinfo (bind_to,
-                           port_str,
-                           &hints,
-                           &res)))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to resolve BIND_TO address `%s': %s\n",
-                  bind_to,
-                  gai_strerror (ec));
-      GNUNET_free (bind_to);
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    }
-    GNUNET_free (bind_to);
-
-    if (NULL == (nh = GNUNET_NETWORK_socket_create (res->ai_family,
-                                                    res->ai_socktype,
-                                                    res->ai_protocol)))
-    {
-      GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                           "socket");
-      freeaddrinfo (res);
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    }
-    if (GNUNET_OK !=
-        GNUNET_NETWORK_socket_bind (nh,
-                                    res->ai_addr,
-                                    res->ai_addrlen))
-    {
-      GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                           "bind");
-      freeaddrinfo (res);
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    }
-    freeaddrinfo (res);
-    if (GNUNET_OK !=
-        GNUNET_NETWORK_socket_listen (nh,
-                                      UNIX_BACKLOG))
-    {
-      GNUNET_log_strerror (GNUNET_ERROR_TYPE_ERROR,
-                           "listen");
-      GNUNET_SCHEDULER_shutdown ();
-      return;
-    }
-    fh = GNUNET_NETWORK_get_fd (nh);
-    GNUNET_NETWORK_socket_free_memory_only_ (nh);
-  }
-
   resume_timeout_heap
     = GNUNET_CONTAINER_heap_create (GNUNET_CONTAINER_HEAP_ORDER_MIN);
   payment_trigger_map
