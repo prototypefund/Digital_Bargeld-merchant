@@ -50,9 +50,19 @@ struct ProposalLookupState
   json_t *contract_terms;
 
   /**
-   * Hash over the contract terms.
+   * Hash over the contract terms. Only set if we got #MHD_HTTP_OK.
    */
   struct GNUNET_HashCode contract_terms_hash;
+
+  /**
+   * Signature of the merchant. Only set if we got #MHD_HTTP_OK.
+   */
+  struct TALER_MerchantSignatureP merchant_sig;
+
+  /**
+   * Public key of the merchant. Only set if we got #MHD_HTTP_OK.
+   */
+  struct TALER_MerchantPublicKeyP merchant_pub;
 
   /**
    * Expected status code.
@@ -141,6 +151,23 @@ proposal_lookup_cb (void *cls,
       TALER_TESTING_FAIL (pls->is);
     json_incref (pls->contract_terms);
     pls->contract_terms_hash = *hash;
+    pls->merchant_sig = *sig;
+    {
+      const char *error_name;
+      unsigned int error_line;
+      struct GNUNET_JSON_Specification spec[] = {
+        GNUNET_JSON_spec_fixed_auto ("merchant_pub",
+                                     &pls->merchant_pub),
+        GNUNET_JSON_spec_end ()
+      };
+
+      if (GNUNET_OK !=
+          GNUNET_JSON_parse (contract_terms,
+                             spec,
+                             &error_name,
+                             &error_line))
+        TALER_TESTING_FAIL (pls->is);
+    }
   }
   TALER_TESTING_interpreter_next (pls->is);
 }
@@ -225,6 +252,10 @@ proposal_lookup_traits (void *cls,
                                              pls->contract_terms),
     TALER_TESTING_make_trait_h_contract_terms (0,
                                                &pls->contract_terms_hash),
+    TALER_TESTING_make_trait_merchant_sig (0,
+                                           &pls->merchant_sig),
+    TALER_TESTING_make_trait_peer_key_pub (0,
+                                           &pls->merchant_pub.eddsa_pub),
     TALER_TESTING_trait_end ()
   };
 
