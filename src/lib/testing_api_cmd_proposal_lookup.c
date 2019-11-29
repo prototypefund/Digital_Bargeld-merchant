@@ -136,7 +136,9 @@ proposal_lookup_cb (void *cls,
     TALER_TESTING_FAIL (pls->is);
   if (MHD_HTTP_OK == http_status)
   {
-    pls->contract_terms = (json_t*) json;
+    pls->contract_terms = json_object_get (json, "contract_terms");
+    if (NULL == pls->contract_terms)
+      TALER_TESTING_FAIL (pls->is);
     json_incref (pls->contract_terms);
     pls->contract_terms_hash = *hash;
   }
