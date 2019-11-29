@@ -45,6 +45,16 @@ struct ProposalLookupState
   const char *merchant_url;
 
   /**
+   * Contract terms we downloaded. Only set if we got #MHD_HTTP_OK.
+   */
+  json_t *contract_terms;
+
+  /**
+   * Hash over the contract terms.
+   */
+  struct GNUNET_HashCode contract_terms_hash;
+
+  /**
    * Expected status code.
    */
   unsigned int http_status;
@@ -87,6 +97,12 @@ proposal_lookup_cleanup (void *cls,
                 "Command '%s' did not complete\n",
                 cmd->label);
     TALER_MERCHANT_proposal_lookup_cancel (pls->plo);
+    pls->plo = NULL;
+  }
+  if (NULL != pls->contract_terms)
+  {
+    json_decref (pls->contract_terms);
+    pls->contract_terms = NULL;
   }
   GNUNET_free (pls);
 }
@@ -118,7 +134,12 @@ proposal_lookup_cb (void *cls,
   pls->plo = NULL;
   if (pls->http_status != http_status)
     TALER_TESTING_FAIL (pls->is);
-
+  if (MHD_HTTP_OK == http_status)
+  {
+    pls->contract_terms = (json_t*) json;
+    json_incref (pls->contract_terms);
+    pls->contract_terms_hash = *hash;
+  }
   TALER_TESTING_interpreter_next (pls->is);
 }
 
@@ -165,7 +186,7 @@ proposal_lookup_run (void *cls,
 
     if (GNUNET_OK != GET_TRAIT_NONCE (proposal_cmd,
                                       &nonce))
-      TALER_TESTING_FAIL (is);
+      nonce = &dummy_nonce;
 
     if (GNUNET_OK != TALER_TESTING_get_trait_order_id
           (proposal_cmd, 0, &order_id))
@@ -178,6 +199,37 @@ proposal_lookup_run (void *cls,
                                              &proposal_lookup_cb,
                                              pls);
   GNUNET_assert (NULL != pls->plo);
+}
+
+
+/**
+ * Offer internal data to other commands.
+ *
+ * @param cls closure
+ * @param ret[out] result (could be anything)
+ * @param trait name of the trait
+ * @param index index number of the object to extract.
+ * @return #GNUNET_OK on success
+ */
+static int
+proposal_lookup_traits (void *cls,
+                        const void **ret,
+                        const char *trait,
+                        unsigned int index)
+{
+  struct ProposalLookupState *pls = cls;
+  struct TALER_TESTING_Trait traits[] = {
+    TALER_TESTING_make_trait_contract_terms (0,
+                                             pls->contract_terms),
+    TALER_TESTING_make_trait_h_contract_terms (0,
+                                               &pls->contract_terms_hash),
+    TALER_TESTING_trait_end ()
+  };
+
+  return TALER_TESTING_get_trait (traits,
+                                  ret,
+                                  trait,
+                                  index);
 }
 
 
@@ -213,7 +265,8 @@ TALER_TESTING_cmd_proposal_lookup
       .cls = pls,
       .label = label,
       .run = &proposal_lookup_run,
-      .cleanup = &proposal_lookup_cleanup
+      .cleanup = &proposal_lookup_cleanup,
+      .traits = &proposal_lookup_traits
     };
 
     return cmd;
