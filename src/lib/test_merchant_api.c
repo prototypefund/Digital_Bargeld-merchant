@@ -496,7 +496,7 @@ run (void *cls,
       ("refund-increase-1",
       merchant_url,
       "refund test",
-      "1",
+      "1",  /* order ID */
       "EUR:0.1",
       "EUR:0.01",
       MHD_HTTP_OK),
@@ -1004,7 +1004,6 @@ run (void *cls,
   };
 
   struct TALER_TESTING_Command commands[] = {
-
     TALER_TESTING_cmd_batch ("pay",
                              pay),
 
@@ -1027,16 +1026,12 @@ run (void *cls,
 
     TALER_TESTING_cmd_batch ("refund",
                              refund),
-
     TALER_TESTING_cmd_batch ("tip",
                              tip),
-
     TALER_TESTING_cmd_batch ("pay-again",
                              pay_again),
-
     TALER_TESTING_cmd_batch ("pay-abort",
                              pay_abort),
-
     TALER_TESTING_cmd_history_default_start
       ("history-default-start",
       merchant_url,
