@@ -130,7 +130,7 @@ handle_refund_increase_finished (void *cls,
   case MHD_HTTP_NOT_FOUND:
     rio->cb (rio->cb_cls,
              response_code,
-             TALER_EC_NONE,
+             TALER_JSON_get_error_code (json),
              json);
     break;
   default:
@@ -297,7 +297,7 @@ handle_refund_lookup_finished (void *cls,
   case MHD_HTTP_NOT_FOUND:
     rlo->cb (rlo->cb_cls,
              response_code,
-             TALER_EC_NONE,
+             TALER_JSON_get_error_code (json),
              json);
     break;
   default:
