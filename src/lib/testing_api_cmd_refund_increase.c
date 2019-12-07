@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2018 Taler Systems SA
+  Copyright (C) 2014-2019 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as
@@ -16,13 +16,12 @@
   License along with TALER; see the file COPYING.  If not, see
   <http://www.gnu.org/licenses/>
 */
-
 /**
  * @file lib/testing_api_cmd_refund_increase.c
  * @brief command to test refunds.
  * @author Marcello Stanisci
+ * @author Christian Grothoff
  */
-
 #include "platform.h"
 #include <taler/taler_exchange_service.h>
 #include <taler/taler_testing_lib.h>
@@ -120,7 +119,6 @@ refund_increase_cb (void *cls,
   ris->rio = NULL;
   if (ris->http_code != http_status)
     TALER_TESTING_FAIL (ris->is);
-
   TALER_TESTING_interpreter_next (ris->is);
 }
 
@@ -151,7 +149,8 @@ refund_increase_run (void *cls,
                                              ris->reason,
                                              &refund_increase_cb,
                                              ris);
-  GNUNET_assert (NULL != ris->rio);
+  if (NULL == ris->rio)
+    TALER_TESTING_FAIL (is);
 }
 
 
@@ -173,7 +172,8 @@ refund_increase_traits (void *cls,
 {
   struct RefundIncreaseState *ris = cls;
   struct TALER_TESTING_Trait traits[] = {
-    TALER_TESTING_make_trait_amount (0, ris->refund_amount),
+    TALER_TESTING_make_trait_amount (0,
+                                     ris->refund_amount),
     TALER_TESTING_trait_end ()
   };
 
