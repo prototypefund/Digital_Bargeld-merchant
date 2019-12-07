@@ -546,7 +546,7 @@ run (void *cls,
       "1-unpaid",
       "EUR:0.1",
       "EUR:0.01",
-      MHD_HTTP_BAD_REQUEST),
+      MHD_HTTP_CONFLICT),
 
     /* Try to increase a non existent proposal.  */
     TALER_TESTING_cmd_refund_increase
