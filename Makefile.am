@@ -23,8 +23,7 @@ EXTRA_DIST = \
  COPYING.AGPL \
  COPYING.LGPL \
  contrib/gnunet.tag \
- contrib/microhttpd.tag \
- Doxyfile
+ contrib/microhttpd.tag 
 
 app:
 	mkdir -p $(PACKAGE)-frontend-$(VERSION)-app
