@@ -268,8 +268,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"1\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\": {\"t_ms\": 0},\
+        \"pay_deadline\": {\"t_ms\": \"never\" },\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
@@ -351,8 +351,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"2\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\": {\"t_ms\": 0},\
+        \"pay_deadline\": {\"t_ms\": \"never\" },\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
