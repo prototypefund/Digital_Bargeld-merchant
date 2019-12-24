@@ -577,9 +577,9 @@ run (void *cls,
           {\"currency\":\"EUR\",\
            \"value\":0,\
            \"fraction\":50000000},\
-        \"refund_deadline\":{\"t_ms\":2},\
-        \"pay_deadline\":{\"t_ms\":1},\
-        \"wire_transfer_deadline\":{\"t_ms\":2366841600},\
+        \"refund_deadline\":{\"t_ms\":2000},\
+        \"pay_deadline\":{\"t_ms\":1000},\
+        \"wire_transfer_deadline\":{\"t_ms\":2366841600000},\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
