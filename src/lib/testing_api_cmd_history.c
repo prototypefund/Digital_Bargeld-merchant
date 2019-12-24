@@ -86,56 +86,6 @@ struct HistoryState
   unsigned int nresult;
 };
 
-/**
- * Parse given JSON object to absolute time.
- *
- * @param root the json object representing data
- * @param[out] ret where to write the data
- * @return #GNUNET_OK upon successful parsing;
- *         #GNUNET_SYSERR upon error
- */
-static int
-parse_abs_time (json_t *root,
-                struct GNUNET_TIME_Absolute *ret)
-{
-  const char *val;
-  unsigned long long int tval;
-
-  val = json_string_value (root);
-  if (NULL == val)
-  {
-    GNUNET_break_op (0);
-    return GNUNET_SYSERR;
-  }
-  if ( (0 == strcasecmp (val,
-                         "/forever/")) ||
-       (0 == strcasecmp (val,
-                         "/end of time/")) ||
-       (0 == strcasecmp (val,
-                         "/never/")) )
-  {
-    *ret = GNUNET_TIME_UNIT_FOREVER_ABS;
-    return GNUNET_OK;
-  }
-  if (1 != sscanf (val,
-                   "/Date(%llu)/",
-                   &tval))
-  {
-    GNUNET_break_op (0);
-    return GNUNET_SYSERR;
-  }
-  /* Time is in seconds in JSON, but in microseconds in
-   * GNUNET_TIME_Absolute */
-  ret->abs_value_us = tval * 1000LL * 1000LL;
-  if ( (ret->abs_value_us) / 1000LL / 1000LL != tval)
-  {
-    /* Integer overflow */
-    GNUNET_break_op (0);
-    return GNUNET_SYSERR;
-  }
-  return GNUNET_OK;
-}
-
 
 /**
  * Callback for a /history request; checks that (1) HTTP status
@@ -193,12 +143,17 @@ history_cb (void *cls,
     size_t index;
     json_array_foreach (arr, index, entry)
     {
-      json_t *timestamp;
+      struct GNUNET_JSON_Specification spec[] = {
+        GNUNET_JSON_spec_absolute_time ("timestamp",
+                                        &entry_timestamp),
+        GNUNET_JSON_spec_end ()
+      };
 
-      timestamp = json_object_get (entry, "timestamp");
-      if (GNUNET_OK != parse_abs_time (timestamp, &entry_timestamp))
+      if (GNUNET_OK !=
+          GNUNET_JSON_parse (entry,
+                             spec,
+                             NULL, NULL))
         TALER_TESTING_FAIL (hs->is);
-
       if (last_timestamp.abs_value_us < entry_timestamp.abs_value_us)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
