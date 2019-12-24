@@ -527,8 +527,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"1-unpaid\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
@@ -591,8 +591,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"unincreased-proposal\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
@@ -801,8 +801,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"1-tip\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
@@ -876,8 +876,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"10\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":10,\
@@ -955,8 +955,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"11\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":10,\

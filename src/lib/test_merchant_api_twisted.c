@@ -241,8 +241,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"5719TRIGGER\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
@@ -286,8 +286,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"fail-check-payment-1\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
@@ -387,8 +387,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"1\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
@@ -413,8 +413,8 @@ run (void *cls,
            \"fraction\":50000000},\
          \"fulfillment_url\": \"https://example.com/\",\
          \"order_id\":\"2\",\
-         \"refund_deadline\":\"\\/Date(0)\\/\",\
-         \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+         \"refund_deadline\":{\"t_ms\":0},\
+         \"pay_deadline\":{\"t_ms\":99999999999},\
          \"amount\":\
            {\"currency\":\"EUR\",\
             \"value\":5,\
@@ -469,8 +469,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"5\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"amount\":\
           {\"currency\":\"EUR\",\
            \"value\":5,\
@@ -639,8 +639,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"5383\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
@@ -729,8 +729,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"11\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
@@ -842,8 +842,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"abort-one\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
@@ -928,8 +928,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"DS-1\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
@@ -947,8 +947,8 @@ run (void *cls,
            \"value\":0,\
            \"fraction\":50000000},\
         \"order_id\":\"DS-2\",\
-        \"refund_deadline\":\"\\/Date(0)\\/\",\
-        \"pay_deadline\":\"\\/Date(99999999999)\\/\",\
+        \"refund_deadline\":{\"t_ms\":0},\
+        \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
         \"amount\":\
           {\"currency\":\"EUR\",\
