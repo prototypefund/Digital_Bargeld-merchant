@@ -572,7 +572,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
   if (cprc->refunded)
     return TALER_MHD_reply_json_pack (connection,
                                       MHD_HTTP_OK,
-                                      "{s:o, s:b, s:b, s:o}",
+                                      "{s:O, s:b, s:b, s:o}",
                                       "contract_terms", cprc->contract_terms,
                                       "paid", 1,
                                       "refunded", cprc->refunded,
@@ -581,7 +581,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
                                         &cprc->refund_amount));
   return TALER_MHD_reply_json_pack (connection,
                                     MHD_HTTP_OK,
-                                    "{s:o, s:b, s:b }",
+                                    "{s:O, s:b, s:b }",
                                     "contract_terms", cprc->contract_terms,
                                     "paid", 1,
                                     "refunded", 0);
