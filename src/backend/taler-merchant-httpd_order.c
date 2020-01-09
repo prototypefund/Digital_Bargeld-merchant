@@ -463,7 +463,6 @@ proposal_put (struct MHD_Connection *connection,
   {
     return MHD_YES;
   }
-
   /* other internal errors might have occurred */
   if (GNUNET_SYSERR == res)
   {
@@ -472,6 +471,17 @@ proposal_put (struct MHD_Connection *connection,
              MHD_HTTP_INTERNAL_SERVER_ERROR,
              TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
              "Impossible to parse the order");
+  }
+  if (0 !=
+      strcasecmp (total.currency,
+                  TMH_currency))
+  {
+    GNUNET_break_op (0);
+    return TALER_MHD_reply_with_error
+             (connection,
+             MHD_HTTP_BAD_REQUEST,
+             TALER_EC_PROPOSAL_ORDER_BAD_CURRENCY,
+             "Total amount must be in currency supported by backend");
   }
 
   if (wire_transfer_deadline.abs_value_us <
