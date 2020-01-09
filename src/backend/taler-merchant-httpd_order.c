@@ -527,7 +527,7 @@ proposal_put (struct MHD_Connection *connection,
                                        "No wire method configured for instance");
   }
   json_object_set_new (order,
-                       "H_wire",
+                       "h_wire",
                        GNUNET_JSON_from_data_auto (&wm->h_wire));
   json_object_set_new (order,
                        "wire_method",
@@ -635,7 +635,7 @@ proposal_put (struct MHD_Connection *connection,
 
 /**
  * Generate a proposal, given its order. In practical terms,
- * it adds the fields  'exchanges', 'merchant_pub', and 'H_wire'
+ * it adds the fields  'exchanges', 'merchant_pub', and 'h_wire'
  * to the order gotten from the frontend. Finally, it signs this
  * data, and returns it to the frontend.
  *

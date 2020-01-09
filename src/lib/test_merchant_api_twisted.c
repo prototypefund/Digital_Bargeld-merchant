@@ -569,7 +569,7 @@ run (void *cls,
       ("create-proposal-unaggregation",
       /* Need a fresh instance in order to associate this
        * proposal with a fresh h_wire;  this way, this proposal
-       * won't get hooked by the aggregator gathering same-H_wire'd
+       * won't get hooked by the aggregator gathering same-h_wire'd
        * transactions.  */
       twister_merchant_url_instance_tor,
       MHD_HTTP_OK,

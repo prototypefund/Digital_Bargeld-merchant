@@ -1171,7 +1171,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                                       &tctx->timestamp),
       TALER_JSON_spec_amount ("amount",
                               &tctx->total_amount),
-      GNUNET_JSON_spec_fixed_auto ("H_wire",
+      GNUNET_JSON_spec_fixed_auto ("h_wire",
                                    &tctx->h_wire),
       GNUNET_JSON_spec_end ()
     };

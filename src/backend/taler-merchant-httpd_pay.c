@@ -224,7 +224,7 @@ struct PayContext
   struct GNUNET_HashCode h_contract_terms;
 
   /**
-   * "H_wire" from @e contract_terms.  Used to identify
+   * "h_wire" from @e contract_terms.  Used to identify
    * the instance's wire transfer method.
    */
   struct GNUNET_HashCode h_wire;
@@ -1573,7 +1573,7 @@ parse_pay (struct MHD_Connection *connection,
                               &pc->amount),
       GNUNET_JSON_spec_string ("fulfillment_url",
                                &fulfillment_url),
-      GNUNET_JSON_spec_fixed_auto ("H_wire",
+      GNUNET_JSON_spec_fixed_auto ("h_wire",
                                    &pc->h_wire),
       GNUNET_JSON_spec_end ()
     };
