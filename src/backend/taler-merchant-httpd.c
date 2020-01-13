@@ -903,7 +903,7 @@ wireformat_iterator_cb (void *cls,
 
 
   wm = GNUNET_new (struct WireMethod);
-  wm->wire_method = TALER_WIRE_payto_get_method (payto);
+  wm->wire_method = TALER_BANK_payto_get_method (payto);
   GNUNET_free (payto);
   GNUNET_asprintf (&instance_option,
                    "ACTIVE_%s",

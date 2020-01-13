@@ -441,7 +441,7 @@ process_wire_accounts (struct Exchange *exchange,
   {
     char *method;
 
-    method = TALER_WIRE_payto_get_method (accounts[i].url);
+    method = TALER_BANK_payto_get_method (accounts[i].url);
     if (NULL == method)
       return GNUNET_SYSERR;
     if (GNUNET_OK !=
