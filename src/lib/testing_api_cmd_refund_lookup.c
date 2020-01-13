@@ -269,7 +269,7 @@ refund_lookup_cb (void *cls,
       (increase_cmd = TALER_TESTING_interpreter_lookup_command
                         (rls->is, rls->increase_reference)))
   {
-    if (GNUNET_OK != TALER_TESTING_get_trait_amount
+    if (GNUNET_OK != TALER_TESTING_get_trait_string
           (increase_cmd, 0, &refund_amount))
       TALER_TESTING_FAIL (rls->is);
 

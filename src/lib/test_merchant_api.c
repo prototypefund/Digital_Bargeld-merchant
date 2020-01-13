@@ -54,6 +54,16 @@ static const char *pickup_amounts_1[] = {"EUR:5", NULL};
  */
 static char *fakebank_url;
 
+static struct TALER_WireTransferIdentifierRawP wtid;
+static char *payer_url;
+static char *payer_payto;
+static struct TALER_BANK_AuthenticationData auth;
+static char *exchange_payto;
+static char *exchange_account_url;
+static char *merchant_payto;
+static struct TALER_TESTING_BankConfiguration bc;
+static struct TALER_TESTING_ExchangeConfiguration ec;
+
 /**
  * Merchant base URL.
  */
@@ -131,11 +141,12 @@ static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
  * @param url exchange_url
  */
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
-  TALER_TESTING_cmd_fakebank_transfer (label, amount, \
-                                       fakebank_url, USER_ACCOUNT_NO, \
-                                       EXCHANGE_ACCOUNT_NO, \
-                                       USER_LOGIN_NAME, USER_LOGIN_PASS, \
-                                       EXCHANGE_URL)
+  TALER_TESTING_cmd_transfer (label, amount, \
+		              payer_url, \
+			      &auth, \
+			      exchange_payto, \
+		              &wtid, \
+                              EXCHANGE_URL)
 
 /**
  * Run wire transfer of funds from some user's account to the
@@ -232,7 +243,8 @@ run (void *cls,
     CMD_TRANSFER_TO_EXCHANGE ("create-reserve-1",
                               "EUR:10.02"),
     /**
-     * Make a reserve exist, according to the previous
+     * Make a reserve exist,
+     * according to the previous
      * transfer.
      */
     CMD_EXEC_WIREWATCH ("wirewatch-1"),
@@ -240,8 +252,9 @@ run (void *cls,
       ("check_bank_transfer-2",
       EXCHANGE_URL,
       "EUR:10.02",
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO),
+      payer_payto, // payer payto
+      exchange_payto), // payee exchange payto
+
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
       "create-reserve-1",
@@ -327,6 +340,7 @@ run (void *cls,
                            "EUR:5",
                            "EUR:4.99",
                            "EUR:0.01"),
+
     TALER_TESTING_cmd_check_bank_empty
       ("check_bank_empty-1"),
     CMD_EXEC_AGGREGATOR ("run-aggregator"),
@@ -334,8 +348,9 @@ run (void *cls,
       ("check_bank_transfer-498c",
       EXCHANGE_URL,
       "EUR:4.98",
-      EXCHANGE_ACCOUNT_NO,
-      MERCHANT_ACCOUNT_NO),
+      exchange_payto,
+      merchant_payto),
+
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-2"),
     TALER_TESTING_cmd_end ()
   };
@@ -412,36 +427,34 @@ run (void *cls,
       merchant_url,
       MHD_HTTP_OK,
       "check_bank_transfer-498c"),
-    TALER_TESTING_cmd_fakebank_transfer
+    TALER_TESTING_cmd_transfer
       ("create-reserve-2",
-      "EUR:1",
-      fakebank_url,
-      USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
-      "user62",
-      "pass62",
-      EXCHANGE_URL),
-    TALER_TESTING_cmd_fakebank_transfer_with_ref
+       "EUR:1",
+       payer_url,
+       &auth,
+       exchange_payto,
+       &wtid,
+       EXCHANGE_URL),
+    TALER_TESTING_cmd_admin_add_incoming_with_ref
       ("create-reserve-2b",
       "EUR:4.01",
-      fakebank_url,
-      USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO,
-      "user62",
-      "pass62",
-      "create-reserve-2",
-      EXCHANGE_URL),
+      exchange_account_url,
+      &auth,
+      exchange_payto,
+      "create-reserve-2"),
     CMD_EXEC_WIREWATCH ("wirewatch-2"),
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2a",
       EXCHANGE_URL,
       "EUR:1",
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO),
+      payer_payto,
+      exchange_payto),
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2b",
       EXCHANGE_URL,
       "EUR:4.01",
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO),
+      payer_payto,
+      exchange_payto),
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
                                        "create-reserve-2",
                                        "EUR:5",
@@ -459,8 +472,8 @@ run (void *cls,
       ("check_bank_transfer-498c-2",
       EXCHANGE_URL,
       "EUR:4.98",
-      EXCHANGE_ACCOUNT_NO,
-      MERCHANT_ACCOUNT_NO),
+      exchange_payto,
+      merchant_payto),
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty"),
     TALER_TESTING_cmd_merchant_track_transfer
       ("track-transfer-2",
@@ -573,8 +586,8 @@ run (void *cls,
       ("check_bank_transfer-unincreased-refund",
       EXCHANGE_URL,
       "EUR:5.01",
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO),
+      payer_payto,
+      exchange_payto),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-unincreased-refund",
@@ -617,8 +630,8 @@ run (void *cls,
       ("check_bank_transfer-unincreased-refund",
       EXCHANGE_URL,
       "EUR:4.98",
-      EXCHANGE_ACCOUNT_NO,
-      MERCHANT_ACCOUNT_NO),
+      exchange_payto,
+      merchant_payto),
 
     /* Actually try to pick up the refund from the
      * "unincreased proposal".  */
@@ -641,24 +654,23 @@ run (void *cls,
   struct TALER_TESTING_Command tip[] = {
 
     /* Test tipping.  */
-    TALER_TESTING_cmd_fakebank_transfer_with_instance
+    TALER_TESTING_cmd_admin_add_incoming_with_instance
       ("create-reserve-tip-1",
       "EUR:20.04",
-      fakebank_url,
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO,
-      USER_LOGIN_NAME,
-      USER_LOGIN_PASS,
+      exchange_account_url,
+      &auth,
+      payer_payto,
       "tip",
-      EXCHANGE_URL,
       CONFIG_FILE),
 
     CMD_EXEC_WIREWATCH ("wirewatch-3"),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-tip-1",
-      EXCHANGE_URL,
-      "EUR:20.04", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+       EXCHANGE_URL,
+      "EUR:20.04",
+      payer_payto,
+      exchange_payto),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-1",
                                      merchant_url_internal ("tip"),
@@ -724,24 +736,21 @@ run (void *cls,
                                               "EUR:10.02", // auth
                                               "EUR:10.02"), // ava
 
-    TALER_TESTING_cmd_fakebank_transfer_with_instance
+    TALER_TESTING_cmd_admin_add_incoming_with_instance
       ("create-reserve-insufficient-funds",
       "EUR:1.01",
-      fakebank_url,
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO,
-      USER_LOGIN_NAME,
-      USER_LOGIN_PASS,
+      exchange_account_url,
+      &auth,
+      payer_payto,
       "dtip",
-      EXCHANGE_URL,
       CONFIG_FILE),
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-insufficient-tip-funds",
       EXCHANGE_URL,
       "EUR:1.01",
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO),
+      payer_payto,
+      exchange_payto),
 
     CMD_EXEC_WIREWATCH
       ("wirewatch-insufficient-tip-funds"),
@@ -826,8 +835,8 @@ run (void *cls,
       ("check_bank_transfer-tip-498c",
       EXCHANGE_URL,
       "EUR:4.98",
-      EXCHANGE_ACCOUNT_NO,
-      MERCHANT_ACCOUNT_NO),
+      exchange_payto,
+      merchant_payto),
     TALER_TESTING_cmd_check_bank_empty
       ("check_bank_empty-at-tips"),
 
@@ -836,14 +845,13 @@ run (void *cls,
 
   struct TALER_TESTING_Command pay_again[] = {
 
-    TALER_TESTING_cmd_fakebank_transfer
+    TALER_TESTING_cmd_transfer
       ("create-reserve-10",
       "EUR:10.02",
-      fakebank_url,
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO,
-      USER_LOGIN_NAME,
-      USER_LOGIN_PASS,
+      payer_url,
+      &auth,
+      exchange_payto,
+      &wtid,
       EXCHANGE_URL),
 
     CMD_EXEC_WIREWATCH ("wirewatch-10"),
@@ -851,7 +859,9 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-10",
       EXCHANGE_URL,
-      "EUR:10.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+      "EUR:10.02",
+      payer_payto,
+      exchange_payto),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-10a",
                                        "create-reserve-10",
@@ -910,8 +920,8 @@ run (void *cls,
       ("check_bank_transfer-9.97-10",
       EXCHANGE_URL,
       "EUR:9.97",
-      EXCHANGE_ACCOUNT_NO,
-      MERCHANT_ACCOUNT_NO),
+      exchange_payto,
+      merchant_payto),
 
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-10"),
 
@@ -928,8 +938,8 @@ run (void *cls,
       ("check_bank_transfer-11",
       EXCHANGE_URL,
       "EUR:10.02",
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO),
+      payer_payto,
+      exchange_payto),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-11a",
                                        "create-reserve-11",
@@ -1064,11 +1074,35 @@ main (int argc,
   GNUNET_log_setup ("test-merchant-api",
                     "DEBUG",
                     NULL);
-  if (NULL ==
-      (fakebank_url = TALER_TESTING_prepare_fakebank
-                        (CONFIG_FILE,
-                        "account-exchange")))
+  if (GNUNET_OK != TALER_TESTING_prepare_fakebank (CONFIG_FILE,
+                                                   "account-exchange",
+                                                   &bc))
     return 77;
+
+  GNUNET_assert
+    (GNUNET_SYSERR != GNUNET_asprintf (&payer_url,
+                                       "%s/%d",
+	                               USER_ACCOUNT_NO));
+  GNUNET_assert
+    (GNUNET_SYSERR != GNUNET_asprintf (&payer_payto,
+                                       "payto://x-taler-bank/%s/%d",
+		                       strchr (strchr (fakebank_url, '/') + 1, '/') + 1,
+				       USER_ACCOUNT_NO));
+  GNUNET_assert
+    (GNUNET_SYSERR != GNUNET_asprintf (&exchange_account_url,
+				       "%s/%d",
+				       fakebank_url,
+                                       EXCHANGE_ACCOUNT_NO));
+  GNUNET_assert
+    (GNUNET_SYSERR != GNUNET_asprintf (&exchange_payto,
+                                       "payto://x-taler-bank/%s/%d",
+		                       strchr (strchr (fakebank_url, '/') + 1, '/') + 1,
+                                       EXCHANGE_ACCOUNT_NO));
+  GNUNET_assert
+    (GNUNET_SYSERR != GNUNET_asprintf (&merchant_payto,
+                                       "payto://x-taler-bank/%s/%d",
+		                       strchr (strchr (fakebank_url, '/') + 1, '/') + 1,
+                                       MERCHANT_ACCOUNT_NO));
   if (NULL ==
       (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
     return 77;
@@ -1076,8 +1110,7 @@ main (int argc,
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
   switch (TALER_TESTING_prepare_exchange (CONFIG_FILE,
-                                          &auditor_url,
-                                          &exchange_url))
+			                  &ec))
   {
   case GNUNET_SYSERR:
     GNUNET_break (0);

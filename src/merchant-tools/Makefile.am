@@ -26,6 +26,7 @@ taler_merchant_benchmark_LDADD = \
   -ltalertesting \
   -ltalerfakebank \
   -ltalerbank \
+  -ltalerwire \
   -ltalerbanktesting \
   -ltalerexchange \
   -ltalerjson \

@@ -33,7 +33,6 @@
 #include <taler/taler_bank_service.h>
 #include <taler/taler_fakebank_lib.h>
 #include <taler/taler_testing_lib.h>
-#include <taler/taler_testing_bank_lib.h>
 #include <taler/taler_error_codes.h>
 #include "taler_merchant_testing_lib.h"
 
@@ -55,25 +54,15 @@ enum PaymentGeneratorError
 
 /* Hard-coded params.  Note, the bank is expected to
  * have the Tor user with account number 3 and password 'x'.
- *
- * This is not a problem _so far_, as the fakebank mocks logins,
- * and the Python bank makes that account by default.  */
-#define USER_ACCOUNT_NO 3
+ */
+#define PAYER_URL "FIXME/3"
 #define EXCHANGE_ACCOUNT_NO 2
 #define USER_LOGIN_NAME "Tor"
 #define USER_LOGIN_PASS "x"
 #define EXCHANGE_URL "http://example.com/"
-
 #define FIRST_INSTRUCTION -1
 #define TRACKS_INSTRUCTION 9
 #define TWOCOINS_INSTRUCTION 5
-
-#define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
-  TALER_TESTING_cmd_fakebank_transfer (label, amount, \
-                                       bank_url, USER_ACCOUNT_NO, \
-                                       EXCHANGE_ACCOUNT_NO, \
-                                       USER_LOGIN_NAME, USER_LOGIN_PASS, \
-                                       EXCHANGE_URL)
 
 /**
  * Help string shown if NO subcommand is given on command line.
@@ -178,6 +167,14 @@ static char *merchant_url;
  * Currency used.
  */
 static char *currency;
+
+/**
+ * Authentication data to use. FIXME: init !
+ */
+static struct TALER_BANK_AuthenticationData auth;
+
+static char *exchange_payto;
+static struct TALER_WireTransferIdentifierRawP wtid;
 
 /**
  * Convenience macros to allocate all the currency-dependant
@@ -336,9 +333,14 @@ run (void *cls,
 
   struct TALER_TESTING_Command ordinary_commands[] = {
 
-    CMD_TRANSFER_TO_EXCHANGE
+    TALER_TESTING_cmd_transfer
       ("create-reserve-1",
-      CURRENCY_10_02),
+       CURRENCY_10_02,
+       PAYER_URL, // bank base URL + path to the payer account.
+       &auth,
+       exchange_payto,
+       &wtid,
+       EXCHANGE_URL),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
@@ -425,9 +427,14 @@ run (void *cls,
 
   struct TALER_TESTING_Command corner_commands[] = {
 
-    CMD_TRANSFER_TO_EXCHANGE
+    TALER_TESTING_cmd_transfer
       ("create-reserve-1",
-      CURRENCY_5_01),
+       CURRENCY_5_01,
+       PAYER_URL,
+       &auth,
+       exchange_payto,
+       &wtid,
+       EXCHANGE_URL),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
@@ -460,9 +467,14 @@ run (void *cls,
       FIRST_INSTRUCTION,
       &unaggregated_number),
 
-    CMD_TRANSFER_TO_EXCHANGE
+    TALER_TESTING_cmd_transfer
       ("create-reserve-2",
-      CURRENCY_10_02),
+       CURRENCY_10_02,
+       PAYER_URL,
+       &auth,
+       exchange_payto,
+       &wtid,
+       EXCHANGE_URL),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-2",
@@ -784,6 +796,12 @@ main (int argc,
     terminate_process (merchantd);
     return FAILED_TO_LAUNCH_BANK;
   }
+
+  /**
+   * FIXME: Need to retrieve the bank base URL!
+   */
+  exchange_payto = TALER_TESTING_make_xtalerbank_payto ("FIXME-BANK-HOSTNAME:PORT",
+		                                        "/2");
 
   result = TALER_TESTING_setup_with_exchange
              (run,

@@ -736,11 +736,11 @@ pay_traits (void *cls,
   }
   {
     struct TALER_TESTING_Trait traits[] = {
-      TALER_TESTING_make_trait_amount
+      TALER_TESTING_make_trait_string
         (AMOUNT_WITH_FEE, ps->amount_with_fee),
-      TALER_TESTING_make_trait_amount
+      TALER_TESTING_make_trait_string
         (AMOUNT_WITHOUT_FEE, ps->amount_without_fee),
-      TALER_TESTING_make_trait_amount
+      TALER_TESTING_make_trait_string
         (REFUND_FEE, ps->refund_fee),
       TALER_TESTING_make_trait_proposal_reference
         (0, ps->proposal_reference),
@@ -871,15 +871,15 @@ pay_abort_run (void *cls,
         (pay_cmd, 0, &coin_reference))
     TALER_TESTING_FAIL (is);
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_amount
+  if (GNUNET_OK != TALER_TESTING_get_trait_string
         (pay_cmd, AMOUNT_WITH_FEE, &amount_with_fee))
     TALER_TESTING_FAIL (is);
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_amount
+  if (GNUNET_OK != TALER_TESTING_get_trait_string
         (pay_cmd, AMOUNT_WITHOUT_FEE, &amount_without_fee))
     TALER_TESTING_FAIL (is);
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_amount
+  if (GNUNET_OK != TALER_TESTING_get_trait_string
         (pay_cmd, REFUND_FEE, &refund_fee))
     TALER_TESTING_FAIL (is);
 
@@ -1079,11 +1079,11 @@ pay_again_run (void *cls,
         (pay_cmd, 0, &proposal_reference))
     TALER_TESTING_FAIL (is);
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_amount
+  if (GNUNET_OK != TALER_TESTING_get_trait_string
         (pay_cmd, AMOUNT_WITH_FEE, &amount_with_fee))
     TALER_TESTING_FAIL (is);
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_amount
+  if (GNUNET_OK != TALER_TESTING_get_trait_string
         (pay_cmd, AMOUNT_WITHOUT_FEE, &amount_without_fee))
     TALER_TESTING_FAIL (is);
 

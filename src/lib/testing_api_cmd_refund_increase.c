@@ -172,7 +172,7 @@ refund_increase_traits (void *cls,
 {
   struct RefundIncreaseState *ris = cls;
   struct TALER_TESTING_Trait traits[] = {
-    TALER_TESTING_make_trait_amount (0,
+    TALER_TESTING_make_trait_string (0,
                                      ris->refund_amount),
     TALER_TESTING_trait_end ()
   };

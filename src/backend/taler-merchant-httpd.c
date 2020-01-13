@@ -27,9 +27,8 @@
 #include <taler/taler_util.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mhd_lib.h>
-#include <taler/taler_exchange_service.h>
-#include <taler/taler_wire_plugin.h>
 #include <taler/taler_wire_lib.h>
+#include <taler/taler_exchange_service.h>
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
@@ -719,10 +718,7 @@ wireformat_iterator_cb (void *cls,
   struct WireMethod *wm;
   char *payto;
   char *fn;
-  char *plugin_name;
-  struct TALER_WIRE_Plugin *plugin;
   json_t *j;
-  enum TALER_ErrorCode ec;
   struct GNUNET_HashCode jh_wire;
   char *wire_file_mode;
 
@@ -754,49 +750,6 @@ wireformat_iterator_cb (void *cls,
     iic->ret = GNUNET_SYSERR;
     return;
   }
-
-  /* check payto://-URL is well-formed and matches plugin */
-  if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_string (iic->config,
-                                             section,
-                                             "PLUGIN",
-                                             &plugin_name))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               section,
-                               "PLUGIN");
-    GNUNET_free (payto);
-    iic->ret = GNUNET_SYSERR;
-    return;
-  }
-  if (NULL ==
-      (plugin = TALER_WIRE_plugin_load (iic->config,
-                                        plugin_name)))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to load wire plugin `%s'\n",
-                plugin_name);
-    GNUNET_free (plugin_name);
-    GNUNET_free (payto);
-    iic->ret = GNUNET_SYSERR;
-    return;
-  }
-  if (TALER_EC_NONE !=
-      (ec = plugin->wire_validate (plugin->cls,
-                                   payto)))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "payto:// URL `%s' not supported by plugin `%s'\n",
-                payto,
-                plugin_name);
-    GNUNET_free (plugin_name);
-    GNUNET_free (payto);
-    TALER_WIRE_plugin_unload (plugin);
-    iic->ret = GNUNET_SYSERR;
-    return;
-  }
-  TALER_WIRE_plugin_unload (plugin);
-  GNUNET_free (plugin_name);
 
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_filename (iic->config,
