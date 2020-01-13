@@ -335,12 +335,12 @@ run (void *cls,
 
     TALER_TESTING_cmd_transfer
       ("create-reserve-1",
-       CURRENCY_10_02,
-       PAYER_URL, // bank base URL + path to the payer account.
-       &auth,
-       exchange_payto,
-       &wtid,
-       EXCHANGE_URL),
+      CURRENCY_10_02,
+      PAYER_URL,  // bank base URL + path to the payer account.
+      &auth,
+      exchange_payto,
+      &wtid,
+      EXCHANGE_URL),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
@@ -429,12 +429,12 @@ run (void *cls,
 
     TALER_TESTING_cmd_transfer
       ("create-reserve-1",
-       CURRENCY_5_01,
-       PAYER_URL,
-       &auth,
-       exchange_payto,
-       &wtid,
-       EXCHANGE_URL),
+      CURRENCY_5_01,
+      PAYER_URL,
+      &auth,
+      exchange_payto,
+      &wtid,
+      EXCHANGE_URL),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
@@ -469,12 +469,12 @@ run (void *cls,
 
     TALER_TESTING_cmd_transfer
       ("create-reserve-2",
-       CURRENCY_10_02,
-       PAYER_URL,
-       &auth,
-       exchange_payto,
-       &wtid,
-       EXCHANGE_URL),
+      CURRENCY_10_02,
+      PAYER_URL,
+      &auth,
+      exchange_payto,
+      &wtid,
+      EXCHANGE_URL),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-2",
@@ -800,8 +800,8 @@ main (int argc,
   /**
    * FIXME: Need to retrieve the bank base URL!
    */
-  exchange_payto = TALER_TESTING_make_xtalerbank_payto ("FIXME-BANK-HOSTNAME:PORT",
-		                                        "/2");
+  exchange_payto = TALER_payto_xtalerbank_make ("FIXME-BANK-HOSTNAME:PORT",
+                                                "/2");
 
   result = TALER_TESTING_setup_with_exchange
              (run,

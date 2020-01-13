@@ -169,7 +169,6 @@ static struct TALER_TESTING_ExchangeConfiguration ec;
   TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE)
 
 
-
 /**
  * Run wire transfer of funds from some user's account to the
  * exchange.
@@ -181,9 +180,9 @@ static struct TALER_TESTING_ExchangeConfiguration ec;
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
   TALER_TESTING_cmd_transfer (label, amount, \
                               payer_url, \
-		              &auth, \
-		              exchange_payto, \
-			      &wtid, \
+                              &auth, \
+                              exchange_payto, \
+                              &wtid, \
                               EXCHANGE_URL)
 
 /**
@@ -1073,16 +1072,16 @@ main (int argc,
     return 77;
 
 
-  exchange_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
-		                                        EXCHANGE_ACCOUNT_PATH);
-  payer_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
-                                                     USER_ACCOUNT_PATH);
-  merchant_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
-                                                        MERCHANT_ACCOUNT_PATH);
+  exchange_payto = TALER_payto_xtalerbank_make (fakebank_url,
+                                                EXCHANGE_ACCOUNT_PATH);
+  payer_payto = TALER_payto_xtalerbank_make (fakebank_url,
+                                             USER_ACCOUNT_PATH);
+  merchant_payto = TALER_payto_xtalerbank_make (fakebank_url,
+                                                MERCHANT_ACCOUNT_PATH);
   GNUNET_asprintf (&payer_url,
-		  "%s%s",
-		  fakebank_url,
-		  USER_ACCOUNT_PATH);
+                   "%s%s",
+                   fakebank_url,
+                   USER_ACCOUNT_PATH);
 
   if (NULL == (merchant_url = TALER_TESTING_prepare_merchant
                                 (CONFIG_FILE)))
@@ -1104,7 +1103,7 @@ main (int argc,
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
   switch (TALER_TESTING_prepare_exchange (CONFIG_FILE,
-			                  &ec))
+                                          &ec))
   {
   case GNUNET_SYSERR:
     GNUNET_break (0);

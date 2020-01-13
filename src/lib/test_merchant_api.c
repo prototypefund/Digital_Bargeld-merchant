@@ -142,10 +142,10 @@ static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
  */
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
   TALER_TESTING_cmd_transfer (label, amount, \
-		              payer_url, \
-			      &auth, \
-			      exchange_payto, \
-		              &wtid, \
+                              payer_url, \
+                              &auth, \
+                              exchange_payto, \
+                              &wtid, \
                               EXCHANGE_URL)
 
 /**
@@ -246,8 +246,7 @@ run (void *cls,
      * Make a reserve exist,
      * according to the previous
      * transfer.
-     */
-    CMD_EXEC_WIREWATCH ("wirewatch-1"),
+     */CMD_EXEC_WIREWATCH ("wirewatch-1"),
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
       EXCHANGE_URL,
@@ -429,12 +428,12 @@ run (void *cls,
       "check_bank_transfer-498c"),
     TALER_TESTING_cmd_transfer
       ("create-reserve-2",
-       "EUR:1",
-       payer_url,
-       &auth,
-       exchange_payto,
-       &wtid,
-       EXCHANGE_URL),
+      "EUR:1",
+      payer_url,
+      &auth,
+      exchange_payto,
+      &wtid,
+      EXCHANGE_URL),
     TALER_TESTING_cmd_admin_add_incoming_with_ref
       ("create-reserve-2b",
       "EUR:4.01",
@@ -667,7 +666,7 @@ run (void *cls,
 
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-tip-1",
-       EXCHANGE_URL,
+      EXCHANGE_URL,
       "EUR:20.04",
       payer_payto,
       exchange_payto),
@@ -1082,19 +1081,19 @@ main (int argc,
   GNUNET_assert
     (GNUNET_SYSERR != GNUNET_asprintf (&payer_url,
                                        "%s%s",
-	                               USER_ACCOUNT_PATH));
+                                       USER_ACCOUNT_PATH));
   GNUNET_assert
     (GNUNET_SYSERR != GNUNET_asprintf (&exchange_account_url,
-				       "%s%s",
-				       fakebank_url,
+                                       "%s%s",
+                                       fakebank_url,
                                        EXCHANGE_ACCOUNT_PATH));
 
-  payer_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
-		                                        USER_ACCOUNT_PATH);
-  exchange_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
-		                                        EXCHANGE_ACCOUNT_PATH);
-  merchant_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
-		                                        MERCHANT_ACCOUNT_PATH);
+  payer_payto = TALER_payto_xtalerbank_make (fakebank_url,
+                                             USER_ACCOUNT_PATH);
+  exchange_payto = TALER_payto_xtalerbank_make (fakebank_url,
+                                                EXCHANGE_ACCOUNT_PATH);
+  merchant_payto = TALER_payto_xtalerbank_make (fakebank_url,
+                                                MERCHANT_ACCOUNT_PATH);
   if (NULL ==
       (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
     return 77;
@@ -1102,7 +1101,7 @@ main (int argc,
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
   switch (TALER_TESTING_prepare_exchange (CONFIG_FILE,
-			                  &ec))
+                                          &ec))
   {
   case GNUNET_SYSERR:
     GNUNET_break (0);
