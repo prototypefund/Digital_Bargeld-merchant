@@ -21,7 +21,6 @@
  */
 #include "platform.h"
 #include <taler/taler_json_lib.h>
-#include <taler/taler_wire_lib.h>
 #include "taler-merchant-httpd_exchanges.h"
 
 
@@ -441,7 +440,7 @@ process_wire_accounts (struct Exchange *exchange,
   {
     char *method;
 
-    method = TALER_BANK_payto_get_method (accounts[i].url);
+    method = TALER_payto_get_method (accounts[i].url);
     if (NULL == method)
       return GNUNET_SYSERR;
     if (GNUNET_OK !=

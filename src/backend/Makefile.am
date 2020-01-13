@@ -35,7 +35,7 @@ taler_merchant_httpd_LDADD = \
   $(top_builddir)/src/backenddb/libtalermerchantdb.la \
   -ltalerexchange \
   -ltalermhd \
-  -ltalerwire \
+  -ltalerbank \
   -ltalerjson \
   -ltalerutil \
   -ltalerpq \

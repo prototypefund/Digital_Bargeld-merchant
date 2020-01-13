@@ -27,7 +27,7 @@
 #include <taler/taler_util.h>
 #include <taler/taler_json_lib.h>
 #include <taler/taler_mhd_lib.h>
-#include <taler/taler_wire_lib.h>
+#include <taler/taler_bank_service.h>
 #include <taler/taler_exchange_service.h>
 #include "taler_merchantdb_lib.h"
 #include "taler-merchant-httpd.h"
@@ -903,7 +903,7 @@ wireformat_iterator_cb (void *cls,
 
 
   wm = GNUNET_new (struct WireMethod);
-  wm->wire_method = TALER_BANK_payto_get_method (payto);
+  wm->wire_method = TALER_payto_get_method (payto);
   GNUNET_free (payto);
   GNUNET_asprintf (&instance_option,
                    "ACTIVE_%s",
