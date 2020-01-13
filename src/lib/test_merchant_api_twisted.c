@@ -101,11 +101,6 @@ static char *merchant_url;
 static char *exchange_url;
 
 /**
- * Auditor URL; fixes FTBFS.
- */
-static char *auditor_url;
-
-/**
  * Merchant process.
  */
 static struct GNUNET_OS_Process *merchantd;
