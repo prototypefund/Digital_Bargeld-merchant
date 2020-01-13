@@ -120,20 +120,30 @@ static struct GNUNET_OS_Process *twisterexchanged;
  */
 static struct GNUNET_OS_Process *twistermerchantd;
 
+
+static char *payer_url;
+static char *payer_payto;
+static char *exchange_payto;
+static char *merchant_payto;
+static struct TALER_BANK_AuthenticationData auth;
+static struct TALER_WireTransferIdentifierRawP wtid;
+static struct TALER_TESTING_BankConfiguration bc;
+static struct TALER_TESTING_ExchangeConfiguration ec;
+
 /**
  * Account number of the exchange at the bank.
  */
-#define EXCHANGE_ACCOUNT_NO 2
+#define EXCHANGE_ACCOUNT_PATH "/2"
 
 /**
  * Account number of the merchant at the bank.
  */
-#define MERCHANT_ACCOUNT_NO 3
+#define MERCHANT_ACCOUNT_PATH "/3"
 
 /**
  * Account number of some user.
  */
-#define USER_ACCOUNT_NO 62
+#define USER_ACCOUNT_PATH "/62"
 
 /**
  * User name. Never checked by fakebank.
@@ -163,6 +173,8 @@ static struct GNUNET_OS_Process *twistermerchantd;
 #define CMD_EXEC_AGGREGATOR(label) \
   TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE)
 
+
+
 /**
  * Run wire transfer of funds from some user's account to the
  * exchange.
@@ -172,11 +184,12 @@ static struct GNUNET_OS_Process *twistermerchantd;
  * @param url exchange_url
  */
 #define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
-  TALER_TESTING_cmd_fakebank_transfer (label, amount, \
-                                       fakebank_url, USER_ACCOUNT_NO, \
-                                       EXCHANGE_ACCOUNT_NO, \
-                                       USER_LOGIN_NAME, USER_LOGIN_PASS, \
-                                       EXCHANGE_URL)
+  TALER_TESTING_cmd_transfer (label, amount, \
+                              payer_url, \
+		              &auth, \
+		              exchange_payto, \
+			      &wtid, \
+                              EXCHANGE_URL)
 
 /**
  * Run wire transfer of funds from some user's account to the
@@ -220,8 +233,8 @@ run (void *cls,
       ("5719-check-transfer",
       EXCHANGE_URL,
       "EUR:1.01",
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO),
+      payer_payto,
+      exchange_payto),
 
     TALER_TESTING_cmd_withdraw_amount ("5719-withdraw",
                                        "5719-create-reserve",
@@ -553,8 +566,8 @@ run (void *cls,
       ("check_bank_transfer-unaggregation",
       EXCHANGE_URL,
       "EUR:5.01",
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO),
+      payer_payto,
+      exchange_payto),
 
     TALER_TESTING_cmd_check_bank_empty
       ("check_bank_unaggregated-a"),
@@ -618,8 +631,8 @@ run (void *cls,
       ("check_bank_transfer-5383",
       EXCHANGE_URL,
       "EUR:2.02",
-      USER_ACCOUNT_NO,
-      EXCHANGE_ACCOUNT_NO),
+      payer_payto,
+      exchange_payto),
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-5383a",
       "create-reserve-5383",
@@ -667,8 +680,8 @@ run (void *cls,
          deposit fee   0.01 * 2 -
          wire fee      0.01
       */"EUR:1.97",
-      EXCHANGE_ACCOUNT_NO,
-      MERCHANT_ACCOUNT_NO),
+      exchange_payto,
+      merchant_payto),
     TALER_TESTING_cmd_modify_object_dl
       ("hack-5383",
       PROXY_EXCHANGE_CONFIG_FILE,
@@ -702,7 +715,9 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-2",
       EXCHANGE_URL,
-      "EUR:2.02", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+      "EUR:2.02",
+      payer_payto,
+      exchange_payto),
 
     TALER_TESTING_cmd_check_bank_empty
       ("track_chunk_check_empty-a"),
@@ -770,8 +785,8 @@ run (void *cls,
          deposit fee   0.01 * 2 -
          wire fee      0.01
       */"EUR:1.97",
-      EXCHANGE_ACCOUNT_NO,
-      MERCHANT_ACCOUNT_NO),
+      exchange_payto,
+      merchant_payto),
 
     /**
      * Fake total to include only one coin.  Math: each 1-EUR
@@ -821,7 +836,7 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_transfer
       ("check_bank_transfer-abort-1",
       EXCHANGE_URL,
-      "EUR:1.01", USER_ACCOUNT_NO, EXCHANGE_ACCOUNT_NO),
+      "EUR:1.01", payer_payto, exchange_payto),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-abort-1",
                                        "create-reserve-abort-1",
@@ -1057,10 +1072,22 @@ main (int argc,
   GNUNET_log_setup ("test-merchant-api-twisted",
                     "DEBUG", NULL);
 
-  if (NULL == (fakebank_url = TALER_TESTING_prepare_fakebank
-                                (CONFIG_FILE,
-                                "account-exchange")))
+  if (GNUNET_OK != TALER_TESTING_prepare_fakebank (CONFIG_FILE,
+                                                   "account-exchange",
+                                                   &bc))
     return 77;
+
+
+  exchange_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
+		                                        EXCHANGE_ACCOUNT_PATH);
+  payer_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
+                                                     USER_ACCOUNT_PATH);
+  merchant_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
+                                                        MERCHANT_ACCOUNT_PATH);
+  GNUNET_asprintf (&payer_url,
+		  "%s%s",
+		  fakebank_url,
+		  USER_ACCOUNT_PATH);
 
   if (NULL == (merchant_url = TALER_TESTING_prepare_merchant
                                 (CONFIG_FILE)))
@@ -1082,8 +1109,7 @@ main (int argc,
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
   switch (TALER_TESTING_prepare_exchange (CONFIG_FILE,
-                                          &auditor_url,
-                                          &exchange_url))
+			                  &ec))
   {
   case GNUNET_SYSERR:
     GNUNET_break (0);

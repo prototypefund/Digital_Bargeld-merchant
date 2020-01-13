@@ -92,17 +92,17 @@ static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
 /**
  * Account number of the exchange at the bank.
  */
-#define EXCHANGE_ACCOUNT_NO 2
+#define EXCHANGE_ACCOUNT_PATH "/2"
 
 /**
  * Account number of some user.
  */
-#define USER_ACCOUNT_NO 62
+#define USER_ACCOUNT_PATH "/62"
 
 /**
  * Account number used by the merchant
  */
-#define MERCHANT_ACCOUNT_NO 3
+#define MERCHANT_ACCOUNT_PATH "/3"
 
 /**
  * User name. Never checked by fakebank.
@@ -1081,28 +1081,20 @@ main (int argc,
 
   GNUNET_assert
     (GNUNET_SYSERR != GNUNET_asprintf (&payer_url,
-                                       "%s/%d",
-	                               USER_ACCOUNT_NO));
-  GNUNET_assert
-    (GNUNET_SYSERR != GNUNET_asprintf (&payer_payto,
-                                       "payto://x-taler-bank/%s/%d",
-		                       strchr (strchr (fakebank_url, '/') + 1, '/') + 1,
-				       USER_ACCOUNT_NO));
+                                       "%s%s",
+	                               USER_ACCOUNT_PATH));
   GNUNET_assert
     (GNUNET_SYSERR != GNUNET_asprintf (&exchange_account_url,
-				       "%s/%d",
+				       "%s%s",
 				       fakebank_url,
-                                       EXCHANGE_ACCOUNT_NO));
-  GNUNET_assert
-    (GNUNET_SYSERR != GNUNET_asprintf (&exchange_payto,
-                                       "payto://x-taler-bank/%s/%d",
-		                       strchr (strchr (fakebank_url, '/') + 1, '/') + 1,
-                                       EXCHANGE_ACCOUNT_NO));
-  GNUNET_assert
-    (GNUNET_SYSERR != GNUNET_asprintf (&merchant_payto,
-                                       "payto://x-taler-bank/%s/%d",
-		                       strchr (strchr (fakebank_url, '/') + 1, '/') + 1,
-                                       MERCHANT_ACCOUNT_NO));
+                                       EXCHANGE_ACCOUNT_PATH));
+
+  payer_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
+		                                        USER_ACCOUNT_PATH);
+  exchange_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
+		                                        EXCHANGE_ACCOUNT_PATH);
+  merchant_payto = TALER_TESTING_make_xtalerbank_payto (fakebank_url,
+		                                        MERCHANT_ACCOUNT_PATH);
   if (NULL ==
       (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
     return 77;
