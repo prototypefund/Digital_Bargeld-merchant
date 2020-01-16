@@ -1433,7 +1433,13 @@ url_handler (void *cls,
       if ( (0 != strcasecmp (effective_url, rh->url)) )
         continue;
       url_found = GNUNET_YES;
-      if ( (rh->method != NULL) && (0 != strcasecmp (method, rh->method)) )
+      if (0 == strcasecmp (method,
+                           MHD_HTTP_METHOD_OPTIONS))
+      {
+        return TALER_MHD_reply_cors_preflight (connection);
+      }
+      if ( (rh->method != NULL) &&
+           (0 != strcasecmp (method, rh->method)) )
         continue;
       selected_handler = rh;
       break;
@@ -1449,6 +1455,11 @@ url_handler (void *cls,
       if ( (0 != strcasecmp (effective_url, rh->url)) )
         continue;
       url_found = GNUNET_YES;
+      if (0 == strcasecmp (method,
+                           MHD_HTTP_METHOD_OPTIONS))
+      {
+        return TALER_MHD_reply_cors_preflight (connection);
+      }
       if ( (rh->method != NULL) && (0 != strcasecmp (method, rh->method)) )
         continue;
       selected_handler = rh;

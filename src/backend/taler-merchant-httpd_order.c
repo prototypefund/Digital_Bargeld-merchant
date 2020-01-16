@@ -150,12 +150,12 @@ make_merchant_base_url (struct MHD_Connection *connection, const
   const char *host;
   const char *forwarded_host;
   const char *uri_path;
-  struct TALER_Buffer buf = { 0 };
+  struct GNUNET_Buffer buf = { 0 };
 
   if (GNUNET_YES == TALER_mhd_is_https (connection))
-    TALER_buffer_write_str (&buf, "https://");
+    GNUNET_buffer_write_str (&buf, "https://");
   else
-    TALER_buffer_write_str (&buf, "http://");
+    GNUNET_buffer_write_str (&buf, "http://");
 
 
   host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
@@ -164,12 +164,12 @@ make_merchant_base_url (struct MHD_Connection *connection, const
 
   if (NULL != forwarded_host)
   {
-    TALER_buffer_write_str (&buf, forwarded_host);
+    GNUNET_buffer_write_str (&buf, forwarded_host);
   }
   else
   {
     GNUNET_assert (NULL != host);
-    TALER_buffer_write_str (&buf, host);
+    GNUNET_buffer_write_str (&buf, host);
   }
 
   uri_path = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
@@ -181,16 +181,16 @@ make_merchant_base_url (struct MHD_Connection *connection, const
     GNUNET_assert (0);
   }
 
-  TALER_buffer_write_path (&buf, "public");
+  GNUNET_buffer_write_path (&buf, "public");
 
   if (0 != strcmp (instance_id, "default"))
   {
-    TALER_buffer_write_path (&buf, "/instances/");
-    TALER_buffer_write_str (&buf, instance_id);
+    GNUNET_buffer_write_path (&buf, "/instances/");
+    GNUNET_buffer_write_str (&buf, instance_id);
   }
-  TALER_buffer_write_path (&buf, "");
+  GNUNET_buffer_write_path (&buf, "");
 
-  return TALER_buffer_reap_str (&buf);
+  return GNUNET_buffer_reap_str (&buf);
 }
 
 
