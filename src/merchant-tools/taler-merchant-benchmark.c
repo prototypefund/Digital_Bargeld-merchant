@@ -310,118 +310,84 @@ static void
 run (void *cls,
      struct TALER_TESTING_Interpreter *is)
 {
-
   /* Will be freed by testing-lib.  */
-  GNUNET_assert
-    (GNUNET_OK == GNUNET_CURL_append_header
-      (is->ctx, APIKEY_SANDBOX));
-
-  ALLOCATE_AMOUNTS
-    (CURRENCY_10_02,
-    CURRENCY_9_98,
-    CURRENCY_5_01,
-    CURRENCY_5,
-    CURRENCY_4_99,
-    CURRENCY_0_02,
-    CURRENCY_0_01);
-
-  ALLOCATE_ORDERS
-    (order_worth_5,
-    order_worth_5_track,
-    order_worth_5_unaggregated,
-    order_worth_10_2coins);
-
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_CURL_append_header (is->ctx,
+                                            APIKEY_SANDBOX));
+  ALLOCATE_AMOUNTS (CURRENCY_10_02,
+                    CURRENCY_9_98,
+                    CURRENCY_5_01,
+                    CURRENCY_5,
+                    CURRENCY_4_99,
+                    CURRENCY_0_02,
+                    CURRENCY_0_01);
+  ALLOCATE_ORDERS (order_worth_5,
+                   order_worth_5_track,
+                   order_worth_5_unaggregated,
+                   order_worth_10_2coins);
   struct TALER_TESTING_Command ordinary_commands[] = {
-
-    TALER_TESTING_cmd_transfer
-      ("create-reserve-1",
-      CURRENCY_10_02,
-      PAYER_URL,  // bank base URL + path to the payer account.
-      &auth,
-      exchange_payto,
-      &wtid,
-      EXCHANGE_URL),
-
-    TALER_TESTING_cmd_exec_wirewatch
-      ("wirewatch-1",
-      cfg_filename),
-
-    TALER_TESTING_cmd_withdraw_amount
-      ("withdraw-coin-1",
-      "create-reserve-1",
-      CURRENCY_5,
-      MHD_HTTP_OK),
-
-    TALER_TESTING_cmd_withdraw_amount
-      ("withdraw-coin-2",
-      "create-reserve-1",
-      CURRENCY_5,
-      MHD_HTTP_OK),
-
-    TALER_TESTING_cmd_proposal
-      ("create-proposal-1",
-      merchant_url,
-      MHD_HTTP_OK,
-      order_worth_5),
-
-    TALER_TESTING_cmd_pay
-      ("deposit-simple",
-      merchant_url,
-      MHD_HTTP_OK,
-      "create-proposal-1",
-      "withdraw-coin-1",
-      CURRENCY_5,
-      CURRENCY_4_99,
-      CURRENCY_0_01),
-
-    TALER_TESTING_cmd_rewind_ip
-      ("rewind-payments",
-      FIRST_INSTRUCTION,
-      &payments_number),
-
+    TALER_TESTING_cmd_transfer ("create-reserve-1",
+                                CURRENCY_10_02,
+                                PAYER_URL,  // bank base URL + path to the payer account.
+                                &auth,
+                                exchange_payto,
+                                &wtid,
+                                EXCHANGE_URL),
+    TALER_TESTING_cmd_exec_wirewatch ("wirewatch-1",
+                                      cfg_filename),
+    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-1",
+                                       "create-reserve-1",
+                                       CURRENCY_5,
+                                       MHD_HTTP_OK),
+    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
+                                       "create-reserve-1",
+                                       CURRENCY_5,
+                                       MHD_HTTP_OK),
+    TALER_TESTING_cmd_proposal ("create-proposal-1",
+                                merchant_url,
+                                MHD_HTTP_OK,
+                                order_worth_5),
+    TALER_TESTING_cmd_pay ("deposit-simple",
+                           merchant_url,
+                           MHD_HTTP_OK,
+                           "create-proposal-1",
+                           "withdraw-coin-1",
+                           CURRENCY_5,
+                           CURRENCY_4_99,
+                           CURRENCY_0_01),
+    TALER_TESTING_cmd_rewind_ip ("rewind-payments",
+                                 FIRST_INSTRUCTION,
+                                 &payments_number),
     /* Next proposal-pay cycle will be used by /track CMDs
      * and so it will not have to be looped over, only /track
      * CMDs will have to.  */
-
-    TALER_TESTING_cmd_proposal
-      ("create-proposal-2",
-      merchant_url,
-      MHD_HTTP_OK,
-      order_worth_5_track),
-
-    TALER_TESTING_cmd_pay
-      ("deposit-simple-2",
-      merchant_url,
-      MHD_HTTP_OK,
-      "create-proposal-2",
-      "withdraw-coin-2",
-      CURRENCY_5,
-      CURRENCY_4_99,
-      CURRENCY_0_01),
-
+    TALER_TESTING_cmd_proposal ("create-proposal-2",
+                                merchant_url,
+                                MHD_HTTP_OK,
+                                order_worth_5_track),
+    TALER_TESTING_cmd_pay ("deposit-simple-2",
+                           merchant_url,
+                           MHD_HTTP_OK,
+                           "create-proposal-2",
+                           "withdraw-coin-2",
+                           CURRENCY_5,
+                           CURRENCY_4_99,
+                           CURRENCY_0_01),
     /* /track/transaction over deposit-simple-2 */
 
-    TALER_TESTING_cmd_exec_aggregator
-      ("aggregate-1",
-      cfg_filename),
-
-    TALER_TESTING_cmd_merchant_track_transaction
-      ("track-transaction-1",
-      merchant_url,
-      MHD_HTTP_OK,
-      "deposit-simple-2"),
-
-    TALER_TESTING_cmd_merchant_track_transfer
-      ("track-transfer-1",
-      merchant_url,
-      MHD_HTTP_OK,
-      "track-transaction-1"),
-
-    TALER_TESTING_cmd_rewind_ip
-      ("rewind-tracks",
-      TRACKS_INSTRUCTION,
-      &tracks_number),
-
+    TALER_TESTING_cmd_exec_aggregator ("aggregate-1",
+                                       cfg_filename),
+    TALER_TESTING_cmd_merchant_track_transaction ("track-transaction-1",
+                                                  merchant_url,
+                                                  MHD_HTTP_OK,
+                                                  "deposit-simple-2"),
+    TALER_TESTING_cmd_merchant_track_transfer ("track-transfer-1",
+                                               merchant_url,
+                                               MHD_HTTP_OK,
+                                               "track-transaction-1"),
+    TALER_TESTING_cmd_rewind_ip ("rewind-tracks",
+                                 TRACKS_INSTRUCTION,
+                                 &tracks_number),
     TALER_TESTING_cmd_end ()
   };
 
