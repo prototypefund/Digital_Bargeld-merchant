@@ -66,7 +66,7 @@ struct TALER_MERCHANT_TipAuthorizeOperation
   /**
    * Minor context that holds body and headers.
    */
-  struct TEAH_PostContext post_ctx;
+  struct TALER_CURL_PostContext post_ctx;
 };
 
 
