@@ -49,13 +49,7 @@
 
 static const char *pickup_amounts_1[] = {"EUR:5", NULL};
 
-/**
- * URL of the fakebank.
- */
-static char *fakebank_url;
-
 static char *payer_payto;
-static struct TALER_BANK_AuthenticationData auth;
 static char *exchange_payto;
 static char *merchant_payto;
 static struct TALER_TESTING_BankConfiguration bc;
@@ -70,11 +64,6 @@ static char *merchant_url;
  * Merchant process.
  */
 static struct GNUNET_OS_Process *merchantd;
-
-/**
- * Exchange base URL.
- */
-static char *exchange_url;
 
 /**
  * Map for #intern()
@@ -146,7 +135,7 @@ CMD_TRANSFER_TO_EXCHANGE (char *label, char *amount)
 
   return TALER_TESTING_cmd_admin_add_incoming (label,
                                                amount,
-                                               &auth,
+                                               &bc.exchange_auth,
                                                payer_payto);
 }
 
@@ -235,13 +224,14 @@ run (void *cls,
      * Make a reserve exist,
      * according to the previous
      * transfer.
-     */CMD_EXEC_WIREWATCH ("wirewatch-1"),
-    TALER_TESTING_cmd_check_bank_transfer
+     */
+    CMD_EXEC_WIREWATCH ("wirewatch-1"),
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-2",
-      EXCHANGE_URL,
       "EUR:10.02",
       payer_payto, // payer payto
-      exchange_payto), // payee exchange payto
+      exchange_payto,
+      "create-reserve-1"), // payee exchange payto
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
@@ -264,17 +254,11 @@ run (void *cls,
       ("create-proposal-1",
       merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1\",\
         \"refund_deadline\": {\"t_ms\": 0},\
         \"pay_deadline\": {\"t_ms\": \"never\" },\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:5.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -349,17 +333,11 @@ run (void *cls,
       ("create-proposal-2",
       merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"2\",\
         \"refund_deadline\": {\"t_ms\": 0},\
         \"pay_deadline\": {\"t_ms\": \"never\" },\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:5.0\",\
         \"summary\": \"useful product\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -420,7 +398,7 @@ run (void *cls,
     TALER_TESTING_cmd_admin_add_incoming_with_ref
       ("create-reserve-2b",
       "EUR:4.01",
-      &auth,
+      &bc.exchange_auth,
       exchange_payto,
       "create-reserve-2"),
     CMD_EXEC_WIREWATCH ("wirewatch-2"),
@@ -516,17 +494,11 @@ run (void *cls,
       ("create-proposal-not-to-be-paid",
       merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1-unpaid\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:5.0\"\
         \"summary\": \"useful product\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -581,17 +553,11 @@ run (void *cls,
       ("create-proposal-unincreased-refund",
       merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"unincreased-proposal\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:5.0\"\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -639,7 +605,7 @@ run (void *cls,
     TALER_TESTING_cmd_admin_add_incoming_with_instance
       ("create-reserve-tip-1",
       "EUR:20.04",
-      &auth,
+      &bc.exchange_auth,
       payer_payto,
       "tip",
       CONFIG_FILE),
@@ -655,14 +621,14 @@ run (void *cls,
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-1",
                                      merchant_url_internal ("tip"),
-                                     exchange_url,
+                                     EXCHANGE_URL,
                                      MHD_HTTP_OK,
                                      "tip 1",
                                      "EUR:5.01"),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-2",
                                      merchant_url_internal ("tip"),
-                                     exchange_url,
+                                     EXCHANGE_URL,
                                      MHD_HTTP_OK,
                                      "tip 2",
                                      "EUR:5.01"),
@@ -674,7 +640,7 @@ run (void *cls,
      * actually create a reserve.  */TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-null",
       merchant_url_internal ("nulltip"),
-      exchange_url,
+      EXCHANGE_URL,
       MHD_HTTP_NOT_FOUND,
       "tip 2",
       "EUR:5.01",
@@ -720,7 +686,7 @@ run (void *cls,
     TALER_TESTING_cmd_admin_add_incoming_with_instance
       ("create-reserve-insufficient-funds",
       "EUR:1.01",
-      &auth,
+      &bc.exchange_auth,
       payer_payto,
       "dtip",
       CONFIG_FILE),
@@ -738,7 +704,7 @@ run (void *cls,
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-3-insufficient-funds",
       merchant_url_internal ("dtip"),
-      exchange_url,
+      EXCHANGE_URL,
       MHD_HTTP_PRECONDITION_FAILED,
       "tip 3",
       "EUR:2.02",
@@ -747,7 +713,7 @@ run (void *cls,
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-4-unknown-instance",
       merchant_url_internal ("unknown"),
-      exchange_url,
+      EXCHANGE_URL,
       MHD_HTTP_NOT_FOUND,
       "tip 4",
       "EUR:5.01",
@@ -756,7 +722,7 @@ run (void *cls,
     TALER_TESTING_cmd_tip_authorize_with_ec
       ("authorize-tip-5-notip-instance",
       merchant_url,
-      exchange_url,
+      EXCHANGE_URL,
       MHD_HTTP_NOT_FOUND,
       "tip 5",
       "EUR:5.01",
@@ -785,17 +751,11 @@ run (void *cls,
       ("create-proposal-tip-1",
       merchant_url_internal ("tip"),
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1-tip\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:5.0\",\
         \"summary\": \"useful product\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -854,17 +814,11 @@ run (void *cls,
       ("create-proposal-10",
       merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"10\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":10,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:10.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -933,17 +887,11 @@ run (void *cls,
       ("create-proposal-11",
       merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"11\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":10,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:10.0\"\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -1031,7 +979,7 @@ run (void *cls,
 
   TALER_TESTING_run_with_fakebank (is,
                                    commands,
-                                   fakebank_url);
+                                   bc.exchange_auth.wire_gateway_url);
 }
 
 
