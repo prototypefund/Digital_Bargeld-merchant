@@ -234,10 +234,10 @@ handle_status (void *cls,
         return;
       }
       break;
-    case TALER_EXCHANGE_RTT_PAYBACK:
+    case TALER_EXCHANGE_RTT_RECOUP:
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   _ (
-                    "Encountered unsupported /payback operation on tipping reserve\n"));
+                    "Encountered unsupported /recoup operation on tipping reserve\n"));
       /* FIXME: probably should count these like deposits!? */
       break;
     case TALER_EXCHANGE_RTT_CLOSE:
