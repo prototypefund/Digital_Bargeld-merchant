@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2019 Taler Systems SA
+  Copyright (C) 2014-2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as
@@ -17,7 +17,7 @@
   <http://www.gnu.org/licenses/>
 */
 /**
- * @file exchange/test_merchant_api.c
+ * @file lib/test_merchant_api.c
  * @brief testcase to test exchange's HTTP API interface
  * @author Sree Harsha Totakura <sreeharsha@totakura.in>
  * @author Christian Grothoff
@@ -54,7 +54,6 @@ static const char *pickup_amounts_1[] = {"EUR:5", NULL};
  */
 static char *fakebank_url;
 
-static struct TALER_WireTransferIdentifierRawP wtid;
 static char *payer_payto;
 static struct TALER_BANK_AuthenticationData auth;
 static char *exchange_payto;
@@ -76,11 +75,6 @@ static struct GNUNET_OS_Process *merchantd;
  * Exchange base URL.
  */
 static char *exchange_url;
-
-/**
- * Auditor base URL; only used to fix FTBFS.
- */
-static char *auditor_url;
 
 /**
  * Map for #intern()
@@ -153,7 +147,7 @@ CMD_TRANSFER_TO_EXCHANGE (char *label, char *amount)
   return TALER_TESTING_cmd_admin_add_incoming (label,
                                                amount,
                                                &auth,
-                                               customer_payto);
+                                               payer_payto);
 }
 
 
@@ -421,13 +415,8 @@ run (void *cls,
       merchant_url,
       MHD_HTTP_OK,
       "check_bank_transfer-498c"),
-    TALER_TESTING_cmd_transfer
-      ("create-reserve-2",
-      "EUR:1",
-      &auth,
-      exchange_payto,
-      &wtid,
-      EXCHANGE_URL),
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-2",
+                              "EUR:1"),
     TALER_TESTING_cmd_admin_add_incoming_with_ref
       ("create-reserve-2b",
       "EUR:4.01",
@@ -563,13 +552,14 @@ run (void *cls,
       "EUR:0.01",
       MHD_HTTP_NOT_FOUND),
 
-    /**
-     * The following block will (1) create a new
-     * reserve, then (2) a proposal, then (3) pay for
-     * it, and finally (4) attempt to pick up a refund
-     * from it without any increasing taking place
-     * in the first place.
-     **/CMD_TRANSFER_TO_EXCHANGE ("create-reserve-unincreased-refund",
+    /*
+       The following block will (1) create a new
+       reserve, then (2) a proposal, then (3) pay for
+       it, and finally (4) attempt to pick up a refund
+       from it without any increasing taking place
+       in the first place.
+     */
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-unincreased-refund",
                               "EUR:5.01"),
 
     CMD_EXEC_WIREWATCH ("wirewatch-unincreased-refund"),
@@ -834,14 +824,8 @@ run (void *cls,
   };
 
   struct TALER_TESTING_Command pay_again[] = {
-
-    TALER_TESTING_cmd_transfer
-      ("create-reserve-10",
-      "EUR:10.02",
-      &auth,
-      exchange_payto,
-      &wtid,
-      EXCHANGE_URL),
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-1",
+                              "EUR:10.02"),
 
     CMD_EXEC_WIREWATCH ("wirewatch-10"),
 
