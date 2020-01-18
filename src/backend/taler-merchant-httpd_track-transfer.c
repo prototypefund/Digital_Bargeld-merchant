@@ -563,7 +563,7 @@ check_wire_fee (struct TrackTransferContext *rctx,
   /* Wire fee check failed, export proof to client */
   resume_track_transfer_with_response
     (rctx,
-    MHD_HTTP_BAD_DEPENDENCY,
+    MHD_HTTP_FAILED_DEPENDENCY,
     TALER_MHD_make_json_pack (
       "{s:I, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:O}",
       "code",
