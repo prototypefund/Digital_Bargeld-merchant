@@ -187,11 +187,11 @@ proposal_lookup_run (void *cls,
 {
   struct ProposalLookupState *pls = cls;
   const char *order_id;
-  const struct GNUNET_CRYPTO_EddsaPublicKey *nonce;
+  const struct TALER_MerchantPublicKeyP *nonce;
   /* Only used if we do NOT use the nonce from traits.  */
-  struct GNUNET_CRYPTO_EddsaPublicKey dummy_nonce;
+  struct TALER_MerchantPublicKeyP dummy_nonce;
   #define GET_TRAIT_NONCE(cmd,ptr) \
-  TALER_TESTING_get_trait_peer_key_pub (cmd, 1, ptr)
+  TALER_TESTING_get_trait_merchant_pub (cmd, 1, ptr)
 
   pls->is = is;
 
@@ -215,7 +215,12 @@ proposal_lookup_run (void *cls,
 
     if (GNUNET_OK != GET_TRAIT_NONCE (proposal_cmd,
                                       &nonce))
+    {
+      GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                                  &dummy_nonce,
+                                  sizeof (dummy_nonce));
       nonce = &dummy_nonce;
+    }
 
     if (GNUNET_OK != TALER_TESTING_get_trait_order_id
           (proposal_cmd, 0, &order_id))
@@ -224,7 +229,7 @@ proposal_lookup_run (void *cls,
   pls->plo = TALER_MERCHANT_proposal_lookup (is->ctx,
                                              pls->merchant_url,
                                              order_id,
-                                             nonce,
+                                             &nonce->eddsa_pub,
                                              &proposal_lookup_cb,
                                              pls);
   GNUNET_assert (NULL != pls->plo);
@@ -254,8 +259,8 @@ proposal_lookup_traits (void *cls,
                                                &pls->contract_terms_hash),
     TALER_TESTING_make_trait_merchant_sig (0,
                                            &pls->merchant_sig),
-    TALER_TESTING_make_trait_peer_key_pub (0,
-                                           &pls->merchant_pub.eddsa_pub),
+    TALER_TESTING_make_trait_merchant_pub (0,
+                                           &pls->merchant_pub),
     TALER_TESTING_trait_end ()
   };
 

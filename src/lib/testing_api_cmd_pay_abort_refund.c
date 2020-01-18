@@ -159,7 +159,7 @@ pay_abort_refund_run (void *cls,
   const struct TALER_MERCHANT_RefundEntry *refund_entry;
   const unsigned int *num_refunds;
   const struct TALER_TESTING_Command *abort_cmd;
-  const struct GNUNET_CRYPTO_EddsaPublicKey *merchant_pub;
+  const struct TALER_MerchantPublicKeyP *merchant_pub;
   const struct GNUNET_HashCode *h_contract_terms;
 
   pars->is = is;
@@ -181,7 +181,7 @@ pay_abort_refund_run (void *cls,
                                                 &h_contract_terms))
     TALER_TESTING_FAIL (is);
   if (GNUNET_OK !=
-      TALER_TESTING_get_trait_peer_key_pub (abort_cmd,
+      TALER_TESTING_get_trait_merchant_pub (abort_cmd,
                                             0,
                                             &merchant_pub))
     TALER_TESTING_FAIL (is);
@@ -203,7 +203,7 @@ pay_abort_refund_run (void *cls,
                h_contract_terms,
                &refund_entry->coin_pub,
                refund_entry->rtransaction_id,
-               (const struct TALER_MerchantPublicKeyP *) merchant_pub,
+               merchant_pub,
                &refund_entry->merchant_sig,
                &abort_refund_cb,
                pars);

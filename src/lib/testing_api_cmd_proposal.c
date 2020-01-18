@@ -117,7 +117,8 @@ proposal_traits (void *cls,
 {
   struct ProposalState *ps = cls;
 #define MAKE_TRAIT_NONCE(ptr)                       \
-  TALER_TESTING_make_trait_peer_key_pub (1, ptr)
+  TALER_TESTING_make_trait_merchant_pub (1, (struct \
+                                             TALER_MerchantPublicKeyP *) (ptr))
 
   struct TALER_TESTING_Trait traits[] = {
     TALER_TESTING_make_trait_order_id (0, ps->order_id),
@@ -126,8 +127,8 @@ proposal_traits (void *cls,
     TALER_TESTING_make_trait_h_contract_terms
       (0, &ps->h_contract_terms),
     TALER_TESTING_make_trait_merchant_sig (0, &ps->merchant_sig),
-    TALER_TESTING_make_trait_peer_key_pub
-      (0, &ps->merchant_pub.eddsa_pub),
+    TALER_TESTING_make_trait_merchant_pub
+      (0, &ps->merchant_pub),
     MAKE_TRAIT_NONCE (&ps->nonce),
     TALER_TESTING_trait_end ()
   };

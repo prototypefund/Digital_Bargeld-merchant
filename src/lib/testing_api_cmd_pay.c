@@ -331,7 +331,7 @@ pay_cb (void *cls,
   struct GNUNET_CRYPTO_EddsaSignature sig;
   const char *error_name;
   unsigned int error_line;
-  const struct GNUNET_CRYPTO_EddsaPublicKey *merchant_pub;
+  const struct TALER_MerchantPublicKeyP *merchant_pub;
 
   ps->po = NULL;
   if (ps->http_status != http_status)
@@ -375,7 +375,7 @@ pay_cb (void *cls,
                                                    ps->proposal_reference)));
 
     if (GNUNET_OK !=
-        TALER_TESTING_get_trait_peer_key_pub (proposal_cmd,
+        TALER_TESTING_get_trait_merchant_pub (proposal_cmd,
                                               0,
                                               &merchant_pub))
       TALER_TESTING_FAIL (ps->is);
@@ -384,7 +384,7 @@ pay_cb (void *cls,
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
                                     &mr.purpose,
                                     &sig,
-                                    merchant_pub))
+                                    &merchant_pub->eddsa_pub))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Merchant signature given in response to /pay"
@@ -491,7 +491,7 @@ _pay_run (const char *merchant_url,
           const char *amount_with_fee,
           const char *amount_without_fee,
           const char *refund_fee,
-          struct TALER_MERCHANT_Pay * (*api_func)(),
+          struct TALER_MERCHANT_Pay *(*api_func)(),
           void (*api_cb)(),
           void *cls)
 {
@@ -708,7 +708,7 @@ pay_traits (void *cls,
   struct PayState *ps = cls;
   const char *order_id;
   const struct TALER_TESTING_Command *proposal_cmd;
-  struct GNUNET_CRYPTO_EddsaPublicKey *merchant_pub;
+  const struct TALER_MerchantPublicKeyP *merchant_pub;
 
   if (NULL ==
       (proposal_cmd = TALER_TESTING_interpreter_lookup_command
@@ -725,10 +725,9 @@ pay_traits (void *cls,
     return GNUNET_SYSERR;
   }
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_peer_key_pub
+  if (GNUNET_OK != TALER_TESTING_get_trait_merchant_pub
         (proposal_cmd,
         0,
-        (const struct GNUNET_CRYPTO_EddsaPublicKey **)
         &merchant_pub))
   {
     GNUNET_break (0);
@@ -747,7 +746,7 @@ pay_traits (void *cls,
       TALER_TESTING_make_trait_coin_reference
         (0, ps->coin_reference),
       TALER_TESTING_make_trait_order_id (0, order_id),
-      TALER_TESTING_make_trait_peer_key_pub (0, merchant_pub),
+      TALER_TESTING_make_trait_merchant_pub (0, merchant_pub),
       TALER_TESTING_trait_end ()
     };
 
@@ -914,8 +913,8 @@ pay_abort_traits (void *cls,
 {
   struct PayAbortState *pas = cls;
   struct TALER_TESTING_Trait traits[] = {
-    TALER_TESTING_make_trait_peer_key_pub
-      (0, &pas->merchant_pub.eddsa_pub),
+    TALER_TESTING_make_trait_merchant_pub
+      (0, &pas->merchant_pub),
     TALER_TESTING_make_trait_h_contract_terms
       (0, &pas->h_contract),
     TALER_TESTING_make_trait_refund_entry
@@ -990,7 +989,7 @@ pay_again_cb (void *cls,
   const char *error_name;
   unsigned int error_line;
   const struct TALER_TESTING_Command *pay_cmd;
-  const struct GNUNET_CRYPTO_EddsaPublicKey *merchant_pub;
+  const struct TALER_MerchantPublicKeyP *merchant_pub;
 
   pas->pao = NULL;
   if (pas->http_status != http_status)
@@ -1030,7 +1029,7 @@ pay_again_cb (void *cls,
                            (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
 
-    if (GNUNET_OK != TALER_TESTING_get_trait_peer_key_pub
+    if (GNUNET_OK != TALER_TESTING_get_trait_merchant_pub
           (pay_cmd, 0, &merchant_pub))
       TALER_TESTING_FAIL (pas->is);
 
@@ -1038,7 +1037,7 @@ pay_again_cb (void *cls,
           (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
           &mr.purpose,
           &sig,
-          merchant_pub))
+          &merchant_pub->eddsa_pub))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Merchant signature given in"

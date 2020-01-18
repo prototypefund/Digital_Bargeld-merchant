@@ -55,7 +55,6 @@ enum PaymentGeneratorError
 /* Hard-coded params.  Note, the bank is expected to
  * have the Tor user with account number 3 and password 'x'.
  */
-#define PAYER_URL "FIXME/3"
 #define EXCHANGE_ACCOUNT_NO 2
 #define USER_LOGIN_NAME "Tor"
 #define USER_LOGIN_PASS "x"
@@ -174,7 +173,8 @@ static char *currency;
 static struct TALER_BANK_AuthenticationData auth;
 
 static char *exchange_payto;
-static struct TALER_WireTransferIdentifierRawP wtid;
+static char *customer_payto;
+static char *merchant_payto;
 
 /**
  * Convenience macros to allocate all the currency-dependant
@@ -183,6 +183,7 @@ static struct TALER_WireTransferIdentifierRawP wtid;
  * where it is called.
  */
 
+// FIXME: This should not be a macro!
 #define ALLOCATE_AMOUNTS(...) \
   char *CURRENCY_10_02; \
   char *CURRENCY_10; \
@@ -218,6 +219,9 @@ static struct TALER_WireTransferIdentifierRawP wtid;
                    "%s:0.01", \
                    currency);
 
+// FIXME: this should not be a macro
+// FIXME: the inline JSON is outdated
+// FIXME: find a better way to produce the contract terms via a helper function
 #define ALLOCATE_ORDERS(...) \
   char *order_worth_5; \
   char *order_worth_5_track; \
@@ -326,13 +330,10 @@ run (void *cls,
                    order_worth_5_unaggregated,
                    order_worth_10_2coins);
   struct TALER_TESTING_Command ordinary_commands[] = {
-    TALER_TESTING_cmd_transfer ("create-reserve-1",
-                                CURRENCY_10_02,
-                                PAYER_URL,  // bank base URL + path to the payer account.
-                                &auth,
-                                exchange_payto,
-                                &wtid,
-                                EXCHANGE_URL),
+    TALER_TESTING_cmd_admin_add_incoming ("create-reserve-1",
+                                          CURRENCY_10_02,
+                                          &auth,
+                                          customer_payto),
     TALER_TESTING_cmd_exec_wirewatch ("wirewatch-1",
                                       cfg_filename),
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-1",
@@ -393,14 +394,11 @@ run (void *cls,
 
   struct TALER_TESTING_Command corner_commands[] = {
 
-    TALER_TESTING_cmd_transfer
+    TALER_TESTING_cmd_admin_add_incoming
       ("create-reserve-1",
       CURRENCY_5_01,
-      PAYER_URL,
       &auth,
-      exchange_payto,
-      &wtid,
-      EXCHANGE_URL),
+      customer_payto),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-1",
@@ -433,14 +431,11 @@ run (void *cls,
       FIRST_INSTRUCTION,
       &unaggregated_number),
 
-    TALER_TESTING_cmd_transfer
+    TALER_TESTING_cmd_admin_add_incoming
       ("create-reserve-2",
       CURRENCY_10_02,
-      PAYER_URL,
       &auth,
-      exchange_payto,
-      &wtid,
-      EXCHANGE_URL),
+      customer_payto),
 
     TALER_TESTING_cmd_exec_wirewatch
       ("wirewatch-2",
@@ -766,8 +761,10 @@ main (int argc,
   /**
    * FIXME: Need to retrieve the bank base URL!
    */
-  exchange_payto = TALER_payto_xtalerbank_make ("FIXME-BANK-HOSTNAME:PORT",
-                                                "/2");
+
+  exchange_payto = "payto://x-taler-bank/localhost/Exchange";
+  merchant_payto = "payto://x-taler-bank/localhost/Merchant";
+  customer_payto = "payto://x-taler-bank/localhost/Customer";
 
   result = TALER_TESTING_setup_with_exchange
              (run,

@@ -55,11 +55,9 @@ static const char *pickup_amounts_1[] = {"EUR:5", NULL};
 static char *fakebank_url;
 
 static struct TALER_WireTransferIdentifierRawP wtid;
-static char *payer_url;
 static char *payer_payto;
 static struct TALER_BANK_AuthenticationData auth;
 static char *exchange_payto;
-static char *exchange_account_url;
 static char *merchant_payto;
 static struct TALER_TESTING_BankConfiguration bc;
 static struct TALER_TESTING_ExchangeConfiguration ec;
@@ -92,17 +90,17 @@ static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
 /**
  * Account number of the exchange at the bank.
  */
-#define EXCHANGE_ACCOUNT_PATH "/2"
+#define EXCHANGE_ACCOUNT_NAME "2"
 
 /**
  * Account number of some user.
  */
-#define USER_ACCOUNT_PATH "/62"
+#define USER_ACCOUNT_NAME "62"
 
 /**
  * Account number used by the merchant
  */
-#define MERCHANT_ACCOUNT_PATH "/3"
+#define MERCHANT_ACCOUNT_NAME "3"
 
 /**
  * User name. Never checked by fakebank.
@@ -120,8 +118,12 @@ static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
  *
  * @param label label to use for the command.
  */
-#define CMD_EXEC_WIREWATCH(label) \
-  TALER_TESTING_cmd_exec_wirewatch (label, CONFIG_FILE)
+static struct TALER_TESTING_Command
+CMD_EXEC_WIREWATCH (char *label)
+{
+  return TALER_TESTING_cmd_exec_wirewatch (label, CONFIG_FILE);
+}
+
 
 /**
  * Execute the taler-exchange-aggregator command with
@@ -129,8 +131,12 @@ static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
  *
  * @param label label to use for the command.
  */
-#define CMD_EXEC_AGGREGATOR(label) \
-  TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE)
+static struct TALER_TESTING_Command
+CMD_EXEC_AGGREGATOR (char *label)
+{
+  return TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE);
+}
+
 
 /**
  * Run wire transfer of funds from some user's account to the
@@ -140,26 +146,15 @@ static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
  * @param amount amount to transfer, i.e. "EUR:1"
  * @param url exchange_url
  */
-#define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
-  TALER_TESTING_cmd_transfer (label, amount, \
-                              payer_url, \
-                              &auth, \
-                              exchange_payto, \
-                              &wtid, \
-                              EXCHANGE_URL)
+static struct TALER_TESTING_Command
+CMD_TRANSFER_TO_EXCHANGE (char *label, char *amount)
+{
 
-/**
- * Run wire transfer of funds from some user's account to the
- * exchange.
- *
- * @param label label to use for the command.
- * @param amount amount to transfer, i.e. "EUR:1"
- */
-#define CMD_TRANSFER_TO_EXCHANGE_SUBJECT(label,amount,subject) \
-  TALER_TESTING_cmd_fakebank_transfer_with_subject \
-    (label, amount, fakebank_url, USER_ACCOUNT_NO, \
-    EXCHANGE_ACCOUNT_NO, USER_LOGIN_NAME, USER_LOGIN_PASS, \
-    subject)
+  return TALER_TESTING_cmd_admin_add_incoming (label,
+                                               amount,
+                                               &auth,
+                                               customer_payto);
+}
 
 
 static const char *
@@ -429,7 +424,6 @@ run (void *cls,
     TALER_TESTING_cmd_transfer
       ("create-reserve-2",
       "EUR:1",
-      payer_url,
       &auth,
       exchange_payto,
       &wtid,
@@ -437,7 +431,6 @@ run (void *cls,
     TALER_TESTING_cmd_admin_add_incoming_with_ref
       ("create-reserve-2b",
       "EUR:4.01",
-      exchange_account_url,
       &auth,
       exchange_payto,
       "create-reserve-2"),
@@ -656,7 +649,6 @@ run (void *cls,
     TALER_TESTING_cmd_admin_add_incoming_with_instance
       ("create-reserve-tip-1",
       "EUR:20.04",
-      exchange_account_url,
       &auth,
       payer_payto,
       "tip",
@@ -738,7 +730,6 @@ run (void *cls,
     TALER_TESTING_cmd_admin_add_incoming_with_instance
       ("create-reserve-insufficient-funds",
       "EUR:1.01",
-      exchange_account_url,
       &auth,
       payer_payto,
       "dtip",
@@ -847,7 +838,6 @@ run (void *cls,
     TALER_TESTING_cmd_transfer
       ("create-reserve-10",
       "EUR:10.02",
-      payer_url,
       &auth,
       exchange_payto,
       &wtid,
@@ -1078,22 +1068,10 @@ main (int argc,
                                                    &bc))
     return 77;
 
-  GNUNET_assert
-    (GNUNET_SYSERR != GNUNET_asprintf (&payer_url,
-                                       "%s%s",
-                                       USER_ACCOUNT_PATH));
-  GNUNET_assert
-    (GNUNET_SYSERR != GNUNET_asprintf (&exchange_account_url,
-                                       "%s%s",
-                                       fakebank_url,
-                                       EXCHANGE_ACCOUNT_PATH));
+  payer_payto = ("payto://x-taler-bank/localhost/" USER_ACCOUNT_NAME);
+  exchange_payto = ("payto://x-taler-bank/localhost/" EXCHANGE_ACCOUNT_NAME);
+  merchant_payto = ("payto://x-taler-bank/localhost/" MERCHANT_ACCOUNT_NAME);
 
-  payer_payto = TALER_payto_xtalerbank_make (fakebank_url,
-                                             USER_ACCOUNT_PATH);
-  exchange_payto = TALER_payto_xtalerbank_make (fakebank_url,
-                                                EXCHANGE_ACCOUNT_PATH);
-  merchant_payto = TALER_payto_xtalerbank_make (fakebank_url,
-                                                MERCHANT_ACCOUNT_PATH);
   if (NULL ==
       (merchant_url = TALER_TESTING_prepare_merchant (CONFIG_FILE)))
     return 77;
