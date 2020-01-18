@@ -240,13 +240,11 @@ check_coin_history (const struct TALER_MERCHANT_PaidCoin *pc,
   struct TALER_Amount spent_plus_contrib;
 
   if (GNUNET_OK !=
-      TALER_EXCHANGE_verify_coin_history
-      (
-        NULL, /* do not verify fees */
-        pc->amount_with_fee.currency,
-        &pc->coin_pub,
-        json,
-        &spent))
+      TALER_EXCHANGE_verify_coin_history (NULL, /* do not verify fees */
+                                          pc->amount_with_fee.currency,
+                                          &pc->coin_pub,
+                                          json,
+                                          &spent))
   {
     /* Exchange's history fails to verify */
     GNUNET_break_op (0);
