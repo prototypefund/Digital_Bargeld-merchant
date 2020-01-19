@@ -249,7 +249,7 @@ track_transfer_run (void *cls,
         (check_bank_cmd, 0, &wtid))
     TALER_TESTING_FAIL (is);
   if (GNUNET_OK != TALER_TESTING_get_trait_url
-        (check_bank_cmd, 0, &exchange_url))
+        (check_bank_cmd, TALER_TESTING_UT_EXCHANGE_BASE_URL, &exchange_url))
     TALER_TESTING_FAIL (is);
   tts->tth = TALER_MERCHANT_track_transfer (is->ctx,
                                             tts->merchant_url,

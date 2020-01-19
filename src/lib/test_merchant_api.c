@@ -229,9 +229,9 @@ run (void *cls,
     TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-2",
       "EUR:10.02",
-      payer_payto, // payer payto
+      payer_payto,
       exchange_payto,
-      "create-reserve-1"), // payee exchange payto
+      "create-reserve-1"),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-1",
@@ -399,21 +399,22 @@ run (void *cls,
       ("create-reserve-2b",
       "EUR:4.01",
       &bc.exchange_auth,
-      exchange_payto,
+      payer_payto,
       "create-reserve-2"),
     CMD_EXEC_WIREWATCH ("wirewatch-2"),
-    TALER_TESTING_cmd_check_bank_transfer
+
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-2a",
-      EXCHANGE_URL,
       "EUR:1",
       payer_payto,
-      exchange_payto),
-    TALER_TESTING_cmd_check_bank_transfer
+      exchange_payto,
+      "create-reserve-2"),
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-2b",
-      EXCHANGE_URL,
       "EUR:4.01",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "create-reserve-2"),
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2",
                                        "create-reserve-2",
                                        "EUR:5",
@@ -498,7 +499,7 @@ run (void *cls,
         \"order_id\":\"1-unpaid\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\"EUR:5.0\"\
+        \"amount\":\"EUR:5.0\",\
         \"summary\": \"useful product\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -536,12 +537,12 @@ run (void *cls,
 
     CMD_EXEC_WIREWATCH ("wirewatch-unincreased-refund"),
 
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-unincreased-refund",
-      EXCHANGE_URL,
       "EUR:5.01",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "create-reserve-unincreased-refund"),
 
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-unincreased-refund",
@@ -557,7 +558,7 @@ run (void *cls,
         \"order_id\":\"unincreased-proposal\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\"EUR:5.0\"\
+        \"amount\":\"EUR:5.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -612,12 +613,12 @@ run (void *cls,
 
     CMD_EXEC_WIREWATCH ("wirewatch-3"),
 
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-tip-1",
-      EXCHANGE_URL,
       "EUR:20.04",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "create-reserve-tip-1"),
 
     TALER_TESTING_cmd_tip_authorize ("authorize-tip-1",
                                      merchant_url_internal ("tip"),
@@ -691,12 +692,12 @@ run (void *cls,
       "dtip",
       CONFIG_FILE),
 
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-insufficient-tip-funds",
-      EXCHANGE_URL,
       "EUR:1.01",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "create-reserve-insufficient-funds"),
 
     CMD_EXEC_WIREWATCH
       ("wirewatch-insufficient-tip-funds"),
@@ -784,17 +785,16 @@ run (void *cls,
   };
 
   struct TALER_TESTING_Command pay_again[] = {
-    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-1",
+    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-10",
                               "EUR:10.02"),
 
     CMD_EXEC_WIREWATCH ("wirewatch-10"),
-
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-10",
-      EXCHANGE_URL,
       "EUR:10.02",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "create-reserve-10"),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-10a",
                                        "create-reserve-10",
@@ -861,12 +861,12 @@ run (void *cls,
 
     CMD_EXEC_WIREWATCH ("wirewatch-11"),
 
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-11",
-      EXCHANGE_URL,
       "EUR:10.02",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "create-reserve-11"),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-11a",
                                        "create-reserve-11",
@@ -891,7 +891,7 @@ run (void *cls,
         \"order_id\":\"11\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\"EUR:10.0\"\
+        \"amount\":\"EUR:10.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\

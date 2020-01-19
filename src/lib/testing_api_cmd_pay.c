@@ -297,7 +297,7 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
                                           &dpk->fee_deposit));
     GNUNET_assert (GNUNET_OK ==
                    TALER_TESTING_get_trait_url (coin_cmd,
-                                                0,
+                                                TALER_TESTING_UT_EXCHANGE_BASE_URL,
                                                 &icoin->exchange_url));
     GNUNET_assert (GNUNET_OK ==
                    TALER_string_to_amount (refund_fee,

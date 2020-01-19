@@ -499,7 +499,8 @@ tip_pickup_traits (void *cls,
 
   }
   traits[NUM_TRAITS - 2] = TALER_TESTING_make_trait_url
-                             (0, tps->exchange_url);
+                             (TALER_TESTING_UT_EXCHANGE_BASE_URL,
+                             tps->exchange_url);
   traits[NUM_TRAITS - 1] = TALER_TESTING_trait_end ();
 
   return TALER_TESTING_get_trait (traits,
