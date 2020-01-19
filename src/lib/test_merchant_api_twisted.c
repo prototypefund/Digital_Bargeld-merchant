@@ -997,11 +997,11 @@ main (int argc,
                                 (CONFIG_FILE)))
     return 77;
 
-  if (NULL == (twister_exchange_url = TALER_TESTING_prepare_twister
+  if (NULL == (twister_exchange_url = TALER_TWISTER_prepare_twister
                                         (PROXY_EXCHANGE_CONFIG_FILE)))
     return 77;
 
-  if (NULL == (twister_merchant_url = TALER_TESTING_prepare_twister
+  if (NULL == (twister_merchant_url = TALER_TWISTER_prepare_twister
                                         (PROXY_MERCHANT_CONFIG_FILE)))
     return 77;
 
@@ -1028,11 +1028,11 @@ main (int argc,
       // 1 is fine; after all this is merchant test cases.
       return 1;
 
-    if (NULL == (twisterexchanged = TALER_TESTING_run_twister
+    if (NULL == (twisterexchanged = TALER_TWISTER_run_twister
                                       (PROXY_EXCHANGE_CONFIG_FILE)))
       return 77;
 
-    if (NULL == (twistermerchantd = TALER_TESTING_run_twister
+    if (NULL == (twistermerchantd = TALER_TWISTER_run_twister
                                       (PROXY_MERCHANT_CONFIG_FILE)))
       return 77;
 
