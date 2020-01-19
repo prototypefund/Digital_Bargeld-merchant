@@ -23,6 +23,7 @@
  * @author Sree Harsha Totakura <sreeharsha@totakura.in>
  * @author Christian Grothoff
  * @author Marcello Stanisci
+ * @author Florian Dold <dold@taler.net>
  */
 
 #include "platform.h"
@@ -44,6 +45,22 @@
  * for the various components for this test.
  */
 #define CONFIG_FILE "test_merchant_api_twisted.conf"
+
+/**
+ * Account number of the exchange at the bank.
+ */
+#define EXCHANGE_ACCOUNT_NAME "2"
+
+/**
+ * Account number of the merchant at the bank.
+ */
+#define MERCHANT_ACCOUNT_NAME "3"
+
+/**
+ * Account number of some user.
+ */
+#define USER_ACCOUNT_NAME "62"
+
 
 /**
  * Configuration file for the proxy between merchant and
@@ -96,11 +113,6 @@ static char *fakebank_url;
 static char *merchant_url;
 
 /**
- * Exchange base URL.
- */
-static char *exchange_url;
-
-/**
  * Merchant process.
  */
 static struct GNUNET_OS_Process *merchantd;
@@ -116,29 +128,11 @@ static struct GNUNET_OS_Process *twisterexchanged;
 static struct GNUNET_OS_Process *twistermerchantd;
 
 
-static char *payer_url;
 static char *payer_payto;
 static char *exchange_payto;
 static char *merchant_payto;
-static struct TALER_BANK_AuthenticationData auth;
-static struct TALER_WireTransferIdentifierRawP wtid;
 static struct TALER_TESTING_BankConfiguration bc;
 static struct TALER_TESTING_ExchangeConfiguration ec;
-
-/**
- * Account number of the exchange at the bank.
- */
-#define EXCHANGE_ACCOUNT_PATH "/2"
-
-/**
- * Account number of the merchant at the bank.
- */
-#define MERCHANT_ACCOUNT_PATH "/3"
-
-/**
- * Account number of some user.
- */
-#define USER_ACCOUNT_PATH "/62"
 
 /**
  * User name. Never checked by fakebank.
@@ -156,8 +150,12 @@ static struct TALER_TESTING_ExchangeConfiguration ec;
  *
  * @param label label to use for the command.
  */
-#define CMD_EXEC_WIREWATCH(label) \
-  TALER_TESTING_cmd_exec_wirewatch (label, CONFIG_FILE)
+static struct TALER_TESTING_Command
+CMD_EXEC_WIREWATCH (const char *label)
+{
+  return TALER_TESTING_cmd_exec_wirewatch (label, CONFIG_FILE);
+}
+
 
 /**
  * Execute the taler-exchange-aggregator command with
@@ -165,8 +163,11 @@ static struct TALER_TESTING_ExchangeConfiguration ec;
  *
  * @param label label to use for the command.
  */
-#define CMD_EXEC_AGGREGATOR(label) \
-  TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE)
+static struct TALER_TESTING_Command
+CMD_EXEC_AGGREGATOR (const char *label)
+{
+  return TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE);
+}
 
 
 /**
@@ -177,26 +178,15 @@ static struct TALER_TESTING_ExchangeConfiguration ec;
  * @param amount amount to transfer, i.e. "EUR:1"
  * @param url exchange_url
  */
-#define CMD_TRANSFER_TO_EXCHANGE(label,amount) \
-  TALER_TESTING_cmd_transfer (label, amount, \
-                              payer_url, \
-                              &auth, \
-                              exchange_payto, \
-                              &wtid, \
-                              EXCHANGE_URL)
+static struct TALER_TESTING_Command
+CMD_TRANSFER_TO_EXCHANGE (const char *label, const char *amount)
+{
+  return TALER_TESTING_cmd_admin_add_incoming (label,
+                                               amount,
+                                               &bc.exchange_auth,
+                                               payer_payto);
+}
 
-/**
- * Run wire transfer of funds from some user's account to the
- * exchange.
- *
- * @param label label to use for the command.
- * @param amount amount to transfer, i.e. "EUR:1"
- */
-#define CMD_TRANSFER_TO_EXCHANGE_SUBJECT(label,amount,subject) \
-  TALER_TESTING_cmd_fakebank_transfer_with_subject \
-    (label, amount, fakebank_url, USER_ACCOUNT_NO, \
-    EXCHANGE_ACCOUNT_NO, USER_LOGIN_NAME, USER_LOGIN_PASS, \
-    subject)
 
 /**
  * Main function that will tell the interpreter what commands to
@@ -1034,7 +1024,6 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
-
   TALER_TESTING_run_with_fakebank (is,
                                    commands,
                                    fakebank_url);
@@ -1072,16 +1061,9 @@ main (int argc,
     return 77;
 
 
-  exchange_payto = TALER_payto_xtalerbank_make (fakebank_url,
-                                                EXCHANGE_ACCOUNT_PATH);
-  payer_payto = TALER_payto_xtalerbank_make (fakebank_url,
-                                             USER_ACCOUNT_PATH);
-  merchant_payto = TALER_payto_xtalerbank_make (fakebank_url,
-                                                MERCHANT_ACCOUNT_PATH);
-  GNUNET_asprintf (&payer_url,
-                   "%s%s",
-                   fakebank_url,
-                   USER_ACCOUNT_PATH);
+  payer_payto = ("payto://x-taler-bank/localhost/" USER_ACCOUNT_NAME);
+  exchange_payto = ("payto://x-taler-bank/localhost/" EXCHANGE_ACCOUNT_NAME);
+  merchant_payto = ("payto://x-taler-bank/localhost/" MERCHANT_ACCOUNT_NAME);
 
   if (NULL == (merchant_url = TALER_TESTING_prepare_merchant
                                 (CONFIG_FILE)))
