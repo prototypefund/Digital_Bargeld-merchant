@@ -223,8 +223,7 @@ run (void *cls,
      * Make a reserve exist,
      * according to the previous
      * transfer.
-     */
-    CMD_EXEC_WIREWATCH ("wirewatch-1"),
+     */CMD_EXEC_WIREWATCH ("wirewatch-1"),
     TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-2",
       "EUR:10.02",
@@ -530,8 +529,7 @@ run (void *cls,
        it, and finally (4) attempt to pick up a refund
        from it without any increasing taking place
        in the first place.
-     */
-    CMD_TRANSFER_TO_EXCHANGE ("create-reserve-unincreased-refund",
+     */CMD_TRANSFER_TO_EXCHANGE ("create-reserve-unincreased-refund",
                               "EUR:5.01"),
 
     CMD_EXEC_WIREWATCH ("wirewatch-unincreased-refund"),

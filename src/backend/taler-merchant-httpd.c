@@ -1614,10 +1614,10 @@ run (void *cls,
   }
 
   if (GNUNET_OK !=
-      TALER_config_get_denom (config,
-                              "merchant",
-                              "DEFAULT_MAX_WIRE_FEE",
-                              &default_max_wire_fee))
+      TALER_config_get_amount (config,
+                               "merchant",
+                               "DEFAULT_MAX_WIRE_FEE",
+                               &default_max_wire_fee))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "merchant",
@@ -1627,10 +1627,10 @@ run (void *cls,
   }
 
   if (GNUNET_OK !=
-      TALER_config_get_denom (config,
-                              "merchant",
-                              "DEFAULT_MAX_DEPOSIT_FEE",
-                              &default_max_deposit_fee))
+      TALER_config_get_amount (config,
+                               "merchant",
+                               "DEFAULT_MAX_DEPOSIT_FEE",
+                               &default_max_deposit_fee))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                "merchant",
