@@ -172,6 +172,7 @@ parse_auditors (void *cls,
                                "NAME");
     return;
   }
+  // FIXME: url -> auditor_url
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
