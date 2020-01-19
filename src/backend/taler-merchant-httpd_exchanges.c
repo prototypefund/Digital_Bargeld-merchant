@@ -960,7 +960,6 @@ accept_exchanges (void *cls,
                   const char *section)
 {
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
-  char *currency;
   char *url;
   char *mks;
   struct Exchange *exchange;
@@ -980,27 +979,6 @@ accept_exchanges (void *cls,
                                "BASE_URL");
     return;
   }
-  if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_string (cfg,
-                                             section,
-                                             "CURRENCY",
-                                             &currency))
-  {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               section,
-                               "CURRENCY");
-    GNUNET_free (url);
-    return;
-  }
-  if (0 != strcasecmp (currency,
-                       TMH_currency))
-  {
-    /* trusted exchange, but for a different currency; ignore */
-    GNUNET_free (url);
-    GNUNET_free (currency);
-    return;
-  }
-  GNUNET_free (currency);
   exchange = GNUNET_new (struct Exchange);
   exchange->url = url;
   if (GNUNET_OK ==
