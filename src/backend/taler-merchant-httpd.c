@@ -827,7 +827,7 @@ wireformat_iterator_cb (void *cls,
     salt_str = GNUNET_STRINGS_data_to_string_alloc (&salt,
                                                     sizeof (salt));
     j = json_pack ("{s:s, s:s}",
-                   "url", payto,
+                   "payto_uri", payto,
                    "salt", salt_str);
     GNUNET_free (salt_str);
 
