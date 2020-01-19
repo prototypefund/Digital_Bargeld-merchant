@@ -701,7 +701,7 @@ struct WireFormatIteratorContext
 
 
 /**
- * Callback that looks for 'account-*' sections,
+ * Callback that looks for 'merchant-account-*' sections,
  * and populates our wire method according to the data
  *
  * @param cls closure with a `struct WireFormatIteratorContext *`
@@ -723,8 +723,8 @@ wireformat_iterator_cb (void *cls,
   char *wire_file_mode;
 
   if (0 != strncasecmp (section,
-                        "account-",
-                        strlen ("account-")))
+                        "merchant-account-",
+                        strlen ("merchant-account-")))
     return;
   GNUNET_asprintf (&instance_option,
                    "HONOR_%s",
