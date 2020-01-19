@@ -132,7 +132,6 @@ CMD_EXEC_AGGREGATOR (char *label)
 static struct TALER_TESTING_Command
 CMD_TRANSFER_TO_EXCHANGE (char *label, char *amount)
 {
-
   return TALER_TESTING_cmd_admin_add_incoming (label,
                                                amount,
                                                &bc.exchange_auth,

@@ -102,12 +102,6 @@ static char *twister_merchant_url_instance_nonexistent;
 static char *twister_merchant_url_instance_tor;
 
 /**
- * URL of the fakebank.  Obtained from CONFIG_FILE's
- * "exchange-wire-test:BANK_URI" option.
- */
-static char *fakebank_url;
-
-/**
  * Merchant base URL.
  */
 static char *merchant_url;
@@ -212,13 +206,12 @@ run (void *cls,
      * transfer.
      */
     CMD_EXEC_WIREWATCH ("5719-wirewatch"),
-
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("5719-check-transfer",
-      EXCHANGE_URL,
       "EUR:1.01",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "5719-create-reserve"),
 
     TALER_TESTING_cmd_withdraw_amount ("5719-withdraw",
                                        "5719-create-reserve",
@@ -233,18 +226,12 @@ run (void *cls,
       ("5719-create-proposal",
       twister_merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"5719TRIGGER\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":1,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:1.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"triggering bug 5719\",\
                          \"value\":\"{EUR:1}\"} ] }"),
@@ -278,21 +265,15 @@ run (void *cls,
       ("proposal-for-check-payment",
       twister_merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"fail-check-payment-1\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":2,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:2.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:3}\"} ] }"),
+                         \"value\":\"EUR:3\"} ] }"),
 
     /* Need any response code != 200.  */
     TALER_TESTING_cmd_hack_response_code
@@ -379,20 +360,14 @@ run (void *cls,
       ("create-proposal-2",
       twister_merchant_url,
       0,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:5.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
-                         \"value\":\"{EUR:5}\"} ] }"),
+                         \"value\":\"EUR:5\"} ] }"),
     /**
      * Cause proposal to be invalid: this is achieved
      * by deleting the "order_id" field of it.
@@ -404,18 +379,12 @@ run (void *cls,
       ("create-proposal-3",
       twister_merchant_url,
       0,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
          \"fulfillment_url\": \"https://example.com/\",\
          \"order_id\":\"2\",\
          \"refund_deadline\":{\"t_ms\":0},\
          \"pay_deadline\":{\"t_ms\":99999999999},\
-         \"amount\":\
-           {\"currency\":\"EUR\",\
-            \"value\":5,\
-            \"fraction\":0},\
+         \"amount\":\"EUR:5.0\",\
          \"summary\": \"merchant-lib testcase\",\
          \"products\": [ {\"description\":\"ice cream\",\
                           \"value\":\"{EUR:5}\"} ] }"),
@@ -461,17 +430,11 @@ run (void *cls,
       ("create-proposal-5",
       twister_merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"5\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:5.0\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
@@ -545,13 +508,12 @@ run (void *cls,
 
     CMD_EXEC_WIREWATCH
       ("wirewatch-unaggregation"),
-
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-unaggregation",
-      EXCHANGE_URL,
       "EUR:5.01",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "create-reserve-unaggregation"),
 
     TALER_TESTING_cmd_check_bank_empty
       ("check_bank_unaggregated-a"),
@@ -570,17 +532,11 @@ run (void *cls,
        * transactions.  */
       twister_merchant_url_instance_tor,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"refund_deadline\":{\"t_ms\":2000},\
         \"pay_deadline\":{\"t_ms\":1000},\
         \"wire_transfer_deadline\":{\"t_ms\":2366841600000},\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":5,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:0.5\",\
         \"summary\": \"unaggregated product\",\
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"unaggregated cream\",\
@@ -611,12 +567,12 @@ run (void *cls,
     CMD_TRANSFER_TO_EXCHANGE ("create-reserve-5383",
                               "EUR:2.02"),
     CMD_EXEC_WIREWATCH ("wirewatch-5383"),
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-5383",
-      EXCHANGE_URL,
       "EUR:2.02",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "create-reserve-5383"),
     TALER_TESTING_cmd_withdraw_amount
       ("withdraw-coin-5383a",
       "create-reserve-5383",
@@ -631,18 +587,12 @@ run (void *cls,
       ("create-proposal-5383",
       twister_merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"5383\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":2,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:2.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:2}\"} ] }"),
@@ -658,7 +608,7 @@ run (void *cls,
     CMD_EXEC_AGGREGATOR ("run-aggregator-5383"),
     TALER_TESTING_cmd_check_bank_transfer
       ("check_aggregation_transfer-5383",
-      twister_exchange_url,  /* has the 8888-port thing.  */
+      twister_exchange_url,
       /* paid,         1.97 =
          brutto        2.00 -
          deposit fee   0.01 * 2 -
@@ -696,12 +646,12 @@ run (void *cls,
      */
     CMD_EXEC_WIREWATCH ("wirewatch-1"),
 
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-2",
-      EXCHANGE_URL,
       "EUR:2.02",
       payer_payto,
-      exchange_payto),
+      exchange_payto,
+      "create-reserve-1"),
 
     TALER_TESTING_cmd_check_bank_empty
       ("track_chunk_check_empty-a"),
@@ -723,18 +673,12 @@ run (void *cls,
       ("create-proposal-6",
       twister_merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"11\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":2,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:2.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:3}\"} ] }"),
@@ -817,10 +761,12 @@ run (void *cls,
      */
     CMD_EXEC_WIREWATCH ("wirewatch-abort-1"),
 
-    TALER_TESTING_cmd_check_bank_transfer
+    TALER_TESTING_cmd_check_bank_admin_transfer
       ("check_bank_transfer-abort-1",
-      EXCHANGE_URL,
-      "EUR:1.01", payer_payto, exchange_payto),
+      "EUR:1.01",
+      payer_payto,
+      exchange_payto,
+      "create-reserve-abort-1"),
 
     TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-abort-1",
                                        "create-reserve-abort-1",
@@ -836,18 +782,12 @@ run (void *cls,
       ("create-proposal-abort-1",
       twister_merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"abort-one\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":3,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:3.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:3}\"} ] }"),
@@ -922,18 +862,12 @@ run (void *cls,
       ("create-proposal-double-spend",
       twister_merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"DS-1\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":1,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:1.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\": \"will succeed\"}] }"),
 
@@ -941,18 +875,12 @@ run (void *cls,
       ("create-proposal-double-spend-1",
       twister_merchant_url,
       MHD_HTTP_OK,
-      "{\"max_fee\":\
-          {\"currency\":\"EUR\",\
-           \"value\":0,\
-           \"fraction\":50000000},\
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"DS-2\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
         \"fulfillment_url\": \"https://example.com/\",\
-        \"amount\":\
-          {\"currency\":\"EUR\",\
-           \"value\":1,\
-           \"fraction\":0},\
+        \"amount\":\"EUR:1.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\": \"will fail\"}] }"),
 
@@ -1026,7 +954,7 @@ run (void *cls,
 
   TALER_TESTING_run_with_fakebank (is,
                                    commands,
-                                   fakebank_url);
+                                   bc.exchange_auth.wire_gateway_url);
 }
 
 
@@ -1114,7 +1042,6 @@ main (int argc,
     purge_process (merchantd);
     purge_process (twisterexchanged);
     purge_process (twistermerchantd);
-    GNUNET_free (fakebank_url);
     GNUNET_free (merchant_url);
     GNUNET_free (twister_exchange_url);
     GNUNET_free (twister_merchant_url);
