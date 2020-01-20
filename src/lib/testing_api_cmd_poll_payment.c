@@ -180,6 +180,8 @@ conclude_task (void *cls)
   poll_cmd =
     TALER_TESTING_interpreter_lookup_command (ppc->is,
                                               ppc->start_reference);
+  if (NULL == poll_cmd)
+    TALER_TESTING_FAIL (ppc->is);
   cps = poll_cmd->cls;
   if (NULL != cps->cpo)
   {
@@ -297,12 +299,11 @@ poll_payment_start_run (void *cls,
   const struct GNUNET_HashCode *h_contract;
 
   cps->is = is;
-  proposal_cmd = TALER_TESTING_interpreter_lookup_command (
-    is, cps->proposal_reference);
-
+  proposal_cmd
+    = TALER_TESTING_interpreter_lookup_command (is,
+                                                cps->proposal_reference);
   if (NULL == proposal_cmd)
     TALER_TESTING_FAIL (is);
-
   if (GNUNET_OK !=
       TALER_TESTING_get_trait_order_id (proposal_cmd,
                                         0,
@@ -415,6 +416,8 @@ poll_payment_conclude_run (void *cls,
   poll_cmd =
     TALER_TESTING_interpreter_lookup_command (is,
                                               ppc->start_reference);
+  if (NULL == poll_cmd)
+    TALER_TESTING_FAIL (ppc->is);
   GNUNET_assert (poll_cmd->run == &poll_payment_start_run);
   cps = poll_cmd->cls;
   if (NULL == cps->cpo)

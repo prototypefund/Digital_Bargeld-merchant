@@ -553,9 +553,10 @@ sign_success_response (struct PayContext *pc)
       .h_contract_terms = pc->h_contract_terms
     };
 
-    GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
-                              &mr.purpose,
-                              &sig);
+    GNUNET_assert (GNUNET_OK ==
+                   GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
+                                             &mr.purpose,
+                                             &sig));
   }
   resp = json_pack ("{s:O, s:o, s:o, s:o}",
                     "contract_terms",

@@ -182,6 +182,8 @@ conclude_task (void *cls)
   check_cmd =
     TALER_TESTING_interpreter_lookup_command (cpc->is,
                                               cpc->start_reference);
+  if (NULL == check_cmd)
+    TALER_TESTING_FAIL (cpc->is);
   cps = check_cmd->cls;
   if (NULL != cps->cpo)
   {
@@ -296,8 +298,9 @@ check_payment_run (void *cls,
   const char *order_id;
 
   cps->is = is;
-  proposal_cmd = TALER_TESTING_interpreter_lookup_command (
-    is, cps->proposal_reference);
+  proposal_cmd
+    = TALER_TESTING_interpreter_lookup_command (is,
+                                                cps->proposal_reference);
   if (NULL == proposal_cmd)
     TALER_TESTING_FAIL (is);
   if (GNUNET_OK != TALER_TESTING_get_trait_order_id (
@@ -437,9 +440,11 @@ check_payment_conclude_run (void *cls,
   struct CheckPaymentState *cps;
 
   cpc->is = is;
-  check_cmd =
-    TALER_TESTING_interpreter_lookup_command (is,
-                                              cpc->start_reference);
+  check_cmd
+    = TALER_TESTING_interpreter_lookup_command (is,
+                                                cpc->start_reference);
+  if (NULL == check_cmd)
+    TALER_TESTING_FAIL (cpc->is);
   GNUNET_assert (check_cmd->run == &check_payment_run);
   cps = check_cmd->cls;
   if (NULL == cps->cpo)

@@ -210,9 +210,10 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                                          "Could not hash order");
     }
 
-    GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
-                              &pdps.purpose,
-                              &merchant_sig);
+    GNUNET_assert (GNUNET_OK ==
+                   GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
+                                             &pdps.purpose,
+                                             &merchant_sig));
   }
   return TALER_MHD_reply_json_pack (connection,
                                     MHD_HTTP_OK,
