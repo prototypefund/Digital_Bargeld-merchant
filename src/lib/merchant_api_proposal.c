@@ -302,7 +302,6 @@ handle_proposal_lookup_finished (void *cls,
                 "Proposal lookup failed with HTTP status code %u\n",
                 (unsigned int) response_code);
     GNUNET_break (0);
-
     plo->cb (plo->cb_cls,
              response_code,
              json,

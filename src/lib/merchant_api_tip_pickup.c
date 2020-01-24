@@ -136,7 +136,7 @@ check_ok (struct TALER_MERCHANT_TipPickupOperation *tpo,
     }
     tpo->cb (tpo->cb_cls,
              MHD_HTTP_OK,
-             TALER_JSON_get_error_code (json),
+             TALER_EC_NONE,
              &reserve_pub,
              ja_len,
              reserve_sigs,
