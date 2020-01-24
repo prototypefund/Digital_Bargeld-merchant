@@ -109,7 +109,7 @@ check_ok (struct TALER_MERCHANT_TipQueryOperation *tqo,
   }
   tqo->cb (tqo->cb_cls,
            MHD_HTTP_OK,
-           TALER_JSON_get_error_code (json),
+           TALER_EC_NONE,
            json,
            reserve_expiration,
            &reserve_pub,

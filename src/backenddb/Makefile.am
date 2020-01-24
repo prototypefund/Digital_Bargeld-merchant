@@ -3,6 +3,11 @@ AM_CPPFLAGS = -I$(top_srcdir)/src/include
 
 plugindir = $(libdir)/taler
 
+pkgcfgdir = $(prefix)/share/taler/config.d/
+
+pkgcfg_DATA = \
+  merchantdb-postgres.conf
+
 sqldir = $(prefix)/share/taler/sql/merchant/
 
 sql_DATA = \
@@ -76,4 +81,5 @@ TESTS = \
 
 EXTRA_DIST = \
   test-merchantdb-postgres.conf \
+  merchantdb-postgres.conf \
   $(sql_DATA)

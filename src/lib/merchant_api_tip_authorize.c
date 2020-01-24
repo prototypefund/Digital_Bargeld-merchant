@@ -106,7 +106,7 @@ check_ok (struct TALER_MERCHANT_TipAuthorizeOperation *tao,
   }
   tao->cb (tao->cb_cls,
            MHD_HTTP_OK,
-           TALER_JSON_get_error_code (json),
+           TALER_EC_NONE,
            taler_tip_uri,
            &tip_id);
   tao->cb = NULL; /* do not call twice */

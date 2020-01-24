@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014-2017 INRIA
+  (C) 2014-2017 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -1065,7 +1065,8 @@ main (int argc,
     GNUNET_free (testname);
     return 2;
   }
-  GNUNET_SCHEDULER_run (&run, cfg);
+  GNUNET_SCHEDULER_run (&run,
+                        cfg);
   GNUNET_CONFIGURATION_destroy (cfg);
   GNUNET_free (config_filename);
   GNUNET_free (testname);

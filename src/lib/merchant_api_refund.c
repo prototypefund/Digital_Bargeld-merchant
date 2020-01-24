@@ -108,6 +108,11 @@ handle_refund_lookup_finished (void *cls,
              NULL);
     break;
   case MHD_HTTP_OK:
+    rlo->cb (rlo->cb_cls,
+             response_code,
+             TALER_EC_NONE,
+             json);
+    break;
   case MHD_HTTP_NOT_FOUND:
     rlo->cb (rlo->cb_cls,
              response_code,
