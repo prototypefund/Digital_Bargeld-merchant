@@ -91,6 +91,11 @@ handle_refund_increase_finished (void *cls,
              NULL);
     break;
   case MHD_HTTP_OK:
+    rio->cb (rio->cb_cls,
+             response_code,
+             TALER_EC_NONE,
+             json);
+    break;
   case MHD_HTTP_CONFLICT:
   case MHD_HTTP_NOT_FOUND:
     rio->cb (rio->cb_cls,

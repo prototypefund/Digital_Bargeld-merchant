@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014--2019 Taler Systems SA
+  (C) 2014--2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -85,6 +85,11 @@ struct PostgresClosure
   char *currency;
 
   /**
+   * Directory with SQL statements to run to create tables.
+   */
+  char *sql_dir;
+
+  /**
    * Underlying configuration.
    */
   const struct GNUNET_CONFIGURATION_Handle *cfg;
@@ -107,37 +112,16 @@ static int
 postgres_drop_tables (void *cls)
 {
   struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_ExecuteStatement es[] = {
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_transfers CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_deposits CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_transactions CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_proofs CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_contract_terms CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_refunds CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS exchange_wire_fees CASCADE;"),
-    GNUNET_PQ_make_try_execute ("DROP TABLE IF EXISTS merchant_tips CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_tip_pickups CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_tip_reserve_credits CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_tip_reserves CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_orders CASCADE;"),
-    GNUNET_PQ_make_try_execute (
-      "DROP TABLE IF EXISTS merchant_session_info CASCADE;"),
-    GNUNET_PQ_EXECUTE_STATEMENT_END
-  };
+  char *load_path;
 
-  return GNUNET_PQ_exec_statements (pg->conn,
-                                    es);
+  GNUNET_asprintf (&load_path,
+                   "%s%s",
+                   pg->sql_dir,
+                   "drop");
+  GNUNET_PQ_run_sql (pg->conn,
+                     load_path);
+  GNUNET_free (load_path);
+  return GNUNET_OK;
 }
 
 
@@ -3057,147 +3041,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   struct PostgresClosure *pg;
   struct TALER_MERCHANTDB_Plugin *plugin;
   const char *ec;
-  struct GNUNET_PQ_ExecuteStatement es[] = {
-    /* Orders created by the frontend, not signed or given a nonce yet.
-       The contract terms will change (nonce will be added) when moved to the
-       contract terms table */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_orders ("
-                            "order_id VARCHAR NOT NULL"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",contract_terms BYTEA NOT NULL"
-                            ",timestamp INT8 NOT NULL"
-                            ",PRIMARY KEY (order_id, merchant_pub)"
-                            ");"),
-    /* Offers we made to customers */
-    GNUNET_PQ_make_execute (
-      "CREATE TABLE IF NOT EXISTS merchant_contract_terms ("
-      "order_id VARCHAR NOT NULL"
-      ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-      ",contract_terms BYTEA NOT NULL"
-      ",h_contract_terms BYTEA NOT NULL CHECK (LENGTH(h_contract_terms)=64)"
-      ",timestamp INT8 NOT NULL"
-      ",row_id BIGSERIAL UNIQUE"
-      ",paid boolean DEFAULT FALSE NOT NULL"
-      ",PRIMARY KEY (order_id, merchant_pub)"
-      ",UNIQUE (h_contract_terms, merchant_pub)"
-      ");"),
-    /* Table with the proofs for each coin we deposited at the exchange */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_deposits ("
-                            " h_contract_terms BYTEA NOT NULL"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-                            ",exchange_url VARCHAR NOT NULL"
-                            ",amount_with_fee_val INT8 NOT NULL"
-                            ",amount_with_fee_frac INT4 NOT NULL"
-                            ",deposit_fee_val INT8 NOT NULL"
-                            ",deposit_fee_frac INT4 NOT NULL"
-                            ",refund_fee_val INT8 NOT NULL"
-                            ",refund_fee_frac INT4 NOT NULL"
-                            ",wire_fee_val INT8 NOT NULL"
-                            ",wire_fee_frac INT4 NOT NULL"
-                            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
-                            ",exchange_proof BYTEA NOT NULL"
-                            ",PRIMARY KEY (h_contract_terms, coin_pub)"
-                            ",FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)"
-                            ");"),
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_proofs ("
-                            " exchange_url VARCHAR NOT NULL"
-                            ",wtid BYTEA CHECK (LENGTH(wtid)=32)"
-                            ",execution_time INT8 NOT NULL"
-                            ",signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)"
-                            ",proof BYTEA NOT NULL"
-                            ",PRIMARY KEY (wtid, exchange_url)"
-                            ");"),
-    /* Note that h_contract_terms + coin_pub may actually be unknown to
-       us, e.g. someone else deposits something for us at the exchange.
-       Hence those cannot be foreign keys into deposits/transactions! */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_transfers ("
-                            " h_contract_terms BYTEA NOT NULL"
-                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-                            ",wtid BYTEA NOT NULL CHECK (LENGTH(wtid)=32)"
-                            ",PRIMARY KEY (h_contract_terms, coin_pub)"
-                            ");"),
-    GNUNET_PQ_make_try_execute (
-      "CREATE INDEX IF NOT EXISTS merchant_transfers_by_coin"
-      " ON merchant_transfers (h_contract_terms, coin_pub)"),
-    GNUNET_PQ_make_try_execute (
-      "CREATE INDEX IF NOT EXISTS merchant_transfers_by_wtid"
-      " ON merchant_transfers (wtid)"),
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS exchange_wire_fees ("
-                            " exchange_pub BYTEA NOT NULL CHECK (length(exchange_pub)=32)"
-                            ",h_wire_method BYTEA NOT NULL CHECK (length(h_wire_method)=64)"
-                            ",wire_fee_val INT8 NOT NULL"
-                            ",wire_fee_frac INT4 NOT NULL"
-                            ",closing_fee_val INT8 NOT NULL"
-                            ",closing_fee_frac INT4 NOT NULL"
-                            ",start_date INT8 NOT NULL"
-                            ",end_date INT8 NOT NULL"
-                            ",exchange_sig BYTEA NOT NULL CHECK (length(exchange_sig)=64)"
-                            ",PRIMARY KEY (exchange_pub,h_wire_method,start_date,end_date)"
-                            ");"),
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_refunds ("
-                            " rtransaction_id BIGSERIAL UNIQUE"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",h_contract_terms BYTEA NOT NULL"
-                            ",coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)"
-                            ",reason VARCHAR NOT NULL"
-                            ",refund_amount_val INT8 NOT NULL"
-                            ",refund_amount_frac INT4 NOT NULL"
-                            ",refund_fee_val INT8 NOT NULL"
-                            ",refund_fee_frac INT4 NOT NULL"
-                            ");"),
-    /* balances of the reserves available for tips */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_reserves ("
-                            " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
-                            ",expiration INT8 NOT NULL"
-                            ",balance_val INT8 NOT NULL"
-                            ",balance_frac INT4 NOT NULL"
-                            ",PRIMARY KEY (reserve_priv)"
-                            ");"),
-    /* table where we remember when tipping reserves where established / enabled */
-    GNUNET_PQ_make_execute (
-      "CREATE TABLE IF NOT EXISTS merchant_tip_reserve_credits ("
-      " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
-      ",credit_uuid BYTEA UNIQUE NOT NULL CHECK (LENGTH(credit_uuid)=64)"
-      ",timestamp INT8 NOT NULL"
-      ",amount_val INT8 NOT NULL"
-      ",amount_frac INT4 NOT NULL"
-      ",PRIMARY KEY (credit_uuid)"
-      ");"),
-    /* tips that have been authorized */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tips ("
-                            " reserve_priv BYTEA NOT NULL CHECK (LENGTH(reserve_priv)=32)"
-                            ",tip_id BYTEA NOT NULL CHECK (LENGTH(tip_id)=64)"
-                            ",exchange_url VARCHAR NOT NULL"
-                            ",justification VARCHAR NOT NULL"
-                            ",extra BYTEA NOT NULL"
-                            ",timestamp INT8 NOT NULL"
-                            ",amount_val INT8 NOT NULL" /* overall tip amount */
-                            ",amount_frac INT4 NOT NULL"
-                            ",left_val INT8 NOT NULL" /* tip amount not yet picked up */
-                            ",left_frac INT4 NOT NULL"
-                            ",PRIMARY KEY (tip_id)"
-                            ");"),
-    /* tips that have been picked up */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_tip_pickups ("
-                            " tip_id BYTEA NOT NULL REFERENCES merchant_tips (tip_id) ON DELETE CASCADE"
-                            ",pickup_id BYTEA NOT NULL CHECK (LENGTH(pickup_id)=64)"
-                            ",amount_val INT8 NOT NULL"
-                            ",amount_frac INT4 NOT NULL"
-                            ",PRIMARY KEY (pickup_id)"
-                            ");"),
-    /* sessions and their order_id/fulfillment_url mapping */
-    GNUNET_PQ_make_execute ("CREATE TABLE IF NOT EXISTS merchant_session_info ("
-                            " session_id VARCHAR NOT NULL"
-                            ",fulfillment_url VARCHAR NOT NULL"
-                            ",order_id VARCHAR NOT NULL"
-                            ",merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)"
-                            ",timestamp INT8 NOT NULL"
-                            ",PRIMARY KEY (session_id, fulfillment_url, merchant_pub)"
-                            ",UNIQUE (session_id, fulfillment_url, order_id, merchant_pub)"
-                            ");"),
-    GNUNET_PQ_EXECUTE_STATEMENT_END
-  };
   struct GNUNET_PQ_PreparedStatement ps[] = {
     GNUNET_PQ_make_prepare ("insert_deposit",
                             "INSERT INTO merchant_deposits"
@@ -3635,6 +3478,19 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   };
 
   pg = GNUNET_new (struct PostgresClosure);
+  pg->cfg = cfg;
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_filename (cfg,
+                                               "merchantdb-postgres",
+                                               "SQL_DIR",
+                                               &pg->sql_dir))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchantdb-postgres",
+                               "SQL_DIR");
+    GNUNET_free (pg);
+    return NULL;
+  }
   ec = getenv ("TALER_MERCHANTDB_POSTGRES_CONFIG");
   if (NULL != ec)
   {
@@ -3653,16 +3509,19 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
       GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                  "merchantdb-postgres",
                                  "CONFIG");
+      GNUNET_free (pg->sql_dir);
+      GNUNET_free (pg);
       return NULL;
     }
   }
-  pg->cfg = cfg;
   pg->conn = GNUNET_PQ_connect_with_cfg (cfg,
                                          "merchantdb-postgres",
-                                         es,
+                                         "",
+                                         NULL,
                                          ps);
   if (NULL == pg->conn)
   {
+    GNUNET_free (pg->sql_dir);
     GNUNET_free (pg);
     return NULL;
   }
@@ -3676,6 +3535,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                                "taler",
                                "CURRENCY");
     GNUNET_PQ_disconnect (pg->conn);
+    GNUNET_free (pg->sql_dir);
     GNUNET_free (pg);
     return NULL;
   }

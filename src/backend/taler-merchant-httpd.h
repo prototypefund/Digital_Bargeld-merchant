@@ -43,11 +43,6 @@ struct IterateInstancesCls
 {
 
   /**
-   * Handle for the configuration beig parsed
-   */
-  const struct GNUNET_CONFIGURATION_Handle *config;
-
-  /**
    * Current index in the global array of #MerchantInstance
    * types. Used by the callback in order to know which index
    * is associated to the element being processed.

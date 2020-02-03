@@ -161,6 +161,11 @@ struct GNUNET_CONTAINER_MultiHashMap *payment_trigger_map;
  */
 struct GNUNET_SCHEDULER_Task *resume_timeout_task;
 
+/**
+ * Our configuration.
+ */
+static struct GNUNET_CONFIGURATION_Handle *cfg;
+
 
 /**
  * Return #GNUNET_YES if given a valid correlation ID and
@@ -642,12 +647,12 @@ locations_iterator_cb (void *cls,
     "street_number",
     NULL,
   };
-  struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   const char *prefix = "merchant-location-";
   const char *substr = strstr (section, prefix);
   const char *locname;
   json_t *loc;
 
+  (void) cls;
   if ( (NULL == substr) || (substr != section) )
     return;
   locname = section + strlen (prefix);
@@ -730,7 +735,7 @@ wireformat_iterator_cb (void *cls,
                    "HONOR_%s",
                    mi->id);
   if (GNUNET_YES !=
-      GNUNET_CONFIGURATION_get_value_yesno (iic->config,
+      GNUNET_CONFIGURATION_get_value_yesno (cfg,
                                             section,
                                             instance_option))
   {
@@ -739,7 +744,7 @@ wireformat_iterator_cb (void *cls,
   }
   GNUNET_free (instance_option);
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_string (iic->config,
+      GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
                                              "PAYTO_URI",
                                              &payto))
@@ -752,7 +757,7 @@ wireformat_iterator_cb (void *cls,
   }
 
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_filename (iic->config,
+      GNUNET_CONFIGURATION_get_value_filename (cfg,
                                                section,
                                                "WIRE_RESPONSE",
                                                &fn))
@@ -858,14 +863,16 @@ wireformat_iterator_cb (void *cls,
       return;
     }
 
-    if (GNUNET_OK == GNUNET_CONFIGURATION_get_value_string
-          (iic->config,
-          section,
-          "WIRE_FILE_MODE",
-          &wire_file_mode))
+    if (GNUNET_OK ==
+        GNUNET_CONFIGURATION_get_value_string (cfg,
+                                               section,
+                                               "WIRE_FILE_MODE",
+                                               &wire_file_mode))
     {
       errno = 0;
-      mode_t mode = (mode_t) strtoul (wire_file_mode, NULL, 8);
+      mode_t mode = (mode_t) strtoul (wire_file_mode,
+                                      NULL,
+                                      8);
       if (0 != errno)
       {
         GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
@@ -908,7 +915,7 @@ wireformat_iterator_cb (void *cls,
   GNUNET_asprintf (&instance_option,
                    "ACTIVE_%s",
                    mi->id);
-  wm->active = GNUNET_CONFIGURATION_get_value_yesno (iic->config,
+  wm->active = GNUNET_CONFIGURATION_get_value_yesno (cfg,
                                                      section,
                                                      instance_option);
   GNUNET_free (instance_option);
@@ -956,7 +963,7 @@ instances_iterator_cb (void *cls,
               token + 1);
   mi = GNUNET_new (struct MerchantInstance);
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_string (iic->config,
+      GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
                                              "NAME",
                                              &mi->name))
@@ -970,7 +977,7 @@ instances_iterator_cb (void *cls,
   }
 
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_filename (iic->config,
+      GNUNET_CONFIGURATION_get_value_filename (cfg,
                                                section,
                                                "KEYFILE",
                                                &mi->keyfile))
@@ -984,7 +991,7 @@ instances_iterator_cb (void *cls,
     return;
   }
   if (GNUNET_OK ==
-      GNUNET_CONFIGURATION_get_value_string (iic->config,
+      GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
                                              "TIP_EXCHANGE",
                                              &mi->tip_exchange))
@@ -993,7 +1000,7 @@ instances_iterator_cb (void *cls,
     struct GNUNET_CRYPTO_EddsaPrivateKey *tip_pk;
 
     if (GNUNET_OK !=
-        GNUNET_CONFIGURATION_get_value_filename (iic->config,
+        GNUNET_CONFIGURATION_get_value_filename (cfg,
                                                  section,
                                                  "TIP_RESERVE_PRIV_FILENAME",
                                                  &tip_reserves))
@@ -1097,7 +1104,7 @@ instances_iterator_cb (void *cls,
       .mi = mi
     };
 
-    GNUNET_CONFIGURATION_iterate_sections (iic->config,
+    GNUNET_CONFIGURATION_iterate_sections (cfg,
                                            &wireformat_iterator_cb,
                                            &wfic);
   }
@@ -1144,17 +1151,16 @@ lookup_instance (const char *instance_id)
  * Iterate over locations in config in order to populate
  * the location data.
  *
- * @param config configuration handle
  * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  */
 static void
-iterate_locations (const struct GNUNET_CONFIGURATION_Handle *config)
+iterate_locations (void)
 {
   GNUNET_assert (NULL == default_locations);
   default_locations = json_object ();
-  GNUNET_CONFIGURATION_iterate_sections (config,
+  GNUNET_CONFIGURATION_iterate_sections (cfg,
                                          &locations_iterator_cb,
-                                         (void *) config);
+                                         NULL);
 }
 
 
@@ -1162,19 +1168,17 @@ iterate_locations (const struct GNUNET_CONFIGURATION_Handle *config)
  * Iterate over each merchant instance, in order to populate
  * each instance's own data
  *
- * @param config configuration handle
  * @return #GNUNET_OK if successful, #GNUNET_SYSERR upon errors
  *          (for example, if no "default" instance is defined)
  */
 static int
-iterate_instances (const struct GNUNET_CONFIGURATION_Handle *config)
+iterate_instances (void)
 {
   struct IterateInstancesCls iic;
 
-  iic.config = config;
   iic.default_instance = GNUNET_NO;
   iic.ret = GNUNET_OK;
-  GNUNET_CONFIGURATION_iterate_sections (config,
+  GNUNET_CONFIGURATION_iterate_sections (cfg,
                                          &instances_iterator_cb,
                                          &iic);
 
@@ -1652,16 +1656,17 @@ run (void *cls,
     return;
   }
 
+  cfg = GNUNET_CONFIGURATION_dup (config);
   if (GNUNET_OK !=
-      iterate_instances (config))
+      iterate_instances ())
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
-  iterate_locations (config);
+  iterate_locations ();
 
   if (NULL ==
-      (db = TALER_MERCHANTDB_plugin_load (config)))
+      (db = TALER_MERCHANTDB_plugin_load (cfg)))
   {
     GNUNET_SCHEDULER_shutdown ();
     return;

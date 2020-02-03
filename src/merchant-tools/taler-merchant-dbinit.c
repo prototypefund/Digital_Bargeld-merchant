@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015 GNUnet e.V.
+  Copyright (C) 2014, 2015 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -41,22 +41,25 @@ static int reset_db;
  * @param cls closure
  * @param args remaining command-line arguments
  * @param cfgfile name of the configuration file used (for saving, can be NULL!)
- * @param cfg configuration
+ * @param config configuration
  */
 static void
 run (void *cls,
      char *const *args,
      const char *cfgfile,
-     const struct GNUNET_CONFIGURATION_Handle *cfg)
+     const struct GNUNET_CONFIGURATION_Handle *config)
 {
   struct TALER_MERCHANTDB_Plugin *plugin;
+  struct GNUNET_CONFIGURATION_Handle *cfg;
 
+  cfg = GNUNET_CONFIGURATION_dup (config);
   if (NULL ==
       (plugin = TALER_MERCHANTDB_plugin_load (cfg)))
   {
     fprintf (stderr,
              "Failed to initialize database plugin.\n");
     global_ret = 1;
+    GNUNET_CONFIGURATION_destroy (cfg);
     return;
   }
   if (reset_db)
@@ -66,6 +69,7 @@ run (void *cls,
     plugin = TALER_MERCHANTDB_plugin_load (cfg);
   }
   TALER_MERCHANTDB_plugin_unload (plugin);
+  GNUNET_CONFIGURATION_destroy (cfg);
 }
 
 

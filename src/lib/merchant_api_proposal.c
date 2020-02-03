@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2017 GNUnet e.V. and INRIA
+  Copyright (C) 2014-2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify
   it under the terms of the GNU Lesser General Public License as
@@ -131,7 +131,7 @@ handle_proposal_finished (void *cls,
   struct TALER_MERCHANT_ProposalOperation *po = cls;
   const char *order_id;
   const json_t *json = response;
-
+  enum TALER_ErrorCode ec;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_string ("order_id",
                              &order_id),
@@ -158,30 +158,40 @@ handle_proposal_finished (void *cls,
       {
         GNUNET_break_op (0);
         response_code = 0;
+        ec = TALER_JSON_get_error_code (json);
         break;
+      }
+      else
+      {
+        ec = TALER_EC_NONE;
       }
     }
     break;
   case MHD_HTTP_BAD_REQUEST:
+    ec = TALER_JSON_get_error_code (json);
     /* This should never happen, either us or
        the merchant is buggy (or API version conflict);
        just pass JSON reply to the application */
     break;
   case MHD_HTTP_CONFLICT:
+    ec = TALER_JSON_get_error_code (json);
     break;
   case MHD_HTTP_FORBIDDEN:
     /* Nothing really to verify, merchant says one
        of the signatures is invalid; as we checked them,
        this should never happen, we should pass the JSON
        reply to the application */
+    ec = TALER_JSON_get_error_code (json);
     break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */
+    ec = TALER_JSON_get_error_code (json);
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry,
        but this API leaves this to the application */
+    ec = TALER_JSON_get_error_code (json);
     break;
   default:
     /* unexpected response code */
@@ -190,10 +200,12 @@ handle_proposal_finished (void *cls,
                 (unsigned int) response_code);
     GNUNET_break (0);
     response_code = 0;
+    ec = TALER_JSON_get_error_code (json);
+    break;
   }
   po->cb (po->cb_cls,
           response_code,
-          TALER_JSON_get_error_code (json),
+          ec,
           json,
           order_id);
   GNUNET_JSON_parse_free (spec);
@@ -290,7 +302,6 @@ handle_proposal_lookup_finished (void *cls,
                 "Proposal lookup failed with HTTP status code %u\n",
                 (unsigned int) response_code);
     GNUNET_break (0);
-
     plo->cb (plo->cb_cls,
              response_code,
              json,

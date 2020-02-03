@@ -338,6 +338,7 @@ handle_pay_finished (void *cls,
 {
   struct TALER_MERCHANT_Pay *ph = cls;
   const json_t *json = response;
+  enum TALER_ErrorCode ec;
 
   ph->job = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
@@ -349,19 +350,25 @@ handle_pay_finished (void *cls,
     switch (response_code)
     {
     case 0:
+      ec = TALER_JSON_get_error_code (json);
       break;
     case MHD_HTTP_OK:
+      ec = TALER_EC_NONE;
+      break;
     /* Tolerating Not Acceptable because sometimes
      * - especially in tests - we might want to POST
      * coins one at a time.  */
     case MHD_HTTP_NOT_ACCEPTABLE:
+      ec = TALER_JSON_get_error_code (json);
       break;
     case MHD_HTTP_BAD_REQUEST:
+      ec = TALER_JSON_get_error_code (json);
       /* This should never happen, either us
        * or the merchant is buggy (or API version conflict);
        * just pass JSON reply to the application */
       break;
     case MHD_HTTP_CONFLICT:
+      ec = TALER_JSON_get_error_code (json);
       if (GNUNET_OK != check_conflict (ph,
                                        json))
       {
@@ -370,25 +377,30 @@ handle_pay_finished (void *cls,
       }
       break;
     case MHD_HTTP_FORBIDDEN:
+      ec = TALER_JSON_get_error_code (json);
       /* Nothing really to verify, merchant says one of the
        * signatures is invalid; as we checked them, this
        * should never happen, we should pass the JSON reply
        * to the application */
       break;
     case MHD_HTTP_NOT_FOUND:
+      ec = TALER_JSON_get_error_code (json);
       /* Nothing really to verify, this should never
    happen, we should pass the JSON reply to the
          application */
       break;
     case MHD_HTTP_INTERNAL_SERVER_ERROR:
+      ec = TALER_JSON_get_error_code (json);
       /* Server had an internal issue; we should retry,
          but this API leaves this to the application */
       break;
     case MHD_HTTP_SERVICE_UNAVAILABLE:
+      ec = TALER_JSON_get_error_code (json);
       /* Exchange couldn't respond properly; the retry is
          left to the application */
       break;
     default:
+      ec = TALER_JSON_get_error_code (json);
       /* unexpected response code */
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Unexpected response code %u\n",
@@ -399,7 +411,7 @@ handle_pay_finished (void *cls,
     }
     ph->pay_cb (ph->pay_cb_cls,
                 response_code,
-                TALER_JSON_get_error_code (json),
+                ec,
                 json);
   }
   else
@@ -410,6 +422,7 @@ handle_pay_finished (void *cls,
     switch (response_code)
     {
     case 0:
+      ec = TALER_JSON_get_error_code (json);
       break;
     case MHD_HTTP_OK:
       if (GNUNET_OK ==
@@ -420,30 +433,37 @@ handle_pay_finished (void *cls,
         return;
       }
       response_code = 0;
+      ec = TALER_EC_NONE;
       break;
     case MHD_HTTP_BAD_REQUEST:
+      ec = TALER_JSON_get_error_code (json);
       /* This should never happen, either us or the
          merchant is buggy (or API version conflict); just
          pass JSON reply to the application */
       break;
     case MHD_HTTP_CONFLICT:
+      ec = TALER_JSON_get_error_code (json);
       break;
     case MHD_HTTP_FORBIDDEN:
+      ec = TALER_JSON_get_error_code (json);
       /* Nothing really to verify, merchant says one of
          the signatures is invalid; as we checked them,
          this should never happen, we should pass the JSON
          reply to the application */
       break;
     case MHD_HTTP_NOT_FOUND:
+      ec = TALER_JSON_get_error_code (json);
       /* Nothing really to verify, this should never
    happen, we should pass the JSON reply to the
          application */
       break;
     case MHD_HTTP_INTERNAL_SERVER_ERROR:
+      ec = TALER_JSON_get_error_code (json);
       /* Server had an internal issue; we should retry,
          but this API leaves this to the application */
       break;
     default:
+      ec = TALER_JSON_get_error_code (json);
       /* unexpected response code */
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Unexpected response code %u\n",
@@ -454,14 +474,13 @@ handle_pay_finished (void *cls,
     }
     ph->abort_cb (ph->abort_cb_cls,
                   response_code,
-                  TALER_JSON_get_error_code (json),
+                  ec,
                   NULL,
                   NULL,
                   0,
                   NULL,
                   json);
   }
-
   TALER_MERCHANT_pay_cancel (ph);
 }
 

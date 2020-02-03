@@ -33,11 +33,11 @@ struct TALER_MERCHANTDB_Plugin;
 /**
  * Connect to postgresql database
  *
- * @param cfg the configuration handle
+ * @param[in,out] cfg the configuration handle
  * @return connection to the database; NULL upon error
  */
 struct TALER_MERCHANTDB_Plugin *
-TALER_MERCHANTDB_plugin_load (const struct GNUNET_CONFIGURATION_Handle *cfg);
+TALER_MERCHANTDB_plugin_load (struct GNUNET_CONFIGURATION_Handle *cfg);
 
 
 /**
