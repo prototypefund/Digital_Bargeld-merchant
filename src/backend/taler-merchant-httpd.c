@@ -1724,7 +1724,8 @@ main (int argc,
                                "connection-close",
                                "force HTTP connections to be closed after each request",
                                &TMH_merchant_connection_close),
-
+    GNUNET_GETOPT_option_timetravel ('T',
+                                     "timetravel"),
     GNUNET_GETOPT_OPTION_END
   };
 
