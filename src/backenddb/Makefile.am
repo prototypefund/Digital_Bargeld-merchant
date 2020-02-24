@@ -13,7 +13,7 @@ sqldir = $(prefix)/share/taler/sql/merchant/
 sql_DATA = \
   0000.sql \
   0001.sql \
-  drop0000.sql
+  drop0001.sql
 
 if HAVE_POSTGRESQL
 if HAVE_GNUNETPQ

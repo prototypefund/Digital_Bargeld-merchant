@@ -3491,29 +3491,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
     GNUNET_free (pg);
     return NULL;
   }
-  ec = getenv ("TALER_MERCHANTDB_POSTGRES_CONFIG");
-  if (NULL != ec)
-  {
-    GNUNET_CONFIGURATION_set_value_string (cfg,
-                                           "merchantdb-postgres",
-                                           "CONFIG",
-                                           ec);
-  }
-  else
-  {
-    if (GNUNET_OK !=
-        GNUNET_CONFIGURATION_have_value (cfg,
-                                         "merchantdb-postgres",
-                                         "CONFIG"))
-    {
-      GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                                 "merchantdb-postgres",
-                                 "CONFIG");
-      GNUNET_free (pg->sql_dir);
-      GNUNET_free (pg);
-      return NULL;
-    }
-  }
   pg->conn = GNUNET_PQ_connect_with_cfg (cfg,
                                          "merchantdb-postgres",
                                          "",
