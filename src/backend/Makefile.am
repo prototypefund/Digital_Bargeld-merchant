@@ -1,6 +1,11 @@
 # This Makefile.am is in the public domain
 AM_CPPFLAGS = -I$(top_srcdir)/src/include -I$(top_srcdir)/src/backend-lib/
 
+if USE_COVERAGE
+  AM_CFLAGS = --coverage -O0
+  XLIB = -lgcov
+endif
+
 pkgcfgdir = $(prefix)/share/taler/config.d/
 
 pkgcfg_DATA = \
@@ -43,4 +48,5 @@ taler_merchant_httpd_LDADD = \
   -ljansson \
   -lgnunetcurl \
   -lgnunetjson \
-  -lgnunetutil
+  -lgnunetutil \
+  $(XLIB)
