@@ -68,34 +68,16 @@ check_products (json_t *products)
     return GNUNET_SYSERR;
   }
   json_array_foreach (products, index, value) {
-    const char *description;
-    const char *error_name;
-    unsigned int error_line;
-    int res;
-    struct GNUNET_JSON_Specification spec[] = {
-      GNUNET_JSON_spec_string ("description", &description),
-      /* FIXME: there are other fields in the product specification
-         that are currently not labeled as optional. Maybe check
-         those as well, or make them truly optional. */
-      GNUNET_JSON_spec_end ()
-    };
 
-    /* extract fields we need to sign separately */
-    res = GNUNET_JSON_parse (value,
-                             spec,
-                             &error_name,
-                             &error_line);
-    if (GNUNET_OK != res)
+    if (NULL == json_object_get (value,
+                                 "description"))
     {
       GNUNET_break (0);
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Product description parsing failed at #%u: %s:%u\n",
-                  (unsigned int) index,
-                  error_name,
-                  error_line);
+                  "Product description parsing failed at product #%u\n",
+                  (unsigned int) index);
       return GNUNET_SYSERR;
     }
-    GNUNET_JSON_parse_free (spec);
   }
   return GNUNET_OK;
 }
