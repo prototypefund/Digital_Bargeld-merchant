@@ -304,10 +304,10 @@ exchange_cont (void *cls,
     = keys->reserve_closing_delay;
   GNUNET_CRYPTO_eddsa_key_get_public (&ctr->reserve_priv.eddsa_priv,
                                       &reserve_pub.eddsa_pub);
-  ctr->rsh = TALER_EXCHANGE_reserve_status (eh,
-                                            &reserve_pub,
-                                            &handle_status,
-                                            ctr);
+  ctr->rsh = TALER_EXCHANGE_reserves_get (eh,
+                                          &reserve_pub,
+                                          &handle_status,
+                                          ctr);
 }
 
 
@@ -356,7 +356,7 @@ TMH_check_tip_reserve_cleanup (struct CheckTipReserve *ctr)
 {
   if (NULL != ctr->rsh)
   {
-    TALER_EXCHANGE_reserve_status_cancel (ctr->rsh);
+    TALER_EXCHANGE_reserves_get_cancel (ctr->rsh);
     ctr->rsh = NULL;
   }
   if (NULL != ctr->fo)

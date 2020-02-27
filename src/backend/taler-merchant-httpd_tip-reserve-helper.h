@@ -58,7 +58,7 @@ struct CheckTipReserve
   /**
    * Internal: reserve status operation.
    */
-  struct TALER_EXCHANGE_ReserveStatusHandle *rsh;
+  struct TALER_EXCHANGE_ReservesGetHandle *rsh;
 
   /**
    * Internal: DLL for resumption on shutdown.

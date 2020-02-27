@@ -178,7 +178,7 @@ struct TrackCoinContext
   /**
    * Handle for the request to resolve the WTID for this coin.
    */
-  struct TALER_EXCHANGE_TrackTransactionHandle *dwh;
+  struct TALER_EXCHANGE_DepositGetHandle *dwh;
 
   /**
    * Wire transfer identifier for this coin.
@@ -259,7 +259,7 @@ struct TrackTransactionContext
   /**
    * Handle we use to resolve transactions for a given WTID.
    */
-  struct TALER_EXCHANGE_TrackTransferHandle *wdh;
+  struct TALER_EXCHANGE_TransfersGetHandle *wdh;
 
   /**
    * Response to return upon resume.
@@ -342,7 +342,7 @@ free_tctx (struct TrackTransactionContext *tctx)
                                  tcc);
     if (NULL != tcc->dwh)
     {
-      TALER_EXCHANGE_track_transaction_cancel (tcc->dwh);
+      TALER_EXCHANGE_deposits_get_cancel (tcc->dwh);
       tcc->dwh = NULL;
     }
     if (NULL != tcc->exchange_url)
@@ -354,7 +354,7 @@ free_tctx (struct TrackTransactionContext *tctx)
   }
   if (NULL != tctx->wdh)
   {
-    TALER_EXCHANGE_track_transfer_cancel (tctx->wdh);
+    TALER_EXCHANGE_transfers_get_cancel (tctx->wdh);
     tctx->wdh = NULL;
   }
   if (NULL != tctx->fo)
@@ -699,10 +699,10 @@ wtid_cb (void *cls,
     return;
   }
 
-  tctx->wdh = TALER_EXCHANGE_track_transfer (tctx->eh,
-                                             wtid,
-                                             &wire_deposits_cb,
-                                             tctx);
+  tctx->wdh = TALER_EXCHANGE_transfers_get (tctx->eh,
+                                            wtid,
+                                            &wire_deposits_cb,
+                                            tctx);
 }
 
 
@@ -860,13 +860,13 @@ trace_coins (struct TrackTransactionContext *tctx)
     }
     /* we are not done requesting WTIDs from the current
        exchange; do the next one */
-    tcc->dwh = TALER_EXCHANGE_track_transaction (tctx->eh,
-                                                 &tctx->mi->privkey,
-                                                 &tctx->h_wire,
-                                                 &tctx->h_contract_terms,
-                                                 &tcc->coin_pub,
-                                                 &wtid_cb,
-                                                 tcc);
+    tcc->dwh = TALER_EXCHANGE_deposits_get (tctx->eh,
+                                            &tctx->mi->privkey,
+                                            &tctx->h_wire,
+                                            &tctx->h_contract_terms,
+                                            &tcc->coin_pub,
+                                            &wtid_cb,
+                                            tcc);
     return;
   }
   tctx->current_exchange = NULL;

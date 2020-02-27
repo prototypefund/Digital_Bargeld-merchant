@@ -129,7 +129,7 @@ struct WithdrawHandle
   /**
    * Withdraw operation this handle represents.
    */
-  struct TALER_EXCHANGE_ReserveWithdrawHandle *wsh;
+  struct TALER_EXCHANGE_WithdrawHandle *wsh;
 
   /**
    * Interpreter state.
@@ -286,7 +286,7 @@ pickup_cb (void *cls,
       ( (NULL == wh->wsh) &&
       ( (NULL == tps->sigs) ||
         (NULL == tps->sigs[wh->off].rsa_signature) ) );
-    wh->wsh = TALER_EXCHANGE_reserve_withdraw2
+    wh->wsh = TALER_EXCHANGE_withdraw2
                 (tps->is->exchange,
                 tps->dks[i],
                 &reserve_sigs[i],

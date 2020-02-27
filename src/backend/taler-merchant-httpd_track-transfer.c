@@ -60,7 +60,7 @@ struct TrackTransferContext
   /**
    * Handle for the /wire/transfers request.
    */
-  struct TALER_EXCHANGE_TrackTransferHandle *wdh;
+  struct TALER_EXCHANGE_TransfersGetHandle *wdh;
 
   /**
    * For which merchant instance is this tracking request?
@@ -179,7 +179,7 @@ free_transfer_track_context (struct TrackTransferContext *rctx)
   }
   if (NULL != rctx->wdh)
   {
-    TALER_EXCHANGE_track_transfer_cancel (rctx->wdh);
+    TALER_EXCHANGE_transfers_get_cancel (rctx->wdh);
     rctx->wdh = NULL;
   }
   if (NULL != rctx->url)
@@ -470,24 +470,24 @@ check_transfer (void *cls,
     /* Build the `TrackTransferConflictDetails` */
     rctx->response
       = TALER_MHD_make_json_pack (
-      "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
-      "code",
-      (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
-      "hint",
-      "disagreement about deposit valuation",
-      "exchange_deposit_proof", exchange_proof,
-      "conflict_offset",
-      (json_int_t) rctx->current_offset,
-      "exchange_transfer_proof",
-      rctx->original_response,
-      "coin_pub", GNUNET_JSON_from_data_auto (
-        coin_pub),
-      "h_contract_terms",
-      GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
-      "amount_with_fee", TALER_JSON_from_amount (
-        amount_with_fee),
-      "deposit_fee", TALER_JSON_from_amount (
-        deposit_fee));
+          "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
+          "code",
+          (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
+          "hint",
+          "disagreement about deposit valuation",
+          "exchange_deposit_proof", exchange_proof,
+          "conflict_offset",
+          (json_int_t) rctx->current_offset,
+          "exchange_transfer_proof",
+          rctx->original_response,
+          "coin_pub", GNUNET_JSON_from_data_auto (
+            coin_pub),
+          "h_contract_terms",
+          GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
+          "amount_with_fee", TALER_JSON_from_amount (
+            amount_with_fee),
+          "deposit_fee", TALER_JSON_from_amount (
+            deposit_fee));
     return;
   }
   rctx->check_transfer_result = GNUNET_OK;
@@ -828,10 +828,10 @@ process_track_transfer_with_exchange (void *cls,
 
   rctx->fo = NULL;
   rctx->eh = eh;
-  rctx->wdh = TALER_EXCHANGE_track_transfer (eh,
-                                             &rctx->wtid,
-                                             &wire_transfer_cb,
-                                             rctx);
+  rctx->wdh = TALER_EXCHANGE_transfers_get (eh,
+                                            &rctx->wtid,
+                                            &wire_transfer_cb,
+                                            rctx);
   if (NULL == rctx->wdh)
   {
     GNUNET_break (0);
