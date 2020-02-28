@@ -259,11 +259,6 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
                                    po->url));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_VERBOSE,
-                                   1L));
-
   po->job = GNUNET_CURL_job_add2 (ctx,
                                   eh,
                                   po->post_ctx.headers,
