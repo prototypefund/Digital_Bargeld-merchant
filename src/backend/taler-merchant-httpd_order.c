@@ -195,7 +195,7 @@ proposal_put (struct MHD_Connection *connection,
   int res;
   struct TALER_Amount total;
   const char *order_id;
-  const char *summary;
+  json_t *summary;
   const char *fulfillment_url;
   json_t *products;
   json_t *merchant;
@@ -206,7 +206,7 @@ proposal_put (struct MHD_Connection *connection,
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
     GNUNET_JSON_spec_string ("order_id", &order_id),
-    GNUNET_JSON_spec_string ("summary", &summary),
+    GNUNET_JSON_spec_json ("summary", &summary),
     GNUNET_JSON_spec_string ("fulfillment_url",
                              &fulfillment_url),
     /**
