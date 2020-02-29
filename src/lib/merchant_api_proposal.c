@@ -226,12 +226,11 @@ handle_proposal_finished (void *cls,
  * @return a handle for this request, NULL on error
  */
 struct TALER_MERCHANT_ProposalOperation *
-TALER_MERCHANT_order_put
-  (struct GNUNET_CURL_Context *ctx,
-  const char *backend_url,
-  const json_t *order,
-  TALER_MERCHANT_ProposalCallback proposal_cb,
-  void *proposal_cb_cls)
+TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
+                          const char *backend_url,
+                          const json_t *order,
+                          TALER_MERCHANT_ProposalCallback proposal_cb,
+                          void *proposal_cb_cls)
 {
   struct TALER_MERCHANT_ProposalOperation *po;
   json_t *req;
@@ -260,7 +259,6 @@ TALER_MERCHANT_order_put
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,
                                    po->url));
-
   po->job = GNUNET_CURL_job_add2 (ctx,
                                   eh,
                                   po->post_ctx.headers,
