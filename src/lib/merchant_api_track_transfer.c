@@ -71,7 +71,7 @@ struct TALER_MERCHANT_TrackTransferHandle
  * callback.  If not, return an error code.
  *
  * This code is very similar to
- * exchange_api_track_transfer.c::check_track_transfer_response_ok.
+ * exchange_api_transfers_get.c::check_transfers_get_response_ok.
  * (Except we do not check the signature, as that was done by the
  * backend which we trust already.)
  * Any changes should likely be reflected there as well.
@@ -82,9 +82,9 @@ struct TALER_MERCHANT_TrackTransferHandle
  *         #GNUNET_SYSERR if the response was bogus
  */
 static int
-check_track_transfer_response_ok (struct
-                                  TALER_MERCHANT_TrackTransferHandle *wdh,
-                                  const json_t *json)
+check_transfers_get_response_ok (struct
+                                 TALER_MERCHANT_TrackTransferHandle *wdh,
+                                 const json_t *json)
 {
   json_t *deposits;
   struct GNUNET_HashCode h_wire;
@@ -158,9 +158,9 @@ check_track_transfer_response_ok (struct
  * @param json response body, NULL if not in JSON
  */
 static void
-handle_track_transfer_finished (void *cls,
-                                long response_code,
-                                const void *response)
+handle_transfers_get_finished (void *cls,
+                               long response_code,
+                               const void *response)
 {
   struct TALER_MERCHANT_TrackTransferHandle *tdo = cls;
   const json_t *json = response;
@@ -172,8 +172,8 @@ handle_track_transfer_finished (void *cls,
     break;
   case MHD_HTTP_OK:
     if (GNUNET_OK ==
-        check_track_transfer_response_ok (tdo,
-                                          json))
+        check_transfers_get_response_ok (tdo,
+                                         json))
     {
       TALER_MERCHANT_track_transfer_cancel (tdo);
       return;
@@ -269,7 +269,7 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
   tdo->job = GNUNET_CURL_job_add (ctx,
                                   eh,
                                   GNUNET_YES,
-                                  &handle_track_transfer_finished,
+                                  &handle_transfers_get_finished,
                                   tdo);
   return tdo;
 }
