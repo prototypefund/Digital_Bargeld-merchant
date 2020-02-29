@@ -3493,7 +3493,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   }
   pg->conn = GNUNET_PQ_connect_with_cfg (cfg,
                                          "merchantdb-postgres",
-                                         "",
+                                         "merchant-",
                                          NULL,
                                          ps);
   if (NULL == pg->conn)
