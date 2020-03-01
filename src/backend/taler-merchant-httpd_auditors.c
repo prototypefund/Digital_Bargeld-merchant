@@ -110,7 +110,7 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
                     TALER_B2S (&auditors[j].public_key));
 
       }
-      for (unsigned int k = 0; j<ai->num_denom_keys; k++)
+      for (unsigned int k = 0; k<ai->num_denom_keys; k++)
         if (&keys->denom_keys[k] == dk)
           return GNUNET_OK;
     }

@@ -687,7 +687,8 @@ wire_transfer_cb (void *cls,
    *
    * details_length is how many (Taler coin) deposits have been
    * aggregated into _this_ wire transfer.
-   */for (unsigned int i = 0; i<details_length; i++)
+   *///
+  for (unsigned int i = 0; i<details_length; i++)
   {
     rctx->current_offset = i;
     rctx->current_detail = &details[i];
@@ -703,7 +704,7 @@ wire_transfer_cb (void *cls,
     if (0 > qs)
     {
       /* single, read-only SQL statements should never cause
-   serialization problems */
+         serialization problems */
       GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
       /* Always report on hard error as well to enable diagnostics */
       GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);

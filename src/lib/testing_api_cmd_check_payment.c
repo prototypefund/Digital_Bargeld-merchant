@@ -63,7 +63,7 @@ struct CheckPaymentState
 
   /**
    * State for a /check-payment conclude CMD.
- */
+   */
   struct CheckPaymentConcludeState *cs;
 
   /**
@@ -264,7 +264,7 @@ check_payment_cb (void *cls,
     /* synchronous variant */
     if (paid != cps->expect_paid)
       TALER_TESTING_FAIL (cps->is);
-    if (cps->http_status != http_status)
+    if (cps->expected_http_status != http_status)
       TALER_TESTING_FAIL (cps->is);
     TALER_TESTING_interpreter_next (cps->is);
   }

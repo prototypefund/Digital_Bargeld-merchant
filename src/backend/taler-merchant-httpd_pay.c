@@ -2271,9 +2271,7 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                           root,
                           pc);
   json_decref (root);
-  if (GNUNET_SYSERR == res)
-    return MHD_NO;
-  return MHD_YES;
+  return res;
 }
 
 
