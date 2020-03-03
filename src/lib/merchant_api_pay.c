@@ -918,6 +918,8 @@ TALER_MERCHANT_pay_abort (struct GNUNET_CURL_Context *ctx,
                             NULL,
                             payref_cb,
                             payref_cb_cls);
+  if (NULL == ph)
+    return NULL;
   ph->h_contract_terms = *h_contract;
   return ph;
 }
