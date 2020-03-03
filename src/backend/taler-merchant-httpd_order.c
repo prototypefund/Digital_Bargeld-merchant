@@ -68,16 +68,34 @@ check_products (json_t *products)
     return GNUNET_SYSERR;
   }
   json_array_foreach (products, index, value) {
+    const char *description;
+    const char *error_name;
+    unsigned int error_line;
+    int res;
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_string ("description", &description),
+      /* FIXME: there are other fields in the product specification
+         that are currently not labeled as optional. Maybe check
+        those as well, or make them truly optional. */
+      GNUNET_JSON_spec_end ()
+    };
 
-    if (NULL == json_object_get (value,
-                                 "description"))
+    /* extract fields we need to sign separately */
+    res = GNUNET_JSON_parse (value,
+                             spec,
+                             &error_name,
+                             &error_line);
+    if (GNUNET_OK != res)
     {
       GNUNET_break (0);
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Product description parsing failed at product #%u\n",
-                  (unsigned int) index);
+                  "Product description parsing failed at #%u: %s:%u\n",
+                  (unsigned int) index,
+                  error_name,
+                  error_line);
       return GNUNET_SYSERR;
     }
+    GNUNET_JSON_parse_free (spec);
   }
   return GNUNET_OK;
 }
@@ -195,7 +213,7 @@ proposal_put (struct MHD_Connection *connection,
   int res;
   struct TALER_Amount total;
   const char *order_id;
-  json_t *summary;
+  const char *summary;
   const char *fulfillment_url;
   json_t *products;
   json_t *merchant;
@@ -206,7 +224,7 @@ proposal_put (struct MHD_Connection *connection,
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("amount", &total),
     GNUNET_JSON_spec_string ("order_id", &order_id),
-    GNUNET_JSON_spec_json ("summary", &summary),
+    GNUNET_JSON_spec_string ("summary", &summary),
     GNUNET_JSON_spec_string ("fulfillment_url",
                              &fulfillment_url),
     /**
