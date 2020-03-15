@@ -168,24 +168,6 @@ static struct GNUNET_CONFIGURATION_Handle *cfg;
 
 
 /**
- * Return #GNUNET_YES if given a valid correlation ID and
- * #GNUNET_NO otherwise.
- *
- * @returns #GNUNET_YES iff given a valid correlation ID
- */
-static int
-is_valid_correlation_id (const char *correlation_id)
-{
-  if (strlen (correlation_id) >= 64)
-    return GNUNET_NO;
-  for (size_t i = 0; i < strlen (correlation_id); i++)
-    if (! (isalnum (correlation_id[i]) || (correlation_id[i] == '-')))
-      return GNUNET_NO;
-  return GNUNET_YES;
-}
-
-
-/**
  * Callback that frees all the elements in the hashmap
  *
  * @param cls closure, NULL
@@ -1340,7 +1322,7 @@ url_handler (void *cls,
                                                   MHD_HEADER_KIND,
                                                   "Taler-Correlation-Id");
     if ((NULL != correlation_id) &&
-        (GNUNET_YES != is_valid_correlation_id (correlation_id)))
+        (GNUNET_YES != GNUNET_CURL_is_valid_scope_id (correlation_id)))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "illegal incoming correlation ID\n");
