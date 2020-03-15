@@ -3502,14 +3502,9 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
     return NULL;
   }
   if (GNUNET_OK !=
-      GNUNET_CONFIGURATION_get_value_string (cfg,
-                                             "taler",
-                                             "CURRENCY",
-                                             &pg->currency))
+      TALER_config_get_currency (cfg,
+                                 &pg->currency))
   {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "taler",
-                               "CURRENCY");
     GNUNET_PQ_disconnect (pg->conn);
     GNUNET_free (pg->sql_dir);
     GNUNET_free (pg);

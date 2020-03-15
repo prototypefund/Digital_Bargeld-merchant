@@ -1545,15 +1545,10 @@ run (void *cls,
   result = GNUNET_SYSERR;
   GNUNET_SCHEDULER_add_shutdown (&do_shutdown,
                                  NULL);
-  if (GNUNET_SYSERR ==
-      GNUNET_CONFIGURATION_get_value_string (config,
-                                             "taler",
-                                             "CURRENCY",
-                                             &TMH_currency))
+  if (GNUNET_OK !=
+      TALER_config_get_currency (config,
+                                 &TMH_currency))
   {
-    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
-                               "taler",
-                               "CURRENCY");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }
