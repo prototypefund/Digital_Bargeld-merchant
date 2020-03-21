@@ -470,24 +470,24 @@ check_transfer (void *cls,
     /* Build the `TrackTransferConflictDetails` */
     rctx->response
       = TALER_MHD_make_json_pack (
-          "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
-          "code",
-          (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
-          "hint",
-          "disagreement about deposit valuation",
-          "exchange_deposit_proof", exchange_proof,
-          "conflict_offset",
-          (json_int_t) rctx->current_offset,
-          "exchange_transfer_proof",
-          rctx->original_response,
-          "coin_pub", GNUNET_JSON_from_data_auto (
-            coin_pub),
-          "h_contract_terms",
-          GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
-          "amount_with_fee", TALER_JSON_from_amount (
-            amount_with_fee),
-          "deposit_fee", TALER_JSON_from_amount (
-            deposit_fee));
+      "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
+      "code",
+      (json_int_t) TALER_EC_TRANSFERS_GET_CONFLICTING_REPORTS,
+      "hint",
+      "disagreement about deposit valuation",
+      "exchange_deposit_proof", exchange_proof,
+      "conflict_offset",
+      (json_int_t) rctx->current_offset,
+      "exchange_transfer_proof",
+      rctx->original_response,
+      "coin_pub", GNUNET_JSON_from_data_auto (
+        coin_pub),
+      "h_contract_terms",
+      GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
+      "amount_with_fee", TALER_JSON_from_amount (
+        amount_with_fee),
+      "deposit_fee", TALER_JSON_from_amount (
+        deposit_fee));
     return;
   }
   rctx->check_transfer_result = GNUNET_OK;
@@ -567,7 +567,7 @@ check_wire_fee (struct TrackTransferContext *rctx,
     TALER_MHD_make_json_pack (
       "{s:I, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:O}",
       "code",
-      (json_int_t) TALER_EC_TRACK_TRANSFER_JSON_BAD_WIRE_FEE,
+      (json_int_t) TALER_EC_TRANSFERS_GET_JSON_BAD_WIRE_FEE,
       "wire_fee", TALER_JSON_from_amount (wire_fee),
       "execution_time", GNUNET_JSON_from_time_abs (
         execution_time),
@@ -635,7 +635,7 @@ wire_transfer_cb (void *cls,
       TALER_MHD_make_json_pack ("{s:I, s:I, s:I, s:O}",
                                 "code",
                                 (json_int_t)
-                                TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
+                                TALER_EC_TRANSFERS_GET_EXCHANGE_ERROR,
                                 "exchange-code", (json_int_t) ec,
                                 "exchange-http-status",
                                 (json_int_t) http_status,
@@ -666,7 +666,7 @@ wire_transfer_cb (void *cls,
       TALER_MHD_make_json_pack ("{s:I, s:s}",
                                 "code",
                                 (json_int_t)
-                                TALER_EC_TRACK_TRANSFER_DB_STORE_TRANSFER_ERROR,
+                                TALER_EC_TRANSFERS_GET_DB_STORE_TRANSFER_ERROR,
                                 "details",
                                 "failed to store response from exchange to local database"));
     return;
@@ -714,7 +714,7 @@ wire_transfer_cb (void *cls,
         TALER_MHD_make_json_pack ("{s:I, s:s}",
                                   "code",
                                   (json_int_t)
-                                  TALER_EC_TRACK_TRANSFER_DB_FETCH_DEPOSIT_ERROR,
+                                  TALER_EC_TRANSFERS_GET_DB_FETCH_DEPOSIT_ERROR,
                                   "details",
                                   "failed to obtain deposit data from local database"));
       return;
@@ -739,7 +739,7 @@ wire_transfer_cb (void *cls,
         TALER_MHD_make_json_pack ("{s:I, s:s, s:I, s:s}",
                                   "code",
                                   (json_int_t)
-                                  TALER_EC_TRACK_TRANSFER_DB_INTERNAL_LOGIC_ERROR,
+                                  TALER_EC_TRANSFERS_GET_DB_INTERNAL_LOGIC_ERROR,
                                   "details", "internal logic error",
                                   "line", (json_int_t) __LINE__,
                                   "file", __FILE__));
@@ -781,7 +781,7 @@ wire_transfer_cb (void *cls,
         TALER_MHD_make_json_pack ("{s:I, s:s}",
                                   "code",
                                   (json_int_t)
-                                  TALER_EC_TRACK_TRANSFER_DB_STORE_COIN_ERROR,
+                                  TALER_EC_TRANSFERS_GET_DB_STORE_COIN_ERROR,
                                   "details",
                                   "failed to store response from exchange to local database"));
       return;
@@ -799,7 +799,7 @@ wire_transfer_cb (void *cls,
     resume_track_transfer_with_response
       (rctx,
       MHD_HTTP_INTERNAL_SERVER_ERROR,
-      TALER_MHD_make_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
+      TALER_MHD_make_error (TALER_EC_TRANSFERS_GET_JSON_RESPONSE_ERROR,
                             "Fail to elaborate the response."));
     return;
   }
@@ -842,7 +842,7 @@ process_track_transfer_with_exchange (void *cls,
       TALER_MHD_make_json_pack ("{s:I, s:s}",
                                 "code",
                                 (json_int_t)
-                                TALER_EC_TRACK_TRANSFER_REQUEST_ERROR,
+                                TALER_EC_TRANSFERS_GET_REQUEST_ERROR,
                                 "error",
                                 "failed to run /track/transfer on exchange"));
   }
@@ -871,7 +871,7 @@ handle_track_transfer_timeout (void *cls)
   resume_track_transfer_with_response (rctx,
                                        MHD_HTTP_SERVICE_UNAVAILABLE,
                                        TALER_MHD_make_error (
-                                         TALER_EC_TRACK_TRANSFER_EXCHANGE_TIMEOUT,
+                                         TALER_EC_TRANSFERS_GET_EXCHANGE_TIMEOUT,
                                          "exchange not reachable"));
 }
 
@@ -898,7 +898,7 @@ proof_cb (void *cls,
   {
     rctx->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
     rctx->response
-      = TALER_MHD_make_error (TALER_EC_TRACK_TRANSFER_JSON_RESPONSE_ERROR,
+      = TALER_MHD_make_error (TALER_EC_TRANSFERS_GET_JSON_RESPONSE_ERROR,
                               "Fail to elaborate response.");
     return;
   }
@@ -1049,7 +1049,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       TALER_EC_TRACK_TRANSFER_DB_FETCH_FAILED,
+                                       TALER_EC_TRANSFERS_GET_DB_FETCH_FAILED,
                                        "Fail to query database about proofs");
   }
   if (0 != rctx->response_code)
