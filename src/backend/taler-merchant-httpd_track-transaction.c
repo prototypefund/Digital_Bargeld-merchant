@@ -473,7 +473,7 @@ wire_deposits_cb (void *cls,
       TALER_MHD_make_json_pack ("{s:I, s:I, s:I, s:O}",
                                 "code",
                                 (json_int_t)
-                                TALER_EC_DEPOSITS_GET_WIRE_TRANSFER_TRACE_ERROR,
+                                TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
                                 "exchange-http-status",
                                 (json_int_t) http_status,
                                 "exchange-code", (json_int_t) ec,
@@ -638,7 +638,7 @@ wtid_cb (void *cls,
       TALER_MHD_make_json_pack
         ("{s:I, s:I, s:I, s:O}",
         "code",
-        (json_int_t) TALER_EC_DEPOSITS_GET_COIN_TRACE_ERROR,
+        (json_int_t) TALER_EC_TRACK_TRANSACTION_COIN_TRACE_ERROR,
         "exchange-http-status",
         (json_int_t) http_status,
         "exchange-code",
@@ -671,7 +671,7 @@ wtid_cb (void *cls,
       (tcc->tctx,
       MHD_HTTP_INTERNAL_SERVER_ERROR,
       TALER_MHD_make_error
-        (TALER_EC_DEPOSITS_GET_DB_FETCH_FAILED,
+        (TALER_EC_TRACK_TRANSACTION_DB_FETCH_FAILED,
         "Fail to query database about proofs"));
     return;
   }
@@ -689,7 +689,7 @@ wtid_cb (void *cls,
       TALER_MHD_make_json_pack ("{s:I, s:s, s:O, s:o, s:o}",
                                 "code",
                                 (json_int_t)
-                                TALER_EC_DEPOSITS_GET_CONFLICTING_REPORTS,
+                                TALER_EC_TRACK_TRANSACTION_CONFLICTING_REPORTS,
                                 "error",
                                 "conflicting transfer data from exchange",
                                 "transaction_tracking_claim", json,
@@ -1143,7 +1143,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       TALER_EC_DEPOSITS_GET_DB_FETCH_TRANSACTION_ERROR,
+                                       TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
                                        "Database error finding contract terms");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
@@ -1209,14 +1209,14 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != tctx->qs);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       TALER_EC_DEPOSITS_GET_DB_FETCH_PAYMENT_ERROR,
+                                       TALER_EC_TRACK_TRANSACTION_DB_FETCH_PAYMENT_ERROR,
                                        "Database error: failed to find payment data");
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_NOT_FOUND,
-                                       TALER_EC_DEPOSITS_GET_DB_NO_DEPOSITS_ERROR,
+                                       TALER_EC_TRACK_TRANSACTION_DB_NO_DEPOSITS_ERROR,
                                        "deposit data not found");
   }
   *connection_cls = tctx;
