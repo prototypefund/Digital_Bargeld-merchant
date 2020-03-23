@@ -470,24 +470,24 @@ check_transfer (void *cls,
     /* Build the `TrackTransferConflictDetails` */
     rctx->response
       = TALER_MHD_make_json_pack (
-      "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
-      "code",
-      (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
-      "hint",
-      "disagreement about deposit valuation",
-      "exchange_deposit_proof", exchange_proof,
-      "conflict_offset",
-      (json_int_t) rctx->current_offset,
-      "exchange_transfer_proof",
-      rctx->original_response,
-      "coin_pub", GNUNET_JSON_from_data_auto (
-        coin_pub),
-      "h_contract_terms",
-      GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
-      "amount_with_fee", TALER_JSON_from_amount (
-        amount_with_fee),
-      "deposit_fee", TALER_JSON_from_amount (
-        deposit_fee));
+          "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
+          "code",
+          (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
+          "hint",
+          "disagreement about deposit valuation",
+          "exchange_deposit_proof", exchange_proof,
+          "conflict_offset",
+          (json_int_t) rctx->current_offset,
+          "exchange_transfer_proof",
+          rctx->original_response,
+          "coin_pub", GNUNET_JSON_from_data_auto (
+            coin_pub),
+          "h_contract_terms",
+          GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
+          "amount_with_fee", TALER_JSON_from_amount (
+            amount_with_fee),
+          "deposit_fee", TALER_JSON_from_amount (
+            deposit_fee));
     return;
   }
   rctx->check_transfer_result = GNUNET_OK;
@@ -1049,7 +1049,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       TALER_EC_TRACK_TRANSFER_DB_FETCH_FAILED,
+                                       TALER_EC_TRACK_TRANSFER_DB_FETCH_DEPOSIT_ERROR,
                                        "Fail to query database about proofs");
   }
   if (0 != rctx->response_code)

@@ -671,7 +671,7 @@ wtid_cb (void *cls,
       (tcc->tctx,
       MHD_HTTP_INTERNAL_SERVER_ERROR,
       TALER_MHD_make_error
-        (TALER_EC_TRACK_TRANSACTION_DB_FETCH_FAILED,
+        (TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
         "Fail to query database about proofs"));
     return;
   }
