@@ -70,7 +70,7 @@ json_t *j_auditors;
  * @param mh exchange issuing @a dk
  * @param dk a denomination issued by @a mh
  * @param exchange_trusted #GNUNET_YES if the exchange of @a dk is trusted by config
- * @return #GNUNET_OK if we accept this denomination
+ * @return #GNUNET_OK if we accept this denomination // FIXME: should return TALER_EC instead!
  */
 int
 TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,

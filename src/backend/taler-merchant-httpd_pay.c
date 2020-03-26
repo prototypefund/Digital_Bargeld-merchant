@@ -1195,15 +1195,17 @@ process_pay_with_exchange (void *cls,
           "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
       return;
     }
+    // FIXME: AUDITORS_check_dk should return TALER_EC instead!
     if (GNUNET_OK !=
         TMH_AUDITORS_check_dk (mh,
                                denom_details,
                                exchange_trusted))
     {
+      // FIXME: and we should use THAT EC in our error code generation here!
       GNUNET_break_op (0);
       resume_pay_with_response
         (pc,
-        MHD_HTTP_BAD_REQUEST,
+        MHD_HTTP_FAILED_DEPENDENCY,
         TALER_MHD_make_json_pack
           ("{s:s, s:I, s:o}",
           "error", "invalid denomination",
