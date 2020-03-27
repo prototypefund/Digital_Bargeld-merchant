@@ -119,16 +119,15 @@ cmd_exec_wirewatch (char *label)
 
 
 /**
- * Execute the taler-exchange-aggregator command with
+ * Execute the taler-exchange-aggregator, closer and transfer commands with
  * our configuration file.
  *
  * @param label label to use for the command.
  */
-static struct TALER_TESTING_Command
-cmd_exec_aggregator (char *label)
-{
-  return TALER_TESTING_cmd_exec_aggregator (label, CONFIG_FILE);
-}
+#define CMD_EXEC_AGGREGATOR(label) \
+  TALER_TESTING_cmd_exec_aggregator (label "-aggregator", CONFIG_FILE), \
+  TALER_TESTING_cmd_exec_closer (label "-closer", CONFIG_FILE), \
+  TALER_TESTING_cmd_exec_transfer (label "-transfer", CONFIG_FILE)
 
 
 /**
@@ -317,7 +316,7 @@ run (void *cls,
                            "EUR:4.99",
                            "EUR:0.01"),
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-1"),
-    cmd_exec_aggregator ("run-aggregator"),
+    CMD_EXEC_AGGREGATOR ("run-aggregator"),
     TALER_TESTING_cmd_check_bank_transfer ("check_bank_transfer-498c",
                                            EXCHANGE_URL,
                                            "EUR:4.98",
@@ -413,7 +412,7 @@ run (void *cls,
                            "EUR:5",
                            "EUR:4.99",
                            "EUR:0.01"),
-    cmd_exec_aggregator ("run-aggregator-2"),
+    CMD_EXEC_AGGREGATOR ("run-aggregator-2"),
     TALER_TESTING_cmd_check_bank_transfer ("check_bank_transfer-498c-2",
                                            EXCHANGE_URL,
                                            "EUR:4.98",
@@ -538,7 +537,7 @@ run (void *cls,
                            "EUR:5",
                            "EUR:4.99",
                            "EUR:0.01"),
-    cmd_exec_aggregator ("run-aggregator-unincreased-refund"),
+    CMD_EXEC_AGGREGATOR ("run-aggregator-unincreased-refund"),
     TALER_TESTING_cmd_check_bank_transfer (
       "check_bank_transfer-unincreased-refund",
       EXCHANGE_URL,
@@ -702,7 +701,7 @@ run (void *cls,
                            "EUR:5", // amount + fee
                            "EUR:4.99", // amount - fee
                            "EUR:0.01"), // refund fee
-    cmd_exec_aggregator ("aggregator-tip-1"),
+    CMD_EXEC_AGGREGATOR ("aggregator-tip-1"),
     TALER_TESTING_cmd_check_bank_transfer ("check_bank_transfer-tip-498c",
                                            EXCHANGE_URL,
                                            "EUR:4.98",
@@ -759,7 +758,7 @@ run (void *cls,
                                  "withdraw-coin-10a;withdraw-coin-10b",
                                  "EUR:0.01",
                                  MHD_HTTP_OK),
-    cmd_exec_aggregator ("run-aggregator-10"),
+    CMD_EXEC_AGGREGATOR ("run-aggregator-10"),
     TALER_TESTING_cmd_check_bank_transfer ("check_bank_transfer-9.97-10",
                                            EXCHANGE_URL,
                                            "EUR:9.97",
@@ -829,7 +828,7 @@ run (void *cls,
                                         "EUR:5",
                                         "EUR:0.01",
                                         MHD_HTTP_OK),
-    cmd_exec_aggregator ("run-aggregator-11"),
+    CMD_EXEC_AGGREGATOR ("run-aggregator-11"),
     TALER_TESTING_cmd_check_bank_empty ("check_bank_empty-11"),
     TALER_TESTING_cmd_end ()
   };
