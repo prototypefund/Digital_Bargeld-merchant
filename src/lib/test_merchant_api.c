@@ -907,6 +907,7 @@ main (int argc,
   TALER_TESTING_cleanup_files (CONFIG_FILE);
 
   switch (TALER_TESTING_prepare_exchange (CONFIG_FILE,
+                                          GNUNET_YES,
                                           &ec))
   {
   case GNUNET_SYSERR:
