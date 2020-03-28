@@ -127,7 +127,7 @@ handle_status (void *cls,
     return;
   }
 
-  if (TALER_EXCHANGE_RTT_DEPOSIT != history[0].type)
+  if (TALER_EXCHANGE_RTT_CREDIT != history[0].type)
   {
     GNUNET_break_op (0);
     resume_with_response (ctr,
@@ -172,7 +172,7 @@ handle_status (void *cls,
   {
     switch (history[i].type)
     {
-    case TALER_EXCHANGE_RTT_DEPOSIT:
+    case TALER_EXCHANGE_RTT_CREDIT:
       {
         enum GNUNET_DB_QueryStatus qs;
         struct GNUNET_HashCode uuid;
