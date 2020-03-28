@@ -3570,6 +3570,7 @@ libtaler_plugin_merchantdb_postgres_done (void *cls)
   struct PostgresClosure *pg = plugin->cls;
 
   GNUNET_PQ_disconnect (pg->conn);
+  GNUNET_free (pg->sql_dir);
   GNUNET_free (pg->currency);
   GNUNET_free (pg);
   GNUNET_free (plugin);
