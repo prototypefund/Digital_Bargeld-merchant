@@ -126,7 +126,6 @@ cmd_exec_wirewatch (char *label)
  */
 #define CMD_EXEC_AGGREGATOR(label) \
   TALER_TESTING_cmd_exec_aggregator (label "-aggregator", CONFIG_FILE), \
-  TALER_TESTING_cmd_exec_closer (label "-closer", CONFIG_FILE), \
   TALER_TESTING_cmd_exec_transfer (label "-transfer", CONFIG_FILE)
 
 
