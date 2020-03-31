@@ -33,7 +33,7 @@ struct TALER_MERCHANTDB_Plugin;
 
 
 /**
- * Tipically called by `find_contract_terms_by_date`.
+ * Typically called by `find_contract_terms_by_date`.
  *
  * @param cls closure
  * @param order_id order id
@@ -145,7 +145,7 @@ typedef void
  * @param cls closure
  * @param coin_pub public coin from which the refund comes from
  * @param rtransaction_id identificator of the refund
- * @param reason human-readable explaination of the refund
+ * @param reason human-readable explanation of the refund
  * @param refund_amount refund amount which is being taken from coin_pub
  * @param refund_fee cost of this refund operation
  */
@@ -228,10 +228,10 @@ struct TALER_MERCHANTDB_Plugin
                            const json_t *contract_terms);
 
   /**
-   * Mark contract terms as payed.  Needed by /history as only payed
+   * Mark contract terms as paid.  Needed by /history as only paid
    * contracts must be shown.
    *
-   * NOTE: we can't get the list of (payed) contracts from the
+   * NOTE: we can't get the list of (paid) contracts from the
    * transactions table because it lacks contract_terms plain JSON.
    * In facts, the protocol doesn't allow to store contract_terms in
    * transactions table, as /pay handler doesn't receive this data

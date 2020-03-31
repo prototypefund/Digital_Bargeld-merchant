@@ -31,6 +31,6 @@ PHP:  PHP License, AGPL- and LGPL-Compatible, owned by The PHP Group
 
 5. DIRECTORY STRUCTURE
 
-- 'src/' contains the "backend", a C piece of software which implements cryto routines
+- 'src/' contains the "backend", a C piece of software which implements crypto routines
   and communication with the 'exchange'
  'doc/' contains documentation files, like TeXinfo

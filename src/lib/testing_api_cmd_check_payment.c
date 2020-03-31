@@ -284,7 +284,7 @@ check_payment_cb (void *cls,
 /**
  * Run a /check-payment CMD.
  *
- * @param cmd the command currenly being run.
+ * @param cmd the command currently being run.
  * @param cls closure.
  * @param is interpreter state.
  */
@@ -426,7 +426,7 @@ check_payment_conclude_cleanup (void *cls,
 /**
  * Run a /check-payment conclusion CMD.
  *
- * @param cmd the command currenly being run.
+ * @param cmd the command currently being run.
  * @param cls closure.
  * @param is interpreter state.
  */

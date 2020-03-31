@@ -62,7 +62,7 @@ struct TrackTransactionState
   const char *pay_reference;
 
   /**
-   * Subject line of the wire transfer that payed
+   * Subject line of the wire transfer that paid
    * the tracked contract back.  WARNING: impredictible
    * behaviour if _multiple_ wire transfers were
    * issued to pay this contract back.

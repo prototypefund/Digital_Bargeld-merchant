@@ -1216,7 +1216,7 @@ iterate_instances (void)
  *        can be set with the #MHD_OPTION_NOTIFY_COMPLETED).
  *        Initially, `*con_cls` will be NULL.
  * @return #MHD_YES if the connection was handled successfully,
- *         #MHD_NO if the socket must be closed due to a serios
+ *         #MHD_NO if the socket must be closed due to a serious
  *         error while handling the request
  */
 static int
@@ -1489,7 +1489,7 @@ url_handler (void *cls,
   {
     hc->rh = selected_handler;
     /* Store the async context ID, so we can restore it if
-     * we get another callack for this request. */
+     * we get another callback for this request. */
     hc->async_scope_id = aid;
   }
   return ret;

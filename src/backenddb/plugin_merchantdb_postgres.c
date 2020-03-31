@@ -499,10 +499,10 @@ postgres_insert_order (void *cls,
 
 
 /**
- * Mark contract terms as payed.  Needed by /history as only payed
+ * Mark contract terms as paid.  Needed by /history as only paid
  * contracts must be shown.
  *
- * NOTE: we can't get the list of (payed) contracts from the
+ * NOTE: we can't get the list of (paid) contracts from the
  * transactions table because it lacks contract_terms plain JSON.  In
  * facts, the protocol doesn't allow to store contract_terms in
  * transactions table, as /pay handler doesn't receive this data (only
@@ -883,8 +883,8 @@ find_contracts_cb (void *cls,
  * the same timestamp and just go behind in history by tuning `start`.
  * @param nrows only nrows rows are returned.
  * @param past if set to #GNUNET_YES, retrieves rows older than `date`.
- * @param ascending if GNUNET_YES, results will be sorted in chronological order.
- * This is tipically used to show live updates on the merchant's backoffice
+ * @param ascending if #GNUNET_YES, results will be sorted in chronological order.
+ * This is typically used to show live updates on the merchant's backoffice
  * Web interface.
  * @param cb function to call with transaction data, can be NULL.
  * @param cb_cls closure for @a cb
@@ -1831,11 +1831,11 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
  * Insert a refund row into merchant_refunds.  Not meant to be exported
  * in the db API.
  *
- * @param cls closure, tipically a connection to the db
+ * @param cls closure, typically a connection to the db
  * @param merchant_pub merchant instance public key
  * @param h_contract_terms hashcode of the contract related to this refund
  * @param coin_pub public key of the coin giving the (part of) refund
- * @param reason human readable explaination behind the refund
+ * @param reason human readable explanation behind the refund
  * @param refund how much this coin is refunding
  * @param refund_fee refund fee for this coin
  */

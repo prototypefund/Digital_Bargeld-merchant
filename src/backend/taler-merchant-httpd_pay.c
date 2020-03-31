@@ -179,7 +179,7 @@ struct PayContext
 
   /**
    * Proposal data for the proposal that is being
-   * payed for in this context.
+   * paid for in this context.
    */
   json_t *contract_terms;
 
@@ -1742,7 +1742,7 @@ parse_pay (struct MHD_Connection *connection,
  * @param cls closure with a `struct PayContext`
  * @param coin_pub public coin from which the refund comes from
  * @param rtransaction_id identificator of the refund
- * @param reason human-readable explaination of the refund
+ * @param reason human-readable explanation of the refund
  * @param refund_amount refund amount which is being taken from coin_pub
  * @param refund_fee cost of this refund operation
  */

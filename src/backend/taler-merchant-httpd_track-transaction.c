@@ -843,7 +843,7 @@ trace_coins (struct TrackTransactionContext *tctx)
 
   for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
 
-    /* How come one does't have wtid? */
+    /* How come one doesn't have wtid? */
     if (GNUNET_YES != tcc->have_wtid)
       break;
 

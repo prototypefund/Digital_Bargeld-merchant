@@ -129,7 +129,7 @@ static struct TALER_Amount refund_amount;
 
 /**
  * Amount to be refunded.  Used to trigger error about
- * subsequest refund amount being lesser than the previous
+ * subsequent refund amount being lesser than the previous
  * ones.
  */
 static struct TALER_Amount little_refund_amount;
@@ -200,7 +200,7 @@ static json_t *contract_terms_future;
  * @param cls closure
  * @param coin_pub public coin from which the refund comes from
  * @param rtransaction_id identificator of the refund
- * @param reason human-readable explaination of the refund
+ * @param reason human-readable explanation of the refund
  * @param refund_amount refund amount which is being taken from coin_pub
  * @param refund_fee cost of this refund operation
  */

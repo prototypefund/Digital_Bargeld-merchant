@@ -284,7 +284,7 @@ poll_payment_cb (void *cls,
 /**
  * Run a /poll-payment CMD.
  *
- * @param cmd the command currenly being run.
+ * @param cmd the command currently being run.
  * @param cls closure.
  * @param is interpreter state.
  */
@@ -399,7 +399,7 @@ poll_payment_conclude_cleanup (void *cls,
 /**
  * Run a /poll-payment CMD.
  *
- * @param cmd the command currenly being run.
+ * @param cmd the command currently being run.
  * @param cls closure.
  * @param is interpreter state.
  */

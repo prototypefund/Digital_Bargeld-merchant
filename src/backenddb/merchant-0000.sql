@@ -150,7 +150,7 @@ BEGIN;
 -- It requires that PL/pgSQL is already loaded - will raise exception otherwise.
 -- All versioning "stuff" (tables, functions) is in "_v" schema.
 
--- All functions are defined as 'RETURNS SETOF INT4' to be able to make them to RETURN literaly nothing (0 rows).
+-- All functions are defined as 'RETURNS SETOF INT4' to be able to make them to RETURN literally nothing (0 rows).
 -- >> RETURNS VOID<< IS similar, but it still outputs "empty line" in psql when calling.
 CREATE SCHEMA IF NOT EXISTS _v;
 COMMENT ON SCHEMA _v IS 'Schema for versioning data and functionality.';

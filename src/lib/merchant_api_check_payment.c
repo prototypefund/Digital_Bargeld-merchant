@@ -177,7 +177,7 @@ handle_check_payment_finished (void *cls,
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
  * @param order_id order id to identify the payment
- * @parem session_id sesion id for the payment (or NULL if the payment is not bound to a session)
+ * @param session_id sesion id for the payment (or NULL if the payment is not bound to a session)
  * @param timeout timeout to use in long polling (how long may the server wait to reply
  *        before generating an unpaid response). Note that this is just provided to
  *        the server, we as client will block until the response comes back or until
