@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014-2017 GNUnet e.V. and INRIA
+  (C) 2014-2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify
   it under the terms of the GNU Affero General Public License as
@@ -141,8 +141,8 @@ struct PayContext
 {
 
   /**
-   * This field MUST be first.
-   * FIXME: Explain why!
+   * This field MUST be first for handle_mhd_completion_callback() to work
+   * when it treats this struct as a `struct TM_HandlerContext`.
    */
   struct TM_HandlerContext hc;
 
@@ -217,6 +217,22 @@ struct PayContext
    * Placeholder for #TALER_MHD_parse_post_json() to keep its internal state.
    */
   void *json_parse_context;
+
+  /**
+   * Optional session id given in @e root.
+   * NULL if not given.
+   */
+  char *session_id;
+
+  /**
+   * Transaction ID given in @e root.
+   */
+  char *order_id;
+
+  /**
+   * Fulfillment URL from @e contract_terms.
+   */
+  char *fulfillment_url;
 
   /**
    * Hashed proposal.
@@ -359,22 +375,6 @@ struct PayContext
    */
   enum { PC_MODE_PAY, PC_MODE_ABORT_REFUND } mode;
 
-  /**
-   * Optional session id given in @e root.
-   * NULL if not given.
-   */
-  char *session_id;
-
-  /**
-   * Transaction ID given in @e root.
-   */
-  char *order_id;
-
-  /**
-   * Fulfillment URL from @e contract_terms.
-   */
-  char *fulfillment_url;
-
 };
 
 
@@ -390,6 +390,29 @@ static struct PayContext *pc_tail;
 
 
 /**
+ * Abort all pending /deposit operations.
+ *
+ * @param pc pay context to abort
+ */
+static void
+abort_deposit (struct PayContext *pc)
+{
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Aborting pending /deposit operations\n");
+  for (unsigned int i = 0; i<pc->coins_cnt; i++)
+  {
+    struct DepositConfirmation *dci = &pc->dc[i];
+
+    if (NULL != dci->dh)
+    {
+      TALER_EXCHANGE_deposit_cancel (dci->dh);
+      dci->dh = NULL;
+    }
+  }
+}
+
+
+/**
  * Force all pay contexts to be resumed as we are about
  * to shut down MHD.
  */
@@ -400,6 +423,12 @@ MH_force_pc_resume ()
        NULL != pc;
        pc = pc->next)
   {
+    abort_deposit (pc);
+    if (NULL != pc->timeout_task)
+    {
+      GNUNET_SCHEDULER_cancel (pc->timeout_task);
+      pc->timeout_task = NULL;
+    }
     if (GNUNET_YES == pc->suspended)
     {
       pc->suspended = GNUNET_SYSERR;
@@ -501,81 +530,6 @@ resume_pay_with_response (struct PayContext *pc,
 
 
 /**
- * Abort all pending /deposit operations.
- *
- * @param pc pay context to abort
- */
-static void
-abort_deposit (struct PayContext *pc)
-{
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Aborting pending /deposit operations\n");
-  for (unsigned int i = 0; i<pc->coins_cnt; i++)
-  {
-    struct DepositConfirmation *dci = &pc->dc[i];
-
-    if (NULL != dci->dh)
-    {
-      TALER_EXCHANGE_deposit_cancel (dci->dh);
-      dci->dh = NULL;
-    }
-  }
-}
-
-
-/**
- * Generate a response that indicates payment success.
- *
- * @param pc payment context
- * @return the mhd response
- */
-static struct MHD_Response *
-sign_success_response (struct PayContext *pc)
-{
-  json_t *refunds;
-  enum TALER_ErrorCode ec;
-  const char *errmsg;
-  struct GNUNET_CRYPTO_EddsaSignature sig;
-  json_t *resp;
-  struct MHD_Response *mret;
-
-  refunds = TM_get_refund_json (pc->mi,
-                                &pc->h_contract_terms,
-                                &ec,
-                                &errmsg);
-  if (NULL == refunds)
-    return TALER_MHD_make_error (ec,
-                                 errmsg);
-  {
-    struct PaymentResponsePS mr = {
-      .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK),
-      .purpose.size = htonl (sizeof (mr)),
-      .h_contract_terms = pc->h_contract_terms
-    };
-
-    GNUNET_assert (GNUNET_OK ==
-                   GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
-                                             &mr.purpose,
-                                             &sig));
-  }
-  resp = json_pack ("{s:O, s:o, s:o, s:o}",
-                    "contract_terms",
-                    pc->contract_terms,
-                    "sig",
-                    GNUNET_JSON_from_data_auto (&sig),
-                    "h_contract_terms",
-                    GNUNET_JSON_from_data (&pc->h_contract_terms,
-                                           sizeof (struct GNUNET_HashCode)),
-                    "refund_permissions",
-                    refunds);
-
-  mret = TALER_MHD_make_json (resp);
-  json_decref (resp);
-  return mret;
-}
-
-
-/**
  * Resume payment processing with an error.
  *
  * @param pc operation to resume
@@ -597,6 +551,84 @@ resume_pay_with_error (struct PayContext *pc,
 
 
 /**
+ * Generate a response that indicates payment success.
+ *
+ * @param pc payment context
+ */
+static void
+generate_success_response (struct PayContext *pc)
+{
+  json_t *refunds;
+  struct GNUNET_CRYPTO_EddsaSignature sig;
+
+  /* Check for applicable refunds */
+  {
+    enum TALER_ErrorCode ec;
+    const char *errmsg;
+
+    refunds = TM_get_refund_json (pc->mi,
+                                  &pc->h_contract_terms,
+                                  &ec,
+                                  &errmsg);
+    /* We would get an EMPTY array back on success if there
+       are no refunds, but not NULL. So NULL is always an error. */
+    if (NULL == refunds)
+    {
+      resume_pay_with_error (pc,
+                             MHD_HTTP_INTERNAL_SERVER_ERROR,
+                             ec,
+                             errmsg);
+      return;
+    }
+  }
+
+  /* Sign on our end (as the payment did go through, even if it may
+     have been refunded already) */
+  {
+    struct PaymentResponsePS mr = {
+      .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK),
+      .purpose.size = htonl (sizeof (mr)),
+      .h_contract_terms = pc->h_contract_terms
+    };
+
+    GNUNET_assert (GNUNET_OK ==
+                   GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
+                                             &mr.purpose,
+                                             &sig));
+  }
+
+  /* Build the response */
+  {
+    json_t *resp;
+
+    resp = json_pack ("{s:O, s:o, s:o, s:o}",
+                      "contract_terms",
+                      pc->contract_terms,
+                      "sig",
+                      GNUNET_JSON_from_data_auto (&sig),
+                      "h_contract_terms",
+                      GNUNET_JSON_from_data (&pc->h_contract_terms,
+                                             sizeof (struct GNUNET_HashCode)),
+                      "refund_permissions",
+                      refunds);
+    if (NULL == resp)
+    {
+      GNUNET_break (0);
+      resume_pay_with_error (pc,
+                             MHD_HTTP_INTERNAL_SERVER_ERROR,
+                             TALER_EC_JSON_ALLOCATION_FAILURE,
+                             "could not build final response");
+      return;
+    }
+    resume_pay_with_response (pc,
+                              MHD_HTTP_OK,
+                              TALER_MHD_make_json (resp));
+    json_decref (resp);
+  }
+}
+
+
+/**
  * Custom cleanup routine for a `struct PayContext`.
  *
  * @param hc the `struct PayContext` to clean up.
@@ -612,15 +644,11 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
     pc->timeout_task = NULL;
   }
   TALER_MHD_parse_post_cleanup_callback (pc->json_parse_context);
+  abort_deposit (pc);
   for (unsigned int i = 0; i<pc->coins_cnt; i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];
 
-    if (NULL != dc->dh)
-    {
-      TALER_EXCHANGE_deposit_cancel (dc->dh);
-      dc->dh = NULL;
-    }
     if (NULL != dc->denom.rsa_public_key)
     {
       GNUNET_CRYPTO_rsa_public_key_free (dc->denom.rsa_public_key);
@@ -664,9 +692,10 @@ pay_context_cleanup (struct TM_HandlerContext *hc)
  * the contract.
  *
  * @param pc payment context to check
- * @return taler error code, #TALER_EC_NONE if amount is sufficient
+ * @return #GNUNET_OK if the payment is sufficient, #GNUNET_SYSERR if it is
+ *         insufficient
  */
-static enum TALER_ErrorCode
+static int
 check_payment_sufficient (struct PayContext *pc)
 {
   struct TALER_Amount acc_fee;
@@ -676,7 +705,14 @@ check_payment_sufficient (struct PayContext *pc)
   struct TALER_Amount total_wire_fee;
 
   if (0 == pc->coins_cnt)
-    return TALER_EC_PAY_PAYMENT_INSUFFICIENT;
+  {
+    GNUNET_break_op (0);
+    resume_pay_with_error (pc,
+                           MHD_HTTP_BAD_REQUEST,
+                           TALER_EC_PAY_PAYMENT_INSUFFICIENT,
+                           "insufficient funds (no coins!)");
+    return GNUNET_SYSERR;
+  }
 
   acc_fee = pc->dc[0].deposit_fee;
   total_wire_fee = pc->dc[0].wire_fee;
@@ -700,17 +736,23 @@ check_payment_sufficient (struct PayContext *pc)
                             &dc->amount_with_fee,
                             &acc_amount)) )
     {
-      GNUNET_break_op (0);
+      GNUNET_break (0);
       /* Overflow in these amounts? Very strange. */
-      return TALER_EC_PAY_AMOUNT_OVERFLOW;
+      resume_pay_with_error (pc,
+                             MHD_HTTP_INTERNAL_SERVER_ERROR,
+                             TALER_EC_PAY_AMOUNT_OVERFLOW,
+                             "Overflow adding up amounts");
     }
     if (1 ==
         TALER_amount_cmp (&dc->deposit_fee,
                           &dc->amount_with_fee))
     {
       GNUNET_break_op (0);
-      /* fee higher than residual coin value, makes no sense. */
-      return TALER_EC_PAY_FEES_EXCEED_PAYMENT;
+      resume_pay_with_error (pc,
+                             MHD_HTTP_BAD_REQUEST,
+                             TALER_EC_PAY_FEES_EXCEED_PAYMENT,
+                             "Deposit fees exceed coin's contribution");
+      return GNUNET_SYSERR;
     }
 
     /* If exchange differs, add wire fee */
@@ -727,38 +769,48 @@ check_payment_sufficient (struct PayContext *pc)
       if (GNUNET_YES == new_exchange)
       {
         if (GNUNET_OK !=
+            TALER_amount_cmp_currency (&total_wire_fee,
+                                       &dc->wire_fee))
+        {
+          GNUNET_break_op (0);
+          resume_pay_with_error (pc,
+                                 MHD_HTTP_PRECONDITION_FAILED,
+                                 TALER_EC_PAY_WIRE_FEE_CURRENCY_MISMATCH,
+                                 "exchange wire in different currency");
+          return GNUNET_SYSERR;
+        }
+        if (GNUNET_OK !=
             TALER_amount_add (&total_wire_fee,
                               &total_wire_fee,
                               &dc->wire_fee))
         {
           GNUNET_break_op (0);
-          return TALER_EC_PAY_EXCHANGE_REJECTED;
+          resume_pay_with_error (pc,
+                                 MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                 TALER_EC_PAY_EXCHANGE_WIRE_FEE_ADDITION_FAILED,
+                                 "could not add exchange wire fee to total");
+          return GNUNET_SYSERR;
         }
       }
     }
   }
 
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Amount received from wallet: %s\n",
               TALER_amount_to_string (&acc_amount));
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Deposit fee for all coins: %s\n",
               TALER_amount_to_string (&acc_fee));
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Total wire fee: %s\n",
               TALER_amount_to_string (&total_wire_fee));
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Max wire fee: %s\n",
               TALER_amount_to_string (&pc->max_wire_fee));
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Deposit fee limit for merchant: %s\n",
               TALER_amount_to_string (&pc->max_fee));
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Total refunded amount: %s\n",
               TALER_amount_to_string (&pc->total_refunded));
 
@@ -769,12 +821,17 @@ check_payment_sufficient (struct PayContext *pc)
                                  &pc->max_wire_fee))
   {
     GNUNET_break (0);
-    return TALER_EC_PAY_WIRE_FEE_CURRENCY_MISSMATCH;
+    resume_pay_with_error (pc,
+                           MHD_HTTP_PRECONDITION_FAILED,
+                           TALER_EC_PAY_WIRE_FEE_CURRENCY_MISMATCH,
+                           "exchange wire does not match our currency");
+    return GNUNET_SYSERR;
   }
 
-  if (GNUNET_OK == TALER_amount_subtract (&wire_fee_delta,
-                                          &total_wire_fee,
-                                          &pc->max_wire_fee))
+  if (GNUNET_OK ==
+      TALER_amount_subtract (&wire_fee_delta,
+                             &total_wire_fee,
+                             &pc->max_wire_fee))
   {
     /* Actual wire fee is indeed higher than our maximum,
        compute how much the customer is expected to cover!  */
@@ -786,97 +843,102 @@ check_payment_sufficient (struct PayContext *pc)
   {
     /* Wire fee threshold is still above the wire fee amount.
        Customer is not going to contribute on this.  */
-    GNUNET_assert
-      (GNUNET_OK == TALER_amount_get_zero
-        (total_wire_fee.currency,
-        &wire_fee_customer_contribution));
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_amount_get_zero (total_wire_fee.currency,
+                                          &wire_fee_customer_contribution));
   }
 
-  /**
-   * Deposit fees of *all* the coins are higher than
-   * the fixed limit that the merchant is willing to
-   * pay.  The fees difference must be paid by the customer.
-   */if (-1 == TALER_amount_cmp (&pc->max_fee,
+  if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
   {
+    /**
+     * Deposit fees of *all* the different exchanges of all the coins are
+     * higher than the fixed limit that the merchant is willing to pay.  The
+     * fees difference must be paid by the customer.
+     *///
     struct TALER_Amount excess_fee;
     struct TALER_Amount total_needed;
 
     /* compute fee amount to be covered by customer */
-    GNUNET_assert
-      (GNUNET_OK == TALER_amount_subtract (&excess_fee,
-                                           &acc_fee,
-                                           &pc->max_fee));
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_amount_subtract (&excess_fee,
+                                          &acc_fee,
+                                          &pc->max_fee));
     /* add that to the total */
-    if (GNUNET_OK != TALER_amount_add (&total_needed,
-                                       &excess_fee,
-                                       &pc->amount))
+    if (GNUNET_OK !=
+        TALER_amount_add (&total_needed,
+                          &excess_fee,
+                          &pc->amount))
     {
       GNUNET_break (0);
-      return TALER_EC_PAY_AMOUNT_OVERFLOW;
+      resume_pay_with_error (pc,
+                             MHD_HTTP_BAD_REQUEST,
+                             TALER_EC_PAY_AMOUNT_OVERFLOW,
+                             "Overflow adding up amounts");
+      return GNUNET_SYSERR;
     }
 
     /* add wire fee contribution to the total */
-    GNUNET_assert
-      (GNUNET_OK == TALER_amount_add
-        (&total_needed,
-        &total_needed,
-        &wire_fee_customer_contribution));
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_amount_add (&total_needed,
+                                     &total_needed,
+                                     &wire_fee_customer_contribution));
 
     /* check if total payment sufficies */
     if (-1 == TALER_amount_cmp (&acc_amount,
                                 &total_needed))
     {
       GNUNET_break_op (0);
-      return TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES;
+      resume_pay_with_error (pc,
+                             MHD_HTTP_BAD_REQUEST,
+                             TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES,
+                             "insufficient funds (after including wire fee share to be covered by customer)");
+      return GNUNET_SYSERR;
     }
+    /* We're actually OK, the customer did pay their share of the wire fees */
   }
-
-  /**
-   * The deposit fees of all the coins are below the
-   * limit that the merchant is willing to pay, for some X
-   * delta.  Since a fraction of the wire fee must be paid
-   * by the customer, this block will take from X such a
-   * fraction, and check that the remaining paid amount is
-   * enough to pay both the remaining wire fee customer's
-   * fraction AND the price of the contract itself.
-   */else
+  else
   {
+    /**
+     * The deposit fees of all the exchanges of all the coins are below the
+     * limit that the merchant is willing to pay, for some X delta.  Since a
+     * fraction of the wire fee must be paid by the customer, this block will
+     * take from X such a fraction, and check that the remaining paid amount
+     * is enough to pay both the remaining wire fee customer's fraction AND
+     * the price of the contract itself.
+     *///
+    // FIXME: I'm confused even reading the above comment. -CG
     struct TALER_Amount deposit_fee_savings;
 
-    GNUNET_assert
-      (GNUNET_SYSERR != TALER_amount_subtract
-        (&deposit_fee_savings,
-        &pc->max_fee,
-        &acc_fee));
-
-    /* See how much of wire fee
-       contribution is covered by
-       fee_savings */
+    GNUNET_assert (GNUNET_SYSERR !=
+                   TALER_amount_subtract (&deposit_fee_savings,
+                                          &pc->max_fee,
+                                          &acc_fee));
+    /* See how much of wire fee contribution is covered by fee_savings */
     if (-1 == TALER_amount_cmp (&deposit_fee_savings,
                                 &wire_fee_customer_contribution))
     {
       /* wire_fee_customer_contribution > deposit_fee_savings */
-      GNUNET_assert
-        (GNUNET_SYSERR != TALER_amount_subtract
-          (&wire_fee_customer_contribution,
-          &wire_fee_customer_contribution,
-          &deposit_fee_savings));
-
+      GNUNET_assert (GNUNET_SYSERR !=
+                     TALER_amount_subtract (&wire_fee_customer_contribution,
+                                            &wire_fee_customer_contribution,
+                                            &deposit_fee_savings));
       /* subtract remaining wire fees from total contribution */
       GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "Subtract remaining wire fees"
-                  " from total contribution: %s\n",
-                  TALER_amount_to_string
-                    (&wire_fee_customer_contribution));
+                  "Subtract remaining wire fees from total contribution: %s\n",
+                  TALER_amount_to_string (&wire_fee_customer_contribution));
 
-      if (GNUNET_SYSERR == TALER_amount_subtract
-            (&acc_amount,
-            &acc_amount,
-            &wire_fee_customer_contribution))
+      if (GNUNET_SYSERR ==
+          TALER_amount_subtract (&acc_amount,
+                                 &acc_amount,
+                                 &wire_fee_customer_contribution))
       {
         GNUNET_break_op (0);
-        return TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES;
+        resume_pay_with_error (pc,
+                               MHD_HTTP_BAD_REQUEST,
+                               TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES,
+                               "insufficient funds (FIXME: why)");
+        return GNUNET_SYSERR;
       }
     }
 
@@ -894,79 +956,25 @@ check_payment_sufficient (struct PayContext *pc)
                   TALER_amount2s (&pc->amount),
                   str);
       GNUNET_free (str);
-      return TALER_EC_PAY_PAYMENT_INSUFFICIENT;
+      resume_pay_with_error (pc,
+                             MHD_HTTP_BAD_REQUEST,
+                             TALER_EC_PAY_PAYMENT_INSUFFICIENT,
+                             "FIXME: explain nicely");
+      return GNUNET_SYSERR;
     }
   }
 
   /* Do not count any refunds towards the payment */
-  GNUNET_assert
-    (GNUNET_SYSERR != TALER_amount_subtract (&acc_amount,
-                                             &acc_amount,
-                                             &pc->total_refunded));
+  // FIXME: check why this assertion holds:
+  GNUNET_assert (GNUNET_SYSERR !=
+                 TALER_amount_subtract (&acc_amount,
+                                        &acc_amount,
+                                        &pc->total_refunded));
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Subtracting total refunds from paid amount: %s\n",
               TALER_amount_to_string (&pc->total_refunded));
 
-  return TALER_EC_NONE;
-}
-
-
-/**
- * Generate full error response based on the @a ec
- *
- * @param pc context for which to generate the error
- * @param ec error code identifying the issue
- */
-static void
-generate_error_response (struct PayContext *pc,
-                         enum TALER_ErrorCode ec)
-{
-  switch (ec)
-  {
-  case TALER_EC_PAY_AMOUNT_OVERFLOW:
-    resume_pay_with_error (pc,
-                           MHD_HTTP_BAD_REQUEST,
-                           ec,
-                           "Overflow adding up amounts");
-    break;
-  case TALER_EC_PAY_FEES_EXCEED_PAYMENT:
-    resume_pay_with_error (pc,
-                           MHD_HTTP_BAD_REQUEST,
-                           ec,
-                           "Deposit fees exceed coin's contribution");
-    break;
-  case TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES:
-    resume_pay_with_error (pc,
-                           MHD_HTTP_METHOD_NOT_ACCEPTABLE,
-                           ec,
-                           "insufficient funds (including excessive exchange fees to be covered by customer)");
-    break;
-  case TALER_EC_PAY_PAYMENT_INSUFFICIENT:
-    resume_pay_with_error (pc,
-                           MHD_HTTP_METHOD_NOT_ACCEPTABLE,
-                           ec,
-                           "insufficient funds");
-    break;
-  case TALER_EC_PAY_WIRE_FEE_CURRENCY_MISSMATCH:
-    resume_pay_with_error (pc,
-                           MHD_HTTP_INTERNAL_SERVER_ERROR,
-                           ec,
-                           "wire_fee currency does not match");
-    break;
-  case TALER_EC_PAY_EXCHANGE_REJECTED:
-    resume_pay_with_error (pc,
-                           MHD_HTTP_PRECONDITION_FAILED,
-                           ec,
-                           "exchange charges incompatible wire fee");
-    break;
-  default:
-    resume_pay_with_error (pc,
-                           MHD_HTTP_INTERNAL_SERVER_ERROR,
-                           ec,
-                           "unexpected error code");
-    GNUNET_break (0);
-    break;
-  }
+  return GNUNET_OK;
 }
 
 
@@ -1036,34 +1044,54 @@ deposit_cb (void *cls,
     {
       /* We can't do anything meaningful here, the exchange did something wrong */
       resume_pay_with_response (pc,
-                                MHD_HTTP_SERVICE_UNAVAILABLE,
+                                MHD_HTTP_FAILED_DEPENDENCY,
                                 TALER_MHD_make_json_pack (
-                                  "{s:s, s:I, s:I, s:I, s:s}",
-                                  "error",
-                                  "exchange failed",
+                                  "{s:s, s:I, s:I}",
+                                  "hint",
+                                  "exchange failed, response body not even in JSON",
                                   "code",
                                   (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
-                                  "exchange-code",
-                                  (json_int_t) ec,
                                   "exchange-http-status",
-                                  (json_int_t) http_status,
-                                  "hint",
-                                  "The exchange provided an unexpected response"));
+                                  (json_int_t) http_status));
     }
     else
     {
       /* Forward error, adding the "coin_pub" for which the
          error was being generated */
-      json_t *eproof;
-
-      eproof = json_copy ((json_t *) proof);
-      json_object_set_new (eproof,
-                           "coin_pub",
-                           GNUNET_JSON_from_data_auto (&dc->coin_pub));
-      resume_pay_with_response (pc,
-                                http_status,
-                                TALER_MHD_make_json (eproof));
-      json_decref (eproof);
+      if (TALER_EC_DEPOSIT_INSUFFICIENT_FUNDS == ec)
+        resume_pay_with_response (
+          pc,
+          MHD_HTTP_CONFLICT,
+          TALER_MHD_make_json_pack ("{s:s, s:I, s:I, s:I, s:o, s:O}",
+                                    "hint",
+                                    "exchange failed on deposit of a coin",
+                                    "code",
+                                    (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
+                                    "exchange-code",
+                                    (json_int_t) ec,
+                                    "exchange-http-status",
+                                    (json_int_t) http_status,
+                                    "coin_pub",
+                                    GNUNET_JSON_from_data_auto (&dc->coin_pub),
+                                    "exchange-reply",
+                                    proof));
+      else
+        resume_pay_with_response (
+          pc,
+          MHD_HTTP_FAILED_DEPENDENCY,
+          TALER_MHD_make_json_pack ("{s:s, s:I, s:I, s:I, s:o, s:O}",
+                                    "hint",
+                                    "exchange failed on deposit of a coin",
+                                    "code",
+                                    (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
+                                    "exchange-code",
+                                    (json_int_t) ec,
+                                    "exchange-http-status",
+                                    (json_int_t) http_status,
+                                    "coin_pub",
+                                    GNUNET_JSON_from_data_auto (&dc->coin_pub),
+                                    "exchange-reply",
+                                    proof));
     }
     return;
   }
@@ -1151,17 +1179,17 @@ process_pay_with_exchange (void *cls,
   {
     GNUNET_break (0);
     resume_pay_with_error (pc,
-                           MHD_HTTP_INTERNAL_SERVER_ERROR,
+                           MHD_HTTP_FAILED_DEPENDENCY,
                            TALER_EC_PAY_EXCHANGE_KEYS_FAILURE,
                            "no keys");
     return;
   }
 
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Found transaction data for proposal `%s'"
-              " of merchant `%s', initiating deposits\n",
-              GNUNET_h2s (&pc->h_contract_terms),
-              TALER_B2S (&pc->mi->pubkey));
+  GNUNET_log (
+    GNUNET_ERROR_TYPE_DEBUG,
+    "Found transaction data for proposal `%s' of merchant `%s', initiating deposits\n",
+    GNUNET_h2s (&pc->h_contract_terms),
+    TALER_B2S (&pc->mi->pubkey));
 
   /* Initiate /deposit operation for all coins of
      the current exchange (!) */
@@ -1170,49 +1198,48 @@ process_pay_with_exchange (void *cls,
   {
     struct DepositConfirmation *dc = &pc->dc[i];
     const struct TALER_EXCHANGE_DenomPublicKey *denom_details;
+    enum TALER_ErrorCode ec;
+    unsigned int hc;
 
     if (GNUNET_YES == dc->found_in_db)
       continue;
     if (0 != strcmp (dc->exchange_url,
                      pc->current_exchange))
       continue;
-    denom_details = TALER_EXCHANGE_get_denomination_key
-                      (keys,
-                      &dc->denom);
-
+    denom_details = TALER_EXCHANGE_get_denomination_key (keys,
+                                                         &dc->denom);
     if (NULL == denom_details)
     {
-      GNUNET_break_op (0);
-      resume_pay_with_response
-        (pc,
-        MHD_HTTP_BAD_REQUEST,
-        TALER_MHD_make_json_pack
-          ("{s:s, s:I, s:o, s:o}",
-          "error", "denomination not found",
+      struct GNUNET_HashCode h_denom;
+
+      GNUNET_CRYPTO_rsa_public_key_hash (dc->denom.rsa_public_key,
+                                         &h_denom);
+      resume_pay_with_response (
+        pc,
+        MHD_HTTP_FAILED_DEPENDENCY,
+        TALER_MHD_make_json_pack (
+          "{s:s, s:I, s:o, s:o}",
+          "hint", "coin's denomination not found",
           "code", TALER_EC_PAY_DENOMINATION_KEY_NOT_FOUND,
-          "denom_pub", GNUNET_JSON_from_rsa_public_key
-            (dc->denom.rsa_public_key),
+          "h_denom_pub", GNUNET_JSON_from_data_auto (&h_denom),
           "exchange_keys", TALER_EXCHANGE_get_keys_raw (mh)));
       return;
     }
-    // FIXME: AUDITORS_check_dk should return TALER_EC instead!
     if (GNUNET_OK !=
         TMH_AUDITORS_check_dk (mh,
                                denom_details,
-                               exchange_trusted))
+                               exchange_trusted,
+                               &hc,
+                               &ec))
     {
-      // FIXME: and we should use THAT EC in our error code generation here!
-      GNUNET_break_op (0);
-      resume_pay_with_response
-        (pc,
-        MHD_HTTP_FAILED_DEPENDENCY,
-        TALER_MHD_make_json_pack
-          ("{s:s, s:I, s:o}",
-          "error", "invalid denomination",
-          "code", (json_int_t)
-          TALER_EC_PAY_DENOMINATION_KEY_AUDITOR_FAILURE,
-          "denom_pub", GNUNET_JSON_from_rsa_public_key
-            (dc->denom.rsa_public_key)));
+      resume_pay_with_response (
+        pc,
+        hc,
+        TALER_MHD_make_json_pack ("{s:s, s:I, s:o}",
+                                  "hint", "invalid denomination",
+                                  "code", (json_int_t) ec,
+                                  "h_denom_pub", GNUNET_JSON_from_data_auto (
+                                    &denom_details->h_key)));
       return;
     }
 
@@ -1222,15 +1249,11 @@ process_pay_with_exchange (void *cls,
 
     GNUNET_assert (NULL != pc->wm);
     GNUNET_assert (NULL != pc->wm->j_wire);
-    GNUNET_log
-      (GNUNET_ERROR_TYPE_DEBUG,
-      "Timing for this payment, wire_deadline:"
-      " %llu, refund_deadline: %llu\n",
-      (unsigned long long)
-      pc->wire_transfer_deadline.abs_value_us,
-      (unsigned long long) pc->refund_deadline.abs_value_us);
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Timing for this payment, wire_deadline: %llu, refund_deadline: %llu\n",
+                (unsigned long long) pc->wire_transfer_deadline.abs_value_us,
+                (unsigned long long) pc->refund_deadline.abs_value_us);
     db->preflight (db->cls);
-
     dc->dh = TALER_EXCHANGE_deposit (mh,
                                      &dc->amount_with_fee,
                                      pc->wire_transfer_deadline,
@@ -1247,17 +1270,17 @@ process_pay_with_exchange (void *cls,
                                      dc);
     if (NULL == dc->dh)
     {
-      /* Signature was invalid.  If the exchange was
-         unavailable, we'd get that information in the callback. */
+      /* Signature was invalid or some other constraint was not satisfied.  If
+         the exchange was unavailable, we'd get that information in the
+         callback. */
       GNUNET_break_op (0);
-      resume_pay_with_response
-        (pc,
+      resume_pay_with_response (
+        pc,
         MHD_HTTP_UNAUTHORIZED,
-        TALER_MHD_make_json_pack
-          ("{s:s, s:I, s:i}",
-          "hint", "Coin signature invalid.",
-          "code", (json_int_t)
-          TALER_EC_PAY_COIN_SIGNATURE_INVALID,
+        TALER_MHD_make_json_pack (
+          "{s:s, s:I, s:i}",
+          "hint", "deposit signature invalid",
+          "code", (json_int_t) TALER_EC_PAY_COIN_SIGNATURE_INVALID,
           "coin_idx", i));
       return;
     }
@@ -1329,9 +1352,9 @@ handle_pay_timeout (void *cls)
     pc->fo = NULL;
   }
   resume_pay_with_error (pc,
-                         MHD_HTTP_SERVICE_UNAVAILABLE,
+                         MHD_HTTP_REQUEST_TIMEOUT,
                          TALER_EC_PAY_EXCHANGE_TIMEOUT,
-                         "exchange not reachable");
+                         "likely the exchange did not reply quickly enough");
 }
 
 
@@ -1431,9 +1454,6 @@ parse_pay (struct MHD_Connection *connection,
            struct PayContext *pc)
 {
   json_t *coins;
-  json_t *coin;
-  json_t *merchant;
-  unsigned int coins_index;
   const char *order_id;
   const char *mode;
   struct TALER_MerchantPublicKeyP merchant_pub;
@@ -1450,36 +1470,41 @@ parse_pay (struct MHD_Connection *connection,
     GNUNET_JSON_spec_end ()
   };
   enum GNUNET_DB_QueryStatus qs;
-  const char *session_id;
 
   res = TALER_MHD_parse_json_data (connection,
                                    root,
                                    spec);
   if (GNUNET_YES != res)
   {
-    GNUNET_break (0);
+    GNUNET_break_op (0);
     return res;
   }
-
-  session_id = json_string_value (json_object_get (root,
-                                                   "session_id"));
 
   if (0 != GNUNET_memcmp (&merchant_pub,
                           &pc->mi->pubkey))
   {
+    GNUNET_JSON_parse_free (spec);
     TALER_LOG_INFO (
       "Unknown merchant public key included in payment (usually wrong instance chosen)\n");
-    if (MHD_YES ==
-        TALER_MHD_reply_with_error (connection,
-                                    MHD_HTTP_NOT_FOUND,
-                                    TALER_EC_PAY_WRONG_INSTANCE,
-                                    "Payment sent to wrong instance (merchant_pub unknown to the merchant)"))
-      return GNUNET_NO;
-    return GNUNET_SYSERR;
+    return
+      (MHD_YES ==
+       TALER_MHD_reply_with_error (connection,
+                                   MHD_HTTP_BAD_REQUEST,
+                                   TALER_EC_PAY_WRONG_INSTANCE,
+                                   "merchant_pub in contract does not match this instance"))
+      ? GNUNET_NO
+      : GNUNET_SYSERR;
   }
 
-  if (NULL != session_id)
-    pc->session_id = GNUNET_strdup (session_id);
+  {
+    const char *session_id;
+
+    session_id = json_string_value (json_object_get (root,
+                                                     "session_id"));
+    if (NULL != session_id)
+      pc->session_id = GNUNET_strdup (session_id);
+  }
+  GNUNET_assert (NULL == pc->order_id);
   pc->order_id = GNUNET_strdup (order_id);
   GNUNET_assert (NULL == pc->contract_terms);
   qs = db->find_contract_terms (db->cls,
@@ -1488,30 +1513,32 @@ parse_pay (struct MHD_Connection *connection,
                                 &merchant_pub);
   if (0 > qs)
   {
+    GNUNET_JSON_parse_free (spec);
     /* single, read-only SQL statements should never cause
        serialization problems */
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
-    /* Always report on hard error as well to enable diagnostics */
+    /* Always report on hard error to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    return TALER_MHD_reply_with_error (connection,
-                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       TALER_EC_PAY_DB_FETCH_PAY_ERROR,
-                                       "db error to previous /pay data");
-
+    return
+      (MHD_YES ==
+       TALER_MHD_reply_with_error (connection,
+                                   MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                   TALER_EC_PAY_DB_FETCH_PAY_ERROR,
+                                   "db error to previous /pay data"))
+      ? GNUNET_NO
+      : GNUNET_SYSERR;
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
     GNUNET_JSON_parse_free (spec);
-    if (MHD_YES !=
-        TALER_MHD_reply_with_error (connection,
-                                    MHD_HTTP_NOT_FOUND,
-                                    TALER_EC_PAY_DB_STORE_PAY_ERROR,
-                                    "Proposal not found"))
-    {
-      GNUNET_break (0);
-      return GNUNET_SYSERR;
-    }
-    return GNUNET_NO;
+    return
+      (MHD_YES ==
+       TALER_MHD_reply_with_error (connection,
+                                   MHD_HTTP_NOT_FOUND,
+                                   TALER_EC_PAY_PROPOSAL_NOT_FOUND,
+                                   "Proposal not found"))
+      ? GNUNET_NO
+      : GNUNET_SYSERR;
   }
 
   if (GNUNET_OK !=
@@ -1520,39 +1547,33 @@ parse_pay (struct MHD_Connection *connection,
   {
     GNUNET_break (0);
     GNUNET_JSON_parse_free (spec);
-    if (MHD_YES !=
-        TALER_MHD_reply_with_error (connection,
-                                    MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                    TALER_EC_PAY_FAILED_COMPUTE_PROPOSAL_HASH,
-                                    "Failed to hash proposal"))
-    {
-      GNUNET_break (0);
-      return GNUNET_SYSERR;
-    }
-    return GNUNET_NO;
+    return
+      (MHD_YES ==
+       TALER_MHD_reply_with_error (connection,
+                                   MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                   TALER_EC_PAY_FAILED_COMPUTE_PROPOSAL_HASH,
+                                   "Failed to hash proposal"))
+      ? GNUNET_NO
+      : GNUNET_SYSERR;
   }
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Handling /pay for order `%s' with contract hash `%s'\n",
               order_id,
               GNUNET_h2s (&pc->h_contract_terms));
 
-  merchant = json_object_get (pc->contract_terms,
-                              "merchant");
-  if (NULL == merchant)
+  if (NULL == json_object_get (pc->contract_terms,
+                               "merchant"))
   {
     /* invalid contract */
-    GNUNET_break (0);
     GNUNET_JSON_parse_free (spec);
-    if (MHD_YES !=
-        TALER_MHD_reply_with_error (connection,
-                                    MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                    TALER_EC_PAY_MERCHANT_FIELD_MISSING,
-                                    "No merchant field in proposal"))
-    {
-      GNUNET_break (0);
-      return GNUNET_SYSERR;
-    }
-    return GNUNET_NO;
+    return
+      (MHD_YES ==
+       TALER_MHD_reply_with_error (connection,
+                                   MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                   TALER_EC_PAY_MERCHANT_FIELD_MISSING,
+                                   "No merchant field in proposal"))
+      ? GNUNET_NO
+      : GNUNET_SYSERR;
   }
   if (0 != strcasecmp ("abort-refund",
                        mode))
@@ -1586,17 +1607,17 @@ parse_pay (struct MHD_Connection *connection,
                                      espec);
     if (GNUNET_YES != res)
     {
-      GNUNET_JSON_parse_free (spec);
       GNUNET_break (0);
-      return (GNUNET_NO == res) ? MHD_YES : MHD_NO;
+      GNUNET_JSON_parse_free (spec);
+      return res;
     }
 
     pc->fulfillment_url = GNUNET_strdup (fulfillment_url);
-
     if (pc->wire_transfer_deadline.abs_value_us <
         pc->refund_deadline.abs_value_us)
     {
-      /* This should already have been checked when creating the order! */
+      /* This should already have been checked when creating the
+         order! */
       GNUNET_break (0);
       GNUNET_JSON_parse_free (spec);
       return TALER_MHD_reply_with_error (connection,
@@ -1641,11 +1662,9 @@ parse_pay (struct MHD_Connection *connection,
                                      espec);
     if (GNUNET_YES != res)
     {
-      GNUNET_break_op (0); /* invalid input, use default */
-      /* default is we cover no fee */
-      GNUNET_assert (GNUNET_OK ==
-                     TALER_amount_get_zero (pc->max_fee.currency,
-                                            &pc->max_wire_fee));
+      GNUNET_break_op (0); /* invalid input, fail */
+      GNUNET_JSON_parse_free (spec);
+      return res;
     }
   }
   else
@@ -1655,6 +1674,7 @@ parse_pay (struct MHD_Connection *connection,
                    TALER_amount_get_zero (pc->max_fee.currency,
                                           &pc->max_wire_fee));
   }
+
   if (NULL != json_object_get (pc->contract_terms,
                                "wire_fee_amortization"))
   {
@@ -1685,7 +1705,7 @@ parse_pay (struct MHD_Connection *connection,
   {
     GNUNET_JSON_parse_free (spec);
     return TALER_MHD_reply_with_error (connection,
-                                       MHD_HTTP_NOT_FOUND,
+                                       MHD_HTTP_BAD_REQUEST,
                                        TALER_EC_PAY_COINS_ARRAY_EMPTY,
                                        "coins");
   }
@@ -1694,38 +1714,42 @@ parse_pay (struct MHD_Connection *connection,
                              struct DepositConfirmation);
 
   /* This loop populates the array 'dc' in 'pc' */
-  json_array_foreach (coins, coins_index, coin)
   {
-    struct DepositConfirmation *dc = &pc->dc[coins_index];
-    const char *exchange_url;
-    struct GNUNET_JSON_Specification ispec[] = {
-      TALER_JSON_spec_denomination_public_key ("denom_pub",
-                                               &dc->denom),
-      TALER_JSON_spec_amount ("contribution",
-                              &dc->amount_with_fee),
-      GNUNET_JSON_spec_string ("exchange_url",
-                               &exchange_url),
-      GNUNET_JSON_spec_fixed_auto ("coin_pub",
-                                   &dc->coin_pub),
-      TALER_JSON_spec_denomination_signature ("ub_sig",
-                                              &dc->ub_sig),
-      GNUNET_JSON_spec_fixed_auto ("coin_sig",
-                                   &dc->coin_sig),
-      GNUNET_JSON_spec_end ()
-    };
-
-    res = TALER_MHD_parse_json_data (connection,
-                                     coin,
-                                     ispec);
-    if (GNUNET_YES != res)
+    unsigned int coins_index;
+    json_t *coin;
+    json_array_foreach (coins, coins_index, coin)
     {
-      GNUNET_JSON_parse_free (spec);
-      GNUNET_break_op (0);
-      return res;
+      struct DepositConfirmation *dc = &pc->dc[coins_index];
+      const char *exchange_url;
+      struct GNUNET_JSON_Specification ispec[] = {
+        TALER_JSON_spec_denomination_public_key ("denom_pub",
+                                                 &dc->denom),
+        TALER_JSON_spec_amount ("contribution",
+                                &dc->amount_with_fee),
+        GNUNET_JSON_spec_string ("exchange_url",
+                                 &exchange_url),
+        GNUNET_JSON_spec_fixed_auto ("coin_pub",
+                                     &dc->coin_pub),
+        TALER_JSON_spec_denomination_signature ("ub_sig",
+                                                &dc->ub_sig),
+        GNUNET_JSON_spec_fixed_auto ("coin_sig",
+                                     &dc->coin_sig),
+        GNUNET_JSON_spec_end ()
+      };
+
+      res = TALER_MHD_parse_json_data (connection,
+                                       coin,
+                                       ispec);
+      if (GNUNET_YES != res)
+      {
+        GNUNET_JSON_parse_free (spec);
+        GNUNET_break_op (0);
+        return res;
+      }
+      dc->exchange_url = GNUNET_strdup (exchange_url);
+      dc->index = coins_index;
+      dc->pc = pc;
     }
-    dc->exchange_url = GNUNET_strdup (exchange_url);
-    dc->index = coins_index;
-    dc->pc = pc;
   }
   pc->pending = pc->coins_cnt;
   GNUNET_JSON_parse_free (spec);
@@ -1790,17 +1814,12 @@ begin_transaction (struct PayContext *pc)
   if (pc->retry_counter++ > MAX_RETRIES)
   {
     GNUNET_break (0);
-    resume_pay_with_response (pc,
-                              MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TALER_MHD_make_json_pack ("{s:I, s:s}",
-                                                        "code",
-                                                        (json_int_t)
-                                                        TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
-                                                        "hint",
-                                                        "Soft merchant database error: retry counter exceeded"));
+    resume_pay_with_error (pc,
+                           MHD_HTTP_INTERNAL_SERVER_ERROR,
+                           TALER_EC_PAY_DB_STORE_TRANSACTION_ERROR,
+                           "Soft merchant database error: retry counter exceeded");
     return;
   }
-
   GNUNET_assert (GNUNET_YES == pc->suspended);
 
   /* Init. some price accumulators.  */
@@ -1824,7 +1843,7 @@ begin_transaction (struct PayContext *pc)
     resume_pay_with_error (pc,
                            MHD_HTTP_INTERNAL_SERVER_ERROR,
                            TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
-                           "Merchant database error (could not start transaction)");
+                           "Merchant database error (could not begin transaction)");
     return;
   }
 
@@ -1870,7 +1889,7 @@ begin_transaction (struct PayContext *pc)
     resume_pay_with_error (pc,
                            MHD_HTTP_INTERNAL_SERVER_ERROR,
                            TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
-                           "Merchant database error");
+                           "Merchant database error checking for refunds");
     return;
   }
 
@@ -1938,7 +1957,7 @@ begin_transaction (struct PayContext *pc)
       resume_pay_with_error (pc,
                              MHD_HTTP_INTERNAL_SERVER_ERROR,
                              TALER_EC_PAY_DB_STORE_PAY_ERROR,
-                             "Merchant database error");
+                             "Merchant database error storing abort-refund");
       return;
     }
     qs = db->commit (db->cls);
@@ -1973,21 +1992,18 @@ begin_transaction (struct PayContext *pc)
       }
       for (unsigned int i = 0; i<pc->coins_cnt; i++)
       {
-        struct TALER_RefundRequestPS rr;
         struct TALER_MerchantSignatureP msig;
-        uint64_t rtransactionid;
+        struct TALER_RefundRequestPS rr = {
+          .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND),
+          .purpose.size = htonl (sizeof (rr)),
+          .h_contract_terms = pc->h_contract_terms,
+          .coin_pub = pc->dc[i].coin_pub,
+          .merchant = pc->mi->pubkey,
+          .rtransaction_id = GNUNET_htonll (0)
+        };
 
-        /* Will only work with coins found in DB.  */
         if (GNUNET_YES != pc->dc[i].found_in_db)
-          continue;
-
-        rtransactionid = 0;
-        rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
-        rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
-        rr.h_contract_terms = pc->h_contract_terms;
-        rr.coin_pub = pc->dc[i].coin_pub;
-        rr.merchant = pc->mi->pubkey;
-        rr.rtransaction_id = GNUNET_htonll (rtransactionid);
+          continue; /* Skip coins not found in DB.  */
         TALER_amount_hton (&rr.refund_amount,
                            &pc->dc[i].amount_with_fee);
         TALER_amount_hton (&rr.refund_fee,
@@ -2010,22 +2026,19 @@ begin_transaction (struct PayContext *pc)
 
         /* Pack refund for i-th coin.  */
         if (0 !=
-            json_array_append_new (refunds,
-                                   json_pack ("{s:I, s:o, s:o s:o s:o}",
-                                              "rtransaction_id",
-                                              (json_int_t) rtransactionid,
-                                              "coin_pub",
-                                              GNUNET_JSON_from_data_auto (
-                                                &rr.coin_pub),
-                                              "merchant_sig",
-                                              GNUNET_JSON_from_data_auto (
-                                                &msig),
-                                              "refund_amount",
-                                              TALER_JSON_from_amount_nbo (
-                                                &rr.refund_amount),
-                                              "refund_fee",
-                                              TALER_JSON_from_amount_nbo (
-                                                &rr.refund_fee))))
+            json_array_append_new (
+              refunds,
+              json_pack ("{s:I, s:o, s:o s:o s:o}",
+                         "rtransaction_id",
+                         (json_int_t) 0,
+                         "coin_pub",
+                         GNUNET_JSON_from_data_auto (&rr.coin_pub),
+                         "merchant_sig",
+                         GNUNET_JSON_from_data_auto (&msig),
+                         "refund_amount",
+                         TALER_JSON_from_amount_nbo (&rr.refund_amount),
+                         "refund_fee",
+                         TALER_JSON_from_amount_nbo (&rr.refund_fee))))
         {
           json_decref (refunds);
           GNUNET_break (0);
@@ -2038,11 +2051,11 @@ begin_transaction (struct PayContext *pc)
       }
 
       /* Resume and send back the response.  */
-      resume_pay_with_response
-        (pc,
+      resume_pay_with_response (
+        pc,
         MHD_HTTP_OK,
-        TALER_MHD_make_json_pack
-          ("{s:o, s:o, s:o}",
+        TALER_MHD_make_json_pack (
+          "{s:o, s:o, s:o}",
           /* Refunds pack.  */
           "refund_permissions", refunds,
           "merchant_pub",
@@ -2051,24 +2064,17 @@ begin_transaction (struct PayContext *pc)
           GNUNET_JSON_from_data_auto (&pc->h_contract_terms)));
     }
     return;
-  }
+  } /* End of PC_MODE_ABORT_REFUND */
+
   /* Default PC_MODE_PAY mode */
 
   /* Final termination case: all coins already known, just
      generate ultimate outcome. */
   if (0 == pc->pending)
   {
-    enum TALER_ErrorCode ec;
-
-    ec = check_payment_sufficient (pc);
-    if (TALER_EC_NONE != ec)
+    if (GNUNET_OK != check_payment_sufficient (pc))
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "Payment is not sufficient (ec=%u).\n",
-                  (unsigned int) ec);
       db->rollback (db->cls);
-      generate_error_response (pc,
-                               ec);
       return;
     }
     /* Payment succeeded, save in database */
@@ -2078,7 +2084,6 @@ begin_transaction (struct PayContext *pc)
     qs = db->mark_proposal_paid (db->cls,
                                  &pc->h_contract_terms,
                                  &pc->mi->pubkey);
-
     if (qs < 0)
     {
       db->rollback (db->cls);
@@ -2087,16 +2092,16 @@ begin_transaction (struct PayContext *pc)
         begin_transaction (pc);
         return;
       }
-      resume_pay_with_error
-        (pc,
+      resume_pay_with_error (
+        pc,
         MHD_HTTP_INTERNAL_SERVER_ERROR,
         TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
-        "Merchant database error: could not "
-        "mark proposal as 'paid'");
+        "Merchant database error: could not mark proposal as 'paid'");
       return;
     }
 
-    if ( (NULL != pc->session_id) && (NULL != pc->fulfillment_url) )
+    if ( (NULL != pc->session_id) &&
+         (NULL != pc->fulfillment_url) )
     {
       qs = db->insert_session_info (db->cls,
                                     pc->session_id,
@@ -2117,20 +2122,16 @@ begin_transaction (struct PayContext *pc)
         begin_transaction (pc);
         return;
       }
-      resume_pay_with_error
-        (pc,
+      resume_pay_with_error (
+        pc,
         MHD_HTTP_INTERNAL_SERVER_ERROR,
         TALER_EC_PAY_DB_STORE_PAYMENTS_ERROR,
-        "Merchant database error: could not "
-        "mark proposal as 'paid'");
+        "Merchant database error: could not commit to mark proposal as 'paid'");
       return;
     }
-
     resume_suspended_payment_checks (pc->order_id,
                                      &pc->mi->pubkey);
-    resume_pay_with_response (pc,
-                              MHD_HTTP_OK,
-                              sign_success_response (pc));
+    generate_success_response (pc);
     return;
   }
 
@@ -2159,26 +2160,24 @@ handler_pay_json (struct MHD_Connection *connection,
                   const json_t *root,
                   struct PayContext *pc)
 {
-  int ret;
+  {
+    int ret;
 
-  ret = parse_pay (connection,
-                   root,
-                   pc);
+    ret = parse_pay (connection,
+                     root,
+                     pc);
+    if (GNUNET_OK != ret)
+      return (GNUNET_NO == ret) ? MHD_YES : MHD_NO;
+  }
 
-  if (GNUNET_OK != ret)
-    return (GNUNET_NO == ret) ? MHD_YES : MHD_NO;
-
+  /* Payment not finished, suspend while we interact with the exchange */
   MHD_suspend_connection (connection);
   pc->suspended = GNUNET_YES;
-  GNUNET_log
-    (GNUNET_ERROR_TYPE_DEBUG,
-    "Suspending /pay handling while working with the exchange\n");
-
-  pc->timeout_task = GNUNET_SCHEDULER_add_delayed
-                       (PAY_TIMEOUT,
-                       &handle_pay_timeout,
-                       pc);
-
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Suspending /pay handling while working with the exchange\n");
+  pc->timeout_task = GNUNET_SCHEDULER_add_delayed (PAY_TIMEOUT,
+                                                   &handle_pay_timeout,
+                                                   pc);
   begin_transaction (pc);
   return MHD_YES;
 }
@@ -2231,6 +2230,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
     /* not the first call, recover state */
     pc = *connection_cls;
   }
+  if (GNUNET_SYSERR == pc->suspended)
+    return MHD_NO; /* during shutdown, we don't generate any more replies */
   if (0 != pc->response_code)
   {
     /* We are *done* processing the request,

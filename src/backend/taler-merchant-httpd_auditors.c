@@ -70,12 +70,16 @@ json_t *j_auditors;
  * @param mh exchange issuing @a dk
  * @param dk a denomination issued by @a mh
  * @param exchange_trusted #GNUNET_YES if the exchange of @a dk is trusted by config
- * @return #GNUNET_OK if we accept this denomination // FIXME: should return TALER_EC instead!
+ * @param[out] hc HTTP status code to return (on error)
+ * @param[out] ec Taler error code to return (on error)
+ * @return #GNUNET_OK
  */
 int
 TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
                        const struct TALER_EXCHANGE_DenomPublicKey *dk,
-                       int exchange_trusted)
+                       int exchange_trusted,
+                       unsigned int *hc,
+                       enum TALER_ErrorCode *ec)
 {
   const struct TALER_EXCHANGE_Keys *keys;
   const struct TALER_EXCHANGE_AuditorInformation *ai;
@@ -84,16 +88,23 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Denomination key offered by client has expired for deposits\n");
+    *hc = MHD_HTTP_GONE;
+    *ec = TALER_EC_PAY_DENOMINATION_DEPOSIT_EXPIRED;
     return GNUNET_SYSERR; /* expired */
   }
   if (GNUNET_YES == exchange_trusted)
+  {
+    *ec = TALER_EC_NONE;
+    *hc = MHD_HTTP_OK;
     return GNUNET_OK;
+  }
   keys = TALER_EXCHANGE_get_keys (mh);
   if (NULL == keys)
   {
     /* this should never happen, keys should have been successfully
        obtained before we even got into this function */
-    GNUNET_break (0);
+    *ec = TALER_EC_PAY_EXCHANGE_HAS_NO_KEYS;
+    *hc = MHD_HTTP_FAILED_DEPENDENCY;
     return GNUNET_SYSERR;
   }
   for (unsigned int i = 0; i<keys->num_auditors; i++)
@@ -108,16 +119,21 @@ TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
                     "Found supported auditor `%s' (%s)\n",
                     auditors[j].name,
                     TALER_B2S (&auditors[j].public_key));
-
       }
       for (unsigned int k = 0; k<ai->num_denom_keys; k++)
         if (&keys->denom_keys[k] == dk)
+        {
+          *ec = TALER_EC_NONE;
+          *hc = MHD_HTTP_OK;
           return GNUNET_OK;
+        }
     }
   }
   GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
               "Denomination key %s offered by client not audited by any accepted auditor\n",
               GNUNET_h2s (&dk->h_key));
+  *hc = MHD_HTTP_BAD_REQUEST;
+  *ec = TALER_EC_PAY_DENOMINATION_KEY_AUDITOR_FAILURE;
   return GNUNET_NO;
 }
 

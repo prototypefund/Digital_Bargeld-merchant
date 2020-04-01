@@ -561,7 +561,7 @@ TMH_trigger_daemon ()
  * @param daemon_handle HTTP server to prepare to run
  */
 static struct GNUNET_SCHEDULER_Task *
-prepare_daemon ()
+prepare_daemon (void)
 {
   struct GNUNET_SCHEDULER_Task *ret;
   fd_set rs;
@@ -1670,8 +1670,8 @@ run (void *cls,
                           MHD_OPTION_LISTEN_SOCKET, fh,
                           MHD_OPTION_NOTIFY_COMPLETED,
                           &handle_mhd_completion_callback, NULL,
-                          MHD_OPTION_CONNECTION_TIMEOUT, (unsigned
-                                                          int) 10 /* 10s */,
+                          MHD_OPTION_CONNECTION_TIMEOUT,
+                          (unsigned int) 10 /* 10s */,
                           MHD_OPTION_END);
   if (NULL == mhd)
   {

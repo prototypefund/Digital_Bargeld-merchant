@@ -288,10 +288,15 @@ check_conflict (struct TALER_MERCHANT_Pay *ph,
                 const json_t *json)
 {
   json_t *history;
+  json_t *ereply;
   struct TALER_CoinSpendPublicKeyP coin_pub;
   struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_json ("history", &history),
+    GNUNET_JSON_spec_json ("exchange-reply", &ereply),
     GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin_pub),
+    GNUNET_JSON_spec_end ()
+  };
+  struct GNUNET_JSON_Specification hspec[] = {
+    GNUNET_JSON_spec_json ("history", &history),
     GNUNET_JSON_spec_end ()
   };
   int ret;
@@ -304,6 +309,17 @@ check_conflict (struct TALER_MERCHANT_Pay *ph,
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
   }
+  if (GNUNET_OK !=
+      GNUNET_JSON_parse (ereply,
+                         hspec,
+                         NULL, NULL))
+  {
+    GNUNET_break_op (0);
+    GNUNET_JSON_parse_free (spec);
+    return GNUNET_SYSERR;
+  }
+  GNUNET_JSON_parse_free (spec);
+
   for (unsigned int i = 0; i<ph->num_coins; i++)
   {
     if (0 == memcmp (&ph->coins[i].coin_pub,
@@ -312,13 +328,13 @@ check_conflict (struct TALER_MERCHANT_Pay *ph,
     {
       ret = check_coin_history (&ph->coins[i],
                                 history);
-      GNUNET_JSON_parse_free (spec);
+      GNUNET_JSON_parse_free (hspec);
       return ret;
     }
   }
   GNUNET_break_op (0); /* complaint is not about any of the coins
                           that we actually paid with... */
-  GNUNET_JSON_parse_free (spec);
+  GNUNET_JSON_parse_free (hspec);
   return GNUNET_SYSERR;
 }
 
@@ -378,16 +394,37 @@ handle_pay_finished (void *cls,
       break;
     case MHD_HTTP_FORBIDDEN:
       ec = TALER_JSON_get_error_code (json);
-      /* Nothing really to verify, merchant says one of the
-       * signatures is invalid; as we checked them, this
-       * should never happen, we should pass the JSON reply
-       * to the application */
+      /* Nothing really to verify, merchant says one of the signatures is
+       * invalid OR we tried to abort the payment after it was successful. We
+       * should pass the JSON reply to the application */
       break;
     case MHD_HTTP_NOT_FOUND:
       ec = TALER_JSON_get_error_code (json);
       /* Nothing really to verify, this should never
    happen, we should pass the JSON reply to the
          application */
+      break;
+    case MHD_HTTP_PRECONDITION_FAILED:
+      ec = TALER_JSON_get_error_code (json);
+      /* Nothing really to verify, the merchant is blaming us for failing to
+         satisfy some constraint.  We should pass the JSON reply to the
+         application */
+      break;
+    case MHD_HTTP_REQUEST_TIMEOUT:
+      ec = TALER_JSON_get_error_code (json);
+      /* The merchant couldn't generate a timely response, likely because
+         it itself waited too long on the exchange.
+         Pass on to application. */
+      break;
+    case MHD_HTTP_GONE:
+      ec = TALER_JSON_get_error_code (json);
+      /* The merchant says our denomination key has expired for deposits,
+         might be a disagreement in timestamps? Still, pass on to application. */
+      break;
+    case MHD_HTTP_FAILED_DEPENDENCY:
+      ec = TALER_JSON_get_error_code (json);
+      /* Nothing really to verify, the merchant is blaming the exchange.
+         We should pass the JSON reply to the application */
       break;
     case MHD_HTTP_INTERNAL_SERVER_ERROR:
       ec = TALER_JSON_get_error_code (json);

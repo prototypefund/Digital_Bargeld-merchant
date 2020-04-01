@@ -158,7 +158,7 @@ handle_status (void *cls,
     resume_with_response (ctr,
                           MHD_HTTP_SERVICE_UNAVAILABLE,
                           TALER_MHD_make_error (
-                            TALER_EC_TIP_QUERY_RESERVE_CURRENCY_MISSMATCH,
+                            TALER_EC_TIP_QUERY_RESERVE_CURRENCY_MISMATCH,
                             "Exchange currency unexpected"));
     return;
   }

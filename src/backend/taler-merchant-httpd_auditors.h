@@ -54,12 +54,16 @@ TMH_AUDITORS_init (const struct GNUNET_CONFIGURATION_Handle *cfg);
  * @param mh exchange issuing @a dk
  * @param dk a denomination issued by @a mh
  * @param exchange_trusted #GNUNET_YES if the exchange of @a dk is trusted by config
- * @return #GNUNET_OK if we accept this denomination
+ * @param[out] hc set to the HTTP status code to return
+ * @param[out] ec set to the Taler error code to return
+ * @return #GNUNET_OK on success
  */
 int
 TMH_AUDITORS_check_dk (struct TALER_EXCHANGE_Handle *mh,
                        const struct TALER_EXCHANGE_DenomPublicKey *dk,
-                       int exchange_trusted);
+                       int exchange_trusted,
+                       unsigned int *hc,
+                       enum TALER_ErrorCode *ec);
 
 
 /**
