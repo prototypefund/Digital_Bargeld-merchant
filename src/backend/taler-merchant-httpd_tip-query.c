@@ -97,11 +97,18 @@ generate_final_response (struct TipQueryContext *tqc)
                              &tqc->ctr.amount_deposited,
                              &tqc->ctr.amount_withdrawn))
   {
+    char *a1;
+    char *a2;
+
     GNUNET_break_op (0);
+    a1 = TALER_amount_to_string (&tqc->ctr.amount_deposited);
+    a2 = TALER_amount_to_string (&tqc->ctr.amount_withdrawn);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "amount overflow, deposited %s but withdrawn %s\n",
-                TALER_amount_to_string (&tqc->ctr.amount_deposited),
-                TALER_amount_to_string (&tqc->ctr.amount_withdrawn));
+                a1,
+                a2);
+    GNUNET_free (a2);
+    GNUNET_free (a1);
     return TALER_MHD_reply_with_error (tqc->ctr.connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
                                        TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_INCONSISTENT,

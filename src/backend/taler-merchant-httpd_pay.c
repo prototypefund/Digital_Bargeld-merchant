@@ -700,9 +700,11 @@ check_payment_sufficient (struct PayContext *pc)
 {
   struct TALER_Amount acc_fee;
   struct TALER_Amount acc_amount;
+  struct TALER_Amount final_amount;
   struct TALER_Amount wire_fee_delta;
   struct TALER_Amount wire_fee_customer_contribution;
   struct TALER_Amount total_wire_fee;
+  struct TALER_Amount total_needed;
 
   if (0 == pc->coins_cnt)
   {
@@ -784,7 +786,7 @@ check_payment_sufficient (struct PayContext *pc)
                               &total_wire_fee,
                               &dc->wire_fee))
         {
-          GNUNET_break_op (0);
+          GNUNET_break (0);
           resume_pay_with_error (pc,
                                  MHD_HTTP_INTERNAL_SERVER_ERROR,
                                  TALER_EC_PAY_EXCHANGE_WIRE_FEE_ADDITION_FAILED,
@@ -797,22 +799,22 @@ check_payment_sufficient (struct PayContext *pc)
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Amount received from wallet: %s\n",
-              TALER_amount_to_string (&acc_amount));
+              TALER_amount2s (&acc_amount));
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Deposit fee for all coins: %s\n",
-              TALER_amount_to_string (&acc_fee));
+              TALER_amount2s (&acc_fee));
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Total wire fee: %s\n",
-              TALER_amount_to_string (&total_wire_fee));
+              TALER_amount2s (&total_wire_fee));
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Max wire fee: %s\n",
-              TALER_amount_to_string (&pc->max_wire_fee));
+              TALER_amount2s (&pc->max_wire_fee));
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Deposit fee limit for merchant: %s\n",
-              TALER_amount_to_string (&pc->max_fee));
+              TALER_amount2s (&pc->max_fee));
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Total refunded amount: %s\n",
-              TALER_amount_to_string (&pc->total_refunded));
+              TALER_amount2s (&pc->total_refunded));
 
   /* Now compare exchange wire fee compared to
    * what we are willing to pay */
@@ -820,7 +822,6 @@ check_payment_sufficient (struct PayContext *pc)
       TALER_amount_cmp_currency (&total_wire_fee,
                                  &pc->max_wire_fee))
   {
-    GNUNET_break (0);
     resume_pay_with_error (pc,
                            MHD_HTTP_PRECONDITION_FAILED,
                            TALER_EC_PAY_WIRE_FEE_CURRENCY_MISMATCH,
@@ -848,16 +849,28 @@ check_payment_sufficient (struct PayContext *pc)
                                           &wire_fee_customer_contribution));
   }
 
+  /* add wire fee contribution to the total fees */
+  if (GNUNET_OK !=
+      TALER_amount_add (&acc_fee,
+                        &acc_fee,
+                        &wire_fee_customer_contribution))
+  {
+    GNUNET_break (0);
+    resume_pay_with_error (pc,
+                           MHD_HTTP_INTERNAL_SERVER_ERROR,
+                           TALER_EC_PAY_AMOUNT_OVERFLOW,
+                           "Overflow adding up amounts");
+    return GNUNET_SYSERR;
+  }
   if (-1 == TALER_amount_cmp (&pc->max_fee,
                               &acc_fee))
   {
     /**
-     * Deposit fees of *all* the different exchanges of all the coins are
+     * Sum of fees of *all* the different exchanges of all the coins are
      * higher than the fixed limit that the merchant is willing to pay.  The
-     * fees difference must be paid by the customer.
+     * difference must be paid by the customer.
      *///
     struct TALER_Amount excess_fee;
-    struct TALER_Amount total_needed;
 
     /* compute fee amount to be covered by customer */
     GNUNET_assert (GNUNET_OK ==
@@ -872,107 +885,69 @@ check_payment_sufficient (struct PayContext *pc)
     {
       GNUNET_break (0);
       resume_pay_with_error (pc,
-                             MHD_HTTP_BAD_REQUEST,
+                             MHD_HTTP_INTERNAL_SERVER_ERROR,
                              TALER_EC_PAY_AMOUNT_OVERFLOW,
                              "Overflow adding up amounts");
       return GNUNET_SYSERR;
     }
+  }
+  else
+  {
+    /* Fees are fully covered by the merchant, all we require
+       is that the total payment is not below the contract's amount */
+    total_needed = pc->amount;
+  }
 
-    /* add wire fee contribution to the total */
-    GNUNET_assert (GNUNET_OK ==
-                   TALER_amount_add (&total_needed,
-                                     &total_needed,
-                                     &wire_fee_customer_contribution));
+  /* Do not count refunds towards the payment */
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Subtracting total refunds from paid amount: %s\n",
+              TALER_amount2s (&pc->total_refunded));
+  if (GNUNET_SYSERR ==
+      TALER_amount_subtract (&final_amount,
+                             &acc_amount,
+                             &pc->total_refunded))
+  {
+    GNUNET_break (0);
+    resume_pay_with_error (pc,
+                           MHD_HTTP_INTERNAL_SERVER_ERROR,
+                           TALER_EC_PAY_REFUNDS_EXCEED_PAYMENTS,
+                           "refunded amount exceeds total payments");
+    return GNUNET_SYSERR;
+  }
 
-    /* check if total payment sufficies */
-    if (-1 == TALER_amount_cmp (&acc_amount,
-                                &total_needed))
+  if (-1 == TALER_amount_cmp (&final_amount,
+                              &total_needed))
+  {
+    /* acc_amount < total_needed */
+    if (-1 < TALER_amount_cmp (&acc_amount,
+                               &total_needed))
+    {
+      resume_pay_with_error (pc,
+                             MHD_HTTP_PAYMENT_REQUIRED,
+                             TALER_EC_PAY_REFUNDED,
+                             "contract not paid up due to refunds");
+    }
+    else if (-1 < TALER_amount_cmp (&acc_amount,
+                                    &pc->amount))
     {
       GNUNET_break_op (0);
       resume_pay_with_error (pc,
                              MHD_HTTP_BAD_REQUEST,
                              TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES,
-                             "insufficient funds (after including wire fee share to be covered by customer)");
-      return GNUNET_SYSERR;
+                             "contract not paid up due to fees (client may have calculated them badly)");
     }
-    /* We're actually OK, the customer did pay their share of the wire fees */
-  }
-  else
-  {
-    /**
-     * The deposit fees of all the exchanges of all the coins are below the
-     * limit that the merchant is willing to pay, for some X delta.  Since a
-     * fraction of the wire fee must be paid by the customer, this block will
-     * take from X such a fraction, and check that the remaining paid amount
-     * is enough to pay both the remaining wire fee customer's fraction AND
-     * the price of the contract itself.
-     *///
-    // FIXME: I'm confused even reading the above comment. -CG
-    struct TALER_Amount deposit_fee_savings;
-
-    GNUNET_assert (GNUNET_SYSERR !=
-                   TALER_amount_subtract (&deposit_fee_savings,
-                                          &pc->max_fee,
-                                          &acc_fee));
-    /* See how much of wire fee contribution is covered by fee_savings */
-    if (-1 == TALER_amount_cmp (&deposit_fee_savings,
-                                &wire_fee_customer_contribution))
+    else
     {
-      /* wire_fee_customer_contribution > deposit_fee_savings */
-      GNUNET_assert (GNUNET_SYSERR !=
-                     TALER_amount_subtract (&wire_fee_customer_contribution,
-                                            &wire_fee_customer_contribution,
-                                            &deposit_fee_savings));
-      /* subtract remaining wire fees from total contribution */
-      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                  "Subtract remaining wire fees from total contribution: %s\n",
-                  TALER_amount_to_string (&wire_fee_customer_contribution));
-
-      if (GNUNET_SYSERR ==
-          TALER_amount_subtract (&acc_amount,
-                                 &acc_amount,
-                                 &wire_fee_customer_contribution))
-      {
-        GNUNET_break_op (0);
-        resume_pay_with_error (pc,
-                               MHD_HTTP_BAD_REQUEST,
-                               TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES,
-                               "insufficient funds (FIXME: why)");
-        return GNUNET_SYSERR;
-      }
-    }
-
-    /* fees are acceptable, merchant covers them all;
-       let's check the amount */
-    if (-1 == TALER_amount_cmp (&acc_amount,
-                                &pc->amount))
-    {
-      char *str;
-
       GNUNET_break_op (0);
-      str = TALER_amount_to_string (&acc_amount);
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "price vs. sent: %s vs. %s\n",
-                  TALER_amount2s (&pc->amount),
-                  str);
-      GNUNET_free (str);
       resume_pay_with_error (pc,
                              MHD_HTTP_BAD_REQUEST,
                              TALER_EC_PAY_PAYMENT_INSUFFICIENT,
-                             "FIXME: explain nicely");
-      return GNUNET_SYSERR;
+                             "payment insufficient");
+
     }
+    return GNUNET_SYSERR;
   }
 
-  /* Do not count any refunds towards the payment */
-  // FIXME: check why this assertion holds:
-  GNUNET_assert (GNUNET_SYSERR !=
-                 TALER_amount_subtract (&acc_amount,
-                                        &acc_amount,
-                                        &pc->total_refunded));
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "Subtracting total refunds from paid amount: %s\n",
-              TALER_amount_to_string (&pc->total_refunded));
 
   return GNUNET_OK;
 }
@@ -1040,7 +1015,21 @@ deposit_cb (void *cls,
     /* Transaction failed; stop all other ongoing deposits */
     abort_deposit (pc);
 
-    if (NULL == proof)
+    if (5 == http_status / 100)
+    {
+      /* internal server error at exchange */
+      resume_pay_with_response (pc,
+                                MHD_HTTP_SERVICE_UNAVAILABLE,
+                                TALER_MHD_make_json_pack (
+                                  "{s:s, s:I, s:I}",
+                                  "hint",
+                                  "exchange had an internal server error",
+                                  "code",
+                                  (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
+                                  "exchange-http-status",
+                                  (json_int_t) http_status));
+    }
+    else if (NULL == proof)
     {
       /* We can't do anything meaningful here, the exchange did something wrong */
       resume_pay_with_response (pc,
@@ -1170,7 +1159,7 @@ process_pay_with_exchange (void *cls,
     resume_pay_with_error (pc,
                            MHD_HTTP_PRECONDITION_FAILED,
                            TALER_EC_PAY_EXCHANGE_REJECTED,
-                           "exchange not supported");
+                           "exchange not supported (we do not trust it and also not its auditors)");
     return;
   }
   pc->mh = mh;
@@ -1317,7 +1306,7 @@ find_next_exchange (struct PayContext *pc)
         GNUNET_break (0);
         resume_pay_with_error (pc,
                                MHD_HTTP_INTERNAL_SERVER_ERROR,
-                               TALER_EC_PAY_EXCHANGE_FAILED,
+                               TALER_EC_PAY_EXCHANGE_LOOKUP_FAILED,
                                "Failed to lookup exchange by URL");
         return;
       }
@@ -1524,7 +1513,7 @@ parse_pay (struct MHD_Connection *connection,
        TALER_MHD_reply_with_error (connection,
                                    MHD_HTTP_INTERNAL_SERVER_ERROR,
                                    TALER_EC_PAY_DB_FETCH_PAY_ERROR,
-                                   "db error to previous /pay data"))
+                                   "Failed to obtain contract terms from DB"))
       ? GNUNET_NO
       : GNUNET_SYSERR;
   }
@@ -1621,10 +1610,26 @@ parse_pay (struct MHD_Connection *connection,
       GNUNET_break (0);
       GNUNET_JSON_parse_free (spec);
       return TALER_MHD_reply_with_error (connection,
-                                         MHD_HTTP_BAD_REQUEST,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
                                          TALER_EC_PAY_REFUND_DEADLINE_PAST_WIRE_TRANSFER_DEADLINE,
                                          "refund deadline after wire transfer deadline");
     }
+
+    if (pc->pay_deadline.abs_value_us <
+        GNUNET_TIME_absolute_get ().abs_value_us)
+    {
+      /* too late */
+      GNUNET_JSON_parse_free (spec);
+      return
+        (MHD_YES ==
+         TALER_MHD_reply_with_error (connection,
+                                     MHD_HTTP_GONE,
+                                     TALER_EC_PAY_OFFER_EXPIRED,
+                                     "The payment deadline has past and the offer is no longer valid"))
+        ? GNUNET_NO
+        : GNUNET_SYSERR;
+    }
+
   }
 
   /* find wire method */

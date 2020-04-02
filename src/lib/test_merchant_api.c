@@ -522,7 +522,7 @@ run (void *cls,
                                 "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"unincreased-proposal\",\
         \"refund_deadline\":{\"t_ms\":0},\
-        \"pay_deadline\":{\"t_ms\":99999999999},\
+        \"pay_deadline\":{\"t_ms\":9999999999999},\
         \"amount\":\"EUR:5.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
@@ -686,7 +686,7 @@ run (void *cls,
                                 "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1-tip\",                           \
         \"refund_deadline\":{\"t_ms\":0},\
-        \"pay_deadline\":{\"t_ms\":99999999999},\
+        \"pay_deadline\":{\"t_ms\":99999999999999},\
         \"amount\":\"EUR:5.0\",\
         \"summary\": \"useful product\",\
         \"fulfillment_url\": \"https://example.com/\",\
@@ -737,7 +737,7 @@ run (void *cls,
                                 "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"10\",\
         \"refund_deadline\":{\"t_ms\":0},\
-        \"pay_deadline\":{\"t_ms\":99999999999},\
+        \"pay_deadline\":{\"t_ms\":99999999999999},\
         \"amount\":\"EUR:10.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
@@ -794,7 +794,7 @@ run (void *cls,
                                 "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"11\",\
         \"refund_deadline\":{\"t_ms\":0},\
-        \"pay_deadline\":{\"t_ms\":99999999999},\
+        \"pay_deadline\":{\"t_ms\":99999999999999},\
         \"amount\":\"EUR:10.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\

@@ -152,7 +152,6 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
                                  &res[i].rtransaction_id),
         GNUNET_JSON_spec_end ()
       };
-      struct TALER_RefundRequestPS rr;
       int found;
 
       if (GNUNET_OK !=
@@ -165,14 +164,6 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
         return GNUNET_SYSERR;
       }
 
-      rr.purpose.purpose = htonl
-                             (TALER_SIGNATURE_MERCHANT_REFUND);
-      rr.purpose.size = htonl
-                          (sizeof (struct TALER_RefundRequestPS));
-      rr.h_contract_terms = ph->h_contract_terms;
-      rr.coin_pub = res[i].coin_pub;
-      rr.merchant = merchant_pub;
-      rr.rtransaction_id = GNUNET_htonll (res[i].rtransaction_id);
       found = -1;
       for (unsigned int j = 0; j<ph->num_coins; j++)
       {
@@ -181,11 +172,8 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
                          sizeof
                          (struct TALER_CoinSpendPublicKeyP)))
         {
-          TALER_amount_hton (&rr.refund_amount,
-                             &ph->coins[j].amount_with_fee);
-          TALER_amount_hton (&rr.refund_fee,
-                             &ph->coins[j].refund_fee);
           found = j;
+          break;
         }
       }
       if (-1 == found)
@@ -195,16 +183,31 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
         return GNUNET_SYSERR;
       }
 
-      if (GNUNET_OK !=
-          GNUNET_CRYPTO_eddsa_verify
-            (TALER_SIGNATURE_MERCHANT_REFUND,
-            &rr.purpose,
-            &sig->eddsa_sig,
-            &merchant_pub.eddsa_pub))
       {
-        GNUNET_break_op (0);
-        GNUNET_JSON_parse_free (spec);
-        return GNUNET_SYSERR;
+        struct TALER_RefundRequestPS rr = {
+          .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND),
+          .purpose.size = htonl (sizeof (struct TALER_RefundRequestPS)),
+          .h_contract_terms = ph->h_contract_terms,
+          .coin_pub = res[i].coin_pub,
+          .merchant = merchant_pub,
+          .rtransaction_id = GNUNET_htonll (res[i].rtransaction_id)
+        };
+
+        TALER_amount_hton (&rr.refund_amount,
+                           &ph->coins[found].amount_with_fee);
+        TALER_amount_hton (&rr.refund_fee,
+                           &ph->coins[found].refund_fee);
+        if (GNUNET_OK !=
+            GNUNET_CRYPTO_eddsa_verify
+              (TALER_SIGNATURE_MERCHANT_REFUND,
+              &rr.purpose,
+              &sig->eddsa_sig,
+              &merchant_pub.eddsa_pub))
+        {
+          GNUNET_break_op (0);
+          GNUNET_JSON_parse_free (spec);
+          return GNUNET_SYSERR;
+        }
       }
     }
     ph->abort_cb (ph->abort_cb_cls,
@@ -383,20 +386,11 @@ handle_pay_finished (void *cls,
        * or the merchant is buggy (or API version conflict);
        * just pass JSON reply to the application */
       break;
-    case MHD_HTTP_CONFLICT:
-      ec = TALER_JSON_get_error_code (json);
-      if (GNUNET_OK != check_conflict (ph,
-                                       json))
-      {
-        GNUNET_break_op (0);
-        response_code = 0;
-      }
-      break;
     case MHD_HTTP_FORBIDDEN:
       ec = TALER_JSON_get_error_code (json);
-      /* Nothing really to verify, merchant says one of the signatures is
-       * invalid OR we tried to abort the payment after it was successful. We
-       * should pass the JSON reply to the application */
+      /* Nothing really to verify, merchant says we tried to abort the payment
+       * after it was successful. We should pass the JSON reply to the
+       * application */
       break;
     case MHD_HTTP_NOT_FOUND:
       ec = TALER_JSON_get_error_code (json);
@@ -407,7 +401,8 @@ handle_pay_finished (void *cls,
     case MHD_HTTP_PRECONDITION_FAILED:
       ec = TALER_JSON_get_error_code (json);
       /* Nothing really to verify, the merchant is blaming us for failing to
-         satisfy some constraint.  We should pass the JSON reply to the
+         satisfy some constraint (likely it does not like our exchange because
+         of some disagreement on the PKI).  We should pass the JSON reply to the
          application */
       break;
     case MHD_HTTP_REQUEST_TIMEOUT:
@@ -416,10 +411,20 @@ handle_pay_finished (void *cls,
          it itself waited too long on the exchange.
          Pass on to application. */
       break;
+    case MHD_HTTP_CONFLICT:
+      ec = TALER_JSON_get_error_code (json);
+      if (GNUNET_OK != check_conflict (ph,
+                                       json))
+      {
+        GNUNET_break_op (0);
+        response_code = 0;
+      }
+      break;
     case MHD_HTTP_GONE:
       ec = TALER_JSON_get_error_code (json);
-      /* The merchant says our denomination key has expired for deposits,
-         might be a disagreement in timestamps? Still, pass on to application. */
+      /* The merchant says we are too late, the offer has expired or some
+         denomination key of a coin involved has expired.
+         Might be a disagreement in timestamps? Still, pass on to application. */
       break;
     case MHD_HTTP_FAILED_DEPENDENCY:
       ec = TALER_JSON_get_error_code (json);
