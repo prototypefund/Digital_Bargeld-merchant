@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016, 2017 INRIA
+  (C) 2014-2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -31,6 +31,10 @@
  */
 #define MAX_RETRIES 5
 
+
+/**
+ * Closure for #process_refunds_cb.
+ */
 struct ProcessRefundData
 {
   /**
@@ -55,6 +59,7 @@ struct ProcessRefundData
   enum TALER_ErrorCode ec;
 };
 
+
 /**
  * Information we keep for individual calls
  * to requests that parse JSON, but keep no other state.
@@ -63,8 +68,8 @@ struct TMH_JsonParseContext
 {
 
   /**
-   * This field MUST be first.
-   * FIXME: Explain why!
+   * This field MUST be first for handle_mhd_completion_callback() to work
+   * when it treats this struct as a `struct TM_HandlerContext`.
    */
   struct TM_HandlerContext hc;
 
@@ -79,8 +84,8 @@ struct TMH_JsonParseContext
  * Make a taler://refund URI
  *
  * @param connection MHD connection to take host and path from
- * @param instance_id merchant's instance ID
- * @param order_id order ID to show a refund for
+ * @param instance_id merchant's instance ID, must not be NULL
+ * @param order_id order ID to show a refund for, must not be NULL
  * @returns the URI, must be freed with #GNUNET_free
  */
 static char *
@@ -95,37 +100,36 @@ make_taler_refund_uri (struct MHD_Connection *connection,
   const char *query;
   char *result;
 
-  host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND, "Host");
-  forwarded_host = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
+  GNUNET_assert (NULL != instance_id);
+  GNUNET_assert (NULL != order_id);
+  host = MHD_lookup_connection_value (connection,
+                                      MHD_HEADER_KIND,
+                                      MHD_HTTP_HEADER_HOST);
+  forwarded_host = MHD_lookup_connection_value (connection,
+                                                MHD_HEADER_KIND,
                                                 "X-Forwarded-Host");
-
-  uri_path = MHD_lookup_connection_value (connection, MHD_HEADER_KIND,
-                                          "X-Forwarded-Prefix");
-  if (NULL == uri_path)
-    uri_path = "-";
-
   if (NULL != forwarded_host)
     host = forwarded_host;
-
-  if (0 == strcmp (instance_id, "default"))
-    uri_instance_id = "-";
-  else
-    uri_instance_id = instance_id;
-
   if (NULL == host)
   {
     /* Should never happen, at least the host header should be defined */
     GNUNET_break (0);
     return NULL;
   }
-
+  uri_path = MHD_lookup_connection_value (connection,
+                                          MHD_HEADER_KIND,
+                                          "X-Forwarded-Prefix");
+  if (NULL == uri_path)
+    uri_path = "-";
+  if (0 == strcmp (instance_id,
+                   "default"))
+    uri_instance_id = "-";
+  else
+    uri_instance_id = instance_id;
   if (GNUNET_YES == TALER_mhd_is_https (connection))
     query = "";
   else
     query = "?insecure=1";
-
-  GNUNET_assert (NULL != order_id);
-
   GNUNET_assert (0 < GNUNET_asprintf (&result,
                                       "taler://refund/%s/%s/%s/%s%s",
                                       host,
@@ -179,7 +183,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   const char *order_id;
   const char *reason;
   struct GNUNET_HashCode h_contract_terms;
-  struct TALER_MerchantRefundConfirmationPS confirmation;
   struct GNUNET_CRYPTO_EddsaSignature sig;
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("refund", &refund),
@@ -200,7 +203,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   {
     ctx = *connection_cls;
   }
-
   res = TALER_MHD_parse_post_json (connection,
                                    &ctx->json_parse_context,
                                    upload_data,
@@ -224,10 +226,12 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_SYSERR == res)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Hard error from JSON parser\n");
+    GNUNET_break_op (0);
     json_decref (root);
-    return MHD_NO;
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_JSON_INVALID,
+                                       "Request body does not match specification");
   }
 
   db->preflight (db->cls);
@@ -251,14 +255,14 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unknown order id given: %s\n",
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Unknown order id given: `%s'\n",
                 order_id);
     json_decref (root);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_NOT_FOUND,
                                        TALER_EC_REFUND_ORDER_ID_UNKNOWN,
-                                       "Order id not found in database");
+                                       "order_id not found in database");
   }
 
   if (GNUNET_OK !=
@@ -268,8 +272,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_break (0);
     GNUNET_JSON_parse_free (spec);
     json_decref (contract_terms);
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not hash contract terms\n");
     json_decref (root);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
@@ -295,7 +297,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "increase refund returned %d\n",
                 qs);
-
     if (GNUNET_DB_STATUS_HARD_ERROR == qs)
     {
       GNUNET_break (0);
@@ -359,123 +360,52 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
    *
    * Just a "200 OK" should be fine here, as the frontend has all
    * the information needed to generate the right response.
-   */confirmation.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK);
-  confirmation.purpose.size = htonl (sizeof (struct
-                                             TALER_MerchantRefundConfirmationPS));
-  GNUNET_CRYPTO_hash (order_id,
-                      strlen (order_id),
-                      &confirmation.h_order_id);
-
-  if (GNUNET_OK !=
-      GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
-                                &confirmation.purpose,
-                                &sig))
+   *///
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Failed to sign successful refund confirmation\n");
-    json_decref (contract_terms);
-    GNUNET_JSON_parse_free (spec);
-    json_decref (root);
-    return TALER_MHD_reply_with_error (connection,
-                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       TALER_EC_REFUND_MERCHANT_SIGNING_FAILED,
-                                       "Refund done, but failed to sign confirmation");
+    struct TALER_MerchantRefundConfirmationPS confirmation = {
+      .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK),
+      .purpose.size = htonl (sizeof (confirmation))
+    };
 
+    GNUNET_CRYPTO_hash (order_id,
+                        strlen (order_id),
+                        &confirmation.h_order_id);
+
+    if (GNUNET_OK !=
+        GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
+                                  &confirmation.purpose,
+                                  &sig))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Failed to sign successful refund confirmation\n");
+      json_decref (contract_terms);
+      GNUNET_JSON_parse_free (spec);
+      json_decref (root);
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_REFUND_MERCHANT_SIGNING_FAILED,
+                                         "Refund done, but failed to sign confirmation");
+
+    }
   }
 
   {
     int ret;
     char *taler_refund_uri;
 
-    taler_refund_uri = make_taler_refund_uri (connection, mi->id, order_id);
+    taler_refund_uri = make_taler_refund_uri (connection,
+                                              mi->id,
+                                              order_id);
     ret = TALER_MHD_reply_json_pack (connection,
                                      MHD_HTTP_OK,
                                      "{s:o, s:o, s:s}",
-                                     "sig",
-                                     GNUNET_JSON_from_data_auto (&sig),
-                                     "contract_terms",
-                                     contract_terms,
+                                     "sig", GNUNET_JSON_from_data_auto (&sig),
+                                     "contract_terms", contract_terms,
                                      "taler_refund_uri", taler_refund_uri);
     GNUNET_free (taler_refund_uri);
     GNUNET_JSON_parse_free (spec);
     json_decref (root);
     return ret;
-  }
-}
-
-
-/**
- * Function called with information about a refund.
- * It is responsible for packing up the data to return.
- *
- * @param cls closure
- * @param coin_pub public coin from which the refund comes from
- * @param rtransaction_id identificator of the refund
- * @param reason human-readable explanation of the refund
- * @param refund_amount refund amount which is being taken from coin_pub
- * @param refund_fee cost of this refund operation
- */
-static void
-process_refunds_cb (void *cls,
-                    const struct TALER_CoinSpendPublicKeyP *coin_pub,
-                    uint64_t rtransaction_id,
-                    const char *reason,
-                    const struct TALER_Amount *refund_amount,
-                    const struct TALER_Amount *refund_fee)
-{
-  struct ProcessRefundData *prd = cls;
-  struct TALER_RefundRequestPS rr;
-  struct GNUNET_CRYPTO_EddsaSignature sig;
-  json_t *element;
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Found refund of %s for coin %s with reason `%s' in database\n",
-              TALER_B2S (coin_pub),
-              TALER_amount2s (refund_amount),
-              reason);
-  rr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND);
-  rr.purpose.size = htonl (sizeof (struct TALER_RefundRequestPS));
-  rr.h_contract_terms = *prd->h_contract_terms;
-  rr.coin_pub = *coin_pub;
-  rr.merchant = prd->merchant->pubkey;
-  rr.rtransaction_id = GNUNET_htonll (rtransaction_id);
-  TALER_amount_hton (&rr.refund_amount,
-                     refund_amount);
-  TALER_amount_hton (&rr.refund_fee,
-                     refund_fee);
-
-  if (GNUNET_OK !=
-      GNUNET_CRYPTO_eddsa_sign (&prd->merchant->privkey.eddsa_priv,
-                                &rr.purpose,
-                                &sig))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not sign refund request\n");
-    prd->ec = TALER_EC_INTERNAL_LOGIC_ERROR;
-    return;
-  }
-
-  element = json_pack ("{s:o, s:o, s:o, s:I, s:o}",
-                       "refund_amount", TALER_JSON_from_amount (refund_amount),
-                       "refund_fee", TALER_JSON_from_amount (refund_fee),
-                       "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
-                       "rtransaction_id", (json_int_t) rtransaction_id,
-                       "merchant_sig", GNUNET_JSON_from_data_auto (&sig));
-  if (NULL == element)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not pack a response's element up\n");
-    prd->ec = TALER_EC_PARSER_OUT_OF_MEMORY;
-    return;
-  }
-
-  if (-1 == json_array_append_new (prd->response,
-                                   element))
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not append a response's element\n");
-    prd->ec = TALER_EC_PARSER_OUT_OF_MEMORY;
-    return;
   }
 }
 
@@ -509,8 +439,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                           "order_id");
   if (NULL == order_id)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Argument 'order_id' not given\n");
+    GNUNET_break_op (0);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_BAD_REQUEST,
                                        TALER_EC_PARAMETER_MISSING,
@@ -539,13 +468,13 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
 
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unknown order id given: %s\n",
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Unknown order id given: `%s'\n",
                 order_id);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_NOT_FOUND,
                                        TALER_EC_REFUND_ORDER_ID_UNKNOWN,
-                                       "Order id not found in database");
+                                       "order_id not found in database");
   }
 
   if (GNUNET_OK !=
@@ -553,8 +482,6 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                        &h_contract_terms))
   {
     GNUNET_break (0);
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not hash contract terms\n");
     json_decref (contract_terms);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
@@ -592,6 +519,84 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
 
 
 /**
+ * Function called with information about a refund.
+ * It is responsible for packing up the data to return.
+ *
+ * @param cls closure
+ * @param coin_pub public coin from which the refund comes from
+ * @param rtransaction_id identificator of the refund
+ * @param reason human-readable explanation of the refund
+ * @param refund_amount refund amount which is being taken from coin_pub
+ * @param refund_fee cost of this refund operation
+ */
+static void
+process_refunds_cb (void *cls,
+                    const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                    uint64_t rtransaction_id,
+                    const char *reason,
+                    const struct TALER_Amount *refund_amount,
+                    const struct TALER_Amount *refund_fee)
+{
+  struct ProcessRefundData *prd = cls;
+  struct GNUNET_CRYPTO_EddsaSignature sig;
+  json_t *element;
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Found refund of %s for coin %s with reason `%s' in database\n",
+              TALER_B2S (coin_pub),
+              TALER_amount2s (refund_amount),
+              reason);
+  {
+    struct TALER_RefundRequestPS rr = {
+      .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND),
+      .purpose.size = htonl (sizeof (rr)),
+      .h_contract_terms = *prd->h_contract_terms,
+      .coin_pub = *coin_pub,
+      .merchant = prd->merchant->pubkey,
+      .rtransaction_id = GNUNET_htonll (rtransaction_id)
+    };
+
+    TALER_amount_hton (&rr.refund_amount,
+                       refund_amount);
+    TALER_amount_hton (&rr.refund_fee,
+                       refund_fee);
+    if (GNUNET_OK !=
+        GNUNET_CRYPTO_eddsa_sign (&prd->merchant->privkey.eddsa_priv,
+                                  &rr.purpose,
+                                  &sig))
+    {
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Could not sign refund request\n");
+      prd->ec = TALER_EC_INTERNAL_LOGIC_ERROR;
+      return;
+    }
+  }
+
+  element = json_pack ("{s:o, s:o, s:o, s:I, s:o}",
+                       "refund_amount", TALER_JSON_from_amount (refund_amount),
+                       "refund_fee", TALER_JSON_from_amount (refund_fee),
+                       "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
+                       "rtransaction_id", (json_int_t) rtransaction_id,
+                       "merchant_sig", GNUNET_JSON_from_data_auto (&sig));
+  if (NULL == element)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not pack refund response element\n");
+    prd->ec = TALER_EC_PARSER_OUT_OF_MEMORY;
+    return;
+  }
+  if (-1 == json_array_append_new (prd->response,
+                                   element))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Could not append a response's element\n");
+    prd->ec = TALER_EC_PARSER_OUT_OF_MEMORY;
+    return;
+  }
+}
+
+
+/**
  * Get the JSON representation of a refund.
  *
  * @param merchant_pub the merchant's public key
@@ -610,6 +615,11 @@ TM_get_refund_json (const struct MerchantInstance *mi,
   struct ProcessRefundData prd;
 
   prd.response = json_array ();
+  if (NULL == prd.response)
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
   prd.h_contract_terms = h_contract_terms;
   prd.merchant = mi;
   prd.ec = TALER_EC_NONE;
@@ -631,8 +641,7 @@ TM_get_refund_json (const struct MerchantInstance *mi,
                 GNUNET_h2s (h_contract_terms));
     json_decref (prd.response);
     *ret_ec = TALER_EC_REFUND_LOOKUP_DB_ERROR;
-    *ret_errmsg = ("database hard error: looking for "
-                   "h_contract_terms in merchant_refunds table");
+    *ret_errmsg = "Failed to lookup refunds for contract";
   }
   if (TALER_EC_NONE != prd.ec)
   {

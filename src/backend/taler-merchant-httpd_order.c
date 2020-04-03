@@ -109,8 +109,8 @@ struct TMH_JsonParseContext
 {
 
   /**
-   * This field MUST be first.
-   * FIXME: Explain why!
+   * This field MUST be first for handle_mhd_completion_callback() to work
+   * when it treats this struct as a `struct TM_HandlerContext`.
    */
   struct TM_HandlerContext hc;
 
