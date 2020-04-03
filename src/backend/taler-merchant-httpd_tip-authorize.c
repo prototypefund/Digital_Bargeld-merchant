@@ -55,7 +55,7 @@ struct TipAuthContext
   /**
    * Context for checking the tipping reserve's status.
    */
-  struct CheckTipReserve ctr;
+  struct TMH_CheckTipReserve ctr;
 
   /**
    * Tip amount requested.
@@ -180,7 +180,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                 "Instance `%s' not configured for tipping\n",
                 mi->id);
     return TALER_MHD_reply_with_error (connection,
-                                       MHD_HTTP_NOT_FOUND,
+                                       MHD_HTTP_PRECONDITION_FAILED,
                                        TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
                                        "exchange for tipping not configured for the instance");
   }
@@ -233,7 +233,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
       break;
     case TALER_EC_TIP_AUTHORIZE_RESERVE_UNKNOWN:
       msg = "Failed to approve tip: merchant's tipping reserve does not exist";
-      rc = MHD_HTTP_NOT_FOUND;
+      rc = MHD_HTTP_SERVICE_UNAVAILABLE;
       break;
     default:
       rc = MHD_HTTP_INTERNAL_SERVER_ERROR;

@@ -33,7 +33,7 @@
  * Context with input, output and internal state for
  * #TMH_check_tip_reserve() and #TMH_check_tip_reserve_cleanup().
  */
-struct CheckTipReserve
+struct TMH_CheckTipReserve
 {
   /**
    * Input: MHD connection we should resume when finished
@@ -63,12 +63,12 @@ struct CheckTipReserve
   /**
    * Internal: DLL for resumption on shutdown.
    */
-  struct CheckTipReserve *next;
+  struct TMH_CheckTipReserve *next;
 
   /**
    * Internal: DLL for resumption on shutdown.
    */
-  struct CheckTipReserve *prev;
+  struct TMH_CheckTipReserve *prev;
 
   /**
    * Output: response object to return (on error only)
@@ -130,7 +130,7 @@ struct CheckTipReserve
  * @param tip_exchange the URL of the exchange to query
  */
 void
-TMH_check_tip_reserve (struct CheckTipReserve *ctr,
+TMH_check_tip_reserve (struct TMH_CheckTipReserve *ctr,
                        const char *tip_exchange);
 
 
@@ -140,7 +140,7 @@ TMH_check_tip_reserve (struct CheckTipReserve *ctr,
  * @param[in] context to clean up
  */
 void
-TMH_check_tip_reserve_cleanup (struct CheckTipReserve *ctr);
+TMH_check_tip_reserve_cleanup (struct TMH_CheckTipReserve *ctr);
 
 /**
  * Force all tip reserve helper contexts to be resumed as we are about to shut

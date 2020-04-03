@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2018--2019 Taler Systems SA
+  (C) 2018--2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -25,12 +25,12 @@
 /**
  * Head of active ctr context DLL.
  */
-static struct CheckTipReserve *ctr_head;
+static struct TMH_CheckTipReserve *ctr_head;
 
 /**
  * Tail of active ctr context DLL.
  */
-static struct CheckTipReserve *ctr_tail;
+static struct TMH_CheckTipReserve *ctr_tail;
 
 
 /**
@@ -39,7 +39,7 @@ static struct CheckTipReserve *ctr_tail;
  * @param ctr what to resume
  */
 static void
-resume_ctr (struct CheckTipReserve *ctr)
+resume_ctr (struct TMH_CheckTipReserve *ctr)
 {
   GNUNET_assert (GNUNET_YES == ctr->suspended);
   GNUNET_CONTAINER_DLL_remove (ctr_head,
@@ -60,7 +60,7 @@ resume_ctr (struct CheckTipReserve *ctr)
  * @param response response data to send back
  */
 static void
-resume_with_response (struct CheckTipReserve *ctr,
+resume_with_response (struct TMH_CheckTipReserve *ctr,
                       unsigned int response_code,
                       struct MHD_Response *response)
 {
@@ -76,7 +76,7 @@ resume_with_response (struct CheckTipReserve *ctr,
  * for the tipping reserve.  Update our database balance with the
  * result.
  *
- * @param cls closure with a `struct CheckTipReserve *'
+ * @param cls closure with a `struct TMH_CheckTipReserve *'
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code, #TALER_EC_NONE on success
@@ -94,25 +94,37 @@ handle_status (void *cls,
                unsigned int history_length,
                const struct TALER_EXCHANGE_ReserveHistory *history)
 {
-  struct CheckTipReserve *ctr = cls;
+  struct TMH_CheckTipReserve *ctr = cls;
 
   ctr->rsh = NULL;
   ctr->reserve_expiration = GNUNET_TIME_UNIT_ZERO_ABS;
   if (MHD_HTTP_NOT_FOUND == http_status)
   {
-    resume_with_response (ctr,
-                          MHD_HTTP_NOT_FOUND,
-                          TALER_MHD_make_error (ec,
-                                                "Reserve unknown at exchange"));
+    resume_with_response (
+      ctr,
+      MHD_HTTP_SERVICE_UNAVAILABLE,
+      TALER_MHD_make_json_pack (
+        "{s:I, s:I, s:s, s:I, s:O}",
+        "code", (json_int_t) TALER_EC_TIP_QUERY_RESERVE_UNKNOWN_TO_EXCHANGE,
+        "exchange-http-status", http_status,
+        "hint", "tipping reserve unknown at exchange",
+        "exchange-code", TALER_JSON_get_error_code (json),
+        "exchange-reply", json));
     return;
   }
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_break_op (0);
-    resume_with_response (ctr,
-                          MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TALER_MHD_make_error (ec,
-                                                "Exchange returned error code for reserve status"));
+    resume_with_response (
+      ctr,
+      MHD_HTTP_FAILED_DEPENDENCY,
+      TALER_MHD_make_json_pack (
+        "{s:I, s:I, s:s, s:I, s:O}",
+        "code", (json_int_t) TALER_EC_TIP_QUERY_RESERVE_HISTORY_FAILED,
+        "exchange-http-status", http_status,
+        "hint", "exchange failed to provide reserve history",
+        "exchange-code", TALER_JSON_get_error_code (json),
+        "exchange-reply", json));
     return;
   }
 
@@ -120,57 +132,56 @@ handle_status (void *cls,
   {
     GNUNET_break_op (0);
     resume_with_response (ctr,
-                          MHD_HTTP_SERVICE_UNAVAILABLE,
+                          MHD_HTTP_FAILED_DEPENDENCY,
                           TALER_MHD_make_error (
                             TALER_EC_TIP_QUERY_RESERVE_HISTORY_FAILED_EMPTY,
                             "Exchange returned empty reserve history"));
     return;
   }
 
-  if (TALER_EXCHANGE_RTT_CREDIT != history[0].type)
   {
-    GNUNET_break_op (0);
-    resume_with_response (ctr,
-                          MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TALER_MHD_make_error (
-                            TALER_EC_TIP_QUERY_RESERVE_HISTORY_INVALID_NO_DEPOSIT,
-                            "Exchange returned invalid reserve history"));
-    return;
-  }
+    unsigned int found = UINT_MAX;
 
-  if (GNUNET_OK !=
-      TALER_amount_get_zero (history[0].amount.currency,
-                             &ctr->amount_withdrawn))
-  {
-    GNUNET_break_op (0);
-    resume_with_response (ctr,
-                          MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TALER_MHD_make_error (
-                            TALER_EC_TIP_QUERY_RESERVE_HISTORY_INVALID_CURRENCY,
-                            "Exchange returned invalid reserve history"));
-    return;
-  }
+    for (unsigned int i = 0; i<history_length; i++)
+      if (TALER_EXCHANGE_RTT_CREDIT == history[i].type)
+        found = i;
+    if (UINT_MAX == found)
+    {
+      GNUNET_break_op (0);
+      resume_with_response (ctr,
+                            MHD_HTTP_FAILED_DEPENDENCY,
+                            TALER_MHD_make_error (
+                              TALER_EC_TIP_QUERY_RESERVE_HISTORY_INVALID_NO_DEPOSIT,
+                              "Exchange returned invalid reserve history"));
+      return;
+    }
 
-  if (0 != strcasecmp (TMH_currency,
-                       history[0].amount.currency))
-  {
-    GNUNET_break_op (0);
-    resume_with_response (ctr,
-                          MHD_HTTP_SERVICE_UNAVAILABLE,
-                          TALER_MHD_make_error (
-                            TALER_EC_TIP_QUERY_RESERVE_CURRENCY_MISMATCH,
-                            "Exchange currency unexpected"));
-    return;
+    if (0 != strcasecmp (TMH_currency,
+                         history[found].amount.currency))
+    {
+      GNUNET_break_op (0);
+      resume_with_response (ctr,
+                            MHD_HTTP_SERVICE_UNAVAILABLE,
+                            TALER_MHD_make_error (
+                              TALER_EC_TIP_QUERY_RESERVE_CURRENCY_MISMATCH,
+                              "Exchange currency unexpected"));
+      return;
+    }
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_amount_get_zero (history[found].amount.currency,
+                                          &ctr->amount_withdrawn));
   }
 
   if (GNUNET_YES == ctr->none_authorized)
-    ctr->amount_authorized = ctr->amount_withdrawn;
-  ctr->amount_deposited = ctr->amount_withdrawn;
+    ctr->amount_authorized = ctr->amount_withdrawn; /* aka zero */
+  ctr->amount_deposited = ctr->amount_withdrawn; /* aka zero */
 
   /* Update DB based on status! */
   for (unsigned int i = 0; i<history_length; i++)
   {
-    switch (history[i].type)
+    const struct TALER_EXCHANGE_ReserveHistory *hi = &history[i];
+
+    switch (hi->type)
     {
     case TALER_EXCHANGE_RTT_CREDIT:
       {
@@ -178,43 +189,43 @@ handle_status (void *cls,
         struct GNUNET_HashCode uuid;
         struct GNUNET_TIME_Absolute deposit_expiration;
 
+        if (GNUNET_OK !=
+            TALER_amount_add (&ctr->amount_deposited,
+                              &ctr->amount_deposited,
+                              &hi->amount))
+        {
+          GNUNET_break_op (0);
+          resume_with_response (
+            ctr,
+            MHD_HTTP_FAILED_DEPENDENCY,
+            TALER_MHD_make_error (
+              TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_DEPOSIT,
+              "Exchange returned invalid reserve history (amount overflow)"));
+          return;
+        }
         deposit_expiration = GNUNET_TIME_absolute_add (
-          history[i].details.in_details.timestamp,
-          ctr->
-          idle_reserve_expiration_time);
+          hi->details.in_details.timestamp,
+          ctr->idle_reserve_expiration_time);
         /* We're interested in the latest DEPOSIT timestamp, since this determines the
          * reserve's expiration date. Note that the history isn't chronologically ordered. */
         ctr->reserve_expiration = GNUNET_TIME_absolute_max (
           ctr->reserve_expiration,
           deposit_expiration);
-        GNUNET_CRYPTO_hash (history[i].details.in_details.wire_reference,
-                            history[i].details.in_details.wire_reference_size,
+        GNUNET_CRYPTO_hash (hi->details.in_details.wire_reference,
+                            hi->details.in_details.wire_reference_size,
                             &uuid);
         db->preflight (db->cls);
         qs = db->enable_tip_reserve_TR (db->cls,
                                         &ctr->reserve_priv,
                                         &uuid,
-                                        &history[i].amount,
+                                        &hi->amount,
                                         deposit_expiration);
-        if (GNUNET_OK !=
-            TALER_amount_add (&ctr->amount_deposited,
-                              &ctr->amount_deposited,
-                              &history[i].amount))
-        {
-          GNUNET_break_op (0);
-          resume_with_response (ctr,
-                                MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                TALER_MHD_make_error (
-                                  TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_DEPOSIT,
-                                  "Exchange returned invalid reserve history (amount overflow)"));
-          return;
-        }
 
         if (0 > qs)
         {
+          /* This is not inherently fatal for the client's request, so we merely log it */
           GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      _ (
-                        "Database error updating tipping reserve status: %d\n"),
+                      "Database error updating tipping reserve status: %d\n",
                       qs);
         }
       }
@@ -223,36 +234,89 @@ handle_status (void *cls,
       if (GNUNET_OK !=
           TALER_amount_add (&ctr->amount_withdrawn,
                             &ctr->amount_withdrawn,
-                            &history[i].amount))
+                            &hi->amount))
       {
         GNUNET_break_op (0);
-        resume_with_response (ctr,
-                              MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TALER_MHD_make_error (
-                                TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_WITHDRAW,
-                                "Exchange returned invalid reserve history (amount overflow)"));
+        resume_with_response (
+          ctr,
+          MHD_HTTP_FAILED_DEPENDENCY,
+          TALER_MHD_make_error (
+            TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_WITHDRAW,
+            "Exchange returned invalid reserve history (amount overflow)"));
         return;
       }
       break;
     case TALER_EXCHANGE_RTT_RECOUP:
-      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  _ (
-                    "Encountered unsupported /recoup operation on tipping reserve\n"));
-      /* FIXME: probably should count these like deposits!? */
+      {
+        enum GNUNET_DB_QueryStatus qs;
+        struct GNUNET_HashContext *hc;
+        struct GNUNET_HashCode uuid;
+        struct GNUNET_TIME_Absolute deposit_expiration;
+        struct GNUNET_TIME_AbsoluteNBO de;
+
+        GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                    "Encountered unexpected recoup operation on tipping reserve\n");
+        /* While unexpected, we can simply count these like deposits. */
+        if (GNUNET_OK !=
+            TALER_amount_add (&ctr->amount_deposited,
+                              &ctr->amount_deposited,
+                              &hi->amount))
+        {
+          GNUNET_break_op (0);
+          resume_with_response (
+            ctr,
+            MHD_HTTP_FAILED_DEPENDENCY,
+            TALER_MHD_make_error (
+              TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_RECOUP,
+              "Exchange returned invalid reserve history (amount overflow)"));
+          return;
+        }
+        deposit_expiration = GNUNET_TIME_absolute_add (
+          hi->details.recoup_details.timestamp,
+          ctr->idle_reserve_expiration_time);
+        ctr->reserve_expiration = GNUNET_TIME_absolute_max (
+          ctr->reserve_expiration,
+          deposit_expiration);
+        de = GNUNET_TIME_absolute_hton (deposit_expiration);
+        hc = GNUNET_CRYPTO_hash_context_start ();
+        GNUNET_CRYPTO_hash_context_read (
+          hc,
+          &hi->details.recoup_details.coin_pub,
+          sizeof (struct TALER_CoinSpendPublicKeyP));
+        GNUNET_CRYPTO_hash_context_read (hc,
+                                         &de,
+                                         sizeof (de));
+        GNUNET_CRYPTO_hash_context_finish (hc,
+                                           &uuid);
+        db->preflight (db->cls);
+        qs = db->enable_tip_reserve_TR (db->cls,
+                                        &ctr->reserve_priv,
+                                        &uuid,
+                                        &hi->amount,
+                                        deposit_expiration);
+        if (0 > qs)
+        {
+          /* This is not inherently fatal for the client's request, so we merely log it */
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      "Database error updating tipping reserve status: %d\n",
+                      qs);
+        }
+      }
       break;
     case TALER_EXCHANGE_RTT_CLOSE:
       /* We count 'closing' amounts just like withdrawals */
       if (GNUNET_OK !=
           TALER_amount_add (&ctr->amount_withdrawn,
                             &ctr->amount_withdrawn,
-                            &history[i].amount))
+                            &hi->amount))
       {
         GNUNET_break_op (0);
-        resume_with_response (ctr,
-                              MHD_HTTP_INTERNAL_SERVER_ERROR,
-                              TALER_MHD_make_error (
-                                TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_CLOSED,
-                                "Exchange returned invalid reserve history (amount overflow)"));
+        resume_with_response (
+          ctr,
+          MHD_HTTP_FAILED_DEPENDENCY,
+          TALER_MHD_make_error (
+            TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_CLOSED,
+            "Exchange returned invalid reserve history (amount overflow)"));
         return;
       }
       break;
@@ -271,7 +335,7 @@ handle_status (void *cls,
  * operation.  Given the exchange handle, we will then interrogate
  * the exchange about the status of the tipping reserve.
  *
- * @param cls closure with a `struct CheckTipReserve *`
+ * @param cls closure with a `struct TMH_CheckTipReserve *`
  * @param eh handle to the exchange context
  * @param wire_fee current applicable wire fee for dealing with @a eh, NULL if not available
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
@@ -282,7 +346,7 @@ exchange_cont (void *cls,
                const struct TALER_Amount *wire_fee,
                int exchange_trusted)
 {
-  struct CheckTipReserve *ctr = cls;
+  struct TMH_CheckTipReserve *ctr = cls;
   struct TALER_ReservePublicKeyP reserve_pub;
   const struct TALER_EXCHANGE_Keys *keys;
 
@@ -290,9 +354,9 @@ exchange_cont (void *cls,
   if (NULL == eh)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                _ ("Failed to contact exchange configured for tipping!\n"));
+                "Failed to contact exchange configured for tipping!\n");
     resume_with_response (ctr,
-                          MHD_HTTP_SERVICE_UNAVAILABLE,
+                          MHD_HTTP_FAILED_DEPENDENCY,
                           TALER_MHD_make_error (
                             TALER_EC_TIP_QUERY_RESERVE_STATUS_FAILED_EXCHANGE_DOWN,
                             "Unable to obtain /keys from exchange"));
@@ -321,15 +385,15 @@ exchange_cont (void *cls,
  * @param tip_exchange the URL of the exchange to query
  */
 void
-TMH_check_tip_reserve (struct CheckTipReserve *ctr,
+TMH_check_tip_reserve (struct TMH_CheckTipReserve *ctr,
                        const char *tip_exchange)
 {
   MHD_suspend_connection (ctr->connection);
-  db->preflight (db->cls);
+  ctr->suspended = GNUNET_YES;
   GNUNET_CONTAINER_DLL_insert (ctr_head,
                                ctr_tail,
                                ctr);
-  ctr->suspended = GNUNET_YES;
+  db->preflight (db->cls);
   ctr->fo = TMH_EXCHANGES_find_exchange (tip_exchange,
                                          NULL,
                                          &exchange_cont,
@@ -352,7 +416,7 @@ TMH_check_tip_reserve (struct CheckTipReserve *ctr,
  * @param[in] context to clean up
  */
 void
-TMH_check_tip_reserve_cleanup (struct CheckTipReserve *ctr)
+TMH_check_tip_reserve_cleanup (struct TMH_CheckTipReserve *ctr)
 {
   if (NULL != ctr->rsh)
   {
@@ -384,9 +448,9 @@ TMH_check_tip_reserve_cleanup (struct CheckTipReserve *ctr)
 void
 MH_force_trh_resume ()
 {
-  struct CheckTipReserve *n;
+  struct TMH_CheckTipReserve *n;
 
-  for (struct CheckTipReserve *ctr = ctr_head;
+  for (struct TMH_CheckTipReserve *ctr = ctr_head;
        NULL != ctr;
        ctr = n)
   {

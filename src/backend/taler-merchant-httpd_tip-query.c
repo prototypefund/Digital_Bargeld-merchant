@@ -36,6 +36,9 @@
 #define MAX_RETRIES 5
 
 
+/**
+ * Internal per-request state for processing tip queries.
+ */
 struct TipQueryContext
 {
   /**
@@ -50,15 +53,15 @@ struct TipQueryContext
   const char *instance;
 
   /**
-   * GNUNET_YES if the tip query has already been processed
+   * Context for checking the tipping reserve's status.
+   */
+  struct TMH_CheckTipReserve ctr;
+
+  /**
+   * #GNUNET_YES if the tip query has already been processed
    * and we can queue the response.
    */
   int processed;
-
-  /**
-   * Context for checking the tipping reserve's status.
-   */
-  struct CheckTipReserve ctr;
 
 };
 
@@ -109,29 +112,26 @@ generate_final_response (struct TipQueryContext *tqc)
                 a2);
     GNUNET_free (a2);
     GNUNET_free (a1);
-    return TALER_MHD_reply_with_error (tqc->ctr.connection,
-                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_INCONSISTENT,
-                                       "Exchange returned invalid reserve history (amount overflow)");
+    return TALER_MHD_reply_with_error (
+      tqc->ctr.connection,
+      MHD_HTTP_INTERNAL_SERVER_ERROR,
+      TALER_EC_TIP_QUERY_RESERVE_HISTORY_ARITHMETIC_ISSUE_INCONSISTENT,
+      "Exchange returned invalid reserve history (amount overflow)");
   }
-  return TALER_MHD_reply_json_pack (tqc->ctr.connection,
-                                    MHD_HTTP_OK,
-                                    "{s:o, s:o, s:o, s:o, s:o}",
-                                    "reserve_pub",
-                                    GNUNET_JSON_from_data_auto (
-                                      &reserve_pub),
-                                    "reserve_expiration",
-                                    GNUNET_JSON_from_time_abs (
-                                      tqc->ctr.reserve_expiration),
-                                    "amount_authorized",
-                                    TALER_JSON_from_amount (
-                                      &tqc->ctr.amount_authorized),
-                                    "amount_picked_up",
-                                    TALER_JSON_from_amount (
-                                      &tqc->ctr.amount_withdrawn),
-                                    "amount_available",
-                                    TALER_JSON_from_amount (
-                                      &amount_available));
+  return TALER_MHD_reply_json_pack (
+    tqc->ctr.connection,
+    MHD_HTTP_OK,
+    "{s:o, s:o, s:o, s:o, s:o}",
+    "reserve_pub",
+    GNUNET_JSON_from_data_auto (&reserve_pub),
+    "reserve_expiration",
+    GNUNET_JSON_from_time_abs (tqc->ctr.reserve_expiration),
+    "amount_authorized",
+    TALER_JSON_from_amount (&tqc->ctr.amount_authorized),
+    "amount_picked_up",
+    TALER_JSON_from_amount (&tqc->ctr.amount_withdrawn),
+    "amount_available",
+    TALER_JSON_from_amount (&amount_available));
 }
 
 
@@ -199,18 +199,20 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
 
   if (NULL == mi->tip_exchange)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Instance `%s' not configured for tipping\n",
                 mi->id);
-    return TALER_MHD_reply_with_error (connection,
-                                       MHD_HTTP_NOT_FOUND,
-                                       TALER_EC_TIP_AUTHORIZE_INSTANCE_DOES_NOT_TIP,
-                                       "exchange for tipping not configured for the instance");
+    return TALER_MHD_reply_with_error (
+      connection,
+      MHD_HTTP_PRECONDITION_FAILED,
+      TALER_EC_TIP_QUERY_INSTANCE_DOES_NOT_TIP,
+      "exchange for tipping not configured for the instance");
   }
   tqc->ctr.reserve_priv = mi->tip_reserve;
 
   {
-    int qs;
+    enum GNUNET_DB_QueryStatus qs;
+
     for (unsigned int i = 0; i<MAX_RETRIES; i++)
     {
       db->preflight (db->cls);
@@ -222,8 +224,7 @@ MH_handler_tip_query (struct TMH_RequestHandler *rh,
     }
     if (0 > qs)
     {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Database hard error on get_authorized_tip_amount\n");
+      GNUNET_break (0);
       return TALER_MHD_reply_with_error (connection,
                                          MHD_HTTP_INTERNAL_SERVER_ERROR,
                                          TALER_EC_TIP_QUERY_DB_ERROR,

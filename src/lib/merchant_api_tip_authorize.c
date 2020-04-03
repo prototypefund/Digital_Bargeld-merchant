@@ -130,27 +130,40 @@ handle_tip_authorize_finished (void *cls,
 {
   struct TALER_MERCHANT_TipAuthorizeOperation *tao = cls;
   const json_t *json = response;
+  enum TALER_ErrorCode ec;
 
   tao->job = NULL;
   switch (response_code)
   {
   case MHD_HTTP_OK:
-    if (GNUNET_OK != check_ok (tao,
-                               json))
+    if (GNUNET_OK ==
+        check_ok (tao,
+                  json))
     {
-      GNUNET_break_op (0);
-      response_code = 0;
+      TALER_MERCHANT_tip_authorize_cancel (tao);
+      return;
     }
+    GNUNET_break_op (0);
+    response_code = 0;
+    ec = TALER_EC_INVALID_RESPONSE;
     break;
   case MHD_HTTP_NOT_FOUND:
     /* Well-defined status code, pass on to application! */
+    ec = TALER_JSON_get_error_code (json);
     break;
   case MHD_HTTP_PRECONDITION_FAILED:
     /* Well-defined status code, pass on to application! */
+    ec = TALER_JSON_get_error_code (json);
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
        leaves this to the application */
+    ec = TALER_JSON_get_error_code (json);
+    break;
+  case MHD_HTTP_SERVICE_UNAVAILABLE:
+    /* Server had an unclear (internal or external) issue; we should retry,
+       but this API leaves this to the application */
+    ec = TALER_JSON_get_error_code (json);
     break;
   default:
     /* unexpected response code */
@@ -158,13 +171,14 @@ handle_tip_authorize_finished (void *cls,
                 "Unexpected response code %u\n",
                 (unsigned int) response_code);
     GNUNET_break (0);
+    ec = TALER_JSON_get_error_code (json);
     response_code = 0;
     break;
   }
   if (NULL != tao->cb)
     tao->cb (tao->cb_cls,
              response_code,
-             TALER_JSON_get_error_code (json),
+             ec,
              NULL, NULL);
   TALER_MERCHANT_tip_authorize_cancel (tao);
 }
