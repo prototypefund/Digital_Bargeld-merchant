@@ -517,7 +517,7 @@ proposal_put (struct MHD_Connection *connection,
   /* add fields to the contract that the backend should provide */
   json_object_set (order,
                    "exchanges",
-                   trusted_exchanges);
+                   TMH_trusted_exchanges);
 
   json_object_set (order,
                    "auditors",

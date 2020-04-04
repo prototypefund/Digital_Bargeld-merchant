@@ -818,12 +818,19 @@ wire_transfer_cb (void *cls,
  * @param eh NULL if exchange was not found to be acceptable
  * @param wire_fee NULL (we did not specify a wire method)
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
+ * @param ec error code, #TALER_EC_NONE on success
+ * @param http_status the HTTP status we got from the exchange
+ * @param error_reply the full reply from the exchange, NULL if
+ *        the response was NOT in JSON or on success
  */
 static void
 process_track_transfer_with_exchange (void *cls,
                                       struct TALER_EXCHANGE_Handle *eh,
                                       const struct TALER_Amount *wire_fee,
-                                      int exchange_trusted)
+                                      int exchange_trusted,
+                                      enum TALER_ErrorCode ec,
+                                      unsigned int http_status,
+                                      const json_t *error_reply)
 {
   struct TrackTransferContext *rctx = cls;
 

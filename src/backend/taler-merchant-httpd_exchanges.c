@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014-2018 Taler Systems SA
+  (C) 2014-2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -87,7 +87,7 @@ struct TMH_EXCHANGES_FindOperation
   struct Exchange *my_exchange;
 
   /**
-   * Wire method we care about for fees.
+   * Wire method we care about for fees, NULL if we do not care about wire fees.
    */
   char *wire_method;
 
@@ -197,6 +197,11 @@ struct Exchange
   struct GNUNET_TIME_Relative retry_delay;
 
   /**
+   * How long should we wait between the next retry for /wire?
+   */
+  struct GNUNET_TIME_Relative wire_retry_delay;
+
+  /**
    * Task where we retry fetching /keys from the exchange.
    */
   struct GNUNET_SCHEDULER_Task *retry_task;
@@ -242,7 +247,7 @@ static struct Exchange *exchange_tail;
 /**
  * List of our trusted exchanges for inclusion in contracts.
  */
-json_t *trusted_exchanges;
+json_t *TMH_trusted_exchanges;
 
 
 /**
@@ -259,11 +264,17 @@ json_t *trusted_exchanges;
  * @param keys information about the various keys used
  *        by the exchange
  * @param compat version compatibility data
+ * @param ec error code, #TALER_EC_NONE on success
+ * @param http_status status returned by /keys, #MHD_HTTP_OK on success
+ * @param full_reply JSON body of /keys request, NULL if reply was not in JSON
  */
 static void
 keys_mgmt_cb (void *cls,
               const struct TALER_EXCHANGE_Keys *keys,
-              enum TALER_EXCHANGE_VersionCompatibility compat);
+              enum TALER_EXCHANGE_VersionCompatibility compat,
+              enum TALER_ErrorCode ec,
+              unsigned int http_status,
+              const json_t *full_reply);
 
 
 /**
@@ -305,9 +316,9 @@ retry_exchange (void *cls)
  * @param cls closure
  * @param wire_method name of the wire method (i.e. "sepa")
  * @param fees fee structure for this method
- * @return #GNUNET_OK on success
+ * @return #TALER_EC_NONE on success
  */
-static int
+static enum TALER_ErrorCode
 process_wire_fees (struct Exchange *exchange,
                    const struct TALER_MasterPublicKeyP *master_pub,
                    const char *wire_method,
@@ -341,7 +352,7 @@ process_wire_fees (struct Exchange *exchange,
   {
     /* Hole in the fee structure, not allowed! */
     GNUNET_break_op (0);
-    return GNUNET_SYSERR;
+    return TALER_EC_HOLE_IN_WIRE_FEE_STRUCTURE;
   }
   while (NULL != fees)
   {
@@ -365,9 +376,10 @@ process_wire_fees (struct Exchange *exchange,
                    "store wire fee"))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to start database transaction!\n");
+                  "Failed to start database transaction to store exchange wire fees (will try to continue anyway)!\n");
       GNUNET_free (af);
-      return GNUNET_SYSERR;
+      fees = fees->next;
+      continue;
     }
     qs = db->store_wire_fee_by_exchange (db->cls,
                                          master_pub,
@@ -380,7 +392,7 @@ process_wire_fees (struct Exchange *exchange,
     if (0 > qs)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to persist exchange wire fees in merchant DB!\n");
+                  "Failed to persist exchange wire fees in merchant DB (will try to continue anyway)!\n");
       GNUNET_free (af);
       fees = fees->next;
       db->rollback (db->cls);
@@ -389,7 +401,7 @@ process_wire_fees (struct Exchange *exchange,
     if (0 == qs)
     {
       /* Entry was already in DB, fine, continue as if we had succeeded */
-      GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                   "Fees already in DB, rolling back transaction attempt!\n");
       db->rollback (db->cls);
     }
@@ -400,13 +412,12 @@ process_wire_fees (struct Exchange *exchange,
       if (0 > qs)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "Failed to persist exchange wire fees in merchant DB!\n");
+                    "Failed to persist exchange wire fees in merchant DB (will try to continue anyway)!\n");
         GNUNET_free (af);
         fees = fees->next;
         continue;
       }
     }
-
     af->next = NULL;
     if (NULL == endp)
       f->af = af;
@@ -415,7 +426,7 @@ process_wire_fees (struct Exchange *exchange,
     endp = af;
     fees = fees->next;
   }
-  return GNUNET_OK;
+  return TALER_EC_NONE;
 }
 
 
@@ -428,9 +439,9 @@ process_wire_fees (struct Exchange *exchange,
  * @param master_pub public key of the exchange
  * @param accounts_len length of the @a accounts array
  * @param accounts list of wire accounts of the exchange
- * @return #GNUNET_OK on success
+ * @return #TALER_EC_NONE on success
  */
-static int
+static enum TALER_ErrorCode
 process_wire_accounts (struct Exchange *exchange,
                        const struct TALER_MasterPublicKeyP *master_pub,
                        unsigned int accounts_len,
@@ -438,23 +449,25 @@ process_wire_accounts (struct Exchange *exchange,
 {
   for (unsigned int i = 0; i<accounts_len; i++)
   {
+    enum TALER_ErrorCode ec;
     char *method;
 
     method = TALER_payto_get_method (accounts[i].payto_uri);
     if (NULL == method)
-      return GNUNET_SYSERR;
-    if (GNUNET_OK !=
-        process_wire_fees (exchange,
-                           master_pub,
-                           method,
-                           accounts[i].fees))
     {
-      GNUNET_free (method);
-      return GNUNET_SYSERR;
+      /* malformed payto:// URI returned by exchange */
+      GNUNET_break_op (0);
+      return TALER_EC_PAYTO_MALFORMED;
     }
+    ec = process_wire_fees (exchange,
+                            master_pub,
+                            method,
+                            accounts[i].fees);
     GNUNET_free (method);
+    if (TALER_EC_NONE != ec)
+      return ec;
   }
-  return GNUNET_OK;
+  return TALER_EC_NONE;
 }
 
 
@@ -547,20 +560,14 @@ process_find_operations (struct Exchange *exchange)
       /* no wire transfer method given, so we yield no fee */
       wire_fee = NULL;
     }
-    GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
-                                 exchange->fo_tail,
-                                 fo);
     fo->fc (fo->fc_cls,
             exchange->conn,
             wire_fee,
-            exchange->trusted);
-    GNUNET_free_non_null (fo->wire_method);
-    if (NULL != fo->at)
-    {
-      GNUNET_SCHEDULER_cancel (fo->at);
-      fo->at = NULL;
-    }
-    GNUNET_free (fo);
+            exchange->trusted,
+            TALER_EC_NONE,
+            MHD_HTTP_OK,
+            NULL);
+    TMH_EXCHANGES_find_exchange_cancel (fo);
   }
   return need_wire;
 }
@@ -585,39 +592,59 @@ wire_task_cb (void *cls);
  * If the request fails to generate a valid response from the
  * exchange, @a http_status will also be zero.
  *
+ * Must only be called if 'exchange->pending' is #GNUNET_NO,
+ * that is #TALER_EXCHANGE_get_keys() will succeed.
+ *
  * @param cls closure, a `struct Exchange`
  * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful request;
  *                    0 if the exchange's reply is bogus (fails to follow the protocol)
  * @param ec taler-specific error code, #TALER_EC_NONE on success
  * @param accounts_len length of the @a accounts array
  * @param accounts list of wire accounts of the exchange, NULL on error
+ * @param full_reply the complete response from the exchange (if it was in JSON)
  */
 static void
 handle_wire_data (void *cls,
                   unsigned int http_status,
                   enum TALER_ErrorCode ec,
                   unsigned int accounts_len,
-                  const struct TALER_EXCHANGE_WireAccount *accounts)
+                  const struct TALER_EXCHANGE_WireAccount *accounts,
+                  const json_t *full_reply)
 {
   struct Exchange *exchange = cls;
   const struct TALER_EXCHANGE_Keys *keys;
+  enum TALER_ErrorCode ecx;
 
   exchange->wire_request = NULL;
   if (MHD_HTTP_OK != http_status)
   {
+    struct TMH_EXCHANGES_FindOperation *fo;
+
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Failed to obtain /wire details from `%s': %d\n",
+                "Failed to obtain /wire details from `%s': %u/%d\n",
                 exchange->url,
+                http_status,
                 ec);
+    while (NULL != (fo = exchange->fo_head))
+    {
+      fo->fc (fo->fc_cls,
+              NULL,
+              NULL,
+              GNUNET_NO,
+              ec,
+              http_status,
+              full_reply);
+      TMH_EXCHANGES_find_exchange_cancel (fo);
+    }
     return;
   }
   keys = TALER_EXCHANGE_get_keys (exchange->conn);
-  if ( (NULL == keys) ||
-       (GNUNET_OK !=
-        process_wire_accounts (exchange,
+  GNUNET_assert (NULL != keys);
+  ecx = process_wire_accounts (exchange,
                                &keys->master_pub,
                                accounts_len,
-                               accounts)) )
+                               accounts);
+  if (TALER_EC_NONE != ecx)
   {
     /* Report hard failure to all callbacks! */
     struct TMH_EXCHANGES_FindOperation *fo;
@@ -625,39 +652,38 @@ handle_wire_data (void *cls,
     GNUNET_break_op (0);
     while (NULL != (fo = exchange->fo_head))
     {
-      GNUNET_CONTAINER_DLL_remove (exchange->fo_head,
-                                   exchange->fo_tail,
-                                   fo);
-      /* TODO: report more precise error, this ultimately generates
-         "exchange not supported" instead of "exchange violated
-         protocol"; we should ideally generate a reply with
-         a specific TALER_EC-code, boxing 'obj' within it. */
       fo->fc (fo->fc_cls,
               NULL,
               NULL,
-              GNUNET_NO);
-      GNUNET_free_non_null (fo->wire_method);
-      if (NULL != fo->at)
-      {
-        GNUNET_SCHEDULER_cancel (fo->at);
-        fo->at = NULL;
-      }
-      GNUNET_free (fo);
+              GNUNET_NO,
+              ecx,
+              0,
+              full_reply);
+      TMH_EXCHANGES_find_exchange_cancel (fo);
     }
     return;
   }
-  if (GNUNET_YES ==
-      process_find_operations (exchange))
+  if ( (GNUNET_YES ==
+        process_find_operations (exchange)) &&
+       (NULL == exchange->wire_task) &&
+       (NULL == exchange->wire_request) )
   {
-    /* need to run /wire again, with some delay */
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Do not have sufficient wire data. Will re-request /wire in 1 minute\n");
-
-    GNUNET_assert (NULL == exchange->wire_task);
-    exchange->wire_task = GNUNET_SCHEDULER_add_delayed (
+    /* need to run /wire again. But as we DID get a successful reply,
+       and as the exchange is unlikely to offer new wire methods very
+       frequently, start with some significant delay */
+    exchange->wire_retry_delay = GNUNET_TIME_relative_max (
       GNUNET_TIME_UNIT_MINUTES,
-      &wire_task_cb,
-      exchange);
+      exchange->wire_retry_delay);
+    exchange->wire_retry_delay = RETRY_BACKOFF (exchange->wire_retry_delay);
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Exchange does not support our wire method. Retrying in %s\n",
+                GNUNET_STRINGS_relative_time_to_string (
+                  exchange->wire_retry_delay,
+                  GNUNET_YES));
+    exchange->wire_task
+      = GNUNET_SCHEDULER_add_delayed (exchange->wire_retry_delay,
+                                      &wire_task_cb,
+                                      exchange);
   }
 }
 
@@ -668,6 +694,9 @@ handle_wire_data (void *cls,
  * the callback.  If requests without /wire data remain,
  * retry the /wire request after some delay.
  *
+ * Must only be called if 'exchange->pending' is #GNUNET_NO,
+ * that is #TALER_EXCHANGE_get_keys() will succeed.
+ *
  * @param cls a `struct Exchange` to check
  */
 static void
@@ -676,6 +705,7 @@ wire_task_cb (void *cls)
   struct Exchange *exchange = cls;
 
   exchange->wire_task = NULL;
+  GNUNET_assert (GNUNET_NO == exchange->pending);
   if (GNUNET_YES !=
       process_find_operations (exchange))
     return; /* no more need */
@@ -700,11 +730,17 @@ wire_task_cb (void *cls)
  * @param keys information about the various keys used
  *        by the exchange
  * @param compat version compatibility data
+ * @param ec error code, #TALER_EC_NONE on success
+ * @param http_status status returned by /keys, #MHD_HTTP_OK on success
+ * @param full_reply JSON body of /keys request, NULL if reply was not in JSON
  */
 static void
 keys_mgmt_cb (void *cls,
               const struct TALER_EXCHANGE_Keys *keys,
-              enum TALER_EXCHANGE_VersionCompatibility compat)
+              enum TALER_EXCHANGE_VersionCompatibility compat,
+              enum TALER_ErrorCode ec,
+              unsigned int http_status,
+              const json_t *full_reply)
 {
   struct Exchange *exchange = cls;
   struct GNUNET_TIME_Absolute expire;
@@ -712,6 +748,8 @@ keys_mgmt_cb (void *cls,
 
   if (NULL == keys)
   {
+    struct TMH_EXCHANGES_FindOperation *fo;
+
     exchange->pending = GNUNET_YES;
     if (NULL != exchange->wire_request)
     {
@@ -723,18 +761,35 @@ keys_mgmt_cb (void *cls,
       GNUNET_SCHEDULER_cancel (exchange->wire_task);
       exchange->wire_task = NULL;
     }
+    while (NULL != (fo = exchange->fo_head))
+    {
+      fo->fc (fo->fc_cls,
+              NULL,
+              NULL,
+              GNUNET_NO,
+              ec,
+              http_status,
+              full_reply);
+      TMH_EXCHANGES_find_exchange_cancel (fo);
+    }
     if (TALER_EXCHANGE_VC_INCOMPATIBLE_NEWER == compat)
     {
-      /* Give up, log hard error. */
+      /* Log hard error: we likely need admin help! */
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Exchange `%s' runs an incompatible more recent version of the Taler protocol. Will not retry. This client may need to be updated.\n",
                   exchange->url);
-      return;
+      /* Theoretically, the exchange could downgrade,
+         but let's not be too aggressive about retries
+         on this one. */
+      exchange->retry_delay = GNUNET_TIME_relative_max (GNUNET_TIME_UNIT_HOURS,
+                                                        exchange->retry_delay);
     }
     exchange->retry_delay = RETRY_BACKOFF (exchange->retry_delay);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Failed to fetch /keys from `%s', retrying in %s\n",
+                "Failed to fetch /keys from `%s': %d/%u, retrying in %s\n",
                 exchange->url,
+                (int) ec,
+                http_status,
                 GNUNET_STRINGS_relative_time_to_string (exchange->retry_delay,
                                                         GNUNET_YES));
     GNUNET_assert (NULL == exchange->retry_task);
@@ -743,6 +798,19 @@ keys_mgmt_cb (void *cls,
                                                          exchange);
     return;
   }
+  if ( (GNUNET_YES == exchange->trusted) &&
+       (0 != GNUNET_memcmp (&exchange->master_pub,
+                            &keys->master_pub)) )
+  {
+    /* master pub differs => do not trust the exchange (without auditor) */
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                "Master public key of exchange `%s' differs from our configuration. Not trusting exchange.\n",
+                exchange->url);
+    exchange->trusted = GNUNET_NO;
+  }
+  if (GNUNET_NO == exchange->trusted)
+    exchange->master_pub = keys->master_pub;
+
   if (0 != (TALER_EXCHANGE_VC_NEWER & compat))
   {
     /* Warn user exactly once about need to upgrade */
@@ -763,8 +831,7 @@ keys_mgmt_cb (void *cls,
     delay = RELOAD_DELAY;
   else
     delay = GNUNET_TIME_absolute_get_remaining (expire);
-  exchange->retry_delay
-    = GNUNET_TIME_UNIT_ZERO;
+  exchange->retry_delay = GNUNET_TIME_UNIT_ZERO;
   if (NULL != exchange->retry_task)
     GNUNET_SCHEDULER_cancel (exchange->retry_task);
   exchange->retry_task
@@ -772,13 +839,13 @@ keys_mgmt_cb (void *cls,
                                     &retry_exchange,
                                     exchange);
   exchange->pending = GNUNET_NO;
-  if (GNUNET_YES ==
-      process_find_operations (exchange))
+  if ( (GNUNET_YES ==
+        process_find_operations (exchange)) &&
+       (NULL == exchange->wire_request) &&
+       (NULL == exchange->wire_task) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Got key data, but do not have current wire data. Will request /wire now\n");
-    GNUNET_assert (NULL == exchange->wire_request);
-    GNUNET_assert (NULL == exchange->wire_task);
+                "Got key data, but also need wire data. Will request /wire now\n");
     exchange->wire_request = TALER_EXCHANGE_wire (exchange->conn,
                                                   &handle_wire_data,
                                                   exchange);
@@ -840,27 +907,25 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
     GNUNET_break (0);
     return NULL;
   }
-
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Trying to find chosen exchange `%s'\n",
               chosen_exchange);
-
   /* Check if the exchange is known */
   for (exchange = exchange_head; NULL != exchange; exchange = exchange->next)
-  /* test it by checking public key --- FIXME: hostname or public key!?
-     Should probably be URL, not hostname anyway! */
   {
+    /* test it by checking URL */
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Comparing chosen exchange url '%s' with known url '%s'.\n",
+                chosen_exchange,
+                exchange->url);
     if (0 == strcmp (exchange->url,
                      chosen_exchange))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                  "The exchange `%s' is already known\n",
+                  "The exchange `%s' is already known (good)\n",
                   chosen_exchange);
       break;
     }
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Comparing chosen exchange url '%s' with known url '%s'.\n",
-                chosen_exchange, exchange->url);
   }
   if (NULL == exchange)
   {
@@ -901,13 +966,13 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
     return fo;
   }
 
-  /* If new or resumed, retry fetching /keys */
+  /* If new or resumed, (re)try fetching /keys */
   if ( (NULL == exchange->conn) &&
+       (NULL == exchange->retry_task) &&
        (GNUNET_YES == exchange->pending) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Do not have current key data. Will request /keys now\n");
-    GNUNET_assert (NULL == exchange->retry_task);
     exchange->retry_task = GNUNET_SCHEDULER_add_now (&retry_exchange,
                                                      exchange);
   }
@@ -916,7 +981,7 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
             (NULL == exchange->wire_request) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Do not have current wire data. Will re-request /wire now\n");
+                "Do not have required wire data. Will re-request /wire now\n");
     exchange->wire_task = GNUNET_SCHEDULER_add_now (&wire_task_cb,
                                                     exchange);
   }
@@ -1007,7 +1072,7 @@ accept_exchanges (void *cls,
   else
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "MASTER_KEY not given in section '%s', not trusting exchange\n",
+                "MASTER_KEY missing in section '%s', not trusting exchange\n",
                 section);
 
   }
@@ -1047,7 +1112,7 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
                                          &accept_exchanges,
                                          (void *) cfg);
   /* build JSON with list of trusted exchanges (will be included in contracts) */
-  trusted_exchanges = json_array ();
+  TMH_trusted_exchanges = json_array ();
   for (struct Exchange *exchange = exchange_head;
        NULL != exchange;
        exchange = exchange->next)
@@ -1061,7 +1126,7 @@ TMH_EXCHANGES_init (const struct GNUNET_CONFIGURATION_Handle *cfg)
                             "master_pub", GNUNET_JSON_from_data_auto (
                               &exchange->master_pub));
     GNUNET_assert (0 ==
-                   json_array_append_new (trusted_exchanges,
+                   json_array_append_new (TMH_trusted_exchanges,
                                           j_exchange));
   }
   return GNUNET_OK;
@@ -1125,8 +1190,8 @@ TMH_EXCHANGES_done ()
   merchant_curl_ctx = NULL;
   GNUNET_CURL_gnunet_rc_destroy (merchant_curl_rc);
   merchant_curl_rc = NULL;
-  json_decref (trusted_exchanges);
-  trusted_exchanges = NULL;
+  json_decref (TMH_trusted_exchanges);
+  TMH_trusted_exchanges = NULL;
 }
 
 
