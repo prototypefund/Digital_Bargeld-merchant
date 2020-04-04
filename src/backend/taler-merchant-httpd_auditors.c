@@ -152,27 +152,38 @@ parse_auditors (void *cls,
   const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   char *pks;
   struct Auditor auditor;
+  char *currency;
 
   if (0 != strncasecmp (section,
-                        "auditor-",
-                        strlen ("auditor-")))
+                        "merchant-auditor-",
+                        strlen ("merchant-auditor-")))
     return;
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
-                                             "NAME",
-                                             &auditor.name))
+                                             "CURRENCY",
+                                             &currency))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "NAME");
+                               "CURRENCY");
     return;
   }
-  // FIXME: url -> auditor_url
+  if (0 != strcasecmp (currency,
+                       TMH_currency))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Auditor given in section `%s' is for another currency. Skipping.\n",
+                section);
+    GNUNET_free (currency);
+    return;
+  }
+  GNUNET_free (currency);
+  auditor.name = GNUNET_strdup (&section[strlen ("merchant-auditor-")]);
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
-                                             "URL",
+                                             "AUDITOR_BASE_URL",
                                              &auditor.url))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
@@ -184,12 +195,12 @@ parse_auditors (void *cls,
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
-                                             "PUBLIC_KEY",
+                                             "AUDITOR_KEY",
                                              &pks))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "PUBLIC_KEY");
+                               "AUDITOR_KEY");
     GNUNET_free (auditor.name);
     GNUNET_free (auditor.url);
     return;
@@ -201,8 +212,8 @@ parse_auditors (void *cls,
   {
     GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "PUBLIC_KEY",
-                               "valid public key");
+                               "AUDITOR_KEY",
+                               "need a valid EdDSA public key");
     GNUNET_free (auditor.name);
     GNUNET_free (auditor.url);
     GNUNET_free (pks);

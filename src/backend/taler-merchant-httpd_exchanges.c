@@ -292,7 +292,7 @@ retry_exchange (void *cls)
   /* might be a scheduled reload and not our first attempt */
   exchange->retry_task = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Connecting to exchange exchange %s in retry_exchange\n",
+              "Connecting to exchange %s in retry_exchange()\n",
               exchange->url);
   if (NULL != exchange->conn)
   {
@@ -304,6 +304,8 @@ retry_exchange (void *cls)
                                            &keys_mgmt_cb,
                                            exchange,
                                            TALER_EXCHANGE_OPTION_END);
+  /* Note: while the API spec says 'returns NULL on error', the implementation
+     actually never returns NULL. */
   GNUNET_break (NULL != exchange->conn);
 }
 
@@ -1028,6 +1030,7 @@ accept_exchanges (void *cls,
   char *url;
   char *mks;
   struct Exchange *exchange;
+  char *currency;
 
   if (0 != strncasecmp (section,
                         "merchant-exchange-",
@@ -1036,12 +1039,33 @@ accept_exchanges (void *cls,
   if (GNUNET_OK !=
       GNUNET_CONFIGURATION_get_value_string (cfg,
                                              section,
-                                             "BASE_URL",
+                                             "CURRENCY",
+                                             &currency))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               section,
+                               "CURRENCY");
+    return;
+  }
+  if (0 != strcasecmp (currency,
+                       TMH_currency))
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Exchange given in section `%s' is for another currency. Skipping.\n",
+                section);
+    GNUNET_free (currency);
+    return;
+  }
+  GNUNET_free (currency);
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_string (cfg,
+                                             section,
+                                             "EXCHANGE_BASE_URL",
                                              &url))
   {
     GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
                                section,
-                               "BASE_URL");
+                               "EXCHANGE_BASE_URL");
     return;
   }
   exchange = GNUNET_new (struct Exchange);
@@ -1065,7 +1089,7 @@ accept_exchanges (void *cls,
       GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
                                  section,
                                  "MASTER_KEY",
-                                 _ ("ill-formed key"));
+                                 _ ("ill-formed EdDSA key"));
     }
     GNUNET_free (mks);
   }
@@ -1183,6 +1207,8 @@ TMH_EXCHANGES_done ()
       GNUNET_SCHEDULER_cancel (exchange->retry_task);
       exchange->retry_task = NULL;
     }
+    GNUNET_assert (NULL == exchange->fo_head);
+    GNUNET_assert (NULL == exchange->fo_tail);
     GNUNET_free (exchange->url);
     GNUNET_free (exchange);
   }

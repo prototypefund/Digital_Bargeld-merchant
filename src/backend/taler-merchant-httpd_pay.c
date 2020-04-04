@@ -1232,7 +1232,7 @@ process_pay_with_exchange (void *cls,
         pc,
         hc,
         TALER_MHD_make_json_pack ("{s:s, s:I, s:o}",
-                                  "hint", "invalid denomination",
+                                  "hint", "denomination not accepted",
                                   "code", (json_int_t) ec,
                                   "h_denom_pub", GNUNET_JSON_from_data_auto (
                                     &denom_details->h_key)));
