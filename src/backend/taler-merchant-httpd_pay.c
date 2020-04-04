@@ -1158,22 +1158,34 @@ process_pay_with_exchange (void *cls,
 
   pc->fo = NULL;
   GNUNET_assert (GNUNET_YES == pc->suspended);
-  if (NULL == mh)
+  if (MHD_HTTP_OK != http_status)
   {
-    /* The exchange on offer is not in the set of our (trusted)
-       exchanges.  Reject the payment. */
+    /* The request failed somehow */
     GNUNET_break_op (0);
-    resume_pay_with_error (pc,
-                           MHD_HTTP_PRECONDITION_FAILED,
-                           TALER_EC_PAY_EXCHANGE_REJECTED,
-                           "exchange not supported (we do not trust it and also not its auditors)");
+    resume_pay_with_response (
+      pc,
+      MHD_HTTP_FAILED_DEPENDENCY,
+      TALER_MHD_make_json_pack (
+        (NULL != error_reply)
+        ? "{s:s, s:I, s:I, s:I, s:O}"
+        : "{s:s, s:I, s:I, s:I}",
+        "hint",
+        "failed to obtain meta-data from exchange",
+        "code",
+        (json_int_t) TALER_EC_PAY_EXCHANGE_KEYS_FAILURE,
+        "exchange-http-status",
+        (json_int_t) http_status,
+        "exchange-code",
+        (json_int_t) ec,
+        "exchange-reply",
+        error_reply));
     return;
   }
   pc->mh = mh;
   keys = TALER_EXCHANGE_get_keys (mh);
   if (NULL == keys)
   {
-    GNUNET_break (0);
+    GNUNET_break (0); /* should not be possible if HTTP status is #MHD_HTTP_OK */
     resume_pay_with_error (pc,
                            MHD_HTTP_FAILED_DEPENDENCY,
                            TALER_EC_PAY_EXCHANGE_KEYS_FAILURE,
@@ -1206,6 +1218,7 @@ process_pay_with_exchange (void *cls,
                                                          &dc->denom);
     if (NULL == denom_details)
     {
+      /* FIXME: #6136 applies HERE */
       struct GNUNET_HashCode h_denom;
 
       GNUNET_CRYPTO_rsa_public_key_hash (dc->denom.rsa_public_key,

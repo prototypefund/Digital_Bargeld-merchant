@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014-2017 INRIA
+  (C) 2014-2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -201,7 +201,7 @@ free_transfer_track_context (struct TrackTransferContext *rctx)
  *
  * @param cls closure, NULL
  * @param key current key
- * @param value a `struct MerchantInstance`
+ * @param value a `struct Entry`
  * @return #GNUNET_YES if the iteration should continue,
  *         #GNUNET_NO otherwise.
  */
@@ -210,9 +210,11 @@ hashmap_free (void *cls,
               const struct GNUNET_HashCode *key,
               void *value)
 {
-  struct TALER_Amount *amount = value;
+  struct TALER_Entry *entry = value;
 
-  GNUNET_free (amount);
+  (void) cls;
+  (void) key;
+  GNUNET_free (entry);
   return GNUNET_YES;
 }
 
@@ -471,23 +473,16 @@ check_transfer (void *cls,
     rctx->response
       = TALER_MHD_make_json_pack (
           "{s:I, s:s, s:o, s:I, s:o, s:o, s:s, s:o, s:o}",
-          "code",
-          (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
-          "hint",
-          "disagreement about deposit valuation",
+          "code", (json_int_t) TALER_EC_TRACK_TRANSFER_CONFLICTING_REPORTS,
+          "hint", "disagreement about deposit valuation",
           "exchange_deposit_proof", exchange_proof,
-          "conflict_offset",
-          (json_int_t) rctx->current_offset,
-          "exchange_transfer_proof",
-          rctx->original_response,
-          "coin_pub", GNUNET_JSON_from_data_auto (
-            coin_pub),
-          "h_contract_terms",
-          GNUNET_JSON_from_data_auto (&ttd->h_contract_terms),
-          "amount_with_fee", TALER_JSON_from_amount (
-            amount_with_fee),
-          "deposit_fee", TALER_JSON_from_amount (
-            deposit_fee));
+          "conflict_offset", (json_int_t) rctx->current_offset,
+          "exchange_transfer_proof", rctx->original_response,
+          "coin_pub", GNUNET_JSON_from_data_auto (coin_pub),
+          "h_contract_terms", GNUNET_JSON_from_data_auto (
+            &ttd->h_contract_terms),
+          "amount_with_fee", TALER_JSON_from_amount (amount_with_fee),
+          "deposit_fee", TALER_JSON_from_amount (deposit_fee));
     return;
   }
   rctx->check_transfer_result = GNUNET_OK;
@@ -561,28 +556,20 @@ check_wire_fee (struct TrackTransferContext *rctx,
     return GNUNET_OK; /* expected_fee >= wire_fee */
 
   /* Wire fee check failed, export proof to client */
-  resume_track_transfer_with_response
-    (rctx,
+  resume_track_transfer_with_response (
+    rctx,
     MHD_HTTP_FAILED_DEPENDENCY,
     TALER_MHD_make_json_pack (
       "{s:I, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:o, s:O}",
-      "code",
-      (json_int_t) TALER_EC_TRACK_TRANSFER_JSON_BAD_WIRE_FEE,
+      "code", (json_int_t) TALER_EC_TRACK_TRANSFER_JSON_BAD_WIRE_FEE,
       "wire_fee", TALER_JSON_from_amount (wire_fee),
-      "execution_time", GNUNET_JSON_from_time_abs (
-        execution_time),
-      "expected_wire_fee", TALER_JSON_from_amount (
-        &expected_fee),
-      "expected_closing_fee",
-      TALER_JSON_from_amount (&closing_fee),
-      "start_date", GNUNET_JSON_from_time_abs (
-        start_date),
-      "end_date", GNUNET_JSON_from_time_abs (
-        end_date),
-      "master_sig", GNUNET_JSON_from_data_auto (
-        &master_sig),
-      "master_pub", GNUNET_JSON_from_data_auto (
-        master_pub),
+      "execution_time", GNUNET_JSON_from_time_abs (execution_time),
+      "expected_wire_fee", TALER_JSON_from_amount (&expected_fee),
+      "expected_closing_fee", TALER_JSON_from_amount (&closing_fee),
+      "start_date", GNUNET_JSON_from_time_abs (start_date),
+      "end_date", GNUNET_JSON_from_time_abs (end_date),
+      "master_sig", GNUNET_JSON_from_data_auto (&master_sig),
+      "master_pub", GNUNET_JSON_from_data_auto (master_pub),
       "json", json));
   return GNUNET_SYSERR;
 }
@@ -629,17 +616,15 @@ wire_transfer_cb (void *cls,
               http_status);
   if (MHD_HTTP_OK != http_status)
   {
-    resume_track_transfer_with_response
-      (rctx,
+    resume_track_transfer_with_response (
+      rctx,
       MHD_HTTP_FAILED_DEPENDENCY,
-      TALER_MHD_make_json_pack ("{s:I, s:I, s:I, s:O}",
-                                "code",
-                                (json_int_t)
-                                TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
-                                "exchange-code", (json_int_t) ec,
-                                "exchange-http-status",
-                                (json_int_t) http_status,
-                                "details", json));
+      TALER_MHD_make_json_pack (
+        "{s:I, s:I, s:I, s:O}",
+        "code", (json_int_t) TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
+        "exchange-code", (json_int_t) ec,
+        "exchange-http-status", (json_int_t) http_status,
+        "exchange-reply", details));
     return;
   }
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
@@ -835,6 +820,24 @@ process_track_transfer_with_exchange (void *cls,
   struct TrackTransferContext *rctx = cls;
 
   rctx->fo = NULL;
+  if (MHD_HTTP_OK != http_status)
+  {
+    /* The request failed somehow */
+    GNUNET_break_op (0);
+    resume_track_transfer_with_response (
+      rctx,
+      MHD_HTTP_FAILED_DEPENDENCY,
+      TALER_MHD_make_json_pack (
+        (NULL != error_reply)
+        ? "{s:s, s:I, s:I, s:I, s:O}"
+        : "{s:s, s:I, s:I, s:I}",
+        "hint", "failed to obtain meta-data from exchange",
+        "code", (json_int_t) TALER_EC_TRACK_TRANSFER_EXCHANGE_KEYS_FAILURE,
+        "exchange-http-status", (json_int_t) http_status,
+        "exchange-code", (json_int_t) ec,
+        "exchange-reply", error_reply));
+    return;
+  }
   rctx->eh = eh;
   rctx->wdh = TALER_EXCHANGE_transfers_get (eh,
                                             &rctx->wtid,
@@ -851,7 +854,7 @@ process_track_transfer_with_exchange (void *cls,
                                 (json_int_t)
                                 TALER_EC_TRACK_TRANSFER_REQUEST_ERROR,
                                 "error",
-                                "failed to run /track/transfer on exchange"));
+                                "failed to run /transfers/ GET on exchange"));
   }
 }
 
