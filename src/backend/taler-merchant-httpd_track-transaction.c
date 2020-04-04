@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014-2017 INRIA
+  (C) 2014-2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -94,14 +94,13 @@ static struct MHD_Response *
 make_track_transaction_ok (unsigned int num_transfers,
                            const struct TransactionWireTransfer *transfers)
 {
-  struct MHD_Response *ret;
   json_t *j_transfers;
-  struct TALER_Amount sum;
 
   j_transfers = json_array ();
   for (unsigned int i = 0; i<num_transfers; i++)
   {
     const struct TransactionWireTransfer *transfer = &transfers[i];
+    struct TALER_Amount sum;
 
     sum = transfer->coins[0].amount_with_fee;
     for (unsigned int j = 1; j<transfer->num_coins; j++)
@@ -115,23 +114,26 @@ make_track_transaction_ok (unsigned int num_transfers,
     }
 
     GNUNET_assert (0 ==
-                   json_array_append_new (j_transfers,
-                                          json_pack ("{s:s, s:o, s:o, s:o}",
-                                                     "exchange",
-                                                     transfer->exchange_url,
-                                                     "wtid",
-                                                     GNUNET_JSON_from_data_auto (
-                                                       &transfer->wtid),
-                                                     "execution_time",
-                                                     GNUNET_JSON_from_time_abs (
-                                                       transfer->execution_time),
-                                                     "amount",
-                                                     TALER_JSON_from_amount (
-                                                       &sum))));
+                   json_array_append_new (
+                     j_transfers,
+                     json_pack (
+                       "{s:s, s:o, s:o, s:o}",
+                       "exchange",
+                       transfer->exchange_url,
+                       "wtid",
+                       GNUNET_JSON_from_data_auto (&transfer->wtid),
+                       "execution_time",
+                       GNUNET_JSON_from_time_abs (transfer->execution_time),
+                       "amount",
+                       TALER_JSON_from_amount (&sum))));
   }
-  ret = TALER_MHD_make_json (j_transfers);
-  json_decref (j_transfers);
-  return ret;
+  {
+    struct MHD_Response *ret;
+
+    ret = TALER_MHD_make_json (j_transfers);
+    json_decref (j_transfers);
+    return ret;
+  }
 }
 
 
@@ -467,17 +469,19 @@ wire_deposits_cb (void *cls,
   if (MHD_HTTP_OK != http_status)
   {
     GNUNET_break_op (0);
-    resume_track_transaction_with_response
-      (tctx,
+    resume_track_transaction_with_response (
+      tctx,
       MHD_HTTP_FAILED_DEPENDENCY,
-      TALER_MHD_make_json_pack ("{s:I, s:I, s:I, s:O}",
-                                "code",
-                                (json_int_t)
-                                TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
-                                "exchange-http-status",
-                                (json_int_t) http_status,
-                                "exchange-code", (json_int_t) ec,
-                                "details", json));
+      TALER_MHD_make_json_pack (
+        "{s:I, s:I, s:I, s:O}",
+        "code",
+        (json_int_t) TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
+        "exchange-http-status",
+        (json_int_t) http_status,
+        "exchange-code",
+        (json_int_t) ec,
+        "details",
+        json));
     return;
   }
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
@@ -510,7 +514,6 @@ wire_deposits_cb (void *cls,
       continue;
     for (unsigned int d = 0; d<details_length; d++)
     {
-
       if (0 == GNUNET_memcmp (&details[d].coin_pub,
                               &tcc->coin_pub))
       {
@@ -616,27 +619,25 @@ wtid_cb (void *cls,
   enum GNUNET_DB_QueryStatus qs;
 
   tcc->dwh = NULL;
-
   if (MHD_HTTP_OK != http_status)
   {
     if (MHD_HTTP_ACCEPTED == http_status)
     {
-      resume_track_transaction_with_response
-        (tcc->tctx,
+      resume_track_transaction_with_response (
+        tcc->tctx,
         MHD_HTTP_ACCEPTED,
         /* Return verbatim what the exchange said.  */
         TALER_MHD_make_json (json));
-
       return;
     }
 
     /* Transaction not resolved for one of the
        coins, report error! */
-    resume_track_transaction_with_response
-      (tcc->tctx,
+    resume_track_transaction_with_response (
+      tcc->tctx,
       MHD_HTTP_FAILED_DEPENDENCY,
-      TALER_MHD_make_json_pack
-        ("{s:I, s:I, s:I, s:O}",
+      TALER_MHD_make_json_pack (
+        "{s:I, s:I, s:I, s:O}",
         "code",
         (json_int_t) TALER_EC_TRACK_TRANSACTION_COIN_TRACE_ERROR,
         "exchange-http-status",
@@ -645,7 +646,6 @@ wtid_cb (void *cls,
         (json_int_t) ec,
         "details",
         json));
-
     return;
   }
   tctx->current_wtid = *wtid;
@@ -683,19 +683,16 @@ wtid_cb (void *cls,
        tracked? Inconsistent state (! At least regarding
        what the exchange tells us) */
     GNUNET_break_op (0);
-    resume_track_transaction_with_response
-      (tcc->tctx,
+    resume_track_transaction_with_response (
+      tcc->tctx,
       MHD_HTTP_FAILED_DEPENDENCY,
-      TALER_MHD_make_json_pack ("{s:I, s:s, s:O, s:o, s:o}",
-                                "code",
-                                (json_int_t)
-                                TALER_EC_TRACK_TRANSACTION_CONFLICTING_REPORTS,
-                                "error",
-                                "conflicting transfer data from exchange",
-                                "transaction_tracking_claim", json,
-                                "wtid_tracking_claim", pcc.p_ret,
-                                "coin_pub", GNUNET_JSON_from_data_auto (
-                                  &tcc->coin_pub)));
+      TALER_MHD_make_json_pack (
+        "{s:I, s:s, s:O, s:o, s:o}",
+        "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_CONFLICTING_REPORTS,
+        "hint", "conflicting transfer data from exchange",
+        "transaction_tracking_claim", json,
+        "wtid_tracking_claim", pcc.p_ret,
+        "coin_pub", GNUNET_JSON_from_data_auto (&tcc->coin_pub)));
     return;
   }
 
@@ -714,14 +711,14 @@ wtid_cb (void *cls,
 static void
 generate_response (struct TrackTransactionContext *tctx)
 {
-  struct TrackCoinContext *tcc;
-  unsigned int num_wtid;
+  unsigned int num_wtid = 0;
 
-  num_wtid = 0;
   /* count how many disjoint wire transfer identifiers there are;
      note that there should only usually be one, so while this
      is worst-case O(n^2), in pracitce this is O(n) */
-  for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
+  for (struct TrackCoinContext *tcc = tctx->tcc_head;
+       NULL != tcc;
+       tcc = tcc->next)
   {
     int found = GNUNET_NO;
 
@@ -743,12 +740,13 @@ generate_response (struct TrackTransactionContext *tctx)
   {
     /* on-stack allocation is fine, as the number of coins and the
        number of wire-transfers per-transaction is expected to be tiny. */
-    struct MHD_Response *resp;
     struct TransactionWireTransfer wts[num_wtid];
     unsigned int wtid_off;
 
     wtid_off = 0;
-    for (tcc = tctx->tcc_head; NULL != tcc; tcc = tcc->next)
+    for (struct TrackCoinContext *tcc = tctx->tcc_head;
+         NULL != tcc;
+         tcc = tcc->next)
     {
       int found = GNUNET_NO;
 
@@ -806,13 +804,17 @@ generate_response (struct TrackTransactionContext *tctx)
     } /* for all tcc */
     GNUNET_assert (wtid_off == num_wtid);
 
-    resp = make_track_transaction_ok (num_wtid,
-                                      wts);
-    for (wtid_off = 0; wtid_off < num_wtid; wtid_off++)
-      GNUNET_free (wts[wtid_off].coins);
-    resume_track_transaction_with_response (tctx,
-                                            MHD_HTTP_OK,
-                                            resp);
+    {
+      struct MHD_Response *resp;
+
+      resp = make_track_transaction_ok (num_wtid,
+                                        wts);
+      for (wtid_off = 0; wtid_off < num_wtid; wtid_off++)
+        GNUNET_free (wts[wtid_off].coins);
+      resume_track_transaction_with_response (tctx,
+                                              MHD_HTTP_OK,
+                                              resp);
+    }
   } /* end of scope for 'wts' and 'resp' */
 }
 
@@ -901,6 +903,24 @@ process_track_transaction_with_exchange (void *cls,
   struct TrackTransactionContext *tctx = cls;
 
   tctx->fo = NULL;
+  if (MHD_HTTP_OK != http_status)
+  {
+    /* The request failed somehow */
+    GNUNET_break_op (0);
+    resume_track_transaction_with_response (
+      tctx,
+      MHD_HTTP_FAILED_DEPENDENCY,
+      TALER_MHD_make_json_pack (
+        (NULL != error_reply)
+        ? "{s:s, s:I, s:I, s:I, s:O}"
+        : "{s:s, s:I, s:I, s:I}",
+        "hint", "failed to obtain meta-data from exchange",
+        "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_EXCHANGE_KEYS_FAILURE,
+        "exchange-http-status", (json_int_t) http_status,
+        "exchange-code", (json_int_t) ec,
+        "exchange-reply", error_reply));
+    return;
+  }
   tctx->eh = eh;
   trace_coins (tctx);
 }
@@ -919,7 +939,6 @@ handle_track_transaction_timeout (void *cls)
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming /track/transaction with error after timeout\n");
   tctx->timeout_task = NULL;
-
   if (NULL != tctx->fo)
   {
     TMH_EXCHANGES_find_exchange_cancel (tctx->fo);
@@ -994,13 +1013,11 @@ coin_cb (void *cls,
 {
   struct TrackTransactionContext *tctx = cls;
   struct TrackCoinContext *tcc;
-  enum GNUNET_DB_QueryStatus qs;
 
   tcc = GNUNET_new (struct TrackCoinContext);
   tcc->tctx = tctx;
   tcc->coin_pub = *coin_pub;
   tcc->exchange_url = GNUNET_strdup (exchange_url);
-
   tcc->amount_with_fee = *amount_with_fee;
   tcc->deposit_fee = *deposit_fee;
   GNUNET_CONTAINER_DLL_insert (tctx->tcc_head,
@@ -1011,14 +1028,18 @@ coin_cb (void *cls,
      this contract term's hash code.  The callback
      will then set the wtid for the "current coin"
      context. */
-  qs = db->find_transfers_by_hash (db->cls,
-                                   h_contract_terms,
-                                   &transfer_cb,
-                                   tcc);
-  if (0 > qs)
   {
-    GNUNET_break (0);
-    tctx->qs = qs;
+    enum GNUNET_DB_QueryStatus qs;
+
+    qs = db->find_transfers_by_hash (db->cls,
+                                     h_contract_terms,
+                                     &transfer_cb,
+                                     tcc);
+    if (0 > qs)
+    {
+      GNUNET_break (0);
+      tctx->qs = qs;
+    }
   }
 }
 
