@@ -1292,6 +1292,9 @@ url_handler (void *cls,
     { "/poll-payment", MHD_HTTP_METHOD_GET, "text/plain",
       NULL, 0,
       &MH_handler_poll_payment, MHD_HTTP_OK},
+    { "/config", MHD_HTTP_METHOD_GET, "text/plain",
+      NULL, 0,
+      &MH_handler_config, MHD_HTTP_OK},
     {NULL, NULL, NULL, NULL, 0, 0 }
   };
   static struct TMH_RequestHandler h404 = {

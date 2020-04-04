@@ -41,10 +41,10 @@
  * versioning uses either.
  *
  * When changing this version, you likely want to also update
- * #TALER_PROTOCOL_CURRENT and #TALER_PROTOCOL_AGE in
+ * #MERCHANT_PROTOCOL_CURRENT and #MERCHANT_PROTOCOL_AGE in
  * TBD.c! // FIXME: update comment once libtalermerchant looks at version!
  */
-#define TALER_PROTOCOL_VERSION "0:0:0"
+#define MERCHANT_PROTOCOL_VERSION "0:0:0"
 
 
 /**
@@ -75,7 +75,7 @@ MH_handler_config (struct TMH_RequestHandler *rh,
                                     MHD_HTTP_OK,
                                     "{s:s, s:s}",
                                     "currency", TMH_currency,
-                                    "version", TALER_PROTOCOL_VERSION);
+                                    "version", MERCHANT_PROTOCOL_VERSION);
 }
 
 
