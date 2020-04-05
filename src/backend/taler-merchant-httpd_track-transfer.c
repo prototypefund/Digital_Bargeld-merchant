@@ -580,11 +580,8 @@ check_wire_fee (struct TrackTransferContext *rctx,
  * of the coin transactions that were combined into the wire transfer.
  *
  * @param cls closure
- * @param http_status HTTP status code we got, 0 on exchange protocol violation
- * @param ec taler-specific error code for the operation, #TALER_EC_NONE on success
+ * @param hr HTTP response details
  * @param exchange_pub public key of the exchange used to sign @a json
- * @param json original json reply (may include signatures, those have then been
- *        validated already)
  * @param h_wire hash of the wire transfer address the transfer went to, or NULL on error
  * @param execution_time time when the exchange claims to have performed the wire transfer
  * @param total_amount total amount of the wire transfer, or NULL if the exchange could
@@ -595,10 +592,8 @@ check_wire_fee (struct TrackTransferContext *rctx,
  */
 static void
 wire_transfer_cb (void *cls,
-                  unsigned int http_status,
-                  enum TALER_ErrorCode ec,
+                  const struct TALER_EXCHANGE_HttpResponse *hr,
                   const struct TALER_ExchangePublicKeyP *exchange_pub,
-                  const json_t *json,
                   const struct GNUNET_HashCode *h_wire,
                   struct GNUNET_TIME_Absolute execution_time,
                   const struct TALER_Amount *total_amount,
@@ -613,8 +608,8 @@ wire_transfer_cb (void *cls,
   rctx->wdh = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Got response code %u from exchange for /track/transfer\n",
-              http_status);
-  if (MHD_HTTP_OK != http_status)
+              hr->http_status);
+  if (MHD_HTTP_OK != hr->http_status)
   {
     resume_track_transfer_with_response (
       rctx,
@@ -622,9 +617,9 @@ wire_transfer_cb (void *cls,
       TALER_MHD_make_json_pack (
         "{s:I, s:I, s:I, s:O}",
         "code", (json_int_t) TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
-        "exchange-code", (json_int_t) ec,
-        "exchange-http-status", (json_int_t) http_status,
-        "exchange-reply", details));
+        "exchange-code", (json_int_t) hr->ec,
+        "exchange-http-status", (json_int_t) hr->http_status,
+        "exchange-reply", hr->reply));
     return;
   }
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
@@ -635,7 +630,7 @@ wire_transfer_cb (void *cls,
                                       &rctx->wtid,
                                       execution_time,
                                       exchange_pub,
-                                      json);
+                                      hr->reply);
     if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
       break;
   }
@@ -656,11 +651,11 @@ wire_transfer_cb (void *cls,
                                 "failed to store response from exchange to local database"));
     return;
   }
-  rctx->original_response = json;
+  rctx->original_response = hr->reply;
 
   if (GNUNET_SYSERR ==
       check_wire_fee (rctx,
-                      json,
+                      hr->reply,
                       execution_time,
                       wire_fee))
     return;
@@ -778,7 +773,7 @@ wire_transfer_cb (void *cls,
               "About to call tracks transformator.\n");
 
   if (NULL == (jresponse =
-                 transform_response (json,
+                 transform_response (hr->reply,
                                      rctx)))
   {
     resume_track_transfer_with_response

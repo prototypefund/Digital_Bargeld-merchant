@@ -83,32 +83,24 @@ struct PayAbortRefundState
  * code is as expected.
  *
  * @param cls closure
- * @param http_status HTTP response code, #MHD_HTTP_OK (200) for
- *        successful deposit; 0 if the exchange's reply is bogus
- *        (fails to follow the protocol)
- * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param hr HTTP response code details
  * @param sign_key exchange key used to sign @a obj, or NULL
- * @param obj the received JSON reply, should be kept as proof
- *        (and, in particular, be forwarded to the customer)
  */
 static void
 abort_refund_cb (void *cls,
-                 unsigned int http_status,
-                 enum TALER_ErrorCode ec,
-                 const struct TALER_ExchangePublicKeyP *sign_key,
-                 const json_t *obj)
+                 const struct TALER_EXCHANGE_HttpResponse *hr,
+                 const struct TALER_ExchangePublicKeyP *sign_key)
 {
   struct PayAbortRefundState *pars = cls;
 
   pars->rh = NULL;
-  if (pars->http_status != http_status)
+  if (pars->http_status != hr->http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unexpected response code %u (%d) to command %s\n",
-                http_status,
-                ec,
-                TALER_TESTING_interpreter_get_current_label
-                  (pars->is));
+                hr->http_status,
+                hr->ec,
+                TALER_TESTING_interpreter_get_current_label (pars->is));
     TALER_TESTING_interpreter_fail (pars->is);
     return;
   }

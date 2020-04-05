@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2017 Taler Systems SA
+  (C) 2017-2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -302,6 +302,7 @@ exchange_found_cb (void *cls,
   MHD_resume_connection (pc->connection);
   if (NULL == eh)
   {
+    // FIXME: #6014: forward error details!
     pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_DOWN;
     pc->error_hint = "failed to contact exchange, check URL";
     pc->response_code = MHD_HTTP_FAILED_DEPENDENCY;
@@ -311,6 +312,7 @@ exchange_found_cb (void *cls,
   keys = TALER_EXCHANGE_get_keys (eh);
   if (NULL == keys)
   {
+    // FIXME: #6014: forward error details!?
     pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEYS;
     pc->error_hint =
       "could not obtain denomination keys from exchange, check URL";
@@ -710,20 +712,16 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   timestamp_expire = GNUNET_TIME_absolute_add (timestamp,
                                                GNUNET_TIME_UNIT_DAYS);
 
-  ret = TALER_MHD_reply_json_pack (connection,
-                                   MHD_HTTP_OK,
-                                   "{s:s, s:o, s:o, s:o, s:o, s:o}",
-                                   "exchange_url", exchange_url,
-                                   "amount", TALER_JSON_from_amount (
-                                     &tip_amount),
-                                   "amount_left", TALER_JSON_from_amount (
-                                     &tip_amount_left),
-                                   "stamp_created",
-                                   GNUNET_JSON_from_time_abs (timestamp),
-                                   "stamp_expire",
-                                   GNUNET_JSON_from_time_abs (
-                                     timestamp_expire),
-                                   "extra", extra);
+  ret = TALER_MHD_reply_json_pack (
+    connection,
+    MHD_HTTP_OK,
+    "{s:s, s:o, s:o, s:o, s:o, s:o}",
+    "exchange_url", exchange_url,
+    "amount", TALER_JSON_from_amount (&tip_amount),
+    "amount_left", TALER_JSON_from_amount (&tip_amount_left),
+    "stamp_created", GNUNET_JSON_from_time_abs (timestamp),
+    "stamp_expire", GNUNET_JSON_from_time_abs (timestamp_expire),
+    "extra", extra);
 
   GNUNET_free (exchange_url);
   json_decref (extra);

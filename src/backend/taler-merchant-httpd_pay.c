@@ -982,23 +982,15 @@ begin_transaction (struct PayContext *pc);
  *   in that array). That way, the last executed callback can detect
  *   that no other confirmations are on the way, and can pack a response
  *   for the wallet
- * @param http_status HTTP response code, #MHD_HTTP_OK
- *   (200) for successful deposit; 0 if the exchange's reply is bogus (fails
- *   to follow the protocol)
- * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param hr HTTP response code details
  * @param exchange_sig signature from the exchange over the deposit confirmation
  * @param sign_key which key did the exchange use to sign the @a proof
- * @param proof the received JSON reply,
- *   should be kept as proof (and, in case of errors, be forwarded to
- *   the customer)
  */
 static void
 deposit_cb (void *cls,
-            unsigned int http_status,
-            enum TALER_ErrorCode ec,
+            const struct TALER_EXCHANGE_HttpResponse *hr,
             const struct TALER_ExchangeSignatureP *exchange_sig,
-            const struct TALER_ExchangePublicKeyP *sign_key,
-            const json_t *proof)
+            const struct TALER_ExchangePublicKeyP *sign_key)
 {
   struct DepositConfirmation *dc = cls;
   struct PayContext *pc = dc->pc;
@@ -1007,47 +999,52 @@ deposit_cb (void *cls,
   dc->dh = NULL;
   GNUNET_assert (GNUNET_YES == pc->suspended);
   pc->pending_at_ce--;
-  if (MHD_HTTP_OK != http_status)
+  if (MHD_HTTP_OK != hr->http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Deposit operation failed with HTTP code %u\n",
-                http_status);
+                "Deposit operation failed with HTTP code %u/%d\n",
+                hr->http_status,
+                (int) hr->ec);
     /* Transaction failed; stop all other ongoing deposits */
     abort_deposit (pc);
 
-    if (5 == http_status / 100)
+    if (5 == hr->http_status / 100)
     {
       /* internal server error at exchange */
       resume_pay_with_response (pc,
                                 MHD_HTTP_SERVICE_UNAVAILABLE,
                                 TALER_MHD_make_json_pack (
-                                  "{s:s, s:I, s:I}",
+                                  "{s:s, s:I, s:I, s:I}",
                                   "hint",
                                   "exchange had an internal server error",
                                   "code",
                                   (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
+                                  "exchange-code",
+                                  (json_int_t) hr->ec,
                                   "exchange-http-status",
-                                  (json_int_t) http_status));
+                                  (json_int_t) hr->http_status));
     }
-    else if (NULL == proof)
+    else if (NULL == hr->reply)
     {
       /* We can't do anything meaningful here, the exchange did something wrong */
       resume_pay_with_response (pc,
                                 MHD_HTTP_FAILED_DEPENDENCY,
                                 TALER_MHD_make_json_pack (
-                                  "{s:s, s:I, s:I}",
+                                  "{s:s, s:I, s:I, s:I}",
                                   "hint",
                                   "exchange failed, response body not even in JSON",
                                   "code",
                                   (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
+                                  "exchange-code",
+                                  (json_int_t) hr->ec,
                                   "exchange-http-status",
-                                  (json_int_t) http_status));
+                                  (json_int_t) hr->http_status));
     }
     else
     {
       /* Forward error, adding the "coin_pub" for which the
          error was being generated */
-      if (TALER_EC_DEPOSIT_INSUFFICIENT_FUNDS == ec)
+      if (TALER_EC_DEPOSIT_INSUFFICIENT_FUNDS == hr->ec)
         resume_pay_with_response (
           pc,
           MHD_HTTP_CONFLICT,
@@ -1057,13 +1054,13 @@ deposit_cb (void *cls,
                                     "code",
                                     (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
                                     "exchange-code",
-                                    (json_int_t) ec,
+                                    (json_int_t) hr->ec,
                                     "exchange-http-status",
-                                    (json_int_t) http_status,
+                                    (json_int_t) hr->http_status,
                                     "coin_pub",
                                     GNUNET_JSON_from_data_auto (&dc->coin_pub),
                                     "exchange-reply",
-                                    proof));
+                                    hr->reply));
       else
         resume_pay_with_response (
           pc,
@@ -1074,13 +1071,13 @@ deposit_cb (void *cls,
                                     "code",
                                     (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
                                     "exchange-code",
-                                    (json_int_t) ec,
+                                    (json_int_t) hr->ec,
                                     "exchange-http-status",
-                                    (json_int_t) http_status,
+                                    (json_int_t) hr->http_status,
                                     "coin_pub",
                                     GNUNET_JSON_from_data_auto (&dc->coin_pub),
                                     "exchange-reply",
-                                    proof));
+                                    hr->reply));
     }
     return;
   }
@@ -1102,7 +1099,7 @@ deposit_cb (void *cls,
                           &dc->refund_fee,
                           &dc->wire_fee,
                           sign_key,
-                          proof);
+                          hr->reply);
   if (0 > qs)
   {
     /* Special report if retries insufficient */

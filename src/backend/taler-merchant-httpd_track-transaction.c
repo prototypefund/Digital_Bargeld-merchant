@@ -435,11 +435,8 @@ trace_coins (struct TrackTransactionContext *tctx);
  * any coins of the original wire transfer not taken care of.
  *
  * @param cls closure
- * @param http_status HTTP status code we got, 0 on exchange protocol violation
- * @param ec taler-specific error code
+ * @param hr HTTP response details
  * @param exchange_pub public key of the exchange used for signing
- * @param json original json reply (may include signatures, those have then been
- *        validated already)
  * @param execution_time time when the exchange claims to have performed the wire transfer
  * @param wtid extracted wire transfer identifier, or NULL if the exchange could
  *             not provide any (set only if @a http_status is #MHD_HTTP_OK)
@@ -451,10 +448,8 @@ trace_coins (struct TrackTransactionContext *tctx);
  */
 static void
 wire_deposits_cb (void *cls,
-                  unsigned int http_status,
-                  enum TALER_ErrorCode ec,
+                  const struct TALER_EXCHANGE_HttpResponse *hr,
                   const struct TALER_ExchangePublicKeyP *exchange_pub,
-                  const json_t *json,
                   const struct GNUNET_HashCode *h_wire,
                   struct GNUNET_TIME_Absolute execution_time,
                   const struct TALER_Amount *total_amount,
@@ -466,7 +461,7 @@ wire_deposits_cb (void *cls,
   enum GNUNET_DB_QueryStatus qs;
 
   tctx->wdh = NULL;
-  if (MHD_HTTP_OK != http_status)
+  if (MHD_HTTP_OK != hr->http_status)
   {
     GNUNET_break_op (0);
     resume_track_transaction_with_response (
@@ -477,11 +472,11 @@ wire_deposits_cb (void *cls,
         "code",
         (json_int_t) TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
         "exchange-http-status",
-        (json_int_t) http_status,
+        (json_int_t) hr->http_status,
         "exchange-code",
-        (json_int_t) ec,
-        "details",
-        json));
+        (json_int_t) hr->ec,
+        "exchange-reply",
+        hr->reply));
     return;
   }
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
@@ -492,7 +487,7 @@ wire_deposits_cb (void *cls,
                                       &tctx->current_wtid,
                                       tctx->current_execution_time,
                                       exchange_pub,
-                                      json);
+                                      hr->reply);
     if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
       break;
   }
@@ -592,12 +587,8 @@ proof_cb (void *cls,
  * the other coins.
  *
  * @param cls closure with a `struct TrackCoinContext`
- * @param http_status HTTP status code we got, 0 on exchange protocol violation
- * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param hr HTTP response details
  * @param exchange_pub public key of the exchange used for signing @a json
- * @param json original json reply (may include signatures, those have then been
- *        validated already), should be a `TrackTransactionResponse`
- *        from the exchange API
  * @param wtid wire transfer identifier used by the exchange, NULL if exchange did not
  *                  yet execute the transaction
  * @param execution_time actual or planned execution time for the wire transfer
@@ -605,10 +596,8 @@ proof_cb (void *cls,
  */
 static void
 wtid_cb (void *cls,
-         unsigned int http_status,
-         enum TALER_ErrorCode ec,
+         const struct TALER_EXCHANGE_HttpResponse *hr,
          const struct TALER_ExchangePublicKeyP *exchange_pub,
-         const json_t *json,
          const struct TALER_WireTransferIdentifierRawP *wtid,
          struct GNUNET_TIME_Absolute execution_time,
          const struct TALER_Amount *coin_contribution)
@@ -619,15 +608,15 @@ wtid_cb (void *cls,
   enum GNUNET_DB_QueryStatus qs;
 
   tcc->dwh = NULL;
-  if (MHD_HTTP_OK != http_status)
+  if (MHD_HTTP_OK != hr->http_status)
   {
-    if (MHD_HTTP_ACCEPTED == http_status)
+    if (MHD_HTTP_ACCEPTED == hr->http_status)
     {
       resume_track_transaction_with_response (
         tcc->tctx,
         MHD_HTTP_ACCEPTED,
         /* Return verbatim what the exchange said.  */
-        TALER_MHD_make_json (json));
+        TALER_MHD_make_json (hr->reply));
       return;
     }
 
@@ -641,11 +630,11 @@ wtid_cb (void *cls,
         "code",
         (json_int_t) TALER_EC_TRACK_TRANSACTION_COIN_TRACE_ERROR,
         "exchange-http-status",
-        (json_int_t) http_status,
+        (json_int_t) hr->http_status,
         "exchange-code",
-        (json_int_t) ec,
-        "details",
-        json));
+        (json_int_t) hr->ec,
+        "exchange-reply",
+        hr->reply));
     return;
   }
   tctx->current_wtid = *wtid;
@@ -667,11 +656,11 @@ wtid_cb (void *cls,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    resume_track_transaction_with_response
-      (tcc->tctx,
+    resume_track_transaction_with_response (
+      tcc->tctx,
       MHD_HTTP_INTERNAL_SERVER_ERROR,
-      TALER_MHD_make_error
-        (TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
+      TALER_MHD_make_error (
+        TALER_EC_TRACK_TRANSACTION_DB_FETCH_TRANSACTION_ERROR,
         "Fail to query database about proofs"));
     return;
   }
@@ -690,7 +679,7 @@ wtid_cb (void *cls,
         "{s:I, s:s, s:O, s:o, s:o}",
         "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_CONFLICTING_REPORTS,
         "hint", "conflicting transfer data from exchange",
-        "transaction_tracking_claim", json,
+        "transaction_tracking_claim", hr->reply,
         "wtid_tracking_claim", pcc.p_ret,
         "coin_pub", GNUNET_JSON_from_data_auto (&tcc->coin_pub)));
     return;

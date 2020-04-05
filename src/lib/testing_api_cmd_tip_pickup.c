@@ -154,20 +154,13 @@ struct WithdrawHandle
  * from the exchange, that is the final step in getting the tip.
  *
  * @param cls closure, a `struct WithdrawHandle *`
- * @param http_status HTTP response code, #MHD_HTTP_OK (200)
- *        for successful status request, 0 if the exchange's
- *        reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param hr HTTP response details
  * @param sig signature over the coin, NULL on error
- * @param full_response full response from the exchange
- *        (for logging, in case of errors)
  */
 static void
 pickup_withdraw_cb (void *cls,
-                    unsigned int http_status,
-                    enum TALER_ErrorCode ec,
-                    const struct TALER_DenominationSignature *sig,
-                    const json_t *full_response)
+                    const struct TALER_EXCHANGE_HttpResponse *hr,
+                    const struct TALER_DenominationSignature *sig)
 {
   struct WithdrawHandle *wh = cls;
   struct TALER_TESTING_Interpreter *is = wh->is;
@@ -178,17 +171,16 @@ pickup_withdraw_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Withdraw operation %u completed with %u (%d)\n",
               wh->off,
-              http_status,
-              ec);
+              hr->http_status,
+              hr->ec);
   GNUNET_assert (wh->off < tps->num_coins);
-  if ( (MHD_HTTP_OK != http_status) ||
-       (TALER_EC_NONE != ec) )
+  if ( (MHD_HTTP_OK != hr->http_status) ||
+       (TALER_EC_NONE != hr->ec) )
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u (%d)"
-                " to command %s when withdrawing\n",
-                http_status,
-                ec,
+                "Unexpected response code %u (%d) to command %s when withdrawing\n",
+                hr->http_status,
+                hr->ec,
                 TALER_TESTING_interpreter_get_current_label (is));
     TALER_TESTING_interpreter_fail (is);
     return;
@@ -482,21 +474,16 @@ tip_pickup_traits (void *cls,
   {
     traits[i] = TALER_TESTING_make_trait_planchet_secrets
                   (i, &tps->psa[i]);
-
     traits[i + tps->num_coins] =
       TALER_TESTING_make_trait_coin_priv
         (i, &tps->psa[i].coin_priv);
-
     traits[i + (tps->num_coins * 2)] =
       TALER_TESTING_make_trait_denom_pub (i, tps->dks[i]);
-
     traits[i + (tps->num_coins * 3)] =
       TALER_TESTING_make_trait_denom_sig (i, &tps->sigs[i]);
-
     traits[i + (tps->num_coins * 4)] =
       TALER_TESTING_make_trait_amount_obj
         (i, &tps->amounts_obj[i]);
-
   }
   traits[NUM_TRAITS - 2] = TALER_TESTING_make_trait_url
                              (TALER_TESTING_UT_EXCHANGE_BASE_URL,

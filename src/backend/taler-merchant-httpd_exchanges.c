@@ -261,20 +261,16 @@ json_t *TMH_trusted_exchanges;
  *   this callback is called. Thus, once 'pending' turns 'false',
  *   it is safe to call 'TALER_EXCHANGE_get_keys()' on the exchange's handle,
  *   in order to get the "good" keys.
+ * @param hr http response details
  * @param keys information about the various keys used
  *        by the exchange
  * @param compat version compatibility data
- * @param ec error code, #TALER_EC_NONE on success
- * @param http_status status returned by /keys, #MHD_HTTP_OK on success
- * @param full_reply JSON body of /keys request, NULL if reply was not in JSON
  */
 static void
 keys_mgmt_cb (void *cls,
+              const struct TALER_EXCHANGE_HttpResponse *hr,
               const struct TALER_EXCHANGE_Keys *keys,
-              enum TALER_EXCHANGE_VersionCompatibility compat,
-              enum TALER_ErrorCode ec,
-              unsigned int http_status,
-              const json_t *full_reply);
+              enum TALER_EXCHANGE_VersionCompatibility compat);
 
 
 /**
@@ -598,44 +594,39 @@ wire_task_cb (void *cls);
  * that is #TALER_EXCHANGE_get_keys() will succeed.
  *
  * @param cls closure, a `struct Exchange`
- * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful request;
- *                    0 if the exchange's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code, #TALER_EC_NONE on success
+ * @param hr HTTP response details
  * @param accounts_len length of the @a accounts array
  * @param accounts list of wire accounts of the exchange, NULL on error
- * @param full_reply the complete response from the exchange (if it was in JSON)
  */
 static void
 handle_wire_data (void *cls,
-                  unsigned int http_status,
-                  enum TALER_ErrorCode ec,
+                  const struct TALER_EXCHANGE_HttpResponse *hr,
                   unsigned int accounts_len,
-                  const struct TALER_EXCHANGE_WireAccount *accounts,
-                  const json_t *full_reply)
+                  const struct TALER_EXCHANGE_WireAccount *accounts)
 {
   struct Exchange *exchange = cls;
   const struct TALER_EXCHANGE_Keys *keys;
   enum TALER_ErrorCode ecx;
 
   exchange->wire_request = NULL;
-  if (MHD_HTTP_OK != http_status)
+  if (MHD_HTTP_OK != hr->http_status)
   {
     struct TMH_EXCHANGES_FindOperation *fo;
 
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Failed to obtain /wire details from `%s': %u/%d\n",
                 exchange->url,
-                http_status,
-                ec);
+                hr->http_status,
+                hr->ec);
     while (NULL != (fo = exchange->fo_head))
     {
       fo->fc (fo->fc_cls,
               NULL,
               NULL,
               GNUNET_NO,
-              ec,
-              http_status,
-              full_reply);
+              hr->ec,
+              hr->http_status,
+              hr->reply);
       TMH_EXCHANGES_find_exchange_cancel (fo);
     }
     return;
@@ -660,7 +651,7 @@ handle_wire_data (void *cls,
               GNUNET_NO,
               ecx,
               0,
-              full_reply);
+              hr->reply);
       TMH_EXCHANGES_find_exchange_cancel (fo);
     }
     return;
@@ -729,20 +720,16 @@ wire_task_cb (void *cls)
  *   this callback is called. Thus, once 'pending' turns 'false',
  *   it is safe to call 'TALER_EXCHANGE_get_keys()' on the exchange's handle,
  *   in order to get the "good" keys.
+ * @param hr http response details
  * @param keys information about the various keys used
  *        by the exchange
  * @param compat version compatibility data
- * @param ec error code, #TALER_EC_NONE on success
- * @param http_status status returned by /keys, #MHD_HTTP_OK on success
- * @param full_reply JSON body of /keys request, NULL if reply was not in JSON
  */
 static void
 keys_mgmt_cb (void *cls,
+              const struct TALER_EXCHANGE_HttpResponse *hr,
               const struct TALER_EXCHANGE_Keys *keys,
-              enum TALER_EXCHANGE_VersionCompatibility compat,
-              enum TALER_ErrorCode ec,
-              unsigned int http_status,
-              const json_t *full_reply)
+              enum TALER_EXCHANGE_VersionCompatibility compat)
 {
   struct Exchange *exchange = cls;
   struct GNUNET_TIME_Absolute expire;
@@ -769,9 +756,9 @@ keys_mgmt_cb (void *cls,
               NULL,
               NULL,
               GNUNET_NO,
-              ec,
-              http_status,
-              full_reply);
+              hr->ec,
+              hr->http_status,
+              hr->reply);
       TMH_EXCHANGES_find_exchange_cancel (fo);
     }
     if (TALER_EXCHANGE_VC_INCOMPATIBLE_NEWER == compat)
@@ -790,8 +777,8 @@ keys_mgmt_cb (void *cls,
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Failed to fetch /keys from `%s': %d/%u, retrying in %s\n",
                 exchange->url,
-                (int) ec,
-                http_status,
+                (int) hr->ec,
+                hr->http_status,
                 GNUNET_STRINGS_relative_time_to_string (exchange->retry_delay,
                                                         GNUNET_YES));
     GNUNET_assert (NULL == exchange->retry_task);

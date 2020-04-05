@@ -77,19 +77,14 @@ resume_with_response (struct TMH_CheckTipReserve *ctr,
  * result.
  *
  * @param cls closure with a `struct TMH_CheckTipReserve *'
- * @param http_status HTTP response code, #MHD_HTTP_OK (200) for successful status request
- *                    0 if the exchange's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code, #TALER_EC_NONE on success
- * @param[in] json original response in JSON format (useful only for diagnostics)
+ * @param hr HTTP response details
  * @param balance current balance in the reserve, NULL on error
  * @param history_length number of entries in the transaction history, 0 on error
  * @param history detailed transaction history, NULL on error
  */
 static void
 handle_status (void *cls,
-               unsigned int http_status,
-               enum TALER_ErrorCode ec,
-               const json_t *json,
+               const struct TALER_EXCHANGE_HttpResponse *hr,
                const struct TALER_Amount *balance,
                unsigned int history_length,
                const struct TALER_EXCHANGE_ReserveHistory *history)
@@ -98,7 +93,7 @@ handle_status (void *cls,
 
   ctr->rsh = NULL;
   ctr->reserve_expiration = GNUNET_TIME_UNIT_ZERO_ABS;
-  if (MHD_HTTP_NOT_FOUND == http_status)
+  if (MHD_HTTP_NOT_FOUND == hr->http_status)
   {
     resume_with_response (
       ctr,
@@ -106,13 +101,13 @@ handle_status (void *cls,
       TALER_MHD_make_json_pack (
         "{s:I, s:I, s:s, s:I, s:O}",
         "code", (json_int_t) TALER_EC_TIP_QUERY_RESERVE_UNKNOWN_TO_EXCHANGE,
-        "exchange-http-status", http_status,
+        "exchange-http-status", hr->http_status,
         "hint", "tipping reserve unknown at exchange",
-        "exchange-code", TALER_JSON_get_error_code (json),
-        "exchange-reply", json));
+        "exchange-code", hr->ec,
+        "exchange-reply", hr->reply));
     return;
   }
-  if (MHD_HTTP_OK != http_status)
+  if (MHD_HTTP_OK != hr->http_status)
   {
     GNUNET_break_op (0);
     resume_with_response (
@@ -121,10 +116,10 @@ handle_status (void *cls,
       TALER_MHD_make_json_pack (
         "{s:I, s:I, s:s, s:I, s:O}",
         "code", (json_int_t) TALER_EC_TIP_QUERY_RESERVE_HISTORY_FAILED,
-        "exchange-http-status", http_status,
+        "exchange-http-status", hr->http_status,
         "hint", "exchange failed to provide reserve history",
-        "exchange-code", TALER_JSON_get_error_code (json),
-        "exchange-reply", json));
+        "exchange-code", (json_int_t) hr->ec,
+        "exchange-reply", hr->reply));
     return;
   }
 
