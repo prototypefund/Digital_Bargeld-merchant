@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2017 GNUnet e.V. and INRIA
+  Copyright (C) 2014-2017, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -82,9 +82,9 @@ struct TALER_MERCHANT_TrackTransferHandle
  *         #GNUNET_SYSERR if the response was bogus
  */
 static int
-check_transfers_get_response_ok (struct
-                                 TALER_MERCHANT_TrackTransferHandle *wdh,
-                                 const json_t *json)
+check_transfers_get_response_ok (
+  struct TALER_MERCHANT_TrackTransferHandle *wdh,
+  const json_t *json)
 {
   json_t *deposits;
   struct GNUNET_HashCode h_wire;
@@ -99,6 +99,10 @@ check_transfers_get_response_ok (struct
     GNUNET_JSON_spec_json ("deposits_sums", &deposits),
     GNUNET_JSON_spec_fixed_auto ("exchange_pub", &exchange_pub),
     GNUNET_JSON_spec_end ()
+  };
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = MHD_HTTP_OK,
+    .reply = json
   };
 
   if (GNUNET_OK !=
@@ -135,10 +139,8 @@ check_transfers_get_response_ok (struct
       }
     }
     wdh->cb (wdh->cb_cls,
-             MHD_HTTP_OK,
-             TALER_EC_NONE,
+             &hr,
              &exchange_pub,
-             json,
              &h_wire,
              &total_amount,
              num_details,
@@ -164,11 +166,16 @@ handle_transfers_get_finished (void *cls,
 {
   struct TALER_MERCHANT_TrackTransferHandle *tdo = cls;
   const json_t *json = response;
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = (unsigned int) response_code,
+    .reply = json
+  };
 
   tdo->job = NULL;
   switch (response_code)
   {
   case 0:
+    hr.ec = TALER_EC_INVALID_RESPONSE;
     break;
   case MHD_HTTP_OK:
     if (GNUNET_OK ==
@@ -179,33 +186,43 @@ handle_transfers_get_finished (void *cls,
       return;
     }
     GNUNET_break_op (0);
-    response_code = 0;
+    hr.http_status = 0;
+    hr.ec = TALER_EC_INVALID_RESPONSE; // TODO: use more specific code!
     break;
   case MHD_HTTP_FAILED_DEPENDENCY:
     /* Not a reason to break execution.  */
+    TALER_MERCHANT_parse_error_details_ (json,
+                                         response_code,
+                                         &hr);
     break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
        leaves this to the application */
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   default:
     /* unexpected response code */
+    GNUNET_break_op (0);
+    TALER_MERCHANT_parse_error_details_ (json,
+                                         response_code,
+                                         &hr);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u\n",
-                (unsigned int) response_code);
-    GNUNET_break (0);
+                "Unexpected response code %u/%d\n",
+                (unsigned int) response_code,
+                (int) hr.ec);
     response_code = 0;
     break;
   }
   tdo->cb (tdo->cb_cls,
-           response_code,
-           TALER_JSON_get_error_code (json),
+           &hr,
            NULL,
-           json,
            NULL,
            NULL,
            0,
@@ -227,23 +244,22 @@ handle_transfers_get_finished (void *cls,
  * @return a handle for this request
  */
 struct TALER_MERCHANT_TrackTransferHandle *
-TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
-                               const char *backend_url,
-                               const char *wire_method,
-                               const struct
-                               TALER_WireTransferIdentifierRawP *wtid,
-                               const char *exchange_url,
-                               TALER_MERCHANT_TrackTransferCallback
-                               track_transfer_cb,
-                               void *track_transfer_cb_cls)
+TALER_MERCHANT_track_transfer (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *wire_method,
+  const struct TALER_WireTransferIdentifierRawP *wtid,
+  const char *exchange_url,
+  TALER_MERCHANT_TrackTransferCallback track_transfer_cb,
+  void *track_transfer_cb_cls)
 {
   struct TALER_MERCHANT_TrackTransferHandle *tdo;
   CURL *eh;
   char *wtid_str;
 
-  wtid_str = GNUNET_STRINGS_data_to_string_alloc (wtid,
-                                                  sizeof (struct
-                                                          TALER_WireTransferIdentifierRawP));
+  wtid_str = GNUNET_STRINGS_data_to_string_alloc (
+    wtid,
+    sizeof (struct TALER_WireTransferIdentifierRawP));
   tdo = GNUNET_new (struct TALER_MERCHANT_TrackTransferHandle);
   tdo->ctx = ctx;
   tdo->cb = track_transfer_cb; // very last to be called
@@ -282,8 +298,8 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
  * @param tdo handle to the tracking operation being cancelled
  */
 void
-TALER_MERCHANT_track_transfer_cancel (struct
-                                      TALER_MERCHANT_TrackTransferHandle *tdo)
+TALER_MERCHANT_track_transfer_cancel (
+  struct TALER_MERCHANT_TrackTransferHandle *tdo)
 {
   if (NULL != tdo->job)
   {

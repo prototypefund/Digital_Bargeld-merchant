@@ -225,8 +225,7 @@ conclude_task (void *cls)
  * Callback for a /poll-payment request.
  *
  * @param cls closure.
- * @param http_status HTTP status code we got.
- * @param json full response we got.
+ * @param hr HTTP response we got
  * @param paid #GNUNET_YES (#GNUNET_NO) if the contract was (not) paid
  * @param refunded #GNUNET_YES (#GNUNET_NO) if the contract was
  *        (not) refunded.
@@ -237,8 +236,7 @@ conclude_task (void *cls)
  */
 static void
 poll_payment_cb (void *cls,
-                 unsigned int http_status,
-                 const json_t *obj,
+                 const struct TALER_MERCHANT_HttpResponse *hr,
                  int paid,
                  int refunded,
                  struct TALER_Amount *refund_amount,
@@ -247,15 +245,15 @@ poll_payment_cb (void *cls,
   struct PollPaymentStartState *cps = cls;
 
   cps->cpo = NULL;
-  if ( (MHD_HTTP_OK != http_status) &&
-       (NULL != obj) )
+  if ( (MHD_HTTP_OK != hr->http_status) &&
+       (NULL != hr->reply) )
   {
-    char *log = json_dumps (obj,
+    char *log = json_dumps (hr->reply,
                             JSON_COMPACT);
 
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Poll payment returned %u: %s\n",
-                http_status,
+                hr->http_status,
                 log);
     free (log);
   }
@@ -263,12 +261,12 @@ poll_payment_cb (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Poll payment returned %u (%d/%d)\n",
-                http_status,
+                hr->http_status,
                 paid,
                 refunded);
   }
   cps->paid = paid;
-  cps->http_status = http_status;
+  cps->http_status = hr->http_status;
   cps->refunded = refunded;
   if (GNUNET_YES == refunded)
     cps->refund = *refund_amount;

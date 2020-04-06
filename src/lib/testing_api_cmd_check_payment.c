@@ -227,11 +227,10 @@ conclude_task (void *cls)
  * Callback for a /check-payment request.
  *
  * @param cls closure.
- * @param http_status HTTP status code we got.
- * @param json full response we got.
- * @param paid #GNUNET_YES (GNUNET_NO) if the contract was paid
+ * @param hr HTTP response we got
+ * @param paid #GNUNET_YES (#GNUNET_NO) if the contract was paid
  *        (not paid).
- * @param refunded #GNUNET_YES (GNUNET_NO) if the contract was
+ * @param refunded #GNUNET_YES (#GNUNET_NO) if the contract was
  *        refunded (not refunded).
  * @param refund_amount the amount that was refunded to this
  *        contract.
@@ -240,8 +239,7 @@ conclude_task (void *cls)
  */
 static void
 check_payment_cb (void *cls,
-                  unsigned int http_status,
-                  const json_t *obj,
+                  const struct TALER_MERCHANT_HttpResponse *hr,
                   int paid,
                   int refunded,
                   struct TALER_Amount *refund_amount,
@@ -257,14 +255,14 @@ check_payment_cb (void *cls,
               paid,
               taler_pay_uri);
   cps->paid = paid;
-  cps->http_status = http_status;
+  cps->http_status = hr->http_status;
   cps->refunded = refunded;
   if (0 == cps->timeout.rel_value_us)
   {
     /* synchronous variant */
     if (paid != cps->expect_paid)
       TALER_TESTING_FAIL (cps->is);
-    if (cps->expected_http_status != http_status)
+    if (cps->expected_http_status != hr->http_status)
       TALER_TESTING_FAIL (cps->is);
     TALER_TESTING_interpreter_next (cps->is);
   }

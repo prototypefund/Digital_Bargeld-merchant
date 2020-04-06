@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2018 GNUnet e.V. and INRIA
+  Copyright (C) 2018, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -92,13 +92,18 @@ handle_check_payment_finished (void *cls,
 
   if (MHD_HTTP_OK != response_code)
   {
+    struct TALER_MERCHANT_HttpResponse hr;
+
+    TALER_MERCHANT_parse_error_details_ (response,
+                                         response_code,
+                                         &hr);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Checking payment failed with HTTP status code %u\n",
-                (unsigned int) response_code);
+                "Checking payment failed with HTTP status code %u/%d\n",
+                (unsigned int) response_code,
+                (int) hr.ec);
     GNUNET_break_op (0);
     cpo->cb (cpo->cb_cls,
-             response_code,
-             json,
+             &hr,
              GNUNET_SYSERR,
              GNUNET_SYSERR,
              NULL,
@@ -113,12 +118,15 @@ handle_check_payment_finished (void *cls,
                                                                     "taler_pay_uri"));
     if (NULL == taler_pay_uri)
     {
+      struct TALER_MERCHANT_HttpResponse hr = {
+        .ec = TALER_EC_CHECK_PAYMENT_RESPONSE_MALFORMED,
+        .reply = json
+      };
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "no taler_pay_uri in unpaid check-payment response\n");
       GNUNET_break_op (0);
       cpo->cb (cpo->cb_cls,
-               0,
-               json,
+               &hr,
                GNUNET_SYSERR,
                GNUNET_SYSERR,
                NULL,
@@ -126,9 +134,12 @@ handle_check_payment_finished (void *cls,
     }
     else
     {
+      struct TALER_MERCHANT_HttpResponse hr = {
+        .reply = json,
+        .http_status = MHD_HTTP_OK
+      };
       cpo->cb (cpo->cb_cls,
-               response_code,
-               json,
+               &hr,
                GNUNET_NO,
                GNUNET_NO,
                NULL,
@@ -145,12 +156,15 @@ handle_check_payment_finished (void *cls,
                              spec,
                              NULL, NULL)) ) )
   {
+    struct TALER_MERCHANT_HttpResponse hr = {
+      .ec = TALER_EC_CHECK_PAYMENT_RESPONSE_MALFORMED,
+      .reply = json
+    };
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "check payment failed to parse JSON\n");
     GNUNET_break_op (0);
     cpo->cb (cpo->cb_cls,
-             0,
-             json,
+             &hr,
              GNUNET_SYSERR,
              GNUNET_SYSERR,
              NULL,
@@ -158,14 +172,19 @@ handle_check_payment_finished (void *cls,
     TALER_MERCHANT_check_payment_cancel (cpo);
     return;
   }
+  {
+    struct TALER_MERCHANT_HttpResponse hr = {
+      .reply = json,
+      .http_status = MHD_HTTP_OK
+    };
 
-  cpo->cb (cpo->cb_cls,
-           MHD_HTTP_OK,
-           json,
-           GNUNET_YES,
-           (json_true () == refunded),
-           (json_true () == refunded) ? &refund_amount : NULL,
-           NULL);
+    cpo->cb (cpo->cb_cls,
+             &hr,
+             GNUNET_YES,
+             (json_true () == refunded),
+             (json_true () == refunded) ? &refund_amount : NULL,
+             NULL);
+  }
   TALER_MERCHANT_check_payment_cancel (cpo);
 }
 
@@ -187,14 +206,14 @@ handle_check_payment_finished (void *cls,
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_CheckPaymentOperation *
-TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
-                              const char *backend_url,
-                              const char *order_id,
-                              const char *session_id,
-                              struct GNUNET_TIME_Relative timeout,
-                              TALER_MERCHANT_CheckPaymentCallback
-                              check_payment_cb,
-                              void *check_payment_cb_cls)
+TALER_MERCHANT_check_payment (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *order_id,
+  const char *session_id,
+  struct GNUNET_TIME_Relative timeout,
+  TALER_MERCHANT_CheckPaymentCallback check_payment_cb,
+  void *check_payment_cb_cls)
 {
   struct TALER_MERCHANT_CheckPaymentOperation *cpo;
   CURL *eh;
@@ -279,8 +298,8 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
  * @param cph handle to the request to be canceled
  */
 void
-TALER_MERCHANT_check_payment_cancel (struct
-                                     TALER_MERCHANT_CheckPaymentOperation *cph)
+TALER_MERCHANT_check_payment_cancel (
+  struct TALER_MERCHANT_CheckPaymentOperation *cph)
 {
   if (NULL != cph->job)
   {

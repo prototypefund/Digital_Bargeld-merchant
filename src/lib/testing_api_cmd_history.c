@@ -67,7 +67,6 @@ struct HistoryState
    */
   unsigned long long start;
 
-
   /**
    * When this flag is GNUNET_YES, then the interpreter
    * will request /history *omitting* the 'start' URL argument.
@@ -93,16 +92,11 @@ struct HistoryState
  * the rows are sorted from the youngest to the oldest record.
  *
  * @param cls closure
- * @param http_status HTTP status returned by the merchant
- *        backend
- * @param ec taler-specific error code
- * @param json actual body containing the history
+ * @param hr HTTP response we got
  */
 static void
 history_cb (void *cls,
-            unsigned int http_status,
-            enum TALER_ErrorCode ec,
-            const json_t *json)
+            const struct TALER_MERCHANT_HttpResponse *hr)
 {
   struct HistoryState *hs = cls;
   unsigned int nresult;
@@ -112,7 +106,7 @@ history_cb (void *cls,
 
   hs->ho = NULL;
 
-  if (hs->http_status != http_status)
+  if (hs->http_status != hr->http_status)
     TALER_TESTING_FAIL (hs->is);
 
   if (0 == hs->http_status)
@@ -123,13 +117,13 @@ history_cb (void *cls,
     return;
   }
 
-  arr = json_object_get (json, "history");
+  arr = json_object_get (hr->reply,
+                         "history");
   nresult = json_array_size (arr);
   if (hs->nresult != nresult)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected number of history entries."
-                " Got %d, expected %d\n",
+                "Unexpected number of history entries: Got %d, expected %d\n",
                 nresult,
                 hs->nresult);
     TALER_TESTING_FAIL (hs->is);
@@ -157,8 +151,7 @@ history_cb (void *cls,
       if (last_timestamp.abs_value_us < entry_timestamp.abs_value_us)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                    "History entries are NOT"
-                    " sorted from younger to older\n");
+                    "History entries are NOT sorted from younger to older\n");
         TALER_TESTING_interpreter_fail (hs->is);
         return;
       }

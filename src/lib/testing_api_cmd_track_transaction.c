@@ -91,35 +91,29 @@ struct TrackTransactionState
  * in the state what came from the backend.
  *
  * @param cls closure
- * @param http_status HTTP status code we got,
- *        0 on exchange protocol violation
- * @param ec taler-specific error code
- * @param json original json reply
+ * @param hr HTTP response
  */
 static void
 track_transaction_cb (void *cls,
-                      unsigned int http_status,
-                      enum TALER_ErrorCode ec,
-                      const json_t *json)
+                      const struct TALER_MERCHANT_HttpResponse *hr)
 {
   struct TrackTransactionState *tts = cls;
 
   tts->tth = NULL;
-  if (tts->http_status != http_status)
+  if (tts->http_status != hr->http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unexpected response code %u (%d) to command %s\n",
-                http_status,
-                ec,
-                TALER_TESTING_interpreter_get_current_label
-                  (tts->is));
+                hr->http_status,
+                (int) hr->ec,
+                TALER_TESTING_interpreter_get_current_label (tts->is));
     TALER_TESTING_interpreter_fail (tts->is);
     return;
   }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "/track/transaction, response code: %u\n",
-              http_status);
-  if (MHD_HTTP_OK == http_status)
+              hr->http_status);
+  if (MHD_HTTP_OK == hr->http_status)
   {
     /* Only storing first element's wtid, as this works around
      * the disability of the real bank to provide a "bank check"
@@ -127,25 +121,26 @@ track_transaction_cb (void *cls,
     json_t *wtid_str;
     json_t *exchange_url;
 
-    if (NULL == (wtid_str = json_object_get
-                              (json_array_get (json, 0), "wtid")))
+    if (NULL == (wtid_str
+                   = json_object_get (json_array_get (hr->reply,
+                                                      0),
+                                      "wtid")))
     {
       TALER_TESTING_interpreter_fail (tts->is);
       return;
     }
 
-    if (NULL == (exchange_url = json_object_get
-                                  (json_array_get (json, 0), "exchange")))
+    if (NULL == (exchange_url
+                   = json_object_get (json_array_get (hr->reply,
+                                                      0),
+                                      "exchange")))
     {
-
       TALER_TESTING_interpreter_fail (tts->is);
       return;
     }
 
-    tts->exchange_url = GNUNET_strdup
-                          (json_string_value (exchange_url));
-    tts->wtid_str = GNUNET_strdup
-                      (json_string_value (wtid_str));
+    tts->exchange_url = GNUNET_strdup (json_string_value (exchange_url));
+    tts->wtid_str = GNUNET_strdup (json_string_value (wtid_str));
   }
   TALER_TESTING_interpreter_next (tts->is);
 }
@@ -169,21 +164,20 @@ track_transaction_run (void *cls,
 
   tts->is = is;
   if (NULL ==
-      (pay_cmd = TALER_TESTING_interpreter_lookup_command
-                   (is, tts->pay_reference)))
+      (pay_cmd = TALER_TESTING_interpreter_lookup_command (is,
+                                                           tts->pay_reference)))
+    TALER_TESTING_FAIL (is);
+  if (GNUNET_OK !=
+      TALER_TESTING_get_trait_order_id (pay_cmd,
+                                        0,
+                                        &order_id))
     TALER_TESTING_FAIL (is);
 
-  if (GNUNET_OK != TALER_TESTING_get_trait_order_id
-        (pay_cmd, 0, &order_id))
-    TALER_TESTING_FAIL (is);
-
-  tts->tth = TALER_MERCHANT_track_transaction
-               (is->ctx,
-               tts->merchant_url,
-               order_id,
-               &track_transaction_cb,
-               tts);
-
+  tts->tth = TALER_MERCHANT_track_transaction (is->ctx,
+                                               tts->merchant_url,
+                                               order_id,
+                                               &track_transaction_cb,
+                                               tts);
   GNUNET_assert (NULL != tts->tth);
 }
 
@@ -212,7 +206,6 @@ track_transaction_cleanup (void *cls,
   /* Need to discard 'const' before freeing.  */
   GNUNET_free_non_null ((char *) tts->exchange_url);
   GNUNET_free_non_null ((char *) tts->wtid_str);
-
   GNUNET_free (tts);
 }
 
@@ -236,26 +229,27 @@ track_transaction_traits (void *cls,
   struct TrackTransactionState *tts = cls;
   struct TALER_WireTransferIdentifierRawP *wtid_ptr;
 
-  if (GNUNET_OK != GNUNET_STRINGS_string_to_data
-        (tts->wtid_str,
+  if (GNUNET_OK !=
+      GNUNET_STRINGS_string_to_data (
+        tts->wtid_str,
         strlen (tts->wtid_str),
         &tts->wtid,
         sizeof (struct TALER_WireTransferIdentifierRawP)))
     wtid_ptr = NULL;
   else
     wtid_ptr = &tts->wtid;
+  {
+    struct TALER_TESTING_Trait traits[] = {
+      TALER_TESTING_make_trait_wtid (0, wtid_ptr),
+      TALER_TESTING_make_trait_url (0, tts->exchange_url),
+      TALER_TESTING_trait_end ()
+    };
 
-  struct TALER_TESTING_Trait traits[] = {
-    TALER_TESTING_make_trait_wtid (0, wtid_ptr),
-    TALER_TESTING_make_trait_url (0, tts->exchange_url),
-    TALER_TESTING_trait_end ()
-  };
-
-  return TALER_TESTING_get_trait (traits,
-                                  ret,
-                                  trait,
-                                  index);
-  return GNUNET_SYSERR;
+    return TALER_TESTING_get_trait (traits,
+                                    ret,
+                                    trait,
+                                    index);
+  }
 }
 
 
@@ -270,11 +264,10 @@ track_transaction_traits (void *cls,
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_merchant_track_transaction
-  (const char *label,
-  const char *merchant_url,
-  unsigned int http_status,
-  const char *pay_reference)
+TALER_TESTING_cmd_merchant_track_transaction (const char *label,
+                                              const char *merchant_url,
+                                              unsigned int http_status,
+                                              const char *pay_reference)
 {
   struct TrackTransactionState *tts;
 
@@ -282,16 +275,17 @@ TALER_TESTING_cmd_merchant_track_transaction
   tts->merchant_url = merchant_url;
   tts->http_status = http_status;
   tts->pay_reference = pay_reference;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = tts,
+      .label = label,
+      .run = &track_transaction_run,
+      .cleanup = &track_transaction_cleanup,
+      .traits = &track_transaction_traits
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = tts,
-    .label = label,
-    .run = &track_transaction_run,
-    .cleanup = &track_transaction_cleanup,
-    .traits = &track_transaction_traits
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 

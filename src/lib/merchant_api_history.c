@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
+  Copyright (C) 2014, 2015, 2016, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it
   under the terms of the GNU Lesser General Public License as
@@ -18,7 +18,7 @@
 */
 
 /**
- * @file lib/merchant_api_contract.c
+ * @file lib/merchant_api_history.c
  * @brief Implementation of the /history request of the merchant's
  *        HTTP API
  * @author Marcello Stanisci
@@ -99,6 +99,10 @@ history_raw_cb (void *cls,
 {
   struct TALER_MERCHANT_HistoryOperation *ho = cls;
   const json_t *json = response;
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = (unsigned int) response_code,
+    .reply = json
+  };
 
   ho->job = NULL;
   switch (response_code)
@@ -110,41 +114,36 @@ history_raw_cb (void *cls,
      * The response was malformed or didn't have the
      * application/json header.
      */
-    ho->cb (ho->cb_cls,
-            response_code,
-            TALER_EC_INVALID_RESPONSE,
-            json);
-    TALER_MERCHANT_history_cancel (ho);
-    return;
+    hr.ec = TALER_EC_INVALID_RESPONSE;
+    break;
   case MHD_HTTP_OK:
-    ho->cb (ho->cb_cls,
-            MHD_HTTP_OK,
-            TALER_EC_NONE,
-            json);
-    TALER_MERCHANT_history_cancel (ho);
-    return;
+    /* all good already */
+    break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "/history URL not found\n");
     break;
   case MHD_HTTP_BAD_REQUEST:
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Wrong/missing URL parameter\n");
     break;
   default:
     /* unexpected response code */
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u\n",
-                (unsigned int) response_code);
-    GNUNET_break (0);
-    response_code = 0;
+                "Unexpected response code %u/%d\n",
+                (unsigned int) response_code,
+                (int) hr.ec);
+    GNUNET_break_op (0);
     break;
   }
-
   ho->cb (ho->cb_cls,
-          response_code,
-          TALER_JSON_get_error_code (json),
-          json);
+          &hr);
   TALER_MERCHANT_history_cancel (ho);
 }
 
@@ -245,8 +244,8 @@ TALER_MERCHANT_history2 (struct GNUNET_CURL_Context *ctx,
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_HistoryOperation *
-TALER_MERCHANT_history_default_start
-  (struct GNUNET_CURL_Context *ctx,
+TALER_MERCHANT_history_default_start (
+  struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
   long long delta,
   struct GNUNET_TIME_Absolute date,
@@ -284,14 +283,13 @@ TALER_MERCHANT_history_default_start
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_HistoryOperation *
-TALER_MERCHANT_history
-  (struct GNUNET_CURL_Context *ctx,
-  const char *backend_url,
-  unsigned long long start,
-  long long delta,
-  struct GNUNET_TIME_Absolute date,
-  TALER_MERCHANT_HistoryOperationCallback history_cb,
-  void *history_cb_cls)
+TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
+                        const char *backend_url,
+                        unsigned long long start,
+                        long long delta,
+                        struct GNUNET_TIME_Absolute date,
+                        TALER_MERCHANT_HistoryOperationCallback history_cb,
+                        void *history_cb_cls)
 {
   return TALER_MERCHANT_history2 (ctx,
                                   backend_url,
@@ -304,4 +302,4 @@ TALER_MERCHANT_history
 }
 
 
-/* end of merchant_api_contract.c */
+/* end of merchant_api_history.c */

@@ -65,11 +65,11 @@ struct TALER_MERCHANT_RefundLookupOperation
 /**
  * Cancel a /refund lookup operation
  *
- * @param
+ * @param rlo operation to cancel
  */
 void
-TALER_MERCHANT_refund_lookup_cancel (struct
-                                     TALER_MERCHANT_RefundLookupOperation *rlo)
+TALER_MERCHANT_refund_lookup_cancel (
+  struct TALER_MERCHANT_RefundLookupOperation *rlo)
 {
   if (NULL != rlo->job)
   {
@@ -95,6 +95,10 @@ handle_refund_lookup_finished (void *cls,
 {
   struct TALER_MERCHANT_RefundLookupOperation *rlo = cls;
   const json_t *json = response;
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = (unsigned int) response_code,
+    .reply = json
+  };
 
   rlo->job = NULL;
   switch (response_code)
@@ -102,31 +106,23 @@ handle_refund_lookup_finished (void *cls,
   case 0:
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Backend didn't even return from GET /refund\n");
-    rlo->cb (rlo->cb_cls,
-             0,
-             TALER_EC_INVALID_RESPONSE,
-             NULL);
+    hr.ec = TALER_EC_INVALID_RESPONSE;
     break;
   case MHD_HTTP_OK:
-    rlo->cb (rlo->cb_cls,
-             response_code,
-             TALER_EC_NONE,
-             json);
+    /* nothing to do, all good! */
     break;
   case MHD_HTTP_NOT_FOUND:
-    rlo->cb (rlo->cb_cls,
-             response_code,
-             TALER_JSON_get_error_code (json),
-             json);
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   default:
     GNUNET_break_op (0); /* unexpected status code */
-    rlo->cb (rlo->cb_cls,
-             response_code,
-             TALER_JSON_get_error_code (json),
-             json);
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   }
+  rlo->cb (rlo->cb_cls,
+           &hr);
   TALER_MERCHANT_refund_lookup_cancel (rlo);
 }
 

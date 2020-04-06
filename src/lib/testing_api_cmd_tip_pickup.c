@@ -210,46 +210,40 @@ pickup_withdraw_cb (void *cls,
  * (and if the status was 200 OK) proceede with the withdrawal.
  *
  * @param cls closure
- * @param http_status HTTP status returned by the merchant
- *        backend, "200 OK" on success
- * @param ec taler-specific error code
+ * @param hr HTTP response
  * @param reserve_pub public key of the reserve that made the
  *        @a reserve_sigs, NULL on error
  * @param num_reserve_sigs length of the @a reserve_sigs array,
  *        0 on error
  * @param reserve_sigs array of signatures authorizing withdrawals,
  *        NULL on error
- * @param json original json response
  */
 static void
 pickup_cb (void *cls,
-           unsigned int http_status,
-           enum TALER_ErrorCode ec,
+           const struct TALER_MERCHANT_HttpResponse *hr,
            const struct TALER_ReservePublicKeyP *reserve_pub,
            unsigned int num_reserve_sigs,
-           const struct TALER_ReserveSignatureP *reserve_sigs,
-           const json_t *json)
+           const struct TALER_ReserveSignatureP *reserve_sigs)
 {
   struct TipPickupState *tps = cls;
 
   tps->tpo = NULL;
-  if (http_status != tps->http_status)
+  if (hr->http_status != tps->http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unexpected response code %u (%d) to command %s\n",
-                http_status,
-                ec,
-                TALER_TESTING_interpreter_get_current_label
-                  (tps->is));
+                hr->http_status,
+                (int) hr->ec,
+                TALER_TESTING_interpreter_get_current_label (tps->is));
     TALER_TESTING_FAIL (tps->is);
   }
 
-  if (ec != tps->expected_ec)
+  if (hr->ec != tps->expected_ec)
     TALER_TESTING_FAIL (tps->is);
 
   /* Safe to go ahead: http status was expected.  */
-  if ( (MHD_HTTP_OK != http_status) ||
-       (TALER_EC_NONE != ec) )
+  if ( (MHD_HTTP_OK != hr->http_status) ||
+       (TALER_EC_NONE != hr->ec) )
   {
     TALER_TESTING_interpreter_next (tps->is);
     return;
@@ -259,13 +253,12 @@ pickup_cb (void *cls,
 
   /* pickup successful, now withdraw! */
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Obtained %u signatures for withdrawal"
-              " from picking up a tip\n",
+              "Obtained %u signatures for withdrawal from picking up a tip\n",
               num_reserve_sigs);
 
   GNUNET_assert (NULL == tps->withdraws);
-  tps->withdraws = GNUNET_new_array
-                     (num_reserve_sigs, struct WithdrawHandle);
+  tps->withdraws = GNUNET_new_array (num_reserve_sigs,
+                                     struct WithdrawHandle);
 
   for (unsigned int i = 0; i<num_reserve_sigs; i++)
   {
@@ -274,18 +267,16 @@ pickup_cb (void *cls,
     wh->off = i;
     wh->is = tps->is;
     wh->tps = tps;
-    GNUNET_assert
-      ( (NULL == wh->wsh) &&
-      ( (NULL == tps->sigs) ||
-        (NULL == tps->sigs[wh->off].rsa_signature) ) );
-    wh->wsh = TALER_EXCHANGE_withdraw2
-                (tps->is->exchange,
-                tps->dks[i],
-                &reserve_sigs[i],
-                reserve_pub,
-                &tps->psa[i],
-                &pickup_withdraw_cb,
-                wh);
+    GNUNET_assert ( (NULL == wh->wsh) &&
+                    ( (NULL == tps->sigs) ||
+                      (NULL == tps->sigs[wh->off].rsa_signature) ) );
+    wh->wsh = TALER_EXCHANGE_withdraw2 (tps->is->exchange,
+                                        tps->dks[i],
+                                        &reserve_sigs[i],
+                                        reserve_pub,
+                                        &tps->psa[i],
+                                        &pickup_withdraw_cb,
+                                        wh);
     if (NULL == wh->wsh)
       TALER_TESTING_FAIL (tps->is);
   }
@@ -327,20 +318,25 @@ tip_pickup_run (void *cls,
   else
   {
     const unsigned int *np;
+
     if (NULL ==  /* looking for "parent" tip-pickup command */
-        (replay_cmd = TALER_TESTING_interpreter_lookup_command
-                        (is, tps->replay_reference)) )
+        (replay_cmd
+           = TALER_TESTING_interpreter_lookup_command (is,
+                                                       tps->replay_reference)) )
       TALER_TESTING_FAIL (is);
 
-    if (GNUNET_OK != TALER_TESTING_get_trait_uint
-          (replay_cmd, 0, &np))
+    if (GNUNET_OK !=
+        TALER_TESTING_get_trait_uint (replay_cmd,
+                                      0,
+                                      &np))
       TALER_TESTING_FAIL (is);
     num_planchets = *np;
   }
 
   if (NULL ==
-      (authorize_cmd = TALER_TESTING_interpreter_lookup_command
-                         (is, tps->authorize_reference)) )
+      (authorize_cmd
+         = TALER_TESTING_interpreter_lookup_command (is,
+                                                     tps->authorize_reference)) )
     TALER_TESTING_FAIL (is);
 
   tps->num_coins = num_planchets;
@@ -349,51 +345,51 @@ tip_pickup_run (void *cls,
 
     tps->psa = GNUNET_new_array (num_planchets,
                                  struct TALER_PlanchetSecretsP);
-    tps->dks = GNUNET_new_array
-                 (num_planchets,
-                 const struct TALER_EXCHANGE_DenomPublicKey *);
-
-    tps->amounts_obj = GNUNET_new_array
-                         (num_planchets, struct TALER_Amount);
+    tps->dks = GNUNET_new_array (num_planchets,
+                                 const struct TALER_EXCHANGE_DenomPublicKey *);
+    tps->amounts_obj = GNUNET_new_array (num_planchets,
+                                         struct TALER_Amount);
 
     for (unsigned int i = 0; i<num_planchets; i++)
     {
       if (NULL == replay_cmd)
       {
-        GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-                         (tps->amounts[i], &tps->amounts_obj[i]));
-
-        tps->dks[i] = TALER_TESTING_find_pk
-                        (is->keys,
-                        &tps->amounts_obj[i]);
-
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_string_to_amount (tps->amounts[i],
+                                               &tps->amounts_obj[i]));
+        tps->dks[i] = TALER_TESTING_find_pk (is->keys,
+                                             &tps->amounts_obj[i]);
         if (NULL == tps->dks[i])
           TALER_TESTING_FAIL (is);
-
         TALER_planchet_setup_random (&tps->psa[i]);
       }
       else
       {
-        if (GNUNET_OK != TALER_TESTING_get_trait_denom_pub
-              (replay_cmd, i, &tps->dks[i]))
-          TALER_TESTING_FAIL (is);
-
         struct TALER_PlanchetSecretsP *ps;
 
-        if (GNUNET_OK != TALER_TESTING_get_trait_planchet_secrets
-              (replay_cmd, i, &ps))
+        if (GNUNET_OK !=
+            TALER_TESTING_get_trait_denom_pub (replay_cmd,
+                                               i,
+                                               &tps->dks[i]))
+          TALER_TESTING_FAIL (is);
+        if (GNUNET_OK !=
+            TALER_TESTING_get_trait_planchet_secrets (replay_cmd,
+                                                      i,
+                                                      &ps))
           TALER_TESTING_FAIL (is);
         tps->psa[i] = *ps;
       }
 
-      if (GNUNET_OK != TALER_planchet_prepare (&tps->dks[i]->key,
-                                               &tps->psa[i],
-                                               &planchets[i]))
+      if (GNUNET_OK !=
+          TALER_planchet_prepare (&tps->dks[i]->key,
+                                  &tps->psa[i],
+                                  &planchets[i]))
         TALER_TESTING_FAIL (is);
     }
-
-    if (GNUNET_OK != TALER_TESTING_get_trait_tip_id
-          (authorize_cmd, 0, &tip_id))
+    if (GNUNET_OK !=
+        TALER_TESTING_get_trait_tip_id (authorize_cmd,
+                                        0,
+                                        &tip_id))
       TALER_TESTING_FAIL (is);
 
     tps->tpo = TALER_MERCHANT_tip_pickup (is->ctx,
@@ -438,14 +434,11 @@ tip_pickup_cleanup (void *cls,
         GNUNET_CRYPTO_rsa_signature_free (tps->sigs[i].rsa_signature);
     GNUNET_free (tps->sigs);
   }
-
   if (NULL != tps->tpo)
   {
-    TALER_LOG_WARNING ("Tip-pickup operation"
-                       " did not complete\n");
+    TALER_LOG_WARNING ("Tip-pickup operation did not complete\n");
     TALER_MERCHANT_tip_pickup_cancel (tps->tpo);
   }
-
   GNUNET_free (tps);
 }
 
@@ -472,24 +465,21 @@ tip_pickup_traits (void *cls,
 
   for (unsigned int i = 0; i<tps->num_coins; i++)
   {
-    traits[i] = TALER_TESTING_make_trait_planchet_secrets
-                  (i, &tps->psa[i]);
+    traits[i] = TALER_TESTING_make_trait_planchet_secrets (i,
+                                                           &tps->psa[i]);
     traits[i + tps->num_coins] =
-      TALER_TESTING_make_trait_coin_priv
-        (i, &tps->psa[i].coin_priv);
+      TALER_TESTING_make_trait_coin_priv (i, &tps->psa[i].coin_priv);
     traits[i + (tps->num_coins * 2)] =
       TALER_TESTING_make_trait_denom_pub (i, tps->dks[i]);
     traits[i + (tps->num_coins * 3)] =
       TALER_TESTING_make_trait_denom_sig (i, &tps->sigs[i]);
     traits[i + (tps->num_coins * 4)] =
-      TALER_TESTING_make_trait_amount_obj
-        (i, &tps->amounts_obj[i]);
+      TALER_TESTING_make_trait_amount_obj (i, &tps->amounts_obj[i]);
   }
-  traits[NUM_TRAITS - 2] = TALER_TESTING_make_trait_url
-                             (TALER_TESTING_UT_EXCHANGE_BASE_URL,
-                             tps->exchange_url);
+  traits[NUM_TRAITS - 2]
+    = TALER_TESTING_make_trait_url (TALER_TESTING_UT_EXCHANGE_BASE_URL,
+                                    tps->exchange_url);
   traits[NUM_TRAITS - 1] = TALER_TESTING_trait_end ();
-
   return TALER_TESTING_get_trait (traits,
                                   ret,
                                   trait,
@@ -514,13 +504,12 @@ tip_pickup_traits (void *cls,
  * @param ec expected Taler error code.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_tip_pickup_with_ec
-  (const char *label,
-  const char *merchant_url,
-  unsigned int http_status,
-  const char *authorize_reference,
-  const char **amounts,
-  enum TALER_ErrorCode ec)
+TALER_TESTING_cmd_tip_pickup_with_ec (const char *label,
+                                      const char *merchant_url,
+                                      unsigned int http_status,
+                                      const char *authorize_reference,
+                                      const char **amounts,
+                                      enum TALER_ErrorCode ec)
 {
   struct TipPickupState *tps;
 
@@ -530,16 +519,17 @@ TALER_TESTING_cmd_tip_pickup_with_ec
   tps->amounts = amounts;
   tps->http_status = http_status;
   tps->expected_ec = ec;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = tps,
+      .label = label,
+      .run = &tip_pickup_run,
+      .cleanup = &tip_pickup_cleanup,
+      .traits = &tip_pickup_traits
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = tps,
-    .label = label,
-    .run = &tip_pickup_run,
-    .cleanup = &tip_pickup_cleanup,
-    .traits = &tip_pickup_traits
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 
@@ -556,12 +546,11 @@ TALER_TESTING_cmd_tip_pickup_with_ec
  *        which denominations will be accepted for tipping.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_tip_pickup
-  (const char *label,
-  const char *merchant_url,
-  unsigned int http_status,
-  const char *authorize_reference,
-  const char **amounts)
+TALER_TESTING_cmd_tip_pickup (const char *label,
+                              const char *merchant_url,
+                              unsigned int http_status,
+                              const char *authorize_reference,
+                              const char **amounts)
 {
   struct TipPickupState *tps;
 
@@ -570,16 +559,17 @@ TALER_TESTING_cmd_tip_pickup
   tps->authorize_reference = authorize_reference;
   tps->amounts = amounts;
   tps->http_status = http_status;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = tps,
+      .label = label,
+      .run = &tip_pickup_run,
+      .cleanup = &tip_pickup_cleanup,
+      .traits = &tip_pickup_traits
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = tps,
-    .label = label,
-    .run = &tip_pickup_run,
-    .cleanup = &tip_pickup_cleanup,
-    .traits = &tip_pickup_traits
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 

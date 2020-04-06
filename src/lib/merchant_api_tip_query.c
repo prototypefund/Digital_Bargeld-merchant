@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2018 Taler Systems SA
+  Copyright (C) 2014-2018, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -31,7 +31,7 @@
 
 
 /**
- * @brief A handle for tracking /tip-pickup operations
+ * @brief A handle for tracking /tip-query operations
  */
 struct TALER_MERCHANT_TipQueryOperation
 {
@@ -73,54 +73,6 @@ struct TALER_MERCHANT_TipQueryOperation
 
 
 /**
- * We got a 200 response back from the exchange (or the merchant).
- * Now we need to parse the response and if it is well-formed,
- * call the callback (and set it to NULL afterwards).
- *
- * @param tqo handle of the original operation
- * @param json cryptographic proof returned by the exchange/merchant
- * @return #GNUNET_OK if response is valid
- */
-static int
-check_ok (struct TALER_MERCHANT_TipQueryOperation *tqo,
-          const json_t *json)
-{
-  struct GNUNET_TIME_Absolute reserve_expiration;
-  struct TALER_Amount amount_authorized;
-  struct TALER_Amount amount_available;
-  struct TALER_Amount amount_picked_up;
-  struct TALER_ReservePublicKeyP reserve_pub;
-  struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_fixed_auto ("reserve_pub", &reserve_pub),
-    GNUNET_JSON_spec_absolute_time ("reserve_expiration", &reserve_expiration),
-    TALER_JSON_spec_amount ("amount_authorized", &amount_authorized),
-    TALER_JSON_spec_amount ("amount_available", &amount_available),
-    TALER_JSON_spec_amount ("amount_picked_up", &amount_picked_up),
-    GNUNET_JSON_spec_end ()
-  };
-
-  if (GNUNET_OK !=
-      GNUNET_JSON_parse (json,
-                         spec,
-                         NULL, NULL))
-  {
-    GNUNET_break_op (0);
-    return GNUNET_SYSERR;
-  }
-  tqo->cb (tqo->cb_cls,
-           MHD_HTTP_OK,
-           TALER_EC_NONE,
-           json,
-           reserve_expiration,
-           &reserve_pub,
-           &amount_authorized,
-           &amount_available,
-           &amount_picked_up);
-  return GNUNET_OK;
-}
-
-
-/**
  * Function called when we're done processing the
  * HTTP /track/transaction request.
  *
@@ -135,6 +87,10 @@ handle_tip_query_finished (void *cls,
 {
   struct TALER_MERCHANT_TipQueryOperation *tqo = cls;
   const json_t *json = response;
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = (unsigned int) response_code,
+    .reply = json
+  };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Got /tip-query response with status code %u\n",
@@ -144,39 +100,72 @@ handle_tip_query_finished (void *cls,
   switch (response_code)
   {
   case MHD_HTTP_OK:
-    if (GNUNET_OK != check_ok (tqo,
-                               json))
     {
-      GNUNET_break_op (0);
-      response_code = 0;
+      struct GNUNET_TIME_Absolute reserve_expiration;
+      struct TALER_Amount amount_authorized;
+      struct TALER_Amount amount_available;
+      struct TALER_Amount amount_picked_up;
+      struct TALER_ReservePublicKeyP reserve_pub;
+      struct GNUNET_JSON_Specification spec[] = {
+        GNUNET_JSON_spec_fixed_auto ("reserve_pub", &reserve_pub),
+        GNUNET_JSON_spec_absolute_time ("reserve_expiration",
+                                        &reserve_expiration),
+        TALER_JSON_spec_amount ("amount_authorized", &amount_authorized),
+        TALER_JSON_spec_amount ("amount_available", &amount_available),
+        TALER_JSON_spec_amount ("amount_picked_up", &amount_picked_up),
+        GNUNET_JSON_spec_end ()
+      };
+
+      if (GNUNET_OK !=
+          GNUNET_JSON_parse (json,
+                             spec,
+                             NULL, NULL))
+      {
+        GNUNET_break_op (0);
+        hr.http_status = 0;
+        hr.ec = TALER_EC_INVALID_RESPONSE;
+        break;
+      }
+      tqo->cb (tqo->cb_cls,
+               &hr,
+               reserve_expiration,
+               &reserve_pub,
+               &amount_authorized,
+               &amount_available,
+               &amount_picked_up);
+      TALER_MERCHANT_tip_query_cancel (tqo);
+      return;
     }
-    break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
        leaves this to the application */
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   case MHD_HTTP_NOT_FOUND:
     /* legal, can happen if instance or tip reserve is unknown */
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   default:
     /* unexpected response code */
+    GNUNET_break_op (0);
+    TALER_MERCHANT_parse_error_details_ (json,
+                                         response_code,
+                                         &hr);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u\n",
-                (unsigned int) response_code);
-    GNUNET_break (0);
-    response_code = 0;
+                "Unexpected response code %u/%d\n",
+                (unsigned int) response_code,
+                (int) hr.ec);
     break;
   }
-  if (MHD_HTTP_OK != response_code)
-    tqo->cb (tqo->cb_cls,
-             response_code,
-             TALER_JSON_get_error_code (json),
-             json,
-             GNUNET_TIME_UNIT_ZERO_ABS,
-             NULL,
-             NULL,
-             NULL,
-             NULL);
+  tqo->cb (tqo->cb_cls,
+           &hr,
+           GNUNET_TIME_UNIT_ZERO_ABS,
+           NULL,
+           NULL,
+           NULL,
+           NULL);
   TALER_MERCHANT_tip_query_cancel (tqo);
 }
 

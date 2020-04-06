@@ -80,9 +80,7 @@ struct TipQueryState
  * expectations.
  *
  * @param cls closure
- * @param http_status HTTP status code for this request
- * @param ec Taler-specific error code
- * @param raw raw response body
+ * @param hr HTTP response
  * @param reserve_expiration when the tip reserve will expire
  * @param reserve_pub tip reserve public key
  * @param amount_authorized total amount authorized on tip reserve
@@ -92,9 +90,7 @@ struct TipQueryState
  */
 static void
 tip_query_cb (void *cls,
-              unsigned int http_status,
-              enum TALER_ErrorCode ec,
-              const json_t *raw,
+              const struct TALER_MERCHANT_HttpResponse *hr,
               struct GNUNET_TIME_Absolute reserve_expiration,
               struct TALER_ReservePublicKeyP *reserve_pub,
               struct TALER_Amount *amount_authorized,
@@ -107,9 +103,7 @@ tip_query_cb (void *cls,
   tqs->tqo = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Tip query callback at command `%s'\n",
-              TALER_TESTING_interpreter_get_current_label
-                (tqs->is));
-
+              TALER_TESTING_interpreter_get_current_label (tqs->is));
   GNUNET_assert (NULL != reserve_pub);
   GNUNET_assert (NULL != amount_authorized);
   GNUNET_assert (NULL != amount_available);
@@ -117,8 +111,9 @@ tip_query_cb (void *cls,
 
   if (tqs->expected_amount_available)
   {
-    GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-                     (tqs->expected_amount_available, &a));
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_string_to_amount (tqs->expected_amount_available,
+                                           &a));
     {
       char *str;
 
@@ -128,46 +123,50 @@ tip_query_cb (void *cls,
                       str);
       GNUNET_free (str);
     }
-    if (0 != TALER_amount_cmp (amount_available, &a))
+    if (0 !=
+        TALER_amount_cmp (amount_available,
+                          &a))
       TALER_TESTING_FAIL (tqs->is);
   }
 
   if (tqs->expected_amount_authorized)
   {
-    GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-                     (tqs->expected_amount_authorized, &a));
-    {
-      char *str;
+    char *str;
 
-      str = TALER_amount_to_string (amount_authorized);
-      TALER_LOG_INFO ("expected authorized %s, actual %s\n",
-                      TALER_amount2s (&a),
-                      str);
-      GNUNET_free (str);
-    }
-    if (0 != TALER_amount_cmp (amount_authorized, &a))
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_string_to_amount (tqs->expected_amount_authorized,
+                                           &a));
+    str = TALER_amount_to_string (amount_authorized);
+    TALER_LOG_INFO ("expected authorized %s, actual %s\n",
+                    TALER_amount2s (&a),
+                    str);
+    GNUNET_free (str);
+    if (0 !=
+        TALER_amount_cmp (amount_authorized,
+                          &a))
       TALER_TESTING_FAIL (tqs->is);
   }
 
   if (tqs->expected_amount_picked_up)
   {
-    GNUNET_assert (GNUNET_OK == TALER_string_to_amount
-                     (tqs->expected_amount_picked_up, &a));
-    {
-      char *str;
-      str = TALER_amount_to_string (amount_picked_up);
-      TALER_LOG_INFO ("expected picked_up %s, actual %s\n",
-                      TALER_amount2s (&a),
-                      str);
-      GNUNET_free (str);
-    }
-    if (0 != TALER_amount_cmp (amount_picked_up, &a))
+    char *str;
+
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_string_to_amount (tqs->expected_amount_picked_up,
+                                           &a));
+    str = TALER_amount_to_string (amount_picked_up);
+    TALER_LOG_INFO ("expected picked_up %s, actual %s\n",
+                    TALER_amount2s (&a),
+                    str);
+    GNUNET_free (str);
+    if (0 !=
+        TALER_amount_cmp (amount_picked_up,
+                          &a))
       TALER_TESTING_FAIL (tqs->is);
   }
 
-  if (tqs->http_status != http_status)
+  if (tqs->http_status != hr->http_status)
     TALER_TESTING_FAIL (tqs->is);
-
   TALER_TESTING_interpreter_next (tqs->is);
 }
 
@@ -235,13 +234,12 @@ tip_query_run (void *cls,
  * @return the command
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_tip_query_with_amounts
-  (const char *label,
-  const char *merchant_url,
-  unsigned int http_status,
-  const char *expected_amount_picked_up,
-  const char *expected_amount_authorized,
-  const char *expected_amount_available)
+TALER_TESTING_cmd_tip_query_with_amounts (const char *label,
+                                          const char *merchant_url,
+                                          unsigned int http_status,
+                                          const char *expected_amount_picked_up,
+                                          const char *expected_amount_authorized,
+                                          const char *expected_amount_available)
 {
   struct TipQueryState *tqs;
 
@@ -251,15 +249,16 @@ TALER_TESTING_cmd_tip_query_with_amounts
   tqs->expected_amount_picked_up = expected_amount_picked_up;
   tqs->expected_amount_authorized = expected_amount_authorized;
   tqs->expected_amount_available = expected_amount_available;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = tqs,
+      .label = label,
+      .run = &tip_query_run,
+      .cleanup = &tip_query_cleanup
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = tqs,
-    .label = label,
-    .run = &tip_query_run,
-    .cleanup = &tip_query_cleanup
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 
@@ -282,15 +281,16 @@ TALER_TESTING_cmd_tip_query (const char *label,
   tqs = GNUNET_new (struct TipQueryState);
   tqs->merchant_url = merchant_url;
   tqs->http_status = http_status;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = tqs,
+      .label = label,
+      .run = &tip_query_run,
+      .cleanup = &tip_query_cleanup
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = tqs,
-    .label = label,
-    .run = &tip_query_run,
-    .cleanup = &tip_query_cleanup
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 

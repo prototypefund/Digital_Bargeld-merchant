@@ -20,8 +20,10 @@ libtalermerchanttesting_la_LDFLAGS = \
 
 libtalermerchant_la_SOURCES = \
   merchant_api_check_payment.c \
+  merchant_api_common.c \
   merchant_api_history.c \
   merchant_api_proposal.c \
+  merchant_api_proposal_lookup.c \
   merchant_api_pay.c \
   merchant_api_poll_payment.c \
   merchant_api_refund.c \
@@ -46,6 +48,7 @@ libtalermerchanttesting_la_SOURCES = \
   testing_api_cmd_check_payment.c \
   testing_api_cmd_history.c \
   testing_api_cmd_pay.c \
+  testing_api_cmd_pay_abort.c \
   testing_api_cmd_pay_abort_refund.c \
   testing_api_cmd_poll_payment.c \
   testing_api_cmd_proposal.c \

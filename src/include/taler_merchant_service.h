@@ -29,6 +29,98 @@
 #include <jansson.h>
 
 
+/**
+ * General information about the HTTP response we obtained
+ * from the merchant for a request.
+ */
+struct TALER_MERCHANT_HttpResponse
+{
+
+  /**
+   * The complete JSON reply. NULL if we failed to parse the
+   * reply (too big, invalid JSON).
+   */
+  const json_t *reply;
+
+  /**
+   * The complete JSON reply from the exchange, if we generated an error in
+   * response to an exchange error.  Usually set if @e http_status is
+   * #MHD_HTTP_FAILED_DEPENDENDCY or #MHD_HTTP_SERVICE_UNAVAILABLE. NULL if we
+   * failed to obtain a JSON reply from the exchange or if we did not receive
+   * an error from the exchange.
+   */
+  const json_t *exchange_reply;
+
+  /**
+   * Set to the human-readable 'hint' that is optionally
+   * provided by the exchange together with errors. NULL
+   * if no hint was provided or if there was no error.
+   */
+  const char *hint;
+
+  /**
+   * The error hint from the exchange, if we generated an error in
+   * response to an exchange error.  Usually set if @e http_status is
+   * #MHD_HTTP_FAILED_DEPENDENDCY or #MHD_HTTP_SERVICE_UNAVAILABLE. NULL if we
+   * failed to obtain a hint from the exchange or if we did not receive
+   * an error from the exchange.
+   */
+  const char *exchange_hint;
+
+  /**
+   * HTTP status code for the response.  0 if the
+   * HTTP request failed and we did not get any answer, or
+   * if the answer was invalid and we set @a ec to a
+   * client-side error code.
+   */
+  unsigned int http_status;
+
+  /**
+   * The HTTP status code from the exchange, if we generated an error in
+   * response to an exchange error.  Usually set if @e http_status is
+   * #MHD_HTTP_FAILED_DEPENDENDCY or #MHD_HTTP_SERVICE_UNAVAILABLE. 0 if we
+   * failed to obtain a JSON reply from the exchange or if we did not receive
+   * an error from the exchange.
+   */
+  unsigned int exchange_http_status;
+
+  /**
+   * Taler error code.  #TALER_EC_NONE if everything was
+   * OK.  Usually set to the "code" field of an error
+   * response, but may be set to values created at the
+   * client side, for example when the response was
+   * not in JSON format or was otherwise ill-formed.
+   */
+  enum TALER_ErrorCode ec;
+
+  /**
+   * The error code from the reply from the exchange, if we generated an error in
+   * response to an exchange error.  Usually set if @e http_status is
+   * #MHD_HTTP_FAILED_DEPENDENDCY or #MHD_HTTP_SERVICE_UNAVAILABLE. NULL if we
+   * failed to obtain a error code from the exchange or if we did not receive
+   * an error from the exchange.
+   */
+  enum TALER_ErrorCode exchange_code;
+
+};
+
+
+/**
+ * Take a @a response from the merchant API that (presumably) contains
+ * error details and setup the corresponding @a hr structure.  Internally
+ * used to convert merchant's responses in to @a hr.
+ *
+ * @param response, if NULL we will report #TALER_EC_INVALIDD_RESPONSE in `ec`
+ * @param http_status http status to use
+ * @param[out] hr response object to initialize, fields will
+ *        only be valid as long as @a response is valid as well
+ */
+void
+TALER_MERCHANT_parse_error_details_ (const json_t *response,
+                                     unsigned int http_status,
+                                     struct TALER_MERCHANT_HttpResponse *hr);
+
+
 /* ********************* /refund ************************** */
 
 /**
@@ -41,15 +133,13 @@ struct TALER_MERCHANT_RefundLookupOperation;
  * Callback to process a GET /refund request
  *
  * @param cls closure
- * @param http_status HTTP status code for this request
- * @param ec taler-specific error code
- * @param obj the response body
+ * @param hr HTTP response details
  */
 typedef void
-(*TALER_MERCHANT_RefundLookupCallback) (void *cls,
-                                        unsigned int http_status,
-                                        enum TALER_ErrorCode ec,
-                                        const json_t *obj);
+(*TALER_MERCHANT_RefundLookupCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr);
+
 
 /**
  * Does a GET /refund.
@@ -74,8 +164,8 @@ TALER_MERCHANT_refund_lookup (struct GNUNET_CURL_Context *ctx,
  * @param rlo the refund increasing operation to cancel
  */
 void
-TALER_MERCHANT_refund_lookup_cancel (struct
-                                     TALER_MERCHANT_RefundLookupOperation *rlo);
+TALER_MERCHANT_refund_lookup_cancel (
+  struct TALER_MERCHANT_RefundLookupOperation *rlo);
 
 
 /**
@@ -90,13 +180,11 @@ struct TALER_MERCHANT_RefundIncreaseOperation;
  * @param cls closure
  * @param http_status HTTP status code for this request
  * @param ec taler-specific error code
- * @param obj the response body
  */
 typedef void
-(*TALER_MERCHANT_RefundIncreaseCallback) (void *cls,
-                                          unsigned int http_status,
-                                          enum TALER_ErrorCode ec,
-                                          const json_t *obj);
+(*TALER_MERCHANT_RefundIncreaseCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr);
 
 
 /**
@@ -125,9 +213,8 @@ TALER_MERCHANT_refund_increase (struct GNUNET_CURL_Context *ctx,
  * @param rio the refund increasing operation to cancel
  */
 void
-TALER_MERCHANT_refund_increase_cancel (struct
-                                       TALER_MERCHANT_RefundIncreaseOperation *
-                                       rio);
+TALER_MERCHANT_refund_increase_cancel (
+  struct TALER_MERCHANT_RefundIncreaseOperation *rio);
 
 
 /* *********************  /proposal *********************** */
@@ -143,18 +230,14 @@ struct TALER_MERCHANT_ProposalOperation;
  * /contract request to a merchant.
  *
  * @param cls closure
- * @param http_status HTTP response code, 200 indicates success;
- *                    0 if the backend's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code
- * @param obj raw JSON reply, or error details if the request failed
+ * @param hr HTTP response details
  * @param order_id order id of the newly created order
  */
 typedef void
-(*TALER_MERCHANT_ProposalCallback) (void *cls,
-                                    unsigned int http_status,
-                                    enum TALER_ErrorCode ec,
-                                    const json_t *obj,
-                                    const char *order_id);
+(*TALER_MERCHANT_ProposalCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  const char *order_id);
 
 
 /**
@@ -196,19 +279,18 @@ struct TALER_MERCHANT_ProposalLookupOperation;
  * Callback called to work a GET /proposal response.
  *
  * @param cls closure
- * @param http_status HTTP status code of the request
- * @param body JSON containing the response's payload.
- * In case of errors, it contains the appropriate error encoding.
+ * @param hr HTTP response details
+ * @param contract_terms the details of the contract
+ * @param sig merchant's signature over @a contract_terms
+ * @param contract_hash hash over @a contract_terms
  */
 typedef void
-(*TALER_MERCHANT_ProposalLookupOperationCallback) (void *cls,
-                                                   unsigned int http_status,
-                                                   const json_t *body,
-                                                   const json_t *contract_terms,
-                                                   const struct
-                                                   TALER_MerchantSignatureP *sig,
-                                                   const struct
-                                                   GNUNET_HashCode *hash);
+(*TALER_MERCHANT_ProposalLookupOperationCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  const json_t *contract_terms,
+  const struct TALER_MerchantSignatureP *sig,
+  const struct GNUNET_HashCode *contract_hash);
 
 
 /**
@@ -225,14 +307,13 @@ typedef void
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_ProposalLookupOperation *
-TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
-                                const char *backend_url,
-                                const char *order_id,
-                                const struct
-                                GNUNET_CRYPTO_EddsaPublicKey *nonce,
-                                TALER_MERCHANT_ProposalLookupOperationCallback
-                                plo_cb,
-                                void *plo_cb_cls);
+TALER_MERCHANT_proposal_lookup (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *order_id,
+  const struct GNUNET_CRYPTO_EddsaPublicKey *nonce,
+  TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
+  void *plo_cb_cls);
 
 
 /**
@@ -241,9 +322,8 @@ TALER_MERCHANT_proposal_lookup (struct GNUNET_CURL_Context *ctx,
  * @param plo handle to the request to be canceled
  */
 void
-TALER_MERCHANT_proposal_lookup_cancel (struct
-                                       TALER_MERCHANT_ProposalLookupOperation *
-                                       plo);
+TALER_MERCHANT_proposal_lookup_cancel (
+  struct TALER_MERCHANT_ProposalLookupOperation *plo);
 
 
 /* *********************  /pay *********************** */
@@ -266,18 +346,11 @@ struct TALER_MERCHANT_Pay;
  * /pay request to a merchant.
  *
  * @param cls closure
- * @param http_status HTTP response code, 200 or 300-level response codes
- *                    can indicate success, depending on whether the interaction
- *                    was with a merchant frontend or backend;
- *                    0 if the merchant's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code
- * @param obj the received JSON reply, with error details if the request failed
+ * @param hr HTTP response details
  */
 typedef void
 (*TALER_MERCHANT_PayCallback) (void *cls,
-                               unsigned int http_status,
-                               enum TALER_ErrorCode ec,
-                               const json_t *obj);
+                               const struct TALER_MERCHANT_HttpResponse *hr);
 
 
 /**
@@ -397,28 +470,20 @@ struct TALER_MERCHANT_RefundEntry
  * /pay request to a merchant.
  *
  * @param cls closure
- * @param http_status HTTP response code, 200 or 300-level response codes
- *                    can indicate success, depending on whether the interaction
- *                    was with a merchant frontend or backend;
- *                    0 if the merchant's reply is bogus (fails to follow the protocol)
- * @param ec taler-specific error code
+ * @param hr HTTP response details
  * @param merchant_pub public key of the merchant
  * @param h_contract hash of the contract
  * @param num_refunds size of the @a res array, 0 on errors
  * @param res merchant signatures refunding coins, NULL on errors
- * @param obj the received JSON reply, with error details if the request failed
  */
 typedef void
-(*TALER_MERCHANT_PayRefundCallback) (void *cls,
-                                     unsigned int http_status,
-                                     enum TALER_ErrorCode ec,
-                                     const struct
-                                     TALER_MerchantPublicKeyP *merchant_pub,
-                                     const struct GNUNET_HashCode *h_contract,
-                                     unsigned int num_refunds,
-                                     const struct
-                                     TALER_MERCHANT_RefundEntry *res,
-                                     const json_t *obj);
+(*TALER_MERCHANT_PayRefundCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  const struct GNUNET_HashCode *h_contract,
+  unsigned int num_refunds,
+  const struct TALER_MERCHANT_RefundEntry *res);
 
 
 /**
@@ -525,32 +590,24 @@ struct TALER_MERCHANT_PaidCoin
  *
  * @param ctx execution context
  * @param merchant_url base URL of the merchant
- * @param h_contract hash of the contact of the merchant with the customer
- * @param amount total value of the contract to be paid to the merchant
- * @param max_fee maximum fee covered by the merchant (according to the contract)
- * @param transaction_id transaction id for the transaction between merchant and customer
- * @param merchant_sig the signature of the merchant over the original contract
- * @param refund_deadline date until which the merchant can issue a refund to the customer via the merchant (can be zero if refunds are not allowed)
- * @param pay_deadline maximum time limit to pay for this contract
- * @param timestamp timestamp when the contract was finalized, must match approximately the current time of the merchant
- * @param wire_transfer_deadline date by which the merchant would like the exchange to execute the wire transfer (can be zero if there is no specific date desired by the frontend). If non-zero, must be larger than @a refund_deadline.
- * @param num_coins number of coins used to pay
- * @param coins array of coins we use to pay
- * @param coin_sig the signature made with purpose #TALER_SIGNATURE_WALLET_COIN_DEPOSIT made by the customer with the coin’s private key.
+ * @param merchant_pub public key of the merchant
+ * @param order_id which order should be paid
+ * @param num_coins length of the @a coins array
+ * @param coins array of coins to pay with
  * @param pay_cb the callback to call when a reply for this request is available
  * @param pay_cb_cls closure for @a pay_cb
  * @return a handle for this request
  */
 struct TALER_MERCHANT_Pay *
-TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
-                             const char *merchant_url,
-                             const struct
-                             TALER_MerchantPublicKeyP *merchant_pub,
-                             const char *order_id,
-                             unsigned int num_coins,
-                             const struct TALER_MERCHANT_PaidCoin *coins,
-                             TALER_MERCHANT_PayCallback pay_cb,
-                             void *pay_cb_cls);
+TALER_MERCHANT_pay_frontend (
+  struct GNUNET_CURL_Context *ctx,
+  const char *merchant_url,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  const char *order_id,
+  unsigned int num_coins,
+  const struct TALER_MERCHANT_PaidCoin *coins,
+  TALER_MERCHANT_PayCallback pay_cb,
+  void *pay_cb_cls);
 
 
 /**
@@ -561,7 +618,7 @@ TALER_MERCHANT_pay_frontend (struct GNUNET_CURL_Context *ctx,
  * obtain a definitive result, or /refresh the coins involved to
  * ensure that the merchant can no longer complete the payment.
  *
- * @param wh the wire information request handle
+ * @param ph the payment request handle
  */
 void
 TALER_MERCHANT_pay_cancel (struct TALER_MERCHANT_Pay *ph);
@@ -603,11 +660,8 @@ struct TALER_MERCHANT_TrackTransferDetails
  * Callbacks of this type are used to work the result of submitting a /track/transfer request to a merchant
  *
  * @param cls closure
- * @param http_status HTTP status code we got, 0 on exchange protocol violation
- * @param ec taler-specific error code
+ * @param hr HTTP response details
  * @param sign_key exchange key used to sign @a json, or NULL
- * @param json original json reply (may include signatures, those have then been
- *        validated already)
  * @param h_wire hash of the wire transfer address the transfer went to, or NULL on error
  * @param total_amount total amount of the wire transfer, or NULL if the exchange could
  *             not provide any @a wtid (set only if @a http_status is #MHD_HTTP_OK)
@@ -615,19 +669,14 @@ struct TALER_MERCHANT_TrackTransferDetails
  * @param details array with details about the combined transactions
  */
 typedef void
-(*TALER_MERCHANT_TrackTransferCallback) (void *cls,
-                                         unsigned int http_status,
-                                         enum TALER_ErrorCode ec,
-                                         const struct
-                                         TALER_ExchangePublicKeyP *sign_key,
-                                         const json_t *json,
-                                         const struct GNUNET_HashCode *h_wire,
-                                         const struct
-                                         TALER_Amount *total_amount,
-                                         unsigned int details_length,
-                                         const struct
-                                         TALER_MERCHANT_TrackTransferDetails *
-                                         details);
+(*TALER_MERCHANT_TrackTransferCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  const struct TALER_ExchangePublicKeyP *sign_key,
+  const struct GNUNET_HashCode *h_wire,
+  const struct TALER_Amount *total_amount,
+  unsigned int details_length,
+  const struct TALER_MERCHANT_TrackTransferDetails *details);
 
 
 /**
@@ -643,15 +692,15 @@ typedef void
  * @return a handle for this request
  */
 struct TALER_MERCHANT_TrackTransferHandle *
-TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
-                               const char *backend_url,
-                               const char *wire_method,
-                               const struct
-                               TALER_WireTransferIdentifierRawP *wtid,
-                               const char *exchange_url,
-                               TALER_MERCHANT_TrackTransferCallback
-                               track_transfer_cb,
-                               void *track_transfer_cb_cls);
+TALER_MERCHANT_track_transfer (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *wire_method,
+  const struct TALER_WireTransferIdentifierRawP *wtid,
+  const char *exchange_url,
+  TALER_MERCHANT_TrackTransferCallback
+  track_transfer_cb,
+  void *track_transfer_cb_cls);
 
 
 /**
@@ -661,8 +710,8 @@ TALER_MERCHANT_track_transfer (struct GNUNET_CURL_Context *ctx,
  * @param co the deposit's tracking operation
  */
 void
-TALER_MERCHANT_track_transfer_cancel (struct
-                                      TALER_MERCHANT_TrackTransferHandle *tdo);
+TALER_MERCHANT_track_transfer_cancel (
+  struct TALER_MERCHANT_TrackTransferHandle *tdo);
 
 
 /* ********************* /track/transaction *********************** */
@@ -709,10 +758,9 @@ struct TALER_MERCHANT_CoinWireTransfer
  * @param transfers details about each transfer and which coins are aggregated in it
 */
 typedef void
-(*TALER_MERCHANT_TrackTransactionCallback) (void *cls,
-                                            unsigned int http_status,
-                                            enum TALER_ErrorCode ec,
-                                            const json_t *json);
+(*TALER_MERCHANT_TrackTransactionCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr);
 
 
 /**
@@ -720,30 +768,29 @@ typedef void
  *
  * @param ctx execution context
  * @param backend_url base URL of the backend
- * @param transaction_id which transaction should we trace
+ * @param order_id which order should we trace
  * @param track_transaction_cb the callback to call when a reply for this request is available
  * @param track_transaction_cb_cls closure for @a track_transaction_cb
  * @return a handle for this request
  */
 struct TALER_MERCHANT_TrackTransactionHandle *
-TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
-                                  const char *backend_url,
-                                  const char *order_id,
-                                  TALER_MERCHANT_TrackTransactionCallback
-                                  track_transaction_cb,
-                                  void *track_transaction_cb_cls);
+TALER_MERCHANT_track_transaction (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *order_id,
+  TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
+  void *track_transaction_cb_cls);
 
 
 /**
  * Cancel a /track/transaction request.  This function cannot be used
  * on a request handle if a response is already served for it.
  *
- * @param co the deposit's tracking operation
+ * @param tdo the tracking request to cancel
  */
 void
-TALER_MERCHANT_track_transaction_cancel (struct
-                                         TALER_MERCHANT_TrackTransactionHandle *
-                                         tdo);
+TALER_MERCHANT_track_transaction_cancel (
+  struct TALER_MERCHANT_TrackTransactionHandle *tdo);
 
 /* ********************* /history *********************** */
 
@@ -755,15 +802,13 @@ struct TALER_MERCHANT_HistoryOperation;
  * documentation)
  *
  * @param cls closure
- * @param http_status HTTP status returned by the merchant backend
- * @param ec taler-specific error code
- * @param json actual body containing history
+ * @param hr HTTP response details
  */
 typedef void
-(*TALER_MERCHANT_HistoryOperationCallback) (void *cls,
-                                            unsigned int http_status,
-                                            enum TALER_ErrorCode ec,
-                                            const json_t *json);
+(*TALER_MERCHANT_HistoryOperationCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr);
+
 
 /**
  * Issue a /history request to the backend.
@@ -800,13 +845,13 @@ TALER_MERCHANT_history (struct GNUNET_CURL_Context *ctx,
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_HistoryOperation *
-TALER_MERCHANT_history_default_start (struct GNUNET_CURL_Context *ctx,
-                                      const char *backend_url,
-                                      long long delta,
-                                      struct GNUNET_TIME_Absolute date,
-                                      TALER_MERCHANT_HistoryOperationCallback
-                                      history_cb,
-                                      void *history_cb_cls);
+TALER_MERCHANT_history_default_start (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  long long delta,
+  struct GNUNET_TIME_Absolute date,
+  TALER_MERCHANT_HistoryOperationCallback history_cb,
+  void *history_cb_cls);
 
 
 /**
@@ -831,17 +876,16 @@ struct TALER_MERCHANT_TipAuthorizeOperation;
  * the operation.
  *
  * @param cls closure
- * @param http_status HTTP status returned by the merchant backend
- * @param ec taler-specific error code
- * @param taler_tip_uri tip URI
+ * @param hr HTTP response details
  * @param tip_id which tip ID should be used to pickup the tip
+ * @param tip_uri URI for the tip
  */
 typedef void
-(*TALER_MERCHANT_TipAuthorizeCallback) (void *cls,
-                                        unsigned int http_status,
-                                        enum TALER_ErrorCode ec,
-                                        const char *taler_tip_uri,
-                                        struct GNUNET_HashCode *tip_id);
+(*TALER_MERCHANT_TipAuthorizeCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  struct GNUNET_HashCode *tip_id,
+  const char *tip_uri);
 
 
 /**
@@ -875,8 +919,8 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
  * @param ta handle from the operation to cancel
  */
 void
-TALER_MERCHANT_tip_authorize_cancel (struct
-                                     TALER_MERCHANT_TipAuthorizeOperation *ta);
+TALER_MERCHANT_tip_authorize_cancel (
+  struct TALER_MERCHANT_TipAuthorizeOperation *ta);
 
 /* ********************** /tip-pickup ************************* */
 
@@ -892,23 +936,18 @@ struct TALER_MERCHANT_TipPickupOperation;
  * the operation.
  *
  * @param cls closure
- * @param http_status HTTP status returned by the merchant backend, "200 OK" on success
- * @param ec taler-specific error code
+ * @param hr HTTP response details
  * @param reserve_pub public key of the reserve that made the @a reserve_sigs, NULL on error
  * @param num_reserve_sigs length of the @a reserve_sigs array, 0 on error
  * @param reserve_sigs array of signatures authorizing withdrawals, NULL on error
- * @param json original json response
  */
 typedef void
-(*TALER_MERCHANT_TipPickupCallback) (void *cls,
-                                     unsigned int http_status,
-                                     enum TALER_ErrorCode ec,
-                                     const struct
-                                     TALER_ReservePublicKeyP *reserve_pub,
-                                     unsigned int num_reserve_sigs,
-                                     const struct
-                                     TALER_ReserveSignatureP *reserve_sigs,
-                                     const json_t *json);
+(*TALER_MERCHANT_TipPickupCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  const struct TALER_ReservePublicKeyP *reserve_pub,
+  unsigned int num_reserve_sigs,
+  const struct TALER_ReserveSignatureP *reserve_sigs);
 
 
 /**
@@ -956,8 +995,7 @@ struct TALER_MERCHANT_CheckPaymentOperation;
  * Callback to process a GET /check-payment request
  *
  * @param cls closure
- * @param http_status HTTP status code for this request
- * @param obj raw response body
+ * @param hr HTTP response details
  * @param paid #GNUNET_YES if the payment is settled, #GNUNET_NO if not
  *        settled, $GNUNET_SYSERR on error
  *        (note that refunded payments are returned as paid!)
@@ -969,13 +1007,13 @@ struct TALER_MERCHANT_CheckPaymentOperation;
  *                      the payment
  */
 typedef void
-(*TALER_MERCHANT_CheckPaymentCallback) (void *cls,
-                                        unsigned int http_status,
-                                        const json_t *obj,
-                                        int paid,
-                                        int refunded,
-                                        struct TALER_Amount *refund_amount,
-                                        const char *taler_pay_uri);
+(*TALER_MERCHANT_CheckPaymentCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  int paid,
+  int refunded,
+  struct TALER_Amount *refund_amount,
+  const char *taler_pay_uri);
 
 
 /**
@@ -1010,8 +1048,8 @@ TALER_MERCHANT_check_payment (struct GNUNET_CURL_Context *ctx,
  * @param cpo handle to the request to be canceled
  */
 void
-TALER_MERCHANT_check_payment_cancel (struct
-                                     TALER_MERCHANT_CheckPaymentOperation *cpo);
+TALER_MERCHANT_check_payment_cancel (
+  struct TALER_MERCHANT_CheckPaymentOperation *cpo);
 
 
 /* ********************** /tip-query ************************* */
@@ -1026,9 +1064,7 @@ struct TALER_MERCHANT_TipQueryOperation;
  * Callback to process a GET /tip-query request
  *
  * @param cls closure
- * @param http_status HTTP status code for this request
- * @param ec Taler-specific error code
- * @param raw raw response body
+ * @param hr HTTP response details
  * @param reserve_expiration when the tip reserve will expire
  * @param reserve_pub tip reserve public key
  * @param amount_authorized total amount authorized on tip reserve
@@ -1036,16 +1072,14 @@ struct TALER_MERCHANT_TipQueryOperation;
  * @param amount_picked_up total amount picked up from tip reserve
  */
 typedef void
-(*TALER_MERCHANT_TipQueryCallback) (void *cls,
-                                    unsigned int http_status,
-                                    enum TALER_ErrorCode ec,
-                                    const json_t *raw,
-                                    struct GNUNET_TIME_Absolute
-                                    reserve_expiration,
-                                    struct TALER_ReservePublicKeyP *reserve_pub,
-                                    struct TALER_Amount *amount_authorized,
-                                    struct TALER_Amount *amount_available,
-                                    struct TALER_Amount *amount_picked_up);
+(*TALER_MERCHANT_TipQueryCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  struct GNUNET_TIME_Absolute reserve_expiration,
+  struct TALER_ReservePublicKeyP *reserve_pub,
+  struct TALER_Amount *amount_authorized,
+  struct TALER_Amount *amount_available,
+  struct TALER_Amount *amount_picked_up);
 
 
 /**
@@ -1094,8 +1128,7 @@ struct TALER_MERCHANT_PollPaymentOperation;
  * Callback to process a GET /poll-payment request
  *
  * @param cls closure
- * @param http_status HTTP status code for this request
- * @param obj raw response body
+ * @param hr HTTP response details
  * @param paid #GNUNET_YES if the payment is settled, #GNUNET_NO if not
  *        settled, $GNUNET_SYSERR on error
  *        (note that refunded payments are returned as paid!)
@@ -1107,13 +1140,13 @@ struct TALER_MERCHANT_PollPaymentOperation;
  *                      the payment
  */
 typedef void
-(*TALER_MERCHANT_PollPaymentCallback) (void *cls,
-                                       unsigned int http_status,
-                                       const json_t *obj,
-                                       int paid,
-                                       int refunded,
-                                       struct TALER_Amount *refund_amount,
-                                       const char *taler_pay_uri);
+(*TALER_MERCHANT_PollPaymentCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  int paid,
+  int refunded,
+  struct TALER_Amount *refund_amount,
+  const char *taler_pay_uri);
 
 
 /**
@@ -1134,15 +1167,15 @@ typedef void
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_PollPaymentOperation *
-TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
-                             const char *backend_url,
-                             const char *order_id,
-                             const struct GNUNET_HashCode *h_contract,
-                             const char *session_id,
-                             struct GNUNET_TIME_Relative timeout,
-                             TALER_MERCHANT_PollPaymentCallback
-                             poll_payment_cb,
-                             void *poll_payment_cls);
+TALER_MERCHANT_poll_payment (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *order_id,
+  const struct GNUNET_HashCode *h_contract,
+  const char *session_id,
+  struct GNUNET_TIME_Relative timeout,
+  TALER_MERCHANT_PollPaymentCallback poll_payment_cb,
+  void *poll_payment_cls);
 
 
 /**
@@ -1151,8 +1184,8 @@ TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
  * @param cpo handle to the request to be canceled
  */
 void
-TALER_MERCHANT_poll_payment_cancel (struct
-                                    TALER_MERCHANT_PollPaymentOperation *cpo);
+TALER_MERCHANT_poll_payment_cancel (
+  struct TALER_MERCHANT_PollPaymentOperation *cpo);
 
 
 #endif  /* _TALER_MERCHANT_SERVICE_H */

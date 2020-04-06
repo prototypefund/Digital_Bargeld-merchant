@@ -90,12 +90,16 @@ check_ok (struct TALER_MERCHANT_TipPickupOperation *tpo,
 {
   struct TALER_ReservePublicKeyP reserve_pub;
   json_t *ja;
+  unsigned int ja_len;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_fixed_auto ("reserve_pub", &reserve_pub),
     GNUNET_JSON_spec_json ("reserve_sigs", &ja),
     GNUNET_JSON_spec_end ()
   };
-  unsigned int ja_len;
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = MHD_HTTP_OK,
+    .reply = json
+  };
 
   if (GNUNET_OK !=
       GNUNET_JSON_parse (json,
@@ -135,12 +139,10 @@ check_ok (struct TALER_MERCHANT_TipPickupOperation *tpo,
       }
     }
     tpo->cb (tpo->cb_cls,
-             MHD_HTTP_OK,
-             TALER_EC_NONE,
+             &hr,
              &reserve_pub,
              ja_len,
-             reserve_sigs,
-             json);
+             reserve_sigs);
     tpo->cb = NULL; /* do not call twice */
   }
   GNUNET_JSON_parse_free (spec);
@@ -163,6 +165,10 @@ handle_tip_pickup_finished (void *cls,
 {
   struct TALER_MERCHANT_TipPickupOperation *tpo = cls;
   const json_t *json = response;
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = (unsigned int) response_code,
+    .reply = json
+  };
 
   tpo->job = NULL;
   switch (response_code)
@@ -172,37 +178,45 @@ handle_tip_pickup_finished (void *cls,
                                json))
     {
       GNUNET_break_op (0);
-      response_code = 0;
+      hr.http_status = 0;
+      hr.ec = TALER_EC_INVALID_RESPONSE;
     }
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
        leaves this to the application */
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   case MHD_HTTP_CONFLICT:
     /* legal, can happen if we pickup a tip twice... */
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   case MHD_HTTP_NOT_FOUND:
     /* legal, can happen if tip ID is unknown */
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   default:
     /* unexpected response code */
+    GNUNET_break_op (0);
+    TALER_MERCHANT_parse_error_details_ (json,
+                                         response_code,
+                                         &hr);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u\n",
-                (unsigned int) response_code);
-    GNUNET_break (0);
-    response_code = 0;
+                "Unexpected response code %u/%d\n",
+                (unsigned int) response_code,
+                (int) hr.ec);
     break;
   }
   if (NULL != tpo->cb)
   {
     tpo->cb (tpo->cb_cls,
-             response_code,
-             TALER_JSON_get_error_code (json),
+             &hr,
              NULL,
              0,
-             NULL,
-             json);
+             NULL);
     tpo->cb = NULL;
   }
   TALER_MERCHANT_tip_pickup_cancel (tpo);

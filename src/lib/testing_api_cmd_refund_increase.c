@@ -104,20 +104,16 @@ refund_increase_cleanup (void *cls,
  * if the HTTP response code is the one expected.
  *
  * @param cls closure
- * @param http_status HTTP status code
- * @param ec taler-specific error object
- * @param obj response body; is NULL on success.
+ * @param hr HTTP response
  */
 static void
 refund_increase_cb (void *cls,
-                    unsigned int http_status,
-                    enum TALER_ErrorCode ec,
-                    const json_t *obj)
+                    const struct TALER_MERCHANT_HttpResponse *hr)
 {
   struct RefundIncreaseState *ris = cls;
 
   ris->rio = NULL;
-  if (ris->http_code != http_status)
+  if (ris->http_code != hr->http_status)
     TALER_TESTING_FAIL (ris->is);
   TALER_TESTING_interpreter_next (ris->is);
 }
@@ -199,14 +195,13 @@ refund_increase_traits (void *cls,
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_refund_increase
-  (const char *label,
-  const char *merchant_url,
-  const char *reason,
-  const char *order_id,
-  const char *refund_amount,
-  const char *refund_fee,
-  unsigned int http_code)
+TALER_TESTING_cmd_refund_increase (const char *label,
+                                   const char *merchant_url,
+                                   const char *reason,
+                                   const char *order_id,
+                                   const char *refund_amount,
+                                   const char *refund_fee,
+                                   unsigned int http_code)
 {
   struct RefundIncreaseState *ris;
 

@@ -119,16 +119,12 @@ proposal_traits (void *cls,
 #define MAKE_TRAIT_NONCE(ptr)                       \
   TALER_TESTING_make_trait_merchant_pub (1, (struct \
                                              TALER_MerchantPublicKeyP *) (ptr))
-
   struct TALER_TESTING_Trait traits[] = {
     TALER_TESTING_make_trait_order_id (0, ps->order_id),
-    TALER_TESTING_make_trait_contract_terms
-      (0, ps->contract_terms),
-    TALER_TESTING_make_trait_h_contract_terms
-      (0, &ps->h_contract_terms),
+    TALER_TESTING_make_trait_contract_terms (0, ps->contract_terms),
+    TALER_TESTING_make_trait_h_contract_terms (0, &ps->h_contract_terms),
     TALER_TESTING_make_trait_merchant_sig (0, &ps->merchant_sig),
-    TALER_TESTING_make_trait_merchant_pub
-      (0, &ps->merchant_pub),
+    TALER_TESTING_make_trait_merchant_pub (0, &ps->merchant_pub),
     MAKE_TRAIT_NONCE (&ps->nonce),
     TALER_TESTING_trait_end ()
   };
@@ -146,17 +142,16 @@ proposal_traits (void *cls,
  * created.
  *
  * @param cls closure
- * @param http_status HTTP status code we got
- * @param json full response we got
+ * @param hr HTTP response we got
+ * @param sig merchant's signature
+ * @param hash hash over the contract
  */
 static void
-proposal_lookup_initial_cb
-  (void *cls,
-  unsigned int http_status,
-  const json_t *json,
-  const json_t *contract_terms,
-  const struct TALER_MerchantSignatureP *sig,
-  const struct GNUNET_HashCode *hash)
+proposal_lookup_initial_cb (void *cls,
+                            const struct TALER_MERCHANT_HttpResponse *hr,
+                            const json_t *contract_terms,
+                            const struct TALER_MerchantSignatureP *sig,
+                            const struct GNUNET_HashCode *hash)
 {
   struct ProposalState *ps = cls;
   struct TALER_MerchantPublicKeyP merchant_pub;
@@ -169,13 +164,12 @@ proposal_lookup_initial_cb
   };
 
   ps->plo = NULL;
-  if (ps->http_status != http_status)
+  if (ps->http_status != hr->http_status)
     TALER_TESTING_FAIL (ps->is);
 
   ps->contract_terms = json_deep_copy (contract_terms);
   ps->h_contract_terms = *hash;
   ps->merchant_sig = *sig;
-
   if (GNUNET_OK !=
       GNUNET_JSON_parse (contract_terms,
                          spec,
@@ -196,9 +190,7 @@ proposal_lookup_initial_cb
     free (log);
     TALER_TESTING_FAIL (ps->is);
   }
-
   ps->merchant_pub = merchant_pub;
-
   TALER_TESTING_interpreter_next (ps->is);
 }
 
@@ -210,28 +202,21 @@ proposal_lookup_initial_cb
  * method.
  *
  * @param cls closure.
- * @param http_status HTTP response code coming from
- *        the backend.
- * @param ec error code.
- * @param obj when successful, it has the format:
- *        '{"order_id": "<order_id>"}'
+ * @param hr HTTP response
  * @param order_id order id of the proposal.
  */
 static void
 proposal_cb (void *cls,
-             unsigned int http_status,
-             enum TALER_ErrorCode ec,
-             const json_t *obj,
+             const struct TALER_MERCHANT_HttpResponse *hr,
              const char *order_id)
 {
   struct ProposalState *ps = cls;
 
   ps->po = NULL;
-
-  if (ps->http_status != http_status)
+  if (ps->http_status != hr->http_status)
   {
     TALER_LOG_ERROR ("Given vs expected: %u vs %u\n",
-                     http_status,
+                     hr->http_status,
                      ps->http_status);
     TALER_TESTING_FAIL (ps->is);
   }
@@ -243,21 +228,20 @@ proposal_cb (void *cls,
     return;
   }
 
-  switch (http_status)
+  switch (hr->http_status)
   {
   case MHD_HTTP_OK:
     ps->order_id = GNUNET_strdup (order_id);
     break;
   default:
     {
-      char *s = json_dumps (obj, JSON_COMPACT);
+      char *s = json_dumps (hr->reply,
+                            JSON_COMPACT);
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Unexpected status code from /proposal:" \
-                  " %u (%d). Command %s, response: %s\n",
-                  http_status,
-                  ec,
-                  TALER_TESTING_interpreter_get_current_label (
-                    ps->is),
+                  "Unexpected status code from /proposal: %u (%d) at %s; JSON: %s\n",
+                  hr->http_status,
+                  hr->ec,
+                  TALER_TESTING_interpreter_get_current_label (ps->is),
                   s);
       GNUNET_free_non_null (s);
       /**
@@ -270,13 +254,12 @@ proposal_cb (void *cls,
   }
 
   if (NULL ==
-      (ps->plo = TALER_MERCHANT_proposal_lookup
-                   (ps->is->ctx,
-                   ps->merchant_url,
-                   ps->order_id,
-                   &ps->nonce,
-                   &proposal_lookup_initial_cb,
-                   ps)))
+      (ps->plo = TALER_MERCHANT_proposal_lookup (ps->is->ctx,
+                                                 ps->merchant_url,
+                                                 ps->order_id,
+                                                 &ps->nonce,
+                                                 &proposal_lookup_initial_cb,
+                                                 ps)))
     TALER_TESTING_FAIL (ps->is);
 }
 

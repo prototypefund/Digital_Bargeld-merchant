@@ -95,53 +95,46 @@ struct TipAuthorizeState
  * tip_expiration).
  *
  * @param cls closure
- * @param http_status HTTP status returned by the merchant backend
- * @param ec taler-specific error code
+ * @param hr HTTP response we got
  * @param taler_tip_uri URI to let the wallet know about the tip
  * @param tip_id unique identifier for the tip
  */
 static void
 tip_authorize_cb (void *cls,
-                  unsigned int http_status,
-                  enum TALER_ErrorCode ec,
-                  const char *taler_tip_uri,
-                  struct GNUNET_HashCode *tip_id)
+                  const struct TALER_MERCHANT_HttpResponse *hr,
+                  struct GNUNET_HashCode *tip_id,
+                  const char *taler_tip_uri)
 {
   struct TipAuthorizeState *tas = cls;
 
   tas->tao = NULL;
-  if (tas->http_status != http_status)
+  if (tas->http_status != hr->http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u (%d)"
-                " to command %s\n",
-                http_status,
-                ec,
-                TALER_TESTING_interpreter_get_current_label
-                  (tas->is));
-
+                "Unexpected response code %u (%d) to command %s\n",
+                hr->http_status,
+                hr->ec,
+                TALER_TESTING_interpreter_get_current_label (tas->is));
     TALER_TESTING_interpreter_fail (tas->is);
     return;
   }
 
-  if (tas->expected_ec != ec)
+  if (tas->expected_ec != hr->ec)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unexpected error code %d (%u) to command %s\n",
-                ec,
-                http_status,
-                TALER_TESTING_interpreter_get_current_label
-                  (tas->is));
+                (int) hr->ec,
+                hr->http_status,
+                TALER_TESTING_interpreter_get_current_label (tas->is));
     TALER_TESTING_interpreter_fail (tas->is);
     return;
   }
-  if ( (MHD_HTTP_OK == http_status) &&
-       (TALER_EC_NONE == ec) )
+  if ( (MHD_HTTP_OK == hr->http_status) &&
+       (TALER_EC_NONE == hr->ec) )
   {
     tas->tip_uri = strdup (taler_tip_uri);
     tas->tip_id = *tip_id;
   }
-
   TALER_TESTING_interpreter_next (tas->is);
 }
 
@@ -195,15 +188,14 @@ tip_authorize_run (void *cls,
                                            &amount))
     TALER_TESTING_FAIL (is);
 
-  tas->tao = TALER_MERCHANT_tip_authorize
-               (is->ctx,
-               tas->merchant_url,
-               "http://merchant.com/pickup",
-               "http://merchant.com/continue",
-               &amount,
-               tas->justification,
-               tip_authorize_cb,
-               tas);
+  tas->tao = TALER_MERCHANT_tip_authorize (is->ctx,
+                                           tas->merchant_url,
+                                           "http://merchant.com/pickup",
+                                           "http://merchant.com/continue",
+                                           &amount,
+                                           tas->justification,
+                                           tip_authorize_cb,
+                                           tas);
 
   GNUNET_assert (NULL != tas->tao);
 }
@@ -272,14 +264,13 @@ tip_authorize_cleanup (void *cls,
  * @param ec expected Taler-defined error code.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_tip_authorize_with_ec
-  (const char *label,
-  const char *merchant_url,
-  const char *exchange_url,
-  unsigned int http_status,
-  const char *justification,
-  const char *amount,
-  enum TALER_ErrorCode ec)
+TALER_TESTING_cmd_tip_authorize_with_ec (const char *label,
+                                         const char *merchant_url,
+                                         const char *exchange_url,
+                                         unsigned int http_status,
+                                         const char *justification,
+                                         const char *amount,
+                                         enum TALER_ErrorCode ec)
 {
   struct TipAuthorizeState *tas;
 
@@ -289,16 +280,17 @@ TALER_TESTING_cmd_tip_authorize_with_ec
   tas->amount = amount;
   tas->http_status = http_status;
   tas->expected_ec = ec;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .label = label,
+      .cls = tas,
+      .run = &tip_authorize_run,
+      .cleanup = &tip_authorize_cleanup,
+      .traits = &tip_authorize_traits
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .label = label,
-    .cls = tas,
-    .run = &tip_authorize_run,
-    .cleanup = &tip_authorize_cleanup,
-    .traits = &tip_authorize_traits
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 
@@ -331,16 +323,17 @@ TALER_TESTING_cmd_tip_authorize (const char *label,
   tas->justification = justification;
   tas->amount = amount;
   tas->http_status = http_status;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .label = label,
+      .cls = tas,
+      .run = &tip_authorize_run,
+      .cleanup = &tip_authorize_cleanup,
+      .traits = &tip_authorize_traits
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .label = label,
-    .cls = tas,
-    .run = &tip_authorize_run,
-    .cleanup = &tip_authorize_cleanup,
-    .traits = &tip_authorize_traits
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 
@@ -359,16 +352,17 @@ TALER_TESTING_cmd_tip_authorize_fake (const char *label)
   struct TipAuthorizeState *tas;
 
   tas = GNUNET_new (struct TipAuthorizeState);
+  {
+    struct TALER_TESTING_Command cmd = {
+      .label = label,
+      .cls = tas,
+      .run = &tip_authorize_fake_run,
+      .cleanup = &tip_authorize_cleanup,
+      .traits = &tip_authorize_traits
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .label = label,
-    .cls = tas,
-    .run = &tip_authorize_fake_run,
-    .cleanup = &tip_authorize_cleanup,
-    .traits = &tip_authorize_traits
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 

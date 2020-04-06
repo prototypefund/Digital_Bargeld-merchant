@@ -138,61 +138,6 @@ struct PayAgainState
 
 
 /**
- * State for a "pay abort" CMD.
- */
-struct PayAbortState
-{
-
-  /**
-   * Expected HTTP response code.
-   */
-  unsigned int http_status;
-
-  /**
-   * Reference to the "pay" command to abort.
-   */
-  const char *pay_reference;
-
-  /**
-   * Merchant URL.
-   */
-  const char *merchant_url;
-
-  /**
-   * Handle to a "pay abort" operation.
-   */
-  struct TALER_MERCHANT_Pay *pao;
-
-  /**
-   * Interpreter state.
-   */
-  struct TALER_TESTING_Interpreter *is;
-
-  /**
-   * How many refund permissions this CMD got
-   * the right for.  Roughly, there is one refund
-   * permission for one coin.
-   */
-  unsigned int num_refunds;
-
-  /**
-   * The actual refund data.
-   */
-  struct TALER_MERCHANT_RefundEntry *res;
-
-  /**
-   * The contract whose payment is to be aborted.
-   */
-  struct GNUNET_HashCode h_contract;
-
-  /**
-   * Merchant public key.
-   */
-  struct TALER_MerchantPublicKeyP merchant_pub;
-};
-
-
-/**
  * Parse the @a coins specification and grow the @a pc
  * array with the coins found, updating @a npc.
  *
@@ -314,18 +259,11 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
  * HTTP response code matches our expectation.
  *
  * @param cls closure with the interpreter state
- * @param http_status HTTP response code, #MHD_HTTP_OK (200)
- *        for successful deposit; 0 if the exchange's reply is
- *        bogus (fails to follow the protocol)
- * @param ec taler-specific error object
- * @param obj the received JSON reply, should be kept as proof
- *        (and, in case of errors, be forwarded to the customer)
+ * @param hr HTTP response
  */
 static void
 pay_cb (void *cls,
-        unsigned int http_status,
-        enum TALER_ErrorCode ec,
-        const json_t *obj)
+        const struct TALER_MERCHANT_HttpResponse *hr)
 {
   struct PayState *ps = cls;
   struct GNUNET_CRYPTO_EddsaSignature sig;
@@ -334,17 +272,16 @@ pay_cb (void *cls,
   const struct TALER_MerchantPublicKeyP *merchant_pub;
 
   ps->po = NULL;
-  if (ps->http_status != http_status)
+  if (ps->http_status != hr->http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unexpected response code %u (%d) to command %s\n",
-                http_status,
-                ec,
-                TALER_TESTING_interpreter_get_current_label (
-                  ps->is));
+                hr->http_status,
+                (int) hr->ec,
+                TALER_TESTING_interpreter_get_current_label (ps->is));
     TALER_TESTING_FAIL (ps->is);
   }
-  if (MHD_HTTP_OK == http_status)
+  if (MHD_HTTP_OK == hr->http_status)
   {
     /* Check signature */
     struct PaymentResponsePS mr;
@@ -357,29 +294,26 @@ pay_cb (void *cls,
     };
     const struct TALER_TESTING_Command *proposal_cmd;
 
-    GNUNET_assert (GNUNET_OK == GNUNET_JSON_parse (
-                     obj, spec,
-                     &error_name,
-                     &error_line));
-
-    mr.purpose.purpose = htonl (
-      TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
+    GNUNET_assert (GNUNET_OK ==
+                   GNUNET_JSON_parse (hr->reply,
+                                      spec,
+                                      &error_name,
+                                      &error_line));
+    mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
     mr.h_contract_terms = ps->h_contract_terms;
 
     /* proposal reference was used at least once, at this point */
-    GNUNET_assert
-      (NULL !=
-      (proposal_cmd =
-         TALER_TESTING_interpreter_lookup_command (ps->is,
-                                                   ps->proposal_reference)));
-
+    GNUNET_assert (NULL !=
+                   (proposal_cmd =
+                      TALER_TESTING_interpreter_lookup_command (ps->is,
+                                                                ps->
+                                                                proposal_reference)));
     if (GNUNET_OK !=
         TALER_TESTING_get_trait_merchant_pub (proposal_cmd,
                                               0,
                                               &merchant_pub))
       TALER_TESTING_FAIL (ps->is);
-
     if (GNUNET_OK !=
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
                                     &mr.purpose,
@@ -387,75 +321,12 @@ pay_cb (void *cls,
                                     &merchant_pub->eddsa_pub))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Merchant signature given in response to /pay"
-                  " invalid\n");
+                  "Merchant signature given in response to /pay invalid\n");
       TALER_TESTING_FAIL (ps->is);
     }
   }
 
   TALER_TESTING_interpreter_next (ps->is);
-}
-
-
-/**
- * Callback for a "pay abort" operation.  Mainly, check HTTP
- * response code was as expected and stores refund permissions
- * in the state.
- *
- * @param cls closure.
- * @param http_status HTTP response code.
- * @param ec Taler error code.
- * @param merchant_pub public key of the merchant refunding the
- *        contract.
- * @param h_contract the contract involved in the refund.
- * @param num_refunds how many refund permissions have been
- *        issued.
- * @param res array containing the refund permissions.
- * @param obj raw response body.
- */
-static void
-pay_abort_cb (void *cls,
-              unsigned int http_status,
-              enum TALER_ErrorCode ec,
-              const struct TALER_MerchantPublicKeyP *merchant_pub,
-              const struct GNUNET_HashCode *h_contract,
-              unsigned int num_refunds,
-              const struct TALER_MERCHANT_RefundEntry *res,
-              const json_t *obj)
-{
-  struct PayAbortState *pas = cls;
-
-  pas->pao = NULL;
-  if (pas->http_status != http_status)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u (%d) to command %s\n",
-                http_status,
-                ec,
-                TALER_TESTING_interpreter_get_current_label
-                  (pas->is));
-    TALER_TESTING_FAIL (pas->is);
-  }
-  if ( (MHD_HTTP_OK == http_status) &&
-       (TALER_EC_NONE == ec) )
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-                "Received %u refunds\n",
-                num_refunds);
-    pas->num_refunds = num_refunds;
-    pas->res = GNUNET_new_array (num_refunds,
-                                 struct TALER_MERCHANT_RefundEntry);
-    memcpy (pas->res,
-            res,
-            num_refunds * sizeof (struct TALER_MERCHANT_RefundEntry));
-    pas->h_contract = *h_contract;
-    pas->merchant_pub = *merchant_pub;
-  }
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Successful pay-abort (HTTP status: %u)\n",
-              http_status);
-  TALER_TESTING_interpreter_next (pas->is);
 }
 
 
@@ -479,7 +350,7 @@ pay_abort_cb (void *cls,
  * @param api_func "lib" function that will be called to either
  *        issue a "pay" or "abort" request.
  * @param api_cb callback for @a api_func.
- * @param cls closure.
+ * @param api_cb_cls closure for @a api_cb
  *
  * @return handle to the operation, NULL if errors occur.
  */
@@ -491,9 +362,8 @@ _pay_run (const char *merchant_url,
           const char *amount_with_fee,
           const char *amount_without_fee,
           const char *refund_fee,
-          struct TALER_MERCHANT_Pay *(*api_func)(),
-          void (*api_cb)(),
-          void *cls)
+          TALER_MERCHANT_PayCallback api_cb,
+          void *api_cb_cls)
 {
   const struct TALER_TESTING_Command *proposal_cmd;
   const json_t *contract_terms;
@@ -531,47 +401,48 @@ _pay_run (const char *merchant_url,
     GNUNET_break (0);
     return NULL;
   }
-
-  /* Get information that needs to be put verbatim in the
-   * deposit permission */
-  struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_string ("order_id",
-                             &order_id),
-    GNUNET_JSON_spec_absolute_time ("refund_deadline",
-                                    &refund_deadline),
-    GNUNET_JSON_spec_absolute_time ("pay_deadline",
-                                    &pay_deadline),
-    GNUNET_JSON_spec_absolute_time ("timestamp",
-                                    &timestamp),
-    GNUNET_JSON_spec_fixed_auto ("merchant_pub",
-                                 &merchant_pub),
-    GNUNET_JSON_spec_fixed_auto ("h_wire",
-                                 &h_wire),
-    TALER_JSON_spec_amount ("amount",
-                            &total_amount),
-    TALER_JSON_spec_amount ("max_fee",
-                            &max_fee),
-    GNUNET_JSON_spec_end ()
-  };
-
-  if (GNUNET_OK !=
-      GNUNET_JSON_parse (contract_terms,
-                         spec,
-                         &error_name,
-                         &error_line))
   {
-    char *js;
+    /* Get information that needs to be put verbatim in the
+     * deposit permission */
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_string ("order_id",
+                               &order_id),
+      GNUNET_JSON_spec_absolute_time ("refund_deadline",
+                                      &refund_deadline),
+      GNUNET_JSON_spec_absolute_time ("pay_deadline",
+                                      &pay_deadline),
+      GNUNET_JSON_spec_absolute_time ("timestamp",
+                                      &timestamp),
+      GNUNET_JSON_spec_fixed_auto ("merchant_pub",
+                                   &merchant_pub),
+      GNUNET_JSON_spec_fixed_auto ("h_wire",
+                                   &h_wire),
+      TALER_JSON_spec_amount ("amount",
+                              &total_amount),
+      TALER_JSON_spec_amount ("max_fee",
+                              &max_fee),
+      GNUNET_JSON_spec_end ()
+    };
 
-    js = json_dumps (contract_terms,
-                     JSON_INDENT (1));
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Parser failed on %s:%u for input `%s'\n",
-                error_name,
-                error_line,
-                js);
-    free (js);
-    GNUNET_break_op (0);
-    return NULL;
+    if (GNUNET_OK !=
+        GNUNET_JSON_parse (contract_terms,
+                           spec,
+                           &error_name,
+                           &error_line))
+    {
+      char *js;
+
+      js = json_dumps (contract_terms,
+                       JSON_INDENT (1));
+      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                  "Parser failed on %s:%u for input `%s'\n",
+                  error_name,
+                  error_line,
+                  js);
+      free (js);
+      GNUNET_break_op (0);
+      return NULL;
+    }
   }
 
   cr = GNUNET_strdup (coin_reference);
@@ -595,38 +466,38 @@ _pay_run (const char *merchant_url,
   }
 
   GNUNET_free (cr);
-  if (GNUNET_OK != TALER_TESTING_get_trait_merchant_sig
-        (proposal_cmd, 0, &merchant_sig))
+  if (GNUNET_OK !=
+      TALER_TESTING_get_trait_merchant_sig (proposal_cmd,
+                                            0,
+                                            &merchant_sig))
   {
     GNUNET_break (0);
     return NULL;
   }
-
-
-  if (GNUNET_OK != TALER_TESTING_get_trait_h_contract_terms
-        (proposal_cmd, 0, &h_proposal))
+  if (GNUNET_OK !=
+      TALER_TESTING_get_trait_h_contract_terms (proposal_cmd,
+                                                0,
+                                                &h_proposal))
   {
     GNUNET_break (0);
     return NULL;
   }
-
-  ret = api_func (is->ctx,
-                  merchant_url,
-                  h_proposal,
-                  &total_amount,
-                  &max_fee,
-                  &merchant_pub,
-                  merchant_sig,
-                  timestamp,
-                  refund_deadline,
-                  pay_deadline,
-                  &h_wire,
-                  order_id,
-                  npay_coins,
-                  pay_coins,
-                  api_cb,
-                  cls);
-
+  ret = TALER_MERCHANT_pay_wallet (is->ctx,
+                                   merchant_url,
+                                   h_proposal,
+                                   &total_amount,
+                                   &max_fee,
+                                   &merchant_pub,
+                                   merchant_sig,
+                                   timestamp,
+                                   refund_deadline,
+                                   pay_deadline,
+                                   &h_wire,
+                                   order_id,
+                                   npay_coins,
+                                   pay_coins,
+                                   api_cb,
+                                   api_cb_cls);
   GNUNET_array_grow (pay_coins,
                      npay_coins,
                      0);
@@ -657,7 +528,6 @@ pay_run (void *cls,
                                   ps->amount_with_fee,
                                   ps->amount_without_fee,
                                   ps->refund_fee,
-                                  &TALER_MERCHANT_pay_wallet,
                                   &pay_cb,
                                   ps)))
     TALER_TESTING_FAIL (is);
@@ -810,179 +680,15 @@ TALER_TESTING_cmd_pay (const char *label,
 
 
 /**
- * Free a "pay abort" CMD, and cancel it if need be.
- *
- * @param cls closure.
- * @param cmd command currently being freed.
- */
-static void
-pay_abort_cleanup (void *cls,
-                   const struct TALER_TESTING_Command *cmd)
-{
-  struct PayAbortState *pas = cls;
-
-  if (NULL != pas->pao)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Command `%s' did not complete.\n",
-                TALER_TESTING_interpreter_get_current_label (
-                  pas->is));
-    TALER_MERCHANT_pay_cancel (pas->pao);
-  }
-  GNUNET_free_non_null (pas->res);
-  GNUNET_free (pas);
-}
-
-
-/**
- * Run a "pay abort" CMD.
- *
- * @param cls closure
- * @param cmd command being run.
- * @param is interpreter state
- */
-static void
-pay_abort_run (void *cls,
-               const struct TALER_TESTING_Command *cmd,
-               struct TALER_TESTING_Interpreter *is)
-{
-
-  struct PayAbortState *pas = cls;
-  const struct TALER_TESTING_Command *pay_cmd;
-
-  const char *proposal_reference;
-  const char *coin_reference;
-  const char *amount_with_fee;
-  const char *amount_without_fee;
-  const char *refund_fee;
-
-  pas->is = is;
-  pay_cmd = TALER_TESTING_interpreter_lookup_command
-              (is, pas->pay_reference);
-  if (NULL == pay_cmd)
-    TALER_TESTING_FAIL (is);
-
-  if (GNUNET_OK != TALER_TESTING_get_trait_proposal_reference
-        (pay_cmd, 0, &proposal_reference))
-    TALER_TESTING_FAIL (is);
-
-  if (GNUNET_OK != TALER_TESTING_get_trait_coin_reference
-        (pay_cmd, 0, &coin_reference))
-    TALER_TESTING_FAIL (is);
-
-  if (GNUNET_OK != TALER_TESTING_get_trait_string
-        (pay_cmd, AMOUNT_WITH_FEE, &amount_with_fee))
-    TALER_TESTING_FAIL (is);
-
-  if (GNUNET_OK != TALER_TESTING_get_trait_string
-        (pay_cmd, AMOUNT_WITHOUT_FEE, &amount_without_fee))
-    TALER_TESTING_FAIL (is);
-
-  if (GNUNET_OK != TALER_TESTING_get_trait_string
-        (pay_cmd, REFUND_FEE, &refund_fee))
-    TALER_TESTING_FAIL (is);
-
-  if (NULL == (pas->pao = _pay_run (pas->merchant_url,
-                                    coin_reference,
-                                    proposal_reference,
-                                    is,
-                                    amount_with_fee,
-                                    amount_without_fee,
-                                    refund_fee,
-                                    &TALER_MERCHANT_pay_abort,
-                                    &pay_abort_cb,
-                                    pas)))
-    TALER_TESTING_FAIL (is);
-}
-
-
-/**
- * Offer internal data useful to other commands.
- *
- * @param cls closure
- * @param ret[out] result (could be anything)
- * @param trait name of the trait
- * @param index index number of the object to extract.
- * @return #GNUNET_OK on success
- */
-static int
-pay_abort_traits (void *cls,
-                  const void **ret,
-                  const char *trait,
-                  unsigned int index)
-{
-  struct PayAbortState *pas = cls;
-  struct TALER_TESTING_Trait traits[] = {
-    TALER_TESTING_make_trait_merchant_pub
-      (0, &pas->merchant_pub),
-    TALER_TESTING_make_trait_h_contract_terms
-      (0, &pas->h_contract),
-    TALER_TESTING_make_trait_refund_entry
-      (0, pas->res),
-    TALER_TESTING_make_trait_uint (0, &pas->num_refunds),
-    TALER_TESTING_trait_end ()
-  };
-
-  return TALER_TESTING_get_trait (traits,
-                                  ret,
-                                  trait,
-                                  index);
-}
-
-
-/**
- * Make a "pay abort" test command.
- *
- * @param label command label
- * @param merchant_url merchant base URL
- * @param pay_reference reference to the payment to abort
- * @param http_status expected HTTP response code
- *
- * @return the command
- */
-struct TALER_TESTING_Command
-TALER_TESTING_cmd_pay_abort (const char *label,
-                             const char *merchant_url,
-                             const char *pay_reference,
-                             unsigned int http_status)
-{
-  struct PayAbortState *pas;
-
-  pas = GNUNET_new (struct PayAbortState);
-  pas->http_status = http_status;
-  pas->pay_reference = pay_reference;
-  pas->merchant_url = merchant_url;
-  {
-    struct TALER_TESTING_Command cmd = {
-      .cls = pas,
-      .label = label,
-      .run = &pay_abort_run,
-      .cleanup = &pay_abort_cleanup,
-      .traits = &pay_abort_traits
-    };
-
-    return cmd;
-  }
-}
-
-
-/**
  * Function called with the result of a /pay again operation,
  * check signature and HTTP response code are good.
  *
  * @param cls closure with the interpreter state
- * @param http_status HTTP response code, #MHD_HTTP_OK (200)
- *        for successful deposit; 0 if the exchange's reply is
- *        bogus (fails to follow the protocol)
- * @param ec taler-specific error object
- * @param obj the received JSON reply, should be kept as proof
- *        (and, in case of errors, be forwarded to the customer)
+ * @param hr HTTP response
  */
 static void
 pay_again_cb (void *cls,
-              unsigned int http_status,
-              enum TALER_ErrorCode ec,
-              const json_t *obj)
+              const struct TALER_MERCHANT_HttpResponse *hr)
 {
   struct PayAgainState *pas = cls;
   struct GNUNET_CRYPTO_EddsaSignature sig;
@@ -992,24 +698,23 @@ pay_again_cb (void *cls,
   const struct TALER_MerchantPublicKeyP *merchant_pub;
 
   pas->pao = NULL;
-  if (pas->http_status != http_status)
+  if (pas->http_status != hr->http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unexpected response code %u (%d) to command %s\n",
-                http_status,
-                ec,
-                TALER_TESTING_interpreter_get_current_label
-                  (pas->is));
+                hr->http_status,
+                (int) hr->ec,
+                TALER_TESTING_interpreter_get_current_label (pas->is));
     TALER_TESTING_interpreter_fail (pas->is);
     return;
   }
 
   if (NULL ==
-      (pay_cmd = TALER_TESTING_interpreter_lookup_command
-                   (pas->is, pas->pay_reference)))
+      (pay_cmd = TALER_TESTING_interpreter_lookup_command (pas->is,
+                                                           pas->pay_reference)))
     TALER_TESTING_FAIL (pas->is);
 
-  if (MHD_HTTP_OK == http_status)
+  if (MHD_HTTP_OK == hr->http_status)
   {
     struct PaymentResponsePS mr;
     /* Check signature */
@@ -1021,23 +726,24 @@ pay_again_cb (void *cls,
       GNUNET_JSON_spec_end ()
     };
 
-    GNUNET_assert (GNUNET_OK == GNUNET_JSON_parse (obj,
+    GNUNET_assert (GNUNET_OK == GNUNET_JSON_parse (hr->reply,
                                                    spec,
                                                    &error_name,
                                                    &error_line));
-    mr.purpose.purpose = htonl
-                           (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
+    mr.purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_PAYMENT_OK);
     mr.purpose.size = htonl (sizeof (mr));
 
-    if (GNUNET_OK != TALER_TESTING_get_trait_merchant_pub
-          (pay_cmd, 0, &merchant_pub))
+    if (GNUNET_OK !=
+        TALER_TESTING_get_trait_merchant_pub (pay_cmd,
+                                              0,
+                                              &merchant_pub))
       TALER_TESTING_FAIL (pas->is);
 
-    if (GNUNET_OK != GNUNET_CRYPTO_eddsa_verify
-          (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
-          &mr.purpose,
-          &sig,
-          &merchant_pub->eddsa_pub))
+    if (GNUNET_OK !=
+        GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
+                                    &mr.purpose,
+                                    &sig,
+                                    &merchant_pub->eddsa_pub))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Merchant signature given in"
@@ -1093,7 +799,6 @@ pay_again_run (void *cls,
                                     amount_with_fee,
                                     amount_without_fee,
                                     pas->refund_fee,
-                                    &TALER_MERCHANT_pay_wallet,
                                     &pay_again_cb,
                                     pas)))
     TALER_TESTING_FAIL (is);

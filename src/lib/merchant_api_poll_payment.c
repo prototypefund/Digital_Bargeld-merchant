@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2018, 2019 GNUnet e.V. and INRIA
+  Copyright (C) 2018, 2019, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -81,7 +81,10 @@ handle_poll_payment_finished (void *cls,
   struct TALER_Amount refund_amount = { 0 };
   const json_t *json = response;
   const json_t *refunded;
-
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = (unsigned int) response_code,
+    .reply = json
+  };
   struct GNUNET_JSON_Specification spec[] = {
     TALER_JSON_spec_amount ("refund_amount",
                             &refund_amount),
@@ -93,9 +96,10 @@ handle_poll_payment_finished (void *cls,
   switch (response_code)
   {
   case MHD_HTTP_NOT_FOUND:
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     cpo->cb (cpo->cb_cls,
-             response_code,
-             json,
+             &hr,
              GNUNET_NO,
              GNUNET_NO,
              NULL,
@@ -106,13 +110,15 @@ handle_poll_payment_finished (void *cls,
     /* see below */
     break;
   default:
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Polling payment failed with HTTP status code %u\n",
-                (unsigned int) response_code);
+                "Polling payment failed with HTTP status code %u/%d\n",
+                (unsigned int) response_code,
+                (int) hr.ec);
     GNUNET_break_op (0);
     cpo->cb (cpo->cb_cls,
-             response_code,
-             json,
+             &hr,
              GNUNET_SYSERR,
              GNUNET_SYSERR,
              NULL,
@@ -131,9 +137,10 @@ handle_poll_payment_finished (void *cls,
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                   "no taler_pay_uri in unpaid poll-payment response\n");
       GNUNET_break_op (0);
+      hr.http_status = 0;
+      hr.ec = TALER_EC_POLL_PAYMENT_REPLY_MALFORMED;
       cpo->cb (cpo->cb_cls,
-               0,
-               json,
+               &hr,
                GNUNET_SYSERR,
                GNUNET_SYSERR,
                NULL,
@@ -142,8 +149,7 @@ handle_poll_payment_finished (void *cls,
     else
     {
       cpo->cb (cpo->cb_cls,
-               response_code,
-               json,
+               &hr,
                GNUNET_NO,
                GNUNET_NO,
                NULL,
@@ -164,9 +170,10 @@ handle_poll_payment_finished (void *cls,
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "poll payment failed to parse JSON\n");
     GNUNET_break_op (0);
+    hr.http_status = 0;
+    hr.ec = TALER_EC_POLL_PAYMENT_REPLY_MALFORMED;
     cpo->cb (cpo->cb_cls,
-             0,
-             json,
+             &hr,
              GNUNET_SYSERR,
              GNUNET_SYSERR,
              NULL,
@@ -176,8 +183,7 @@ handle_poll_payment_finished (void *cls,
   }
 
   cpo->cb (cpo->cb_cls,
-           MHD_HTTP_OK,
-           json,
+           &hr,
            GNUNET_YES,
            (json_true () == refunded),
            (json_true () == refunded) ? &refund_amount : NULL,
@@ -204,15 +210,15 @@ handle_poll_payment_finished (void *cls,
  * @return handle for this operation, NULL upon errors
  */
 struct TALER_MERCHANT_PollPaymentOperation *
-TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
-                             const char *backend_url,
-                             const char *order_id,
-                             const struct GNUNET_HashCode *h_contract,
-                             const char *session_id,
-                             struct GNUNET_TIME_Relative timeout,
-                             TALER_MERCHANT_PollPaymentCallback
-                             poll_payment_cb,
-                             void *poll_payment_cb_cls)
+TALER_MERCHANT_poll_payment (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *order_id,
+  const struct GNUNET_HashCode *h_contract,
+  const char *session_id,
+  struct GNUNET_TIME_Relative timeout,
+  TALER_MERCHANT_PollPaymentCallback poll_payment_cb,
+  void *poll_payment_cb_cls)
 {
   struct TALER_MERCHANT_PollPaymentOperation *cpo;
   CURL *eh;
@@ -296,8 +302,8 @@ TALER_MERCHANT_poll_payment (struct GNUNET_CURL_Context *ctx,
  * @param cph handle to the request to be canceled
  */
 void
-TALER_MERCHANT_poll_payment_cancel (struct
-                                    TALER_MERCHANT_PollPaymentOperation *cph)
+TALER_MERCHANT_poll_payment_cancel (
+  struct TALER_MERCHANT_PollPaymentOperation *cph)
 {
   if (NULL != cph->job)
   {

@@ -123,8 +123,7 @@ proposal_lookup_cleanup (void *cls,
  * response code is as expected.
  *
  * @param cls closure
- * @param http_status HTTP status code we got
- * @param json full response we got
+ * @param hr HTTP response we got
  * @param contract_terms the contract terms; they are the
  *        backend-filled up proposal minus cryptographic
  *        information.
@@ -133,8 +132,7 @@ proposal_lookup_cleanup (void *cls,
  */
 static void
 proposal_lookup_cb (void *cls,
-                    unsigned int http_status,
-                    const json_t *json,
+                    const struct TALER_MERCHANT_HttpResponse *hr,
                     const json_t *contract_terms,
                     const struct TALER_MerchantSignatureP *sig,
                     const struct GNUNET_HashCode *hash)
@@ -142,11 +140,12 @@ proposal_lookup_cb (void *cls,
   struct ProposalLookupState *pls = cls;
 
   pls->plo = NULL;
-  if (pls->http_status != http_status)
+  if (pls->http_status != hr->http_status)
     TALER_TESTING_FAIL (pls->is);
-  if (MHD_HTTP_OK == http_status)
+  if (MHD_HTTP_OK == hr->http_status)
   {
-    pls->contract_terms = json_object_get (json, "contract_terms");
+    pls->contract_terms = json_object_get (hr->reply,
+                                           "contract_terms");
     if (NULL == pls->contract_terms)
       TALER_TESTING_FAIL (pls->is);
     json_incref (pls->contract_terms);

@@ -85,33 +85,29 @@ struct TrackTransferState
  *        transactions
  */
 static void
-track_transfer_cb
-  (void *cls,
-  unsigned int http_status,
-  enum TALER_ErrorCode ec,
-  const struct TALER_ExchangePublicKeyP *sign_key,
-  const json_t *json,
-  const struct GNUNET_HashCode *h_wire,
-  const struct TALER_Amount *total_amount,
-  unsigned int details_length,
-  const struct TALER_MERCHANT_TrackTransferDetails *details)
+track_transfer_cb (void *cls,
+                   const struct TALER_MERCHANT_HttpResponse *hr,
+                   const struct TALER_ExchangePublicKeyP *sign_key,
+                   const struct GNUNET_HashCode *h_wire,
+                   const struct TALER_Amount *total_amount,
+                   unsigned int details_length,
+                   const struct TALER_MERCHANT_TrackTransferDetails *details)
 {
   /* FIXME, deeper checks should be implemented here. */
   struct TrackTransferState *tts = cls;
 
   tts->tth = NULL;
-  if (tts->http_status != http_status)
+  if (tts->http_status != hr->http_status)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Unexpected response code %u (%d) to command %s\n",
-                http_status,
-                ec,
-                TALER_TESTING_interpreter_get_current_label
-                  (tts->is));
+                hr->http_status,
+                (int) hr->ec,
+                TALER_TESTING_interpreter_get_current_label (tts->is));
     TALER_TESTING_interpreter_fail (tts->is);
     return;
   }
-  switch (http_status)
+  switch (hr->http_status)
   {
   /**
    * Check that all the deposits sum up to the total
@@ -128,9 +124,8 @@ track_transfer_cb
       size_t index;
       json_t *value;
 
-      amount_str = json_string_value
-                     (json_object_get (json,
-                                       "total"));
+      amount_str = json_string_value (json_object_get (hr->reply,
+                                                       "total"));
       if (GNUNET_OK !=
           TALER_string_to_amount (amount_str,
                                   &total))
@@ -141,9 +136,8 @@ track_transfer_cb
         TALER_TESTING_FAIL (tts->is);
         return;
       }
-      amount_str = json_string_value
-                     (json_object_get (json,
-                                       "wire_fee"));
+      amount_str = json_string_value (json_object_get (hr->reply,
+                                                       "wire_fee"));
       if (GNUNET_OK !=
           TALER_string_to_amount (amount_str,
                                   &wire_fee))
@@ -157,13 +151,12 @@ track_transfer_cb
       GNUNET_assert (GNUNET_OK ==
                      TALER_amount_get_zero (total.currency,
                                             &sum));
-      deposits = json_object_get (json,
+      deposits = json_object_get (hr->reply,
                                   "deposits_sums");
       json_array_foreach (deposits, index, value)
       {
-        amount_str = json_string_value
-                       (json_object_get (value,
-                                         "deposit_value"));
+        amount_str = json_string_value (json_object_get (value,
+                                                         "deposit_value"));
         if (GNUNET_OK !=
             TALER_string_to_amount (amount_str,
                                     &amount_iter))
@@ -174,9 +167,8 @@ track_transfer_cb
           TALER_TESTING_FAIL (tts->is);
           return;
         }
-        amount_str = json_string_value
-                       (json_object_get (value,
-                                         "deposit_fee"));
+        amount_str = json_string_value (json_object_get (value,
+                                                         "deposit_fee"));
         if (GNUNET_OK !=
             TALER_string_to_amount (amount_str,
                                     &deposit_fee_iter))
@@ -205,9 +197,8 @@ track_transfer_cb
                                  &total))
       {
         GNUNET_break (0);
-        TALER_LOG_ERROR
-          ("Inconsistent amount transferred."
-          "  Sum: %s, claimed: %s\n",
+        TALER_LOG_ERROR (
+          "Inconsistent amount transferred: Sum %s, claimed %s\n",
           TALER_amount_to_string (&sum),
           TALER_amount_to_string (&total));
         TALER_TESTING_interpreter_fail (tts->is);
@@ -241,15 +232,20 @@ track_transfer_run (void *cls,
   const char *exchange_url;
 
   tts->is = is;
-  check_bank_cmd = TALER_TESTING_interpreter_lookup_command
-                     (is, tts->check_bank_reference);
+  check_bank_cmd
+    = TALER_TESTING_interpreter_lookup_command (is,
+                                                tts->check_bank_reference);
   if (NULL == check_bank_cmd)
     TALER_TESTING_FAIL (is);
-  if (GNUNET_OK != TALER_TESTING_get_trait_wtid
-        (check_bank_cmd, 0, &wtid))
+  if (GNUNET_OK !=
+      TALER_TESTING_get_trait_wtid (check_bank_cmd,
+                                    0,
+                                    &wtid))
     TALER_TESTING_FAIL (is);
-  if (GNUNET_OK != TALER_TESTING_get_trait_url
-        (check_bank_cmd, TALER_TESTING_UT_EXCHANGE_BASE_URL, &exchange_url))
+  if (GNUNET_OK !=
+      TALER_TESTING_get_trait_url (check_bank_cmd,
+                                   TALER_TESTING_UT_EXCHANGE_BASE_URL,
+                                   &exchange_url))
     TALER_TESTING_FAIL (is);
   tts->tth = TALER_MERCHANT_track_transfer (is->ctx,
                                             tts->merchant_url,
@@ -299,11 +295,10 @@ track_transfer_cleanup (void *cls,
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_merchant_track_transfer
-  (const char *label,
-  const char *merchant_url,
-  unsigned int http_status,
-  const char *check_bank_reference)
+TALER_TESTING_cmd_merchant_track_transfer (const char *label,
+                                           const char *merchant_url,
+                                           unsigned int http_status,
+                                           const char *check_bank_reference)
 {
   struct TrackTransferState *tts;
 
@@ -311,15 +306,16 @@ TALER_TESTING_cmd_merchant_track_transfer
   tts->merchant_url = merchant_url;
   tts->http_status = http_status;
   tts->check_bank_reference = check_bank_reference;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = tts,
+      .label = label,
+      .run = &track_transfer_run,
+      .cleanup = &track_transfer_cleanup
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = tts,
-    .label = label,
-    .run = &track_transfer_run,
-    .cleanup = &track_transfer_cleanup
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 

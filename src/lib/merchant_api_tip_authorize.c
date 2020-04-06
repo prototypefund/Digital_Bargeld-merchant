@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2017 Taler Systems SA
+  Copyright (C) 2014-2017, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -33,7 +33,7 @@
 
 
 /**
- * @brief A handle for tracking transactions.
+ * @brief A handle for tip authorizations.
  */
 struct TALER_MERCHANT_TipAuthorizeOperation
 {
@@ -90,6 +90,10 @@ check_ok (struct TALER_MERCHANT_TipAuthorizeOperation *tao,
     GNUNET_JSON_spec_fixed_auto ("tip_id", &tip_id),
     GNUNET_JSON_spec_end ()
   };
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = MHD_HTTP_OK,
+    .reply = json
+  };
 
   if (GNUNET_OK !=
       GNUNET_JSON_parse (json,
@@ -99,16 +103,18 @@ check_ok (struct TALER_MERCHANT_TipAuthorizeOperation *tao,
     char *log;
 
     GNUNET_break_op (0);
-    log = json_dumps (json, 0);
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO, "JSON %s\n", log);
+    log = json_dumps (json,
+                      0);
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "JSON %s\n",
+                log);
     free (log);
     return GNUNET_SYSERR;
   }
   tao->cb (tao->cb_cls,
-           MHD_HTTP_OK,
-           TALER_EC_NONE,
-           taler_tip_uri,
-           &tip_id);
+           &hr,
+           &tip_id,
+           taler_tip_uri);
   tao->cb = NULL; /* do not call twice */
   GNUNET_JSON_parse_free (spec);
   return GNUNET_OK;
@@ -130,7 +136,10 @@ handle_tip_authorize_finished (void *cls,
 {
   struct TALER_MERCHANT_TipAuthorizeOperation *tao = cls;
   const json_t *json = response;
-  enum TALER_ErrorCode ec;
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = (unsigned int) response_code,
+    .reply = json
+  };
 
   tao->job = NULL;
   switch (response_code)
@@ -144,42 +153,49 @@ handle_tip_authorize_finished (void *cls,
       return;
     }
     GNUNET_break_op (0);
-    response_code = 0;
-    ec = TALER_EC_INVALID_RESPONSE;
+    hr.http_status = 0;
+    hr.ec = TALER_EC_INVALID_RESPONSE;
     break;
   case MHD_HTTP_NOT_FOUND:
     /* Well-defined status code, pass on to application! */
-    ec = TALER_JSON_get_error_code (json);
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   case MHD_HTTP_PRECONDITION_FAILED:
     /* Well-defined status code, pass on to application! */
-    ec = TALER_JSON_get_error_code (json);
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
        leaves this to the application */
-    ec = TALER_JSON_get_error_code (json);
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   case MHD_HTTP_SERVICE_UNAVAILABLE:
     /* Server had an unclear (internal or external) issue; we should retry,
        but this API leaves this to the application */
-    ec = TALER_JSON_get_error_code (json);
+    TALER_MERCHANT_parse_error_details_ (json,
+                                         response_code,
+                                         &hr);
     break;
   default:
     /* unexpected response code */
+    GNUNET_break_op (0);
+    TALER_MERCHANT_parse_error_details_ (json,
+                                         response_code,
+                                         &hr);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u\n",
-                (unsigned int) response_code);
-    GNUNET_break (0);
-    ec = TALER_JSON_get_error_code (json);
-    response_code = 0;
+                "Unexpected response code %u/%d\n",
+                (unsigned int) response_code,
+                (int) hr.ec);
     break;
   }
   if (NULL != tao->cb)
     tao->cb (tao->cb_cls,
-             response_code,
-             ec,
-             NULL, NULL);
+             &hr,
+             NULL,
+             NULL);
   TALER_MERCHANT_tip_authorize_cancel (tao);
 }
 
@@ -216,7 +232,9 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
   tao->ctx = ctx;
   tao->cb = authorize_cb;
   tao->cb_cls = authorize_cb_cls;
-  tao->url = TALER_url_join (backend_url, "tip-authorize", NULL);
+  tao->url = TALER_url_join (backend_url,
+                             "tip-authorize",
+                             NULL);
   if (NULL == tao->url)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -278,8 +296,8 @@ TALER_MERCHANT_tip_authorize (struct GNUNET_CURL_Context *ctx,
  * @param tao handle to the tracking operation being cancelled
  */
 void
-TALER_MERCHANT_tip_authorize_cancel (struct
-                                     TALER_MERCHANT_TipAuthorizeOperation *tao)
+TALER_MERCHANT_tip_authorize_cancel (
+  struct TALER_MERCHANT_TipAuthorizeOperation *tao)
 {
   if (NULL != tao->job)
   {

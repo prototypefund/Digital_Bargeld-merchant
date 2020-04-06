@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016, 2017, 2019 Taler Systems SA
+  Copyright (C) 2014, 2015, 2016, 2017, 2019, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -15,7 +15,7 @@
   <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_refund.c
+ * @file lib/merchant_api_refund_increase.c
  * @brief Implementation of the /refund POST and GET
  * @author Christian Grothoff
  * @author Marcello Stanisci
@@ -80,35 +80,37 @@ handle_refund_increase_finished (void *cls,
 {
   struct TALER_MERCHANT_RefundIncreaseOperation *rio = cls;
   const json_t *json = response;
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = (unsigned int) response_code,
+    .reply = json
+  };
 
   rio->job = NULL;
   switch (response_code)
   {
   case 0:
+    hr.ec = TALER_EC_INVALID_RESPONSE;
     rio->cb (rio->cb_cls,
-             0,
-             TALER_EC_INVALID_RESPONSE,
-             NULL);
+             &hr);
     break;
   case MHD_HTTP_OK:
     rio->cb (rio->cb_cls,
-             response_code,
-             TALER_EC_NONE,
-             json);
+             &hr);
     break;
   case MHD_HTTP_CONFLICT:
   case MHD_HTTP_NOT_FOUND:
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     rio->cb (rio->cb_cls,
-             response_code,
-             TALER_JSON_get_error_code (json),
-             json);
+             &hr);
     break;
   default:
     GNUNET_break_op (0); /* unexpected status code */
+    TALER_MERCHANT_parse_error_details_ (json,
+                                         response_code,
+                                         &hr);
     rio->cb (rio->cb_cls,
-             response_code,
-             TALER_JSON_get_error_code (json),
-             json);
+             &hr);
     break;
   }
   TALER_MERCHANT_refund_increase_cancel (rio);
@@ -121,9 +123,8 @@ handle_refund_increase_finished (void *cls,
  * @param rio the refund increasing operation to cancel
  */
 void
-TALER_MERCHANT_refund_increase_cancel (struct
-                                       TALER_MERCHANT_RefundIncreaseOperation *
-                                       rio)
+TALER_MERCHANT_refund_increase_cancel (
+  struct TALER_MERCHANT_RefundIncreaseOperation *rio)
 {
   if (NULL != rio->job)
   {

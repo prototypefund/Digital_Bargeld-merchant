@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016 GNUnet e.V. and INRIA
+  Copyright (C) 2014, 2015, 2016, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -80,51 +80,64 @@ handle_track_transaction_finished (void *cls,
 {
   struct TALER_MERCHANT_TrackTransactionHandle *tdo = cls;
   const json_t *json = response;
+  struct TALER_MERCHANT_HttpResponse hr = {
+    .http_status = (unsigned int) response_code,
+    .reply = json
+  };
 
   tdo->job = NULL;
   switch (response_code)
   {
   case 0:
+    hr.ec = TALER_EC_INVALID_RESPONSE;
     break;
   case MHD_HTTP_OK:
+    /* FIXME: should we not have a timestamp here as well? */
     tdo->cb (tdo->cb_cls,
-             MHD_HTTP_OK,
-             TALER_EC_NONE,
-             json);
+             &hr);
     TALER_MERCHANT_track_transaction_cancel (tdo);
     return;
   case MHD_HTTP_ACCEPTED:
     {
-      /* Expect time stamp of when the transfer is supposed to happen */
+      /* FIXME: Expect time stamp of when the transfer is supposed to happen
+         => Parse it? */
     }
     break;
   case MHD_HTTP_FAILED_DEPENDENCY:
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Exchange gave inconsistent response\n");
+    TALER_MERCHANT_parse_error_details_ (json,
+                                         response_code,
+                                         &hr);
     break;
   case MHD_HTTP_NOT_FOUND:
     /* Nothing really to verify, this should never
        happen, we should pass the JSON reply to the application */
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "Did not find any data\n");
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   case MHD_HTTP_INTERNAL_SERVER_ERROR:
     /* Server had an internal issue; we should retry, but this API
        leaves this to the application */
+    hr.ec = TALER_JSON_get_error_code (json);
+    hr.hint = TALER_JSON_get_error_hint (json);
     break;
   default:
     /* unexpected response code */
+    GNUNET_break_op (0);
+    TALER_MERCHANT_parse_error_details_ (json,
+                                         response_code,
+                                         &hr);
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u\n",
-                (unsigned int) response_code);
-    GNUNET_break (0);
-    response_code = 0;
+                "Unexpected response code %u/%d\n",
+                (unsigned int) response_code,
+                (int) hr.ec);
     break;
   }
   tdo->cb (tdo->cb_cls,
-           response_code,
-           TALER_JSON_get_error_code (json),
-           json);
+           &hr);
   TALER_MERCHANT_track_transaction_cancel (tdo);
 }
 
@@ -140,12 +153,12 @@ handle_track_transaction_finished (void *cls,
  * @return a handle for this request
  */
 struct TALER_MERCHANT_TrackTransactionHandle *
-TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
-                                  const char *backend_url,
-                                  const char *order_id,
-                                  TALER_MERCHANT_TrackTransactionCallback
-                                  track_transaction_cb,
-                                  void *track_transaction_cb_cls)
+TALER_MERCHANT_track_transaction (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *order_id,
+  TALER_MERCHANT_TrackTransactionCallback track_transaction_cb,
+  void *track_transaction_cb_cls)
 {
   struct TALER_MERCHANT_TrackTransactionHandle *tdo;
   CURL *eh;
@@ -189,9 +202,8 @@ TALER_MERCHANT_track_transaction (struct GNUNET_CURL_Context *ctx,
  * @param tdo handle to the tracking operation being cancelled
  */
 void
-TALER_MERCHANT_track_transaction_cancel (struct
-                                         TALER_MERCHANT_TrackTransactionHandle *
-                                         tdo)
+TALER_MERCHANT_track_transaction_cancel (
+  struct TALER_MERCHANT_TrackTransactionHandle *tdo)
 {
   if (NULL != tdo->job)
   {
