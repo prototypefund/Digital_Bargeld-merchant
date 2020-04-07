@@ -109,10 +109,9 @@ parse_instances (const json_t *ia,
                                &ii->instance_baseurl),
       GNUNET_JSON_spec_string ("name",
                                &ii->name),
-      GNUNET_JSON_spec_string ("tipping_exchange_baseurl",
-                               &ii->tipping_exchange_baseurl),
       GNUNET_JSON_spec_end ()
     };
+    json_t *teb;
 
     if (GNUNET_OK !=
         GNUNET_JSON_parse (value,
@@ -121,7 +120,17 @@ parse_instances (const json_t *ia,
     {
       GNUNET_break_op (0);
       ret = GNUNET_SYSERR;
+      continue;
     }
+    teb = json_object_get (value,
+                           "tipping_exchange_baseurl");
+    if (! json_is_string (teb))
+    {
+      GNUNET_break_op (0);
+      ret = GNUNET_SYSERR;
+      continue;
+    }
+    ii->tipping_exchange_baseurl = json_string_value (teb);
   }
   return ret;
 }

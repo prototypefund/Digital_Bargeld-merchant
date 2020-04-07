@@ -101,7 +101,7 @@ struct WireMethod
 
 
 /**
- * Information that defines a merchant "instance". Tha4673t way, a single
+ * Information that defines a merchant "instance". That way, a single
  * backend can account for several merchants, as used to do in donation
  * shops
  */
@@ -356,6 +356,13 @@ extern struct TALER_MerchantPrivateKeyP privkey;
  * Our public key, corresponds to #privkey.
  */
 extern struct TALER_MerchantPublicKeyP pubkey;
+
+/**
+ * Hashmap pointing at merchant instances by 'id'. An 'id' is
+ * just a string that identifies a merchant instance. When a frontend
+ * needs to specify an instance to the backend, it does so by 'id'
+ */
+extern struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
 
 /**
  * Handle to the database backend.

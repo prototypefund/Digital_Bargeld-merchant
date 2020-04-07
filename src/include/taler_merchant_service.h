@@ -184,7 +184,7 @@ struct TALER_MERCHANT_InstanceInformation
   /**
    * URL of this instance.  The URL can be relative to the current domain
    * (i.e. "/PizzaShop/") or include a schema and fully qualified domain name
-   * (i.e. "https://backend.example.com/"). The latter can be used to redirect
+   * (i.e. "https://backend.example.com/PS/"). The latter can be used to redirect
    * clients to a different server in case the deployment location changes.
    */
   const char *instance_baseurl;

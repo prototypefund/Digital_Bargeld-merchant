@@ -42,9 +42,42 @@
  *
  * When changing this version, you likely want to also update
  * #MERCHANT_PROTOCOL_CURRENT and #MERCHANT_PROTOCOL_AGE in
- * TBD.c! // FIXME: update comment once libtalermerchant looks at version!
+ * merchant_api_config.c!
  */
 #define MERCHANT_PROTOCOL_VERSION "0:0:0"
+
+
+static int
+add_instance (void *cls,
+              const struct GNUNET_HashCode *key,
+              void *value)
+{
+  json_t *ja = cls;
+  struct MerchantInstance *mi = value;
+  char *url;
+
+  GNUNET_asprintf (&url,
+                   "/%s/",
+                   mi->id);
+  GNUNET_assert (0 ==
+                 json_array_append_new (
+                   ja,
+                   json_pack (
+                     (NULL != mi->tip_exchange)
+                     ? "{s:s, s:s, s:o, s:s}"
+                     : "{s:s, s:s, s:o}",
+                     "name",
+                     mi->name,
+                     "backend_base_url",
+                     url,
+                     "merchant_pub",
+                     GNUNET_JSON_from_data_auto (&mi->pubkey),
+                     /* optional: */
+                     "tipping_exchange_baseurl",
+                     mi->tip_exchange)));
+  GNUNET_free (url);
+  return GNUNET_OK;
+}
 
 
 /**
@@ -66,16 +99,31 @@ MH_handler_config (struct TMH_RequestHandler *rh,
                    size_t *upload_data_size,
                    struct MerchantInstance *mi)
 {
+  static struct MHD_Response *response;
+
   (void) rh;
   (void) connection_cls;
   (void) upload_data;
   (void) upload_data_size;
   (void) mi;
-  return TALER_MHD_reply_json_pack (connection,
-                                    MHD_HTTP_OK,
-                                    "{s:s, s:s}",
-                                    "currency", TMH_currency,
-                                    "version", MERCHANT_PROTOCOL_VERSION);
+  if (NULL == response)
+  {
+    json_t *ia;
+
+    ia = json_array ();
+    GNUNET_assert (NULL != ia);
+    GNUNET_CONTAINER_multihashmap_iterate (by_id_map,
+                                           &add_instance,
+                                           ia);
+    response = TALER_MHD_make_json_pack ("{s:s, s:s, s:o}",
+                                         "currency", TMH_currency,
+                                         "version", MERCHANT_PROTOCOL_VERSION,
+                                         "instances", ia);
+
+  }
+  return MHD_queue_response (connection,
+                             MHD_HTTP_OK,
+                             response);
 }
 
 
