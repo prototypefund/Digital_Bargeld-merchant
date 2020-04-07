@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016, 2017 INRIA
+  (C) 2014, 2015, 2016, 2017 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -15,13 +15,13 @@
 */
 
 /**
- * @file backend/taler-merchant-httpd_refund.c
- * @brief HTTP serving layer mainly intended to communicate with the frontend
+ * @file backend/taler-merchant-httpd_refund_lookup.h
+ * @brief
  * @author Marcello Stanisci
  */
 
-#ifndef TALER_MERCHANT_HTTPD_REFUND_H
-#define TALER_MERCHANT_HTTPD_REFUND_H
+#ifndef TALER_MERCHANT_HTTPD_REFUND_LOOKUP_H
+#define TALER_MERCHANT_HTTPD_REFUND_LOOKUP_H
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 
@@ -44,20 +44,5 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                           const char *upload_data,
                           size_t *upload_data_size,
                           struct MerchantInstance *mi);
-
-/**
- * Get the JSON representation of a refund.
- *
- * @param merchant_pub the merchant's public key
- * @param mi merchant instance
- * @param ret_ec where to store error code
- * @param ret_errmsg where to store error message
- * @return NULL on error, JSON array with refunds on success
- */
-json_t *
-TM_get_refund_json (const struct MerchantInstance *mi,
-                    const struct GNUNET_HashCode *h_contract_terms,
-                    enum TALER_ErrorCode *ret_ec,
-                    const char **ret_errmsg);
 
 #endif
