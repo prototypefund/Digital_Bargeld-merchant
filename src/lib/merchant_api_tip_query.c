@@ -41,11 +41,6 @@ struct TALER_MERCHANT_TipQueryOperation
   char *url;
 
   /**
-   * JSON encoding of the request to POST.
-   */
-  char *json_enc;
-
-  /**
    * Handle for the request.
    */
   struct GNUNET_CURL_Job *job;
@@ -65,10 +60,6 @@ struct TALER_MERCHANT_TipQueryOperation
    */
   struct GNUNET_CURL_Context *ctx;
 
-  /**
-   * Expected number of planchets.
-   */
-  unsigned int num_planchets;
 };
 
 

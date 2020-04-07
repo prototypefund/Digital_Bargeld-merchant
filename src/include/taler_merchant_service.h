@@ -121,6 +121,175 @@ TALER_MERCHANT_parse_error_details_ (const json_t *response,
                                      struct TALER_MERCHANT_HttpResponse *hr);
 
 
+/* ********************* /public/config ****************** */
+
+
+/**
+ * How compatible are the protocol version of the auditor and this
+ * client?  The bits (1,2,4) can be used to test if the auditor's
+ * version is incompatible, older or newer respectively.
+ */
+enum TALER_MERCHANT_VersionCompatibility
+{
+
+  /**
+   * The auditor runs exactly the same protocol version.
+   */
+  TALER_MERCHANT_VC_MATCH = 0,
+
+  /**
+   * The auditor is too old or too new to be compatible with this
+   * implementation (bit)
+   */
+  TALER_MERCHANT_VC_INCOMPATIBLE = 1,
+
+  /**
+   * The auditor is older than this implementation (bit)
+   */
+  TALER_MERCHANT_VC_OLDER = 2,
+
+  /**
+   * The auditor is too old to be compatible with
+   * this implementation.
+   */
+  TALER_MERCHANT_VC_INCOMPATIBLE_OUTDATED
+    = TALER_MERCHANT_VC_INCOMPATIBLE
+      | TALER_MERCHANT_VC_OLDER,
+
+  /**
+   * The auditor is more recent than this implementation (bit).
+   */
+  TALER_MERCHANT_VC_NEWER = 4,
+
+  /**
+   * The auditor is too recent for this implementation.
+   */
+  TALER_MERCHANT_VC_INCOMPATIBLE_NEWER
+    = TALER_MERCHANT_VC_INCOMPATIBLE
+      | TALER_MERCHANT_VC_NEWER,
+
+  /**
+   * We could not even parse the version data.
+   */
+  TALER_MERCHANT_VC_PROTOCOL_ERROR = 8
+
+};
+
+
+/**
+ * @brief Information about a merchant instance.
+ */
+struct TALER_MERCHANT_InstanceInformation
+{
+  /**
+   * URL of this instance.  The URL can be relative to the current domain
+   * (i.e. "/PizzaShop/") or include a schema and fully qualified domain name
+   * (i.e. "https://backend.example.com/"). The latter can be used to redirect
+   * clients to a different server in case the deployment location changes.
+   */
+  const char *instance_baseurl;
+
+  /**
+   * Legal name of the merchant/instance.
+   */
+  const char *name;
+
+  /**
+   * Base URL of the exchange this instance uses for tipping, or NULL if this
+   * instance does not support tipping.
+   */
+  const char *tipping_exchange_baseurl;
+
+  /**
+   * Public key of the instance.
+   */
+  struct TALER_MerchantPublicKeyP merchant_pub;
+
+};
+
+
+/**
+ * @brief Config information we get from the backend.
+ */
+struct TALER_MERCHANT_ConfigInformation
+{
+  /**
+   * Currency used/supported by the merchant.
+   */
+  const char *currency;
+
+  /**
+   * Supported Taler protocol version by the merchant.
+   * String in the format current:revision:age using the
+   * semantics of GNU libtool.  See
+   * https://www.gnu.org/software/libtool/manual/html_node/Versioning.html#Versioning
+   */
+  const char *version;
+
+  /**
+   * Array with information about the merchant's instances.
+   */
+  struct TALER_MERCHANT_InstanceInformation *iis;
+
+  /**
+   * Length of the @e iis array.
+   */
+  unsigned int iis_len;
+
+};
+
+
+/**
+ * Function called with information about the merchant.
+ *
+ * @param cls closure
+ * @param hr HTTP response data
+ * @param ci basic information about the merchant
+ * @param compat protocol compatibility information
+ */
+typedef void
+(*TALER_MERCHANT_ConfigCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  const struct TALER_MERCHANT_ConfigInformation *ci,
+  enum TALER_MERCHANT_VersionCompatibility compat);
+
+
+/**
+ * Handle for a #TALER_MERCHANT_config_get() operation.
+ */
+struct TALER_MERCHANT_ConfigGetHandle;
+
+
+/**
+ * Get the config data of a merchant. Will connect to the merchant backend
+ * and obtain information about the backend.  The respective information will
+ * be passed to the @a config_cb once available.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param config_cb function to call with the
+ *        backend's config information
+ * @param config_cb_cls closure for @a config_cb
+ * @return the config check handle; NULL upon error
+ */
+struct TALER_MERCHANT_ConfigGetHandle *
+TALER_MERCHANT_config_get (struct GNUNET_CURL_Context *ctx,
+                           const char *backend_url,
+                           TALER_MERCHANT_ConfigCallback config_cb,
+                           void *config_cb_cls);
+
+
+/**
+ * Cancel /config request.  Must not be called by clients after
+ * the callback was invoked.
+ *
+ * @param vgh request to cancel.
+ */
+void
+TALER_MERCHANT_config_get_cancel (struct TALER_MERCHANT_ConfigGetHandle *vgh);
+
+
 /* ********************* /refund ************************** */
 
 /**
