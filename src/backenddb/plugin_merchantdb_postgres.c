@@ -2054,7 +2054,7 @@ process_refund_cb (void *cls,
 
 
 /**
- * Closure for #process_deposits_cb.
+ * Closure for #process_deposits_for_refund_cb.
  */
 struct InsertRefundContext
 {
@@ -2198,7 +2198,9 @@ process_deposits_for_refund_cb (void *cls,
   if (0 >= TALER_amount_cmp (ctx->refund,
                              &current_refund))
   {
-    ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
+    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                "Existing refund of %s at or above requested refund. Finished early.\n",
+                TALER_amount2s (&current_refund));
     return;
   }
 
@@ -2301,11 +2303,11 @@ process_deposits_for_refund_cb (void *cls,
    * Although this should be checked as the business should never
    * issue a refund bigger than the contract's actual price, we cannot
    * rely upon the frontend being correct.
-   */GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+   *///
+  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
               "The refund of %s is bigger than the order's value\n",
               TALER_amount2s (ctx->refund));
-
-  ctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
+  ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
 }
 
 
@@ -2322,39 +2324,40 @@ process_deposits_for_refund_cb (void *cls,
  * @param reason 0-terminated UTF-8 string giving the reason why the customer
  *               got a refund (free form, business-specific)
  * @return transaction status
- *         #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT if the refund is accepted
- *         #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if the refund cannot be issued: this can happen for two
- *               reasons: the issued refund is not greater of the previous refund,
- *               or the coins don't have enough amount left to pay for this refund.
+ *        #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS if @a refund is ABOVE the amount we
+ *        were originally paid and thus the transaction failed;
+ *        #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT if the request is valid,
+ *        regardless of whether it actually increased the refund beyond
+ *        what was already refunded (idempotency!)
  */
 static enum GNUNET_DB_QueryStatus
-postgres_increase_refund_for_contract_NT (void *cls,
-                                          const struct
-                                          GNUNET_HashCode *h_contract_terms,
-                                          const struct
-                                          TALER_MerchantPublicKeyP *merchant_pub,
-                                          const struct TALER_Amount *refund,
-                                          const char *reason)
+postgres_increase_refund_for_contract_NT (
+  void *cls,
+  const struct GNUNET_HashCode *h_contract_terms,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  const struct TALER_Amount *refund,
+  const char *reason)
 {
   struct PostgresClosure *pg = cls;
-  struct InsertRefundContext ctx;
   enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
     GNUNET_PQ_query_param_auto_from_type (merchant_pub),
     GNUNET_PQ_query_param_end
   };
+  struct InsertRefundContext ctx = {
+    .pg = pg,
+    .qs = GNUNET_DB_STATUS_SUCCESS_ONE_RESULT,
+    .refund = refund,
+    .reason = reason,
+    .h_contract_terms = h_contract_terms,
+    .merchant_pub = merchant_pub
+  };
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Asked to refund %s on contract %s\n",
               TALER_amount2s (refund),
               GNUNET_h2s (h_contract_terms));
-  ctx.pg = pg;
-  ctx.qs = GNUNET_DB_STATUS_SUCCESS_ONE_RESULT;
-  ctx.refund = refund;
-  ctx.reason = reason;
-  ctx.h_contract_terms = h_contract_terms;
-  ctx.merchant_pub = merchant_pub;
   qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
                                              "find_deposits",
                                              params,
@@ -2363,11 +2366,8 @@ postgres_increase_refund_for_contract_NT (void *cls,
   switch (qs)
   {
   case GNUNET_DB_STATUS_SUCCESS_NO_RESULTS:
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unknown contract: %s (merchant_pub: %s), no refund possible\n",
-                GNUNET_h2s (h_contract_terms),
-                TALER_B2S (merchant_pub));
-    return qs;
+    /* never paid, means we clearly cannot refund anything */
+    return GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
   case GNUNET_DB_STATUS_SOFT_ERROR:
   case GNUNET_DB_STATUS_HARD_ERROR:
     return qs;

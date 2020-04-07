@@ -25,12 +25,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_refund.h"
 
-/**
- * How often do we retry the non-trivial refund INSERT database
- * transaction?
- */
-#define MAX_RETRIES 5
-
 
 /**
  * Return refund situation about a contract.

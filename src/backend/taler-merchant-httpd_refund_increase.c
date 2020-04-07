@@ -129,82 +129,26 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
 
 
 /**
- * Handle request for increasing the refund associated with
- * a contract.
+ * Process a refund request.
  *
- * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param mi merchant backend instance, never NULL
+ * @param connection HTTP client connection
+ * @param mi merchant instance doing the processing
+ * @param refund amount to be refunded
+ * @param order_id for which order is the refund
+ * @param reason reason for the refund
  * @return MHD result code
  */
-int
-MH_handler_refund_increase (struct TMH_RequestHandler *rh,
-                            struct MHD_Connection *connection,
-                            void **connection_cls,
-                            const char *upload_data,
-                            size_t *upload_data_size,
-                            struct MerchantInstance *mi)
+static int
+process_refund (struct MHD_Connection *connection,
+                struct MerchantInstance *mi,
+                const struct TALER_Amount *refund,
+                const char *order_id,
+                const char *reason)
 {
-  int res;
-  struct TMH_JsonParseContext *ctx;
-  struct TALER_Amount refund;
-  json_t *root;
   json_t *contract_terms;
-  const char *order_id;
-  const char *reason;
-  struct GNUNET_HashCode h_contract_terms;
-  struct GNUNET_CRYPTO_EddsaSignature sig;
-  struct GNUNET_JSON_Specification spec[] = {
-    TALER_JSON_spec_amount ("refund", &refund),
-    GNUNET_JSON_spec_string ("order_id", &order_id),
-    GNUNET_JSON_spec_string ("reason", &reason),
-    GNUNET_JSON_spec_end ()
-  };
   enum GNUNET_DB_QueryStatus qs;
   enum GNUNET_DB_QueryStatus qsx;
-
-  if (NULL == *connection_cls)
-  {
-    ctx = GNUNET_new (struct TMH_JsonParseContext);
-    ctx->hc.cc = &json_parse_cleanup;
-    *connection_cls = ctx;
-  }
-  else
-  {
-    ctx = *connection_cls;
-  }
-  res = TALER_MHD_parse_post_json (connection,
-                                   &ctx->json_parse_context,
-                                   upload_data,
-                                   upload_data_size,
-                                   &root);
-  if (GNUNET_SYSERR == res)
-    return MHD_NO;
-  /* the POST's body has to be further fetched */
-  if ( (GNUNET_NO == res) ||
-       (NULL == root) )
-    return MHD_YES;
-
-  res = TALER_MHD_parse_json_data (connection,
-                                   root,
-                                   spec);
-  if (GNUNET_NO == res)
-  {
-    GNUNET_break_op (0);
-    json_decref (root);
-    return MHD_YES;
-  }
-  if (GNUNET_SYSERR == res)
-  {
-    GNUNET_break_op (0);
-    json_decref (root);
-    return TALER_MHD_reply_with_error (connection,
-                                       MHD_HTTP_BAD_REQUEST,
-                                       TALER_EC_JSON_INVALID,
-                                       "Request body does not match specification");
-  }
+  struct GNUNET_HashCode h_contract_terms;
 
   db->preflight (db->cls);
   /* Convert order id to h_contract_terms */
@@ -219,7 +163,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    json_decref (root);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
                                        TALER_EC_REFUND_LOOKUP_DB_ERROR,
@@ -230,7 +173,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Unknown order id given: `%s'\n",
                 order_id);
-    json_decref (root);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_NOT_FOUND,
                                        TALER_EC_REFUND_ORDER_ID_UNKNOWN,
@@ -242,14 +184,13 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                        &h_contract_terms))
   {
     GNUNET_break (0);
-    GNUNET_JSON_parse_free (spec);
     json_decref (contract_terms);
-    json_decref (root);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
                                        TALER_EC_INTERNAL_LOGIC_ERROR,
                                        "Could not hash contract terms");
   }
+  json_decref (contract_terms);
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
   {
     if (GNUNET_OK !=
@@ -257,14 +198,12 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                    "increase refund"))
     {
       GNUNET_break (0);
-      json_decref (contract_terms);
-      json_decref (root);
       return GNUNET_DB_STATUS_HARD_ERROR;
     }
     qs = db->increase_refund_for_contract_NT (db->cls,
                                               &h_contract_terms,
                                               &mi->pubkey,
-                                              &refund,
+                                              refund,
                                               reason);
     GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                 "increase refund returned %d\n",
@@ -302,9 +241,6 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR != qs);
     /* Always report on hard error as well to enable diagnostics */
     GNUNET_break (GNUNET_DB_STATUS_HARD_ERROR == qs);
-    GNUNET_JSON_parse_free (spec);
-    json_decref (contract_terms);
-    json_decref (root);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
                                        TALER_EC_REFUND_MERCHANT_DB_COMMIT_ERROR,
@@ -312,53 +248,13 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Refunded amount lower or equal to previous refund: %s\n",
-                TALER_amount2s (&refund));
-    GNUNET_JSON_parse_free (spec);
-    json_decref (contract_terms);
-    json_decref (root);
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Refusing refund amount %s that is larger than original payment\n",
+                TALER_amount2s (refund));
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_CONFLICT,
                                        TALER_EC_REFUND_INCONSISTENT_AMOUNT,
-                                       "Amount incorrect: not larger than the previous one");
-  }
-
-  /**
-   * Return to the frontend at this point.  The frontend will then return
-   * a "402 Payment required" carrying a "X-Taler-Refund-Url: www"
-   * where 'www' is the URL where the wallet can automatically fetch
-   * the refund permission.
-   *
-   * Just a "200 OK" should be fine here, as the frontend has all
-   * the information needed to generate the right response.
-   *///
-  {
-    struct TALER_MerchantRefundConfirmationPS confirmation = {
-      .purpose.purpose = htonl (TALER_SIGNATURE_MERCHANT_REFUND_OK),
-      .purpose.size = htonl (sizeof (confirmation))
-    };
-
-    GNUNET_CRYPTO_hash (order_id,
-                        strlen (order_id),
-                        &confirmation.h_order_id);
-
-    if (GNUNET_OK !=
-        GNUNET_CRYPTO_eddsa_sign (&mi->privkey.eddsa_priv,
-                                  &confirmation.purpose,
-                                  &sig))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Failed to sign successful refund confirmation\n");
-      json_decref (contract_terms);
-      GNUNET_JSON_parse_free (spec);
-      json_decref (root);
-      return TALER_MHD_reply_with_error (connection,
-                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                         TALER_EC_REFUND_MERCHANT_SIGNING_FAILED,
-                                         "Refund done, but failed to sign confirmation");
-
-    }
+                                       "Amount above payment");
   }
 
   {
@@ -368,17 +264,101 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
     taler_refund_uri = make_taler_refund_uri (connection,
                                               mi->id,
                                               order_id);
-    ret = TALER_MHD_reply_json_pack (connection,
-                                     MHD_HTTP_OK,
-                                     "{s:o, s:o, s:s}",
-                                     "sig", GNUNET_JSON_from_data_auto (&sig),
-                                     "contract_terms", contract_terms,
-                                     "taler_refund_uri", taler_refund_uri);
+    ret = TALER_MHD_reply_json_pack (
+      connection,
+      MHD_HTTP_OK,
+      "{s:o, s:s}",
+      "h_contract_terms",
+      GNUNET_JSON_from_data_auto (&h_contract_terms),
+      "taler_refund_url",
+      taler_refund_uri);
     GNUNET_free (taler_refund_uri);
-    GNUNET_JSON_parse_free (spec);
-    json_decref (root);
     return ret;
   }
+}
+
+
+/**
+ * Handle request for increasing the refund associated with
+ * a contract.
+ *
+ * @param connection the MHD connection to handle
+ * @param[in,out] connection_cls the connection's closure (can be updated)
+ * @param upload_data upload data
+ * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
+ * @param mi merchant backend instance, never NULL
+ * @return MHD result code
+ */
+int
+MH_handler_refund_increase (struct TMH_RequestHandler *rh,
+                            struct MHD_Connection *connection,
+                            void **connection_cls,
+                            const char *upload_data,
+                            size_t *upload_data_size,
+                            struct MerchantInstance *mi)
+{
+  int res;
+  struct TMH_JsonParseContext *ctx;
+  struct TALER_Amount refund;
+  const char *order_id;
+  const char *reason;
+  struct GNUNET_JSON_Specification spec[] = {
+    TALER_JSON_spec_amount ("refund", &refund),
+    GNUNET_JSON_spec_string ("order_id", &order_id),
+    GNUNET_JSON_spec_string ("reason", &reason),
+    GNUNET_JSON_spec_end ()
+  };
+  json_t *root;
+
+  if (NULL == *connection_cls)
+  {
+    ctx = GNUNET_new (struct TMH_JsonParseContext);
+    ctx->hc.cc = &json_parse_cleanup;
+    *connection_cls = ctx;
+  }
+  else
+  {
+    ctx = *connection_cls;
+  }
+
+  res = TALER_MHD_parse_post_json (connection,
+                                   &ctx->json_parse_context,
+                                   upload_data,
+                                   upload_data_size,
+                                   &root);
+  if (GNUNET_SYSERR == res)
+    return MHD_NO;
+  /* the POST's body has to be further fetched */
+  if ( (GNUNET_NO == res) ||
+       (NULL == root) )
+    return MHD_YES;
+
+  res = TALER_MHD_parse_json_data (connection,
+                                   root,
+                                   spec);
+  if (GNUNET_NO == res)
+  {
+    GNUNET_break_op (0);
+    json_decref (root);
+    return MHD_YES;
+  }
+  if (GNUNET_SYSERR == res)
+  {
+    GNUNET_break_op (0);
+    json_decref (root);
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_JSON_INVALID,
+                                       "Request body does not match specification");
+  }
+  res = process_refund (connection,
+                        mi,
+                        &refund,
+                        order_id,
+                        reason);
+  GNUNET_JSON_parse_free (spec);
+  json_decref (root);
+  return res;
 }
 
 

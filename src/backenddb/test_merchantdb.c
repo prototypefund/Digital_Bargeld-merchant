@@ -981,21 +981,19 @@ run (void *cls)
                                                    &refund_amount,
                                                    "refund testing"));
 
-  FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->increase_refund_for_contract_NT (plugin->cls,
                                                    &h_contract_terms,
                                                    &merchant_pub,
                                                    &refund_amount,
                                                    "same refund amount as "
-                                                   "the previous one, should succeed without changes (0)"));
-
-  /*Should fail as this refund a lesser amount respect to the previous one*/
-  FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
+                                                   "the previous one, should succeed without changes (1)"));
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->increase_refund_for_contract_NT (plugin->cls,
                                                    &h_contract_terms,
                                                    &merchant_pub,
                                                    &little_refund_amount,
-                                                   "lower refund amount as the previous one, should succeed without changes (0)"));
+                                                   "lower refund amount as the previous one, should succeed without changes (1)"));
   FAILIF (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
           plugin->increase_refund_for_contract_NT (plugin->cls,
                                                    &h_contract_terms,
@@ -1003,13 +1001,12 @@ run (void *cls)
                                                    &right_second_refund_amount,
                                                    "right refund increase"));
 
-  FAILIF (GNUNET_DB_STATUS_HARD_ERROR !=
+  FAILIF (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS !=
           plugin->increase_refund_for_contract_NT (plugin->cls,
                                                    &h_contract_terms,
                                                    &merchant_pub,
                                                    &too_big_refund_amount,
-                                                   "make refund testing fail due"
-                                                   " to too big refund amount"));
+                                                   "make refund testing fail due to too big refund amount"));
 
   FAILIF (GNUNET_OK !=
           test_wire_fee ());
