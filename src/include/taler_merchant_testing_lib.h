@@ -65,6 +65,22 @@ TALER_TESTING_run_merchant (const char *config_filename,
 
 /* ************** Specific interpreter commands ************ */
 
+
+/**
+ * Define a "config" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        "config" request.
+ * @param http_code expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_config (const char *label,
+                          const char *merchant_url,
+                          unsigned int http_code);
+
+
 /**
  * Make the "proposal" command.
  *

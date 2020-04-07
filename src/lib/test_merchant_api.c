@@ -833,6 +833,9 @@ run (void *cls,
   };
 
   struct TALER_TESTING_Command commands[] = {
+    TALER_TESTING_cmd_config ("config",
+                              merchant_url,
+                              MHD_HTTP_OK),
     TALER_TESTING_cmd_batch ("pay",
                              pay),
     TALER_TESTING_cmd_batch ("double-spending",
