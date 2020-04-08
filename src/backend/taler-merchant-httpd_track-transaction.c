@@ -1074,7 +1074,7 @@ find_exchange (struct TrackTransactionContext *tctx)
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_track_transaction (struct TMH_RequestHandler *rh,
                               struct MHD_Connection *connection,
                               void **connection_cls,
@@ -1102,7 +1102,7 @@ MH_handler_track_transaction (struct TMH_RequestHandler *rh,
 
   if (0 != tctx->response_code)
   {
-    int ret;
+    MHD_RESULT ret;
 
     /* We are *done* processing the request, just queue the response (!) */
     if (UINT_MAX == tctx->response_code)

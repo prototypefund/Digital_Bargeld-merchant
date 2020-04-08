@@ -109,7 +109,7 @@ struct PollPaymentRequestContext
 
   /**
    * Initially #GNUNET_SYSERR. If we queued a response, set to the
-   * result code (i.e. #MHD_YES or #MHD_NO).
+   * result code (i.e. #MHD_YES or #MHD_NO). FIXME: fix type!
    */
   int ret;
 
@@ -174,10 +174,10 @@ process_refunds_cb (void *cls,
  * @param pprc check pay request context
  * @return #MHD_YES on success
  */
-static int
+static MHD_RESULT
 send_pay_request (struct PollPaymentRequestContext *pprc)
 {
-  int ret;
+  MHD_RESULT ret;
   char *already_paid_order_id = NULL;
   char *taler_pay_uri;
   struct GNUNET_TIME_Relative remaining;
@@ -255,7 +255,7 @@ send_pay_request (struct PollPaymentRequestContext *pprc)
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_poll_payment (struct TMH_RequestHandler *rh,
                          struct MHD_Connection *connection,
                          void **connection_cls,
@@ -265,7 +265,7 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
 {
   struct PollPaymentRequestContext *pprc = *connection_cls;
   enum GNUNET_DB_QueryStatus qs;
-  int ret;
+  MHD_RESULT ret;
 
   if (NULL == pprc)
   {

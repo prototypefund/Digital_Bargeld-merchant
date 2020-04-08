@@ -52,7 +52,7 @@
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
                             struct MHD_Connection *connection,
                             void **connection_cls,
@@ -107,7 +107,7 @@ MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
       GNUNET_JSON_spec_absolute_time ("timestamp", &timestamp),
       GNUNET_JSON_spec_end ()
     };
-    int res;
+    enum GNUNET_GenericReturnValue res;
 
     db->preflight (db->cls);
     qs = db->find_order (db->cls,

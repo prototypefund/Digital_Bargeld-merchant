@@ -138,7 +138,7 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
  * @param reason reason for the refund
  * @return MHD result code
  */
-static int
+static MHD_RESULT
 process_refund (struct MHD_Connection *connection,
                 struct MerchantInstance *mi,
                 const struct TALER_Amount *refund,
@@ -258,7 +258,7 @@ process_refund (struct MHD_Connection *connection,
   }
 
   {
-    int ret;
+    MHD_RESULT ret;
     char *taler_refund_uri;
 
     taler_refund_uri = make_taler_refund_uri (connection,
@@ -289,7 +289,7 @@ process_refund (struct MHD_Connection *connection,
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                             struct MHD_Connection *connection,
                             void **connection_cls,
@@ -297,7 +297,7 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                             size_t *upload_data_size,
                             struct MerchantInstance *mi)
 {
-  int res;
+  enum GNUNET_GenericReturnValue res;
   struct TMH_JsonParseContext *ctx;
   struct TALER_Amount refund;
   const char *order_id;
@@ -351,14 +351,18 @@ MH_handler_refund_increase (struct TMH_RequestHandler *rh,
                                        TALER_EC_JSON_INVALID,
                                        "Request body does not match specification");
   }
-  res = process_refund (connection,
-                        mi,
-                        &refund,
-                        order_id,
-                        reason);
-  GNUNET_JSON_parse_free (spec);
-  json_decref (root);
-  return res;
+  {
+    MHD_RESULT ret;
+
+    ret = process_refund (connection,
+                          mi,
+                          &refund,
+                          order_id,
+                          reason);
+    GNUNET_JSON_parse_free (spec);
+    json_decref (root);
+    return ret;
+  }
 }
 
 

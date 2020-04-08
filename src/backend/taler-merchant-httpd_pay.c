@@ -1456,7 +1456,7 @@ check_coin_paid (void *cls,
  *         #GNUNET_NO on failure (response was queued with MHD)
  *         #GNUNET_SYSERR on hard error (MHD connection must be dropped)
  */
-static int
+static enum GNUNET_GenericReturnValue
 parse_pay (struct MHD_Connection *connection,
            const json_t *root,
            struct PayContext *pc)
@@ -1465,7 +1465,7 @@ parse_pay (struct MHD_Connection *connection,
   const char *order_id;
   const char *mode;
   struct TALER_MerchantPublicKeyP merchant_pub;
-  int res;
+  enum GNUNET_GenericReturnValue res;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_string ("mode",
                              &mode),
@@ -2167,13 +2167,13 @@ begin_transaction (struct PayContext *pc)
  * @return value to return to MHD (#MHD_NO to drop connection,
  *         #MHD_YES to keep handling it)
  */
-static int
+static MHD_RESULT
 handler_pay_json (struct MHD_Connection *connection,
                   const json_t *root,
                   struct PayContext *pc)
 {
   {
-    int ret;
+    enum GNUNET_GenericReturnValue ret;
 
     ret = parse_pay (connection,
                      root,
@@ -2209,7 +2209,7 @@ handler_pay_json (struct MHD_Connection *connection,
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_pay (struct TMH_RequestHandler *rh,
                 struct MHD_Connection *connection,
                 void **connection_cls,
@@ -2218,7 +2218,8 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
                 struct MerchantInstance *mi)
 {
   struct PayContext *pc;
-  int res;
+  enum GNUNET_GenericReturnValue res;
+  MHD_RESULT ret;
   json_t *root;
 
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
@@ -2282,11 +2283,11 @@ MH_handler_pay (struct TMH_RequestHandler *rh,
        (NULL == root) )
     return MHD_YES; /* the POST's body has to be further fetched */
 
-  res = handler_pay_json (connection,
+  ret = handler_pay_json (connection,
                           root,
                           pc);
   json_decref (root);
-  return res;
+  return ret;
 }
 
 

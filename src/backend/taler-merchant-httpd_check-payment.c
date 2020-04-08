@@ -353,7 +353,7 @@ check_order_and_request_payment (struct CheckPaymentRequestContext *cprc)
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_check_payment (struct TMH_RequestHandler *rh,
                           struct MHD_Connection *connection,
                           void **connection_cls,
@@ -363,7 +363,7 @@ MH_handler_check_payment (struct TMH_RequestHandler *rh,
 {
   struct CheckPaymentRequestContext *cprc = *connection_cls;
   enum GNUNET_DB_QueryStatus qs;
-  int ret;
+  MHD_RESULT ret;
 
   if (NULL == cprc)
   {

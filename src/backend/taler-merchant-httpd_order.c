@@ -204,13 +204,13 @@ make_merchant_base_url (struct MHD_Connection *connection, const
  * @param order[in] order to process (can be modified)
  * @return MHD result code
  */
-static int
+static MHD_RESULT
 proposal_put (struct MHD_Connection *connection,
               json_t *root,
               json_t *order,
               const struct MerchantInstance *mi)
 {
-  int res;
+  enum GNUNET_GenericReturnValue res;
   struct TALER_Amount total;
   const char *order_id;
   const char *summary;
@@ -698,18 +698,24 @@ MH_handler_order_post (struct TMH_RequestHandler *rh,
     return MHD_YES;
   order = json_object_get (root,
                            "order");
-  if (NULL == order)
   {
-    res = TALER_MHD_reply_with_error
-            (connection,
-            MHD_HTTP_BAD_REQUEST,
-            TALER_EC_PARAMETER_MISSING,
-            "order");
+    MHD_RESULT ret;
+
+    if (NULL == order)
+    {
+      ret = TALER_MHD_reply_with_error
+              (connection,
+              MHD_HTTP_BAD_REQUEST,
+              TALER_EC_PARAMETER_MISSING,
+              "order");
+    }
+    else
+    {
+      ret = proposal_put (connection, root, order, mi);
+    }
+    json_decref (root);
+    return ret;
   }
-  else
-    res = proposal_put (connection, root, order, mi);
-  json_decref (root);
-  return res;
 }
 
 

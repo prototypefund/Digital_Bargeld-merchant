@@ -177,7 +177,7 @@ pickup_cleanup (struct TM_HandlerContext *hc)
  * @return #MHD_YES upon success, #MHD_NO if
  *         the connection ought to be dropped
  */
-static int
+static MHD_RESULT
 run_pickup (struct MHD_Connection *connection,
             struct PickupContext *pc)
 {
@@ -400,7 +400,7 @@ exchange_found_cb (void *cls,
  * @return #MHD_YES upon success, #MHD_NO if
  *         the connection ought to be dropped
  */
-static int
+static MHD_RESULT
 prepare_pickup (struct PickupContext *pc)
 {
   enum GNUNET_DB_QueryStatus qs;
@@ -507,7 +507,7 @@ parse_planchet (struct MHD_Connection *connection,
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
                        struct MHD_Connection *connection,
                        void **connection_cls,
@@ -515,7 +515,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
                        size_t *upload_data_size,
                        struct MerchantInstance *mi)
 {
-  int res;
+  enum GNUNET_GenericReturnValue res;
   struct GNUNET_HashCode tip_id;
   json_t *planchets;
   struct GNUNET_JSON_Specification spec[] = {
@@ -604,10 +604,14 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
     }
   }
   pc->tip_id = tip_id;
-  res = prepare_pickup (pc);
-  GNUNET_JSON_parse_free (spec);
-  json_decref (root);
-  return res;
+  {
+    MHD_RESULT ret;
+
+    ret = prepare_pickup (pc);
+    GNUNET_JSON_parse_free (spec);
+    json_decref (root);
+    return ret;
+  }
 }
 
 
@@ -623,7 +627,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
                            struct MHD_Connection *connection,
                            void **connection_cls,
@@ -639,8 +643,8 @@ MH_handler_tip_pickup_get (struct TMH_RequestHandler *rh,
   struct TALER_Amount tip_amount_left;
   struct GNUNET_TIME_Absolute timestamp;
   struct GNUNET_TIME_Absolute timestamp_expire;
-  int ret;
-  int qs;
+  MHD_RESULT ret;
+  enum GNUNET_DB_QueryStatus qs;
 
   tip_id_str = MHD_lookup_connection_value (connection,
                                             MHD_GET_ARGUMENT_KIND,

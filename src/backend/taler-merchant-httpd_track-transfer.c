@@ -927,7 +927,7 @@ proof_cb (void *cls,
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_track_transfer (struct TMH_RequestHandler *rh,
                            struct MHD_Connection *connection,
                            void **connection_cls,
@@ -939,7 +939,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   const char *str;
   const char *url;
   const char *wire_method;
-  int ret;
+  MHD_RESULT ret;
   enum GNUNET_DB_QueryStatus qs;
 
   if (NULL == *connection_cls)

@@ -40,7 +40,7 @@
  * @param mi merchant backend instance, NULL is allowed in this case!
  * @return MHD result code
  */
-int
+MHD_RESULT
 TMH_MHD_handler_static_response (struct TMH_RequestHandler *rh,
                                  struct MHD_Connection *connection,
                                  void **connection_cls,
@@ -61,7 +61,7 @@ TMH_MHD_handler_static_response (struct TMH_RequestHandler *rh,
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 TMH_MHD_handler_agpl_redirect (struct TMH_RequestHandler *rh,
                                struct MHD_Connection *connection,
                                void **connection_cls,
@@ -83,7 +83,7 @@ TMH_MHD_handler_agpl_redirect (struct TMH_RequestHandler *rh,
  * @param ... varargs
  * @return MHD result code
  */
-int
+MHD_RESULT
 TMH_MHD_helper_send_json_pack (struct TMH_RequestHandler *rh,
                                struct MHD_Connection *connection,
                                void *connection_cls,
@@ -105,7 +105,7 @@ TMH_MHD_helper_send_json_pack (struct TMH_RequestHandler *rh,
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 TMH_MHD_handler_send_json_pack_error (struct TMH_RequestHandler *rh,
                                       struct MHD_Connection *connection,
                                       void **connection_cls,

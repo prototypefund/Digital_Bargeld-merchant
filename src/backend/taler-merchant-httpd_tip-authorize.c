@@ -108,7 +108,7 @@ cleanup_tac (struct TM_HandlerContext *hc)
  * @param mi merchant backend instance, never NULL
  * @return MHD result code
  */
-int
+MHD_RESULT
 MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                           struct MHD_Connection *connection,
                           void **connection_cls,
@@ -117,7 +117,7 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                           struct MerchantInstance *mi)
 {
   struct TipAuthContext *tac;
-  int res;
+  enum GNUNET_GenericReturnValue res;
   enum TALER_ErrorCode ec;
   struct GNUNET_TIME_Absolute expiration;
   struct GNUNET_HashCode tip_id;
@@ -136,12 +136,14 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
   }
   if (NULL != tac->ctr.response)
   {
-    res = MHD_queue_response (connection,
+    MHD_RESULT ret;
+
+    ret = MHD_queue_response (connection,
                               tac->ctr.response_code,
                               tac->ctr.response);
     MHD_destroy_response (tac->ctr.response);
     tac->ctr.response = NULL;
-    return res;
+    return ret;
   }
   if (GNUNET_NO == tac->parsed_json)
   {
@@ -292,13 +294,11 @@ MH_handler_tip_authorize (struct TMH_RequestHandler *rh,
                                         uri_instance_id,
                                         hash_enc.encoding));
 
-
-    res = TALER_MHD_reply_json_pack (connection,
-                                     MHD_HTTP_OK,
-                                     "{s:s, s:s}",
-                                     "taler_tip_uri", taler_tip_uri,
-                                     "tip_id", hash_enc.encoding);
-    return res;
+    return TALER_MHD_reply_json_pack (connection,
+                                      MHD_HTTP_OK,
+                                      "{s:s, s:s}",
+                                      "taler_tip_uri", taler_tip_uri,
+                                      "tip_id", hash_enc.encoding);
   }
 }
 

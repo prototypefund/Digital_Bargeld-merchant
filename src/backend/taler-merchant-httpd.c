@@ -1221,7 +1221,7 @@ iterate_instances (void)
  *         #MHD_NO if the socket must be closed due to a serious
  *         error while handling the request
  */
-static int
+static MHD_RESULT
 url_handler (void *cls,
              struct MHD_Connection *connection,
              const char *url,
@@ -1314,7 +1314,7 @@ url_handler (void *cls,
   int is_public;
   /* Matching URL found, but maybe method doesn't match */
   int url_found = GNUNET_NO;
-  int ret;
+  MHD_RESULT ret;
   struct TMH_RequestHandler *selected_handler = NULL;
 
   (void) cls;

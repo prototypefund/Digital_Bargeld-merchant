@@ -25,6 +25,7 @@
 #include "taler_merchantdb_lib.h"
 #include <microhttpd.h>
 #include <taler/taler_mhd_lib.h>
+#include <gnunet/gnunet_mhd_compat.h>
 
 /**
  * Shorthand for exit jumps.
@@ -202,17 +203,17 @@ struct TMH_RequestHandler
    * @param mi merchant backend instance, never NULL
    * @return MHD result code
    */
-  int (*handler)(struct TMH_RequestHandler *rh,
-                 struct MHD_Connection *connection,
-                 void **connection_cls,
-                 const char *upload_data,
-                 size_t *upload_data_size,
-                 struct MerchantInstance *mi);
+  MHD_RESULT (*handler)(struct TMH_RequestHandler *rh,
+                        struct MHD_Connection *connection,
+                        void **connection_cls,
+                        const char *upload_data,
+                        size_t *upload_data_size,
+                        struct MerchantInstance *mi);
 
   /**
    * Default response code.
    */
-  int response_code;
+  unsigned int response_code;
 };
 
 
