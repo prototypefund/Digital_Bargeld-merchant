@@ -236,7 +236,7 @@ build_coins (struct TALER_MERCHANT_PayCoin **pc,
                               TALER_TESTING_find_pk (is->keys,
                                                      &icoin->denom_value)));
 
-    GNUNET_assert (GNUNET_SYSERR !=
+    GNUNET_assert (0 <=
                    TALER_amount_subtract (&icoin->amount_without_fee,
                                           &icoin->denom_value,
                                           &dpk->fee_deposit));

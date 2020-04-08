@@ -107,7 +107,7 @@ make_track_transaction_ok (unsigned int num_transfers,
     {
       const struct TALER_MERCHANT_CoinWireTransfer *coin = &transfer->coins[j];
 
-      GNUNET_assert (GNUNET_SYSERR !=
+      GNUNET_assert (0 <=
                      TALER_amount_add (&sum,
                                        &sum,
                                        &coin->amount_with_fee));

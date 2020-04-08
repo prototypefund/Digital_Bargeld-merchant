@@ -260,9 +260,10 @@ refund_lookup_cb (void *cls,
     /* Can be NULL: not all coins are involved in refund */
     if (NULL == iamount)
       continue;
-    GNUNET_assert (GNUNET_OK == TALER_amount_add (&acc,
-                                                  &acc,
-                                                  iamount));
+    GNUNET_assert (0 <=
+                   TALER_amount_add (&acc,
+                                     &acc,
+                                     iamount));
   }
 
   GNUNET_free (coin_reference_dup);

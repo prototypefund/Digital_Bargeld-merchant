@@ -179,17 +179,17 @@ track_transfer_cb (void *cls,
           TALER_TESTING_FAIL (tts->is);
           return;
         }
-        GNUNET_assert (GNUNET_SYSERR !=
+        GNUNET_assert (0 <=
                        TALER_amount_add (&sum,
                                          &sum,
                                          &amount_iter));
-        GNUNET_assert (GNUNET_SYSERR !=
+        GNUNET_assert (0 <=
                        TALER_amount_subtract (&sum,
                                               &sum,
                                               &deposit_fee_iter));
       }
 
-      GNUNET_assert (GNUNET_SYSERR !=
+      GNUNET_assert (0 <=
                      TALER_amount_subtract (&sum,
                                             &sum,
                                             &wire_fee));

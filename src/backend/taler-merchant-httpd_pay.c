@@ -728,11 +728,11 @@ check_payment_sufficient (struct PayContext *pc)
     struct DepositConfirmation *dc = &pc->dc[i];
 
     GNUNET_assert (GNUNET_YES == dc->found_in_db);
-    if ( (GNUNET_OK !=
+    if ( (0 >
           TALER_amount_add (&acc_fee,
                             &dc->deposit_fee,
                             &acc_fee)) ||
-         (GNUNET_OK !=
+         (0 >
           TALER_amount_add (&acc_amount,
                             &dc->amount_with_fee,
                             &acc_amount)) )
@@ -780,7 +780,7 @@ check_payment_sufficient (struct PayContext *pc)
                                  "exchange wire in different currency");
           return GNUNET_SYSERR;
         }
-        if (GNUNET_OK !=
+        if (0 >
             TALER_amount_add (&total_wire_fee,
                               &total_wire_fee,
                               &dc->wire_fee))
@@ -828,28 +828,31 @@ check_payment_sufficient (struct PayContext *pc)
     return GNUNET_SYSERR;
   }
 
-  if (GNUNET_OK ==
-      TALER_amount_subtract (&wire_fee_delta,
-                             &total_wire_fee,
-                             &pc->max_wire_fee))
+  switch (TALER_amount_subtract (&wire_fee_delta,
+                                 &total_wire_fee,
+                                 &pc->max_wire_fee))
   {
+  case TALER_AAR_RESULT_POSITIVE:
     /* Actual wire fee is indeed higher than our maximum,
        compute how much the customer is expected to cover!  */
     TALER_amount_divide (&wire_fee_customer_contribution,
                          &wire_fee_delta,
                          pc->wire_fee_amortization);
-  }
-  else
-  {
+    break;
+  case TALER_AAR_RESULT_ZERO:
+  case TALER_AAR_INVALID_NEGATIVE_RESULT:
     /* Wire fee threshold is still above the wire fee amount.
        Customer is not going to contribute on this.  */
     GNUNET_assert (GNUNET_OK ==
                    TALER_amount_get_zero (total_wire_fee.currency,
                                           &wire_fee_customer_contribution));
+    break;
+  default:
+    GNUNET_assert (0);
   }
 
   /* add wire fee contribution to the total fees */
-  if (GNUNET_OK !=
+  if (0 >
       TALER_amount_add (&acc_fee,
                         &acc_fee,
                         &wire_fee_customer_contribution))
@@ -872,12 +875,12 @@ check_payment_sufficient (struct PayContext *pc)
     struct TALER_Amount excess_fee;
 
     /* compute fee amount to be covered by customer */
-    GNUNET_assert (GNUNET_OK ==
+    GNUNET_assert (TALER_AAR_RESULT_POSITIVE ==
                    TALER_amount_subtract (&excess_fee,
                                           &acc_fee,
                                           &pc->max_fee));
     /* add that to the total */
-    if (GNUNET_OK !=
+    if (0 >
         TALER_amount_add (&total_needed,
                           &excess_fee,
                           &pc->amount))
@@ -901,7 +904,7 @@ check_payment_sufficient (struct PayContext *pc)
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
               "Subtracting total refunds from paid amount: %s\n",
               TALER_amount2s (&pc->total_refunded));
-  if (GNUNET_SYSERR ==
+  if (0 >
       TALER_amount_subtract (&final_amount,
                              &acc_amount,
                              &pc->total_refunded))
@@ -1412,7 +1415,7 @@ check_coin_paid (void *cls,
                 "Coin (%s) already found in our DB.\n",
                 TALER_b2s (coin_pub,
                            sizeof (*coin_pub)));
-    if (GNUNET_OK !=
+    if (0 >
         TALER_amount_add (&pc->total_paid,
                           &pc->total_paid,
                           amount_with_fee))
@@ -1422,7 +1425,7 @@ check_coin_paid (void *cls,
       GNUNET_break (0);
       continue;
     }
-    if (GNUNET_OK !=
+    if (0 >
         TALER_amount_add (&pc->total_fees_paid,
                           &pc->total_fees_paid,
                           deposit_fee))
@@ -1810,10 +1813,10 @@ check_coin_refunded (void *cls,
                             &dc->coin_pub))
     {
       dc->refunded = GNUNET_YES;
-      GNUNET_break (GNUNET_OK ==
-                    TALER_amount_add (&pc->total_refunded,
-                                      &pc->total_refunded,
-                                      refund_amount));
+      GNUNET_assert (0 <=
+                     TALER_amount_add (&pc->total_refunded,
+                                       &pc->total_refunded,
+                                       refund_amount));
     }
   }
 }

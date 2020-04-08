@@ -95,7 +95,7 @@ generate_final_response (struct TipQueryContext *tqc)
 
   GNUNET_CRYPTO_eddsa_key_get_public (&tqc->ctr.reserve_priv.eddsa_priv,
                                       &reserve_pub);
-  if (GNUNET_SYSERR ==
+  if (0 >
       TALER_amount_subtract (&amount_available,
                              &tqc->ctr.amount_deposited,
                              &tqc->ctr.amount_withdrawn))

@@ -241,7 +241,7 @@ build_deposits_response (void *cls,
   json_t *order_id;
 
   db->preflight (db->cls);
-  if (GNUNET_OK !=
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT !=
       db->find_contract_terms_from_hash (db->cls,
                                          &contract_terms,
                                          key,
@@ -331,11 +331,11 @@ transform_response (const json_t *result,
                                                       &h_key)))
     {
       /* The map already knows this h_contract_terms*/
-      if ( (GNUNET_SYSERR ==
+      if ( (0 >
             TALER_amount_add (&current_entry->deposit_value,
                               &current_entry->deposit_value,
                               &iter_value)) ||
-           (GNUNET_SYSERR ==
+           (0 >
             TALER_amount_add (&current_entry->deposit_fee,
                               &current_entry->deposit_fee,
                               &iter_fee)) )

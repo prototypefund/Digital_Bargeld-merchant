@@ -351,7 +351,7 @@ exchange_found_cb (void *cls,
     GNUNET_CRYPTO_hash_context_read (hc,
                                      pd->coin_ev,
                                      pd->coin_ev_size);
-    if (GNUNET_OK !=
+    if (0 >
         TALER_amount_add (&amount_with_fee,
                           &dk->value,
                           &dk->fee_withdraw))
@@ -364,7 +364,7 @@ exchange_found_cb (void *cls,
     }
     else
     {
-      if (GNUNET_OK !=
+      if (0 >
           TALER_amount_add (&total,
                             &total,
                             &amount_with_fee))

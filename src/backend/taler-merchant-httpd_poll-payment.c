@@ -157,7 +157,7 @@ process_refunds_cb (void *cls,
 
   if (pprc->refunded)
   {
-    GNUNET_assert (GNUNET_SYSERR !=
+    GNUNET_assert (0 <=
                    TALER_amount_add (&pprc->refund_amount,
                                      &pprc->refund_amount,
                                      refund_amount));

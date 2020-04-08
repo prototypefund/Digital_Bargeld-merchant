@@ -184,7 +184,7 @@ handle_status (void *cls,
         struct GNUNET_HashCode uuid;
         struct GNUNET_TIME_Absolute deposit_expiration;
 
-        if (GNUNET_OK !=
+        if (0 >
             TALER_amount_add (&ctr->amount_deposited,
                               &ctr->amount_deposited,
                               &hi->amount))
@@ -226,7 +226,7 @@ handle_status (void *cls,
       }
       break;
     case TALER_EXCHANGE_RTT_WITHDRAWAL:
-      if (GNUNET_OK !=
+      if (0 >
           TALER_amount_add (&ctr->amount_withdrawn,
                             &ctr->amount_withdrawn,
                             &hi->amount))
@@ -252,7 +252,7 @@ handle_status (void *cls,
         GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                     "Encountered unexpected recoup operation on tipping reserve\n");
         /* While unexpected, we can simply count these like deposits. */
-        if (GNUNET_OK !=
+        if (0 >
             TALER_amount_add (&ctr->amount_deposited,
                               &ctr->amount_deposited,
                               &hi->amount))
@@ -300,7 +300,7 @@ handle_status (void *cls,
       break;
     case TALER_EXCHANGE_RTT_CLOSE:
       /* We count 'closing' amounts just like withdrawals */
-      if (GNUNET_OK !=
+      if (0 >
           TALER_amount_add (&ctr->amount_withdrawn,
                             &ctr->amount_withdrawn,
                             &hi->amount))

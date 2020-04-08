@@ -1017,7 +1017,7 @@ find_tip_authorizations_cb (void *cls,
     }
     else
     {
-      if (GNUNET_OK !=
+      if (0 >
           TALER_amount_add (&ctx->authorized_amount,
                             &ctx->authorized_amount,
                             &amount))
@@ -2037,7 +2037,7 @@ process_refund_cb (void *cls,
       ictx->err = GNUNET_SYSERR;
       return;
     }
-    if (GNUNET_SYSERR ==
+    if (0 >
         TALER_amount_add (&ictx->refunded_amount,
                           &ictx->refunded_amount,
                           &acc))
@@ -2174,7 +2174,7 @@ process_deposits_for_refund_cb (void *cls,
     deposit_amount_with_fee[i] = amount_with_fee;
     deposit_coin_pubs[i] = coin_pub;
     deposit_refund_fee[i] = refund_fee;
-    if (GNUNET_SYSERR ==
+    if (0 >
         TALER_amount_add (&current_refund,
                           &current_refund,
                           &ictx.refunded_amount))
@@ -2212,7 +2212,7 @@ process_deposits_for_refund_cb (void *cls,
     struct TALER_Amount remaining_refund;
 
     /* How much of the coin is left after the existing refunds? */
-    if (GNUNET_SYSERR ==
+    if (0 >
         TALER_amount_subtract (&left,
                                &deposit_amount_with_fee[i],
                                &deposit_refund[i]))
@@ -2233,7 +2233,7 @@ process_deposits_for_refund_cb (void *cls,
     }
 
     /* How much of the refund is still to be paid back? */
-    if (GNUNET_SYSERR ==
+    if (0 >
         TALER_amount_subtract (&remaining_refund,
                                ctx->refund,
                                &current_refund))
@@ -2255,7 +2255,7 @@ process_deposits_for_refund_cb (void *cls,
       increment = &left;
     }
 
-    if (GNUNET_SYSERR ==
+    if (0 >
         TALER_amount_add (&current_refund,
                           &current_refund,
                           increment))
@@ -2558,7 +2558,7 @@ RETRY:
   {
     new_expiration = GNUNET_TIME_absolute_max (old_expiration,
                                                expiration);
-    if (GNUNET_OK !=
+    if (0 >
         TALER_amount_add (&new_balance,
                           credit,
                           &old_balance))
@@ -2696,7 +2696,7 @@ RETRY:
     postgres_rollback (pg);
     return TALER_EC_TIP_AUTHORIZE_RESERVE_EXPIRED;
   }
-  if (GNUNET_SYSERR ==
+  if (0 >
       TALER_amount_subtract (&new_balance,
                              &old_balance,
                              amount))
@@ -2958,7 +2958,7 @@ RETRY:
   {
     struct TALER_Amount new_left;
 
-    if (GNUNET_SYSERR ==
+    if (0 >
         TALER_amount_subtract (&new_left,
                                &left_amount,
                                amount))

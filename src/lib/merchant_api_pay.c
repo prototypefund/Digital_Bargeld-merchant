@@ -257,7 +257,7 @@ check_coin_history (const struct TALER_MERCHANT_PaidCoin *pc,
     GNUNET_break_op (0);
     return GNUNET_SYSERR;
   }
-  if (GNUNET_OK !=
+  if (0 >
       TALER_amount_add (&spent_plus_contrib,
                         &spent,
                         &pc->amount_with_fee))
@@ -610,7 +610,7 @@ request_pay_generic (
     const struct TALER_MERCHANT_PaidCoin *pc = &coins[i];
     struct TALER_Amount fee;
 
-    if (GNUNET_SYSERR ==
+    if (0 >
         TALER_amount_subtract (&fee,
                                &pc->amount_with_fee,
                                &pc->amount_without_fee))
@@ -628,11 +628,11 @@ request_pay_generic (
     }
     else
     {
-      if ( (GNUNET_OK !=
+      if ( (0 >
             TALER_amount_add (&total_fee,
                               &total_fee,
                               &fee)) ||
-           (GNUNET_OK !=
+           (0 >
             TALER_amount_add (&total_amount,
                               &total_amount,
                               &pc->amount_with_fee)) )
@@ -825,7 +825,7 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
                                         &dr.coin_pub.eddsa_pub);
     TALER_amount_hton (&dr.amount_with_fee,
                        &coin->amount_with_fee);
-    if (GNUNET_SYSERR ==
+    if (0 >
         TALER_amount_subtract (&fee,
                                &coin->amount_with_fee,
                                &coin->amount_without_fee))
