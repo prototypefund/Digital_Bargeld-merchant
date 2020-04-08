@@ -199,7 +199,7 @@ check_abort_refund (struct TALER_MERCHANT_Pay *ph,
                            &ph->coins[found].refund_fee);
         if (GNUNET_OK !=
             GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_REFUND,
-                                        &rr.purpose,
+                                        &rr,
                                         &sig->eddsa_sig,
                                         &merchant_pub.eddsa_pub))
         {
@@ -844,10 +844,9 @@ prepare_pay_generic (struct GNUNET_CURL_Context *ctx,
                        TALER_amount2s (&fee));
     }
 
-    GNUNET_assert (GNUNET_OK ==
-                   GNUNET_CRYPTO_eddsa_sign (&coin->coin_priv.eddsa_priv,
-                                             &dr.purpose,
-                                             &p->coin_sig.eddsa_signature));
+    GNUNET_CRYPTO_eddsa_sign (&coin->coin_priv.eddsa_priv,
+                              &dr,
+                              &p->coin_sig.eddsa_signature);
     p->denom_pub = coin->denom_pub;
     p->denom_sig = coin->denom_sig;
     p->denom_value = coin->denom_value;

@@ -102,16 +102,9 @@ process_refunds_cb (void *cls,
                        refund_amount);
     TALER_amount_hton (&rr.refund_fee,
                        refund_fee);
-    if (GNUNET_OK !=
-        GNUNET_CRYPTO_eddsa_sign (&prd->merchant->privkey.eddsa_priv,
-                                  &rr.purpose,
-                                  &sig))
-    {
-      GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Could not sign refund request\n");
-      prd->ec = TALER_EC_INTERNAL_LOGIC_ERROR;
-      return;
-    }
+    GNUNET_CRYPTO_eddsa_sign (&prd->merchant->privkey.eddsa_priv,
+                              &rr,
+                              &sig);
   }
 
   element = json_pack ("{s:o, s:o, s:o, s:I, s:o}",

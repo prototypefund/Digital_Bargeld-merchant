@@ -316,7 +316,7 @@ pay_cb (void *cls,
       TALER_TESTING_FAIL (ps->is);
     if (GNUNET_OK !=
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
-                                    &mr.purpose,
+                                    &mr,
                                     &sig,
                                     &merchant_pub->eddsa_pub))
     {
@@ -741,7 +741,7 @@ pay_again_cb (void *cls,
 
     if (GNUNET_OK !=
         GNUNET_CRYPTO_eddsa_verify (TALER_SIGNATURE_MERCHANT_PAYMENT_OK,
-                                    &mr.purpose,
+                                    &mr,
                                     &sig,
                                     &merchant_pub->eddsa_pub))
     {

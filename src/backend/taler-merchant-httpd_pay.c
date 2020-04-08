@@ -591,10 +591,9 @@ generate_success_response (struct PayContext *pc)
       .h_contract_terms = pc->h_contract_terms
     };
 
-    GNUNET_assert (GNUNET_OK ==
-                   GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
-                                             &mr.purpose,
-                                             &sig));
+    GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
+                              &mr,
+                              &sig);
   }
 
   /* Build the response */
@@ -2031,21 +2030,9 @@ begin_transaction (struct PayContext *pc)
         TALER_amount_hton (&rr.refund_fee,
                            &pc->dc[i].refund_fee);
 
-        if (GNUNET_OK !=
-            GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
-                                      &rr.purpose,
-                                      &msig.eddsa_sig))
-        {
-          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                      "Failed to sign successful refund confirmation\n");
-          json_decref (refunds);
-          resume_pay_with_error (pc,
-                                 MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                 TALER_EC_PAY_REFUND_SIGNATURE_FAILED,
-                                 "Refund approved, but failed to sign confirmation");
-          return;
-        }
-
+        GNUNET_CRYPTO_eddsa_sign (&pc->mi->privkey.eddsa_priv,
+                                  &rr,
+                                  &msig.eddsa_sig);
         /* Pack refund for i-th coin.  */
         if (0 !=
             json_array_append_new (

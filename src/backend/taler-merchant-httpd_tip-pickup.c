@@ -241,10 +241,9 @@ run_pickup (struct MHD_Connection *connection,
     struct TALER_ReserveSignatureP reserve_sig;
 
     pd->wr.reserve_pub = reserve_pub;
-    GNUNET_assert (GNUNET_OK ==
-                   GNUNET_CRYPTO_eddsa_sign (&reserve_priv.eddsa_priv,
-                                             &pd->wr.purpose,
-                                             &reserve_sig.eddsa_signature));
+    GNUNET_CRYPTO_eddsa_sign (&reserve_priv.eddsa_priv,
+                              &pd->wr,
+                              &reserve_sig.eddsa_signature);
     if (0 !=
         json_array_append_new (sigs,
                                json_pack ("{s:o}",
