@@ -64,6 +64,11 @@ struct CoinRefund
   struct ProcessRefundData *prd;
 
   /**
+   * URL of the exchange for this @e coin_pub.
+   */
+  char *exchange_url;
+
+  /**
    * Coin to refund.
    */
   struct TALER_CoinSpendPublicKeyP coin_pub;
@@ -213,6 +218,7 @@ cleanup_prd (struct TM_HandlerContext *cls)
       json_decref (cr->exchange_reply);
       cr->exchange_reply = NULL;
     }
+    GNUNET_free (cr->exchange_url);
     GNUNET_free (cr);
   }
   GNUNET_free (prd);
@@ -295,12 +301,25 @@ refund_cb (void *cls,
   }
   else
   {
+    enum GNUNET_DB_QueryStatus qs;
+
     cr->exchange_pub = *exchange_pub;
     cr->exchange_sig = *exchange_sig;
-    /* FIXME: store in our database,
-       1) as evidence for us that the refund happened, and
-       2) to possibly avoid doing another exchange iteration
-       the next time around. */
+    qs = db->put_refund_proof (db->cls,
+                               &cr->prd->merchant->pubkey,
+                               &cr->prd->h_contract_terms,
+                               &cr->coin_pub,
+                               cr->rtransaction_id,
+                               exchange_pub,
+                               exchange_sig);
+    if (0 >= qs)
+    {
+      /* generally, this is relatively harmless for the merchant, but let's at
+         least log this. */
+      GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
+                  "Failed to persist exchange response to /refund in database: %d\n",
+                  qs);
+    }
   }
   check_resume_prd (cr->prd);
 }
@@ -381,6 +400,7 @@ process_refunds_cb (void *cls,
               TALER_amount2s (refund_amount),
               reason);
   cr = GNUNET_new (struct CoinRefund);
+  cr->exchange_url = GNUNET_strdup (exchange_url);
   cr->prd = prd;
   cr->coin_pub = *coin_pub;
   cr->rtransaction_id = rtransaction_id;
@@ -389,13 +409,6 @@ process_refunds_cb (void *cls,
   GNUNET_CONTAINER_DLL_insert (prd->cr_head,
                                prd->cr_tail,
                                cr);
-  /* FIXME: check in database if we already got the
-     results from #refund_cb() from an earlier request,
-     if so, avoid this step: */
-  cr->fo = TMH_EXCHANGES_find_exchange (exchange_url,
-                                        NULL,
-                                        &exchange_found_cb,
-                                        cr);
 }
 
 
@@ -528,6 +541,31 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                                          MHD_HTTP_INTERNAL_SERVER_ERROR,
                                          TALER_EC_REFUND_LOOKUP_DB_ERROR,
                                          "Failed to lookup refunds for contract");
+    }
+
+    /* Now launch exchange interactions, unless we already have the
+       response in the database! */
+    for (struct CoinRefund *cr = prd->cr_head;
+         NULL != cr;
+         cr = cr->next)
+    {
+      enum GNUNET_DB_QueryStatus qs;
+
+      qs = db->get_refund_proof (db->cls,
+                                 &cr->prd->merchant->pubkey,
+                                 &cr->prd->h_contract_terms,
+                                 &cr->coin_pub,
+                                 cr->rtransaction_id,
+                                 &cr->exchange_pub,
+                                 &cr->exchange_sig);
+      if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
+      {
+        /* We need to talk to the exchange */
+        cr->fo = TMH_EXCHANGES_find_exchange (cr->exchange_url,
+                                              NULL,
+                                              &exchange_found_cb,
+                                              cr);
+      }
     }
   }
 
