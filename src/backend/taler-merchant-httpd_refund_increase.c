@@ -248,7 +248,7 @@ process_refund (struct MHD_Connection *connection,
   }
   if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
   {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+    GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Refusing refund amount %s that is larger than original payment\n",
                 TALER_amount2s (refund));
     return TALER_MHD_reply_with_error (connection,

@@ -2388,7 +2388,7 @@ process_deposits_for_refund_cb (void *cls,
    * issue a refund bigger than the contract's actual price, we cannot
    * rely upon the frontend being correct.
    *///
-  GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+  GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
               "The refund of %s is bigger than the order's value\n",
               TALER_amount2s (ctx->refund));
   ctx->qs = GNUNET_DB_STATUS_SUCCESS_NO_RESULTS;
