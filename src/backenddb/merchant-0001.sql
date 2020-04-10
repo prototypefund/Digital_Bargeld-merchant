@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS merchant_deposits
   ,signkey_pub BYTEA NOT NULL CHECK (LENGTH(signkey_pub)=32)
   ,exchange_proof BYTEA NOT NULL
   ,PRIMARY KEY (h_contract_terms, coin_pub)
-  ,FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)
+  ,FOREIGN KEY (h_contract_terms, merchant_pub)
+   REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)
   );
 
 CREATE TABLE IF NOT EXISTS merchant_proofs
@@ -109,9 +110,24 @@ CREATE TABLE IF NOT EXISTS merchant_refunds
   ,reason VARCHAR NOT NULL
   ,refund_amount_val INT8 NOT NULL
   ,refund_amount_frac INT4 NOT NULL
-  ,FOREIGN KEY (h_contract_terms, coin_pub) REFERENCES merchant_deposits (h_contract_terms, coin_pub)
-  ,FOREIGN KEY (h_contract_terms, merchant_pub) REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)
+  ,FOREIGN KEY (h_contract_terms, coin_pub)
+   REFERENCES merchant_deposits (h_contract_terms, coin_pub)
+  ,FOREIGN KEY (h_contract_terms, merchant_pub)
+   REFERENCES merchant_contract_terms (h_contract_terms, merchant_pub)
+  ,PRIMARY KEY (h_contract_terms, merchant_pub, coin_pub, rtransaction_id)
   );
+
+CREATE TABLE IF NOT EXISTS merchant_refund_proofs
+  (rtransaction_id BIGSERIAL UNIQUE
+  ,merchant_pub BYTEA NOT NULL CHECK (LENGTH(merchant_pub)=32)
+  ,h_contract_terms BYTEA NOT NULL CHECK (LENGTH(h_contract_terms)=64)
+  ,coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)
+  ,exchange_sig BYTEA NOT NULL CHECK (LENGTH(exchange_sig)=64)
+  ,exchange_pub BYTEA NOT NULL CHECK (LENGTH(exchange_pub)=32)
+  ,FOREIGN KEY (h_contract_terms, merchant_pub, coin_pub, rtransaction_id)
+   REFERENCES merchant_refunds (h_contract_terms, merchant_pub, coin_pub, rtransaction_id)
+  ,PRIMARY KEY (h_contract_terms, merchant_pub, coin_pub, rtransaction_id)
+);
 
 -- balances of the reserves available for tips
 CREATE TABLE IF NOT EXISTS merchant_tip_reserves

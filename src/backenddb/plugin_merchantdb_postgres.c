@@ -1829,6 +1829,97 @@ postgres_get_refunds_from_contract_terms_hash (
 
 
 /**
+ * Obtain refund proofs associated with a refund operation on a
+ * coin.
+ *
+ * @param cls closure, typically a connection to the db
+ * @param merchant_pub public key of the merchant instance
+ * @param h_contract_terms hash code of the contract
+ * @param coin_pub public key of the coin
+ * @param rtransaction_id identificator of the refund
+ * @param[out] exchange_pub public key of the exchange affirming the refund
+ * @param[out] exchange_sig signature of the exchange affirming the refund
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_get_refund_proof (
+  void *cls,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  const struct GNUNET_HashCode *h_contract_terms,
+  const struct TALER_CoinSpendPublicKeyP *coin_pub,
+  uint64_t rtransaction_id,
+  struct TALER_ExchangePublicKeyP *exchange_pub,
+  struct TALER_ExchangeSignatureP *exchange_sig)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_auto_from_type (coin_pub),
+    GNUNET_PQ_query_param_uint64 (&rtransaction_id),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    GNUNET_PQ_result_spec_auto_from_type ("exchange_sig",
+                                          exchange_sig),
+    GNUNET_PQ_result_spec_auto_from_type ("exchange_pub",
+                                          exchange_pub),
+    GNUNET_PQ_result_spec_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                   "get_refund_proof",
+                                                   params,
+                                                   rs);
+}
+
+
+/**
+ * Store refund proofs associated with a refund operation on a
+ * coin.
+ *
+ * @param cls closure, typically a connection to the db
+ * @param merchant_pub public key of the merchant instance
+ * @param h_contract_terms hash code of the contract
+ * @param coin_pub public key of the coin
+ * @param rtransaction_id identificator of the refund
+ * @param exchange_pub public key of the exchange affirming the refund
+ * @param exchange_sig signature of the exchange affirming the refund
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_put_refund_proof (
+  void *cls,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  const struct GNUNET_HashCode *h_contract_terms,
+  const struct TALER_CoinSpendPublicKeyP *coin_pub,
+  uint64_t rtransaction_id,
+  const struct TALER_ExchangePublicKeyP *exchange_pub,
+  const struct TALER_ExchangeSignatureP *exchange_sig)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_uint64 (&rtransaction_id),
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_auto_from_type (h_contract_terms),
+    GNUNET_PQ_query_param_auto_from_type (coin_pub),
+    GNUNET_PQ_query_param_auto_from_type (exchange_sig),
+    GNUNET_PQ_query_param_auto_from_type (exchange_pub),
+    GNUNET_PQ_query_param_end
+  };
+
+  TALER_LOG_DEBUG ("Inserting refund proof %s + %s\n",
+                   GNUNET_h2s (h_contract_terms),
+                   TALER_B2S (coin_pub));
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_refund_proof",
+                                             params);
+}
+
+
+/**
  * Insert a refund row into merchant_refunds.  Not meant to be exported
  * in the db API.
  *
@@ -3231,6 +3322,28 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             " WHERE merchant_refunds.merchant_pub=$1"
                             "   AND merchant_refunds.h_contract_terms=$2",
                             2),
+    GNUNET_PQ_make_prepare ("get_refund_proof",
+                            "SELECT"
+                            " exchange_pub"
+                            ",exchange_sig"
+                            " FROM merchant_refund_proofs"
+                            " WHERE"
+                            " h_contract_terms=$1"
+                            " AND merchant_pub=$2"
+                            " AND coin_pub=$3"
+                            " AND rtransaction_id=$4",
+                            4),
+    GNUNET_PQ_make_prepare ("insert_refund_proof",
+                            "INSERT INTO merchant_refund_proofs"
+                            "(rtransaction_id"
+                            ",merchant_pub"
+                            ",h_contract_terms"
+                            ",coin_pub"
+                            ",exchange_sig"
+                            ",exchange_pub)"
+                            " VALUES "
+                            "($1, $2, $3, $4, $5, $6)",
+                            6),
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_asc",
                             "SELECT"
                             " contract_terms"
@@ -3532,6 +3645,8 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->lookup_wire_fee = &postgres_lookup_wire_fee;
   plugin->increase_refund_for_contract_NT =
     &postgres_increase_refund_for_contract_NT;
+  plugin->get_refund_proof = &postgres_get_refund_proof;
+  plugin->put_refund_proof = &postgres_put_refund_proof;
   plugin->mark_proposal_paid = &postgres_mark_proposal_paid;
   plugin->insert_session_info = &postgres_insert_session_info;
   plugin->find_session_info = &postgres_find_session_info;

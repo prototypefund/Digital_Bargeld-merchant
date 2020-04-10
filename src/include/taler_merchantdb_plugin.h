@@ -685,6 +685,55 @@ struct TALER_MERCHANTDB_Plugin
     TALER_MERCHANTDB_RefundCallback rc,
     void *rc_cls);
 
+
+  /**
+   * Obtain refund proofs associated with a refund operation on a
+   * coin.
+   *
+   * @param cls closure, typically a connection to the db
+   * @param merchant_pub public key of the merchant instance
+   * @param h_contract_terms hash code of the contract
+   * @param coin_pub public key of the coin
+   * @param rtransaction_id identificator of the refund
+   * @param[out] exchange_pub public key of the exchange affirming the refund
+   * @param[out] exchange_sig signature of the exchange affirming the refund
+   * @return transaction status
+   */
+  enum GNUNET_DB_QueryStatus
+  (*get_refund_proof)(
+    void *cls,
+    const struct TALER_MerchantPublicKeyP *merchant_pub,
+    const struct GNUNET_HashCode *h_contract_terms,
+    const struct TALER_CoinSpendPublicKeyP *coin_pub,
+    uint64_t rtransaction_id,
+    struct TALER_ExchangePublicKeyP *exchange_pub,
+    struct TALER_ExchangeSignatureP *exchange_sig);
+
+
+  /**
+   * Store refund proofs associated with a refund operation on a
+   * coin.
+   *
+   * @param cls closure, typically a connection to the db
+   * @param merchant_pub public key of the merchant instance
+   * @param h_contract_terms hash code of the contract
+   * @param coin_pub public key of the coin
+   * @param rtransaction_id identificator of the refund
+   * @param exchange_pub public key of the exchange affirming the refund
+   * @param exchange_sig signature of the exchange affirming the refund
+   * @return transaction status
+   */
+  enum GNUNET_DB_QueryStatus
+  (*put_refund_proof)(
+    void *cls,
+    const struct TALER_MerchantPublicKeyP *merchant_pub,
+    const struct GNUNET_HashCode *h_contract_terms,
+    const struct TALER_CoinSpendPublicKeyP *coin_pub,
+    uint64_t rtransaction_id,
+    const struct TALER_ExchangePublicKeyP *exchange_pub,
+    const struct TALER_ExchangeSignatureP *exchange_sig);
+
+
   /**
    * Add @a credit to a reserve to be used for tipping.  Note that
    * this function does not actually perform any wire transfers to
