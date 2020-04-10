@@ -179,6 +179,7 @@ TALER_TESTING_cmd_check_payment_conclude (const char *label,
  * @param merchant_url merchant base url
  * @param proposal_reference the proposal whose payment status
  *        is going to be checked.
+ * @param min_refund minimum refund to wait for
  * @param timeout which timeout to use
  * @return the command
  */
@@ -186,6 +187,7 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_poll_payment_start (const char *label,
                                       const char *merchant_url,
                                       const char *proposal_reference,
+                                      const char *min_refund,
                                       struct GNUNET_TIME_Relative timeout);
 
 
@@ -439,7 +441,6 @@ TALER_TESTING_cmd_merchant_track_transaction (const char *label,
  * @param check_bank_reference reference to a "check bank" CMD
  *        that will provide the WTID and exchange URL to issue
  *        the track against.
- * @param pay_reference FIXME not used.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_track_transfer (const char *label,
@@ -455,13 +456,12 @@ TALER_TESTING_cmd_merchant_track_transfer (const char *label,
  * @param index which signature to offer if there are multiple
  *        on offer
  * @param merchant_sig set to the offered signature.
- *
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_merchant_sig (unsigned int index,
-                                       const struct
-                                       TALER_MerchantSignatureP *merchant_sig);
+TALER_TESTING_make_trait_merchant_sig (
+  unsigned int index,
+  const struct TALER_MerchantSignatureP *merchant_sig);
 
 
 /**
@@ -475,10 +475,10 @@ TALER_TESTING_make_trait_merchant_sig (unsigned int index,
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_merchant_sig (const struct TALER_TESTING_Command *cmd,
-                                      unsigned int index,
-                                      struct TALER_MerchantSignatureP **
-                                      merchant_sig);
+TALER_TESTING_get_trait_merchant_sig (
+  const struct TALER_TESTING_Command *cmd,
+  unsigned int index,
+  struct TALER_MerchantSignatureP **merchant_sig);
 
 /**
  * Obtain a reference to a proposal command.  Any command that
@@ -491,15 +491,14 @@ TALER_TESTING_get_trait_merchant_sig (const struct TALER_TESTING_Command *cmd,
  * @param cmd command to extract the trait from.
  * @param index which reference to pick if @a cmd has multiple
  *        on offer.
- * @param proposal_reference[out] set to the wanted reference.
- *
+ * @param[out] proposal_reference set to the wanted reference.
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_proposal_reference (const struct
-                                            TALER_TESTING_Command *cmd,
-                                            unsigned int index,
-                                            const char **proposal_reference);
+TALER_TESTING_get_trait_proposal_reference (
+  const struct TALER_TESTING_Command *cmd,
+  unsigned int index,
+  const char **proposal_reference);
 
 /**
  * Offer a proposal reference.
@@ -534,7 +533,7 @@ TALER_TESTING_make_trait_coin_reference (unsigned int index,
  * @param cmd command to extract trait from
  * @param index which reference to pick if @a cmd has multiple
  *        on offer
- * @param coin_reference[out] set to the wanted reference.
+ * @param[out] coin_reference set to the wanted reference.
  *        NOTE: a _single_ reference can contain
  *        _multiple_ instances, using semi-colon as separator.
  *        For example, a _single_ reference can be this:
@@ -556,29 +555,25 @@ TALER_TESTING_get_trait_coin_reference (const struct TALER_TESTING_Command *cmd,
  * @param cmd command to extract trait from.
  * @param index index of the trait.
  * @param planchet_secrets[out] set to the wanted secrets.
- *
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_planchet_secrets (const struct
-                                          TALER_TESTING_Command *cmd,
-                                          unsigned int index,
-                                          struct TALER_PlanchetSecretsP **
-                                          planchet_secrets);
+TALER_TESTING_get_trait_planchet_secrets (
+  const struct TALER_TESTING_Command *cmd,
+  unsigned int index,
+  struct TALER_PlanchetSecretsP **planchet_secrets);
 
 /**
  * Offer planchet secrets.
  *
  * @param index of the trait.
  * @param planchet_secrets set to the offered secrets.
- *
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_planchet_secrets (unsigned int index,
-                                           const struct
-                                           TALER_PlanchetSecretsP *
-                                           planchet_secrets);
+TALER_TESTING_make_trait_planchet_secrets (
+  unsigned int index,
+  const struct TALER_PlanchetSecretsP *planchet_secrets);
 
 /**
  * Offer tip id.
@@ -598,8 +593,7 @@ TALER_TESTING_make_trait_tip_id (unsigned int index,
  * @param cmd command to extract the trait from.
  * @param index which tip id to pick if @a
  *        cmd has multiple on offer
- * @param tip_id[out] set to the wanted data.
- *
+ * @param[out] tip_id set to the wanted data.
  * @return #GNUNET_OK on success
  */
 int
@@ -618,9 +612,9 @@ TALER_TESTING_get_trait_tip_id (const struct TALER_TESTING_Command *cmd,
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_h_contract_terms (unsigned int index,
-                                           const struct
-                                           GNUNET_HashCode *h_contract_terms);
+TALER_TESTING_make_trait_h_contract_terms (
+  unsigned int index,
+  const struct GNUNET_HashCode *h_contract_terms);
 
 
 /**
@@ -628,15 +622,14 @@ TALER_TESTING_make_trait_h_contract_terms (unsigned int index,
  *
  * @param cmd command to extract the trait from.
  * @param index index number of the trait to fetch.
- * @param h_contract_terms[out] set to the wanted data.
+ * @param[out] h_contract_terms set to the wanted data.
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_h_contract_terms (const struct
-                                          TALER_TESTING_Command *cmd,
-                                          unsigned int index,
-                                          const struct
-                                          GNUNET_HashCode **h_contract_terms);
+TALER_TESTING_get_trait_h_contract_terms (
+  const struct TALER_TESTING_Command *cmd,
+  unsigned int index,
+  const struct GNUNET_HashCode **h_contract_terms);
 
 /**
  * Offer refund entry.
@@ -646,9 +639,9 @@ TALER_TESTING_get_trait_h_contract_terms (const struct
  * @return the trait
  */
 struct TALER_TESTING_Trait
-TALER_TESTING_make_trait_refund_entry (unsigned int index,
-                                       const struct
-                                       TALER_MERCHANT_RefundEntry *refund_entry);
+TALER_TESTING_make_trait_refund_entry (
+  unsigned int index,
+  const struct TALER_MERCHANT_RefundEntry *refund_entry);
 
 
 /**
@@ -656,15 +649,14 @@ TALER_TESTING_make_trait_refund_entry (unsigned int index,
  *
  * @param cmd command to extract the trait from.
  * @param index the trait index.
- * @param refund_entry[out] set to the wanted data.
- *
+ * @param[out] refund_entry set to the wanted data.
  * @return #GNUNET_OK on success
  */
 int
-TALER_TESTING_get_trait_refund_entry (const struct TALER_TESTING_Command *cmd,
-                                      unsigned int index,
-                                      const struct
-                                      TALER_MERCHANT_RefundEntry **refund_entry);
+TALER_TESTING_get_trait_refund_entry (
+  const struct TALER_TESTING_Command *cmd,
+  unsigned int index,
+  const struct TALER_MERCHANT_RefundEntry **refund_entry);
 
 /**
  * Create a /tip-authorize CMD, specifying the Taler error code
@@ -699,11 +691,11 @@ TALER_TESTING_cmd_tip_authorize_with_ec (const char *label,
  * to test against such a case.
  *
  * @param label command label.
- *
  * @return the command.
  */
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_tip_authorize_fake (const char *label);
+
 
 /**
  * Create a /tip-authorize CMD.
@@ -810,10 +802,10 @@ TALER_TESTING_cmd_tip_pickup (const char *label,
  *
  * @param label command label
  * @param new_ip new instruction pointer's value.  Note that,
- * when the next instruction will be called, the interpreter
- * will increment the ip _anyway_ so this value must be
- * set to the index of the instruction we want to execute next
- * MINUS one.
+ *    when the next instruction will be called, the interpreter
+ *    will increment the ip _anyway_ so this value must be
+ *    set to the index of the instruction we want to execute next
+ *    MINUS one.
  * @param counter counts how many times the rewinding has
  * to happen.
  */

@@ -205,6 +205,9 @@ handle_poll_payment_finished (void *cls,
  *        before generating an unpaid response). Note that this is just provided to
  *        the server, we as client will block until the response comes back or until
  *        #TALER_MERCHANT_poll_payment_cancel() is called.
+ * @param min_refund long poll for the service to approve a refund exceeding this value;
+ *        use NULL to not wait for any refund (only for payment). Only makes sense
+ *        with a non-zero @a timeout.
  * @param poll_payment_cb callback which will work the response gotten from the backend
  * @param poll_payment_cb_cls closure to pass to @a poll_payment_cb
  * @return handle for this operation, NULL upon errors
@@ -217,6 +220,7 @@ TALER_MERCHANT_poll_payment (
   const struct GNUNET_HashCode *h_contract,
   const char *session_id,
   struct GNUNET_TIME_Relative timeout,
+  const struct TALER_Amount *min_refund,
   TALER_MERCHANT_PollPaymentCallback poll_payment_cb,
   void *poll_payment_cb_cls)
 {
@@ -253,6 +257,9 @@ TALER_MERCHANT_poll_payment (
                              "h_contract", h_contract_s,
                              (0 != ts) ? "timeout" : NULL,
                              timeout_s,
+                             (NULL != min_refund) ? "refund" : NULL,
+                             (NULL != min_refund) ? TALER_amount2s (
+                               min_refund) : NULL,
                              NULL);
   GNUNET_free (h_contract_s);
   GNUNET_free (timeout_s);

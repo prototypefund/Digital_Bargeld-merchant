@@ -289,6 +289,16 @@ struct TMH_SuspendedConnection
    */
   struct GNUNET_TIME_Absolute long_poll_timeout;
 
+  /**
+   * Minimum refund amount to be exceeded (exclusive this value!) for resume.
+   */
+  struct TALER_Amount refund_expected;
+
+  /**
+   * #GNUNET_YES if we are waiting for a refund.
+   */
+  int awaiting_refund;
+
 };
 
 
@@ -412,9 +422,26 @@ TMH_compute_pay_key (const char *order_id,
  * Suspend connection from @a sc until payment has been received.
  *
  * @param sc connection to suspend
+ * @param min_refund refund amount we are waiting on to be exceeded before resuming,
+ *                   NULL if we are not waiting for refunds
  */
 void
-TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc);
+TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc,
+                       const struct TALER_Amount *min_refund);
+
+
+/**
+ * Find out if we have any clients long-polling for @a order_id to be
+ * confirmed at merchant @a mpub, and if so, tell them to resume.
+ *
+ * @param order_id the order that was paid
+ * @param mpub the merchant's public key of the instance where the payment happened
+ * @param refund_amount refunded amount, if the trigger was a refund, otherwise NULL
+ */
+void
+TMH_long_poll_resume (const char *order_id,
+                      const struct TALER_MerchantPublicKeyP *mpub,
+                      const struct TALER_Amount *refund_amount);
 
 
 /**

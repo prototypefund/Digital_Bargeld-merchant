@@ -194,7 +194,8 @@ send_pay_request (struct CheckPaymentRequestContext *cprc)
     GNUNET_log (GNUNET_ERROR_TYPE_INFO,
                 "Suspending /check-payment on key %s\n",
                 GNUNET_h2s (&cprc->sc.key));
-    TMH_long_poll_suspend (&cprc->sc);
+    TMH_long_poll_suspend (&cprc->sc,
+                           NULL);
     return MHD_YES;
   }
 

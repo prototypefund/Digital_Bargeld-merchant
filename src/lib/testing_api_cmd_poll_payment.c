@@ -85,6 +85,11 @@ struct PollPaymentStartState
   struct TALER_Amount refund;
 
   /**
+   * Refund to wait for, set if @e wait_for_refund is #GNUNET_YES
+   */
+  struct TALER_Amount min_refund;
+
+  /**
    * Final HTTP response status code.
    */
   unsigned int http_status;
@@ -98,6 +103,11 @@ struct PollPaymentStartState
    * #GNUNET_YES if the proposal was paid and then refunded
    */
   int refunded;
+
+  /**
+   * #GNUNET_YES if we are waiting for a refund.
+   */
+  int wait_for_refund;
 
 };
 
@@ -325,6 +335,9 @@ poll_payment_start_run (void *cls,
                                           h_contract,
                                           NULL, /* session id */
                                           cps->timeout,
+                                          (GNUNET_YES == cps->wait_for_refund)
+                                          ? &cps->min_refund
+                                          : NULL,
                                           &poll_payment_cb,
                                           cps);
   GNUNET_assert (NULL != cps->cpo);
@@ -341,6 +354,7 @@ poll_payment_start_run (void *cls,
  * @param merchant_url merchant base url
  * @param proposal_reference the proposal whose payment status
  *        is going to be checked.
+ * @param min_refund minimum refund to wait for
  * @param timeout which timeout to use
  * @return the command
  */
@@ -348,6 +362,7 @@ struct TALER_TESTING_Command
 TALER_TESTING_cmd_poll_payment_start (const char *label,
                                       const char *merchant_url,
                                       const char *proposal_reference,
+                                      const char *min_refund,
                                       struct GNUNET_TIME_Relative timeout)
 {
   struct PollPaymentStartState *cps;
@@ -356,6 +371,13 @@ TALER_TESTING_cmd_poll_payment_start (const char *label,
   cps->proposal_reference = proposal_reference;
   cps->merchant_url = merchant_url;
   cps->timeout = timeout;
+  if (NULL != min_refund)
+  {
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_string_to_amount (min_refund,
+                                           &cps->min_refund));
+    cps->wait_for_refund = GNUNET_YES;
+  }
   {
     struct TALER_TESTING_Command cmd = {
       .cls = cps,

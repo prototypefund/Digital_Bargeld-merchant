@@ -300,15 +300,23 @@ do_resume (void *cls)
  * Suspend connection from @a sc until payment has been received.
  *
  * @param sc connection to suspend
+ * @param min_refund refund amount we are waiting on to be exceeded before resuming,
+ *                   NULL if we are not waiting for refunds
  */
 void
-TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc)
+TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc,
+                       const struct TALER_Amount *min_refund)
 {
   GNUNET_assert (GNUNET_OK ==
                  GNUNET_CONTAINER_multihashmap_put (payment_trigger_map,
                                                     &sc->key,
                                                     sc,
                                                     GNUNET_CONTAINER_MULTIHASHMAPOPTION_MULTIPLE));
+  if (NULL != min_refund)
+  {
+    sc->awaiting_refund = GNUNET_YES;
+    sc->refund_expected = *min_refund;
+  }
   sc->hn = GNUNET_CONTAINER_heap_insert (resume_timeout_heap,
                                          sc,
                                          sc->long_poll_timeout.abs_value_us);
@@ -322,6 +330,73 @@ TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc)
   resume_timeout_task = GNUNET_SCHEDULER_add_at (sc->long_poll_timeout,
                                                  &do_resume,
                                                  NULL);
+}
+
+
+/**
+ * Function called to resume suspended connections.
+ *
+ * @param cls pointer to a `struct TALER_Amount` indicating the refund amount, or NULL
+ * @param key key in the #payment_trigger_map
+ * @param value a `struct TMH_SuspendedConnection` to resume
+ * @return #GNUNET_OK (continue to iterate)
+ */
+static int
+resume_operation (void *cls,
+                  const struct GNUNET_HashCode *key,
+                  void *value)
+{
+  const struct TALER_Amount *have_refund = cls;
+  struct TMH_SuspendedConnection *sc = value;
+
+  if ( (GNUNET_YES == sc->awaiting_refund) &&
+       ( (NULL == have_refund) ||
+         (1 != TALER_amount_cmp (have_refund,
+                                 &sc->refund_expected)) ) )
+    return GNUNET_OK; /* skip */
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Resuming operation suspended pending payment on key %s\n",
+              GNUNET_h2s (key));
+  GNUNET_assert (GNUNET_YES ==
+                 GNUNET_CONTAINER_multihashmap_remove (payment_trigger_map,
+                                                       key,
+                                                       sc));
+  GNUNET_assert (sc ==
+                 GNUNET_CONTAINER_heap_remove_node (sc->hn));
+  sc->hn = NULL;
+  MHD_resume_connection (sc->con);
+  return GNUNET_OK;
+}
+
+
+/**
+ * Find out if we have any clients long-polling for @a order_id to be
+ * confirmed at merchant @a mpub, and if so, tell them to resume.
+ *
+ * @param order_id the order that was paid
+ * @param mpub the merchant's public key of the instance where the payment happened
+ * @param have_refund refunded amount, NULL if there was no refund
+ */
+void
+TMH_long_poll_resume (const char *order_id,
+                      const struct TALER_MerchantPublicKeyP *mpub,
+                      const struct TALER_Amount *have_refund)
+{
+  struct GNUNET_HashCode key;
+
+  TMH_compute_pay_key (order_id,
+                       mpub,
+                       &key);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Resuming operations suspended pending payment on key %s\n",
+              GNUNET_h2s (&key));
+  GNUNET_CONTAINER_multihashmap_get_multiple (payment_trigger_map,
+                                              &key,
+                                              &resume_operation,
+                                              (void *) have_refund);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "%u operations remain suspended pending payment\n",
+              GNUNET_CONTAINER_multihashmap_size (payment_trigger_map));
 }
 
 

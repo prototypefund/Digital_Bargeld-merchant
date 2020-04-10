@@ -257,6 +257,11 @@ process_refund (struct MHD_Connection *connection,
                                        "Amount above payment");
   }
 
+  /* Resume /public/poll-payments clients that may wait for this refund */
+  TMH_long_poll_resume (order_id,
+                        &mi->pubkey,
+                        refund);
+
   {
     MHD_RESULT ret;
     char *taler_refund_uri;

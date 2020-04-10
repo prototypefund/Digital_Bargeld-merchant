@@ -444,66 +444,6 @@ MH_force_pc_resume ()
 
 
 /**
- * Function called to resume suspended connections.
- *
- * @param cls NULL
- * @param key key in the #payment_trigger_map
- * @param value a `struct TMH_SuspendedConnection` to resume
- * @return #GNUNET_OK (continue to iterate)
- */
-static int
-resume_operation (void *cls,
-                  const struct GNUNET_HashCode *key,
-                  void *value)
-{
-  struct TMH_SuspendedConnection *sc = value;
-
-  (void) cls;
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Resuming operation suspended pending payment on key %s\n",
-              GNUNET_h2s (key));
-  GNUNET_assert (GNUNET_YES ==
-                 GNUNET_CONTAINER_multihashmap_remove (payment_trigger_map,
-                                                       key,
-                                                       sc));
-  GNUNET_assert (sc ==
-                 GNUNET_CONTAINER_heap_remove_node (sc->hn));
-  sc->hn = NULL;
-  MHD_resume_connection (sc->con);
-  return GNUNET_OK;
-}
-
-
-/**
- * Find out if we have any clients long-polling for @a order_id to be
- * confirmed at merchant @a mpub, and if so, tell them to resume.
- *
- * @param order_id the order that was paid
- * @param mpub the merchant's public key of the instance where the payment happened
- */
-static void
-resume_suspended_payment_checks (const char *order_id,
-                                 const struct TALER_MerchantPublicKeyP *mpub)
-{
-  struct GNUNET_HashCode key;
-
-  TMH_compute_pay_key (order_id,
-                       mpub,
-                       &key);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Resuming operations suspended pending payment on key %s\n",
-              GNUNET_h2s (&key));
-  GNUNET_CONTAINER_multihashmap_get_multiple (payment_trigger_map,
-                                              &key,
-                                              &resume_operation,
-                                              NULL);
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "%u operations remain suspended pending payment\n",
-              GNUNET_CONTAINER_multihashmap_size (payment_trigger_map));
-}
-
-
-/**
  * Resume the given pay context and send the given response.
  * Stores the response in the @a pc and signals MHD to resume
  * the connection.  Also ensures MHD runs immediately.
@@ -2166,8 +2106,9 @@ begin_transaction (struct PayContext *pc)
         "Merchant database error: could not commit to mark proposal as 'paid'");
       return;
     }
-    resume_suspended_payment_checks (pc->order_id,
-                                     &pc->mi->pubkey);
+    TMH_long_poll_resume (pc->order_id,
+                          &pc->mi->pubkey,
+                          NULL);
     generate_success_response (pc);
     return;
   }

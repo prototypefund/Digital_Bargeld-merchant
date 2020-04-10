@@ -102,10 +102,22 @@ struct PollPaymentRequestContext
   struct TALER_Amount refund_amount;
 
   /**
+   * Minimum refund amount the client would like to poll for.
+   * Only initialized if
+   * @e awaiting_refund is set to #GNUNET_YES.
+   */
+  struct TALER_Amount min_refund;
+
+  /**
    * Set to #GNUNET_YES if this payment has been refunded and
    * @e refund_amount is initialized.
    */
   int refunded;
+
+  /**
+   * Set to #GNUNET_YES if this client is waiting for a refund.
+   */
+  int awaiting_refund;
 
   /**
    * Initially #GNUNET_SYSERR. If we queued a response, set to the
@@ -124,8 +136,8 @@ struct PollPaymentRequestContext
 static void
 pprc_cleanup (struct TM_HandlerContext *hc)
 {
-  struct PollPaymentRequestContext *pprc = (struct
-                                            PollPaymentRequestContext *) hc;
+  struct PollPaymentRequestContext *pprc
+    = (struct PollPaymentRequestContext *) hc;
 
   if (NULL != pprc->contract_terms)
     json_decref (pprc->contract_terms);
@@ -171,6 +183,27 @@ process_refunds_cb (void *cls,
 
 
 /**
+ * Suspend this @a pprc until the trigger is satisfied.
+ *
+ * @param ppr
+ */
+static void
+suspend_pprc (struct PollPaymentRequestContext *pprc)
+{
+  TMH_compute_pay_key (pprc->order_id,
+                       &pprc->mi->pubkey,
+                       &pprc->sc.key);
+  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+              "Suspending /poll-payment on key %s\n",
+              GNUNET_h2s (&pprc->sc.key));
+  TMH_long_poll_suspend (&pprc->sc,
+                         (pprc->awaiting_refund)
+                         ? &pprc->min_refund
+                         : NULL);
+}
+
+
+/**
  * The client did not yet pay, send it the payment request.
  *
  * @param pprc check pay request context
@@ -188,13 +221,7 @@ send_pay_request (struct PollPaymentRequestContext *pprc)
   if (0 != remaining.rel_value_us)
   {
     /* long polling: do not queue a response, suspend connection instead */
-    TMH_compute_pay_key (pprc->order_id,
-                         &pprc->mi->pubkey,
-                         &pprc->sc.key);
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Suspending /poll-payment on key %s\n",
-                GNUNET_h2s (&pprc->sc.key));
-    TMH_long_poll_suspend (&pprc->sc);
+    suspend_pprc (pprc);
     return MHD_YES;
   }
 
@@ -274,6 +301,7 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
     /* First time here, parse request and check order is known */
     const char *long_poll_timeout_s;
     const char *cts;
+    const char *min_refund;
 
     pprc = GNUNET_new (struct PollPaymentRequestContext);
     pprc->hc.cc = &pprc_cleanup;
@@ -343,6 +371,27 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
     {
       pprc->sc.long_poll_timeout = GNUNET_TIME_UNIT_ZERO_ABS;
     }
+
+    min_refund = MHD_lookup_connection_value (connection,
+                                              MHD_GET_ARGUMENT_KIND,
+                                              "refund");
+    if (NULL != min_refund)
+    {
+      if ( (GNUNET_OK !=
+            TALER_string_to_amount (min_refund,
+                                    &pprc->min_refund)) ||
+           (0 != strcasecmp (pprc->min_refund.currency,
+                             TMH_currency) ) )
+      {
+        GNUNET_break_op (0);
+        return TALER_MHD_reply_with_error (connection,
+                                           MHD_HTTP_BAD_REQUEST,
+                                           TALER_EC_PARAMETER_MALFORMED,
+                                           "invalid amount given for refund argument");
+      }
+      pprc->awaiting_refund = GNUNET_YES;
+    }
+
     pprc->contract_url = MHD_lookup_connection_value (connection,
                                                       MHD_GET_ARGUMENT_KIND,
                                                       "contract_url");
@@ -495,6 +544,25 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
                                        TALER_EC_PAY_DB_FETCH_TRANSACTION_ERROR,
                                        "Merchant database error");
   }
+  if ( (pprc->awaiting_refund) &&
+       ( (! pprc->refunded) ||
+         (1 != TALER_amount_cmp (&pprc->refund_amount,
+                                 &pprc->min_refund)) ) )
+  {
+    /* Client is waiting for a refund larger than what we have, suspend
+       until timeout */
+    struct GNUNET_TIME_Relative remaining;
+
+    remaining = GNUNET_TIME_absolute_get_remaining (pprc->sc.long_poll_timeout);
+    if (0 != remaining.rel_value_us)
+    {
+      /* yes, indeed suspend */
+      pprc->refunded = GNUNET_NO;
+      suspend_pprc (pprc);
+      return MHD_YES;
+    }
+  }
+
   if (pprc->refunded)
     return TALER_MHD_reply_json_pack (connection,
                                       MHD_HTTP_OK,
