@@ -298,7 +298,7 @@ check_conflict (struct TALER_MERCHANT_Pay *ph,
   json_t *ereply;
   struct TALER_CoinSpendPublicKeyP coin_pub;
   struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_json ("exchange-reply", &ereply),
+    GNUNET_JSON_spec_json ("exchange_reply", &ereply),
     GNUNET_JSON_spec_fixed_auto ("coin_pub", &coin_pub),
     GNUNET_JSON_spec_end ()
   };

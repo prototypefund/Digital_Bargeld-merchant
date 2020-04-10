@@ -391,6 +391,7 @@ poll_payment_conclude_cleanup (void *cls,
     GNUNET_SCHEDULER_cancel (cps->task);
     cps->task = NULL;
   }
+  GNUNET_free (cps);
 }
 
 

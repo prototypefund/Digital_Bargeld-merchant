@@ -229,12 +229,15 @@ track_transaction_traits (void *cls,
   struct TrackTransactionState *tts = cls;
   struct TALER_WireTransferIdentifierRawP *wtid_ptr;
 
-  if (GNUNET_OK !=
-      GNUNET_STRINGS_string_to_data (
-        tts->wtid_str,
-        strlen (tts->wtid_str),
-        &tts->wtid,
-        sizeof (struct TALER_WireTransferIdentifierRawP)))
+  if (MHD_HTTP_OK != tts->http_status)
+    return GNUNET_SYSERR;
+  if ( (NULL != tts->wtid_str) &&
+       (GNUNET_OK !=
+        GNUNET_STRINGS_string_to_data (tts->wtid_str,
+                                       strlen (tts->wtid_str),
+                                       &tts->wtid,
+                                       sizeof (struct
+                                               TALER_WireTransferIdentifierRawP))) )
     wtid_ptr = NULL;
   else
     wtid_ptr = &tts->wtid;

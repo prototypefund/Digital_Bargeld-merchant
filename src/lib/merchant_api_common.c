@@ -57,13 +57,13 @@ TALER_MERCHANT_parse_error_details_ (const json_t *response,
   hr->ec = TALER_JSON_get_error_code (response);
   hr->hint = TALER_JSON_get_error_hint (response);
 
-  /* handle 'exchange-http-status' */
+  /* handle 'exchange_http_status' */
   jc = json_object_get (response,
-                        "exchange-http-status");
+                        "exchange_http_status");
   /* The caller already knows that the JSON represents an error,
      so we are dealing with a missing error code here.  */
   if (NULL == jc)
-    return; /* no need to bother with exchange-code/hint if we had no status */
+    return; /* no need to bother with exchange_code/hint if we had no status */
   if (! json_is_integer (jc))
   {
     GNUNET_break_op (0);
@@ -71,9 +71,9 @@ TALER_MERCHANT_parse_error_details_ (const json_t *response,
   }
   hr->exchange_http_status = (unsigned int) json_integer_value (jc);
 
-  /* handle 'exchange-reply' */
+  /* handle 'exchange_reply' */
   jc = json_object_get (response,
-                        "exchange-reply");
+                        "exchange_reply");
   if (! json_is_object (jc))
   {
     GNUNET_break_op (0);
@@ -83,9 +83,9 @@ TALER_MERCHANT_parse_error_details_ (const json_t *response,
     hr->exchange_reply = jc;
   }
 
-  /* handle 'exchange-code' */
+  /* handle 'exchange_code' */
   jc = json_object_get (response,
-                        "exchange-code");
+                        "exchange_code");
   /* The caller already knows that the JSON represents an error,
      so we are dealing with a missing error code here.  */
   if (NULL == jc)

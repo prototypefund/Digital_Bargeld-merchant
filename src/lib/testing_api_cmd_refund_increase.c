@@ -114,7 +114,14 @@ refund_increase_cb (void *cls,
 
   ris->rio = NULL;
   if (ris->http_code != hr->http_status)
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                "Expected status %u, got %u(%d) for refund increase\n",
+                ris->http_code,
+                hr->http_status,
+                (int) hr->ec);
     TALER_TESTING_FAIL (ris->is);
+  }
   TALER_TESTING_interpreter_next (ris->is);
 }
 

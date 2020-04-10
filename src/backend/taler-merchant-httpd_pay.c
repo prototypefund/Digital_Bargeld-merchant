@@ -934,7 +934,7 @@ check_payment_sufficient (struct PayContext *pc)
     {
       GNUNET_break_op (0);
       resume_pay_with_error (pc,
-                             MHD_HTTP_BAD_REQUEST,
+                             MHD_HTTP_NOT_ACCEPTABLE,
                              TALER_EC_PAY_PAYMENT_INSUFFICIENT_DUE_TO_FEES,
                              "contract not paid up due to fees (client may have calculated them badly)");
     }
@@ -942,7 +942,7 @@ check_payment_sufficient (struct PayContext *pc)
     {
       GNUNET_break_op (0);
       resume_pay_with_error (pc,
-                             MHD_HTTP_BAD_REQUEST,
+                             MHD_HTTP_NOT_ACCEPTABLE,
                              TALER_EC_PAY_PAYMENT_INSUFFICIENT,
                              "payment insufficient");
 
@@ -1021,9 +1021,9 @@ deposit_cb (void *cls,
                                   "exchange had an internal server error",
                                   "code",
                                   (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
-                                  "exchange-code",
+                                  "exchange_code",
                                   (json_int_t) hr->ec,
-                                  "exchange-http-status",
+                                  "exchange_http_status",
                                   (json_int_t) hr->http_status));
     }
     else if (NULL == hr->reply)
@@ -1037,9 +1037,9 @@ deposit_cb (void *cls,
                                   "exchange failed, response body not even in JSON",
                                   "code",
                                   (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
-                                  "exchange-code",
+                                  "exchange_code",
                                   (json_int_t) hr->ec,
-                                  "exchange-http-status",
+                                  "exchange_http_status",
                                   (json_int_t) hr->http_status));
     }
     else
@@ -1055,13 +1055,13 @@ deposit_cb (void *cls,
                                     "exchange failed on deposit of a coin",
                                     "code",
                                     (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
-                                    "exchange-code",
+                                    "exchange_code",
                                     (json_int_t) hr->ec,
-                                    "exchange-http-status",
+                                    "exchange_http_status",
                                     (json_int_t) hr->http_status,
                                     "coin_pub",
                                     GNUNET_JSON_from_data_auto (&dc->coin_pub),
-                                    "exchange-reply",
+                                    "exchange_reply",
                                     hr->reply));
       else
         resume_pay_with_response (
@@ -1072,13 +1072,13 @@ deposit_cb (void *cls,
                                     "exchange failed on deposit of a coin",
                                     "code",
                                     (json_int_t) TALER_EC_PAY_EXCHANGE_FAILED,
-                                    "exchange-code",
+                                    "exchange_code",
                                     (json_int_t) hr->ec,
-                                    "exchange-http-status",
+                                    "exchange_http_status",
                                     (json_int_t) hr->http_status,
                                     "coin_pub",
                                     GNUNET_JSON_from_data_auto (&dc->coin_pub),
-                                    "exchange-reply",
+                                    "exchange_reply",
                                     hr->reply));
     }
     return;
@@ -1172,11 +1172,11 @@ process_pay_with_exchange (void *cls,
         "failed to obtain meta-data from exchange",
         "code",
         (json_int_t) TALER_EC_PAY_EXCHANGE_KEYS_FAILURE,
-        "exchange-http-status",
+        "exchange_http_status",
         (json_int_t) http_status,
-        "exchange-code",
+        "exchange_code",
         (json_int_t) ec,
-        "exchange-reply",
+        "exchange_reply",
         error_reply));
     return;
   }
@@ -1789,14 +1789,16 @@ parse_pay (struct MHD_Connection *connection,
  *
  * @param cls closure with a `struct PayContext`
  * @param coin_pub public coin from which the refund comes from
+ * @param exchange_url URL of the exchange that issued @a coin_pub
  * @param rtransaction_id identificator of the refund
  * @param reason human-readable explanation of the refund
- * @param refund_amount refund amount which is being taken from coin_pub
+ * @param refund_amount refund amount which is being taken from @a coin_pub
  * @param refund_fee cost of this refund operation
  */
 static void
 check_coin_refunded (void *cls,
                      const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                     const char *exchange_url,
                      uint64_t rtransaction_id,
                      const char *reason,
                      const struct TALER_Amount *refund_amount,
@@ -1804,6 +1806,7 @@ check_coin_refunded (void *cls,
 {
   struct PayContext *pc = cls;
 
+  (void) exchange_url;
   for (unsigned int i = 0; i<pc->coins_cnt; i++)
   {
     struct DepositConfirmation *dc = &pc->dc[i];

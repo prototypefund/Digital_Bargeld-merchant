@@ -299,15 +299,70 @@ struct TALER_MERCHANT_RefundLookupOperation;
 
 
 /**
+ * Detail about a refund lookup result.
+ */
+struct TALER_MERCHANT_RefundDetail
+{
+
+  /**
+   * Exchange response details.  Full details are only included
+   * upon failure (HTTP status is not #MHD_HTTP_OK).
+   */
+  struct TALER_EXCHANGE_HttpResponse hr;
+
+  /**
+   * Coin this detail is about.
+   */
+  struct TALER_CoinSpendPublicKeyP coin_pub;
+
+  /**
+   * Refund transaction ID used.
+   */
+  uint64_t rtransaction_id;
+
+  /**
+   * Amount to be refunded for this coin.
+   */
+  struct TALER_Amount refund_amount;
+
+  /**
+   * Applicable refund transaction fee.
+   */
+  struct TALER_Amount refund_fee;
+
+  /**
+   * Public key of the exchange affirming the refund,
+   * only valid if the @e hr http_status is #MHD_HTTP_OK.
+   */
+  struct TALER_ExchangePublicKeyP exchange_pub;
+
+  /**
+   * Signature of the exchange affirming the refund,
+   * only valid if the @e hr http_status is #MHD_HTTP_OK.
+   */
+  struct TALER_ExchangeSignatureP exchange_sig;
+
+};
+
+
+/**
  * Callback to process a GET /refund request
  *
  * @param cls closure
  * @param hr HTTP response details
+ * @param h_contract_terms hash of the contract terms to which the refund is applied
+ * @param merchant_pub public key of the merchant
+ * @param num_details length of the @a details array
+ * @param details details about the refund processing
  */
 typedef void
 (*TALER_MERCHANT_RefundLookupCallback) (
   void *cls,
-  const struct TALER_MERCHANT_HttpResponse *hr);
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  const struct GNUNET_HashCode *h_contract_terms,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  unsigned int num_details,
+  const struct TALER_MERCHANT_RefundDetail *details);
 
 
 /**

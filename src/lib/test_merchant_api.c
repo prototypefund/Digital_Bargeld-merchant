@@ -100,6 +100,11 @@ static struct GNUNET_CONTAINER_MultiHashMap *interned_strings;
 #define USER_ACCOUNT_NAME "62"
 
 /**
+ * Account number of some other user.
+ */
+#define USER_ACCOUNT_NAME2 "63"
+
+/**
  * Account number used by the merchant
  */
 #define MERCHANT_ACCOUNT_NAME "3"
@@ -232,7 +237,8 @@ run (void *cls,
      * Make a reserve exist,
      * according to the previous
      * transfer.
-     */cmd_exec_wirewatch ("wirewatch-1"),
+     *///
+    cmd_exec_wirewatch ("wirewatch-1"),
     TALER_TESTING_cmd_check_bank_admin_transfer ("check_bank_transfer-2",
                                                  "EUR:10.02",
                                                  payer_payto,
@@ -445,24 +451,70 @@ run (void *cls,
   };
 
   struct TALER_TESTING_Command refund[] = {
-    TALER_TESTING_cmd_refund_increase ("refund-increase-1",
+    cmd_transfer_to_exchange ("create-reserve-1r",
+                              "EUR:10.02"),
+    /**
+     * Make a reserve exist, according to the previous transfer.
+     *///
+    cmd_exec_wirewatch ("wirewatch-1r"),
+    TALER_TESTING_cmd_check_bank_admin_transfer ("check_bank_transfer-2r",
+                                                 "EUR:10.02",
+                                                 payer_payto,
+                                                 exchange_payto,
+                                                 "create-reserve-1r"),
+    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-1r",
+                                       "create-reserve-1r",
+                                       "EUR:5",
+                                       MHD_HTTP_OK),
+    TALER_TESTING_cmd_withdraw_amount ("withdraw-coin-2r",
+                                       "create-reserve-1r",
+                                       "EUR:5",
+                                       MHD_HTTP_OK),
+    /**
+     * Check the reserve is depleted.
+     */
+    TALER_TESTING_cmd_status ("withdraw-status-1r",
+                              "create-reserve-1r",
+                              "EUR:0",
+                              MHD_HTTP_OK),
+    TALER_TESTING_cmd_proposal ("create-proposal-1r",
+                                merchant_url,
+                                MHD_HTTP_OK,
+                                "{\"max_fee\":\"EUR:0.5\",\
+        \"order_id\":\"1r\",\
+        \"refund_deadline\": {\"t_ms\": 0},\
+        \"pay_deadline\": {\"t_ms\": \"never\" },\
+        \"amount\":\"EUR:5.0\",\
+        \"summary\": \"merchant-lib testcase\",\
+        \"fulfillment_url\": \"https://example.com/\",\
+        \"products\": [ {\"description\":\"ice cream\",\
+                         \"value\":\"{EUR:5}\"} ] }"),
+    TALER_TESTING_cmd_pay ("pay-for-refund-1r",
+                           merchant_url,
+                           MHD_HTTP_OK,
+                           "create-proposal-1r",
+                           "withdraw-coin-1r",
+                           "EUR:5",
+                           "EUR:4.99",
+                           "EUR:0.01"),
+    TALER_TESTING_cmd_refund_increase ("refund-increase-1r",
                                        merchant_url,
                                        "refund test",
-                                       "1", /* order ID */
+                                       "1r", /* order ID */
                                        "EUR:0.1",
                                        "EUR:0.01",
                                        MHD_HTTP_OK),
     /* Ordinary refund.  */
-    TALER_TESTING_cmd_refund_lookup ("refund-lookup-1",
+    TALER_TESTING_cmd_refund_lookup ("refund-lookup-1r",
                                      merchant_url,
-                                     "refund-increase-1",
-                                     "deposit-simple",
-                                     "1",
+                                     "refund-increase-1r",
+                                     "pay-for-refund-1r",
+                                     "1r",
                                      MHD_HTTP_OK),
     /* Trying to pick up refund from non existent proposal.  */
     TALER_TESTING_cmd_refund_lookup ("refund-lookup-non-existent",
                                      merchant_url,
-                                     "refund-increase-1",
+                                     "refund-increase-1r",
                                      "deposit-simple",
                                      "non-existend-id",
                                      MHD_HTTP_NOT_FOUND),
@@ -522,7 +574,7 @@ run (void *cls,
                                 "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"unincreased-proposal\",\
         \"refund_deadline\":{\"t_ms\":0},\
-        \"pay_deadline\":{\"t_ms\":9999999999999},\
+        \"pay_deadline\":{\"t_ms\":\"never\"},\
         \"amount\":\"EUR:5.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"fulfillment_url\": \"https://example.com/\",\
@@ -538,19 +590,19 @@ run (void *cls,
                            "EUR:0.01"),
     CMD_EXEC_AGGREGATOR ("run-aggregator-unincreased-refund"),
     TALER_TESTING_cmd_check_bank_transfer (
-      "check_bank_transfer-unincreased-refund",
+      "check_bank_transfer-paid-unincreased-refund",
       EXCHANGE_URL,
-      "EUR:4.98",
+      "EUR:9.88", /* '4.98 from above', plus 4.99 from 'pay-for-refund-1r'
+                     and MINUS 0.1 PLUS 0.01 (deposit fee) from 'refund-increase-1r' */
       exchange_payto,
       merchant_payto),
-    /* Actually try to pick up the refund from the
-     * "unincreased proposal".  */
+    /* Actually try to pick up the refund from the "unincreased proposal".  */
     TALER_TESTING_cmd_refund_lookup_with_amount ("refund-lookup-unincreased",
                                                  merchant_url,
                                                  NULL,
                                                  "pay-unincreased-proposal",
                                                  "unincreased-proposal",
-                                                 MHD_HTTP_OK,
+                                                 MHD_HTTP_NOT_FOUND,
                                                  /* If a lookup is attempted
                                                   * on an unincreased
                                                   * proposal, the backend will
@@ -802,7 +854,7 @@ run (void *cls,
                          \"value\":\"{EUR:10}\"} ] }"),
     TALER_TESTING_cmd_pay ("pay-fail-partial-double-11-good",
                            merchant_url,
-                           MHD_HTTP_BAD_REQUEST,
+                           MHD_HTTP_NOT_ACCEPTABLE,
                            "create-proposal-11",
                            "withdraw-coin-11a",
                            "EUR:5",
@@ -865,7 +917,7 @@ run (void *cls,
                                              merchant_url,
                                              MHD_HTTP_OK,
                                              GNUNET_TIME_UNIT_ZERO_ABS,
-                                             4, /* Expected number of records */
+                                             5, /* Expected number of records */
                                              -100), /* Delta */
     /**
      * End the suite.  Fixme: better to have a label for this

@@ -45,6 +45,14 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
                           size_t *upload_data_size,
                           struct MerchantInstance *mi);
 
+
+/**
+ * Force resuming all suspended refund lookups, needed during shutdown.
+ */
+void
+MH_force_refund_resume (void);
+
+
 /**
  * Get the JSON representation of a refund.
  *

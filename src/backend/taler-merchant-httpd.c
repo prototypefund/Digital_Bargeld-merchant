@@ -406,6 +406,7 @@ do_shutdown (void *cls)
   (void) cls;
   MH_force_pc_resume ();
   MH_force_trh_resume ();
+  MH_force_refund_resume ();
   if (NULL != mhd_task)
   {
     GNUNET_SCHEDULER_cancel (mhd_task);

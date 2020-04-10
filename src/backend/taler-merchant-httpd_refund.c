@@ -66,14 +66,16 @@ struct ProcessRefundData
  *
  * @param cls closure
  * @param coin_pub public coin from which the refund comes from
+ * @param exchange_url URL of the exchange that issued @a coin_pub
  * @param rtransaction_id identificator of the refund
  * @param reason human-readable explanation of the refund
- * @param refund_amount refund amount which is being taken from coin_pub
+ * @param refund_amount refund amount which is being taken from @a coin_pub
  * @param refund_fee cost of this refund operation
  */
 static void
 process_refunds_cb (void *cls,
                     const struct TALER_CoinSpendPublicKeyP *coin_pub,
+                    const char *exchange_url,
                     uint64_t rtransaction_id,
                     const char *reason,
                     const struct TALER_Amount *refund_amount,
@@ -83,6 +85,7 @@ process_refunds_cb (void *cls,
   struct GNUNET_CRYPTO_EddsaSignature sig;
   json_t *element;
 
+  (void) exchange_url;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Found refund of %s for coin %s with reason `%s' in database\n",
               TALER_B2S (coin_pub),

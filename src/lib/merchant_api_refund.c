@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014, 2015, 2016, 2017, 2019 Taler Systems SA
+  Copyright (C) 2014-2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -32,6 +32,9 @@
 #include <taler/taler_curl_lib.h>
 
 
+/**
+ * Handle to the refund lookup operation.
+ */
 struct TALER_MERCHANT_RefundLookupOperation
 {
   /**
@@ -82,6 +85,180 @@ TALER_MERCHANT_refund_lookup_cancel (
 
 
 /**
+ * Check that the @a reply to the @a rlo is valid
+ *
+ * @param rlo lookup operation
+ * @param reply JSON reply to verify
+ * @return #TALER_EC_NONE if @a reply is well-formed
+ */
+static enum TALER_ErrorCode
+check_refund_result (struct TALER_MERCHANT_RefundLookupOperation *rlo,
+                     const json_t *reply)
+{
+  json_t *refunds;
+  unsigned int num_refunds;
+  struct GNUNET_HashCode h_contract_terms;
+  struct TALER_MerchantPublicKeyP merchant_pub;
+  struct GNUNET_JSON_Specification spec[] = {
+    GNUNET_JSON_spec_json ("refunds", &refunds),
+    GNUNET_JSON_spec_fixed_auto ("h_contract_terms", &h_contract_terms),
+    GNUNET_JSON_spec_fixed_auto ("merchant_pub", &merchant_pub),
+    GNUNET_JSON_spec_end ()
+  };
+
+  if (GNUNET_OK !=
+      GNUNET_JSON_parse (reply,
+                         spec,
+                         NULL, NULL))
+  {
+    GNUNET_break_op (0);
+    return TALER_EC_REFUND_LOOKUP_INVALID_RESPONSE;
+  }
+  num_refunds = json_array_size (refunds);
+  {
+    struct TALER_MERCHANT_RefundDetail rds[GNUNET_NZL (num_refunds)];
+    json_t *ercp[GNUNET_NZL (num_refunds)];
+
+    memset (rds,
+            0,
+            sizeof (rds));
+    memset (ercp,
+            0,
+            sizeof (ercp));
+    for (unsigned int i = 0; i<num_refunds; i++)
+    {
+      struct TALER_MERCHANT_RefundDetail *rd = &rds[i];
+      json_t *refund = json_array_get (refunds, i);
+      uint32_t hs;
+      struct GNUNET_JSON_Specification spec_detail[] = {
+        GNUNET_JSON_spec_fixed_auto ("coin_pub",
+                                     &rd->coin_pub),
+        TALER_JSON_spec_amount ("refund_amount",
+                                &rd->refund_amount),
+        TALER_JSON_spec_amount ("refund_fee",
+                                &rd->refund_fee),
+        GNUNET_JSON_spec_uint32 ("exchange_http_status",
+                                 &hs),
+        GNUNET_JSON_spec_uint64 ("rtransaction_id",
+                                 &rd->rtransaction_id),
+        GNUNET_JSON_spec_end ()
+      };
+
+      if (GNUNET_OK !=
+          GNUNET_JSON_parse (refund,
+                             spec_detail,
+                             NULL, NULL))
+      {
+        GNUNET_break_op (0);
+        GNUNET_JSON_parse_free (spec);
+        return TALER_EC_REFUND_LOOKUP_INVALID_RESPONSE;
+      }
+      rd->hr.http_status = (unsigned int) hs;
+    }
+
+    for (unsigned int i = 0; i<num_refunds; i++)
+    {
+      struct TALER_MERCHANT_RefundDetail *rd = &rds[i];
+      json_t *refund = json_array_get (refunds, i);
+
+      if (MHD_HTTP_OK == rd->hr.http_status)
+      {
+        struct GNUNET_JSON_Specification spec_detail[] = {
+          GNUNET_JSON_spec_fixed_auto ("exchange_pub",
+                                       &rd->exchange_pub),
+          GNUNET_JSON_spec_fixed_auto ("exchange_sig",
+                                       &rd->exchange_sig),
+          GNUNET_JSON_spec_end ()
+        };
+
+        if (GNUNET_OK !=
+            GNUNET_JSON_parse (refund,
+                               spec_detail,
+                               NULL, NULL))
+        {
+          GNUNET_break_op (0);
+          for (unsigned int j = 0; j<i; j++)
+            if (NULL != ercp[j])
+              json_decref (ercp[j]);
+          GNUNET_JSON_parse_free (spec);
+          return TALER_EC_REFUND_LOOKUP_INVALID_RESPONSE;
+        }
+        /* verify exchange sig (we should not trust the merchant) */
+        {
+          struct TALER_RefundConfirmationPS depconf = {
+            .purpose.size = htonl (sizeof (depconf)),
+            .purpose.purpose = htonl (TALER_SIGNATURE_EXCHANGE_CONFIRM_REFUND),
+            .h_contract_terms = h_contract_terms,
+            .coin_pub = rd->coin_pub,
+            .merchant = merchant_pub,
+            .rtransaction_id = GNUNET_htonll (rd->rtransaction_id)
+          };
+
+          TALER_amount_hton (&depconf.refund_amount,
+                             &rd->refund_amount);
+          TALER_amount_hton (&depconf.refund_fee,
+                             &rd->refund_fee);
+          if (GNUNET_OK !=
+              GNUNET_CRYPTO_eddsa_verify (
+                TALER_SIGNATURE_EXCHANGE_CONFIRM_REFUND,
+                &depconf,
+                &rd->exchange_sig.eddsa_signature,
+                &rd->exchange_pub.eddsa_pub))
+          {
+            /* While the *exchange* signature is invalid, we do blame the
+               merchant here, because the merchant should have checked and
+               sent us an error code (with exchange HTTP status code 0) instead
+               of claiming that the exchange yielded a good response. *///
+            GNUNET_break_op (0);
+            GNUNET_JSON_parse_free (spec);
+            return TALER_EC_REFUND_LOOKUP_INVALID_RESPONSE;
+          }
+        }
+      }
+      else
+      {
+        uint32_t ec;
+        struct GNUNET_JSON_Specification spec_detail[] = {
+          GNUNET_JSON_spec_uint32 ("exchange_code",
+                                   &ec),
+          GNUNET_JSON_spec_end ()
+        };
+
+        if (GNUNET_OK !=
+            GNUNET_JSON_parse (refund,
+                               spec_detail,
+                               NULL, NULL))
+        {
+          GNUNET_break_op (0);
+          rd->hr.ec = TALER_EC_INVALID;
+        }
+        ercp[i] = json_incref (json_object_get (refund,
+                                                "exchange_reply"));
+        rd->hr.reply = ercp[i];
+      }
+    }
+    {
+      struct TALER_MERCHANT_HttpResponse hr = {
+        .http_status = MHD_HTTP_OK,
+        .reply = reply
+      };
+      rlo->cb (rlo->cb_cls,
+               &hr,
+               &h_contract_terms,
+               &merchant_pub,
+               num_refunds,
+               rds);
+    }
+    for (unsigned int j = 0; j<num_refunds; j++)
+      if (NULL != ercp[j])
+        json_decref (ercp[j]);
+  }
+  GNUNET_JSON_parse_free (spec);
+  return TALER_EC_NONE;
+}
+
+
+/**
  * Process GET /refund response
  *
  * @param cls a `struct TALER_MERCHANT_RefundLookupOperation *`
@@ -109,7 +286,15 @@ handle_refund_lookup_finished (void *cls,
     hr.ec = TALER_EC_INVALID_RESPONSE;
     break;
   case MHD_HTTP_OK:
-    /* nothing to do, all good! */
+    if (TALER_EC_NONE ==
+        (hr.ec = check_refund_result (rlo,
+                                      json)))
+    {
+      TALER_MERCHANT_refund_lookup_cancel (rlo);
+      return;
+    }
+    /* failure, report! */
+    hr.http_status = 0;
     break;
   case MHD_HTTP_NOT_FOUND:
     hr.ec = TALER_JSON_get_error_code (json);
@@ -122,7 +307,11 @@ handle_refund_lookup_finished (void *cls,
     break;
   }
   rlo->cb (rlo->cb_cls,
-           &hr);
+           &hr,
+           NULL,
+           NULL,
+           0,
+           NULL);
   TALER_MERCHANT_refund_lookup_cancel (rlo);
 }
 

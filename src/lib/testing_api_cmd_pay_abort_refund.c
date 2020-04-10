@@ -85,11 +85,13 @@ struct PayAbortRefundState
  * @param cls closure
  * @param hr HTTP response code details
  * @param sign_key exchange key used to sign @a obj, or NULL
+ * @param signature the actual signature, or NULL on error
  */
 static void
 abort_refund_cb (void *cls,
                  const struct TALER_EXCHANGE_HttpResponse *hr,
-                 const struct TALER_ExchangePublicKeyP *sign_key)
+                 const struct TALER_ExchangePublicKeyP *sign_key,
+                 const struct TALER_ExchangeSignatureP *signature)
 {
   struct PayAbortRefundState *pars = cls;
 

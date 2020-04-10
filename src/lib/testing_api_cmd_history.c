@@ -109,10 +109,9 @@ history_cb (void *cls,
   if (hs->http_status != hr->http_status)
     TALER_TESTING_FAIL (hs->is);
 
-  if (0 == hs->http_status)
+  if (MHD_HTTP_OK != hs->http_status)
   {
-    /* 0 was caused intentionally by the tests,
-     * move on without further checking. */
+    /* move on without further checking. */
     TALER_TESTING_interpreter_next (hs->is);
     return;
   }
@@ -277,15 +276,16 @@ cmd_history2 (const char *label,
   hs->nrows = nrows;
   hs->merchant_url = merchant_url;
   hs->use_default_start = use_default_start;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = hs,
+      .label = label,
+      .run = &history_run,
+      .cleanup = &history_cleanup
+    };
 
-  struct TALER_TESTING_Command cmd = {
-    .cls = hs,
-    .label = label,
-    .run = &history_run,
-    .cleanup = &history_cleanup
-  };
-
-  return cmd;
+    return cmd;
+  }
 }
 
 

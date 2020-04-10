@@ -101,10 +101,10 @@ handle_status (void *cls,
       TALER_MHD_make_json_pack (
         "{s:I, s:I, s:s, s:I, s:O}",
         "code", (json_int_t) TALER_EC_TIP_QUERY_RESERVE_UNKNOWN_TO_EXCHANGE,
-        "exchange-http-status", hr->http_status,
+        "exchange_http_status", hr->http_status,
         "hint", "tipping reserve unknown at exchange",
-        "exchange-code", hr->ec,
-        "exchange-reply", hr->reply));
+        "exchange_code", hr->ec,
+        "exchange_reply", hr->reply));
     return;
   }
   if (MHD_HTTP_OK != hr->http_status)
@@ -116,10 +116,10 @@ handle_status (void *cls,
       TALER_MHD_make_json_pack (
         "{s:I, s:I, s:s, s:I, s:O}",
         "code", (json_int_t) TALER_EC_TIP_QUERY_RESERVE_HISTORY_FAILED,
-        "exchange-http-status", hr->http_status,
+        "exchange_http_status", hr->http_status,
         "hint", "exchange failed to provide reserve history",
-        "exchange-code", (json_int_t) hr->ec,
-        "exchange-reply", hr->reply));
+        "exchange_code", (json_int_t) hr->ec,
+        "exchange_reply", hr->reply));
     return;
   }
 

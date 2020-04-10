@@ -617,9 +617,9 @@ wire_transfer_cb (void *cls,
       TALER_MHD_make_json_pack (
         "{s:I, s:I, s:I, s:O}",
         "code", (json_int_t) TALER_EC_TRACK_TRANSFER_EXCHANGE_ERROR,
-        "exchange-code", (json_int_t) hr->ec,
-        "exchange-http-status", (json_int_t) hr->http_status,
-        "exchange-reply", hr->reply));
+        "exchange_code", (json_int_t) hr->ec,
+        "exchange_http_status", (json_int_t) hr->http_status,
+        "exchange_reply", hr->reply));
     return;
   }
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
@@ -828,9 +828,9 @@ process_track_transfer_with_exchange (void *cls,
         : "{s:s, s:I, s:I, s:I}",
         "hint", "failed to obtain meta-data from exchange",
         "code", (json_int_t) TALER_EC_TRACK_TRANSFER_EXCHANGE_KEYS_FAILURE,
-        "exchange-http-status", (json_int_t) http_status,
-        "exchange-code", (json_int_t) ec,
-        "exchange-reply", error_reply));
+        "exchange_http_status", (json_int_t) http_status,
+        "exchange_code", (json_int_t) ec,
+        "exchange_reply", error_reply));
     return;
   }
   rctx->eh = eh;

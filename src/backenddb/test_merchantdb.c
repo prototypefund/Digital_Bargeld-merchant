@@ -199,14 +199,16 @@ static json_t *contract_terms_future;
  *
  * @param cls closure
  * @param coin_pub public coin from which the refund comes from
+ * @param exchange_url URL of the exchange that issued the @a coin_pub
  * @param rtransaction_id identificator of the refund
  * @param reason human-readable explanation of the refund
- * @param refund_amount refund amount which is being taken from coin_pub
+ * @param refund_amount refund amount which is being taken from @a coin_pub
  * @param refund_fee cost of this refund operation
  */
 static void
 refund_cb (void *cls,
            const struct TALER_CoinSpendPublicKeyP *coin_pub,
+           const char *exchange_url,
            uint64_t rtransaction_id,
            const char *reason,
            const struct TALER_Amount *refund_amount,

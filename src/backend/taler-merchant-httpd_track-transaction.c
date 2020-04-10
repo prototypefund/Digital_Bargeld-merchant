@@ -471,11 +471,11 @@ wire_deposits_cb (void *cls,
         "{s:I, s:I, s:I, s:O}",
         "code",
         (json_int_t) TALER_EC_TRACK_TRANSACTION_WIRE_TRANSFER_TRACE_ERROR,
-        "exchange-http-status",
+        "exchange_http_status",
         (json_int_t) hr->http_status,
-        "exchange-code",
+        "exchange_code",
         (json_int_t) hr->ec,
-        "exchange-reply",
+        "exchange_reply",
         hr->reply));
     return;
   }
@@ -629,11 +629,11 @@ wtid_cb (void *cls,
         "{s:I, s:I, s:I, s:O}",
         "code",
         (json_int_t) TALER_EC_TRACK_TRANSACTION_COIN_TRACE_ERROR,
-        "exchange-http-status",
+        "exchange_http_status",
         (json_int_t) hr->http_status,
-        "exchange-code",
+        "exchange_code",
         (json_int_t) hr->ec,
-        "exchange-reply",
+        "exchange_reply",
         hr->reply));
     return;
   }
@@ -905,9 +905,9 @@ process_track_transaction_with_exchange (void *cls,
         : "{s:s, s:I, s:I, s:I}",
         "hint", "failed to obtain meta-data from exchange",
         "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_EXCHANGE_KEYS_FAILURE,
-        "exchange-http-status", (json_int_t) http_status,
-        "exchange-code", (json_int_t) ec,
-        "exchange-reply", error_reply));
+        "exchange_http_status", (json_int_t) http_status,
+        "exchange_code", (json_int_t) ec,
+        "exchange_reply", error_reply));
     return;
   }
   tctx->eh = eh;

@@ -1742,9 +1742,12 @@ get_refunds_cb (void *cls,
     struct TALER_Amount refund_amount;
     struct TALER_Amount refund_fee;
     char *reason;
+    char *exchange_url;
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
+      GNUNET_PQ_result_spec_string ("exchange_url",
+                                    &exchange_url),
       GNUNET_PQ_result_spec_uint64 ("rtransaction_id",
                                     &rtransaction_id),
       TALER_PQ_RESULT_SPEC_AMOUNT ("refund_amount",
@@ -1768,6 +1771,7 @@ get_refunds_cb (void *cls,
     grc->qs = i + 1;
     grc->rc (grc->rc_cls,
              &coin_pub,
+             exchange_url,
              rtransaction_id,
              reason,
              &refund_amount,
@@ -1788,15 +1792,12 @@ get_refunds_cb (void *cls,
  * @return transaction status
  */
 static enum GNUNET_DB_QueryStatus
-postgres_get_refunds_from_contract_terms_hash (void *cls,
-                                               const struct
-                                               TALER_MerchantPublicKeyP *
-                                               merchant_pub,
-                                               const struct
-                                               GNUNET_HashCode *h_contract_terms,
-                                               TALER_MERCHANTDB_RefundCallback
-                                               rc,
-                                               void *rc_cls)
+postgres_get_refunds_from_contract_terms_hash (
+  void *cls,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  const struct GNUNET_HashCode *h_contract_terms,
+  TALER_MERCHANTDB_RefundCallback rc,
+  void *rc_cls)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -1837,7 +1838,6 @@ postgres_get_refunds_from_contract_terms_hash (void *cls,
  * @param coin_pub public key of the coin giving the (part of) refund
  * @param reason human readable explanation behind the refund
  * @param refund how much this coin is refunding
- * @param refund_fee refund fee for this coin
  */
 static enum GNUNET_DB_QueryStatus
 insert_refund (void *cls,
@@ -1845,8 +1845,7 @@ insert_refund (void *cls,
                const struct GNUNET_HashCode *h_contract_terms,
                const struct TALER_CoinSpendPublicKeyP *coin_pub,
                const char *reason,
-               const struct TALER_Amount *refund,
-               const struct TALER_Amount *refund_fee)
+               const struct TALER_Amount *refund)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -1855,7 +1854,6 @@ insert_refund (void *cls,
     GNUNET_PQ_query_param_auto_from_type (coin_pub),
     GNUNET_PQ_query_param_string (reason),
     TALER_PQ_query_param_amount (refund),
-    TALER_PQ_query_param_amount (refund_fee),
     GNUNET_PQ_query_param_end
   };
 
@@ -1886,17 +1884,18 @@ insert_refund (void *cls,
  * @return transaction status code
  */
 static enum GNUNET_DB_QueryStatus
-postgres_store_wire_fee_by_exchange (void *cls,
-                                     const struct
-                                     TALER_MasterPublicKeyP *exchange_pub,
-                                     const struct
-                                     GNUNET_HashCode *h_wire_method,
-                                     const struct TALER_Amount *wire_fee,
-                                     const struct TALER_Amount *closing_fee,
-                                     struct GNUNET_TIME_Absolute start_date,
-                                     struct GNUNET_TIME_Absolute end_date,
-                                     const struct
-                                     TALER_MasterSignatureP *exchange_sig)
+postgres_store_wire_fee_by_exchange (
+  void *cls,
+  const struct
+  TALER_MasterPublicKeyP *exchange_pub,
+  const struct
+  GNUNET_HashCode *h_wire_method,
+  const struct TALER_Amount *wire_fee,
+  const struct TALER_Amount *closing_fee,
+  struct GNUNET_TIME_Absolute start_date,
+  struct GNUNET_TIME_Absolute end_date,
+  const struct
+  TALER_MasterSignatureP *exchange_sig)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -2109,7 +2108,6 @@ process_deposits_for_refund_cb (void *cls,
   struct TALER_Amount deposit_refund[GNUNET_NZL (num_results)];
   struct TALER_CoinSpendPublicKeyP deposit_coin_pubs[GNUNET_NZL (num_results)];
   struct TALER_Amount deposit_amount_with_fee[GNUNET_NZL (num_results)];
-  struct TALER_Amount deposit_refund_fee[GNUNET_NZL (num_results)];
 
   GNUNET_assert (GNUNET_OK ==
                  TALER_amount_get_zero (ctx->refund->currency,
@@ -2121,14 +2119,11 @@ process_deposits_for_refund_cb (void *cls,
   {
     struct TALER_CoinSpendPublicKeyP coin_pub;
     struct TALER_Amount amount_with_fee;
-    struct TALER_Amount refund_fee;
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_auto_from_type ("coin_pub",
                                             &coin_pub),
       TALER_PQ_RESULT_SPEC_AMOUNT ("amount_with_fee",
                                    &amount_with_fee),
-      TALER_PQ_RESULT_SPEC_AMOUNT ("refund_fee",
-                                   &refund_fee),
       GNUNET_PQ_result_spec_end
     };
     struct FindRefundContext ictx = {
@@ -2173,7 +2168,6 @@ process_deposits_for_refund_cb (void *cls,
     deposit_refund[i] = ictx.refunded_amount;
     deposit_amount_with_fee[i] = amount_with_fee;
     deposit_coin_pubs[i] = coin_pub;
-    deposit_refund_fee[i] = refund_fee;
     if (0 >
         TALER_amount_add (&current_refund,
                           &current_refund,
@@ -2283,8 +2277,7 @@ process_deposits_for_refund_cb (void *cls,
                                ctx->h_contract_terms,
                                &deposit_coin_pubs[i],
                                ctx->reason,
-                               increment,
-                               &deposit_refund_fee[i])))
+                               increment)))
       {
         GNUNET_break (GNUNET_DB_STATUS_SOFT_ERROR == qs);
         ctx->qs = qs;
@@ -3074,11 +3067,9 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             ",reason"
                             ",refund_amount_val"
                             ",refund_amount_frac"
-                            ",refund_fee_val"
-                            ",refund_fee_frac"
                             ") VALUES"
-                            "($1, $2, $3, $4, $5, $6, $7, $8)",
-                            8),
+                            "($1, $2, $3, $4, $5, $6)",
+                            6),
     GNUNET_PQ_make_prepare ("insert_proof",
                             "INSERT INTO merchant_proofs"
                             "(exchange_url"
@@ -3228,15 +3219,17 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
     GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
                             "SELECT"
                             " coin_pub"
+                            ",merchant_deposits.exchange_url"
                             ",rtransaction_id"
                             ",refund_amount_val"
                             ",refund_amount_frac"
-                            ",refund_fee_val"
-                            ",refund_fee_frac"
+                            ",merchant_deposits.refund_fee_val"
+                            ",merchant_deposits.refund_fee_frac"
                             ",reason"
                             " FROM merchant_refunds"
-                            " WHERE merchant_pub=$1"
-                            " AND h_contract_terms=$2",
+                            "   JOIN merchant_deposits USING (merchant_pub, coin_pub)"
+                            " WHERE merchant_refunds.merchant_pub=$1"
+                            "   AND merchant_refunds.h_contract_terms=$2",
                             2),
     GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_asc",
                             "SELECT"
@@ -3354,9 +3347,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             ",merchant_deposits.exchange_proof"
                             " FROM merchant_transfers"
                             "   JOIN merchant_deposits"
-                            "     ON (merchant_deposits.h_contract_terms = merchant_transfers.h_contract_terms"
-                            "       AND"
-                            "         merchant_deposits.coin_pub = merchant_transfers.coin_pub)"
+                            "     USING (h_contract_terms,coin_pub)"
                             " WHERE wtid=$1",
                             1),
     GNUNET_PQ_make_prepare ("find_proof_by_wtid",

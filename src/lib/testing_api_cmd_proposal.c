@@ -215,8 +215,9 @@ proposal_cb (void *cls,
   ps->po = NULL;
   if (ps->http_status != hr->http_status)
   {
-    TALER_LOG_ERROR ("Given vs expected: %u vs %u\n",
+    TALER_LOG_ERROR ("Given vs expected: %u(%d) vs %u\n",
                      hr->http_status,
+                     (int) hr->ec,
                      ps->http_status);
     TALER_TESTING_FAIL (ps->is);
   }
