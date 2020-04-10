@@ -443,6 +443,7 @@ prepare_pickup (struct PickupContext *pc)
   }
   pc->fo = TMH_EXCHANGES_find_exchange (pc->exchange_url,
                                         NULL,
+                                        GNUNET_NO,
                                         &exchange_found_cb,
                                         pc);
   if (NULL == pc->fo)

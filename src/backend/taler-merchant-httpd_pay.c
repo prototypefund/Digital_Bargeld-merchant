@@ -1318,6 +1318,7 @@ find_next_exchange (struct PayContext *pc)
       pc->current_exchange = dc->exchange_url;
       pc->fo = TMH_EXCHANGES_find_exchange (pc->current_exchange,
                                             pc->wm->wire_method,
+                                            GNUNET_NO,
                                             &process_pay_with_exchange,
                                             pc);
       if (NULL == pc->fo)

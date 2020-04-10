@@ -192,6 +192,11 @@ struct Exchange
   struct TALER_MasterPublicKeyP master_pub;
 
   /**
+   * How soon can may we, at the earliest, re-download /keys?
+   */
+  struct GNUNET_TIME_Absolute first_retry;
+
+  /**
    * How long should we wait between the next retry?
    */
   struct GNUNET_TIME_Relative retry_delay;
@@ -782,6 +787,8 @@ keys_mgmt_cb (void *cls,
                 GNUNET_STRINGS_relative_time_to_string (exchange->retry_delay,
                                                         GNUNET_YES));
     GNUNET_assert (NULL == exchange->retry_task);
+    exchange->first_retry = GNUNET_TIME_relative_to_absolute (
+      exchange->retry_delay);
     exchange->retry_task = GNUNET_SCHEDULER_add_delayed (exchange->retry_delay,
                                                          &retry_exchange,
                                                          exchange);
@@ -816,6 +823,7 @@ keys_mgmt_cb (void *cls,
   expire = TALER_EXCHANGE_check_keys_current (exchange->conn,
                                               GNUNET_NO,
                                               GNUNET_NO);
+  exchange->first_retry = GNUNET_TIME_relative_to_absolute (RELOAD_DELAY);
   if (0 == expire.abs_value_us)
     delay = RELOAD_DELAY;
   else
@@ -877,6 +885,11 @@ return_result (void *cls)
  *
  * @param chosen_exchange URL of the exchange we would like to talk to
  * @param wire_method the wire method we will use with @a chosen_exchange, NULL for none
+ * @param force_reload try to force reloading /keys from the exchange ASAP; note
+ *        that IF the forced reload fails, it is possible @a fc won't be called at all
+ *        until a /keys download succeeds; only use #GNUNET_YES if a new /keys request
+ *        is mandatory. If the force reload request is not allowed due to our rate limiting,
+ *        then @a fc will be called immediately with the existing /keys data
  * @param fc function to call with the handles for the exchange
  * @param fc_cls closure for @a fc
  * @return NULL on error
@@ -884,6 +897,7 @@ return_result (void *cls)
 struct TMH_EXCHANGES_FindOperation *
 TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                              const char *wire_method,
+                             int force_reload,
                              TMH_EXCHANGES_FindContinuation fc,
                              void *fc_cls)
 {
@@ -941,6 +955,25 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                                fo);
   now = GNUNET_TIME_absolute_get ();
   (void) GNUNET_TIME_round_abs (&now);
+  if ( (force_reload) &&
+       (0 == GNUNET_TIME_absolute_get_remaining (
+          exchange->first_retry).rel_value_us) )
+  {
+    /* increment exponential-backoff */
+    exchange->retry_delay = RETRY_BACKOFF (exchange->retry_delay);
+    /* do not allow forced check until both backoff and #RELOAD_DELAY
+       are satisified again */
+    exchange->first_retry
+      = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_max (
+                                            exchange->retry_delay,
+                                            RELOAD_DELAY));
+    TALER_EXCHANGE_check_keys_current (exchange->conn,
+                                       GNUNET_YES,
+                                       GNUNET_NO);
+    return fo;
+  }
+
+
   if ( (GNUNET_YES != exchange->pending) &&
        ( (NULL == fo->wire_method) ||
          (NULL != get_wire_fees (exchange,

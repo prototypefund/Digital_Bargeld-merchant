@@ -563,6 +563,7 @@ MH_handler_refund_lookup (struct TMH_RequestHandler *rh,
         /* We need to talk to the exchange */
         cr->fo = TMH_EXCHANGES_find_exchange (cr->exchange_url,
                                               NULL,
+                                              GNUNET_NO,
                                               &exchange_found_cb,
                                               cr);
       }

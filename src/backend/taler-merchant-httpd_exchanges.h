@@ -90,12 +90,18 @@ struct TMH_EXCHANGES_FindOperation;
  *
  * @param chosen_exchange URL of the exchange we would like to talk to
  * @param wire_method the wire method we will use with @a chosen_exchange, NULL for none
+ * @param force_reload try to force reloading /keys from the exchange ASAP; note
+ *        that IF the forced reload fails, it is possible @a fc won't be called at all
+ *        until a /keys download succeeds; only use #GNUNET_YES if a new /keys request
+ *        is mandatory. If the force reload request is not allowed due to our rate limiting,
+ *        then @a fc will be called immediately with the existing /keys data
  * @param fc function to call with the handles for the exchange
  * @param fc_cls closure for @a fc
  */
 struct TMH_EXCHANGES_FindOperation *
 TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
                              const char *wire_method,
+                             int force_reload,
                              TMH_EXCHANGES_FindContinuation fc,
                              void *fc_cls);
 

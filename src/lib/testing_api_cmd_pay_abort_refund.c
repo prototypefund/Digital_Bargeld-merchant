@@ -190,17 +190,16 @@ pay_abort_refund_run (void *cls,
   GNUNET_assert (GNUNET_OK ==
                  TALER_string_to_amount (pars->refund_fee,
                                          &refund_fee));
-  pars->rh = TALER_EXCHANGE_refund2
-               (is->exchange,
-               &refund_amount,
-               &refund_fee,
-               h_contract_terms,
-               &refund_entry->coin_pub,
-               refund_entry->rtransaction_id,
-               merchant_pub,
-               &refund_entry->merchant_sig,
-               &abort_refund_cb,
-               pars);
+  pars->rh = TALER_EXCHANGE_refund2 (is->exchange,
+                                     &refund_amount,
+                                     &refund_fee,
+                                     h_contract_terms,
+                                     &refund_entry->coin_pub,
+                                     refund_entry->rtransaction_id,
+                                     merchant_pub,
+                                     &refund_entry->merchant_sig,
+                                     &abort_refund_cb,
+                                     pars);
   GNUNET_assert (NULL != pars->rh);
 }
 

@@ -1079,6 +1079,7 @@ MH_handler_track_transfer (struct TMH_RequestHandler *rh,
   MHD_suspend_connection (connection);
   rctx->fo = TMH_EXCHANGES_find_exchange (url,
                                           NULL,
+                                          GNUNET_NO,
                                           &process_track_transfer_with_exchange,
                                           rctx);
   rctx->timeout_task

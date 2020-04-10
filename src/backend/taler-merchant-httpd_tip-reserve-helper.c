@@ -398,6 +398,7 @@ TMH_check_tip_reserve (struct TMH_CheckTipReserve *ctr,
   db->preflight (db->cls);
   ctr->fo = TMH_EXCHANGES_find_exchange (tip_exchange,
                                          NULL,
+                                         GNUNET_NO,
                                          &exchange_cont,
                                          ctr);
   if (NULL == ctr->fo)
