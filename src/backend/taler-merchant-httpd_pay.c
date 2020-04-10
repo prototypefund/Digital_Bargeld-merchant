@@ -371,6 +371,11 @@ struct PayContext
   int suspended;
 
   /**
+   * #GNUNET_YES if we already tried a forced /keys download.
+   */
+  int tried_force_keys;
+
+  /**
    * Which operational mode is the /pay request made in?
    */
   enum { PC_MODE_PAY, PC_MODE_ABORT_REFUND } mode;
@@ -1208,6 +1213,9 @@ process_pay_with_exchange (void *cls,
     enum TALER_ErrorCode ec;
     unsigned int hc;
 
+    if (NULL != dc->dh)
+      continue; /* we were here before (can happen due to
+                   tried_force_keys logic), don't go again */
     if (GNUNET_YES == dc->found_in_db)
       continue;
     if (0 != strcmp (dc->exchange_url,
@@ -1217,9 +1225,22 @@ process_pay_with_exchange (void *cls,
                                                          &dc->denom);
     if (NULL == denom_details)
     {
-      /* FIXME: #6136 applies HERE */
       struct GNUNET_HashCode h_denom;
 
+      if (! pc->tried_force_keys)
+      {
+        /* let's try *forcing* a re-download of /keys from the exchange.
+           Maybe the wallet has seen /keys that we missed. */
+        pc->tried_force_keys = GNUNET_YES;
+        pc->fo = TMH_EXCHANGES_find_exchange (pc->current_exchange,
+                                              pc->wm->wire_method,
+                                              GNUNET_YES,
+                                              &process_pay_with_exchange,
+                                              pc);
+        if (NULL != pc->fo)
+          return;
+      }
+      /* Forcing failed or we already did it, give up */
       GNUNET_CRYPTO_rsa_public_key_hash (dc->denom.rsa_public_key,
                                          &h_denom);
       resume_pay_with_response (

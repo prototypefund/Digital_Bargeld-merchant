@@ -30,6 +30,13 @@
 #define RELOAD_DELAY GNUNET_TIME_relative_multiply (GNUNET_TIME_UNIT_MINUTES, 2)
 
 /**
+ * Delay after which we'll allow clients to force us to re-fetch key
+ * information from the exchange if we don't know the denomination key.
+ */
+#define FORCED_RELOAD_DELAY GNUNET_TIME_relative_multiply ( \
+    GNUNET_TIME_UNIT_MINUTES, 15)
+
+/**
  * Threshold after which exponential backoff should not increase.
  */
 #define RETRY_BACKOFF_THRESHOLD GNUNET_TIME_relative_multiply ( \
@@ -961,12 +968,12 @@ TMH_EXCHANGES_find_exchange (const char *chosen_exchange,
   {
     /* increment exponential-backoff */
     exchange->retry_delay = RETRY_BACKOFF (exchange->retry_delay);
-    /* do not allow forced check until both backoff and #RELOAD_DELAY
+    /* do not allow forced check until both backoff and #FORCED_RELOAD_DELAY
        are satisified again */
     exchange->first_retry
       = GNUNET_TIME_relative_to_absolute (GNUNET_TIME_relative_max (
                                             exchange->retry_delay,
-                                            RELOAD_DELAY));
+                                            FORCED_RELOAD_DELAY));
     TALER_EXCHANGE_check_keys_current (exchange->conn,
                                        GNUNET_YES,
                                        GNUNET_NO);
