@@ -255,6 +255,11 @@ TMH_compute_pay_key (const char *order_id,
   GNUNET_CRYPTO_hash (buf,
                       sizeof (buf),
                       key);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Pay key for %s is %s\n",
+              order_id,
+              GNUNET_h2s (key));
+
 }
 
 
@@ -307,6 +312,9 @@ void
 TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc,
                        const struct TALER_Amount *min_refund)
 {
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Suspending operation on key %s\n",
+              GNUNET_h2s (&sc->key));
   GNUNET_assert (GNUNET_OK ==
                  GNUNET_CONTAINER_multihashmap_put (payment_trigger_map,
                                                     &sc->key,
@@ -353,7 +361,12 @@ resume_operation (void *cls,
        ( (NULL == have_refund) ||
          (1 != TALER_amount_cmp (have_refund,
                                  &sc->refund_expected)) ) )
+  {
+    GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                "Not awaking client, refund amount of %s not yet satisfied\n",
+                TALER_amount2s (&sc->refund_expected));
     return GNUNET_OK; /* skip */
+  }
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming operation suspended pending payment on key %s\n",
               GNUNET_h2s (key));
@@ -365,6 +378,7 @@ resume_operation (void *cls,
                  GNUNET_CONTAINER_heap_remove_node (sc->hn));
   sc->hn = NULL;
   MHD_resume_connection (sc->con);
+  TMH_trigger_daemon ();
   return GNUNET_OK;
 }
 
@@ -596,7 +610,7 @@ static int triggered;
  * Call MHD to process pending requests and then go back
  * and schedule the next run.
  *
- * @param cls the `struct MHD_Daemon` of the HTTP server to run
+ * @param cls NULL
  */
 static void
 run_daemon (void *cls)

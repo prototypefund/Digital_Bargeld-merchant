@@ -441,6 +441,7 @@ poll_payment_conclude_run (void *cls,
     TALER_TESTING_FAIL (ppc->is);
   GNUNET_assert (poll_cmd->run == &poll_payment_start_run);
   cps = poll_cmd->cls;
+  cps->cs = ppc;
   if (NULL == cps->cpo)
     ppc->task = GNUNET_SCHEDULER_add_now (&conclude_task,
                                           ppc);

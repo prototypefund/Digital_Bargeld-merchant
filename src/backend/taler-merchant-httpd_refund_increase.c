@@ -258,6 +258,11 @@ process_refund (struct MHD_Connection *connection,
   }
 
   /* Resume /public/poll-payments clients that may wait for this refund */
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Awakeing clients on %s waiting for refund of less than %s\n",
+              order_id,
+              TALER_amount2s (refund));
+
   TMH_long_poll_resume (order_id,
                         &mi->pubkey,
                         refund);

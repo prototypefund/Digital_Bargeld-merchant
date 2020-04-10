@@ -459,7 +459,6 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
     }
   } /* end of first-time initialization / sanity checks */
 
-
   db->preflight (db->cls);
 
   /* Check if the order has been paid for. */
@@ -526,6 +525,7 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
   /* Accumulate refunds, if any. */
   for (unsigned int i = 0; i<MAX_RETRIES; i++)
   {
+    pprc->refunded = GNUNET_NO;
     qs = db->get_refunds_from_contract_terms_hash (db->cls,
                                                    &mi->pubkey,
                                                    &pprc->h_contract_terms,
@@ -557,7 +557,9 @@ MH_handler_poll_payment (struct TMH_RequestHandler *rh,
     if (0 != remaining.rel_value_us)
     {
       /* yes, indeed suspend */
-      pprc->refunded = GNUNET_NO;
+      GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+                  "Awaiting refund exceeding %s\n",
+                  TALER_amount2s (&pprc->min_refund));
       suspend_pprc (pprc);
       return MHD_YES;
     }
