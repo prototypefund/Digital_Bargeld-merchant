@@ -205,7 +205,7 @@ AC_CHECK_HEADERS([taler/taler_fakebank_lib.h],
 AM_CONDITIONAL(HAVE_TALERFAKEBANK, test x$libtalerfakebank = x1)
 
 
-# check for libtalertwistertesting
+# check for libtalertwister
 twistertesting=0
 AC_MSG_CHECKING([for talerwtistertesting])
 AC_ARG_WITH([twister],
@@ -218,13 +218,15 @@ AS_CASE([$with_twister],
         [no], [AC_MSG_WARN([no twister-testing will be compiled])],
         [LDFLAGS="-L$with_twister/lib $LDFLAGS"
          CPPFLAGS="-I$with_twister/include $CPPFLAGS"])
+AC_CHECK_LIB(talertwistertesting,TALER_TWISTER_run_twister,
+  [AC_CHECK_HEADER([taler/taler_twister_testing_lib.h],[twistertesting=1],,
+                   [#ifdef HAVE_GNUNET_PLATFORM_H
+                      #include <gnunet/platform.h>
+                    #endif
+                    ])])
 
-AC_CHECK_HEADERS([taler/taler_twister_testing_lib.h],
- [AC_CHECK_LIB([talertwistertesting], [TALER_TESTING_run_twister], twistertesting=1,, [-ltalerexchange -ltalerbank])],
-   [], [#ifdef HAVE_GNUNET_PLATFORM_H
-        #include <gnunet/platform.h>
-       #endif])
 AM_CONDITIONAL(HAVE_TWISTER, test x$twistertesting = x1)
+
 
 # gcov compilation
 AC_MSG_CHECKING(whether to compile with support for code coverage analysis)
