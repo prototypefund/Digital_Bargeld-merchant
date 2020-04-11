@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2019 Taler Systems SA
+  (C) 2019, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Affero General Public License as published by the Free Software
@@ -55,7 +55,37 @@ add_instance (void *cls,
   json_t *ja = cls;
   struct MerchantInstance *mi = value;
   char *url;
+  json_t *pta;
 
+  /* Compile array of all unique wire methods supported by this
+     instance */
+  pta = json_array ();
+  GNUNET_assert (NULL != pta);
+  for (struct WireMethod *wm = mi->wm_head;
+       NULL != wm;
+       wm = wm->next)
+  {
+    int duplicate = GNUNET_NO;
+
+    if (! wm->active)
+      break;
+    /* Yes, O(n^2), but really how many bank accounts can an
+       instance realistically have for this to matter? */
+    for (struct WireMethod *pm = mi->wm_head;
+         pm != wm;
+         pm = pm->next)
+      if (0 == strcasecmp (pm->wire_method,
+                           wm->wire_method))
+      {
+        duplicate = GNUNET_YES;
+        break;
+      }
+    if (duplicate)
+      continue;
+    GNUNET_assert (0 ==
+                   json_array_append_new (pta,
+                                          json_string (wm->wire_method)));
+  }
   GNUNET_asprintf (&url,
                    "/%s/",
                    mi->id);
@@ -64,14 +94,16 @@ add_instance (void *cls,
                    ja,
                    json_pack (
                      (NULL != mi->tip_exchange)
-                     ? "{s:s, s:s, s:o, s:s}"
-                     : "{s:s, s:s, s:o}",
+                     ? "{s:s, s:s, s:o, s:o, s:s}"
+                     : "{s:s, s:s, s:o, s:o}",
                      "name",
                      mi->name,
                      "backend_base_url",
                      url,
                      "merchant_pub",
                      GNUNET_JSON_from_data_auto (&mi->pubkey),
+                     "payment_targets",
+                     pta,
                      /* optional: */
                      "tipping_exchange_baseurl",
                      mi->tip_exchange)));
