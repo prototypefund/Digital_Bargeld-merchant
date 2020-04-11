@@ -1047,7 +1047,6 @@ instances_iterator_cb (void *cls,
   struct IterateInstancesCls *iic = cls;
   char *token;
   struct MerchantInstance *mi;
-  struct GNUNET_CRYPTO_EddsaPrivateKey *pk;
   /* used as hashmap keys */
   struct GNUNET_HashCode h_pk;
   struct GNUNET_HashCode h_id;
@@ -1097,7 +1096,6 @@ instances_iterator_cb (void *cls,
                                              &mi->tip_exchange))
   {
     char *tip_reserves;
-    struct GNUNET_CRYPTO_EddsaPrivateKey *tip_pk;
 
     if (GNUNET_OK !=
         GNUNET_CONFIGURATION_get_value_filename (cfg,
@@ -1114,8 +1112,10 @@ instances_iterator_cb (void *cls,
       iic->ret = GNUNET_SYSERR;
       return;
     }
-    tip_pk = GNUNET_CRYPTO_eddsa_key_create_from_file (tip_reserves);
-    if (NULL == tip_pk)
+    if (GNUNET_OK !=
+        GNUNET_CRYPTO_eddsa_key_from_file (tip_reserves,
+                                           GNUNET_NO,
+                                           &mi->tip_reserve.eddsa_priv))
     {
       GNUNET_log_config_invalid (GNUNET_ERROR_TYPE_ERROR,
                                  section,
@@ -1128,18 +1128,13 @@ instances_iterator_cb (void *cls,
       iic->ret = GNUNET_SYSERR;
       return;
     }
-    mi->tip_reserve.eddsa_priv = *tip_pk;
-    GNUNET_free (tip_pk);
     GNUNET_free (tip_reserves);
   }
 
-  if (GNUNET_YES !=
-      GNUNET_DISK_file_test (mi->keyfile))
-    GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-                "Merchant private key `%s' does not exist yet, creating it!\n",
-                mi->keyfile);
-  if (NULL ==
-      (pk = GNUNET_CRYPTO_eddsa_key_create_from_file (mi->keyfile)))
+  if (GNUNET_SYSERR ==
+      GNUNET_CRYPTO_eddsa_key_from_file (mi->keyfile,
+                                         GNUNET_YES,
+                                         &mi->privkey.eddsa_priv))
   {
     GNUNET_break (0);
     GNUNET_free (mi->keyfile);
@@ -1148,10 +1143,8 @@ instances_iterator_cb (void *cls,
     iic->ret = GNUNET_SYSERR;
     return;
   }
-  mi->privkey.eddsa_priv = *pk;
-  GNUNET_CRYPTO_eddsa_key_get_public (pk,
+  GNUNET_CRYPTO_eddsa_key_get_public (&mi->privkey.eddsa_priv,
                                       &mi->pubkey.eddsa_pub);
-  GNUNET_free (pk);
 
   mi->id = GNUNET_strdup (token + 1);
   if (0 == strcasecmp ("default",
