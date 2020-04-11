@@ -56,6 +56,34 @@
  */
 #define UNIX_BACKLOG 500
 
+
+/**
+ * Used by the iterator of the various merchant's instances given
+ * in configuration
+ */
+struct IterateInstancesCls
+{
+
+  /**
+   * Current index in the global array of #MerchantInstance
+   * types. Used by the callback in order to know which index
+   * is associated to the element being processed.
+   */
+  unsigned int current_index;
+
+  /**
+   * Flag indicating whether config contains a default instance
+   */
+  unsigned int default_instance;
+
+  /**
+   * Tells if the parsing encountered any error. We need this
+   * field since the iterator must return void
+   */
+  unsigned int ret;
+};
+
+
 /**
  * Hashmap pointing at merchant instances by 'id'. An 'id' is
  * just a string that identifies a merchant instance. When a frontend
@@ -982,7 +1010,6 @@ wireformat_iterator_cb (void *cls,
     return;
   }
 
-
   wm = GNUNET_new (struct WireMethod);
   wm->wire_method = TALER_payto_get_method (payto);
   GNUNET_free (payto);
@@ -1001,7 +1028,6 @@ wireformat_iterator_cb (void *cls,
     GNUNET_CONTAINER_DLL_insert_tail (mi->wm_head,
                                       mi->wm_tail,
                                       wm);
-
   wm->j_wire = j;
   wm->h_wire = jh_wire;
 }

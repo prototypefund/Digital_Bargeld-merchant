@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015, 2016, 2018 Taler Systems SA
+  (C) 2014, 2015, 2016, 2018, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify
   it under the terms of the GNU Affero General Public License as
@@ -144,8 +144,8 @@ json_parse_cleanup (struct TM_HandlerContext *hc)
  * @returns the merchant instance's base URL
  */
 static char *
-make_merchant_base_url (struct MHD_Connection *connection, const
-                        char *instance_id)
+make_merchant_base_url (struct MHD_Connection *connection,
+                        const char *instance_id)
 {
   const char *host;
   const char *forwarded_host;
@@ -210,7 +210,6 @@ proposal_put (struct MHD_Connection *connection,
               json_t *order,
               const struct MerchantInstance *mi)
 {
-  enum GNUNET_GenericReturnValue res;
   struct TALER_Amount total;
   const char *order_id;
   const char *summary;
@@ -455,22 +454,25 @@ proposal_put (struct MHD_Connection *connection,
   } /* needed to synthesize merchant info */
 
   /* extract fields we need to sign separately */
-  res = TALER_MHD_parse_json_data (connection,
-                                   order,
-                                   spec);
-  /* json is malformed */
-  if (GNUNET_NO == res)
   {
-    return MHD_YES;
-  }
-  /* other internal errors might have occurred */
-  if (GNUNET_SYSERR == res)
-  {
-    return TALER_MHD_reply_with_error
-             (connection,
-             MHD_HTTP_INTERNAL_SERVER_ERROR,
-             TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
-             "Impossible to parse the order");
+    enum GNUNET_GenericReturnValue res;
+
+    res = TALER_MHD_parse_json_data (connection,
+                                     order,
+                                     spec);
+    /* json is malformed */
+    if (GNUNET_NO == res)
+    {
+      return MHD_YES;
+    }
+    /* other internal errors might have occurred */
+    if (GNUNET_SYSERR == res)
+    {
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_PROPOSAL_ORDER_PARSE_ERROR,
+                                         "Impossible to parse the order");
+    }
   }
   if (0 !=
       strcasecmp (total.currency,
@@ -509,11 +511,10 @@ proposal_put (struct MHD_Connection *connection,
   if (GNUNET_OK != check_products (products))
   {
     GNUNET_JSON_parse_free (spec);
-    return TALER_MHD_reply_with_error
-             (connection,
-             MHD_HTTP_BAD_REQUEST,
-             TALER_EC_PARAMETER_MALFORMED,
-             "order:products");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_BAD_REQUEST,
+                                       TALER_EC_PARAMETER_MALFORMED,
+                                       "order:products");
   }
 
   /* add fields to the contract that the backend should provide */
@@ -524,14 +525,30 @@ proposal_put (struct MHD_Connection *connection,
   json_object_set (order,
                    "auditors",
                    j_auditors);
-  /* TODO (#4939-12806): add proper mechanism for
-     selection of wire method(s) by merchant! */
-  wm = mi->wm_head;
+  {
+    const char *target;
+
+    target = MHD_lookup_connection_value (connection,
+                                          MHD_GET_ARGUMENT_KIND,
+                                          "payment_target");
+    wm = mi->wm_head;
+    if (NULL != target)
+    {
+      while ( (NULL != wm) &&
+              (GNUNET_YES == wm->active) &&
+              (0 != strcasecmp (target,
+                                wm->wire_method) ) )
+        wm = wm->next;
+    }
+    if (GNUNET_YES != wm->active)
+      wm = NULL;
+  }
 
   if (NULL == wm)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "No wire method available for instance '%s'\n", mi->id);
+                "No wire method available for instance '%s'\n",
+                mi->id);
     GNUNET_JSON_parse_free (spec);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_NOT_FOUND,
@@ -570,12 +587,11 @@ proposal_put (struct MHD_Connection *connection,
     if (GNUNET_DB_STATUS_SOFT_ERROR == qs)
     {
       GNUNET_break (0);
-      return TALER_MHD_reply_with_error
-               (connection,
-               MHD_HTTP_INTERNAL_SERVER_ERROR,
-               TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
-               "db error: could not check for existing order"
-               " due to repeated soft transaction failure");
+      return TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                         TALER_EC_PROPOSAL_STORE_DB_ERROR_SOFT,
+                                         "db error: could not check for existing order"
+                                         " due to repeated soft transaction failure");
     }
 
     {
@@ -604,22 +620,20 @@ proposal_put (struct MHD_Connection *connection,
 
           js = json_dumps (contract_terms,
                            JSON_COMPACT);
-          GNUNET_log
-            (GNUNET_ERROR_TYPE_ERROR,
-            _ ("Order ID `%s' already exists with proposal `%s'\n"),
-            order_id,
-            js);
+          GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
+                      _ ("Order ID `%s' already exists with proposal `%s'\n"),
+                      order_id,
+                      js);
           free (js);
         }
         json_decref (contract_terms);
 
         /* contract_terms may be private, only expose
          * duplicate order_id to the network */
-        rv = TALER_MHD_reply_with_error
-               (connection,
-               MHD_HTTP_BAD_REQUEST,  /* or conflict? */
-               TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
-               msg);
+        rv = TALER_MHD_reply_with_error (connection,
+                                         MHD_HTTP_BAD_REQUEST, /* or conflict? */
+                                         TALER_EC_PROPOSAL_STORE_DB_ERROR_ALREADY_EXISTS,
+                                         msg);
         GNUNET_free (msg);
         return rv;
       }
@@ -635,13 +649,17 @@ proposal_put (struct MHD_Connection *connection,
   }
 
   /* DB transaction succeeded, generate positive response */
-  res = TALER_MHD_reply_json_pack (connection,
-                                   MHD_HTTP_OK,
-                                   "{s:s}",
-                                   "order_id",
-                                   order_id);
-  GNUNET_JSON_parse_free (spec);
-  return res;
+  {
+    MHD_RESULT ret;
+
+    ret = TALER_MHD_reply_json_pack (connection,
+                                     MHD_HTTP_OK,
+                                     "{s:s}",
+                                     "order_id",
+                                     order_id);
+    GNUNET_JSON_parse_free (spec);
+    return ret;
+  }
 }
 
 
@@ -668,7 +686,6 @@ MH_handler_order_post (struct TMH_RequestHandler *rh,
                        size_t *upload_data_size,
                        struct MerchantInstance *mi)
 {
-  int res;
   struct TMH_JsonParseContext *ctx;
   json_t *root;
   json_t *order;
@@ -684,20 +701,24 @@ MH_handler_order_post (struct TMH_RequestHandler *rh,
     ctx = *connection_cls;
   }
 
-  res = TALER_MHD_parse_post_json (connection,
-                                   &ctx->json_parse_context,
-                                   upload_data,
-                                   upload_data_size,
-                                   &root);
+  {
+    int res;
 
-  if (GNUNET_SYSERR == res)
-    return MHD_NO;
+    res = TALER_MHD_parse_post_json (connection,
+                                     &ctx->json_parse_context,
+                                     upload_data,
+                                     upload_data_size,
+                                     &root);
 
-  /* A error response was already generated */
-  if ( (GNUNET_NO == res) ||
-       /* or, need more data to accomplish parsing */
-       (NULL == root) )
-    return MHD_YES;
+    if (GNUNET_SYSERR == res)
+      return MHD_NO;
+
+    /* A error response was already generated */
+    if ( (GNUNET_NO == res) ||
+         /* or, need more data to accomplish parsing */
+         (NULL == root) )
+      return MHD_YES;
+  }
   order = json_object_get (root,
                            "order");
   {
@@ -705,15 +726,17 @@ MH_handler_order_post (struct TMH_RequestHandler *rh,
 
     if (NULL == order)
     {
-      ret = TALER_MHD_reply_with_error
-              (connection,
-              MHD_HTTP_BAD_REQUEST,
-              TALER_EC_PARAMETER_MISSING,
-              "order");
+      ret = TALER_MHD_reply_with_error (connection,
+                                        MHD_HTTP_BAD_REQUEST,
+                                        TALER_EC_PARAMETER_MISSING,
+                                        "order");
     }
     else
     {
-      ret = proposal_put (connection, root, order, mi);
+      ret = proposal_put (connection,
+                          root,
+                          order,
+                          mi);
     }
     json_decref (root);
     return ret;

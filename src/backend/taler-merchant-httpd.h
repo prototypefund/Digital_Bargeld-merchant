@@ -37,33 +37,6 @@
 
 
 /**
- * Used by the iterator of the various merchant's instances given
- * in configuration
- */
-struct IterateInstancesCls
-{
-
-  /**
-   * Current index in the global array of #MerchantInstance
-   * types. Used by the callback in order to know which index
-   * is associated to the element being processed.
-   */
-  unsigned int current_index;
-
-  /**
-   * Flag indicating whether config contains a default instance
-   */
-  unsigned int default_instance;
-
-  /**
-   * Tells if the parsing encountered any error. We need this
-   * field since the iterator must return void
-   */
-  unsigned int ret;
-};
-
-
-/**
  * Supported wire method.  Kept in a DLL.
  */
 struct WireMethod
@@ -79,7 +52,7 @@ struct WireMethod
   struct WireMethod *prev;
 
   /**
-   * Which wire method is @e j_wire using?  Points into @e j_wire.
+   * Which wire method / payment target identifier is @e j_wire using?
    */
   char *wire_method;
 
