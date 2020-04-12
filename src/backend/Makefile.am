@@ -34,6 +34,7 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_refund_lookup.c taler-merchant-httpd_refund_lookup.h \
   taler-merchant-httpd_tip-authorize.c taler-merchant-httpd_tip-authorize.h \
   taler-merchant-httpd_tip-pickup.c taler-merchant-httpd_tip-pickup.h \
+  taler-merchant-httpd_tip-pickup_get.c \
   taler-merchant-httpd_tip-query.c taler-merchant-httpd_tip-query.h \
   taler-merchant-httpd_tip-reserve-helper.c taler-merchant-httpd_tip-reserve-helper.h \
   taler-merchant-httpd_track-transaction.c taler-merchant-httpd_track-transaction.h \
