@@ -127,21 +127,14 @@ struct PickupContext
   unsigned int planchets_len;
 
   /**
-   * Error code, #TALER_EC_NONE as long as all is fine.
+   * Message to return.
    */
-  enum TALER_ErrorCode ec;
+  struct MHD_Response *response;
 
   /**
-   * HTTP status code to return in combination with @e ec
-   * if @e ec is not #TALER_EC_NONE.
+   * HTTP status code to return in combination with @e response.
    */
   unsigned int response_code;
-
-  /**
-   * Human-readable error hint to return.
-   * if @e ec is not #TALER_EC_NONE.
-   */
-  const char *error_hint;
 
   /**
    * Set to #GNUNET_YES if @e connection was suspended.
@@ -205,7 +198,30 @@ pickup_cleanup (struct TM_HandlerContext *hc)
   }
   TALER_MHD_parse_post_cleanup_callback (pc->json_parse_context);
   GNUNET_free_non_null (pc->exchange_url);
+  if (NULL != pc->response)
+  {
+    MHD_destroy_response (pc->response);
+    pc->response = NULL;
+  }
+
   GNUNET_free (pc);
+}
+
+
+/**
+ * Resume processing of a suspended @a pc.
+ *
+ * @param pc a suspended pickup operation
+ */
+static void
+resume_pc (struct PickupContext *pc)
+{
+  GNUNET_assert (GNUNET_YES == pc->suspended);
+  GNUNET_CONTAINER_DLL_remove (pc_head,
+                               pc_tail,
+                               pc);
+  MHD_resume_connection (pc->connection);
+  TMH_trigger_daemon ();
 }
 
 
@@ -215,28 +231,16 @@ pickup_cleanup (struct TM_HandlerContext *hc)
  * resolves the denomination keys and calculates the total
  * amount to be picked up.  Then runs the pick up execution logic.
  *
- * @param connection MHD connection for sending the response
- * @param tip_id which tip are we picking up
  * @param pc pickup context
- * @return #MHD_YES upon success, #MHD_NO if
- *         the connection ought to be dropped
  */
-static MHD_RESULT
-run_pickup (struct MHD_Connection *connection,
-            struct PickupContext *pc)
+static void
+run_pickup (struct PickupContext *pc)
 {
   struct TALER_ReservePrivateKeyP reserve_priv;
   struct TALER_ReservePublicKeyP reserve_pub;
   enum TALER_ErrorCode ec;
   json_t *sigs;
 
-  if (TALER_EC_NONE != pc->ec)
-  {
-    return TALER_MHD_reply_with_error (connection,
-                                       pc->response_code,
-                                       pc->ec,
-                                       pc->error_hint);
-  }
   db->preflight (db->cls);
   ec = db->pickup_tip_TR (db->cls,
                           &pc->total,
@@ -245,37 +249,37 @@ run_pickup (struct MHD_Connection *connection,
                           &reserve_priv);
   if (TALER_EC_NONE != ec)
   {
-    unsigned int response_code;
     const char *human;
 
     switch (ec)
     {
     case TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN:
-      response_code = MHD_HTTP_NOT_FOUND;
+      pc->response_code = MHD_HTTP_NOT_FOUND;
       human = "tip identifier not known to this service";
       break;
     case TALER_EC_TIP_PICKUP_NO_FUNDS:
-      response_code = MHD_HTTP_CONFLICT;
+      pc->response_code = MHD_HTTP_CONFLICT;
       human = "withdrawn funds exceed amounts approved for tip";
       break;
     default:
-      response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      pc->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
       human = "database failure";
       break;
     }
-    return TALER_MHD_reply_with_error (connection,
-                                       response_code,
-                                       ec,
-                                       human);
+    pc->response = TALER_MHD_make_error (ec,
+                                         human);
+    resume_pc (pc);
+    return;
   }
   sigs = json_array ();
   if (NULL == sigs)
   {
     GNUNET_break (0);
-    return TALER_MHD_reply_with_error (connection,
-                                       MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       TALER_EC_JSON_ALLOCATION_FAILURE,
-                                       "could not create JSON array");
+    pc->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+    pc->response = TALER_MHD_make_error (TALER_EC_JSON_ALLOCATION_FAILURE,
+                                         "could not create JSON array");
+    resume_pc (pc);
+    return;
   }
   GNUNET_CRYPTO_eddsa_key_get_public (&reserve_priv.eddsa_priv,
                                       &reserve_pub.eddsa_pub);
@@ -297,19 +301,20 @@ run_pickup (struct MHD_Connection *connection,
     {
       GNUNET_break (0);
       json_decref (sigs);
-      return TALER_MHD_reply_with_error (connection,
-                                         MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                         TALER_EC_JSON_ALLOCATION_FAILURE,
-                                         "could not add element to JSON array");
+      pc->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
+      pc->response = TALER_MHD_make_error (TALER_EC_JSON_ALLOCATION_FAILURE,
+                                           "could not add element to JSON array");
+      resume_pc (pc);
+      return;
     }
   }
-  return TALER_MHD_reply_json_pack (connection,
-                                    MHD_HTTP_OK,
-                                    "{s:o, s:o}",
-                                    "reserve_pub",
-                                    GNUNET_JSON_from_data_auto (
-                                      &reserve_pub),
-                                    "reserve_sigs", sigs);
+  pc->response_code = MHD_HTTP_OK;
+  pc->response = TALER_MHD_make_json_pack ("{s:o, s:o}",
+                                           "reserve_pub",
+                                           GNUNET_JSON_from_data_auto (
+                                             &reserve_pub),
+                                           "reserve_sigs", sigs);
+  resume_pc (pc);
 }
 
 
@@ -336,28 +341,35 @@ exchange_found_cb (void *cls,
   int ae;
 
   pc->fo = NULL;
-  GNUNET_assert (GNUNET_YES == pc->suspended);
-  GNUNET_CONTAINER_DLL_remove (pc_head,
-                               pc_tail,
-                               pc);
-  MHD_resume_connection (pc->connection);
-  TMH_trigger_daemon ();
   if (NULL == eh)
   {
-    // FIXME: #6014: forward error details!
-    pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_DOWN;
-    pc->error_hint = "failed to contact exchange, check URL";
     pc->response_code = MHD_HTTP_FAILED_DEPENDENCY;
+    pc->response = TALER_MHD_make_json_pack (
+      (NULL != hr->reply)
+      ? "{s:s, s:I, s:I, s:I, s:O}"
+      : "{s:s, s:I, s:I, s:I}",
+      "hint", "failed to contact exchange, check URL",
+      "code", (json_int_t) TALER_EC_TIP_PICKUP_EXCHANGE_DOWN,
+      "exchange_http_status", (json_int_t) hr->http_status,
+      "exchange_code", (json_int_t) hr->ec,
+      "exchange_reply", hr->reply);
+    resume_pc (pc);
     return;
   }
   keys = TALER_EXCHANGE_get_keys (eh);
   if (NULL == keys)
   {
-    // FIXME: #6014: forward error details!?
-    pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEYS;
-    pc->error_hint =
-      "could not obtain denomination keys from exchange, check URL";
     pc->response_code = MHD_HTTP_FAILED_DEPENDENCY;
+    pc->response = TALER_MHD_make_json_pack (
+      (NULL != hr->reply)
+      ? "{s:s, s:I, s:I, s:I, s:O}"
+      : "{s:s, s:I, s:I, s:I}",
+      "hint", "could not obtain denomination keys from exchange, check URL",
+      "code", (json_int_t) TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEYS,
+      "exchange_http_status", (json_int_t) hr->http_status,
+      "exchange_code", (json_int_t) hr->ec,
+      "exchange_reply", hr->reply);
+    resume_pc (pc);
     return;
   }
   GNUNET_assert (0 != pc->planchets_len);
@@ -383,9 +395,15 @@ exchange_found_cb (void *cls,
                                                         h_denomination_pub);
       if (NULL == dk)
       {
-        pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEY;
-        pc->error_hint = "could not find matching denomination key";
         pc->response_code = MHD_HTTP_NOT_FOUND;
+        pc->response
+          = TALER_MHD_make_json_pack (
+              "{s:s, s:I}"
+              "hint",
+              "could not find matching denomination key",
+              "code",
+              (json_int_t) TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEY);
+        resume_pc (pc);
         GNUNET_CRYPTO_hash_context_abort (hc);
         return;
       }
@@ -426,12 +444,19 @@ exchange_found_cb (void *cls,
   }
   if (GNUNET_YES == ae)
   {
-    pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_AMOUNT_OVERFLOW;
-    pc->error_hint = "error computing total value of the tip";
     pc->response_code = MHD_HTTP_BAD_REQUEST;
+    pc->response
+      = TALER_MHD_make_json_pack (
+          "{s:s, s:I}"
+          "hint",
+          "error computing total value of the tip",
+          "code",
+          (json_int_t) TALER_EC_TIP_PICKUP_EXCHANGE_AMOUNT_OVERFLOW);
+    resume_pc (pc);
     return;
   }
   pc->total = total;
+  run_pickup (pc);
 }
 
 
@@ -593,13 +618,16 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
   {
     pc = *connection_cls;
   }
-  if (NULL != pc->planchets)
+  if (NULL != pc->response)
   {
-    /* This actually happens when we are called much later
-       after an exchange /keys' request to obtain the DKs
-       (and not for each request). */
-    return run_pickup (connection,
-                       pc);
+    MHD_RESULT ret;
+
+    ret = MHD_queue_response (connection,
+                              pc->response_code,
+                              pc->response);
+    MHD_destroy_response (pc->response);
+    pc->response = NULL;
+    return ret;
   }
   res = TALER_MHD_parse_post_json (connection,
                                    &pc->json_parse_context,
