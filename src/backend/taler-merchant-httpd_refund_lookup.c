@@ -330,27 +330,22 @@ refund_cb (void *cls,
  * operation.
  *
  * @param cls a `struct CoinRefund *`
+ * @param hr HTTP response details
  * @param eh handle to the exchange context
  * @param wire_fee current applicable wire fee for dealing with @a eh, NULL if not available
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
- * @param ec error code, #TALER_EC_NONE on success
- * @param http_status the HTTP status we got from the exchange
- * @param error_reply the full reply from the exchange, NULL if
- *        the response was NOT in JSON or on success
  */
 static void
 exchange_found_cb (void *cls,
+                   const struct TALER_EXCHANGE_HttpResponse *hr,
                    struct TALER_EXCHANGE_Handle *eh,
                    const struct TALER_Amount *wire_fee,
-                   int exchange_trusted,
-                   enum TALER_ErrorCode ec,
-                   unsigned int http_status,
-                   const json_t *error_reply)
+                   int exchange_trusted)
 {
   struct CoinRefund *cr = cls;
 
   cr->fo = NULL;
-  if (TALER_EC_NONE == ec)
+  if (TALER_EC_NONE == hr->ec)
   {
     cr->rh = TALER_EXCHANGE_refund (eh,
                                     &cr->refund_amount,
@@ -363,9 +358,9 @@ exchange_found_cb (void *cls,
                                     cr);
     return;
   }
-  cr->exchange_status = http_status;
-  cr->exchange_code = ec;
-  cr->exchange_reply = json_incref ((json_t*) error_reply);
+  cr->exchange_status = hr->http_status;
+  cr->exchange_code = hr->ec;
+  cr->exchange_reply = json_incref ((json_t*) hr->reply);
   check_resume_prd (cr->prd);
 }
 

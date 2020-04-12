@@ -23,6 +23,14 @@
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 
+
+/**
+ * We are shutting down, force resuming all suspended pickup operations.
+ */
+void
+MH_force_tip_pickup_resume (void);
+
+
 /**
  * Manages a POST /tip-pickup call, checking that the tip is authorized,
  * and if so, returning the withdrawal permissions.

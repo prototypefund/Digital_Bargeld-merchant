@@ -872,27 +872,23 @@ trace_coins (struct TrackTransactionContext *tctx)
  * tracking the coin.
  *
  * @param cls the `struct TrackTransactionContext`
+ * @param hr HTTP response details
  * @param eh NULL if exchange was not found to be acceptable
  * @param wire_fee NULL (we did not specify a wire method)
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
- * @param ec error code, #TALER_EC_NONE on success
- * @param http_status the HTTP status we got from the exchange
- * @param error_reply the full reply from the exchange, NULL if
- *        the response was NOT in JSON or on success
  */
 static void
 process_track_transaction_with_exchange (void *cls,
+                                         const struct
+                                         TALER_EXCHANGE_HttpResponse *hr,
                                          struct TALER_EXCHANGE_Handle *eh,
                                          const struct TALER_Amount *wire_fee,
-                                         int exchange_trusted,
-                                         enum TALER_ErrorCode ec,
-                                         unsigned int http_status,
-                                         const json_t *error_reply)
+                                         int exchange_trusted)
 {
   struct TrackTransactionContext *tctx = cls;
 
   tctx->fo = NULL;
-  if (MHD_HTTP_OK != http_status)
+  if (MHD_HTTP_OK != hr->http_status)
   {
     /* The request failed somehow */
     GNUNET_break_op (0);
@@ -900,14 +896,14 @@ process_track_transaction_with_exchange (void *cls,
       tctx,
       MHD_HTTP_FAILED_DEPENDENCY,
       TALER_MHD_make_json_pack (
-        (NULL != error_reply)
+        (NULL != hr->reply)
         ? "{s:s, s:I, s:I, s:I, s:O}"
         : "{s:s, s:I, s:I, s:I}",
         "hint", "failed to obtain meta-data from exchange",
         "code", (json_int_t) TALER_EC_TRACK_TRANSACTION_EXCHANGE_KEYS_FAILURE,
-        "exchange_http_status", (json_int_t) http_status,
-        "exchange_code", (json_int_t) ec,
-        "exchange_reply", error_reply));
+        "exchange_http_status", (json_int_t) hr->http_status,
+        "exchange_code", (json_int_t) hr->ec,
+        "exchange_reply", hr->reply));
     return;
   }
   tctx->eh = eh;

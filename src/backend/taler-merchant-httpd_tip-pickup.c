@@ -73,8 +73,17 @@ struct PickupContext
   /**
    * Placeholder for #TALER_MHD_parse_post_json() to keep its internal state.
    */
-
   void *json_parse_context;
+
+  /**
+   * Kept in a DLL while suspended.
+   */
+  struct PickupContext *next;
+
+  /**
+   * Kept in a DLL while suspended.
+   */
+  struct PickupContext *prev;
 
   /**
    * URL of the exchange this tip uses.
@@ -134,7 +143,42 @@ struct PickupContext
    */
   const char *error_hint;
 
+  /**
+   * Set to #GNUNET_YES if @e connection was suspended.
+   */
+  int suspended;
+
 };
+
+
+/**
+ * Kept in a DLL while suspended.
+ */
+static struct PickupContext *pc_head;
+
+/**
+ * Kept in a DLL while suspended.
+ */
+static struct PickupContext *pc_tail;
+
+
+/**
+ * We are shutting down, force resuming all suspended pickup operations.
+ */
+void
+MH_force_tip_pickup_resume ()
+{
+  struct PickupContext *pc;
+
+  while (NULL != (pc = pc_head))
+  {
+    GNUNET_assert (GNUNET_YES == pc->suspended);
+    GNUNET_CONTAINER_DLL_remove (pc_head,
+                                 pc_tail,
+                                 pc);
+    MHD_resume_connection (pc->connection);
+  }
+}
 
 
 /**
@@ -274,38 +318,36 @@ run_pickup (struct MHD_Connection *connection,
  * operation.
  *
  * @param cls closure with the `struct PickupContext`
+ * @param hr HTTP response details
  * @param eh handle to the exchange context
  * @param wire_fee current applicable wire fee for dealing with @a eh, NULL if not available
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
- * @param ec error code, #TALER_EC_NONE on success
- * @param http_status the HTTP status we got from the exchange
- * @param error_reply the full reply from the exchange, NULL if
- *        the response was NOT in JSON or on success
  */
 static void
 exchange_found_cb (void *cls,
+                   const struct TALER_EXCHANGE_HttpResponse *hr,
                    struct TALER_EXCHANGE_Handle *eh,
                    const struct TALER_Amount *wire_fee,
-                   int exchange_trusted,
-                   enum TALER_ErrorCode ec,
-                   unsigned int http_status,
-                   const json_t *error_reply)
+                   int exchange_trusted)
 {
   struct PickupContext *pc = cls;
   const struct TALER_EXCHANGE_Keys *keys;
-  struct GNUNET_HashContext *hc;
   struct TALER_Amount total;
   int ae;
 
   pc->fo = NULL;
+  GNUNET_assert (GNUNET_YES == pc->suspended);
+  GNUNET_CONTAINER_DLL_remove (pc_head,
+                               pc_tail,
+                               pc);
   MHD_resume_connection (pc->connection);
+  TMH_trigger_daemon ();
   if (NULL == eh)
   {
     // FIXME: #6014: forward error details!
     pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_DOWN;
     pc->error_hint = "failed to contact exchange, check URL";
     pc->response_code = MHD_HTTP_FAILED_DEPENDENCY;
-    TMH_trigger_daemon ();
     return;
   }
   keys = TALER_EXCHANGE_get_keys (eh);
@@ -316,7 +358,6 @@ exchange_found_cb (void *cls,
     pc->error_hint =
       "could not obtain denomination keys from exchange, check URL";
     pc->response_code = MHD_HTTP_FAILED_DEPENDENCY;
-    TMH_trigger_daemon ();
     return;
   }
   GNUNET_assert (0 != pc->planchets_len);
@@ -327,68 +368,70 @@ exchange_found_cb (void *cls,
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Calculating tip amount over %u planchets!\n",
               pc->planchets_len);
-  hc = GNUNET_CRYPTO_hash_context_start ();
-  for (unsigned int i = 0; i<pc->planchets_len; i++)
   {
-    struct PlanchetDetail *pd = &pc->planchets[i];
-    const struct TALER_EXCHANGE_DenomPublicKey *dk;
-    struct TALER_Amount amount_with_fee;
+    struct GNUNET_HashContext *hc;
 
-    dk = TALER_EXCHANGE_get_denomination_key_by_hash (keys,
-                                                      &pd->wr.h_denomination_pub);
-    if (NULL == dk)
+    hc = GNUNET_CRYPTO_hash_context_start ();
+    for (unsigned int i = 0; i<pc->planchets_len; i++)
     {
-      pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEY;
-      pc->error_hint = "could not find matching denomination key";
-      pc->response_code = MHD_HTTP_NOT_FOUND;
-      GNUNET_CRYPTO_hash_context_abort (hc);
-      TMH_trigger_daemon ();
-      return;
-    }
-    GNUNET_CRYPTO_hash_context_read (hc,
-                                     &pd->wr.h_denomination_pub,
-                                     sizeof (struct GNUNET_HashCode));
-    GNUNET_CRYPTO_hash_context_read (hc,
-                                     pd->coin_ev,
-                                     pd->coin_ev_size);
-    if (0 >
-        TALER_amount_add (&amount_with_fee,
-                          &dk->value,
-                          &dk->fee_withdraw))
-    {
-      ae = GNUNET_YES;
-    }
-    if (0 == i)
-    {
-      total = amount_with_fee;
-    }
-    else
-    {
+      struct PlanchetDetail *pd = &pc->planchets[i];
+      const struct TALER_EXCHANGE_DenomPublicKey *dk;
+      struct TALER_Amount amount_with_fee;
+
+      dk = TALER_EXCHANGE_get_denomination_key_by_hash (keys,
+                                                        &pd->wr.
+                                                        h_denomination_pub);
+      if (NULL == dk)
+      {
+        pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_LACKED_KEY;
+        pc->error_hint = "could not find matching denomination key";
+        pc->response_code = MHD_HTTP_NOT_FOUND;
+        GNUNET_CRYPTO_hash_context_abort (hc);
+        return;
+      }
+      GNUNET_CRYPTO_hash_context_read (hc,
+                                       &pd->wr.h_denomination_pub,
+                                       sizeof (struct GNUNET_HashCode));
+      GNUNET_CRYPTO_hash_context_read (hc,
+                                       pd->coin_ev,
+                                       pd->coin_ev_size);
       if (0 >
-          TALER_amount_add (&total,
-                            &total,
-                            &amount_with_fee))
+          TALER_amount_add (&amount_with_fee,
+                            &dk->value,
+                            &dk->fee_withdraw))
       {
         ae = GNUNET_YES;
       }
+      if (0 == i)
+      {
+        total = amount_with_fee;
+      }
+      else
+      {
+        if (0 >
+            TALER_amount_add (&total,
+                              &total,
+                              &amount_with_fee))
+        {
+          ae = GNUNET_YES;
+        }
+      }
+      TALER_amount_hton (&pd->wr.withdraw_fee,
+                         &dk->fee_withdraw);
+      TALER_amount_hton (&pd->wr.amount_with_fee,
+                         &amount_with_fee);
     }
-    TALER_amount_hton (&pd->wr.withdraw_fee,
-                       &dk->fee_withdraw);
-    TALER_amount_hton (&pd->wr.amount_with_fee,
-                       &amount_with_fee);
+    GNUNET_CRYPTO_hash_context_finish (hc,
+                                       &pc->pickup_id);
   }
-  GNUNET_CRYPTO_hash_context_finish (hc,
-                                     &pc->pickup_id);
   if (GNUNET_YES == ae)
   {
     pc->ec = TALER_EC_TIP_PICKUP_EXCHANGE_AMOUNT_OVERFLOW;
     pc->error_hint = "error computing total value of the tip";
     pc->response_code = MHD_HTTP_BAD_REQUEST;
-    TMH_trigger_daemon ();
     return;
   }
   pc->total = total;
-  TMH_trigger_daemon ();
 }
 
 
@@ -406,6 +449,10 @@ prepare_pickup (struct PickupContext *pc)
   enum GNUNET_DB_QueryStatus qs;
 
   db->preflight (db->cls);
+  /* FIXME: do not pass NULL's, *do* get the
+     data from the DB, we may be able to avoid
+     most of the processing if we already have
+     a valid result! */
   qs = db->lookup_tip_by_id (db->cls,
                              &pc->tip_id,
                              &pc->exchange_url,
@@ -453,6 +500,12 @@ prepare_pickup (struct PickupContext *pc)
                                        TALER_EC_INTERNAL_INVARIANT_FAILURE,
                                        "consult server logs");
   }
+  /* continued asynchronously in exchange_found_cb() */
+  GNUNET_assert (GNUNET_NO == pc->suspended);
+  pc->suspended = GNUNET_YES;
+  GNUNET_CONTAINER_DLL_insert (pc_head,
+                               pc_tail,
+                               pc);
   MHD_suspend_connection (pc->connection);
   return MHD_YES;
 }

@@ -59,22 +59,17 @@ TMH_EXCHANGES_done (void);
  * operation.
  *
  * @param cls closure
+ * @param hr HTTP response details
  * @param eh handle to the exchange context
  * @param wire_fee current applicable wire fee for dealing with @a eh, NULL if not available
  * @param exchange_trusted #GNUNET_YES if this exchange is trusted by config
- * @param ec error code, #TALER_EC_NONE on success
- * @param http_status the HTTP status we got from the exchange
- * @param error_reply the full reply from the exchange, NULL if
- *        the response was NOT in JSON or on success
  */
 typedef void
 (*TMH_EXCHANGES_FindContinuation)(void *cls,
+                                  const struct TALER_EXCHANGE_HttpResponse *hr,
                                   struct TALER_EXCHANGE_Handle *eh,
                                   const struct TALER_Amount *wire_fee,
-                                  int exchange_trusted,
-                                  enum TALER_ErrorCode ec,
-                                  unsigned int http_status,
-                                  const json_t *error_reply);
+                                  int exchange_trusted);
 
 
 /**

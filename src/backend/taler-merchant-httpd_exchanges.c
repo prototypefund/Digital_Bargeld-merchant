@@ -570,13 +570,17 @@ process_find_operations (struct Exchange *exchange)
       /* no wire transfer method given, so we yield no fee */
       wire_fee = NULL;
     }
-    fo->fc (fo->fc_cls,
-            exchange->conn,
-            wire_fee,
-            exchange->trusted,
-            TALER_EC_NONE,
-            MHD_HTTP_OK,
-            NULL);
+    {
+      struct TALER_EXCHANGE_HttpResponse hr = {
+        .http_status = MHD_HTTP_OK,
+      };
+
+      fo->fc (fo->fc_cls,
+              &hr,
+              exchange->conn,
+              wire_fee,
+              exchange->trusted);
+    }
     TMH_EXCHANGES_find_exchange_cancel (fo);
   }
   return need_wire;
@@ -633,12 +637,10 @@ handle_wire_data (void *cls,
     while (NULL != (fo = exchange->fo_head))
     {
       fo->fc (fo->fc_cls,
+              hr,
               NULL,
               NULL,
-              GNUNET_NO,
-              hr->ec,
-              hr->http_status,
-              hr->reply);
+              GNUNET_NO);
       TMH_EXCHANGES_find_exchange_cancel (fo);
     }
     return;
@@ -653,17 +655,20 @@ handle_wire_data (void *cls,
   {
     /* Report hard failure to all callbacks! */
     struct TMH_EXCHANGES_FindOperation *fo;
+    struct TALER_EXCHANGE_HttpResponse hrx = {
+      .ec = ecx,
+      .http_status = 0,
+      .reply = hr->reply
+    };
 
     GNUNET_break_op (0);
     while (NULL != (fo = exchange->fo_head))
     {
       fo->fc (fo->fc_cls,
+              &hrx,
               NULL,
               NULL,
-              GNUNET_NO,
-              ecx,
-              0,
-              hr->reply);
+              GNUNET_NO);
       TMH_EXCHANGES_find_exchange_cancel (fo);
     }
     return;
@@ -676,9 +681,9 @@ handle_wire_data (void *cls,
     /* need to run /wire again. But as we DID get a successful reply,
        and as the exchange is unlikely to offer new wire methods very
        frequently, start with some significant delay */
-    exchange->wire_retry_delay = GNUNET_TIME_relative_max (
-      GNUNET_TIME_UNIT_MINUTES,
-      exchange->wire_retry_delay);
+    exchange->wire_retry_delay
+      = GNUNET_TIME_relative_max (GNUNET_TIME_UNIT_MINUTES,
+                                  exchange->wire_retry_delay);
     exchange->wire_retry_delay = RETRY_BACKOFF (exchange->wire_retry_delay);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Exchange does not support our wire method. Retrying in %s\n",
@@ -765,12 +770,10 @@ keys_mgmt_cb (void *cls,
     while (NULL != (fo = exchange->fo_head))
     {
       fo->fc (fo->fc_cls,
+              hr,
               NULL,
               NULL,
-              GNUNET_NO,
-              hr->ec,
-              hr->http_status,
-              hr->reply);
+              GNUNET_NO);
       TMH_EXCHANGES_find_exchange_cancel (fo);
     }
     if (TALER_EXCHANGE_VC_INCOMPATIBLE_NEWER == compat)
