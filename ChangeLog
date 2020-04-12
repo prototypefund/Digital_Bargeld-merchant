@@ -1,3 +1,7 @@
+Sun 12 Apr 2020 08:45:11 PM CEST
+    Changed /tip-pickup API to withdraw directly from the exchange
+    and return blind signatures, instead of having the wallet do it (#6173). -CG
+
 Fri 10 Apr 2020 09:01:22 PM CEST
     Changing refund API to have the merchant backend make the /refund
     request to the exchange instead of having the wallet do it (#5299). -CG

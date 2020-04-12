@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2017 Taler Systems SA
+  Copyright (C) 2014-2017, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU Lesser General Public License as published by the Free Software
@@ -33,25 +33,32 @@
 
 
 /**
- * @brief A handle for tracking transactions.
+ * Data we keep per planchet.
+ */
+struct PlanchetData
+{
+  /**
+   * Secrets of the planchet.
+   */
+  struct TALER_PlanchetSecretsP ps;
+
+  /**
+   * Denomination key we are withdrawing.
+   */
+  struct TALER_EXCHANGE_DenomPublicKey pk;
+
+  /**
+   * Hash of the public key of the coin we are signing.
+   */
+  struct GNUNET_HashCode c_hash;
+};
+
+
+/**
+ * Handle for a /tip-pickup operation.
  */
 struct TALER_MERCHANT_TipPickupOperation
 {
-
-  /**
-   * The url for this request.
-   */
-  char *url;
-
-  /**
-   * Minor context that holds body and headers.
-   */
-  struct TALER_CURL_PostContext post_ctx;
-
-  /**
-   * Handle for the request.
-   */
-  struct GNUNET_CURL_Job *job;
 
   /**
    * Function to call with the result.
@@ -64,162 +71,99 @@ struct TALER_MERCHANT_TipPickupOperation
   void *cb_cls;
 
   /**
-   * Reference to the execution context.
+   * Handle for the actual (internal) withdraw operation.
    */
-  struct GNUNET_CURL_Context *ctx;
+  struct TALER_MERCHANT_TipPickup2Operation *tpo2;
 
   /**
-   * Expected number of planchets.
+   * Number of planchets/coins used for this operation.
    */
   unsigned int num_planchets;
+
+  /**
+   * Array of length @e num_planchets.
+   */
+  struct PlanchetData *planchets;
+
 };
 
 
 /**
- * We got a 200 response back from the exchange (or the merchant).
- * Now we need to parse the response and if it is well-formed,
- * call the callback (and set it to NULL afterwards).
+ * Callback for a /tip-pickup request.  Returns the result of the operation.
+ * Note that the client MUST still do the unblinding of the @a blind_sigs.
  *
- * @param tpo handle of the original authorization operation
- * @param json cryptographic proof returned by the exchange/merchant
- * @return #GNUNET_OK if response is valid
- */
-static int
-check_ok (struct TALER_MERCHANT_TipPickupOperation *tpo,
-          const json_t *json)
-{
-  struct TALER_ReservePublicKeyP reserve_pub;
-  json_t *ja;
-  unsigned int ja_len;
-  struct GNUNET_JSON_Specification spec[] = {
-    GNUNET_JSON_spec_fixed_auto ("reserve_pub", &reserve_pub),
-    GNUNET_JSON_spec_json ("reserve_sigs", &ja),
-    GNUNET_JSON_spec_end ()
-  };
-  struct TALER_MERCHANT_HttpResponse hr = {
-    .http_status = MHD_HTTP_OK,
-    .reply = json
-  };
-
-  if (GNUNET_OK !=
-      GNUNET_JSON_parse (json,
-                         spec,
-                         NULL, NULL))
-  {
-    GNUNET_break_op (0);
-    return GNUNET_SYSERR;
-  }
-  ja_len = json_array_size (ja);
-  if (ja_len != tpo->num_planchets)
-  {
-    GNUNET_break_op (0);
-    GNUNET_JSON_parse_free (spec);
-    return GNUNET_SYSERR;
-  }
-  {
-    struct TALER_ReserveSignatureP reserve_sigs[ja_len];
-
-    for (unsigned int i = 0; i<ja_len; i++)
-    {
-      json_t *pj = json_array_get (ja, i);
-
-      struct GNUNET_JSON_Specification ispec[] = {
-        GNUNET_JSON_spec_fixed_auto ("reserve_sig", &reserve_sigs[i]),
-        GNUNET_JSON_spec_end ()
-      };
-
-      if (GNUNET_OK !=
-          GNUNET_JSON_parse (pj,
-                             ispec,
-                             NULL, NULL))
-      {
-        GNUNET_break_op (0);
-        GNUNET_JSON_parse_free (spec);
-        return GNUNET_SYSERR;
-      }
-    }
-    tpo->cb (tpo->cb_cls,
-             &hr,
-             &reserve_pub,
-             ja_len,
-             reserve_sigs);
-    tpo->cb = NULL; /* do not call twice */
-  }
-  GNUNET_JSON_parse_free (spec);
-  return GNUNET_OK;
-}
-
-
-/**
- * Function called when we're done processing the
- * HTTP /track/transaction request.
- *
- * @param cls the `struct TALER_MERCHANT_TipPickupOperation`
- * @param response_code HTTP response code, 0 on error
- * @param json response body, NULL if not in JSON
+ * @param cls closure, a `struct TALER_MERCHANT_TipPickupOperation *`
+ * @param hr HTTP response details
+ * @param num_blind_sigs length of the @a reserve_sigs array, 0 on error
+ * @param blind_sigs array of blind signatures over the planchets, NULL on error
  */
 static void
-handle_tip_pickup_finished (void *cls,
-                            long response_code,
-                            const void *response)
+pickup_done_cb (void *cls,
+                const struct TALER_MERCHANT_HttpResponse *hr,
+                unsigned int num_blind_sigs,
+                const struct TALER_MERCHANT_BlindSignature *blind_sigs)
 {
-  struct TALER_MERCHANT_TipPickupOperation *tpo = cls;
-  const json_t *json = response;
-  struct TALER_MERCHANT_HttpResponse hr = {
-    .http_status = (unsigned int) response_code,
-    .reply = json
-  };
+  struct TALER_MERCHANT_TipPickupOperation *tp = cls;
 
-  tpo->job = NULL;
-  switch (response_code)
+  tp->tpo2 = NULL;
+  if (NULL == blind_sigs)
   {
-  case MHD_HTTP_OK:
-    if (GNUNET_OK != check_ok (tpo,
-                               json))
+    tp->cb (tp->cb_cls,
+            hr,
+            0,
+            NULL);
+    TALER_MERCHANT_tip_pickup_cancel (tp);
+    return;
+  }
+  {
+    struct TALER_DenominationSignature sigs[num_blind_sigs];
+    int ok;
+
+    ok = GNUNET_OK;
+    memset (sigs,
+            0,
+            sizeof (sigs));
+    for (unsigned int i = 0; i<num_blind_sigs; i++)
     {
-      GNUNET_break_op (0);
-      hr.http_status = 0;
-      hr.ec = TALER_EC_INVALID_RESPONSE;
+      struct TALER_FreshCoin fc;
+
+      if (GNUNET_OK !=
+          TALER_planchet_to_coin (&tp->planchets[i].pk.key,
+                                  blind_sigs[i].blind_sig,
+                                  &tp->planchets[i].ps,
+                                  &tp->planchets[i].c_hash,
+                                  &fc))
+      {
+        ok = GNUNET_SYSERR;
+        break;
+      }
+      sigs[i] = fc.sig;
     }
-    break;
-  case MHD_HTTP_INTERNAL_SERVER_ERROR:
-    /* Server had an internal issue; we should retry, but this API
-       leaves this to the application */
-    hr.ec = TALER_JSON_get_error_code (json);
-    hr.hint = TALER_JSON_get_error_hint (json);
-    break;
-  case MHD_HTTP_CONFLICT:
-    /* legal, can happen if we pickup a tip twice... */
-    hr.ec = TALER_JSON_get_error_code (json);
-    hr.hint = TALER_JSON_get_error_hint (json);
-    break;
-  case MHD_HTTP_NOT_FOUND:
-    /* legal, can happen if tip ID is unknown */
-    hr.ec = TALER_JSON_get_error_code (json);
-    hr.hint = TALER_JSON_get_error_hint (json);
-    break;
-  default:
-    /* unexpected response code */
-    GNUNET_break_op (0);
-    TALER_MERCHANT_parse_error_details_ (json,
-                                         response_code,
-                                         &hr);
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Unexpected response code %u/%d\n",
-                (unsigned int) response_code,
-                (int) hr.ec);
-    break;
+    if (GNUNET_OK == ok)
+    {
+      tp->cb (tp->cb_cls,
+              hr,
+              num_blind_sigs,
+              sigs);
+    }
+    else
+    {
+      struct TALER_MERCHANT_HttpResponse hrx = {
+        .reply = hr->reply,
+        .http_status = 0,
+        .ec = TALER_EC_TIP_PICKUP_UNBLIND_FAILURE
+      };
+
+      tp->cb (tp->cb_cls,
+              &hrx,
+              0,
+              NULL);
+    }
+    for (unsigned int i = 0; i<num_blind_sigs; i++)
+      if (NULL != sigs[i].rsa_signature)
+        GNUNET_CRYPTO_rsa_signature_free (sigs[i].rsa_signature);
   }
-  if (NULL != tpo->cb)
-  {
-    tpo->cb (tpo->cb_cls,
-             &hr,
-             NULL,
-             0,
-             NULL);
-    tpo->cb = NULL;
-  }
-  TALER_MERCHANT_tip_pickup_cancel (tpo);
+  TALER_MERCHANT_tip_pickup_cancel (tp);
 }
 
 
@@ -230,8 +174,8 @@ handle_tip_pickup_finished (void *cls,
  * @param ctx execution context
  * @param backend_url base URL of the merchant backend
  * @param tip_id unique identifier for the tip
- * @param num_planches number of planchets provided in @a planchets
- * @param planchets array of planchets to be signed into existence for the tip
+ * @param num_planches number of planchets provided in @a pds
+ * @param pds array of planchet secrets to be signed into existence for the tip
  * @param pickup_cb callback which will work the response gotten from the backend
  * @param pickup_cb_cls closure to pass to @a pickup_cb
  * @return handle for this operation, NULL upon errors
@@ -241,122 +185,83 @@ TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
                            const char *backend_url,
                            const struct GNUNET_HashCode *tip_id,
                            unsigned int num_planchets,
-                           struct TALER_PlanchetDetail *planchets,
+                           const struct TALER_MERCHANT_PlanchetData *pds,
                            TALER_MERCHANT_TipPickupCallback pickup_cb,
                            void *pickup_cb_cls)
 {
-  struct TALER_MERCHANT_TipPickupOperation *tpo;
-  CURL *eh;
-  json_t *pa;
-  json_t *tp_obj;
+  struct TALER_MERCHANT_TipPickupOperation *tp;
+  struct TALER_PlanchetDetail details[GNUNET_NZL (num_planchets)];
 
   if (0 == num_planchets)
   {
     GNUNET_break (0);
     return NULL;
   }
-  pa = json_array ();
+  tp = GNUNET_new (struct TALER_MERCHANT_TipPickupOperation);
+  GNUNET_array_grow (tp->planchets,
+                     tp->num_planchets,
+                     num_planchets);
   for (unsigned int i = 0; i<num_planchets; i++)
   {
-    const struct TALER_PlanchetDetail *planchet = &planchets[i];
-    json_t *p;
-
-    p = json_pack ("{"
-                   " s:o," /* denom_pub_hash */
-                   " s:o," /* coin_ev */
-                   "}",
-                   "denom_pub_hash", GNUNET_JSON_from_data_auto (
-                     &planchet->denom_pub_hash),
-                   "coin_ev", GNUNET_JSON_from_data (planchet->coin_ev,
-                                                     planchet->coin_ev_size));
-    if (NULL == p)
+    tp->planchets[i].ps = pds[i].ps;
+    if (GNUNET_OK !=
+        TALER_planchet_prepare (&pds[i].pk->key,
+                                &tp->planchets[i].ps,
+                                &tp->planchets[i].c_hash,
+                                &details[i]))
     {
       GNUNET_break (0);
-      json_decref (pa);
-      return NULL;
-    }
-    if (0 !=
-        json_array_append_new (pa,
-                               p))
-    {
-      GNUNET_break (0);
-      json_decref (pa);
+      GNUNET_array_grow (tp->planchets,
+                         tp->num_planchets,
+                         0);
+      GNUNET_free (tp);
       return NULL;
     }
   }
-  tp_obj = json_pack ("{"
-                      " s:o," /* tip_id */
-                      " s:o," /* planchets */
-                      "}",
-                      "tip_id", GNUNET_JSON_from_data_auto (tip_id),
-                      "planchets", pa);
-  if (NULL == tp_obj)
+  for (unsigned int i = 0; i<num_planchets; i++)
+  {
+    tp->planchets[i].pk = *pds[i].pk;
+    tp->planchets[i].pk.key.rsa_public_key
+      = GNUNET_CRYPTO_rsa_public_key_dup (pds[i].pk->key.rsa_public_key);
+  }
+  tp->cb = pickup_cb;
+  tp->cb_cls = pickup_cb_cls;
+  tp->tpo2 = TALER_MERCHANT_tip_pickup2 (ctx,
+                                         backend_url,
+                                         tip_id,
+                                         num_planchets,
+                                         details,
+                                         &pickup_done_cb,
+                                         tp);
+  if (NULL == tp->tpo2)
   {
     GNUNET_break (0);
+    TALER_MERCHANT_tip_pickup_cancel (tp);
     return NULL;
   }
-  tpo = GNUNET_new (struct TALER_MERCHANT_TipPickupOperation);
-  tpo->num_planchets = num_planchets;
-  tpo->ctx = ctx;
-  tpo->cb = pickup_cb;
-  tpo->cb_cls = pickup_cb_cls;
-
-  tpo->url = TALER_url_join (backend_url,
-                             "tip-pickup",
-                             NULL);
-  if (NULL == tpo->url)
-  {
-    GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                "Could not construct request URL.\n");
-    json_decref (tp_obj);
-    GNUNET_free (tpo);
-    return NULL;
-  }
-  eh = curl_easy_init ();
-  if (GNUNET_OK != TALER_curl_easy_post (&tpo->post_ctx,
-                                         eh,
-                                         tp_obj))
-  {
-    GNUNET_break (0);
-    json_decref (tp_obj);
-    GNUNET_free (tpo);
-    return NULL;
-  }
-  json_decref (tp_obj);
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Requesting URL '%s'\n",
-              tpo->url);
-
-  GNUNET_assert (CURLE_OK == curl_easy_setopt (eh,
-                                               CURLOPT_URL,
-                                               tpo->url));
-  tpo->job = GNUNET_CURL_job_add2 (ctx,
-                                   eh,
-                                   tpo->post_ctx.headers,
-                                   &handle_tip_pickup_finished,
-                                   tpo);
-  return tpo;
+  return tp;
 }
 
 
 /**
- * Cancel a /track/transaction request.  This function cannot be used
- * on a request handle if a response is already served for it.
+ * Cancel a pending /tip-pickup request
  *
- * @param tpo handle to the tracking operation being cancelled
+ * @param tp handle from the operation to cancel
  */
 void
-TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tpo)
+TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tp)
 {
-  if (NULL != tpo->job)
+  for (unsigned int i = 0; i<tp->num_planchets; i++)
+    GNUNET_CRYPTO_rsa_public_key_dup (tp->planchets[i].pk.key.rsa_public_key);
+  GNUNET_array_grow (tp->planchets,
+                     tp->num_planchets,
+                     0);
+  if (NULL != tp->tpo2)
   {
-    GNUNET_CURL_job_cancel (tpo->job);
-    tpo->job = NULL;
+    TALER_MERCHANT_tip_pickup2_cancel (tp->tpo2);
+    tp->tpo2 = NULL;
   }
-  TALER_curl_easy_post_finished (&tpo->post_ctx);
-  GNUNET_free (tpo->url);
-  GNUNET_free (tpo);
+  GNUNET_free (tp);
 }
 
 

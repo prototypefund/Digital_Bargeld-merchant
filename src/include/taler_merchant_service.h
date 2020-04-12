@@ -1156,22 +1156,103 @@ struct TALER_MERCHANT_TipPickupOperation;
 
 
 /**
- * Callback for a /tip-pickup request.  Returns the result of
- * the operation.
+ * Callback for a /tip-pickup request.  Returns the result of the operation.
  *
  * @param cls closure
  * @param hr HTTP response details
- * @param reserve_pub public key of the reserve that made the @a reserve_sigs, NULL on error
- * @param num_reserve_sigs length of the @a reserve_sigs array, 0 on error
- * @param reserve_sigs array of signatures authorizing withdrawals, NULL on error
+ * @param num_sigs length of the @a reserve_sigs array, 0 on error
+ * @param sigs array of signatures over the coins, NULL on error
  */
 typedef void
 (*TALER_MERCHANT_TipPickupCallback) (
   void *cls,
   const struct TALER_MERCHANT_HttpResponse *hr,
-  const struct TALER_ReservePublicKeyP *reserve_pub,
-  unsigned int num_reserve_sigs,
-  const struct TALER_ReserveSignatureP *reserve_sigs);
+  unsigned int num_sigs,
+  const struct TALER_DenominationSignature *sigs);
+
+
+/**
+ * Information per planchet.
+ */
+struct TALER_MERCHANT_PlanchetData
+{
+  /**
+   * Planchet secrets.
+   */
+  struct TALER_PlanchetSecretsP ps;
+
+  /**
+   * Denomination key desired.
+   */
+  const struct TALER_EXCHANGE_DenomPublicKey *pk;
+
+};
+
+/**
+ * Issue a /tip-pickup request to the backend.  Informs the backend
+ * that a customer wants to pick up a tip.
+ *
+ * @param ctx execution context
+ * @param backend_url base URL of the merchant backend
+ * @param tip_id unique identifier for the tip
+ * @param num_planches number of planchets provided in @a pds
+ * @param pds array of planchet secrets to be signed into existence for the tip
+ * @param pickup_cb callback which will work the response gotten from the backend
+ * @param pickup_cb_cls closure to pass to @a pickup_cb
+ * @return handle for this operation, NULL upon errors
+ */
+struct TALER_MERCHANT_TipPickupOperation *
+TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
+                           const char *backend_url,
+                           const struct GNUNET_HashCode *tip_id,
+                           unsigned int num_planchets,
+                           const struct TALER_MERCHANT_PlanchetData *pds,
+                           TALER_MERCHANT_TipPickupCallback pickup_cb,
+                           void *pickup_cb_cls);
+
+
+/**
+ * Cancel a pending /tip-pickup request
+ *
+ * @param tp handle from the operation to cancel
+ */
+void
+TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tp);
+
+
+/**
+ * Handle for a low-level /tip-pickup operation (without unblinding).
+ */
+struct TALER_MERCHANT_TipPickup2Operation;
+
+/**
+ * A blind signature returned via tipping API.
+ */
+
+struct TALER_MERCHANT_BlindSignature
+{
+  /**
+   * We use RSA.
+   */
+  const struct GNUNET_CRYPTO_RsaSignature *blind_sig;
+};
+
+
+/**
+ * Callback for a /tip-pickup request.  Returns the result of the operation.
+ * Note that the client MUST still do the unblinding of the @a blind_sigs.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ * @param num_blind_sigs length of the @a blind_sigs array, 0 on error
+ * @param blind_sigs array of blind signatures over the planchets, NULL on error
+ */
+typedef void
+(*TALER_MERCHANT_TipPickup2Callback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  unsigned int num_blind_sigs,
+  const struct TALER_MERCHANT_BlindSignature *blind_sigs);
 
 
 /**
@@ -1187,23 +1268,24 @@ typedef void
  * @param pickup_cb_cls closure to pass to @a pickup_cb
  * @return handle for this operation, NULL upon errors
  */
-struct TALER_MERCHANT_TipPickupOperation *
-TALER_MERCHANT_tip_pickup (struct GNUNET_CURL_Context *ctx,
-                           const char *backend_url,
-                           const struct GNUNET_HashCode *tip_id,
-                           unsigned int num_planchets,
-                           struct TALER_PlanchetDetail *planchets,
-                           TALER_MERCHANT_TipPickupCallback pickup_cb,
-                           void *pickup_cb_cls);
+struct TALER_MERCHANT_TipPickup2Operation *
+TALER_MERCHANT_tip_pickup2 (struct GNUNET_CURL_Context *ctx,
+                            const char *backend_url,
+                            const struct GNUNET_HashCode *tip_id,
+                            unsigned int num_planchets,
+                            struct TALER_PlanchetDetail *planchets,
+                            TALER_MERCHANT_TipPickup2Callback pickup_cb,
+                            void *pickup_cb_cls);
 
 
 /**
- * Cancel a pending /tip-pickup request
+ * Cancel a pending /tip-pickup request.
  *
  * @param tp handle from the operation to cancel
  */
 void
-TALER_MERCHANT_tip_pickup_cancel (struct TALER_MERCHANT_TipPickupOperation *tp);
+TALER_MERCHANT_tip_pickup2_cancel (
+  struct TALER_MERCHANT_TipPickup2Operation *tp);
 
 
 /* ********************** /check-payment ************************* */

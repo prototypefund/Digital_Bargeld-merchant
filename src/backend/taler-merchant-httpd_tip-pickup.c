@@ -30,6 +30,12 @@
 
 
 /**
+ * Information we keep per tip pickup request.
+ */
+struct PickupContext;
+
+
+/**
  * Details about a planchet that the customer wants to obtain
  * a withdrawal authorization.  This is the information that
  * will need to be sent to the exchange to obtain the blind
@@ -39,10 +45,24 @@ struct PlanchetDetail
 {
 
   /**
-   * The complete withdraw request that we are building to sign.
-   * Built incrementally during the processing of the request.
+   * Hash of the denomination public key requested for this planchet.
    */
-  struct TALER_WithdrawRequestPS wr;
+  struct GNUNET_HashCode h_denom_pub;
+
+  /**
+   * Pickup context this planchet belongs to.
+   */
+  struct PickupContext *pc;
+
+  /**
+   * Handle to withdraw operation with the exchange.
+   */
+  struct TALER_EXCHANGE_Withdraw2Handle *wh;
+
+  /**
+   * Blind signature to return, or NULL if not available.
+   */
+  json_t *blind_sig;
 
   /**
    * Blinded coin (see GNUNET_CRYPTO_rsa_blind()).  Note: is malloc()'ed!
@@ -58,8 +78,7 @@ struct PlanchetDetail
 
 
 /**
- * Information we keep for individual calls
- * to requests that parse JSON, but keep no other state.
+ * Information we keep per tip pickup request.
  */
 struct PickupContext
 {
@@ -94,6 +113,11 @@ struct PickupContext
    * Operation we run to find the exchange (and get its /keys).
    */
   struct TMH_EXCHANGES_FindOperation *fo;
+
+  /**
+   * Handle to the exchange (set after exchange_found_cb()).
+   */
+  struct TALER_EXCHANGE_Handle *eh;
 
   /**
    * Array of planchets of length @e planchets_len.
@@ -187,7 +211,20 @@ pickup_cleanup (struct TM_HandlerContext *hc)
   if (NULL != pc->planchets)
   {
     for (unsigned int i = 0; i<pc->planchets_len; i++)
-      GNUNET_free_non_null (pc->planchets[i].coin_ev);
+    {
+      struct PlanchetDetail *pd = &pc->planchets[i];
+      GNUNET_free_non_null (pd->coin_ev);
+      if (NULL != pd->wh)
+      {
+        TALER_EXCHANGE_withdraw2_cancel (pd->wh);
+        pd->wh = NULL;
+      }
+      if (NULL != pd->blind_sig)
+      {
+        json_decref (pd->blind_sig);
+        pd->blind_sig = NULL;
+      }
+    }
     GNUNET_free (pc->planchets);
     pc->planchets = NULL;
   }
@@ -203,7 +240,6 @@ pickup_cleanup (struct TM_HandlerContext *hc)
     MHD_destroy_response (pc->response);
     pc->response = NULL;
   }
-
   GNUNET_free (pc);
 }
 
@@ -216,12 +252,84 @@ pickup_cleanup (struct TM_HandlerContext *hc)
 static void
 resume_pc (struct PickupContext *pc)
 {
+  for (unsigned int i = 0; i<pc->planchets_len; i++)
+  {
+    struct PlanchetDetail *pd = &pc->planchets[i];
+
+    if (NULL != pd->wh)
+    {
+      TALER_EXCHANGE_withdraw2_cancel (pc->planchets[i].wh);
+      pc->planchets[i].wh = NULL;
+    }
+  }
   GNUNET_assert (GNUNET_YES == pc->suspended);
   GNUNET_CONTAINER_DLL_remove (pc_head,
                                pc_tail,
                                pc);
   MHD_resume_connection (pc->connection);
   TMH_trigger_daemon ();
+}
+
+
+/**
+ * Function called with the result of our attempt to withdraw
+ * the coin for a tip.
+ *
+ * @param cls closure
+ * @param hr HTTP response data
+ * @param blind_sig blind signature over the coin, NULL on error
+ */
+static void
+withdraw_cb (void *cls,
+             const struct TALER_EXCHANGE_HttpResponse *hr,
+             const struct GNUNET_CRYPTO_RsaSignature *blind_sig)
+{
+  struct PlanchetDetail *pd = cls;
+  struct PickupContext *pc = pd->pc;
+  json_t *ja;
+
+  pd->wh = NULL;
+  if (NULL == blind_sig)
+  {
+    pc->response_code = MHD_HTTP_FAILED_DEPENDENCY;
+    pc->response = TALER_MHD_make_json_pack (
+      (NULL != hr->reply)
+      ? "{s:s, s:I, s:I, s:I, s:O}"
+      : "{s:s, s:I, s:I, s:I}",
+      "hint", "failed to withdraw coin from exchange",
+      "code", (json_int_t) TALER_EC_TIP_PICKUP_WITHDRAW_FAILED_AT_EXCHANGE,
+      "exchange_http_status", (json_int_t) hr->http_status,
+      "exchange_code", (json_int_t) hr->ec,
+      "exchange_reply", hr->reply);
+    resume_pc (pc);
+    return;
+  }
+  /* FIXME: persisit blind_sig in our database!?
+     (or at least _all_ of them once we have them all?) */
+  pd->blind_sig = GNUNET_JSON_from_rsa_signature (blind_sig);
+  GNUNET_assert (NULL != pd->blind_sig);
+  for (unsigned int i = 0; i<pc->planchets_len; i++)
+    if (NULL != pc->planchets[i].wh)
+      return;
+  /* All done, build final response */
+  ja = json_array ();
+  GNUNET_assert (NULL != ja);
+  for (unsigned int i = 0; i<pc->planchets_len; i++)
+  {
+    struct PlanchetDetail *pd = &pc->planchets[i];
+
+    GNUNET_assert (0 ==
+                   json_array_append_new (ja,
+                                          json_pack ("{s:o}",
+                                                     "blind_sig",
+                                                     pd->blind_sig)));
+    pd->blind_sig = NULL;
+  }
+  pc->response_code = MHD_HTTP_OK;
+  pc->response = TALER_MHD_make_json_pack ("{s:o}",
+                                           "blind_sigs",
+                                           ja);
+  resume_pc (pc);
 }
 
 
@@ -237,9 +345,7 @@ static void
 run_pickup (struct PickupContext *pc)
 {
   struct TALER_ReservePrivateKeyP reserve_priv;
-  struct TALER_ReservePublicKeyP reserve_pub;
   enum TALER_ErrorCode ec;
-  json_t *sigs;
 
   db->preflight (db->cls);
   ec = db->pickup_tip_TR (db->cls,
@@ -271,50 +377,30 @@ run_pickup (struct PickupContext *pc)
     resume_pc (pc);
     return;
   }
-  sigs = json_array ();
-  if (NULL == sigs)
-  {
-    GNUNET_break (0);
-    pc->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
-    pc->response = TALER_MHD_make_error (TALER_EC_JSON_ALLOCATION_FAILURE,
-                                         "could not create JSON array");
-    resume_pc (pc);
-    return;
-  }
-  GNUNET_CRYPTO_eddsa_key_get_public (&reserve_priv.eddsa_priv,
-                                      &reserve_pub.eddsa_pub);
   for (unsigned int i = 0; i<pc->planchets_len; i++)
   {
     struct PlanchetDetail *pd = &pc->planchets[i];
-    struct TALER_ReserveSignatureP reserve_sig;
+    struct TALER_PlanchetDetail pdx = {
+      .denom_pub_hash = pd->h_denom_pub,
+      .coin_ev = pd->coin_ev,
+      .coin_ev_size = pd->coin_ev_size,
+    };
 
-    pd->wr.reserve_pub = reserve_pub;
-    GNUNET_CRYPTO_eddsa_sign (&reserve_priv.eddsa_priv,
-                              &pd->wr,
-                              &reserve_sig.eddsa_signature);
-    if (0 !=
-        json_array_append_new (sigs,
-                               json_pack ("{s:o}",
-                                          "reserve_sig",
-                                          GNUNET_JSON_from_data_auto (
-                                            &reserve_sig))))
+    pd->wh = TALER_EXCHANGE_withdraw2 (pc->eh,
+                                       &pdx,
+                                       &reserve_priv,
+                                       &withdraw_cb,
+                                       pd);
+    if (NULL == pd->wh)
     {
       GNUNET_break (0);
-      json_decref (sigs);
       pc->response_code = MHD_HTTP_INTERNAL_SERVER_ERROR;
-      pc->response = TALER_MHD_make_error (TALER_EC_JSON_ALLOCATION_FAILURE,
-                                           "could not add element to JSON array");
+      pc->response = TALER_MHD_make_error (TALER_EC_TIP_PICKUP_WITHDRAW_FAILED,
+                                           "could not inititate withdrawal");
       resume_pc (pc);
       return;
     }
   }
-  pc->response_code = MHD_HTTP_OK;
-  pc->response = TALER_MHD_make_json_pack ("{s:o, s:o}",
-                                           "reserve_pub",
-                                           GNUNET_JSON_from_data_auto (
-                                             &reserve_pub),
-                                           "reserve_sigs", sigs);
-  resume_pc (pc);
 }
 
 
@@ -387,12 +473,11 @@ exchange_found_cb (void *cls,
     for (unsigned int i = 0; i<pc->planchets_len; i++)
     {
       struct PlanchetDetail *pd = &pc->planchets[i];
-      const struct TALER_EXCHANGE_DenomPublicKey *dk;
       struct TALER_Amount amount_with_fee;
+      const struct TALER_EXCHANGE_DenomPublicKey *dk;
 
       dk = TALER_EXCHANGE_get_denomination_key_by_hash (keys,
-                                                        &pd->wr.
-                                                        h_denomination_pub);
+                                                        &pd->h_denom_pub);
       if (NULL == dk)
       {
         pc->response_code = MHD_HTTP_NOT_FOUND;
@@ -408,7 +493,7 @@ exchange_found_cb (void *cls,
         return;
       }
       GNUNET_CRYPTO_hash_context_read (hc,
-                                       &pd->wr.h_denomination_pub,
+                                       &pd->h_denom_pub,
                                        sizeof (struct GNUNET_HashCode));
       GNUNET_CRYPTO_hash_context_read (hc,
                                        pd->coin_ev,
@@ -434,10 +519,6 @@ exchange_found_cb (void *cls,
           ae = GNUNET_YES;
         }
       }
-      TALER_amount_hton (&pd->wr.withdraw_fee,
-                         &dk->fee_withdraw);
-      TALER_amount_hton (&pd->wr.amount_with_fee,
-                         &amount_with_fee);
     }
     GNUNET_CRYPTO_hash_context_finish (hc,
                                        &pc->pickup_id);
@@ -455,6 +536,7 @@ exchange_found_cb (void *cls,
     resume_pc (pc);
     return;
   }
+  pc->eh = eh;
   pc->total = total;
   run_pickup (pc);
 }
@@ -545,32 +627,23 @@ prepare_pickup (struct PickupContext *pc)
  * @return #GNUNET_OK upon success, #GNUNET_NO if a response
  *    was generated, #GNUNET_SYSERR to drop the connection
  */
-static int
+static enum GNUNET_GenericReturnValue
 parse_planchet (struct MHD_Connection *connection,
                 const json_t *planchet,
                 struct PlanchetDetail *pd)
 {
-  int ret;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_fixed_auto ("denom_pub_hash",
-                                 &pd->wr.h_denomination_pub),
+                                 &pd->h_denom_pub),
     GNUNET_JSON_spec_varsize ("coin_ev",
                               (void **) &pd->coin_ev,
                               &pd->coin_ev_size),
     GNUNET_JSON_spec_end ()
   };
 
-  ret = TALER_MHD_parse_json_data (connection,
-                                   planchet,
-                                   spec);
-  if (GNUNET_OK != ret)
-    return ret;
-  pd->wr.purpose.purpose = htonl (TALER_SIGNATURE_WALLET_RESERVE_WITHDRAW);
-  pd->wr.purpose.size = htonl (sizeof (struct TALER_WithdrawRequestPS));
-  GNUNET_CRYPTO_hash (pd->coin_ev,
-                      pd->coin_ev_size,
-                      &pd->wr.h_coin_envelope);
-  return ret;
+  return TALER_MHD_parse_json_data (connection,
+                                    planchet,
+                                    spec);
 }
 
 
@@ -674,6 +747,7 @@ MH_handler_tip_pickup (struct TMH_RequestHandler *rh,
                                     struct PlanchetDetail);
   for (unsigned int i = 0; i<pc->planchets_len; i++)
   {
+    pc->planchets[i].pc = pc;
     if (GNUNET_OK !=
         (res = parse_planchet (connection,
                                json_array_get (planchets,
