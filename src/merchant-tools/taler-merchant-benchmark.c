@@ -509,7 +509,7 @@ run (void *cls,
  *
  * @param process process to terminate.
  */
-void
+static void
 terminate_process (struct GNUNET_OS_Process *process)
 {
   GNUNET_OS_process_kill (process, SIGTERM);
