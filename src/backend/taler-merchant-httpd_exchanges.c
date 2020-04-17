@@ -380,10 +380,10 @@ process_wire_fees (struct Exchange *exchange,
                 wire_method,
                 GNUNET_STRINGS_absolute_time_to_string (af->start_date),
                 TALER_amount2s (&af->wire_fee));
-    db->preflight (db->cls);
+    TMH_db->preflight (TMH_db->cls);
     if (GNUNET_OK !=
-        db->start (db->cls,
-                   "store wire fee"))
+        TMH_db->start (TMH_db->cls,
+                       "store wire fee"))
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Failed to start database transaction to store exchange wire fees (will try to continue anyway)!\n");
@@ -391,21 +391,21 @@ process_wire_fees (struct Exchange *exchange,
       fees = fees->next;
       continue;
     }
-    qs = db->store_wire_fee_by_exchange (db->cls,
-                                         master_pub,
-                                         &h_wire_method,
-                                         &af->wire_fee,
-                                         &af->closing_fee,
-                                         af->start_date,
-                                         af->end_date,
-                                         &af->master_sig);
+    qs = TMH_db->store_wire_fee_by_exchange (TMH_db->cls,
+                                             master_pub,
+                                             &h_wire_method,
+                                             &af->wire_fee,
+                                             &af->closing_fee,
+                                             af->start_date,
+                                             af->end_date,
+                                             &af->master_sig);
     if (0 > qs)
     {
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                   "Failed to persist exchange wire fees in merchant DB (will try to continue anyway)!\n");
       GNUNET_free (af);
       fees = fees->next;
-      db->rollback (db->cls);
+      TMH_db->rollback (TMH_db->cls);
       continue;
     }
     if (0 == qs)
@@ -413,12 +413,12 @@ process_wire_fees (struct Exchange *exchange,
       /* Entry was already in DB, fine, continue as if we had succeeded */
       GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
                   "Fees already in DB, rolling back transaction attempt!\n");
-      db->rollback (db->cls);
+      TMH_db->rollback (TMH_db->cls);
     }
     if (0 < qs)
     {
       /* Inserted into DB, make sure transaction completes */
-      qs = db->commit (db->cls);
+      qs = TMH_db->commit (TMH_db->cls);
       if (0 > qs)
       {
         GNUNET_log (GNUNET_ERROR_TYPE_ERROR,

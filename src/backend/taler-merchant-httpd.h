@@ -39,17 +39,17 @@
 /**
  * Supported wire method.  Kept in a DLL.
  */
-struct WireMethod
+struct TMH_WireMethod
 {
   /**
    * Next entry in DLL.
    */
-  struct WireMethod *next;
+  struct TMH_WireMethod *next;
 
   /**
    * Previous entry in DLL.
    */
-  struct WireMethod *prev;
+  struct TMH_WireMethod *prev;
 
   /**
    * Which wire method / payment target identifier is @e j_wire using?
@@ -69,7 +69,7 @@ struct WireMethod
   /**
    * Is this wire method active (should it be included in new contracts)?
    */
-  int active;
+  bool active;
 
 };
 
@@ -79,7 +79,7 @@ struct WireMethod
  * backend can account for several merchants, as used to do in donation
  * shops
  */
-struct MerchantInstance
+struct TMH_MerchantInstance
 {
 
   /**
@@ -102,12 +102,12 @@ struct MerchantInstance
   /**
    * Next entry in DLL.
    */
-  struct WireMethod *wm_head;
+  struct TMH_WireMethod *wm_head;
 
   /**
    * Previous entry in DLL.
    */
-  struct WireMethod *wm_tail;
+  struct TMH_WireMethod *wm_tail;
 
   /**
    * Merchant's private key
@@ -120,10 +120,48 @@ struct MerchantInstance
   struct TALER_MerchantPublicKeyP pubkey;
 
   /**
+   * Default maximum wire fee to assume, unless stated differently in the proposal
+   * already.
+   */
+  struct TALER_Amount default_max_wire_fee;
+
+  /**
+   * Default max deposit fee that the merchant is willing to
+   * pay; if deposit costs more, then the customer will cover
+   * the difference.
+   */
+  struct TALER_Amount default_max_deposit_fee;
+
+  /**
+   * Default factor for wire fee amortization.
+   */
+  unsigned long long default_wire_fee_amortization;
+
+  /**
+   * If the frontend does NOT specify an execution date, how long should
+   * we tell the exchange to wait to aggregate transactions before
+   * executing the wire transfer?  This delay is added to the current
+   * time when we generate the advisory execution time for the exchange.
+   */
+  struct GNUNET_TIME_Relative default_wire_transfer_delay;
+
+  /**
+   * If the frontend does NOT specify a payment deadline, how long should
+   * offers we make be valid by default?
+   */
+  struct GNUNET_TIME_Relative default_pay_deadline;
+
+  /**
    * Exchange this instance uses for tipping, NULL if tipping
    * is not supported.
    */
   char *tip_exchange;
+
+  /**
+   * Locations from the configuration.  Mapping from
+   * label to location data.
+   */
+  json_t *default_locations;
 
   /**
    * What is the private key of the reserve used for signing tips by this exchange?
@@ -135,14 +173,56 @@ struct MerchantInstance
 
 /**
  * @brief Struct describing an URL and the handler for it.
+ *
+ * The overall URL is always @e url_prefix, optionally followed by the
+ * id_segment, which is optionally followed by the @e url_suffix. It is NOT
+ * allowed for the @e url_prefix to be directly followed by the @e url_suffix.
+ * A @e url_suffix SHOULD only be used with a @e method of #MHD_HTTP_METHOD_POST.
+ */
+struct TMH_RequestHandler;
+
+/**
+ * This information is stored in the "connection_cls" of MHD for
+ * every request that we process.
+ * Individual handlers can evaluate tis memebers and
+ * are allowed to update @e cc and @e ctx to store and clean up
+ * handler-specific data.
+ */
+struct TMH_HandlerContext;
+
+
+/**
+ * @brief Struct describing an URL and the handler for it.
+ *
+ * The overall URL is always @e url_prefix, optionally followed by the
+ * id_segment, which is optionally followed by the @e url_suffix. It is NOT
+ * allowed for the @e url_prefix to be directly followed by the @e url_suffix.
+ * A @e url_suffix SHOULD only be used with a @e method of #MHD_HTTP_METHOD_POST.
  */
 struct TMH_RequestHandler
 {
 
   /**
-   * URL the handler is for.
+   * URL prefix the handler is for.
    */
-  const char *url;
+  const char *url_prefix;
+
+  /**
+   * Does this request include an identifier segment
+   * (product_id, reserve_pub, order_id, tip_id) in the
+   * second segment?
+   */
+  bool have_id_segment;
+
+  /**
+   * Does this request handler expect an instance?
+   */
+  bool skip_instance;
+
+  /**
+   * URL suffix the handler is for.
+   */
+  const char *url_suffix;
 
   /**
    * Method the handler is for, NULL for "all".
@@ -155,36 +235,30 @@ struct TMH_RequestHandler
   const char *mime_type;
 
   /**
-   * Raw data for the @e handler
+   * Raw data for the @e handler (can be NULL).
    */
   const void *data;
 
   /**
-   * Number of bytes in @e data, 0 for 0-terminated.
+   * Number of bytes in @e data.
    */
   size_t data_size;
 
   /**
-   * Function to call to handle the request.
+   * Handler to be called for this URL/METHOD combination.
    *
    * @param rh this struct
-   * @param mime_type the @e mime_type for the reply (hint, can be NULL)
    * @param connection the MHD connection to handle
-   * @param[in,out] connection_cls the connection's closure (can be updated)
-   * @param upload_data upload data
-   * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
-   * @param mi merchant backend instance, never NULL
+   * @param[in,out] hc context with further information about the request
    * @return MHD result code
    */
-  MHD_RESULT (*handler)(struct TMH_RequestHandler *rh,
-                        struct MHD_Connection *connection,
-                        void **connection_cls,
-                        const char *upload_data,
-                        size_t *upload_data_size,
-                        struct MerchantInstance *mi);
+  MHD_RESULT
+  (*handler)(const struct TMH_RequestHandler *rh,
+             struct MHD_Connection *connection,
+             struct TMH_HandlerContext *hc);
 
   /**
-   * Default response code.
+   * Default response code to use.
    */
   unsigned int response_code;
 };
@@ -196,33 +270,39 @@ struct TMH_RequestHandler
  * member.  This struct contains a single callback, which will be
  * invoked to clean up the memory when the contection is completed.
  */
-struct TM_HandlerContext;
+struct TMH_HandlerContext;
 
 /**
  * Signature of a function used to clean up the context
  * we keep in the "connection_cls" of MHD when handling
  * a request.
  *
- * @param hc header of the context to clean up.
+ * @param ctxt the context to clean up.
  */
 typedef void
-(*TM_ContextCleanup)(struct TM_HandlerContext *hc);
+(*TMH_ContextCleanup)(void *ctx);
 
 
 /**
- * Each MHD response handler that sets the "connection_cls" to a
- * non-NULL value must use a struct that has this struct as its first
- * member.  This struct contains a single callback, which will be
- * invoked to clean up the memory when the connection is completed.
+ * This information is stored in the "connection_cls" of MHD for
+ * every request that we process.
+ * Individual handlers can evaluate tis memebers and
+ * are allowed to update @e cc and @e ctx to store and clean up
+ * handler-specific data.
  */
-struct TM_HandlerContext
+struct TMH_HandlerContext
 {
 
   /**
    * Function to execute the handler-specific cleanup of the
-   * (typically larger) context.
+   * (request-specific) context in @e ctx.
    */
-  TM_ContextCleanup cc;
+  TMH_ContextCleanup cc;
+
+  /**
+   * Client-specific context we keep. Passed to @e cc.
+   */
+  void *ctx;
 
   /**
    * Which request handler is handling this request?
@@ -230,9 +310,40 @@ struct TM_HandlerContext
   const struct TMH_RequestHandler *rh;
 
   /**
+   * Which instance is handling this request?
+   */
+  struct TMH_MerchantInstance *instance;
+
+  /**
    * Asynchronous request context id.
    */
   struct GNUNET_AsyncScopeId async_scope_id;
+
+  /**
+   * Our original URL, for logging.
+   */
+  const char *url;
+
+  /**
+   * Infix part of @a url.
+   */
+  char *infix;
+
+  /**
+   * JSON body that was uploaded, NULL if @e is_post is false.
+   */
+  json_t *json;
+
+  /**
+   * Placeholder for #TALER_MHD_parse_post_json() to keep its internal state.
+   * Used when we parse the POSTed data.
+   */
+  void *json_parse_context;
+
+  /**
+   * Set to true if this is an #MHD_HTTP_METHOD_POST request.
+   */
+  bool is_post;
 };
 
 
@@ -247,12 +358,14 @@ struct TMH_SuspendedConnection
   struct MHD_Connection *con;
 
   /**
-   * Associated heap node.
+   * Associated heap node.  Used internally by #TMH_long_poll_suspend()
+   * and TMH_long_poll_resume().
    */
   struct GNUNET_CONTAINER_HeapNode *hn;
 
   /**
-   * Key of this entry in the #payment_trigger_map
+   * Key of this entry in the #payment_trigger_map.  Used internally by
+   * #TMH_long_poll_suspend() and TMH_long_poll_resume().
    */
   struct GNUNET_HashCode key;
 
@@ -270,51 +383,10 @@ struct TMH_SuspendedConnection
   /**
    * #GNUNET_YES if we are waiting for a refund.
    */
-  int awaiting_refund;
+  bool awaiting_refund;
 
 };
 
-
-/**
- * Locations from the configuration.  Mapping from
- * label to location data.
- */
-extern json_t *default_locations;
-
-/**
- * Default maximum wire fee to assume, unless stated differently in the proposal
- * already.
- */
-extern struct TALER_Amount default_max_wire_fee;
-
-/**
- * Default max deposit fee that the merchant is willing to
- * pay; if deposit costs more, then the customer will cover
- * the difference.
- */
-extern struct TALER_Amount default_max_deposit_fee;
-
-/**
- * Default factor for wire fee amortization.
- */
-extern unsigned long long default_wire_fee_amortization;
-
-/**
- * MIN-Heap of suspended connections to resume when the timeout expires,
- * ordered by timeout. Values are of type `struct TMH_SuspendedConnection`
- */
-extern struct GNUNET_CONTAINER_Heap *resume_timeout_heap;
-
-/**
- * Task responsible for timeouts in the #resume_timeout_heap.
- */
-extern struct GNUNET_SCHEDULER_Task *resume_timeout_task;
-
-/**
- * Hash map from H(order_id,merchant_pub) to `struct TMH_SuspendedConnection`
- * entries to resume when a payment is made for the given order.
- */
-extern struct GNUNET_CONTAINER_MultiHashMap *payment_trigger_map;
 
 /**
  * Which currency do we use?
@@ -327,45 +399,10 @@ extern char *TMH_currency;
 extern int TMH_force_audit;
 
 /**
- * Hash of our wire format details as given in #j_wire.
- */
-extern struct GNUNET_HashCode h_wire;
-
-/**
- * Our private key, corresponds to #pubkey.
- */
-extern struct TALER_MerchantPrivateKeyP privkey;
-
-/**
- * Our public key, corresponds to #privkey.
- */
-extern struct TALER_MerchantPublicKeyP pubkey;
-
-/**
- * Hashmap pointing at merchant instances by 'id'. An 'id' is
- * just a string that identifies a merchant instance. When a frontend
- * needs to specify an instance to the backend, it does so by 'id'
- */
-extern struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
-
-/**
  * Handle to the database backend.
  */
-extern struct TALER_MERCHANTDB_Plugin *db;
+extern struct TALER_MERCHANTDB_Plugin *TMH_db;
 
-/**
- * If the frontend does NOT specify an execution date, how long should
- * we tell the exchange to wait to aggregate transactions before
- * executing the wire transfer?  This delay is added to the current
- * time when we generate the advisory execution time for the exchange.
- */
-extern struct GNUNET_TIME_Relative default_wire_transfer_delay;
-
-/**
- * If the frontend does NOT specify a payment deadline, how long should
- * offers we make be valid by default?
- */
-extern struct GNUNET_TIME_Relative default_pay_deadline;
 
 /**
  * Kick MHD to run now, to be called after MHD_resume_connection().
@@ -378,28 +415,18 @@ TMH_trigger_daemon (void);
 
 
 /**
- * Compute @a key to use for @a order_id and @a mpub in our
- * #payment_trigger_map.
- *
- * @param order_id an order ID
- * @param mpub an instance public key
- * @param key[out] set to the hash map key to use
- */
-void
-TMH_compute_pay_key (const char *order_id,
-                     const struct TALER_MerchantPublicKeyP *mpub,
-                     struct GNUNET_HashCode *key);
-
-
-/**
  * Suspend connection from @a sc until payment has been received.
  *
+ * @param order_id the order that we are waiting on
+ * @param mi the merchant instance we are waiting on
  * @param sc connection to suspend
  * @param min_refund refund amount we are waiting on to be exceeded before resuming,
  *                   NULL if we are not waiting for refunds
  */
 void
-TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc,
+TMH_long_poll_suspend (const char *order_id,
+                       const struct TMH_MerchantInstance *mi,
+                       struct TMH_SuspendedConnection *sc,
                        const struct TALER_Amount *min_refund);
 
 
@@ -407,31 +434,14 @@ TMH_long_poll_suspend (struct TMH_SuspendedConnection *sc,
  * Find out if we have any clients long-polling for @a order_id to be
  * confirmed at merchant @a mpub, and if so, tell them to resume.
  *
- * @param order_id the order that was paid
- * @param mpub the merchant's public key of the instance where the payment happened
+ * @param order_id the order that was paid or refunded
+ * @param mi the merchant instance where the payment or refund happened
  * @param refund_amount refunded amount, if the trigger was a refund, otherwise NULL
  */
 void
 TMH_long_poll_resume (const char *order_id,
-                      const struct TALER_MerchantPublicKeyP *mpub,
+                      const struct TMH_MerchantInstance *mi,
                       const struct TALER_Amount *refund_amount);
-
-
-/**
- * Create a taler://pay/ URI for the given @a con and @a order_id
- * and @a session_id and @a instance_id.
- *
- * @param con HTTP connection
- * @param order_id the order id
- * @param session_id session, may be NULL
- * @param instance_id instance, may be "default"
- * @return corresponding taler://pay/ URI, or NULL on missing "host"
- */
-char *
-TMH_make_taler_pay_uri (struct MHD_Connection *con,
-                        const char *order_id,
-                        const char *session_id,
-                        const char *instance_id);
 
 
 #endif

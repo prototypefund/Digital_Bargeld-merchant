@@ -25,8 +25,6 @@
 #include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_exchanges.h"
-#include "taler-merchant-httpd_tip-query.h"
-#include "taler-merchant-httpd_tip-reserve-helper.h"
 
 
 /**
@@ -47,111 +45,28 @@
 #define MERCHANT_PROTOCOL_VERSION "0:0:0"
 
 
-static int
-add_instance (void *cls,
-              const struct GNUNET_HashCode *key,
-              void *value)
-{
-  json_t *ja = cls;
-  struct MerchantInstance *mi = value;
-  char *url;
-  json_t *pta;
-
-  /* Compile array of all unique wire methods supported by this
-     instance */
-  pta = json_array ();
-  GNUNET_assert (NULL != pta);
-  for (struct WireMethod *wm = mi->wm_head;
-       NULL != wm;
-       wm = wm->next)
-  {
-    int duplicate = GNUNET_NO;
-
-    if (! wm->active)
-      break;
-    /* Yes, O(n^2), but really how many bank accounts can an
-       instance realistically have for this to matter? */
-    for (struct WireMethod *pm = mi->wm_head;
-         pm != wm;
-         pm = pm->next)
-      if (0 == strcasecmp (pm->wire_method,
-                           wm->wire_method))
-      {
-        duplicate = GNUNET_YES;
-        break;
-      }
-    if (duplicate)
-      continue;
-    GNUNET_assert (0 ==
-                   json_array_append_new (pta,
-                                          json_string (wm->wire_method)));
-  }
-  GNUNET_asprintf (&url,
-                   "/%s/",
-                   mi->id);
-  GNUNET_assert (0 ==
-                 json_array_append_new (
-                   ja,
-                   json_pack (
-                     (NULL != mi->tip_exchange)
-                     ? "{s:s, s:s, s:o, s:o, s:s}"
-                     : "{s:s, s:s, s:o, s:o}",
-                     "name",
-                     mi->name,
-                     "backend_base_url",
-                     url,
-                     "merchant_pub",
-                     GNUNET_JSON_from_data_auto (&mi->pubkey),
-                     "payment_targets",
-                     pta,
-                     /* optional: */
-                     "tipping_exchange_baseurl",
-                     mi->tip_exchange)));
-  GNUNET_free (url);
-  return GNUNET_OK;
-}
-
-
 /**
  * Handle a "/config" request.
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param mi merchant backend instance, never NULL
+ * @param[in,out] hc handler context (can be updated)
  * @return MHD result code
  */
 MHD_RESULT
 MH_handler_config (struct TMH_RequestHandler *rh,
                    struct MHD_Connection *connection,
-                   void **connection_cls,
-                   const char *upload_data,
-                   size_t *upload_data_size,
-                   struct MerchantInstance *mi)
+                   struct TMH_HandlerContext *hc)
 {
   static struct MHD_Response *response;
 
   (void) rh;
-  (void) connection_cls;
-  (void) upload_data;
-  (void) upload_data_size;
-  (void) mi;
+  (void) hc;
   if (NULL == response)
   {
-    json_t *ia;
-
-    ia = json_array ();
-    GNUNET_assert (NULL != ia);
-    GNUNET_CONTAINER_multihashmap_iterate (by_id_map,
-                                           &add_instance,
-                                           ia);
-    response = TALER_MHD_make_json_pack ("{s:s, s:s, s:o}",
+    response = TALER_MHD_make_json_pack ("{s:s, s:s }",
                                          "currency", TMH_currency,
-                                         "version", MERCHANT_PROTOCOL_VERSION,
-                                         "instances", ia);
-
+                                         "version", MERCHANT_PROTOCOL_VERSION);
   }
   return MHD_queue_response (connection,
                              MHD_HTTP_OK,

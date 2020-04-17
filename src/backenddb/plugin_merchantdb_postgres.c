@@ -3121,7 +3121,7 @@ RETRY:
 void *
 libtaler_plugin_merchantdb_postgres_init (void *cls)
 {
-  struct GNUNET_CONFIGURATION_Handle *cfg = cls;
+  const struct GNUNET_CONFIGURATION_Handle *cfg = cls;
   struct PostgresClosure *pg;
   struct TALER_MERCHANTDB_Plugin *plugin;
   struct GNUNET_PQ_PreparedStatement ps[] = {

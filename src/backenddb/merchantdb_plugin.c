@@ -32,7 +32,7 @@
  * @return #GNUNET_OK on success
  */
 struct TALER_MERCHANTDB_Plugin *
-TALER_MERCHANTDB_plugin_load (struct GNUNET_CONFIGURATION_Handle *cfg)
+TALER_MERCHANTDB_plugin_load (const struct GNUNET_CONFIGURATION_Handle *cfg)
 {
   char *plugin_name;
   char *lib_name;
@@ -54,7 +54,7 @@ TALER_MERCHANTDB_plugin_load (struct GNUNET_CONFIGURATION_Handle *cfg)
                           plugin_name);
   GNUNET_free (plugin_name);
   plugin = GNUNET_PLUGIN_load (lib_name,
-                               cfg);
+                               (void *) cfg);
   if (NULL != plugin)
     plugin->library_name = lib_name;
   else

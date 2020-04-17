@@ -33,27 +33,15 @@
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param mi merchant backend instance, could be NULL in this specific case!
+ * @param[in,out] hc handler context (can be updated)
  * @return MHD result code
  */
 MHD_RESULT
-TMH_MHD_handler_static_response (struct TMH_RequestHandler *rh,
+TMH_MHD_handler_static_response (const struct TMH_RequestHandler *rh,
                                  struct MHD_Connection *connection,
-                                 void **connection_cls,
-                                 const char *upload_data,
-                                 size_t *upload_data_size,
-                                 struct MerchantInstance *instance)
+                                 struct TMH_HandlerContext *hc)
 {
-  (void) instance;
-  (void) connection_cls;
-  (void) upload_data;
-  (void) upload_data_size;
-  (void) instance;
-  if (0 == rh->data_size)
-    rh->data_size = strlen ((const char *) rh->data);
+  (void) hc;
   return TALER_MHD_reply_static (connection,
                                  rh->response_code,
                                  rh->mime_type,
@@ -68,24 +56,16 @@ TMH_MHD_handler_static_response (struct TMH_RequestHandler *rh,
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param mi merchant backend instance, never NULL (but unused)
+ * @param[in,out] hc handler context (can be updated)
  * @return MHD result code
  */
 MHD_RESULT
-TMH_MHD_handler_agpl_redirect (struct TMH_RequestHandler *rh,
+TMH_MHD_handler_agpl_redirect (const struct TMH_RequestHandler *rh,
                                struct MHD_Connection *connection,
-                               void **connection_cls,
-                               const char *upload_data,
-                               size_t *upload_data_size,
-                               struct MerchantInstance *mi)
+                               struct TMH_HandlerContext *hc)
 {
-  (void) mi;
-  (void) connection_cls;
-  (void) upload_data;
-  (void) upload_data_size;
+  (void) rh;
+  (void) hc;
   return TALER_MHD_reply_agpl (connection,
                                "http://www.git.taler.net/?p=merchant.git");
 }

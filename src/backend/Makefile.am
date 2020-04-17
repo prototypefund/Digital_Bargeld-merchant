@@ -21,10 +21,12 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd.c taler-merchant-httpd.h \
   taler-merchant-httpd_auditors.c taler-merchant-httpd_auditors.h \
   taler-merchant-httpd_config.c taler-merchant-httpd_config.h \
-  taler-merchant-httpd_check-payment.c taler-merchant-httpd_check-payment.h \
   taler-merchant-httpd_exchanges.c taler-merchant-httpd_exchanges.h \
+  taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h
+
+DEAD = \
+  taler-merchant-httpd_check-payment.c taler-merchant-httpd_check-payment.h \
   taler-merchant-httpd_history.c taler-merchant-httpd_history.h \
-  taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
   taler-merchant-httpd_order.c taler-merchant-httpd_order.h \
   taler-merchant-httpd_pay.c taler-merchant-httpd_pay.h \
   taler-merchant-httpd_poll-payment.c taler-merchant-httpd_poll-payment.h \

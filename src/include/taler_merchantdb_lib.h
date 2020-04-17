@@ -37,7 +37,7 @@ struct TALER_MERCHANTDB_Plugin;
  * @return connection to the database; NULL upon error
  */
 struct TALER_MERCHANTDB_Plugin *
-TALER_MERCHANTDB_plugin_load (struct GNUNET_CONFIGURATION_Handle *cfg);
+TALER_MERCHANTDB_plugin_load (const struct GNUNET_CONFIGURATION_Handle *cfg);
 
 
 /**

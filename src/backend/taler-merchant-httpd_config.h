@@ -28,18 +28,12 @@
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param mi merchant backend instance, never NULL
+ * @param[in,out] hc handler context (can be updated)
  * @return MHD result code
  */
 MHD_RESULT
-MH_handler_config (struct TMH_RequestHandler *rh,
+MH_handler_config (const struct TMH_RequestHandler *rh,
                    struct MHD_Connection *connection,
-                   void **connection_cls,
-                   const char *upload_data,
-                   size_t *upload_data_size,
-                   struct MerchantInstance *mi);
+                   struct TMH_HandlerContext *hc);
 
 #endif
