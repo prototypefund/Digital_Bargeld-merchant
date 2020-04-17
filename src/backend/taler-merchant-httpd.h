@@ -285,7 +285,7 @@ struct TMH_HandlerContext
   char *infix;
 
   /**
-   * JSON body that was uploaded, NULL if @e is_post is false.
+   * JSON body that was uploaded, NULL if @e has_body is false.
    */
   json_t *json;
 
@@ -296,9 +296,11 @@ struct TMH_HandlerContext
   void *json_parse_context;
 
   /**
-   * Set to true if this is an #MHD_HTTP_METHOD_POST request.
+   * Set to true if this is an #MHD_HTTP_METHOD_POST or #MHD_HTTP_METHOD_PATCH request.
+   * (In principle #MHD_HTTP_METHOD_PUT may also belong, but we do not have PUTs
+   * in the API today, so we do not test for PUT.)
    */
-  bool is_post;
+  bool has_body;
 };
 
 

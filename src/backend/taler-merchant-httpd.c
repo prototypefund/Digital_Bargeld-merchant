@@ -777,7 +777,7 @@ url_handler (void *cls,
   {
     GNUNET_assert (NULL != hc->rh);
     GNUNET_SCHEDULER_begin_async_scope (&hc->async_scope_id);
-    if ( (hc->is_post) &&
+    if ( (hc->has_body) &&
          (NULL == hc->json) )
     {
       int res;
@@ -983,9 +983,11 @@ url_handler (void *cls,
                                       (json_int_t) TALER_EC_INSTANCE_UNKNOWN,
                                       "error",
                                       "merchant instance unknown");
-  hc->is_post = (0 == strcasecmp (method,
-                                  MHD_HTTP_METHOD_POST));
-  if (hc->is_post)
+  hc->has_body = ( (0 == strcasecmp (method,
+                                     MHD_HTTP_METHOD_POST)) ||
+                   (0 == strcasecmp (method,
+                                     MHD_HTTP_METHOD_PATCH)) );
+  if (hc->has_body)
   {
     /* FIXME: Maybe check for maximum upload size here
        and refuse if it is too big? (Note: maximum upload
