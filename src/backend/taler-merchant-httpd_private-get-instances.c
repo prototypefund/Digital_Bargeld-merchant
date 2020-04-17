@@ -14,68 +14,52 @@
   TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_config.c
- * @brief implement API for querying configuration data of the backend
- * @author Florian Dold
+ * @file backend/taler-merchant-httpd_private-get-instances.c
+ * @brief implement GET /instances
+ * @author Christian Grothoff
  */
 #include "platform.h"
-#include <jansson.h>
-#include <taler/taler_util.h>
-#include <taler/taler_json_lib.h>
-#include "taler-merchant-httpd.h"
-#include "taler-merchant-httpd_mhd.h"
-#include "taler-merchant-httpd_exchanges.h"
-
+#include "taler-merchant-httpd_private-get-instances.h"
 
 /**
- * Taler protocol version in the format CURRENT:REVISION:AGE
- * as used by GNU libtool.  See
- * https://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
+ * Add merchant instance to our JSON array.
  *
- * Please be very careful when updating and follow
- * https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html#Updating-version-info
- * precisely.  Note that this version has NOTHING to do with the
- * release version, and the format is NOT the same that semantic
- * versioning uses either.
- *
- * When changing this version, you likely want to also update
- * #MERCHANT_PROTOCOL_CURRENT and #MERCHANT_PROTOCOL_AGE in
- * merchant_api_config.c!
+ * @param cls a `json_t *` JSON array to build
+ * @param key unused
+ * @param value a `struct TMH_MerchantInstance *`
+ * @return #GNUNET_OK (continue to iterate)
  */
-#define MERCHANT_PROTOCOL_VERSION "0:0:0"
-
-
 static int
 add_instance (void *cls,
               const struct GNUNET_HashCode *key,
               void *value)
 {
   json_t *ja = cls;
-  struct MerchantInstance *mi = value;
-  char *url;
+  struct TMH_MerchantInstance *mi = value;
   json_t *pta;
 
+  (void) key;
   /* Compile array of all unique wire methods supported by this
      instance */
   pta = json_array ();
   GNUNET_assert (NULL != pta);
-  for (struct WireMethod *wm = mi->wm_head;
+  for (struct TMH_WireMethod *wm = mi->wm_head;
        NULL != wm;
        wm = wm->next)
   {
-    int duplicate = GNUNET_NO;
+    bool duplicate = false;
 
     if (! wm->active)
       break;
     /* Yes, O(n^2), but really how many bank accounts can an
        instance realistically have for this to matter? */
-    for (struct WireMethod *pm = mi->wm_head;
+    for (struct TMH_WireMethod *pm = mi->wm_head;
          pm != wm;
          pm = pm->next)
       if (0 == strcasecmp (pm->wire_method,
                            wm->wire_method))
       {
-        duplicate = GNUNET_YES;
+        duplicate = true;
         break;
       }
     if (duplicate)
@@ -84,77 +68,58 @@ add_instance (void *cls,
                    json_array_append_new (pta,
                                           json_string (wm->wire_method)));
   }
-  GNUNET_asprintf (&url,
-                   "/%s/",
-                   mi->id);
   GNUNET_assert (0 ==
                  json_array_append_new (
                    ja,
                    json_pack (
-                     (NULL != mi->tip_exchange)
-                     ? "{s:s, s:s, s:o, s:o, s:s}"
-                     : "{s:s, s:s, s:o, s:o}",
+                     "{s:s, s:s, s:o, s:o}",
                      "name",
                      mi->name,
-                     "backend_base_url",
-                     url,
+                     "instance",
+                     mi->id,
                      "merchant_pub",
                      GNUNET_JSON_from_data_auto (&mi->pubkey),
                      "payment_targets",
-                     pta,
-                     /* optional: */
-                     "tipping_exchange_baseurl",
-                     mi->tip_exchange)));
-  GNUNET_free (url);
+                     pta)));
   return GNUNET_OK;
 }
 
 
 /**
- * Handle a "/config" request.
+ * Handle a GET "/instances" request.
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param mi merchant backend instance, never NULL
+ * @param[in,out] hc context with further information about the request
  * @return MHD result code
  */
 MHD_RESULT
-MH_handler_config (struct TMH_RequestHandler *rh,
-                   struct MHD_Connection *connection,
-                   void **connection_cls,
-                   const char *upload_data,
-                   size_t *upload_data_size,
-                   struct MerchantInstance *mi)
+TMH_private_get_instances (const struct TMH_RequestHandler *rh,
+                           struct MHD_Connection *connection,
+                           struct TMH_HandlerContext *hc)
 {
-  static struct MHD_Response *response;
+  struct MHD_Response *response;
+  json_t *ia;
 
-  (void) rh;
-  (void) connection_cls;
-  (void) upload_data;
-  (void) upload_data_size;
-  (void) mi;
-  if (NULL == response)
+  (void) hc;
+  ia = json_array ();
+  GNUNET_assert (NULL != ia);
+  GNUNET_CONTAINER_multihashmap_iterate (TMH_by_id_map,
+                                         &add_instance,
+                                         ia);
+  response = TALER_MHD_make_json_pack ("{s:o}",
+                                       "instances", ia);
+  GNUNET_assert (NULL != response);
   {
-    json_t *ia;
+    MHD_RESULT ret;
 
-    ia = json_array ();
-    GNUNET_assert (NULL != ia);
-    GNUNET_CONTAINER_multihashmap_iterate (by_id_map,
-                                           &add_instance,
-                                           ia);
-    response = TALER_MHD_make_json_pack ("{s:s, s:s, s:o}",
-                                         "currency", TMH_currency,
-                                         "version", MERCHANT_PROTOCOL_VERSION,
-                                         "instances", ia);
-
+    ret = MHD_queue_response (connection,
+                              MHD_HTTP_OK,
+                              response);
+    MHD_destroy_response (response);
+    return ret;
   }
-  return MHD_queue_response (connection,
-                             MHD_HTTP_OK,
-                             response);
 }
 
 
-/* end of taler-merchant-httpd_config.c */
+/* end of taler-merchant-httpd_private-get-instances.c */

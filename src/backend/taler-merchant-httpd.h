@@ -23,7 +23,6 @@
 
 #include "platform.h"
 #include "taler_merchantdb_lib.h"
-#include <microhttpd.h>
 #include <taler/taler_mhd_lib.h>
 #include <gnunet/gnunet_mhd_compat.h>
 
@@ -359,6 +358,12 @@ extern int TMH_force_audit;
  */
 extern struct TALER_MERCHANTDB_Plugin *TMH_db;
 
+/**
+ * Hashmap pointing at merchant instances by 'id'. An 'id' is
+ * just a string that identifies a merchant instance. When a frontend
+ * needs to specify an instance to the backend, it does so by 'id'
+ */
+extern struct GNUNET_CONTAINER_MultiHashMap *TMH_by_id_map;
 
 /**
  * Kick MHD to run now, to be called after MHD_resume_connection().

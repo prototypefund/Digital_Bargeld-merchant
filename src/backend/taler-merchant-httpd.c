@@ -22,19 +22,13 @@
  * @author Florian Dold
  */
 #include "platform.h"
-#include <microhttpd.h>
-#include <gnunet/gnunet_util_lib.h>
-#include <taler/taler_util.h>
-#include <taler/taler_json_lib.h>
-#include <taler/taler_mhd_lib.h>
 #include <taler/taler_bank_service.h>
 #include <taler/taler_exchange_service.h>
-#include "taler_merchantdb_lib.h"
-#include "taler-merchant-httpd.h"
 #include "taler-merchant-httpd_auditors.h"
+#include "taler-merchant-httpd_config.h"
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_mhd.h"
-#include "taler-merchant-httpd_config.h"
+#include "taler-merchant-httpd_private-get-instances.h"
 
 /**
  * Backlog for listen operation on unix-domain sockets.
@@ -62,7 +56,7 @@ struct TALER_MERCHANTDB_Plugin *TMH_db;
  * just a string that identifies a merchant instance. When a frontend
  * needs to specify an instance to the backend, it does so by 'id'
  */
-static struct GNUNET_CONTAINER_MultiHashMap *by_id_map;
+struct GNUNET_CONTAINER_MultiHashMap *TMH_by_id_map;
 
 /**
  * The port we are running on
@@ -443,13 +437,13 @@ do_shutdown (void *cls)
     GNUNET_CONTAINER_multihashmap_destroy (payment_trigger_map);
     payment_trigger_map = NULL;
   }
-  if (NULL != by_id_map)
+  if (NULL != TMH_by_id_map)
   {
-    GNUNET_CONTAINER_multihashmap_iterate (by_id_map,
+    GNUNET_CONTAINER_multihashmap_iterate (TMH_by_id_map,
                                            &instance_free_cb,
                                            NULL);
-    GNUNET_CONTAINER_multihashmap_destroy (by_id_map);
-    by_id_map = NULL;
+    GNUNET_CONTAINER_multihashmap_destroy (TMH_by_id_map);
+    TMH_by_id_map = NULL;
   }
 }
 
@@ -622,7 +616,7 @@ lookup_instance (const char *instance_id)
               instance_id);
   /* We're fine if that returns NULL, the calling routine knows how
      to handle that */
-  return GNUNET_CONTAINER_multihashmap_get (by_id_map,
+  return GNUNET_CONTAINER_multihashmap_get (TMH_by_id_map,
                                             &h_instance);
 }
 
@@ -650,7 +644,7 @@ TMH_add_instance (struct TMH_MerchantInstance *mi)
               "Looking for by-id key %s of `%s' in hashmap\n",
               GNUNET_h2s (&h_instance),
               id);
-  ret = GNUNET_CONTAINER_multihashmap_put (by_id_map,
+  ret = GNUNET_CONTAINER_multihashmap_put (TMH_by_id_map,
                                            &h_instance,
                                            mi,
                                            GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY);
@@ -726,6 +720,12 @@ url_handler (void *cls,
       .method = MHD_HTTP_METHOD_GET,
       .skip_instance = true,
       .handler = &TMH_MHD_handler_agpl_redirect
+    },
+    {
+      .url_prefix = "/instances",
+      .method = MHD_HTTP_METHOD_GET,
+      .skip_instance = true,
+      .handler = &TMH_private_get_instances
     },
     {
       NULL
@@ -1109,8 +1109,8 @@ run (void *cls,
     return;
   }
   if (NULL ==
-      (by_id_map = GNUNET_CONTAINER_multihashmap_create (1,
-                                                         GNUNET_NO)))
+      (TMH_by_id_map = GNUNET_CONTAINER_multihashmap_create (1,
+                                                             GNUNET_NO)))
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
