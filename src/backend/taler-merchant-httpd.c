@@ -1017,7 +1017,7 @@ add_instance_cb (void *cls,
                  const struct TALER_MerchantPrivateKeyP *merchant_priv,
                  const struct TALER_MERCHANTDB_InstanceSettings *is,
                  unsigned int accounts_length,
-                 struct TALER_MERCHANTDB_AccountDetails accounts[])
+                 const struct TALER_MERCHANTDB_AccountDetails accounts[])
 {
   struct TMH_MerchantInstance *mi;
 

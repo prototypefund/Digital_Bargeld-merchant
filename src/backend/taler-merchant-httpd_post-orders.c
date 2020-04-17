@@ -713,11 +713,7 @@ MH_handler_order_post (struct TMH_RequestHandler *rh,
     if (GNUNET_SYSERR == res)
       return MHD_NO;
 
-    /* A error response was already generated */
-    if ( (GNUNET_NO == res) ||
-         /* or, need more data to accomplish parsing */
-         (NULL == root) )
-      return MHD_YES;
+
   }
   order = json_object_get (root,
                            "order");

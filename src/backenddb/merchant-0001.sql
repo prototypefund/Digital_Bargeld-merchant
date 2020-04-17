@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS merchant_instances
   ,default_max_wire_fee_frac INT4 NOT NULL
   ,default_wire_fee_amortization INT4 NOT NULL
   ,default_wire_transfer_delay INT8 NOT NULL
-  ,default_pay_deadline INT8 NOT NULL
+  ,default_pay_delay INT8 NOT NULL
   );
 COMMENT ON TABLE merchant_instances
   IS 'all the instances supported by this backend';
@@ -92,25 +92,25 @@ CREATE TABLE IF NOT EXISTS merchant_keys
 COMMENT ON TABLE merchant_keys
   IS 'private keys of instances that have not been deleted';
 
-CREATE TABLE IF NOT EXISTS merchant_instance_accounts
+CREATE TABLE IF NOT EXISTS merchant_accounts
   (account_serial BIGSERIAL PRIMARY KEY
   ,merchant_serial BIGINT NOT NULL UNIQUE
      REFERENCES merchant_instances (merchant_serial) ON DELETE CASCADE
   ,h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)
-  ,active boolean NOT NULL
-  ,salt BYTEA NOT NULL CHECK (LENGTH(salt)==64)
+  ,salt BYTEA NOT NULL CHECK (LENGTH(salt)=64)
   ,payto_uri VARCHAR NOT NULL
+  ,active boolean NOT NULL
   ,UNIQUE (merchant_serial,payto_uri)
   );
-COMMENT ON TABLE merchant_instance_accounts
+COMMENT ON TABLE merchant_accounts
   IS 'bank accounts of the instances';
-COMMENT ON COLUMN merchant_instance_accounts.h_wire
+COMMENT ON COLUMN merchant_accounts.h_wire
   IS 'salted hash of payto_uri';
-COMMENT ON COLUMN merchant_instance_accounts.salt
+COMMENT ON COLUMN merchant_accounts.salt
   IS 'salt used when hashing payto_uri into h_wire';
-COMMENT ON COLUMN merchant_instance_accounts.payto_uri
+COMMENT ON COLUMN merchant_accounts.payto_uri
   IS 'payto URI of a merchant bank account';
-COMMENT ON COLUMN merchant_instance_accounts.active
+COMMENT ON COLUMN merchant_accounts.active
   IS 'true if we actively use this bank account, false if it is just kept around for older contracts to refer to';
 
 
@@ -286,7 +286,7 @@ CREATE TABLE IF NOT EXISTS merchant_deposits
   ,exchange_sig BYTEA NOT NULL CHECK (LENGTH(exchange_sig)=64)
   ,exchange_timestamp INT8 NOT NULL
   ,account_serial BIGINT NOT NULL
-     REFERENCES merchant_instance_accounts (account_serial) ON DELETE CASCADE
+     REFERENCES merchant_accounts (account_serial) ON DELETE CASCADE
   ,UNIQUE (contract_serial, coin_pub)
   );
 COMMENT ON TABLE merchant_deposits
@@ -333,7 +333,7 @@ CREATE TABLE IF NOT EXISTS merchant_credits
   ,credit_amount_val INT8 NOT NULL
   ,credit_amount_frac INT4 NOT NULL
   ,account_serial BIGINT NOT NULL
-     REFERENCES merchant_instance_accounts (account_serial) ON DELETE CASCADE
+     REFERENCES merchant_accounts (account_serial) ON DELETE CASCADE
   ,verified BOOLEAN NOT NULL DEFAULT FALSE
   ,UNIQUE (wtid, exchange_url)
   );
@@ -346,7 +346,7 @@ CREATE TABLE IF NOT EXISTS merchant_transfer_signatures
   (credit_serial BIGINT PRIMARY KEY
      REFERENCES merchant_credits (credit_serial) ON DELETE CASCADE
   ,account_serial BIGINT NOT NULL
-     REFERENCES merchant_instance_accounts (account_serial) ON DELETE CASCADE
+     REFERENCES merchant_accounts (account_serial) ON DELETE CASCADE
   ,signkey_serial BIGINT NOT NULL
      REFERENCES merchant_exchange_signing_keys (signkey_serial) ON DELETE CASCADE
   ,execution_time INT8 NOT NULL

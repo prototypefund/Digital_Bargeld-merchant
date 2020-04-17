@@ -86,12 +86,6 @@ struct TALER_MERCHANTDB_InstanceSettings
   json_t *jurisdiction;
 
   /**
-   * Default maximum wire fee to assume, unless stated differently in the
-   * proposal already.
-   */
-  struct TALER_Amount default_max_wire_fee;
-
-  /**
    * Default max deposit fee that the merchant is willing to
    * pay; if deposit costs more, then the customer will cover
    * the difference.
@@ -99,9 +93,15 @@ struct TALER_MERCHANTDB_InstanceSettings
   struct TALER_Amount default_max_deposit_fee;
 
   /**
+   * Default maximum wire fee to assume, unless stated differently in the
+   * proposal already.
+   */
+  struct TALER_Amount default_max_wire_fee;
+
+  /**
    * Default factor for wire fee amortization.
    */
-  unsigned long long default_wire_fee_amortization;
+  uint32_t default_wire_fee_amortization;
 
   /**
    * If the frontend does NOT specify an execution date, how long should
@@ -115,7 +115,7 @@ struct TALER_MERCHANTDB_InstanceSettings
    * If the frontend does NOT specify a payment deadline, how long should
    * offers we make be valid by default?
    */
-  struct GNUNET_TIME_Relative default_pay_deadline;
+  struct GNUNET_TIME_Relative default_pay_delay;
 
 };
 
@@ -137,7 +137,7 @@ typedef void
   const struct TALER_MerchantPrivateKeyP *merchant_priv,
   const struct TALER_MERCHANTDB_InstanceSettings *is,
   unsigned int accounts_length,
-  struct TALER_MERCHANTDB_AccountDetails accounts[]);
+  const struct TALER_MERCHANTDB_AccountDetails accounts[]);
 
 
 /**
@@ -294,6 +294,49 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*drop_tables) (void *cls);
+
+  /**
+   * Do a pre-flight check that we are not in an uncommitted transaction.
+   * If we are, try to commit the previous transaction and output a warning.
+   * Does not return anything, as we will continue regardless of the outcome.
+   *
+   * @param cls the `struct PostgresClosure` with the plugin-specific state
+   */
+  void
+  (*preflight) (void *cls);
+
+
+  /**
+   * Start a transaction.
+   *
+   * @param cls the `struct PostgresClosure` with the plugin-specific state
+   * @param name unique name identifying the transaction (for debugging),
+   *             must point to a constant
+   * @return #GNUNET_OK on success
+   */
+  int
+  (*start) (void *cls,
+            const char *name);
+
+
+  /**
+   * Roll back the current transaction of a database connection.
+   *
+   * @param cls the `struct PostgresClosure` with the plugin-specific state
+   * @return #GNUNET_OK on success
+   */
+  void
+  (*rollback) (void *cls);
+
+
+  /**
+   * Commit the current transaction of a database connection.
+   *
+   * @param cls the `struct PostgresClosure` with the plugin-specific state
+   * @return transaction status code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*commit)(void *cls);
 
 
   /**
@@ -977,49 +1020,6 @@ struct TALER_MERCHANTDB_Plugin
                    const struct GNUNET_HashCode *pickup_id,
                    struct TALER_ReservePrivateKeyP *reserve_priv);
 
-
-  /**
-   * Roll back the current transaction of a database connection.
-   *
-   * @param cls the `struct PostgresClosure` with the plugin-specific state
-   * @return #GNUNET_OK on success
-   */
-  void
-  (*rollback) (void *cls);
-
-
-  /**
-   * Start a transaction.
-   *
-   * @param cls the `struct PostgresClosure` with the plugin-specific state
-   * @param name unique name identifying the transaction (for debugging),
-   *             must point to a constant
-   * @return #GNUNET_OK on success
-   */
-  int
-  (*start) (void *cls,
-            const char *name);
-
-
-  /**
-   * Do a pre-flight check that we are not in an uncommitted transaction.
-   * If we are, try to commit the previous transaction and output a warning.
-   * Does not return anything, as we will continue regardless of the outcome.
-   *
-   * @param cls the `struct PostgresClosure` with the plugin-specific state
-   */
-  void
-  (*preflight) (void *cls);
-
-
-  /**
-   * Commit the current transaction of a database connection.
-   *
-   * @param cls the `struct PostgresClosure` with the plugin-specific state
-   * @return transaction status code
-   */
-  enum GNUNET_DB_QueryStatus
-  (*commit)(void *cls);
 
 };
 

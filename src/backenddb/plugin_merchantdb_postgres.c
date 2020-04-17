@@ -102,6 +102,9 @@ struct PostgresClosure
 };
 
 
+/* ********************* NEW API ************************** */
+
+
 /**
  * Drop merchant tables
  *
@@ -122,18 +125,6 @@ postgres_drop_tables (void *cls)
                      load_path);
   GNUNET_free (load_path);
   return GNUNET_OK;
-}
-
-
-/**
- * Check that the database connection is still up.
- *
- * @param pg connection to check
- */
-static void
-check_connection (struct PostgresClosure *pg)
-{
-  GNUNET_PQ_reconnect_if_down (pg->conn);
 }
 
 
@@ -170,6 +161,18 @@ postgres_preflight (void *cls)
                 pg->transaction_name);
   }
   pg->transaction_name = NULL;
+}
+
+
+/**
+ * Check that the database connection is still up.
+ *
+ * @param pg connection to check
+ */
+static void
+check_connection (struct PostgresClosure *pg)
+{
+  GNUNET_PQ_reconnect_if_down (pg->conn);
 }
 
 
@@ -254,6 +257,274 @@ postgres_commit (void *cls)
                                              params);
 }
 
+
+/**
+ * Context for lookup_instances().
+ */
+struct LookupInstancesContext
+{
+  /**
+   * Function to call with the results.
+   */
+  TALER_MERCHANTDB_InstanceCallback cb;
+
+  /**
+   * Closure for @e cb.
+   */
+  void *cb_cls;
+
+  /**
+   * Database context.
+   */
+  struct PostgresClosure *pg;
+
+  /**
+   * Instance settings, valid only during find_instances_cb().
+   */
+  struct TALER_MERCHANTDB_InstanceSettings is;
+
+  /**
+   * Instance serial number, valid only during find_instances_cb().
+   */
+  uint64_t instance_serial;
+
+  /**
+   * Public key of the current instance, valid only during find_instances_cb().
+   */
+  struct TALER_MerchantPublicKeyP merchant_pub;
+
+  /**
+   * Set to the return value on errors.
+   */
+  enum GNUNET_DB_QueryStatus qs;
+
+  /**
+   * true if we only are interested in instances for which we have the private key.
+   */
+  bool active_only;
+};
+
+
+/**
+ * We are processing an instances lookup and have the @a accounts.
+ * Find the private key if possible, and invoke the callback.
+ *
+ * @param lic context we are handling
+ * @param num_accounts length of @a accounts array
+ * @param accounts information about accounts of the instance in @a lic
+ */
+static void
+call_with_accounts (struct LookupInstancesContext *lic,
+                    unsigned int num_accounts,
+                    const struct TALER_MERCHANTDB_AccountDetails accounts[])
+{
+  struct PostgresClosure *pg = lic->pg;
+  enum GNUNET_DB_QueryStatus qs;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_uint64 (&lic->instance_serial),
+    GNUNET_PQ_query_param_end
+  };
+  struct TALER_MerchantPrivateKeyP merchant_priv;
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    GNUNET_PQ_result_spec_auto_from_type ("merchant_priv",
+                                          &merchant_priv),
+    GNUNET_PQ_result_spec_end
+  };
+
+  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                 "lookup_instance_private_key",
+                                                 params,
+                                                 rs);
+  if (qs < 0)
+  {
+    GNUNET_break (0);
+    lic->qs = GNUNET_DB_STATUS_HARD_ERROR;
+    return;
+  }
+  if ( (0 == qs) &&
+       (lic->active_only) )
+    return; /* skip, not interesting */
+  lic->cb (lic->cb_cls,
+           &lic->merchant_pub,
+           (0 == qs) ? NULL : &merchant_priv,
+           &lic->is,
+           num_accounts,
+           accounts);
+}
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results about accounts.
+ *
+ * @param cls of type `struct FindInstancesContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+lookup_accounts_cb (void *cls,
+                    PGresult *result,
+                    unsigned int num_results)
+{
+  struct LookupInstancesContext *lic = cls;
+  char *paytos[num_results];
+  struct TALER_MERCHANTDB_AccountDetails accounts[num_results];
+
+  for (unsigned int i = 0; i < num_results; i++)
+  {
+    uint8_t active;
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_auto_from_type ("h_wire",
+                                            &accounts[i].h_wire),
+      GNUNET_PQ_result_spec_auto_from_type ("salt",
+                                            &accounts[i].salt),
+      GNUNET_PQ_result_spec_string ("payto_uri",
+                                    &paytos[i]),
+      GNUNET_PQ_result_spec_auto_from_type ("active",
+                                            &active),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      lic->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      for (unsigned int j = 0; j < i; j++)
+        GNUNET_free (paytos[j]);
+      return;
+    }
+    accounts[i].active = (0 != active);
+    accounts[i].payto_uri = paytos[i];
+  }
+  call_with_accounts (lic,
+                      num_results,
+                      accounts);
+  for (unsigned int i = 0; i < num_results; i++)
+    GNUNET_free (paytos[i]);
+}
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results about instances.
+ *
+ * @param cls of type `struct FindInstancesContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+lookup_instances_cb (void *cls,
+                     PGresult *result,
+                     unsigned int num_results)
+{
+  struct LookupInstancesContext *lic = cls;
+  struct PostgresClosure *pg = lic->pg;
+
+  for (unsigned int i = 0; i < num_results; i++)
+  {
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_uint64 ("merchant_serial",
+                                    &lic->instance_serial),
+      GNUNET_PQ_result_spec_auto_from_type ("merchant_pub",
+                                            &lic->merchant_pub),
+      GNUNET_PQ_result_spec_string ("merchant_id",
+                                    &lic->is.id),
+      GNUNET_PQ_result_spec_string ("merchant_name",
+                                    &lic->is.name),
+      GNUNET_PQ_result_spec_string ("id",
+                                    &lic->is.id),
+      TALER_PQ_result_spec_json ("location",
+                                 &lic->is.location),
+      TALER_PQ_result_spec_json ("jurisdiction",
+                                 &lic->is.jurisdiction),
+      TALER_PQ_RESULT_SPEC_AMOUNT ("default_max_deposit_fee",
+                                   &lic->is.default_max_deposit_fee),
+      TALER_PQ_RESULT_SPEC_AMOUNT ("default_max_wire_fee",
+                                   &lic->is.default_max_wire_fee),
+      GNUNET_PQ_result_spec_uint32 ("default_wire_fee_amortization",
+                                    &lic->is.default_wire_fee_amortization),
+      GNUNET_PQ_result_spec_relative_time ("default_wire_transfer_delay",
+                                           &lic->is.default_wire_transfer_delay),
+      GNUNET_PQ_result_spec_relative_time ("default_pay_delay",
+                                           &lic->is.default_pay_delay),
+      GNUNET_PQ_result_spec_end
+    };
+    struct GNUNET_PQ_QueryParam params[] = {
+      GNUNET_PQ_query_param_uint64 (&lic->instance_serial),
+      GNUNET_PQ_query_param_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      lic->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
+    }
+    lic->qs = GNUNET_PQ_eval_prepared_multi_select (lic->pg->conn,
+                                                    "lookup_accounts",
+                                                    params,
+                                                    &lookup_accounts_cb,
+                                                    lic);
+    if (0 == lic->qs)
+    {
+      /* find_accounts_cb() did not run, still notify about the
+         account-less instance! */
+      call_with_accounts (lic,
+                          0,
+                          NULL);
+    }
+    GNUNET_PQ_cleanup_result (rs);
+    if (0 > lic->qs)
+      break;
+  }
+}
+
+
+/**
+ * Lookup all of the instances this backend has configured.
+ *
+ * @param cls closure
+ * @param active_only only find 'active' instances
+ * @param cb function to call on all instances found
+ * @param cb_cls closure for @a cb
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_lookup_instances (void *cls,
+                           bool active_only,
+                           TALER_MERCHANTDB_InstanceCallback cb,
+                           void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  struct LookupInstancesContext lic = {
+    .cb = cb,
+    .cb_cls = cb_cls,
+    .active_only = active_only,
+    .pg = pg
+  };
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_end
+  };
+  enum GNUNET_DB_QueryStatus qs;
+
+  check_connection (pg);
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+                                             "lookup_instances",
+                                             params,
+                                             &lookup_instances_cb,
+                                             &lic);
+  if (0 > lic.qs)
+    return lic.qs;
+  return qs;
+}
+
+
+/* ********************* OLD API ************************** */
 
 /**
  * Retrieve proposal data given its proposal data's hashcode
@@ -3125,6 +3396,46 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   struct PostgresClosure *pg;
   struct TALER_MERCHANTDB_Plugin *plugin;
   struct GNUNET_PQ_PreparedStatement ps[] = {
+    GNUNET_PQ_make_prepare ("end_transaction",
+                            "COMMIT",
+                            0),
+    /* for call_with_accounts(), part of postgres_lookup_instances() */
+    GNUNET_PQ_make_prepare ("lookup_instance_private_key",
+                            "SELECT"
+                            " merchant_priv"
+                            " FROM merchant_keys"
+                            " WHERE merchant_serial=$1",
+                            1),
+    /* for find_instances_cb(), part of postgres_lookup_instances() */
+    GNUNET_PQ_make_prepare ("lookup_accounts",
+                            "SELECT"
+                            " h_wire"
+                            ",salt"
+                            ",payto_uri"
+                            ",active"
+                            " FROM merchant_accounts"
+                            " WHERE merchant_serial=$1",
+                            1),
+    /* for postgres_lookup_instances() */
+    GNUNET_PQ_make_prepare ("lookup_instances",
+                            "SELECT"
+                            " merchant_serial"
+                            ",merchant_pub"
+                            ",merchant_id"
+                            ",merchant_name"
+                            ",location"
+                            ",jurisdiction"
+                            ",default_max_deposit_fee_val"
+                            ",default_max_deposit_fee_frac"
+                            ",default_max_wire_fee_val"
+                            ",default_max_wire_fee_frac"
+                            ",default_wire_fee_amortization"
+                            ",default_wire_transfer_delay"
+                            ",default_pay_delay"
+                            " FROM merchant_instances",
+                            0),
+    /* OLD API: */
+#if 0
     GNUNET_PQ_make_prepare ("insert_deposit",
                             "INSERT INTO merchant_deposits"
                             "(h_contract_terms"
@@ -3249,9 +3560,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "   AND merchant_pub=$2"
                             "   AND paid=TRUE",
                             2),
-    GNUNET_PQ_make_prepare ("end_transaction",
-                            "COMMIT",
-                            0),
 
     GNUNET_PQ_make_prepare ("find_refunds",
                             "SELECT"
@@ -3577,6 +3885,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "FROM merchant_tip_reserve_credits "
                             "WHERE credit_uuid=$1 AND reserve_priv=$2",
                             2),
+#endif
     GNUNET_PQ_PREPARED_STATEMENT_END
   };
 
@@ -3617,6 +3926,13 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin = GNUNET_new (struct TALER_MERCHANTDB_Plugin);
   plugin->cls = pg;
   plugin->drop_tables = &postgres_drop_tables;
+  plugin->preflight = &postgres_preflight;
+  plugin->start = &postgres_start;
+  plugin->rollback = &postgres_rollback;
+  plugin->commit = &postgres_commit;
+  plugin->lookup_instances = &postgres_lookup_instances;
+
+  /* old API: */
   plugin->store_deposit = &postgres_store_deposit;
   plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
@@ -3654,10 +3970,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->authorize_tip_TR = &postgres_authorize_tip_TR;
   plugin->lookup_tip_by_id = &postgres_lookup_tip_by_id;
   plugin->pickup_tip_TR = &postgres_pickup_tip_TR;
-  plugin->start = postgres_start;
-  plugin->commit = postgres_commit;
-  plugin->preflight = postgres_preflight;
-  plugin->rollback = postgres_rollback;
 
   return plugin;
 }
