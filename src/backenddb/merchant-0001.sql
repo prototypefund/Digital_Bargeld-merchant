@@ -61,12 +61,22 @@ COMMENT ON COLUMN merchant_exchange_signing_keys.master_pub
 CREATE TABLE IF NOT EXISTS merchant_instances
   (merchant_serial BIGSERIAL PRIMARY KEY
   ,merchant_pub BYTEA NOT NULL UNIQUE CHECK (LENGTH(merchant_pub)=32)
+  ,merchant_id VARCHAR NOT NULL
   ,merchant_name VARCHAR NOT NULL
   ,location BYTEA NOT NULL
   ,jurisdiction BYTEA NOT NULL
+  ,default_max_deposit_fee_val INT8 NOT NULL
+  ,default_max_deposit_fee_frac INT4 NOT NULL
+  ,default_max_wire_fee_val INT8 NOT NULL
+  ,default_max_wire_fee_frac INT4 NOT NULL
+  ,default_wire_fee_amortization INT4 NOT NULL
+  ,default_wire_transfer_delay INT8 NOT NULL
+  ,default_pay_deadline INT8 NOT NULL
   );
 COMMENT ON TABLE merchant_instances
   IS 'all the instances supported by this backend';
+COMMENT ON COLUMN merchant_instances.merchant_id
+  IS 'identifier of the merchant as used in the base URL (required)';
 COMMENT ON COLUMN merchant_instances.merchant_name
   IS 'legal name of the merchant as a simple string (required)';
 COMMENT ON COLUMN merchant_instances.location
@@ -88,7 +98,7 @@ CREATE TABLE IF NOT EXISTS merchant_instance_accounts
      REFERENCES merchant_instances (merchant_serial) ON DELETE CASCADE
   ,h_wire BYTEA NOT NULL CHECK (LENGTH(h_wire)=64)
   ,active boolean NOT NULL
-  ,salt VARCHAR NOT NULL
+  ,salt BYTEA NOT NULL CHECK (LENGTH(salt)==64)
   ,payto_uri VARCHAR NOT NULL
   ,UNIQUE (merchant_serial,payto_uri)
   );

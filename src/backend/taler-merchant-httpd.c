@@ -113,22 +113,18 @@ static const struct GNUNET_CONFIGURATION_Handle *cfg;
 
 
 /**
- * Callback that frees all the instances in the hashmap
+ * Decrement reference counter of @a mi, and free if it hits zero.
  *
- * @param cls closure, NULL
- * @param key current key
- * @param value a `struct TMH_MerchantInstance`
+ * @param[in,out] mi merchant instance to update and possibly free
  */
-static int
-instance_free (void *cls,
-               const struct GNUNET_HashCode *key,
-               void *value)
+void
+TMH_instance_decref (struct TMH_MerchantInstance *mi)
 {
-  struct TMH_MerchantInstance *mi = value;
   struct TMH_WireMethod *wm;
 
-  (void) cls;
-  (void) key;
+  mi->rc--;
+  if (0 != mi->rc)
+    return;
   while (NULL != (wm = (mi->wm_head)))
   {
     GNUNET_CONTAINER_DLL_remove (mi->wm_head,
@@ -139,11 +135,31 @@ instance_free (void *cls,
     GNUNET_free (wm);
   }
 
-  GNUNET_free (mi->id);
-  GNUNET_free (mi->keyfile);
-  GNUNET_free (mi->name);
-  GNUNET_free_non_null (mi->tip_exchange);
+  GNUNET_free (mi->settings.id);
+  GNUNET_free (mi->settings.name);
+  json_decref (mi->settings.location);
+  json_decref (mi->settings.jurisdiction);
   GNUNET_free (mi);
+}
+
+
+/**
+ * Callback that frees all the instances in the hashmap
+ *
+ * @param cls closure, NULL
+ * @param key current key
+ * @param value a `struct TMH_MerchantInstance`
+ */
+static int
+instance_free_cb (void *cls,
+                  const struct GNUNET_HashCode *key,
+                  void *value)
+{
+  struct TMH_MerchantInstance *mi = value;
+
+  (void) cls;
+  (void) key;
+  TMH_instance_decref (mi);
   return GNUNET_YES;
 }
 
@@ -430,7 +446,7 @@ do_shutdown (void *cls)
   if (NULL != by_id_map)
   {
     GNUNET_CONTAINER_multihashmap_iterate (by_id_map,
-                                           &instance_free,
+                                           &instance_free_cb,
                                            NULL);
     GNUNET_CONTAINER_multihashmap_destroy (by_id_map);
     by_id_map = NULL;
@@ -608,6 +624,39 @@ lookup_instance (const char *instance_id)
      to handle that */
   return GNUNET_CONTAINER_multihashmap_get (by_id_map,
                                             &h_instance);
+}
+
+
+/**
+ * Add instance definition to our active set of instances.
+ *
+ * @param[in,out] mi merchant instance details to define
+ * @return #GNUNET_OK on success, #GNUNET_NO if the same ID is in use already
+ */
+int
+TMH_add_instance (struct TMH_MerchantInstance *mi)
+{
+  struct GNUNET_HashCode h_instance;
+  const char *id;
+  int ret;
+
+  id = mi->id;
+  if (NULL == id)
+    id = "default";
+  GNUNET_CRYPTO_hash (id,
+                      strlen (id),
+                      &h_instance);
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Looking for by-id key %s of `%s' in hashmap\n",
+              GNUNET_h2s (&h_instance),
+              id);
+  ret = GNUNET_CONTAINER_multihashmap_put (by_id_map,
+                                           &h_instance,
+                                           mi,
+                                           GNUNET_CONTAINER_MULTIHASHMAPOPTION_UNIQUE_ONLY);
+  if (GNUNET_OK == ret)
+    mi->rc++;
+  return ret;
 }
 
 
@@ -939,7 +988,8 @@ url_handler (void *cls,
   if (hc->is_post)
   {
     /* FIXME: Maybe check for maximum upload size here
-       and refuse if it is too big? */
+       and refuse if it is too big? (Note: maximum upload
+       size may need to vary based on the handler.) */
 
     GNUNET_break (NULL == hc->json); /* can't have it already */
     return MHD_YES; /* proceed with upload */
@@ -947,6 +997,58 @@ url_handler (void *cls,
   return hc->rh->handler (hc->rh,
                           connection,
                           hc);
+}
+
+
+/**
+ * Function called during startup to add all known instances to our
+ * hash map in memory for faster lookups when we receive requests.
+ *
+ * @param cls closure, NULL, unused
+ * @param merchant_pub public key of the instance
+ * @param merchant_priv private key of the instance, NULL if not available
+ * @param is detailed configuration settings for the instance
+ * @param accounts_length length of the @a accounts array
+ * @param accounts list of accounts of the merchant
+ */
+static void
+add_instance_cb (void *cls,
+                 const struct TALER_MerchantPublicKeyP *merchant_pub,
+                 const struct TALER_MerchantPrivateKeyP *merchant_priv,
+                 const struct TALER_MERCHANTDB_InstanceSettings *is,
+                 unsigned int accounts_length,
+                 struct TALER_MERCHANTDB_AccountDetails accounts[])
+{
+  struct TMH_MerchantInstance *mi;
+
+  (void) cls;
+  GNUNET_assert (NULL != merchant_priv);
+  mi = GNUNET_new (struct TMH_MerchantInstance);
+  mi->settings = *is;
+  mi->settings.id = GNUNET_strdup (mi->settings.id);
+  mi->settings.name = GNUNET_strdup (mi->settings.name);
+  mi->settings.location = json_incref (mi->settings.location);
+  mi->settings.jurisdiction = json_incref (mi->settings.jurisdiction);
+  mi->privkey = *merchant_priv;
+  mi->pubkey = *merchant_pub;
+  for (unsigned int i = 0; i<accounts_length; i++)
+  {
+    const struct TALER_MERCHANTDB_AccountDetails *acc = &accounts[i];
+    struct TMH_WireMethod *wm;
+
+    wm = GNUNET_new (struct TMH_WireMethod);
+    wm->h_wire = acc->h_wire;
+    wm->j_wire = json_pack ("{s:s, s:s}",
+                            "payto_uri", acc->payto_uri,
+                            "salt", GNUNET_JSON_from_data_auto (&acc->salt));
+    wm->wire_method = TALER_payto_get_method (acc->payto_uri);
+    wm->active = acc->active;
+    GNUNET_CONTAINER_DLL_insert (mi->wm_head,
+                                 mi->wm_tail,
+                                 wm);
+  }
+  GNUNET_assert (GNUNET_OK ==
+                 TMH_add_instance (mi));
 }
 
 
@@ -1018,6 +1120,21 @@ run (void *cls,
   {
     GNUNET_SCHEDULER_shutdown ();
     return;
+  }
+  /* load instances */
+  {
+    enum GNUNET_DB_QueryStatus qs;
+
+    qs = TMH_db->lookup_instances (TMH_db->cls,
+                                   true,
+                                   &add_instance_cb,
+                                   NULL);
+    if (0 > qs)
+    {
+      GNUNET_break (0);
+      GNUNET_SCHEDULER_shutdown ();
+      return;
+    }
   }
 
   fh = TALER_MHD_bind (cfg,

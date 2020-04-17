@@ -226,16 +226,6 @@ struct TALER_MERCHANT_ConfigInformation
    */
   const char *version;
 
-  /**
-   * Array with information about the merchant's instances.
-   */
-  struct TALER_MERCHANT_InstanceInformation *iis;
-
-  /**
-   * Length of the @e iis array.
-   */
-  unsigned int iis_len;
-
 };
 
 

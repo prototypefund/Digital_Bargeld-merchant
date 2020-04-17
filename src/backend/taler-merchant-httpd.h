@@ -95,11 +95,6 @@ struct TMH_MerchantInstance
   char *name;
 
   /**
-   * File holding the merchant's private key
-   */
-  char *keyfile;
-
-  /**
    * Next entry in DLL.
    */
   struct TMH_WireMethod *wm_head;
@@ -110,7 +105,7 @@ struct TMH_MerchantInstance
   struct TMH_WireMethod *wm_tail;
 
   /**
-   * Merchant's private key
+   * Merchant's private key.
    */
   struct TALER_MerchantPrivateKeyP privkey;
 
@@ -120,54 +115,15 @@ struct TMH_MerchantInstance
   struct TALER_MerchantPublicKeyP pubkey;
 
   /**
-   * Default maximum wire fee to assume, unless stated differently in the proposal
-   * already.
+   * General settings for an instance.
    */
-  struct TALER_Amount default_max_wire_fee;
+  struct TALER_MERCHANTDB_InstanceSettings settings;
 
   /**
-   * Default max deposit fee that the merchant is willing to
-   * pay; if deposit costs more, then the customer will cover
-   * the difference.
+   * Reference counter on this structure. Only destroyed if the
+   * counter hits zero.
    */
-  struct TALER_Amount default_max_deposit_fee;
-
-  /**
-   * Default factor for wire fee amortization.
-   */
-  unsigned long long default_wire_fee_amortization;
-
-  /**
-   * If the frontend does NOT specify an execution date, how long should
-   * we tell the exchange to wait to aggregate transactions before
-   * executing the wire transfer?  This delay is added to the current
-   * time when we generate the advisory execution time for the exchange.
-   */
-  struct GNUNET_TIME_Relative default_wire_transfer_delay;
-
-  /**
-   * If the frontend does NOT specify a payment deadline, how long should
-   * offers we make be valid by default?
-   */
-  struct GNUNET_TIME_Relative default_pay_deadline;
-
-  /**
-   * Exchange this instance uses for tipping, NULL if tipping
-   * is not supported.
-   */
-  char *tip_exchange;
-
-  /**
-   * Locations from the configuration.  Mapping from
-   * label to location data.
-   */
-  json_t *default_locations;
-
-  /**
-   * What is the private key of the reserve used for signing tips by this exchange?
-   * Only valid if @e tip_exchange is non-null.
-   */
-  struct TALER_ReservePrivateKeyP tip_reserve;
+  unsigned int rc;
 };
 
 
@@ -442,6 +398,25 @@ void
 TMH_long_poll_resume (const char *order_id,
                       const struct TMH_MerchantInstance *mi,
                       const struct TALER_Amount *refund_amount);
+
+
+/**
+ * Decrement reference counter of @a mi, and free if it hits zero.
+ *
+ * @param[in,out] mi merchant instance to update and possibly free
+ */
+void
+TMH_instance_decref (struct TMH_MerchantInstance *mi);
+
+
+/**
+ * Add instance definition to our active set of instances.
+ *
+ * @param[in,out] mi merchant instance details to define
+ * @return #GNUNET_OK on success, #GNUNET_NO if the same ID is in use already
+ */
+int
+TMH_add_instance (struct TMH_MerchantInstance *mi);
 
 
 #endif

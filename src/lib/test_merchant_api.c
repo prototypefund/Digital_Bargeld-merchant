@@ -899,6 +899,7 @@ run (void *cls,
     TALER_TESTING_cmd_config ("config",
                               merchant_url,
                               MHD_HTTP_OK),
+#if 0
     TALER_TESTING_cmd_batch ("pay",
                              pay),
     TALER_TESTING_cmd_batch ("double-spending",
@@ -930,6 +931,7 @@ run (void *cls,
                                              GNUNET_TIME_UNIT_ZERO_ABS,
                                              5, /* Expected number of records */
                                              -100), /* Delta */
+#endif
     /**
      * End the suite.  Fixme: better to have a label for this
      * too, as it shows a "(null)" token on logs.

@@ -75,70 +75,8 @@ struct TALER_MERCHANT_ConfigGetHandle
 
 
 /**
- * Parse instance information from @a ia.
- *
- * @param ia JSON array (or NULL!) with instance data
- * @param[in,out] ci config information to update
- * @return #GNUNET_OK on success
- */
-static int
-parse_instances (const json_t *ia,
-                 struct TALER_MERCHANT_ConfigInformation *ci)
-{
-  size_t index;
-  json_t *value;
-  int ret;
-
-  if (NULL == ia)
-    return GNUNET_OK; /* permit not disclosing instances for now */
-  if (! json_is_array (ia))
-  {
-    GNUNET_break_op (0);
-    return GNUNET_SYSERR;
-  }
-  GNUNET_array_grow (ci->iis,
-                     ci->iis_len,
-                     json_array_size (ia));
-  ret = GNUNET_OK;
-  json_array_foreach (ia, index, value) {
-    struct TALER_MERCHANT_InstanceInformation *ii = &ci->iis[index];
-    struct GNUNET_JSON_Specification spec[] = {
-      GNUNET_JSON_spec_fixed_auto ("merchant_pub",
-                                   &ii->merchant_pub),
-      GNUNET_JSON_spec_string ("instance_baseurl",
-                               &ii->instance_baseurl),
-      GNUNET_JSON_spec_string ("name",
-                               &ii->name),
-      GNUNET_JSON_spec_end ()
-    };
-    json_t *teb;
-
-    if (GNUNET_OK !=
-        GNUNET_JSON_parse (value,
-                           spec,
-                           NULL, NULL))
-    {
-      GNUNET_break_op (0);
-      ret = GNUNET_SYSERR;
-      continue;
-    }
-    teb = json_object_get (value,
-                           "tipping_exchange_baseurl");
-    if (! json_is_string (teb))
-    {
-      GNUNET_break_op (0);
-      ret = GNUNET_SYSERR;
-      continue;
-    }
-    ii->tipping_exchange_baseurl = json_string_value (teb);
-  }
-  return ret;
-}
-
-
-/**
  * Function called when we're done processing the
- * HTTP /track/transaction request.
+ * HTTP /config request.
  *
  * @param cls the `struct TALER_MERCHANT_ConfigGetHandle`
  * @param response_code HTTP response code, 0 on error
@@ -165,10 +103,7 @@ handle_config_finished (void *cls,
   {
   case MHD_HTTP_OK:
     {
-      struct TALER_MERCHANT_ConfigInformation vi = {
-        .iis = NULL,
-        .iis_len = 0
-      };
+      struct TALER_MERCHANT_ConfigInformation vi;
       enum TALER_MERCHANT_VersionCompatibility vc =
         TALER_MERCHANT_VC_PROTOCOL_ERROR;
       struct GNUNET_JSON_Specification spec[] = {
@@ -219,25 +154,10 @@ handle_config_finished (void *cls,
           }
         }
       }
-      if (0 == (vc & (TALER_MERCHANT_VC_INCOMPATIBLE
-                      | TALER_MERCHANT_VC_PROTOCOL_ERROR)))
-      {
-        if (GNUNET_OK !=
-            parse_instances (json_object_get (json,
-                                              "instances"),
-                             &vi))
-        {
-          /* Let's keep the 200 OK, as we got at least the version data */
-          hr.ec = TALER_EC_INVALID_RESPONSE;
-        }
-      }
       vgh->cb (vgh->cb_cls,
                &hr,
                &vi,
                vc);
-      GNUNET_array_grow (vi.iis,
-                         vi.iis_len,
-                         0);
       TALER_MERCHANT_config_get_cancel (vgh);
       return;
     }

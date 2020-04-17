@@ -33,6 +33,114 @@ struct TALER_MERCHANTDB_Plugin;
 
 
 /**
+ * Details about a wire account of the merchant.
+ */
+struct TALER_MERCHANTDB_AccountDetails
+{
+  /**
+   * Hash of the wire details (@e payto_uri and @e salt).
+   */
+  struct GNUNET_HashCode h_wire;
+
+  /**
+   * Salt value used for hashing @e payto_uri.
+   */
+  struct GNUNET_HashCode salt;
+
+  /**
+   * Actual account address as a payto://-URI.
+   */
+  const char *payto_uri;
+
+  /**
+   * Is the account set for active use in new contracts?
+   */
+  bool active;
+
+};
+
+
+/**
+ * General settings for an instance.
+ */
+struct TALER_MERCHANTDB_InstanceSettings
+{
+  /**
+   * prefix for the instance under "/instances/"
+   */
+  char *id;
+
+  /**
+   * legal name of the instance
+   */
+  char *name;
+
+  /**
+   * location of the business
+   */
+  json_t *location;
+
+  /**
+   * jurisdiction of the business
+   */
+  json_t *jurisdiction;
+
+  /**
+   * Default maximum wire fee to assume, unless stated differently in the
+   * proposal already.
+   */
+  struct TALER_Amount default_max_wire_fee;
+
+  /**
+   * Default max deposit fee that the merchant is willing to
+   * pay; if deposit costs more, then the customer will cover
+   * the difference.
+   */
+  struct TALER_Amount default_max_deposit_fee;
+
+  /**
+   * Default factor for wire fee amortization.
+   */
+  unsigned long long default_wire_fee_amortization;
+
+  /**
+   * If the frontend does NOT specify an execution date, how long should
+   * we tell the exchange to wait to aggregate transactions before
+   * executing the wire transfer?  This delay is added to the current
+   * time when we generate the advisory execution time for the exchange.
+   */
+  struct GNUNET_TIME_Relative default_wire_transfer_delay;
+
+  /**
+   * If the frontend does NOT specify a payment deadline, how long should
+   * offers we make be valid by default?
+   */
+  struct GNUNET_TIME_Relative default_pay_deadline;
+
+};
+
+
+/**
+ * Typically called by `lookup_instances`.
+ *
+ * @param cls closure
+ * @param merchant_pub public key of the instance
+ * @param merchant_priv private key of the instance, NULL if not available
+ * @param is general instance settings
+ * @param accounts_length length of the @a accounts array
+ * @param accounts list of accounts of the merchant
+ */
+typedef void
+(*TALER_MERCHANTDB_InstanceCallback)(
+  void *cls,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  const struct TALER_MerchantPrivateKeyP *merchant_priv,
+  const struct TALER_MERCHANTDB_InstanceSettings *is,
+  unsigned int accounts_length,
+  struct TALER_MERCHANTDB_AccountDetails accounts[]);
+
+
+/**
  * Typically called by `find_contract_terms_by_date`.
  *
  * @param cls closure
@@ -186,6 +294,22 @@ struct TALER_MERCHANTDB_Plugin
    */
   int
   (*drop_tables) (void *cls);
+
+
+  /**
+   * Lookup all of the instances this backend has configured.
+   *
+   * @param cls closure
+   * @param active_only only find 'active' instances
+   * @param cb function to call on all instances found
+   * @param cb_cls closure for @a cb
+   */
+  enum GNUNET_DB_QueryStatus
+  (*lookup_instances)(void *cls,
+                      bool active_only,
+                      TALER_MERCHANTDB_InstanceCallback cb,
+                      void *cb_cls);
+
 
   /**
    * Insert order into db.
