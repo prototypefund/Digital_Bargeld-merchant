@@ -21,7 +21,8 @@ libtalermerchanttesting_la_LDFLAGS = \
 libtalermerchant_la_SOURCES = \
   merchant_api_check_payment.c \
   merchant_api_common.c \
-  merchant_api_config.c \
+  merchant_api_config_get.c \
+  merchant_api_instances_get.c \
   merchant_api_history.c \
   merchant_api_proposal.c \
   merchant_api_proposal_lookup.c \

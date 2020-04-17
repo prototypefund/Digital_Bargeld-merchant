@@ -177,38 +177,6 @@ enum TALER_MERCHANT_VersionCompatibility
 
 
 /**
- * @brief Information about a merchant instance.
- */
-struct TALER_MERCHANT_InstanceInformation
-{
-  /**
-   * URL of this instance.  The URL can be relative to the current domain
-   * (i.e. "/PizzaShop/") or include a schema and fully qualified domain name
-   * (i.e. "https://backend.example.com/PS/"). The latter can be used to redirect
-   * clients to a different server in case the deployment location changes.
-   */
-  const char *instance_baseurl;
-
-  /**
-   * Legal name of the merchant/instance.
-   */
-  const char *name;
-
-  /**
-   * Base URL of the exchange this instance uses for tipping, or NULL if this
-   * instance does not support tipping.
-   */
-  const char *tipping_exchange_baseurl;
-
-  /**
-   * Public key of the instance.
-   */
-  struct TALER_MerchantPublicKeyP merchant_pub;
-
-};
-
-
-/**
  * @brief Config information we get from the backend.
  */
 struct TALER_MERCHANT_ConfigInformation
@@ -278,6 +246,91 @@ TALER_MERCHANT_config_get (struct GNUNET_CURL_Context *ctx,
  */
 void
 TALER_MERCHANT_config_get_cancel (struct TALER_MERCHANT_ConfigGetHandle *vgh);
+
+
+/* ********************* /instances *********************** */
+
+
+/**
+ * @brief Information about a merchant instance.
+ */
+struct TALER_MERCHANT_InstanceInformation
+{
+  /**
+   * Id of this instance.  This $ID can be used to construct the URL of the
+   * instance, by combining it using "$MERCHANT_BASEURL/instances/$ID/".
+   */
+  const char *id;
+
+  /**
+   * Legal name of the merchant/instance.
+   */
+  const char *name;
+
+  /**
+   * Public key of the instance.
+   */
+  struct TALER_MerchantPublicKeyP merchant_pub;
+
+  /**
+   * JSON array of payment targets (strings) supported by this backend
+   * instance.
+   */
+  json_t *payment_targets;
+
+};
+
+
+/**
+ * Handle for a GET /instances operation.
+ */
+struct TALER_MERCHANT_InstancesGetHandle;
+
+
+/**
+ * Function called with the result of the GET /instances operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response data
+ * @param iis_length length of the @a iis array
+ * @param iis array with instance information of length @a iis_length
+ */
+typedef void
+(*TALER_MERCHANT_InstancesCallback)(
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  unsigned int iis_length,
+  const struct TALER_MERCHANT_InstanceInformation iis[]);
+
+
+/**
+ * Get the instance data of a backend. Will connect to the merchant backend
+ * and obtain information about the instances.  The respective information will
+ * be passed to the @a instances_cb once available.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instances_cb function to call with the
+ *        backend's instances information
+ * @param instances_cb_cls closure for @a config_cb
+ * @return the instances handle; NULL upon error
+ */
+struct TALER_MERCHANT_InstancesGetHandle *
+TALER_MERCHANT_instances_get (struct GNUNET_CURL_Context *ctx,
+                              const char *backend_url,
+                              TALER_MERCHANT_InstancesCallback instances_cb,
+                              void *instances_cb_cls);
+
+
+/**
+ * Cancel /instances request.  Must not be called by clients after
+ * the callback was invoked.
+ *
+ * @param igh request to cancel.
+ */
+void
+TALER_MERCHANT_instances_get_cancel (
+  struct TALER_MERCHANT_InstancesGetHandle *igh);
 
 
 /* ********************* /refund ************************** */

@@ -15,7 +15,7 @@
   <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_config.c
+ * @file lib/merchant_api_config_get.c
  * @brief Implementation of the /config request of the merchant's HTTP API
  * @author Christian Grothoff
  */
@@ -214,11 +214,9 @@ TALER_MERCHANT_config_get (struct GNUNET_CURL_Context *ctx,
     GNUNET_free (vgh);
     return NULL;
   }
-
-  GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Requesting URL '%s'\n",
               vgh->url);
-
   eh = curl_easy_init ();
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
@@ -253,4 +251,4 @@ TALER_MERCHANT_config_get_cancel (struct TALER_MERCHANT_ConfigGetHandle *vgh)
 }
 
 
-/* end of merchant_api_config.c */
+/* end of merchant_api_config_get.c */
