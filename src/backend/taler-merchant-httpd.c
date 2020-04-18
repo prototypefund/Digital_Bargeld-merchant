@@ -29,6 +29,7 @@
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_private-get-instances.h"
+#include "taler-merchant-httpd_private-get-instances-ID.h"
 #include "taler-merchant-httpd_private-post-instances.h"
 
 /**
@@ -728,6 +729,26 @@ url_handler (void *cls,
       .skip_instance = true,
       .handler = &TMH_private_get_instances
     },
+    /* GET /instances/$ID/: */
+    {
+      .url_prefix = "/",
+      .method = MHD_HTTP_METHOD_GET,
+      .handler = &TMH_private_get_instances_ID
+    },
+#if 0
+    /* DELETE /instances/$ID/: */
+    {
+      .url_prefix = "/",
+      .method = MHD_HTTP_METHOD_DELETE,
+      .handler = &TMH_private_delete_instances_ID
+    },
+    /* PATCH /instances/$ID/: */
+    {
+      .url_prefix = "/",
+      .method = MHD_HTTP_METHOD_PATCH,
+      .handler = &TMH_private_patch_instances_ID
+    },
+#endif
     {
       .url_prefix = "/instances",
       .method = MHD_HTTP_METHOD_POST,
@@ -983,13 +1004,10 @@ url_handler (void *cls,
   GNUNET_assert (NULL != hc->rh);
   if ( (NULL == hc->instance) &&
        (GNUNET_YES != hc->rh->skip_instance) )
-    return TALER_MHD_reply_json_pack (connection,
-                                      MHD_HTTP_NOT_FOUND,
-                                      "{s:I, s:s}",
-                                      "code",
-                                      (json_int_t) TALER_EC_INSTANCE_UNKNOWN,
-                                      "error",
-                                      "merchant instance unknown");
+    return TALER_MHD_reply_with_error (connection,
+                                       MHD_HTTP_NOT_FOUND,
+                                       TALER_EC_INSTANCE_UNKNOWN,
+                                       "merchant instance unknown");
   hc->has_body = ( (0 == strcasecmp (method,
                                      MHD_HTTP_METHOD_POST)) ||
                    (0 == strcasecmp (method,

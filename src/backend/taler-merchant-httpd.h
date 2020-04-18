@@ -158,7 +158,7 @@ struct TMH_RequestHandler
   bool have_id_segment;
 
   /**
-   * Does this request handler expect an instance?
+   * Does this request handler work without an instance?
    */
   bool skip_instance;
 
