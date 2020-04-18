@@ -606,6 +606,36 @@ postgres_insert_account (
 }
 
 
+/**
+ * Delete private key of an instance from our database.
+ *
+ * @param cls closure
+ * @param merchant_pub public key of the instance
+ * @return database result code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_delete_instance_private_key (
+  void *cls,
+  const struct TALER_MerchantPublicKeyP *merchant_pub)
+{
+}
+
+
+/**
+ * Purge an instance and all associated information from our database.
+ * Highly likely to cause undesired data loss. Use with caution.
+ *
+ * @param cls closure
+ * @param merchant_pub public key of the instance
+ * @return database result code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_purge_instance (void *cls,
+                         const struct TALER_MerchantPublicKeyP *merchant_pub)
+{
+}
+
+
 /* ********************* OLD API ************************** */
 
 /**

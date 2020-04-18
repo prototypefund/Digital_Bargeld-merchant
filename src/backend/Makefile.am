@@ -23,6 +23,8 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_config.c taler-merchant-httpd_config.h \
   taler-merchant-httpd_exchanges.c taler-merchant-httpd_exchanges.h \
   taler-merchant-httpd_mhd.c taler-merchant-httpd_mhd.h \
+  taler-merchant-httpd_private-delete-instances-ID.c \
+    taler-merchant-httpd_private-delete-instances-ID.h \
   taler-merchant-httpd_private-get-instances.c \
     taler-merchant-httpd_private-get-instances.h \
   taler-merchant-httpd_private-get-instances-ID.c \
