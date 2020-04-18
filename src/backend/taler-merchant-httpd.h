@@ -82,18 +82,6 @@ struct TMH_MerchantInstance
 {
 
   /**
-   * Instance's mnemonic identifier. This value lives as long as
-   * the configuration is kept in memory, as it's as substring of
-   * a section name
-   */
-  char *id;
-
-  /**
-   * Legal name of the merchant.
-   */
-  char *name;
-
-  /**
    * Next entry in DLL.
    */
   struct TMH_WireMethod *wm_head;
@@ -106,12 +94,12 @@ struct TMH_MerchantInstance
   /**
    * Merchant's private key.
    */
-  struct TALER_MerchantPrivateKeyP privkey;
+  struct TALER_MerchantPrivateKeyP merchant_priv;
 
   /**
    * Merchant's public key
    */
-  struct TALER_MerchantPublicKeyP pubkey;
+  struct TALER_MerchantPublicKeyP merchant_pub;
 
   /**
    * General settings for an instance.
@@ -287,7 +275,7 @@ struct TMH_HandlerContext
   /**
    * JSON body that was uploaded, NULL if @e has_body is false.
    */
-  json_t *json;
+  json_t *request_body;
 
   /**
    * Placeholder for #TALER_MHD_parse_post_json() to keep its internal state.
@@ -424,6 +412,15 @@ TMH_instance_decref (struct TMH_MerchantInstance *mi);
  */
 int
 TMH_add_instance (struct TMH_MerchantInstance *mi);
+
+/**
+ * Lookup a merchant instance by its instance ID.
+ *
+ * @param instance_id identifier of the instance to resolve
+ * @return NULL if that instance is unknown to us
+ */
+struct TMH_MerchantInstance *
+TMH_lookup_instance (const char *instance_id);
 
 
 #endif

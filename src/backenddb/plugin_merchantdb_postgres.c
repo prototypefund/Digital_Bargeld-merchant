@@ -436,8 +436,8 @@ lookup_instances_cb (void *cls,
                                     &lic->is.name),
       GNUNET_PQ_result_spec_string ("id",
                                     &lic->is.id),
-      TALER_PQ_result_spec_json ("location",
-                                 &lic->is.location),
+      TALER_PQ_result_spec_json ("address",
+                                 &lic->is.address),
       TALER_PQ_result_spec_json ("jurisdiction",
                                  &lic->is.jurisdiction),
       TALER_PQ_RESULT_SPEC_AMOUNT ("default_max_deposit_fee",
@@ -521,6 +521,88 @@ postgres_lookup_instances (void *cls,
   if (0 > lic.qs)
     return lic.qs;
   return qs;
+}
+
+
+/**
+ * Insert information about an instance into our database.
+ *
+ * @param cls closure
+ * @param merchant_pub public key of the instance
+ * @param merchant_priv private key of the instance
+ * @param is details about the instance
+ * @return database result code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_insert_instance (void *cls,
+                          const struct TALER_MerchantPublicKeyP *merchant_pub,
+                          const struct TALER_MerchantPrivateKeyP *merchant_priv,
+                          const struct TALER_MERCHANTDB_InstanceSettings *is)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
+    GNUNET_PQ_query_param_string (is->id),
+    GNUNET_PQ_query_param_string (is->name),
+    TALER_PQ_query_param_json (is->address),
+    TALER_PQ_query_param_json (is->jurisdiction),
+    TALER_PQ_query_param_amount (&is->default_max_deposit_fee),
+    TALER_PQ_query_param_amount (&is->default_max_wire_fee),
+    GNUNET_PQ_query_param_uint32 (&is->default_wire_fee_amortization),
+    GNUNET_PQ_query_param_relative_time (
+      &is->default_wire_transfer_delay),
+    GNUNET_PQ_query_param_relative_time (&is->default_pay_delay),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_QueryParam params_priv[] = {
+    GNUNET_PQ_query_param_auto_from_type (merchant_priv),
+    GNUNET_PQ_query_param_string (is->id)
+  };
+  enum GNUNET_DB_QueryStatus qs;
+
+  check_connection (pg);
+  qs = GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                           "insert_instance",
+                                           params);
+  if (qs <= 0)
+    return qs;
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_keys",
+                                             params_priv);
+}
+
+
+/**
+ * Insert information about an instance's account into our database.
+ *
+ * @param cls closure
+ * @param id identifier of the instance
+ * @param account_details details about the account
+ * @return database result code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_insert_account (
+  void *cls,
+  const char *id,
+  const struct
+  TALER_MERCHANTDB_AccountDetails *account_details)
+{
+  struct PostgresClosure *pg = cls;
+  uint8_t active = account_details->active;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (id),
+    GNUNET_PQ_query_param_auto_from_type (&account_details->h_wire),
+    GNUNET_PQ_query_param_auto_from_type (&account_details->salt),
+    GNUNET_PQ_query_param_string (account_details->payto_uri),
+    GNUNET_PQ_query_param_auto_from_type (&active),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_account",
+                                             params);
+
 }
 
 
@@ -848,7 +930,7 @@ postgres_insert_session_info (void *cls,
  * Retrieve the order ID that was used to pay for a resource within a session.
  *
  * @param cls closure
- * @param[out] order_id location to store the order ID that was used when
+ * @param[out] order_id where to store the order ID that was used when
  *             paying for the resource URL
  * @param session_id session id
  * @param fulfillment_url URL that canonically identifies the resource
@@ -3423,7 +3505,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             ",merchant_pub"
                             ",merchant_id"
                             ",merchant_name"
-                            ",location"
+                            ",address"
                             ",jurisdiction"
                             ",default_max_deposit_fee_val"
                             ",default_max_deposit_fee_frac"
@@ -3434,6 +3516,45 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             ",default_pay_delay"
                             " FROM merchant_instances",
                             0),
+    /* for postgres_insert_instance() */
+    GNUNET_PQ_make_prepare ("insert_instance",
+                            "INSERT INTO merchant_instances"
+                            "(merchant_pub"
+                            ",merchant_id"
+                            ",merchant_name"
+                            ",address"
+                            ",jurisdiction"
+                            ",default_max_deposit_fee_val"
+                            ",default_max_deposit_fee_frac"
+                            ",default_max_wire_fee_val"
+                            ",default_max_wire_fee_frac"
+                            ",default_wire_fee_amortization"
+                            ",default_wire_transfer_delay"
+                            ",default_pay_delay)"
+                            "VALUES"
+                            "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+                            12),
+    /* for postgres_insert_instance() */
+    GNUNET_PQ_make_prepare ("insert_keys",
+                            "INSERT INTO merchant_keys"
+                            "(merchant_priv"
+                            ",merchant_serial)"
+                            " SELECT $1, merchant_serial"
+                            " FROM merchant_instances"
+                            " WHERE merchant_id=$2",
+                            2),
+    /* for postgres_insert_account() */
+    GNUNET_PQ_make_prepare ("insert_account",
+                            "INSERT INTO merchant_accounts"
+                            "(merchant_serial"
+                            ",h_wire"
+                            ",salt"
+                            ",payto_uri"
+                            ",active)"
+                            " SELECT merchant_serial, $2, $3, $4, $5"
+                            " FROM merchant_instances"
+                            " WHERE merchant_id=$1",
+                            5),
     /* OLD API: */
 #if 0
     GNUNET_PQ_make_prepare ("insert_deposit",
@@ -3931,6 +4052,8 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->rollback = &postgres_rollback;
   plugin->commit = &postgres_commit;
   plugin->lookup_instances = &postgres_lookup_instances;
+  plugin->insert_instance = &postgres_insert_instance;
+  plugin->insert_account = &postgres_insert_account;
 
   /* old API: */
   plugin->store_deposit = &postgres_store_deposit;

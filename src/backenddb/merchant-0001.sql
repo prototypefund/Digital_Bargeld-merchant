@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS merchant_instances
   ,merchant_pub BYTEA NOT NULL UNIQUE CHECK (LENGTH(merchant_pub)=32)
   ,merchant_id VARCHAR NOT NULL
   ,merchant_name VARCHAR NOT NULL
-  ,location BYTEA NOT NULL
+  ,address BYTEA NOT NULL
   ,jurisdiction BYTEA NOT NULL
   ,default_max_deposit_fee_val INT8 NOT NULL
   ,default_max_deposit_fee_frac INT4 NOT NULL
@@ -79,8 +79,8 @@ COMMENT ON COLUMN merchant_instances.merchant_id
   IS 'identifier of the merchant as used in the base URL (required)';
 COMMENT ON COLUMN merchant_instances.merchant_name
   IS 'legal name of the merchant as a simple string (required)';
-COMMENT ON COLUMN merchant_instances.location
-  IS 'physical location of the merchant as a Location in JSON format (required)';
+COMMENT ON COLUMN merchant_instances.address
+  IS 'physical address of the merchant as a Location in JSON format (required)';
 COMMENT ON COLUMN merchant_instances.jurisdiction
   IS 'jurisdiction of the merchant as a Location in JSON format (required)';
 
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS merchant_inventory
   ,total_stock BIGINT NOT NULL
   ,total_sold BIGINT NOT NULL
   ,total_lost BIGINT NOT NULL
-  ,location BYTEA NOT NULL
+  ,address BYTEA NOT NULL
   ,next_restock INT8 NOT NULL
   ,UNIQUE (merchant_serial, product_id)
   );
@@ -155,7 +155,7 @@ COMMENT ON COLUMN merchant_inventory.total_sold
   IS 'Number of products sold, must be below total_stock, non-negative, may never be lowered';
 COMMENT ON COLUMN merchant_inventory.total_lost
   IS 'Number of products that used to be in stock but were lost (spoiled, damaged), may never be lowered';
-COMMENT ON COLUMN merchant_inventory.location
+COMMENT ON COLUMN merchant_inventory.address
   IS 'JSON formatted Location of where the product is stocked';
 COMMENT ON COLUMN merchant_inventory.next_restock
   IS 'GNUnet absolute time indicating when the next restock is expected. 0 for unknown.';

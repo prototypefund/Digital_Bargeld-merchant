@@ -76,9 +76,9 @@ struct TALER_MERCHANTDB_InstanceSettings
   char *name;
 
   /**
-   * location of the business
+   * Address of the business
    */
-  json_t *location;
+  json_t *address;
 
   /**
    * jurisdiction of the business
@@ -353,6 +353,38 @@ struct TALER_MERCHANTDB_Plugin
                       TALER_MERCHANTDB_InstanceCallback cb,
                       void *cb_cls);
 
+
+  /**
+   * Insert information about an instance into our database.
+   *
+   * @param cls closure
+   * @param merchant_pub public key of the instance
+   * @param merchant_priv private key of the instance
+   * @param is details about the instance
+   * @return database result code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*insert_instance)(void *cls,
+                     const struct TALER_MerchantPublicKeyP *merchant_pub,
+                     const struct TALER_MerchantPrivateKeyP *merchant_priv,
+                     const struct TALER_MERCHANTDB_InstanceSettings *is);
+
+  /**
+   * Insert information about an instance's account into our database.
+   *
+   * @param cls closure
+   * @param id identifier of the instance
+   * @param account_details details about the account
+   * @return database result code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*insert_account)(
+    void *cls,
+    const char *id,
+    const struct TALER_MERCHANTDB_AccountDetails *account_details);
+
+
+  /* ****************** OLD API ******************** */
 
   /**
    * Insert order into db.

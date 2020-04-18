@@ -29,6 +29,7 @@
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_private-get-instances.h"
+#include "taler-merchant-httpd_private-post-instances.h"
 
 /**
  * Backlog for listen operation on unix-domain sockets.
@@ -131,7 +132,7 @@ TMH_instance_decref (struct TMH_MerchantInstance *mi)
 
   GNUNET_free (mi->settings.id);
   GNUNET_free (mi->settings.name);
-  json_decref (mi->settings.location);
+  json_decref (mi->settings.address);
   json_decref (mi->settings.jurisdiction);
   GNUNET_free (mi);
 }
@@ -269,7 +270,7 @@ TMH_long_poll_suspend (const char *order_id,
                        const struct TALER_Amount *min_refund)
 {
   compute_pay_key (order_id,
-                   &mi->pubkey,
+                   &mi->merchant_pub,
                    &sc->key);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Suspending operation on key %s\n",
@@ -358,7 +359,7 @@ TMH_long_poll_resume (const char *order_id,
   struct GNUNET_HashCode key;
 
   compute_pay_key (order_id,
-                   &mi->pubkey,
+                   &mi->merchant_pub,
                    &key);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Resuming operations suspended pending payment on key %s\n",
@@ -480,8 +481,8 @@ handle_mhd_completion_callback (void *cls,
     hc->cc (hc->ctx);
   TALER_MHD_parse_post_cleanup_callback (hc->json_parse_context);
   GNUNET_free_non_null (hc->infix);
-  if (NULL != hc->json)
-    json_decref (hc->json);
+  if (NULL != hc->request_body)
+    json_decref (hc->request_body);
   GNUNET_free (hc);
   *con_cls = NULL;
 }
@@ -600,8 +601,8 @@ prepare_daemon (void)
  * @param instance_id identifier of the instance to resolve
  * @return NULL if that instance is unknown to us
  */
-static struct TMH_MerchantInstance *
-lookup_instance (const char *instance_id)
+struct TMH_MerchantInstance *
+TMH_lookup_instance (const char *instance_id)
 {
   struct GNUNET_HashCode h_instance;
 
@@ -634,7 +635,7 @@ TMH_add_instance (struct TMH_MerchantInstance *mi)
   const char *id;
   int ret;
 
-  id = mi->id;
+  id = mi->settings.id;
   if (NULL == id)
     id = "default";
   GNUNET_CRYPTO_hash (id,
@@ -728,6 +729,12 @@ url_handler (void *cls,
       .handler = &TMH_private_get_instances
     },
     {
+      .url_prefix = "/instances",
+      .method = MHD_HTTP_METHOD_POST,
+      .skip_instance = true,
+      .handler = &TMH_private_post_instances
+    },
+    {
       NULL
     }
   };
@@ -778,7 +785,7 @@ url_handler (void *cls,
     GNUNET_assert (NULL != hc->rh);
     GNUNET_SCHEDULER_begin_async_scope (&hc->async_scope_id);
     if ( (hc->has_body) &&
-         (NULL == hc->json) )
+         (NULL == hc->request_body) )
     {
       int res;
 
@@ -786,13 +793,13 @@ url_handler (void *cls,
                                        &hc->json_parse_context,
                                        upload_data,
                                        upload_data_size,
-                                       &hc->json);
+                                       &hc->request_body);
       if (GNUNET_SYSERR == res)
         return MHD_NO;
       /* A error response was already generated */
       if ( (GNUNET_NO == res) ||
            /* or, need more data to accomplish parsing */
-           (NULL == hc->json) )
+           (NULL == hc->request_body) )
         return MHD_YES;
     }
     return hc->rh->handler (hc->rh,
@@ -857,14 +864,14 @@ url_handler (void *cls,
       }
       instance_id = GNUNET_strndup (istart,
                                     slash - istart);
-      hc->instance = lookup_instance (instance_id);
+      hc->instance = TMH_lookup_instance (instance_id);
       GNUNET_free (instance_id);
       url = slash;
     }
     else
     {
       /* use 'default' */
-      hc->instance = lookup_instance (NULL);
+      hc->instance = TMH_lookup_instance (NULL);
     }
   }
 
@@ -993,7 +1000,7 @@ url_handler (void *cls,
        and refuse if it is too big? (Note: maximum upload
        size may need to vary based on the handler.) */
 
-    GNUNET_break (NULL == hc->json); /* can't have it already */
+    GNUNET_break (NULL == hc->request_body); /* can't have it already */
     return MHD_YES; /* proceed with upload */
   }
   return hc->rh->handler (hc->rh,
@@ -1029,10 +1036,10 @@ add_instance_cb (void *cls,
   mi->settings = *is;
   mi->settings.id = GNUNET_strdup (mi->settings.id);
   mi->settings.name = GNUNET_strdup (mi->settings.name);
-  mi->settings.location = json_incref (mi->settings.location);
+  mi->settings.address = json_incref (mi->settings.address);
   mi->settings.jurisdiction = json_incref (mi->settings.jurisdiction);
-  mi->privkey = *merchant_priv;
-  mi->pubkey = *merchant_pub;
+  mi->merchant_priv = *merchant_priv;
+  mi->merchant_pub = *merchant_pub;
   for (unsigned int i = 0; i<accounts_length; i++)
   {
     const struct TALER_MERCHANTDB_AccountDetails *acc = &accounts[i];

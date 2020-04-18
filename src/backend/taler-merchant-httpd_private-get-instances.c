@@ -74,11 +74,11 @@ add_instance (void *cls,
                    json_pack (
                      "{s:s, s:s, s:o, s:o}",
                      "name",
-                     mi->name,
-                     "instance",
-                     mi->id,
+                     mi->settings.name,
+                     "id",
+                     mi->settings.id,
                      "merchant_pub",
-                     GNUNET_JSON_from_data_auto (&mi->pubkey),
+                     GNUNET_JSON_from_data_auto (&mi->merchant_pub),
                      "payment_targets",
                      pta)));
   return GNUNET_OK;
