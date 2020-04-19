@@ -31,6 +31,7 @@
 #include "taler-merchant-httpd_private-delete-instances-ID.h"
 #include "taler-merchant-httpd_private-get-instances.h"
 #include "taler-merchant-httpd_private-get-instances-ID.h"
+#include "taler-merchant-httpd_private-get-products.h"
 #include "taler-merchant-httpd_private-patch-instances-ID.h"
 #include "taler-merchant-httpd_private-post-instances.h"
 
@@ -758,6 +759,12 @@ url_handler (void *cls,
       .method = MHD_HTTP_METHOD_POST,
       .skip_instance = true,
       .handler = &TMH_private_post_instances
+    },
+    /* GET /products: */
+    {
+      .url_prefix = "/products",
+      .method = MHD_HTTP_METHOD_GET,
+      .handler = &TMH_private_get_products
     },
     {
       NULL

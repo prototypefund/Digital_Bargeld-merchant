@@ -363,8 +363,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
       if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
       {
         TMH_db->rollback (TMH_db->cls);
-        // TODO: only on soft error do:
-        continue;
+        goto retry;
       }
       for (struct TMH_WireMethod *wm = wm_head;
            NULL != wm;
@@ -393,13 +392,13 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
       if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
       {
         TMH_db->rollback (TMH_db->cls);
-        // TODO: only on soft error do:
-        continue;
+        goto retry;
       }
       qs = TMH_db->commit (TMH_db->cls);
-      if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
-        break; /* success! */
-    }
+retry:
+      if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
+        break; /* success! -- or hard failure */
+    } /* for .. MAX_RETRIES */
     if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
     {
       GNUNET_JSON_parse_free (spec);

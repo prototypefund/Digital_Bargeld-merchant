@@ -98,7 +98,6 @@ TMH_private_get_instances (const struct TMH_RequestHandler *rh,
                            struct MHD_Connection *connection,
                            struct TMH_HandlerContext *hc)
 {
-  struct MHD_Response *response;
   json_t *ia;
 
   (void) hc;
@@ -107,18 +106,10 @@ TMH_private_get_instances (const struct TMH_RequestHandler *rh,
   GNUNET_CONTAINER_multihashmap_iterate (TMH_by_id_map,
                                          &add_instance,
                                          ia);
-  response = TALER_MHD_make_json_pack ("{s:o}",
-                                       "instances", ia);
-  GNUNET_assert (NULL != response);
-  {
-    MHD_RESULT ret;
-
-    ret = MHD_queue_response (connection,
-                              MHD_HTTP_OK,
-                              response);
-    MHD_destroy_response (response);
-    return ret;
-  }
+  return TALER_MHD_reply_json_pack (connection,
+                                    MHD_HTTP_OK,
+                                    "{s:o}",
+                                    "instances", ia);
 }
 
 

@@ -141,6 +141,25 @@ typedef void
 
 
 /**
+ * Typically called by `lookup_products`.
+ *
+ * @param cls a `json_t *` JSON array to build
+ * @param key unused
+ * @param product_id ID of the product
+ * @param in_stock how many are currently in stock (possibly locked), -1 for infinite
+ * @param unit in which unit is the stock measured in
+ */
+typedef void
+(*TALER_MERCHANTDB_ProductsCallback)(void *cls,
+                                     const struct GNUNET_HashCode *key,
+                                     const char *product_id,
+                                     long long in_stock,
+                                     const char *unit);
+
+
+/* **************** OLD: ******************** */
+
+/**
  * Typically called by `find_contract_terms_by_date`.
  *
  * @param cls closure
@@ -305,7 +324,6 @@ struct TALER_MERCHANTDB_Plugin
   void
   (*preflight) (void *cls);
 
-
   /**
    * Start a transaction.
    *
@@ -318,7 +336,6 @@ struct TALER_MERCHANTDB_Plugin
   (*start) (void *cls,
             const char *name);
 
-
   /**
    * Roll back the current transaction of a database connection.
    *
@@ -328,7 +345,6 @@ struct TALER_MERCHANTDB_Plugin
   void
   (*rollback) (void *cls);
 
-
   /**
    * Commit the current transaction of a database connection.
    *
@@ -337,7 +353,6 @@ struct TALER_MERCHANTDB_Plugin
    */
   enum GNUNET_DB_QueryStatus
   (*commit)(void *cls);
-
 
   /**
    * Lookup all of the instances this backend has configured.
@@ -352,7 +367,6 @@ struct TALER_MERCHANTDB_Plugin
                       bool active_only,
                       TALER_MERCHANTDB_InstanceCallback cb,
                       void *cb_cls);
-
 
   /**
    * Insert information about an instance into our database.
@@ -395,7 +409,6 @@ struct TALER_MERCHANTDB_Plugin
     void *cls,
     const char *merchant_id);
 
-
   /**
    * Purge an instance and all associated information from our database.
    * Highly likely to cause undesired data loss. Use with caution.
@@ -429,6 +442,20 @@ struct TALER_MERCHANTDB_Plugin
   enum GNUNET_DB_QueryStatus
   (*inactivate_account)(void *cls,
                         const struct GNUNET_HashCode *h_wire);
+
+  /**
+   * Lookup all of the products the given instance has configured.
+   *
+   * @param cls closure
+   * @param instance_id instance to lookup products for
+   * @param cb function to call on all products found
+   * @param cb_cls closure for @a cb
+   */
+  enum GNUNET_DB_QueryStatus
+  (*lookup_products)(void *cls,
+                     const char *instance_id,
+                     TALER_MERCHANTDB_ProductsCallback cb,
+                     void *cb_cls);
 
 
   /* ****************** OLD API ******************** */
