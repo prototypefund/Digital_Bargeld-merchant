@@ -169,7 +169,7 @@ TMH_private_patch_products_ID (const struct TMH_RequestHandler *rh,
       return TALER_MHD_reply_with_error (connection,
                                          MHD_HTTP_INTERNAL_SERVER_ERROR,
                                          TALER_EC_INTERNAL_INVARIANT_FAILURE,
-                                         "Impossible to parse the order");
+                                         "Impossible to parse the product description");
   }
   if (-1 == total_stocked)
     pd.total_stocked = UINT64_MAX;

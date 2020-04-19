@@ -37,6 +37,7 @@
 #include "taler-merchant-httpd_private-patch-instances-ID.h"
 #include "taler-merchant-httpd_private-patch-products-ID.h"
 #include "taler-merchant-httpd_private-post-instances.h"
+#include "taler-merchant-httpd_private-post-products-ID-lock.h"
 
 /**
  * Backlog for listen operation on unix-domain sockets.
@@ -785,10 +786,18 @@ url_handler (void *cls,
     },
     /* PATCH /products/$ID/: */
     {
-      .url_prefix = "/",
+      .url_prefix = "/products",
       .method = MHD_HTTP_METHOD_PATCH,
       .have_id_segment = true,
       .handler = &TMH_private_patch_products_ID
+    },
+    /* POST /products/$ID/lock: */
+    {
+      .url_prefix = "/products",
+      .url_suffix = "lock",
+      .method = MHD_HTTP_METHOD_POST,
+      .have_id_segment = true,
+      .handler = &TMH_private_post_products_ID_lock
     },
     {
       NULL

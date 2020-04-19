@@ -18,17 +18,17 @@
 */
 
 /**
- * @file backend/taler-merchant-httpd_private-patch-products-ID.h
- * @brief implementing POST /products request handling
+ * @file backend/taler-merchant-httpd_private-post-products-ID-lock.h
+ * @brief implementing POST /products/$ID/lock request handling
  * @author Christian Grothoff
  */
-#ifndef TALER_MERCHANT_HTTPD_PRIVATE_PATCH_PRODUCTS_ID_H
-#define TALER_MERCHANT_HTTPD_PRIVATE_PATCH_PRODUCTS_ID_H
+#ifndef TALER_MERCHANT_HTTPD_PRIVATE_POST_PRODUCTS_ID_LOCK_H
+#define TALER_MERCHANT_HTTPD_PRIVATE_POST_PRODUCTS_ID_LOCK_H
 #include "taler-merchant-httpd.h"
 
 
 /**
- * PATCH configuration of an existing instance, given its configuration.
+ * Lock an existing product.
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
@@ -36,8 +36,8 @@
  * @return MHD result code
  */
 MHD_RESULT
-TMH_private_patch_products_ID (const struct TMH_RequestHandler *rh,
-                               struct MHD_Connection *connection,
-                               struct TMH_HandlerContext *hc);
+TMH_private_post_products_ID_lock (const struct TMH_RequestHandler *rh,
+                                   struct MHD_Connection *connection,
+                                   struct TMH_HandlerContext *hc);
 
 #endif

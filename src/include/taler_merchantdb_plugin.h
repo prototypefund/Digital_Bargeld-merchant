@@ -571,20 +571,46 @@ struct TALER_MERCHANTDB_Plugin
                     const struct TALER_MERCHANTDB_ProductDetails *pd);
 
   /**
-   * Update details about a particular product.
+   * Update details about a particular product. Note that the
+   * transaction must enforce that the sold/stocked/lost counters
+   * are not reduced (i.e. by expanding the WHERE clause on the existing
+   * values).
    *
    * @param cls closure
    * @param instance_id instance to lookup products for
    * @param product_id product to lookup
    * @param[out] pd set to the product details on success, can be NULL
    *             (in that case we only want to check if the product exists)
-   * @return database result code
+   * @return database result code, #GNUNET_DB_SUCCESS_NO_RESULTS if the
+   *         non-decreasing constraints are not met *or* if the product
+   *         does not yet exist.
    */
   enum GNUNET_DB_QueryStatus
   (*update_product)(void *cls,
                     const char *instance_id,
                     const char *product_id,
                     struct TALER_MERCHANTDB_ProductDetails *pd);
+
+  /**
+   * Lock stocks of a particular product. Note that the transaction must
+   * enforce that the "stocked-sold-lost >= locked" constraint holds.
+   *
+   * @param cls closure
+   * @param instance_id instance to lookup products for
+   * @param product_id product to lookup
+   * @param uuid the UUID that holds the lock
+   * @param quantity how many units should be locked
+   * @param expiration_time when should the lock expire
+   * @return database result code, #GNUNET_DB_SUCCESS_NO_RESULTS if the
+   *         product is unknown OR if there insufficient stocks remaining
+   */
+  enum GNUNET_DB_QueryStatus
+  (*lock_product)(void *cls,
+                  const char *instance_id,
+                  const char *product_id,
+                  const struct GNUNET_Uuid *uuid,
+                  uint32_t quantity,
+                  struct GNUNET_TIME_Absolute expiration_time);
 
 
   /* ****************** OLD API ******************** */
