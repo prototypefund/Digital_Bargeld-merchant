@@ -15,7 +15,7 @@
   <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_instances_get.c
+ * @file lib/merchant_api_get_instances.c
  * @brief Implementation of the GET /instances request of the merchant's HTTP API
  * @author Christian Grothoff
  */
@@ -48,7 +48,7 @@ struct TALER_MERCHANT_InstancesGetHandle
   /**
    * Function to call with the result.
    */
-  TALER_MERCHANT_InstancesCallback cb;
+  TALER_MERCHANT_InstancesGetCallback cb;
 
   /**
    * Closure for @a cb.
@@ -238,7 +238,7 @@ handle_instances_finished (void *cls,
 struct TALER_MERCHANT_InstancesGetHandle *
 TALER_MERCHANT_instances_get (struct GNUNET_CURL_Context *ctx,
                               const char *backend_url,
-                              TALER_MERCHANT_InstancesCallback instances_cb,
+                              TALER_MERCHANT_InstancesGetCallback instances_cb,
                               void *instances_cb_cls)
 {
   struct TALER_MERCHANT_InstancesGetHandle *igh;

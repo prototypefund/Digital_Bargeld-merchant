@@ -388,13 +388,13 @@ struct TALER_MERCHANTDB_Plugin
    * Delete private key of an instance from our database.
    *
    * @param cls closure
-   * @param merchant_pub public key of the instance
+   * @param merchant_id identifier of the instance
    * @return database result code
    */
   enum GNUNET_DB_QueryStatus
   (*delete_instance_private_key)(
     void *cls,
-    const struct TALER_MerchantPublicKeyP *merchant_pub);
+    const char *merchant_id);
 
 
   /**
@@ -402,12 +402,12 @@ struct TALER_MERCHANTDB_Plugin
    * Highly likely to cause undesired data loss. Use with caution.
    *
    * @param cls closure
-   * @param merchant_pub public key of the instance
+   * @param merchant_id identifier of the instance
    * @return database result code
    */
   enum GNUNET_DB_QueryStatus
   (*purge_instance)(void *cls,
-                    const struct TALER_MerchantPublicKeyP *merchant_pub);
+                    const char *merchant_id);
 
 
   /* ****************** OLD API ******************** */

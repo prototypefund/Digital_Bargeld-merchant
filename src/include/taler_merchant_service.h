@@ -296,7 +296,7 @@ struct TALER_MERCHANT_InstancesGetHandle;
  * @param iis array with instance information of length @a iis_length
  */
 typedef void
-(*TALER_MERCHANT_InstancesCallback)(
+(*TALER_MERCHANT_InstancesGetCallback)(
   void *cls,
   const struct TALER_MERCHANT_HttpResponse *hr,
   unsigned int iis_length,
@@ -318,7 +318,7 @@ typedef void
 struct TALER_MERCHANT_InstancesGetHandle *
 TALER_MERCHANT_instances_get (struct GNUNET_CURL_Context *ctx,
                               const char *backend_url,
-                              TALER_MERCHANT_InstancesCallback instances_cb,
+                              TALER_MERCHANT_InstancesGetCallback instances_cb,
                               void *instances_cb_cls);
 
 
@@ -331,6 +331,88 @@ TALER_MERCHANT_instances_get (struct GNUNET_CURL_Context *ctx,
 void
 TALER_MERCHANT_instances_get_cancel (
   struct TALER_MERCHANT_InstancesGetHandle *igh);
+
+
+/**
+ * Handle for a DELETE /instances operation.
+ */
+struct TALER_MERCHANT_InstancesDeleteHandle;
+
+
+/**
+ * Function called with the result of the DELETE /instances operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response data
+ */
+typedef void
+(*TALER_MERCHANT_InstancesDeleteCallback)(
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr);
+
+
+/**
+ * Get the private key of an instance of a backend, thereby disabling the
+ * instance for future requests.  Will preserve the other instance data
+ * (i.e. for taxation).
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id which instance should be deleted
+ * @param instances_cb function to call with the
+ *        backend's return
+ * @param instances_cb_cls closure for @a config_cb
+ * @return the instances handle; NULL upon error
+ */
+struct TALER_MERCHANT_InstancesDeleteHandle *
+TALER_MERCHANT_instances_delete_instance (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  TALER_MERCHANT_InstancesDeleteCallback instances_cb,
+  void *instances_cb_cls);
+
+
+/**
+ * Purge all data associated with an instance. Use with
+ * extreme caution.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id which instance should be deleted
+ * @param instances_cb function to call with the
+ *        backend's return
+ * @param instances_cb_cls closure for @a config_cb
+ * @return the instances handle; NULL upon error
+ */
+struct TALER_MERCHANT_InstancesDeleteHandle *
+TALER_MERCHANT_instances_purge_instance (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  TALER_MERCHANT_InstancesDeleteCallback instances_cb,
+  void *instances_cb_cls);
+
+
+/**
+ * Cancel /instances DELETE request.  Must not be called by clients after
+ * the callback was invoked.
+ *
+ * @param idh request to cancel.
+ */
+void
+TALER_MERCHANT_instances_delete_cancel (
+  struct TALER_MERCHANT_InstancesDeleteHandle *idh);
+
+
+/**
+ * Cancel /instances DELETE request.  Must not be called by clients after
+ * the callback was invoked.
+ *
+ * @param arg request to cancel.
+ */
+#define TALER_MERCHANT_instances_purge_cancel(arg) \
+  TALER_MERCHANT_instances_delete_cancel (arg)
 
 
 /* ********************* /refund ************************** */

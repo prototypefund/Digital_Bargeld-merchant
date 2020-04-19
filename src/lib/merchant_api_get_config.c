@@ -15,7 +15,7 @@
   <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_config_get.c
+ * @file lib/merchant_api_get_config.c
  * @brief Implementation of the /config request of the merchant's HTTP API
  * @author Christian Grothoff
  */

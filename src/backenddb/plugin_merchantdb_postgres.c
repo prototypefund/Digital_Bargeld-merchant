@@ -41,7 +41,8 @@
  * @param field name of the database field to fetch amount from
  * @param amountp[out] pointer to amount to set
  */
-#define TALER_PQ_RESULT_SPEC_AMOUNT(field,amountp) TALER_PQ_result_spec_amount ( \
+#define TALER_PQ_RESULT_SPEC_AMOUNT(field,amountp) \
+  TALER_PQ_result_spec_amount (                    \
     field,pg->currency,amountp)
 
 /**
@@ -51,8 +52,8 @@
  * @param field name of the database field to fetch amount from
  * @param amountp[out] pointer to amount to set
  */
-#define TALER_PQ_RESULT_SPEC_AMOUNT_NBO(field, \
-                                        amountp) TALER_PQ_result_spec_amount_nbo ( \
+#define TALER_PQ_RESULT_SPEC_AMOUNT_NBO(field, amountp) \
+  TALER_PQ_result_spec_amount_nbo (                     \
     field,pg->currency,amountp)
 
 
@@ -63,7 +64,8 @@
  * @param field name of the database field to fetch amount from
  * @param amountp[out] pointer to amount to set
  */
-#define TALER_PQ_RESULT_SPEC_AMOUNT(field,amountp) TALER_PQ_result_spec_amount ( \
+#define TALER_PQ_RESULT_SPEC_AMOUNT(field,amountp) \
+  TALER_PQ_result_spec_amount (                    \
     field,pg->currency,amountp)
 
 
@@ -556,7 +558,8 @@ postgres_insert_instance (void *cls,
   };
   struct GNUNET_PQ_QueryParam params_priv[] = {
     GNUNET_PQ_query_param_auto_from_type (merchant_priv),
-    GNUNET_PQ_query_param_string (is->id)
+    GNUNET_PQ_query_param_string (is->id),
+    GNUNET_PQ_query_param_end
   };
   enum GNUNET_DB_QueryStatus qs;
 
@@ -610,14 +613,24 @@ postgres_insert_account (
  * Delete private key of an instance from our database.
  *
  * @param cls closure
- * @param merchant_pub public key of the instance
+ * @param merchant_id identifier of the instance
  * @return database result code
  */
 static enum GNUNET_DB_QueryStatus
 postgres_delete_instance_private_key (
   void *cls,
-  const struct TALER_MerchantPublicKeyP *merchant_pub)
+  const char *merchant_id)
 {
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (merchant_id),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "delete_key",
+                                             params);
 }
 
 
@@ -626,13 +639,23 @@ postgres_delete_instance_private_key (
  * Highly likely to cause undesired data loss. Use with caution.
  *
  * @param cls closure
- * @param merchant_pub public key of the instance
+ * @param merchant_id identifier of the instance
  * @return database result code
  */
 static enum GNUNET_DB_QueryStatus
 postgres_purge_instance (void *cls,
-                         const struct TALER_MerchantPublicKeyP *merchant_pub)
+                         const char *merchant_id)
 {
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (merchant_id),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "purge_instance",
+                                             params);
 }
 
 
@@ -3585,6 +3608,19 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             " FROM merchant_instances"
                             " WHERE merchant_id=$1",
                             5),
+    /* for postgres_delete_instance_private_key() */
+    GNUNET_PQ_make_prepare ("delete_key",
+                            "DELETE FROM merchant_keys"
+                            " USING merchant_instances"
+                            " WHERE merchant_keys.merchant_serial"
+                            "   = merchant_instances.merchant_serial"
+                            " AND merchant_instances.merchant_id = $1",
+                            1),
+    /* for postgres_purge_instance() */
+    GNUNET_PQ_make_prepare ("purge_keys",
+                            "DELETE FROM merchant_instances"
+                            " WHERE merchant_instances.merchant_id = $1",
+                            1),
     /* OLD API: */
 #if 0
     GNUNET_PQ_make_prepare ("insert_deposit",
@@ -4084,6 +4120,8 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->lookup_instances = &postgres_lookup_instances;
   plugin->insert_instance = &postgres_insert_instance;
   plugin->insert_account = &postgres_insert_account;
+  plugin->delete_instance_private_key = &postgres_delete_instance_private_key;
+  plugin->purge_instance = &postgres_purge_instance;
 
   /* old API: */
   plugin->store_deposit = &postgres_store_deposit;
