@@ -35,8 +35,12 @@ taler_merchant_httpd_SOURCES = \
     taler-merchant-httpd_private-get-products-ID.h \
   taler-merchant-httpd_private-patch-instances-ID.c \
     taler-merchant-httpd_private-patch-instances-ID.h \
+  taler-merchant-httpd_private-patch-products-ID.c \
+    taler-merchant-httpd_private-patch-products-ID.h \
   taler-merchant-httpd_private-post-instances.c \
-    taler-merchant-httpd_private-post-instances.h
+    taler-merchant-httpd_private-post-instances.h \
+  taler-merchant-httpd_private-post-products.c \
+    taler-merchant-httpd_private-post-products.h
 
 DEAD = \
   taler-merchant-httpd_check-payment.c taler-merchant-httpd_check-payment.h \

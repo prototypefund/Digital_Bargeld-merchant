@@ -496,8 +496,8 @@ struct TALER_MERCHANTDB_Plugin
    * @return database result code
    */
   enum GNUNET_DB_QueryStatus
-  (*patch_instance)(void *cls,
-                    const struct TALER_MERCHANTDB_InstanceSettings *is);
+  (*update_instance)(void *cls,
+                     const struct TALER_MERCHANTDB_InstanceSettings *is);
 
   /**
    * Set an instance's account in our database to "inactive".
@@ -554,6 +554,37 @@ struct TALER_MERCHANTDB_Plugin
   (*delete_product)(void *cls,
                     const char *instance_id,
                     const char *product_id);
+
+  /**
+   * Insert details about a particular product.
+   *
+   * @param cls closure
+   * @param instance_id instance to insert product for
+   * @param product_id product identifier of product to insert
+   * @param pd the product details to insert
+   * @return database result code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*insert_product)(void *cls,
+                    const char *instance_id,
+                    const char *product_id,
+                    const struct TALER_MERCHANTDB_ProductDetails *pd);
+
+  /**
+   * Update details about a particular product.
+   *
+   * @param cls closure
+   * @param instance_id instance to lookup products for
+   * @param product_id product to lookup
+   * @param[out] pd set to the product details on success, can be NULL
+   *             (in that case we only want to check if the product exists)
+   * @return database result code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*update_product)(void *cls,
+                    const char *instance_id,
+                    const char *product_id,
+                    struct TALER_MERCHANTDB_ProductDetails *pd);
 
 
   /* ****************** OLD API ******************** */
