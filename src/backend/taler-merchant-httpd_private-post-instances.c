@@ -363,6 +363,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
       if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
       {
         TMH_db->rollback (TMH_db->cls);
+        // TODO: only on soft error do:
         continue;
       }
       for (struct TMH_WireMethod *wm = wm_head;
@@ -370,7 +371,19 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
            wm = wm->next)
       {
         struct TALER_MERCHANTDB_AccountDetails ad;
+        struct GNUNET_JSON_Specification spec[] = {
+          GNUNET_JSON_spec_string ("payto_uri",
+                                   &ad.payto_uri),
+          GNUNET_JSON_spec_fixed_auto ("salt",
+                                       &ad.salt)
+        };
 
+        GNUNET_assert (GNUNET_OK ==
+                       TALER_MHD_parse_json_data (NULL,
+                                                  wm->j_wire,
+                                                  spec));
+        ad.h_wire = wm->h_wire;
+        ad.active = wm->active;
         qs = TMH_db->insert_account (TMH_db->cls,
                                      mi->settings.id,
                                      &ad);
@@ -380,6 +393,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
       if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT != qs)
       {
         TMH_db->rollback (TMH_db->cls);
+        // TODO: only on soft error do:
         continue;
       }
       qs = TMH_db->commit (TMH_db->cls);

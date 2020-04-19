@@ -29,6 +29,8 @@ taler_merchant_httpd_SOURCES = \
     taler-merchant-httpd_private-get-instances.h \
   taler-merchant-httpd_private-get-instances-ID.c \
     taler-merchant-httpd_private-get-instances-ID.h \
+  taler-merchant-httpd_private-patch-instances-ID.c \
+    taler-merchant-httpd_private-patch-instances-ID.h \
   taler-merchant-httpd_private-post-instances.c \
     taler-merchant-httpd_private-post-instances.h
 

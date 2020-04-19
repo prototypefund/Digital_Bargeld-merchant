@@ -70,6 +70,11 @@ struct TMH_WireMethod
    */
   bool active;
 
+  /**
+   * Are we currently in a transaction to delete this account?
+   */
+  bool deleting;
+
 };
 
 

@@ -605,7 +605,6 @@ postgres_insert_account (
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "insert_account",
                                              params);
-
 }
 
 
@@ -655,6 +654,63 @@ postgres_purge_instance (void *cls,
   check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "purge_instance",
+                                             params);
+}
+
+
+/**
+ * Update information about an instance into our database.
+ *
+ * @param cls closure
+ * @param is details about the instance
+ * @return database result code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_patch_instance (void *cls,
+                         const struct TALER_MERCHANTDB_InstanceSettings *is)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (is->id),
+    GNUNET_PQ_query_param_string (is->name),
+    TALER_PQ_query_param_json (is->address),
+    TALER_PQ_query_param_json (is->jurisdiction),
+    TALER_PQ_query_param_amount (&is->default_max_deposit_fee),
+    TALER_PQ_query_param_amount (&is->default_max_wire_fee),
+    GNUNET_PQ_query_param_uint32 (&is->default_wire_fee_amortization),
+    GNUNET_PQ_query_param_relative_time (
+      &is->default_wire_transfer_delay),
+    GNUNET_PQ_query_param_relative_time (&is->default_pay_delay),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "update_instance",
+                                             params);
+}
+
+
+/**
+ * Set an instance's account in our database to "inactive".
+ *
+ * @param cls closure
+ * @param h_wire hash of the wire account to set to inactive
+ * @return database result code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_inactivate_account (void *cls,
+                             const struct GNUNET_HashCode *h_wire)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (h_wire),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "inactivate_account",
                                              params);
 }
 
@@ -3621,6 +3677,27 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "DELETE FROM merchant_instances"
                             " WHERE merchant_instances.merchant_id = $1",
                             1),
+    /* for postgres_patch_instance() */
+    GNUNET_PQ_make_prepare ("update_instance",
+                            "UPDATE merchant_instances SET"
+                            " merchant_name=$2"
+                            ",address=$3"
+                            ",jurisdiction=$4"
+                            ",default_max_deposit_fee_val=$5"
+                            ",default_max_deposit_fee_frac=$6"
+                            ",default_max_wire_fee_val=$7"
+                            ",default_max_wire_fee_frac=$8"
+                            ",default_wire_fee_amortization=$9"
+                            ",default_wire_transfer_delay=$10"
+                            ",default_pay_delay=$11"
+                            " WHERE merchant_id = $1",
+                            11),
+    /* for postgres_inactivate_account() */
+    GNUNET_PQ_make_prepare ("inactivate_account",
+                            "UPDATE merchant_accounts SET"
+                            " active=FALSE"
+                            " WHERE h_wire = $1",
+                            1),
     /* OLD API: */
 #if 0
     GNUNET_PQ_make_prepare ("insert_deposit",
@@ -4122,6 +4199,8 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->insert_account = &postgres_insert_account;
   plugin->delete_instance_private_key = &postgres_delete_instance_private_key;
   plugin->purge_instance = &postgres_purge_instance;
+  plugin->patch_instance = &postgres_patch_instance;
+  plugin->inactivate_account = &postgres_inactivate_account;
 
   /* old API: */
   plugin->store_deposit = &postgres_store_deposit;

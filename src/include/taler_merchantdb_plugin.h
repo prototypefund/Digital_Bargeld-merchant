@@ -383,7 +383,6 @@ struct TALER_MERCHANTDB_Plugin
     const char *id,
     const struct TALER_MERCHANTDB_AccountDetails *account_details);
 
-
   /**
    * Delete private key of an instance from our database.
    *
@@ -408,6 +407,28 @@ struct TALER_MERCHANTDB_Plugin
   enum GNUNET_DB_QueryStatus
   (*purge_instance)(void *cls,
                     const char *merchant_id);
+
+  /**
+   * Update information about an instance into our database.
+   *
+   * @param cls closure
+   * @param is details about the instance
+   * @return database result code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*patch_instance)(void *cls,
+                    const struct TALER_MERCHANTDB_InstanceSettings *is);
+
+  /**
+   * Set an instance's account in our database to "inactive".
+   *
+   * @param cls closure
+   * @param h_wire hash of the wire account to set to inactive
+   * @return database result code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*inactivate_account)(void *cls,
+                        const struct GNUNET_HashCode *h_wire);
 
 
   /* ****************** OLD API ******************** */

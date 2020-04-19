@@ -31,6 +31,7 @@
 #include "taler-merchant-httpd_private-delete-instances-ID.h"
 #include "taler-merchant-httpd_private-get-instances.h"
 #include "taler-merchant-httpd_private-get-instances-ID.h"
+#include "taler-merchant-httpd_private-patch-instances-ID.h"
 #include "taler-merchant-httpd_private-post-instances.h"
 
 /**
@@ -707,6 +708,7 @@ url_handler (void *cls,
              void **con_cls)
 {
   static struct TMH_RequestHandler private_handlers[] = {
+    /* GET /: */
     {
       .url_prefix = "/",
       .method = MHD_HTTP_METHOD_GET,
@@ -718,12 +720,14 @@ url_handler (void *cls,
       .handler = &TMH_MHD_handler_static_response,
       .response_code = MHD_HTTP_OK
     },
+    /* GET /agpl: */
     {
       .url_prefix = "/agpl",
       .method = MHD_HTTP_METHOD_GET,
       .skip_instance = true,
       .handler = &TMH_MHD_handler_agpl_redirect
     },
+    /* GET /instances: */
     {
       .url_prefix = "/instances",
       .method = MHD_HTTP_METHOD_GET,
@@ -742,14 +746,13 @@ url_handler (void *cls,
       .method = MHD_HTTP_METHOD_DELETE,
       .handler = &TMH_private_delete_instances_ID
     },
-#if 0
     /* PATCH /instances/$ID/: */
     {
       .url_prefix = "/",
       .method = MHD_HTTP_METHOD_PATCH,
       .handler = &TMH_private_patch_instances_ID
     },
-#endif
+    /* POST /instances: */
     {
       .url_prefix = "/instances",
       .method = MHD_HTTP_METHOD_POST,
