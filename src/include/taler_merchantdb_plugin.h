@@ -157,6 +157,73 @@ typedef void
                                      const char *unit);
 
 
+/**
+ * Details about a product.
+ */
+struct TALER_MERCHANTDB_ProductDetails
+{
+  /**
+   * Description of the product.
+   */
+  char *description;
+
+  /**
+   * Internationalized description.
+   */
+  json_t *description_i18n;
+
+  /**
+   * Unit in which the product is sold.
+   */
+  char *unit;
+
+  /**
+   * Price per unit of the product.  Zero to imply that the
+   * product is not sold separately or that the price is not fixed.
+   */
+  struct TALER_Amount price;
+
+  /**
+   * List of taxes the merchant pays for this product. Never NULL,
+   * but can be an empty array.
+   */
+  json_t *taxes;
+
+  /**
+   * Number of units of the product in stock in sum in total, including all
+   * existing sales and lost product, in product-specific units. UINT64_MAX
+   * indicates "infinite".
+   */
+  uint64_t total_stocked;
+
+  /**
+   * Number of units of the product in sold, in product-specific units.
+   */
+  uint64_t total_sold;
+
+  /**
+   * Number of units of stock lost.
+   */
+  uint64_t total_lost;
+
+  /**
+   * Base64-encoded product image, or an empty string.
+   */
+  json_t *image;
+
+  /**
+   * Identifies where the product is in stock, possibly an empty map.
+   */
+  json_t *location;
+
+  /**
+   * Identifies when the product will be restocked. 0 for unknown,
+   * #GNUNET_TIME_UNIT_FOREVER_ABS for never.
+   */
+  struct GNUNET_TIME_Absolute next_restock;
+};
+
+
 /* **************** OLD: ******************** */
 
 /**
@@ -450,12 +517,43 @@ struct TALER_MERCHANTDB_Plugin
    * @param instance_id instance to lookup products for
    * @param cb function to call on all products found
    * @param cb_cls closure for @a cb
+   * @return database result code
    */
   enum GNUNET_DB_QueryStatus
   (*lookup_products)(void *cls,
                      const char *instance_id,
                      TALER_MERCHANTDB_ProductsCallback cb,
                      void *cb_cls);
+
+  /**
+   * Lookup details about a particular product.
+   *
+   * @param cls closure
+   * @param instance_id instance to lookup products for
+   * @param product_id product to lookup
+   * @param[out] pd set to the product details on success, can be NULL
+   *             (in that case we only want to check if the product exists)
+   * @return database result code
+   */
+  enum GNUNET_DB_QueryStatus
+  (*lookup_product)(void *cls,
+                    const char *instance_id,
+                    const char *product_id,
+                    struct TALER_MERCHANTDB_ProductDetails *pd);
+
+  /**
+   * Delete information about a product.
+   *
+   * @param cls closure
+   * @param instance_id instance to delete product of
+   * @param product_id product to delete
+   * @return DB status code, #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS
+   *           if locks prevent deletion OR product unknown
+   */
+  enum GNUNET_DB_QueryStatus
+  (*delete_product)(void *cls,
+                    const char *instance_id,
+                    const char *product_id);
 
 
   /* ****************** OLD API ******************** */

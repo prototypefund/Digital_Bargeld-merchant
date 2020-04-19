@@ -29,9 +29,11 @@
 #include "taler-merchant-httpd_exchanges.h"
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_private-delete-instances-ID.h"
+#include "taler-merchant-httpd_private-delete-products-ID.h"
 #include "taler-merchant-httpd_private-get-instances.h"
 #include "taler-merchant-httpd_private-get-instances-ID.h"
 #include "taler-merchant-httpd_private-get-products.h"
+#include "taler-merchant-httpd_private-get-products-ID.h"
 #include "taler-merchant-httpd_private-patch-instances-ID.h"
 #include "taler-merchant-httpd_private-post-instances.h"
 
@@ -765,6 +767,20 @@ url_handler (void *cls,
       .url_prefix = "/products",
       .method = MHD_HTTP_METHOD_GET,
       .handler = &TMH_private_get_products
+    },
+    /* GET /products/$ID/: */
+    {
+      .url_prefix = "/products",
+      .method = MHD_HTTP_METHOD_GET,
+      .have_id_segment = true,
+      .handler = &TMH_private_get_instances_ID
+    },
+    /* DELETE /products/$ID/: */
+    {
+      .url_prefix = "/products",
+      .method = MHD_HTTP_METHOD_DELETE,
+      .have_id_segment = true,
+      .handler = &TMH_private_delete_instances_ID
     },
     {
       NULL
