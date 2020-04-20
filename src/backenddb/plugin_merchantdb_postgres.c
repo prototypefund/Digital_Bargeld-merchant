@@ -4112,10 +4112,15 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             14),
 
     /* for postgres_lock_product() */
-    /* TODO: there MAY be a more elegant way to write this SQL
-       statement to *first* get the product_serial and then
-       re-use it in the 3 main 'AND' sub-clauses */
     GNUNET_PQ_make_prepare ("lock_product",
+                            "WITH ps AS"
+                            "  (SELECT product_serial"
+                            "   FROM merchant_inventory"
+                            "   WHERE product_id=$2"
+                            "     AND merchant_serial="
+                            "     (SELECT merchant_serial"
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1))"
                             "INSERT INTO merchant_inventory_locks"
                             "(product_serial"
                             ",lock_uuid"
@@ -4123,32 +4128,15 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             ",expiration)"
                             " SELECT product_serial, $3, $4, $5"
                             "   FROM merchant_inventory"
-                            "   WHERE product_id=$2"
-                            "     AND merchant_serial="
-                            "       (SELECT merchant_serial"
-                            "          FROM merchant_instances"
-                            "          WHERE merchant_id=$1)"
-                            "     AND total_stock - total_sold - total_lost > "
-                            "       (SELECT SUM(total_locked)"
-                            "          FROM merchant_inventory_locks"
-                            "          WHERE product_serial="
-                            "            (SELECT product_serial"
-                            "               FROM merchant_inventory"
-                            "               WHERE product_id=$2"
-                            "                 AND merchant_serial="
-                            "                 (SELECT merchant_serial"
-                            "                    FROM merchant_instances"
-                            "                    WHERE merchant_id=$1))) +"
-                            "       (SELECT SUM(total_locked)"
-                            "          FROM merchant_order_locks"
-                            "          WHERE product_serial="
-                            "            (SELECT product_serial"
-                            "               FROM merchant_inventory"
-                            "               WHERE product_id=$2"
-                            "                 AND merchant_serial="
-                            "                 (SELECT merchant_serial"
-                            "                    FROM merchant_instances"
-                            "                    WHERE merchant_id=$1)))",
+                            "   JOIN ps USING (product_serial)"
+                            "   WHERE "
+                            "     total_stock - total_sold - total_lost > "
+                            "     (SELECT SUM(total_locked)"
+                            "        FROM merchant_inventory_locks"
+                            "        WHERE product_serial=ps.product_serial) + "
+                            "     (SELECT SUM(total_locked)"
+                            "        FROM merchant_order_locks"
+                            "        WHERE product_serial=ps.product_serial)",
                             5),
 
     /* OLD API: */
