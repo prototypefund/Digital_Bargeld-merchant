@@ -336,7 +336,7 @@ TALER_MERCHANT_instances_get_cancel (
 /**
  * Handle for a DELETE /instances operation.
  */
-struct TALER_MERCHANT_InstancesDeleteHandle;
+struct TALER_MERCHANT_InstanceDeleteHandle;
 
 
 /**
@@ -346,7 +346,7 @@ struct TALER_MERCHANT_InstancesDeleteHandle;
  * @param hr HTTP response data
  */
 typedef void
-(*TALER_MERCHANT_InstancesDeleteCallback)(
+(*TALER_MERCHANT_InstanceDeleteCallback)(
   void *cls,
   const struct TALER_MERCHANT_HttpResponse *hr);
 
@@ -364,12 +364,12 @@ typedef void
  * @param instances_cb_cls closure for @a config_cb
  * @return the instances handle; NULL upon error
  */
-struct TALER_MERCHANT_InstancesDeleteHandle *
-TALER_MERCHANT_instances_delete_instance (
+struct TALER_MERCHANT_InstanceDeleteHandle *
+TALER_MERCHANT_instance_delete (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
   const char *instance_id,
-  TALER_MERCHANT_InstancesDeleteCallback instances_cb,
+  TALER_MERCHANT_InstanceDeleteCallback instances_cb,
   void *instances_cb_cls);
 
 
@@ -385,12 +385,12 @@ TALER_MERCHANT_instances_delete_instance (
  * @param instances_cb_cls closure for @a config_cb
  * @return the instances handle; NULL upon error
  */
-struct TALER_MERCHANT_InstancesDeleteHandle *
-TALER_MERCHANT_instances_purge_instance (
+struct TALER_MERCHANT_InstanceDeleteHandle *
+TALER_MERCHANT_instance_purge (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
   const char *instance_id,
-  TALER_MERCHANT_InstancesDeleteCallback instances_cb,
+  TALER_MERCHANT_InstanceDeleteCallback instances_cb,
   void *instances_cb_cls);
 
 
@@ -401,8 +401,8 @@ TALER_MERCHANT_instances_purge_instance (
  * @param idh request to cancel.
  */
 void
-TALER_MERCHANT_instances_delete_cancel (
-  struct TALER_MERCHANT_InstancesDeleteHandle *idh);
+TALER_MERCHANT_instance_delete_cancel (
+  struct TALER_MERCHANT_InstanceDeleteHandle *idh);
 
 
 /**
@@ -411,8 +411,421 @@ TALER_MERCHANT_instances_delete_cancel (
  *
  * @param arg request to cancel.
  */
-#define TALER_MERCHANT_instances_purge_cancel(arg) \
-  TALER_MERCHANT_instances_delete_cancel (arg)
+#define TALER_MERCHANT_instance_purge_cancel(arg) \
+  TALER_MERCHANT_instance_delete_cancel (arg)
+
+
+/* ********************* /products *********************** */
+
+
+/**
+ * Handle for a GET /products operation.
+ */
+struct TALER_MERCHANT_ProductsGetHandle;
+
+/**
+ * Individual product from the inventory (minimal information
+ * returned via GET /products).
+ */
+struct TALER_MERCHANT_InventoryEntry
+{
+  /**
+   * Product identifier.
+   */
+  const char *product_id;
+
+};
+
+
+/**
+ * Function called with the result of the GET /products operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ * @param products_length length of the @a products array
+ * @param products array of products the requested instance offers
+ */
+typedef void
+(*TALER_MERCHANT_ProductsGetCallback)(
+  void *cls,
+  struct TALER_MERCHANT_HttpResponse *hr,
+  unsigned int products_length,
+  const struct TALER_MERCHANT_InventoryEntry products[]);
+
+
+/**
+ * Make a GET /products request.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id instance to query about its products,
+ *                    NULL to query the default instance
+ * @param cb function to call with the backend's inventory information
+ * @param cb_cls closure for @a cb
+ * @return the request handle; NULL upon error
+ */
+struct TALER_MERCHANT_ProductsGetHandle *
+TALER_MERCHANT_products_get (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  TALER_MERCHANT_ProductsGetCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel GET /products operation.
+ *
+ * @param pgh operation to cancel
+ */
+void
+TALER_MERCHANT_products_get_cancel (
+  struct TALER_MERCHANT_ProductsGetHandle *pgh);
+
+
+/**
+ * Handle for a GET /product/$ID operation. Gets details
+ * about a single product. Do not confused with a
+ * `struct TALER_MERCHANT_ProductsGetHandle`, which
+ * obtains a list of all products.
+ */
+struct TALER_MERCHANT_ProductGetHandle;
+
+
+/**
+ * Function called with the result of the GET /products operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ * @param description description of the product
+ * @param description_i18n Map from IETF BCP 47 language tags to localized descriptions
+ * @param unit unit in which the product is measured (liters, kilograms, packages, etc.)
+ * @param price the price for one @a unit of the product, zero is used to imply that
+ *              this product is not sold separately or that the price is not fixed and
+ *              must be supplied by the front-end.  If non-zero, price must include
+ *              applicable taxes.
+ * @param image base64-encoded product image
+ * @param taxes list of taxes paid by the merchant
+ * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books),
+ *                does NOT indicate remaining stocks, to get remaining stocks,
+ *                subtract @a total_sold and @a total_lost. Note that this still
+ *                does not then say how many of the remaining inventory are locked.
+ * @param total_sold in @a units, total number of @a unit of product sold
+ * @param total_lost in @a units, total number of @a unit of product lost from inventory
+ * @param location where the product is in stock
+ * @param next_restock when the next restocking is expected to happen, 0 for unknown,
+ *                     #GNUNET_TIME_UNIT_FOREVER_ABS for 'never'.
+ */
+typedef void
+(*TALER_MERCHANT_ProductGetCallback)(
+  void *cls,
+  struct TALER_MERCHANT_HttpResponse *hr,
+  const char *description,
+  const json_t *description_i18n,
+  const char *unit,
+  const struct TALER_Amount *price,
+  const json_t *image,
+  const json_t *taxes,
+  int64_t total_stocked,
+  uint64_t total_sold,
+  uint64_t total_lost,
+  const json_t *location,
+  struct GNUNET_TIME_Absolute next_restock);
+
+
+/**
+ * Make a GET /product/$ID request to get details about an
+ * individual product.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id instance to query about its products,
+ *                    NULL to query the default instance
+ * @param product_id identifier of the product to inquire about
+ * @param cb function to call with the backend's product information
+ * @param cb_cls closure for @a cb
+ * @return the request handle; NULL upon error
+ */
+struct TALER_MERCHANT_ProductGetHandle *
+TALER_MERCHANT_product_get (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  const char *product_id,
+  TALER_MERCHANT_ProductGetCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel GET /products/$ID operation.
+ *
+ * @param pgh operation to cancel
+ */
+void
+TALER_MERCHANT_product_get_cancel (
+  struct TALER_MERCHANT_ProductGetHandle *pgh);
+
+
+/**
+ * Handle for a POST /products operation.
+ */
+struct TALER_MERCHANT_ProductsPostHandle;
+
+
+/**
+ * Function called with the result of the POST /products operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ */
+typedef void
+(*TALER_MERCHANT_ProductsPostCallback)(
+  void *cls,
+  struct TALER_MERCHANT_HttpResponse *hr);
+
+
+/**
+ * Make a POST /products request to add a product to the
+ * inventory.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id instance to add a product to,
+ *                    NULL to query the default instance
+ * @param product_id identifier to use for the product
+ * @param description description of the product
+ * @param description_i18n Map from IETF BCP 47 language tags to localized descriptions
+ * @param unit unit in which the product is measured (liters, kilograms, packages, etc.)
+ * @param price the price for one @a unit of the product, zero is used to imply that
+ *              this product is not sold separately or that the price is not fixed and
+ *              must be supplied by the front-end.  If non-zero, price must include
+ *              applicable taxes.
+ * @param image base64-encoded product image
+ * @param taxes list of taxes paid by the merchant
+ * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books)
+ * @param location where the product is in stock
+ * @param next_restock when the next restocking is expected to happen, 0 for unknown,
+ *                     #GNUNET_TIME_UNIT_FOREVER_ABS for 'never'.
+ * @param cb function to call with the backend's result
+ * @param cb_cls closure for @a cb
+ * @return the request handle; NULL upon error
+ */
+struct TALER_MERCHANT_ProductsPostHandle *
+TALER_MERCHANT_products_post (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  const char *product_id,
+  const char *description,
+  const json_t *description_i18n,
+  const char *unit,
+  const struct TALER_Amount *price,
+  const json_t *image,
+  const json_t *taxes,
+  int64_t total_stocked,
+  const json_t *location,
+  struct GNUNET_TIME_Absolute next_restock,
+  TALER_MERCHANT_ProductsPostCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel POST /products operation.
+ *
+ * @param pph operation to cancel
+ */
+void
+TALER_MERCHANT_products_post_cancel (
+  struct TALER_MERCHANT_ProductsPostHandle *pph);
+
+
+/**
+ * Handle for a PATCH /products operation.
+ */
+struct TALER_MERCHANT_ProductPatchHandle;
+
+
+/**
+ * Function called with the result of the PATCH /products operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ */
+typedef void
+(*TALER_MERCHANT_ProductPatchCallback)(
+  void *cls,
+  struct TALER_MERCHANT_HttpResponse *hr);
+
+
+/**
+ * Make a PATCH /products request to update product details in the
+ * inventory.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id instance to add a product to,
+ *                    NULL to query the default instance
+ * @param product_id identifier to use for the product; the product must exist,
+ *                    or the transaction will fail with a #MHD_HTTP_NOT_FOUND
+ *                    HTTP status code
+ * @param description description of the product
+ * @param description_i18n Map from IETF BCP 47 language tags to localized descriptions
+ * @param unit unit in which the product is measured (liters, kilograms, packages, etc.)
+ * @param price the price for one @a unit of the product, zero is used to imply that
+ *              this product is not sold separately or that the price is not fixed and
+ *              must be supplied by the front-end.  If non-zero, price must include
+ *              applicable taxes.
+ * @param image base64-encoded product image
+ * @param taxes list of taxes paid by the merchant
+ * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books),
+ *               must be larger than previous values
+ * @param total_lost in @a units, must be larger than previous values, and may
+ *               not exceed total_stocked minus total_sold; if it does, the transaction
+ *               will fail with a #MHD_HTTP_CONFLICT HTTP status code
+ * @param location where the product is in stock
+ * @param next_restock when the next restocking is expected to happen
+ * @param cb function to call with the backend's result
+ * @param cb_cls closure for @a cb
+ * @return the request handle; NULL upon error
+ */
+struct TALER_MERCHANT_ProductPatchHandle *
+TALER_MERCHANT_product_patch (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  const char *product_id,
+  const char *description,
+  const json_t *description_i18n,
+  const char *unit,
+  const struct TALER_Amount *price,
+  const json_t *image,
+  const json_t *taxes,
+  int64_t total_stocked,
+  uint64_t total_lost,
+  const json_t *location,
+  struct GNUNET_TIME_Absolute next_restock,
+  TALER_MERCHANT_ProductPatchCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel PATCH /products operation.
+ *
+ * @param pph operation to cancel
+ */
+void
+TALER_MERCHANT_product_patch_cancel (
+  struct TALER_MERCHANT_ProductPatchHandle *pph);
+
+
+/**
+ * Handle for a POST /products/$ID/lock operation.
+ */
+struct TALER_MERCHANT_ProductLockHandle;
+
+
+/**
+ * Function called with the result of the POST /product/$ID/lock operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ */
+typedef void
+(*TALER_MERCHANT_ProductLockCallback)(
+  void *cls,
+  struct TALER_MERCHANT_HttpResponse *hr);
+
+
+/**
+ * Make a POST /products/$ID/lock request to reserve a certain
+ * amount of product in inventory to a reservation UUID.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id instance to query about its products,
+ *                    NULL to query the default instance
+ * @param product_id identifier of the product
+ * @param uuid UUID that identifies the client holding the lock
+ * @param duration how long should the lock be held
+ * @param quantity how much product should be locked
+ * @param cb function to call with the backend's lock status
+ * @param cb_cls closure for @a cb
+ * @return the request handle; NULL upon error
+ */
+struct TALER_MERCHANT_ProductLockHandle *
+TALER_MERCHANT_product_lock (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  const char *product_id,
+  struct GNUNET_TIME_Relative duration,
+  uint32_t quantity,
+  TALER_MERCHANT_ProductLockCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel POST /products/$ID/lock operation. Note that the
+ * lock may or may not be acquired despite the cancellation.
+ *
+ * @param pdh operation to cancel
+ */
+void
+TALER_MERCHANT_product_lock_cancel (
+  struct TALER_MERCHANT_ProductLockHandle *plh);
+
+
+/**
+ * Handle for a DELETE /products/$ID operation.
+ */
+struct TALER_MERCHANT_ProductDeleteHandle;
+
+
+/**
+ * Function called with the result of the DELETE /product/$ID operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ */
+typedef void
+(*TALER_MERCHANT_ProductDeleteCallback)(
+  void *cls,
+  struct TALER_MERCHANT_HttpResponse *hr);
+
+
+/**
+ * Make a DELETE /products/$ID request to delete a product from our
+ * inventory.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id instance to query about its products,
+ *                    NULL to query the default instance
+ * @param product_id identifier of the product
+ * @param cb function to call with the backend's deletion status
+ * @param cb_cls closure for @a cb
+ * @return the request handle; NULL upon error
+ */
+struct TALER_MERCHANT_ProductDeleteHandle *
+TALER_MERCHANT_product_delete (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  TALER_MERCHANT_ProductDeleteCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel DELETE /products/$ID operation.
+ *
+ * @param pdh operation to cancel
+ */
+void
+TALER_MERCHANT_product_delete_cancel (
+  struct TALER_MERCHANT_ProductDeleteHandle *pdh);
+
+
+/* *********************   OLD ************************** */
 
 
 /* ********************* /refund ************************** */

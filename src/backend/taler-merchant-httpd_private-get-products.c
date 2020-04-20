@@ -27,14 +27,10 @@
  *
  * @param cls a `json_t *` JSON array to build
  * @param product_id ID of the product
- * @param in_stock how many are currently in stock (possibly locked), -1 for infinite
- * @param unit in which unit is the stock measured in
  */
 static void
 add_product (void *cls,
-             const char *product_id,
-             long long in_stock,
-             const char *unit)
+             const char *product_id)
 {
   json_t *pa = cls;
 
@@ -42,13 +38,9 @@ add_product (void *cls,
                  json_array_append_new (
                    pa,
                    json_pack (
-                     "{s:s, s:I, s:s}",
+                     "{s:s}",
                      "product_id",
-                     product_id,
-                     "stock",
-                     (json_int_t) in_stock,
-                     "unit",
-                     unit)));
+                     product_id)));
 }
 
 

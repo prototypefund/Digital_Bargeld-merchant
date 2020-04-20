@@ -150,6 +150,7 @@ TMH_private_patch_products_ID (const struct TMH_RequestHandler *rh,
     GNUNET_JSON_spec_end ()
   };
 
+  pd.total_sold = 0; /* will be ignored anyway */
   GNUNET_assert (NULL != mi);
   GNUNET_assert (NULL != product_id);
   {

@@ -145,14 +145,10 @@ typedef void
  *
  * @param cls a `json_t *` JSON array to build
  * @param product_id ID of the product
- * @param in_stock how many are currently in stock (possibly locked), -1 for infinite
- * @param unit in which unit is the stock measured in
  */
 typedef void
 (*TALER_MERCHANTDB_ProductsCallback)(void *cls,
-                                     const char *product_id,
-                                     long long in_stock,
-                                     const char *unit);
+                                     const char *product_id);
 
 
 /**
@@ -237,6 +233,7 @@ typedef void
                                          const char *order_id,
                                          uint64_t row_id,
                                          const json_t *contract_terms);
+
 
 /**
  * Function called with information about a transaction.
@@ -578,8 +575,12 @@ struct TALER_MERCHANTDB_Plugin
    * @param cls closure
    * @param instance_id instance to lookup products for
    * @param product_id product to lookup
-   * @param[out] pd set to the product details on success, can be NULL
-   *             (in that case we only want to check if the product exists)
+   * @param pd set to the product details on success, can be NULL
+   *             (in that case we only want to check if the product exists);
+   *             total_sold in @a pd is ignored, total_lost must not
+   *             exceed total_stock minus the existing total_sold;
+   *             total_sold and total_stock must be larger or equal to
+   *             the existing value;
    * @return database result code, #GNUNET_DB_SUCCESS_NO_RESULTS if the
    *         non-decreasing constraints are not met *or* if the product
    *         does not yet exist.
@@ -588,7 +589,7 @@ struct TALER_MERCHANTDB_Plugin
   (*update_product)(void *cls,
                     const char *instance_id,
                     const char *product_id,
-                    struct TALER_MERCHANTDB_ProductDetails *pd);
+                    const struct TALER_MERCHANTDB_ProductDetails *pd);
 
   /**
    * Lock stocks of a particular product. Note that the transaction must

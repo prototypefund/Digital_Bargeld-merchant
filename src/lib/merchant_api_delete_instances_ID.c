@@ -33,7 +33,7 @@
 /**
  * Handle for a DELETE /instances/$ID operation.
  */
-struct TALER_MERCHANT_InstancesDeleteHandle
+struct TALER_MERCHANT_InstanceDeleteHandle
 {
   /**
    * The url for this request.
@@ -48,7 +48,7 @@ struct TALER_MERCHANT_InstancesDeleteHandle
   /**
    * Function to call with the result.
    */
-  TALER_MERCHANT_InstancesDeleteCallback cb;
+  TALER_MERCHANT_InstanceDeleteCallback cb;
 
   /**
    * Closure for @a cb.
@@ -72,11 +72,11 @@ struct TALER_MERCHANT_InstancesDeleteHandle
  * @param json response body, NULL if not in JSON
  */
 static void
-handle_instances_delete_finished (void *cls,
-                                  long response_code,
-                                  const void *response)
+handle_instance_delete_finished (void *cls,
+                                 long response_code,
+                                 const void *response)
 {
-  struct TALER_MERCHANT_InstancesDeleteHandle *idh = cls;
+  struct TALER_MERCHANT_InstanceDeleteHandle *idh = cls;
   const json_t *json = response;
   struct TALER_MERCHANT_HttpResponse hr = {
     .http_status = (unsigned int) response_code,
@@ -107,7 +107,7 @@ handle_instances_delete_finished (void *cls,
   }
   idh->cb (idh->cb_cls,
            &hr);
-  TALER_MERCHANT_instances_delete_cancel (idh);
+  TALER_MERCHANT_instance_delete_cancel (idh);
 }
 
 
@@ -123,19 +123,19 @@ handle_instances_delete_finished (void *cls,
  * @param instances_cb_cls closure for @a config_cb
  * @return the instances handle; NULL upon error
  */
-static struct TALER_MERCHANT_InstancesDeleteHandle *
-instances_delete (
+static struct TALER_MERCHANT_InstanceDeleteHandle *
+instance_delete (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
   const char *instance_id,
   bool purge,
-  TALER_MERCHANT_InstancesDeleteCallback instances_cb,
+  TALER_MERCHANT_InstanceDeleteCallback instances_cb,
   void *instances_cb_cls)
 {
-  struct TALER_MERCHANT_InstancesDeleteHandle *idh;
+  struct TALER_MERCHANT_InstanceDeleteHandle *idh;
   CURL *eh;
 
-  idh = GNUNET_new (struct TALER_MERCHANT_InstancesDeleteHandle);
+  idh = GNUNET_new (struct TALER_MERCHANT_InstanceDeleteHandle);
   idh->ctx = ctx;
   idh->cb = instances_cb;
   idh->cb_cls = instances_cb_cls;
@@ -179,7 +179,7 @@ instances_delete (
   idh->job = GNUNET_CURL_job_add (ctx,
                                   eh,
                                   GNUNET_YES,
-                                  &handle_instances_delete_finished,
+                                  &handle_instance_delete_finished,
                                   idh);
   return idh;
 }
@@ -197,20 +197,20 @@ instances_delete (
  * @param instances_cb_cls closure for @a config_cb
  * @return the instances handle; NULL upon error
  */
-struct TALER_MERCHANT_InstancesDeleteHandle *
-TALER_MERCHANT_instances_delete_instance (
+struct TALER_MERCHANT_InstanceDeleteHandle *
+TALER_MERCHANT_instance_delete (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
   const char *instance_id,
-  TALER_MERCHANT_InstancesDeleteCallback instances_cb,
+  TALER_MERCHANT_InstanceDeleteCallback instances_cb,
   void *instances_cb_cls)
 {
-  return instances_delete (ctx,
-                           backend_url,
-                           instance_id,
-                           false,
-                           instances_cb,
-                           instances_cb_cls);
+  return instance_delete (ctx,
+                          backend_url,
+                          instance_id,
+                          false,
+                          instances_cb,
+                          instances_cb_cls);
 }
 
 
@@ -226,20 +226,20 @@ TALER_MERCHANT_instances_delete_instance (
  * @param instances_cb_cls closure for @a config_cb
  * @return the instances handle; NULL upon error
  */
-struct TALER_MERCHANT_InstancesDeleteHandle *
-TALER_MERCHANT_instances_purge_instance (
+struct TALER_MERCHANT_InstanceDeleteHandle *
+TALER_MERCHANT_instance_purge (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
   const char *instance_id,
-  TALER_MERCHANT_InstancesDeleteCallback instances_cb,
+  TALER_MERCHANT_InstanceDeleteCallback instances_cb,
   void *instances_cb_cls)
 {
-  return instances_delete (ctx,
-                           backend_url,
-                           instance_id,
-                           true,
-                           instances_cb,
-                           instances_cb_cls);
+  return instance_delete (ctx,
+                          backend_url,
+                          instance_id,
+                          true,
+                          instances_cb,
+                          instances_cb_cls);
 }
 
 
@@ -250,8 +250,8 @@ TALER_MERCHANT_instances_purge_instance (
  * @param idh request to cancel.
  */
 void
-TALER_MERCHANT_instances_delete_cancel (
-  struct TALER_MERCHANT_InstancesDeleteHandle *idh)
+TALER_MERCHANT_instance_delete_cancel (
+  struct TALER_MERCHANT_InstanceDeleteHandle *idh)
 {
   if (NULL != idh->job)
     GNUNET_CURL_job_cancel (idh->job);

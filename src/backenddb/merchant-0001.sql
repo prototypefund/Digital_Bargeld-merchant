@@ -154,7 +154,7 @@ COMMENT ON COLUMN merchant_inventory.total_stock
 COMMENT ON COLUMN merchant_inventory.total_sold
   IS 'Number of products sold, must be below total_stock, non-negative, may never be lowered';
 COMMENT ON COLUMN merchant_inventory.total_lost
-  IS 'Number of products that used to be in stock but were lost (spoiled, damaged), may never be lowered';
+  IS 'Number of products that used to be in stock but were lost (spoiled, damaged), may never be lowered; total_stock >= total_sold + total_lost must always hold';
 COMMENT ON COLUMN merchant_inventory.address
   IS 'JSON formatted Location of where the product is stocked';
 COMMENT ON COLUMN merchant_inventory.next_restock
@@ -174,7 +174,7 @@ CREATE INDEX IF NOT EXISTS merchant_inventory_locks_by_expiration
   ON merchant_inventory_locks
     (expiration);
 COMMENT ON TABLE merchant_inventory_locks
-  IS 'locks on inventory helt by shopping carts';
+  IS 'locks on inventory helt by shopping carts; note that locks MAY not be honored if merchants increase total_lost for inventory';
 COMMENT ON COLUMN merchant_inventory_locks.total_locked
   IS 'how many units of the product does this lock reserve';
 COMMENT ON COLUMN merchant_inventory_locks.expiration
@@ -215,7 +215,7 @@ CREATE INDEX IF NOT EXISTS merchant_orders_locks_by_order_and_product
   ON merchant_order_locks
     (order_serial, product_serial);
 COMMENT ON TABLE merchant_order_locks
-  IS 'locks on orders awaiting claim and payment';
+  IS 'locks on orders awaiting claim and payment; note that locks MAY not be honored if merchants increase total_lost for inventory';
 COMMENT ON COLUMN merchant_order_locks.total_locked
   IS 'how many units of the product does this lock reserve';
 

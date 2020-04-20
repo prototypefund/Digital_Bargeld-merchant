@@ -755,15 +755,9 @@ lookup_products_cb (void *cls,
   for (unsigned int i = 0; i < num_results; i++)
   {
     char *product_id;
-    uint64_t in_stock;
-    char *unit;
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_string ("product_id",
                                     &product_id),
-      GNUNET_PQ_result_spec_uint64 ("total_stock",
-                                    &in_stock),
-      GNUNET_PQ_result_spec_string ("unit",
-                                    &unit),
       GNUNET_PQ_result_spec_end
     };
 
@@ -777,9 +771,7 @@ lookup_products_cb (void *cls,
       return;
     }
     plc->cb (plc->cb_cls,
-             product_id,
-             (UINT64_MAX == in_stock) ? -1LL : (long long) in_stock,
-             unit);
+             product_id);
     GNUNET_PQ_cleanup_result (rs);
   }
 }
@@ -963,6 +955,10 @@ postgres_insert_product (void *cls,
  * @param product_id product to lookup
  * @param[out] pd set to the product details on success, can be NULL
  *             (in that case we only want to check if the product exists)
+ *             total_sold in @a pd is ignored, total_lost must not
+ *             exceed total_stock minus the existing total_sold;
+ *             total_sold and total_stock must be larger or equal to
+ *             the existing value;
  * @return database result code, #GNUNET_DB_SUCCESS_NO_RESULTS if the
  *         non-decreasing constraints are not met *or* if the product
  *         does not yet exist.
@@ -971,7 +967,7 @@ static enum GNUNET_DB_QueryStatus
 postgres_update_product (void *cls,
                          const char *instance_id,
                          const char *product_id,
-                         struct TALER_MERCHANTDB_ProductDetails *pd)
+                         const struct TALER_MERCHANTDB_ProductDetails *pd)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -984,7 +980,6 @@ postgres_update_product (void *cls,
     TALER_PQ_query_param_json (pd->taxes),
     TALER_PQ_query_param_amount (&pd->price),
     GNUNET_PQ_query_param_uint64 (&pd->total_stocked),
-    GNUNET_PQ_query_param_uint64 (&pd->total_sold),
     GNUNET_PQ_query_param_uint64 (&pd->total_lost),
     TALER_PQ_query_param_json (pd->address),
     GNUNET_PQ_query_param_absolute_time (&pd->next_restock),
@@ -4022,8 +4017,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
     GNUNET_PQ_make_prepare ("lookup_products",
                             "SELECT"
                             " product_id"
-                            ",total_stock"
-                            ",unit"
                             " FROM merchant_inventory"
                             " JOIN merchant_instances"
                             "   USING (merchant_serial)"
@@ -4097,19 +4090,18 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             ",price_val=$8"
                             ",price_frac=$9"
                             ",total_stock=$10"
-                            ",total_sold=$11"
-                            ",total_lost=$12"
-                            ",address=$13"
-                            ",next_restock=$14"
+                            ",total_lost=$11"
+                            ",address=$12"
+                            ",next_restock=$13"
                             " WHERE merchant_serial="
                             "   (SELECT merchant_serial"
                             "      FROM merchant_instances"
                             "      WHERE merchant_id=$1)"
                             "   AND product_id=$2"
                             "   AND total_stock <= $10"
-                            "   AND total_sold <= $11"
-                            "   AND total_lost <= $12",
-                            14),
+                            "   AND $10 - total_sold >= $11"
+                            "   AND total_lost <= $11",
+                            13),
 
     /* for postgres_lock_product() */
     GNUNET_PQ_make_prepare ("lock_product",
