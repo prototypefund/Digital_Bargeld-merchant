@@ -61,8 +61,8 @@ products_equal (const struct TALER_MERCHANTDB_ProductDetails *p1,
            (p1->total_lost == p2->total_lost) &&
            (1 == json_equal (p1->image,
                              p2->image)) &&
-           (1 == json_equal (p1->location,
-                             p2->location)) &&
+           (1 == json_equal (p1->address,
+                             p2->address)) &&
            (p1->next_restock.abs_value_us ==
             p2->next_restock.abs_value_us) );
 }
@@ -101,8 +101,8 @@ TMH_private_post_products (const struct TMH_RequestHandler *rh,
                            &pd.image),
     GNUNET_JSON_spec_json ("taxes",
                            &pd.taxes),
-    GNUNET_JSON_spec_json ("location",
-                           &pd.taxes),
+    GNUNET_JSON_spec_json ("address",
+                           &pd.address),
     GNUNET_JSON_spec_int64 ("total_stocked",
                             &total_stocked),
     GNUNET_JSON_spec_absolute_time ("next_restock",

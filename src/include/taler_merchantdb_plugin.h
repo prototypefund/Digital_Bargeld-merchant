@@ -144,14 +144,12 @@ typedef void
  * Typically called by `lookup_products`.
  *
  * @param cls a `json_t *` JSON array to build
- * @param key unused
  * @param product_id ID of the product
  * @param in_stock how many are currently in stock (possibly locked), -1 for infinite
  * @param unit in which unit is the stock measured in
  */
 typedef void
 (*TALER_MERCHANTDB_ProductsCallback)(void *cls,
-                                     const struct GNUNET_HashCode *key,
                                      const char *product_id,
                                      long long in_stock,
                                      const char *unit);
@@ -214,7 +212,7 @@ struct TALER_MERCHANTDB_ProductDetails
   /**
    * Identifies where the product is in stock, possibly an empty map.
    */
-  json_t *location;
+  json_t *address;
 
   /**
    * Identifies when the product will be restocked. 0 for unknown,
@@ -542,7 +540,8 @@ struct TALER_MERCHANTDB_Plugin
                     struct TALER_MERCHANTDB_ProductDetails *pd);
 
   /**
-   * Delete information about a product.
+   * Delete information about a product. Note that the transaction must
+   * enforce that no stocks are currently locked.
    *
    * @param cls closure
    * @param instance_id instance to delete product of

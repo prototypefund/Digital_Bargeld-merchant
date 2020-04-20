@@ -666,8 +666,8 @@ postgres_purge_instance (void *cls,
  * @return database result code
  */
 static enum GNUNET_DB_QueryStatus
-postgres_patch_instance (void *cls,
-                         const struct TALER_MERCHANTDB_InstanceSettings *is)
+postgres_update_instance (void *cls,
+                          const struct TALER_MERCHANTDB_InstanceSettings *is)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -715,6 +715,327 @@ postgres_inactivate_account (void *cls,
 }
 
 
+/**
+ * Context used for postgres_lookup_products().
+ */
+struct LookupProductsContext
+{
+  /**
+   * Function to call with the results.
+   */
+  TALER_MERCHANTDB_ProductsCallback cb;
+
+  /**
+   * Closure for @a cb.
+   */
+  void *cb_cls;
+
+  /**
+   * Internal result.
+   */
+  enum GNUNET_DB_QueryStatus qs;
+};
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results about products.
+ *
+ * @param[in,out] cls of type `struct LookupProductsContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+lookup_products_cb (void *cls,
+                    PGresult *result,
+                    unsigned int num_results)
+{
+  struct LookupProductsContext *plc = cls;
+
+  for (unsigned int i = 0; i < num_results; i++)
+  {
+    char *product_id;
+    uint64_t in_stock;
+    char *unit;
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_string ("product_id",
+                                    &product_id),
+      GNUNET_PQ_result_spec_uint64 ("in_stock",
+                                    &in_stock),
+      GNUNET_PQ_result_spec_string ("unit",
+                                    &unit),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      plc->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
+    }
+    plc->cb (plc->cb_cls,
+             product_id,
+             (UINT64_MAX == in_stock) ? -1LL : (long long) in_stock,
+             unit);
+    GNUNET_PQ_cleanup_result (rs);
+  }
+}
+
+
+/**
+ * Lookup all of the products the given instance has configured.
+ *
+ * @param cls closure
+ * @param instance_id instance to lookup products for
+ * @param cb function to call on all products found
+ * @param cb_cls closure for @a cb
+ * @return database result code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_lookup_products (void *cls,
+                          const char *instance_id,
+                          TALER_MERCHANTDB_ProductsCallback cb,
+                          void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  struct LookupProductsContext plc = {
+    .cb = cb,
+    .cb_cls = cb_cls
+  };
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_end
+  };
+  enum GNUNET_DB_QueryStatus qs;
+
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+                                             "lookup_products",
+                                             params,
+                                             &lookup_products_cb,
+                                             &plc);
+  if (0 != plc.qs)
+    return plc.qs;
+  return qs;
+}
+
+
+/**
+ * Lookup details about a particular product.
+ *
+ * @param cls closure
+ * @param instance_id instance to lookup products for
+ * @param product_id product to lookup
+ * @param[out] pd set to the product details on success, can be NULL
+ *             (in that case we only want to check if the product exists)
+ * @return database result code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_lookup_product (void *cls,
+                         const char *instance_id,
+                         const char *product_id,
+                         struct TALER_MERCHANTDB_ProductDetails *pd)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (product_id),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    GNUNET_PQ_result_spec_string ("description",
+                                  &pd->description),
+    TALER_PQ_result_spec_json ("description_i18n",
+                               &pd->description_i18n),
+    GNUNET_PQ_result_spec_string ("unit",
+                                  &pd->unit),
+    TALER_PQ_RESULT_SPEC_AMOUNT ("price",
+                                 &pd->price),
+    TALER_PQ_result_spec_json ("taxes",
+                               &pd->taxes),
+    GNUNET_PQ_result_spec_uint64 ("total_stocked",
+                                  &pd->total_stocked),
+    GNUNET_PQ_result_spec_uint64 ("total_sold",
+                                  &pd->total_sold),
+    GNUNET_PQ_result_spec_uint64 ("total_lost",
+                                  &pd->total_lost),
+    TALER_PQ_result_spec_json ("image",
+                               &pd->image),
+    TALER_PQ_result_spec_json ("address",
+                               &pd->address),
+    GNUNET_PQ_result_spec_absolute_time ("next_restock",
+                                         &pd->next_restock),
+    GNUNET_PQ_result_spec_end
+  };
+  struct GNUNET_PQ_ResultSpec rs_null[] = {
+    GNUNET_PQ_result_spec_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                   "lookup_product",
+                                                   params,
+                                                   (NULL == pd)
+                                                   ? rs_null
+                                                   : rs);
+}
+
+
+/**
+ * Delete information about a product.  Note that the transaction must
+ * enforce that no stocks are currently locked.
+ *
+ * @param cls closure
+ * @param instance_id instance to delete product of
+ * @param product_id product to delete
+ * @return DB status code, #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS
+ *           if locks prevent deletion OR product unknown
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_delete_product (void *cls,
+                         const char *instance_id,
+                         const char *product_id)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (product_id),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "delete_product",
+                                             params);
+}
+
+
+/**
+ * Insert details about a particular product.
+ *
+ * @param cls closure
+ * @param instance_id instance to insert product for
+ * @param product_id product identifier of product to insert
+ * @param pd the product details to insert
+ * @return database result code
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_insert_product (void *cls,
+                         const char *instance_id,
+                         const char *product_id,
+                         const struct TALER_MERCHANTDB_ProductDetails *pd)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (product_id),
+    GNUNET_PQ_query_param_string (pd->description),
+    TALER_PQ_query_param_json (pd->description_i18n),
+    GNUNET_PQ_query_param_string (pd->unit),
+    TALER_PQ_query_param_json (pd->image),
+    TALER_PQ_query_param_json (pd->taxes),
+    TALER_PQ_query_param_amount (&pd->price),
+    GNUNET_PQ_query_param_uint64 (&pd->total_stocked),
+    GNUNET_PQ_query_param_uint64 (&pd->total_sold),
+    GNUNET_PQ_query_param_uint64 (&pd->total_lost),
+    TALER_PQ_query_param_json (pd->address),
+    GNUNET_PQ_query_param_absolute_time (&pd->next_restock),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_product",
+                                             params);
+}
+
+
+/**
+ * Update details about a particular product. Note that the
+ * transaction must enforce that the sold/stocked/lost counters
+ * are not reduced (i.e. by expanding the WHERE clause on the existing
+ * values).
+ *
+ * @param cls closure
+ * @param instance_id instance to lookup products for
+ * @param product_id product to lookup
+ * @param[out] pd set to the product details on success, can be NULL
+ *             (in that case we only want to check if the product exists)
+ * @return database result code, #GNUNET_DB_SUCCESS_NO_RESULTS if the
+ *         non-decreasing constraints are not met *or* if the product
+ *         does not yet exist.
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_update_product (void *cls,
+                         const char *instance_id,
+                         const char *product_id,
+                         struct TALER_MERCHANTDB_ProductDetails *pd)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (product_id),
+    GNUNET_PQ_query_param_string (pd->description),
+    TALER_PQ_query_param_json (pd->description_i18n),
+    GNUNET_PQ_query_param_string (pd->unit),
+    TALER_PQ_query_param_json (pd->image),
+    TALER_PQ_query_param_json (pd->taxes),
+    TALER_PQ_query_param_amount (&pd->price),
+    GNUNET_PQ_query_param_uint64 (&pd->total_stocked),
+    GNUNET_PQ_query_param_uint64 (&pd->total_sold),
+    GNUNET_PQ_query_param_uint64 (&pd->total_lost),
+    TALER_PQ_query_param_json (pd->address),
+    GNUNET_PQ_query_param_absolute_time (&pd->next_restock),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "update_product",
+                                             params);
+}
+
+
+/**
+ * Lock stocks of a particular product. Note that the transaction must
+ * enforce that the "stocked-sold-lost >= locked" constraint holds.
+ *
+ * @param cls closure
+ * @param instance_id instance to lookup products for
+ * @param product_id product to lookup
+ * @param uuid the UUID that holds the lock
+ * @param quantity how many units should be locked
+ * @param expiration_time when should the lock expire
+ * @return database result code, #GNUNET_DB_SUCCESS_NO_RESULTS if the
+ *         product is unknown OR if there insufficient stocks remaining
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_lock_product (void *cls,
+                       const char *instance_id,
+                       const char *product_id,
+                       const struct GNUNET_Uuid *uuid,
+                       uint32_t quantity,
+                       struct GNUNET_TIME_Absolute expiration_time)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (product_id),
+    GNUNET_PQ_query_param_auto_from_type (uuid),
+    GNUNET_PQ_query_param_uint32 (&quantity),
+    GNUNET_PQ_query_param_absolute_time (&expiration_time),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "lock_product",
+                                             params);
+}
+
+
 /* ********************* OLD API ************************** */
 
 /**
@@ -727,12 +1048,11 @@ postgres_inactivate_account (void *cls,
  * @return transaction status
  */
 static enum GNUNET_DB_QueryStatus
-postgres_find_contract_terms_from_hash (void *cls,
-                                        json_t **contract_terms,
-                                        const struct
-                                        GNUNET_HashCode *h_contract_terms,
-                                        const struct
-                                        TALER_MerchantPublicKeyP *merchant_pub)
+postgres_find_contract_terms_from_hash (
+  void *cls,
+  json_t **contract_terms,
+  const struct GNUNET_HashCode *h_contract_terms,
+  const struct TALER_MerchantPublicKeyP *merchant_pub)
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
@@ -3677,7 +3997,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "DELETE FROM merchant_instances"
                             " WHERE merchant_instances.merchant_id = $1",
                             1),
-    /* for postgres_patch_instance() */
+    /* for postgres_update_instance() */
     GNUNET_PQ_make_prepare ("update_instance",
                             "UPDATE merchant_instances SET"
                             " merchant_name=$2"
@@ -4199,8 +4519,14 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->insert_account = &postgres_insert_account;
   plugin->delete_instance_private_key = &postgres_delete_instance_private_key;
   plugin->purge_instance = &postgres_purge_instance;
-  plugin->patch_instance = &postgres_patch_instance;
+  plugin->update_instance = &postgres_update_instance;
   plugin->inactivate_account = &postgres_inactivate_account;
+  plugin->lookup_products = &postgres_lookup_products;
+  plugin->lookup_product = &postgres_lookup_product;
+  plugin->delete_product = &postgres_delete_product;
+  plugin->insert_product = &postgres_insert_product;
+  plugin->update_product = &postgres_update_product;
+  plugin->lock_product = &postgres_lock_product;
 
   /* old API: */
   plugin->store_deposit = &postgres_store_deposit;

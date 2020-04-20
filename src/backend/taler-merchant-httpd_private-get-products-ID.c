@@ -79,8 +79,8 @@ TMH_private_get_products_ID (const struct TMH_RequestHandler *rh,
       (json_int_t) pd.total_lost,
       "description_i18n",
       pd.description_i18n,
-      "location",
-      pd.location,
+      "address",
+      pd.address,
       "image",
       pd.image);
     GNUNET_free (pd.description);

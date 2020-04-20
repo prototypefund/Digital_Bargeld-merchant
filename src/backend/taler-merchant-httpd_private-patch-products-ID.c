@@ -101,7 +101,7 @@ determine_cause (struct MHD_Connection *connection,
     GNUNET_free (pdx.unit);
     json_decref (pdx.taxes);
     json_decref (pdx.image);
-    json_decref (pdx.location);
+    json_decref (pdx.address);
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_CONFLICT,
                                        ec,
@@ -141,8 +141,8 @@ TMH_private_patch_products_ID (const struct TMH_RequestHandler *rh,
                            &pd.image),
     GNUNET_JSON_spec_json ("taxes",
                            &pd.taxes),
-    GNUNET_JSON_spec_json ("location",
-                           &pd.taxes),
+    GNUNET_JSON_spec_json ("address",
+                           &pd.address),
     GNUNET_JSON_spec_int64 ("total_stocked",
                             &total_stocked),
     GNUNET_JSON_spec_absolute_time ("next_restock",

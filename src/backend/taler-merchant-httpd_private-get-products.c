@@ -26,21 +26,18 @@
  * Add product details to our JSON array.
  *
  * @param cls a `json_t *` JSON array to build
- * @param key unused
  * @param product_id ID of the product
  * @param in_stock how many are currently in stock (possibly locked), -1 for infinite
  * @param unit in which unit is the stock measured in
  */
 static void
 add_product (void *cls,
-             const struct GNUNET_HashCode *key,
              const char *product_id,
              long long in_stock,
              const char *unit)
 {
   json_t *pa = cls;
 
-  (void) key;
   GNUNET_assert (0 ==
                  json_array_append_new (
                    pa,
