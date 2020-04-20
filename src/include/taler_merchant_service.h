@@ -334,6 +334,243 @@ TALER_MERCHANT_instances_get_cancel (
 
 
 /**
+ * Handle for a POST /instances/$ID operation.
+ */
+struct TALER_MERCHANT_InstancesPostHandle;
+
+
+/**
+ * Function called with the result of the GET /instances/$ID operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response data
+ */
+typedef void
+(*TALER_MERCHANT_InstancesPostCallback)(
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr);
+
+
+/**
+ * Setup an new instance in the backend.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id identity of the instance to get information about
+ * @param payto_uris_length length of the @a accounts array
+ * @param payto_uris URIs of the bank accounts of the merchant instance
+ * @param name name of the merchant instance
+ * @param address physical address of the merchant instance
+ * @param jurisdiction jurisdiction of the merchant instance
+ * @param default_max_wire_fee default maximum wire fee merchant is willing to fully pay
+ * @param default_wire_fee_amortization default amortization factor for excess wire fees
+ * @param default_max_deposit_fee default maximum deposit fee merchant is willing to pay
+ * @param default_wire_transfer_delay default wire transfer delay merchant will ask for
+ * @param default_pay_delay default validity period for offers merchant makes
+ * @param cb function to call with the
+ *        backend's instances information
+ * @param cb_cls closure for @a config_cb
+ * @return the instances handle; NULL upon error
+ */
+struct TALER_MERCHANT_InstancesPostHandle *
+TALER_MERCHANT_instances_post (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  unsigned int accounts_length,
+  const char *payto_uris[],
+  const char *name,
+  const json_t *address,
+  const json_t *jurisdiction,
+  const struct TALER_Amount *default_max_wire_fee,
+  uint32_t default_wire_fee_amortization,
+  const struct TALER_Amount *default_max_deposit_fee,
+  struct GNUNET_TIME_Relative default_wire_transfer_delay,
+  struct GNUNET_TIME_Relative default_pay_delay,
+  TALER_MERCHANT_InstancesPostCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel /instances request.  Must not be called by clients after
+ * the callback was invoked.
+ *
+ * @param igh request to cancel.
+ */
+void
+TALER_MERCHANT_instances_post_cancel (
+  struct TALER_MERCHANT_InstancesPostHandle *iph);
+
+
+/**
+ * Handle for a PATCH /instances/$ID operation.
+ */
+struct TALER_MERCHANT_InstancePatchHandle;
+
+
+/**
+ * Function called with the result of the GET /instances/$ID operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response data
+ */
+typedef void
+(*TALER_MERCHANT_InstancePatchCallback)(
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr);
+
+
+/**
+ * Setup an new instance in the backend.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id identity of the instance to get information about
+ * @param payto_uris_length length of the @a accounts array
+ * @param payto_uris URIs of the bank accounts of the merchant instance
+ * @param name name of the merchant instance
+ * @param address physical address of the merchant instance
+ * @param jurisdiction jurisdiction of the merchant instance
+ * @param default_max_wire_fee default maximum wire fee merchant is willing to fully pay
+ * @param default_wire_fee_amortization default amortization factor for excess wire fees
+ * @param default_max_deposit_fee default maximum deposit fee merchant is willing to pay
+ * @param default_wire_transfer_delay default wire transfer delay merchant will ask for
+ * @param default_pay_delay default validity period for offers merchant makes
+ * @param cb function to call with the
+ *        backend's instances information
+ * @param cb_cls closure for @a config_cb
+ * @return the instances handle; NULL upon error
+ */
+struct TALER_MERCHANT_InstancePatchHandle *
+TALER_MERCHANT_instance_patch (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *instance_id,
+  unsigned int accounts_length,
+  const char *payto_uris[],
+  const char *name,
+  const json_t *address,
+  const json_t *jurisdiction,
+  const struct TALER_Amount *default_max_wire_fee,
+  uint32_t default_wire_fee_amortization,
+  const struct TALER_Amount *default_max_deposit_fee,
+  struct GNUNET_TIME_Relative default_wire_transfer_delay,
+  struct GNUNET_TIME_Relative default_pay_delay,
+  TALER_MERCHANT_InstancePatchCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel /instances request.  Must not be called by clients after
+ * the callback was invoked.
+ *
+ * @param igh request to cancel.
+ */
+void
+TALER_MERCHANT_instance_patch_cancel (
+  struct TALER_MERCHANT_InstancePatchHandle *iph);
+
+
+/**
+ * Handle for a GET /instances/$ID operation.
+ */
+struct TALER_MERCHANT_InstanceGetHandle;
+
+
+/**
+ * Details about a merchant's bank account.
+ */
+struct TALER_MERCHANT_Account
+{
+  /**
+   * salt used to compute h_wire
+   */
+  struct GNUNET_HashCode salt;
+
+  /**
+   * payto:// URI of the account.
+   */
+  const char *payto_uri;
+
+  /**
+   * Hash of @e payto_uri and @e salt.
+   */
+  struct GNUNET_HashCode h_wire;
+
+  /**
+   * true if the account is active,
+   * false if it is historic.
+   */
+  bool active;
+};
+
+
+/**
+ * Function called with the result of the GET /instances/$ID operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response data
+ * @param accounts_length length of the @a accounts array
+ * @param accounts bank accounts of the merchant instance
+ * @param name name of the merchant instance
+ * @param merchant_pub public key of the merchant instance
+ * @param address physical address of the merchant instance
+ * @param jurisdiction jurisdiction of the merchant instance
+ * @param default_max_wire_fee default maximum wire fee merchant is willing to fully pay
+ * @param default_wire_fee_amortization default amortization factor for excess wire fees
+ * @param default_max_deposit_fee default maximum deposit fee merchant is willing to pay
+ * @param default_wire_transfer_delay default wire transfer delay merchant will ask for
+ * @param default_pay_delay default validity period for offers merchant makes
+ */
+typedef void
+(*TALER_MERCHANT_InstanceGetCallback)(
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  unsigned int accounts_length,
+  const struct TALER_MERCHANT_Account accounts[],
+  const char *name,
+  const struct TALER_MerchantPublicKeyP *merchant_pub,
+  const json_t *address,
+  const json_t *jurisdiction,
+  const struct TALER_Amount *default_max_wire_fee,
+  uint32_t default_wire_fee_amortization,
+  const struct TALER_Amount *default_max_deposit_fee,
+  struct GNUNET_TIME_Relative default_wire_transfer_delay,
+  struct GNUNET_TIME_Relative default_pay_delay);
+
+
+/**
+ * Get the details on one of the instances of a backend. Will connect to the
+ * merchant backend and obtain information about the instance.  The respective
+ * information will be passed to the @a cb once available.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id identity of the instance to get information about
+ * @param cb function to call with the
+ *        backend's instances information
+ * @param cb_cls closure for @a config_cb
+ * @return the instances handle; NULL upon error
+ */
+struct TALER_MERCHANT_InstanceGetHandle *
+TALER_MERCHANT_instance_get (struct GNUNET_CURL_Context *ctx,
+                             const char *backend_url,
+                             TALER_MERCHANT_InstanceGetCallback cb,
+                             void *cb_cls);
+
+
+/**
+ * Cancel /instances request.  Must not be called by clients after
+ * the callback was invoked.
+ *
+ * @param igh request to cancel.
+ */
+void
+TALER_MERCHANT_instance_get_cancel (
+  struct TALER_MERCHANT_InstanceGetHandle *igh);
+
+
+/**
  * Handle for a DELETE /instances operation.
  */
 struct TALER_MERCHANT_InstanceDeleteHandle;
