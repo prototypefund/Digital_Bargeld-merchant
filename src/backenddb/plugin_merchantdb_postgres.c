@@ -760,7 +760,7 @@ lookup_products_cb (void *cls,
     struct GNUNET_PQ_ResultSpec rs[] = {
       GNUNET_PQ_result_spec_string ("product_id",
                                     &product_id),
-      GNUNET_PQ_result_spec_uint64 ("in_stock",
+      GNUNET_PQ_result_spec_uint64 ("total_stock",
                                     &in_stock),
       GNUNET_PQ_result_spec_string ("unit",
                                     &unit),
@@ -4018,6 +4018,139 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             " active=FALSE"
                             " WHERE h_wire = $1",
                             1),
+    /* for postgres_lookup_products() */
+    GNUNET_PQ_make_prepare ("lookup_products",
+                            "SELECT"
+                            " product_id"
+                            ",total_stock"
+                            ",unit"
+                            " FROM merchant_inventory"
+                            " JOIN merchant_instances"
+                            "   USING (merchant_serial)"
+                            " WHERE merchant_instances.merchant_id=$1",
+                            1),
+    /* for postgres_lookup_product() */
+    GNUNET_PQ_make_prepare ("lookup_product",
+                            "SELECT"
+                            " description"
+                            ",description_i18n"
+                            ",unit"
+                            ",price_val"
+                            ",price_frac"
+                            ",taxes"
+                            ",total_stock"
+                            ",total_sold"
+                            ",total_lost"
+                            ",image"
+                            ",merchant_inventory.address"
+                            ",next_restock"
+                            " FROM merchant_inventory"
+                            " JOIN merchant_instances"
+                            "   USING (merchant_serial)"
+                            " WHERE merchant_instances.merchant_id=$1"
+                            "   AND merchant_inventory.product_id=$2",
+                            2),
+    /* for postgres_delete_product() */
+    GNUNET_PQ_make_prepare ("delete_product",
+                            "DELETE"
+                            " FROM merchant_inventory"
+                            " WHERE merchant_inventory.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND merchant_inventory.product_id=$2"
+                            "   AND product_serial NOT IN "
+                            "     (SELECT product_serial FROM merchant_order_locks)"
+                            "   AND product_serial NOT IN "
+                            "     (SELECT product_serial FROM merchant_inventory_locks)",
+                            2),
+    /* for postgres_insert_product() */
+    GNUNET_PQ_make_prepare ("insert_product",
+                            "INSERT INTO merchant_inventory"
+                            "(merchant_serial"
+                            ",product_id"
+                            ",description"
+                            ",description_i18n"
+                            ",unit"
+                            ",image"
+                            ",taxes"
+                            ",price_val"
+                            ",price_frac"
+                            ",total_stock"
+                            ",total_sold"
+                            ",total_lost"
+                            ",address"
+                            ",next_restock)"
+                            " SELECT merchant_serial,"
+                            " $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14"
+                            " FROM merchant_instances"
+                            " WHERE merchant_id=$1",
+                            14),
+    /* for postgres_update_product() */
+    GNUNET_PQ_make_prepare ("update_product",
+                            "UPDATE merchant_inventory SET"
+                            " description=$3"
+                            ",description_i18n=$4"
+                            ",unit=$5"
+                            ",image=$6"
+                            ",taxes=$7"
+                            ",price_val=$8"
+                            ",price_frac=$9"
+                            ",total_stock=$10"
+                            ",total_sold=$11"
+                            ",total_lost=$12"
+                            ",address=$13"
+                            ",next_restock=$14"
+                            " WHERE merchant_serial="
+                            "   (SELECT merchant_serial"
+                            "      FROM merchant_instances"
+                            "      WHERE merchant_id=$1)"
+                            "   AND product_id=$2"
+                            "   AND total_stock <= $10"
+                            "   AND total_sold <= $11"
+                            "   AND total_lost <= $12",
+                            14),
+
+    /* for postgres_lock_product() */
+    /* TODO: there MAY be a more elegant way to write this SQL
+       statement to *first* get the product_serial and then
+       re-use it in the 3 main 'AND' sub-clauses */
+    GNUNET_PQ_make_prepare ("lock_product",
+                            "INSERT INTO merchant_inventory_locks"
+                            "(product_serial"
+                            ",lock_uuid"
+                            ",total_locked"
+                            ",expiration)"
+                            " SELECT product_serial, $3, $4, $5"
+                            "   FROM merchant_inventory"
+                            "   WHERE product_id=$2"
+                            "     AND merchant_serial="
+                            "       (SELECT merchant_serial"
+                            "          FROM merchant_instances"
+                            "          WHERE merchant_id=$1)"
+                            "     AND total_stock - total_sold - total_lost > "
+                            "       (SELECT SUM(total_locked)"
+                            "          FROM merchant_inventory_locks"
+                            "          WHERE product_serial="
+                            "            (SELECT product_serial"
+                            "               FROM merchant_inventory"
+                            "               WHERE product_id=$2"
+                            "                 AND merchant_serial="
+                            "                 (SELECT merchant_serial"
+                            "                    FROM merchant_instances"
+                            "                    WHERE merchant_id=$1))) +"
+                            "       (SELECT SUM(total_locked)"
+                            "          FROM merchant_order_locks"
+                            "          WHERE product_serial="
+                            "            (SELECT product_serial"
+                            "               FROM merchant_inventory"
+                            "               WHERE product_id=$2"
+                            "                 AND merchant_serial="
+                            "                 (SELECT merchant_serial"
+                            "                    FROM merchant_instances"
+                            "                    WHERE merchant_id=$1)))",
+                            5),
+
     /* OLD API: */
 #if 0
     GNUNET_PQ_make_prepare ("insert_deposit",

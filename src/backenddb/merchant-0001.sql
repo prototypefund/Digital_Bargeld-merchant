@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS merchant_inventory
   ,image BYTEA NOT NULL
   ,taxes BYTEA NOT NULL
   ,price_val INT8 NOT NULL
-  ,price_frac INT4 NOT NULL
+  ,price_frac cINT4 NOT NULL
   ,total_stock BIGINT NOT NULL
   ,total_sold BIGINT NOT NULL
   ,total_lost BIGINT NOT NULL
@@ -162,7 +162,7 @@ COMMENT ON COLUMN merchant_inventory.next_restock
 
 CREATE TABLE IF NOT EXISTS merchant_inventory_locks
   (product_serial BIGINT NOT NULL
-     REFERENCES merchant_inventory (product_serial) ON DELETE CASCADE
+     REFERENCES merchant_inventory (product_serial) -- NO "ON DELETE CASCADE": locks prevent deletion!
   ,lock_uuid BYTEA NOT NULL CHECK (LENGTH(lock_uuid)=32)
   ,total_locked BIGINT NOT NULL
   ,expiration TIMESTAMP NOT NULL
@@ -206,7 +206,7 @@ CREATE INDEX IF NOT EXISTS merchant_orders_by_expiration
 
 CREATE TABLE IF NOT EXISTS merchant_order_locks
   (product_serial BIGINT NOT NULL
-     REFERENCES merchant_inventory (product_serial) ON DELETE CASCADE
+     REFERENCES merchant_inventory (product_serial) -- NO "ON DELETE CASCADE": locks prevent deletion!
   ,total_locked BIGINT NOT NULL
   ,order_serial BIGINT NOT NULL
      REFERENCES merchant_orders (order_serial) ON DELETE CASCADE
