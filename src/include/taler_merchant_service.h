@@ -877,7 +877,7 @@ typedef void
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
  * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books)
- * @param location where the product is in stock
+ * @param address where the product is in stock
  * @param next_restock when the next restocking is expected to happen, 0 for unknown,
  *                     #GNUNET_TIME_UNIT_FOREVER_ABS for 'never'.
  * @param cb function to call with the backend's result
@@ -897,7 +897,7 @@ TALER_MERCHANT_products_post (
   const json_t *image,
   const json_t *taxes,
   int64_t total_stocked,
-  const json_t *location,
+  const json_t *address,
   struct GNUNET_TIME_Absolute next_restock,
   TALER_MERCHANT_ProductsPostCallback cb,
   void *cb_cls);
