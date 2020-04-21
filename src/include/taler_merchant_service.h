@@ -1032,6 +1032,7 @@ TALER_MERCHANT_product_lock (
   const char *backend_url,
   const char *instance_id,
   const char *product_id,
+  const struct GNUNET_Uuid *uuid,
   struct GNUNET_TIME_Relative duration,
   uint32_t quantity,
   TALER_MERCHANT_ProductLockCallback cb,
