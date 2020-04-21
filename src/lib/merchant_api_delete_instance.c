@@ -15,8 +15,8 @@
   <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_delete_instances_ID.c
- * @brief Implementation of the GET /instances request of the merchant's HTTP API
+ * @file lib/merchant_api_delete_instance.c
+ * @brief Implementation of the DELETE /instance/$ID request of the merchant's HTTP API
  * @author Christian Grothoff
  */
 #include "platform.h"
@@ -65,14 +65,14 @@ struct TALER_MERCHANT_InstanceDeleteHandle
 
 /**
  * Function called when we're done processing the
- * HTTP DELETE /instances/$ID request.
+ * HTTP GET /instances/$ID request.
  *
- * @param cls the `struct TALER_MERCHANT_InstancesDeleteHandle`
+ * @param cls the `struct TALER_MERCHANT_InstanceDeleteHandle`
  * @param response_code HTTP response code, 0 on error
  * @param json response body, NULL if not in JSON
  */
 static void
-handle_instance_delete_finished (void *cls,
+handle_delete_instance_finished (void *cls,
                                  long response_code,
                                  const void *response)
 {
@@ -85,15 +85,11 @@ handle_instance_delete_finished (void *cls,
 
   idh->job = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Got /instances response with status code %u\n",
+              "Got /instances/$ID response with status code %u\n",
               (unsigned int) response_code);
   switch (response_code)
   {
-  case MHD_HTTP_OK:
-    break;
-  case MHD_HTTP_NOT_FOUND:
-    hr.ec = TALER_JSON_get_error_code (json);
-    hr.hint = TALER_JSON_get_error_hint (json);
+  case MHD_HTTP_NO_CONTENT:
     break;
   default:
     /* unexpected response code */
@@ -112,8 +108,9 @@ handle_instance_delete_finished (void *cls,
 
 
 /**
- * Purge all data associated with an instance. Use with
- * extreme caution.
+ * Delete the private key of an instance of a backend, thereby disabling the
+ * instance for future requests.  Will preserve the other instance data
+ * (i.e. for taxation).
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
@@ -123,38 +120,28 @@ handle_instance_delete_finished (void *cls,
  * @param instances_cb_cls closure for @a config_cb
  * @return the instances handle; NULL upon error
  */
-static struct TALER_MERCHANT_InstanceDeleteHandle *
-instance_delete (
-  struct GNUNET_CURL_Context *ctx,
-  const char *backend_url,
-  const char *instance_id,
-  bool purge,
-  TALER_MERCHANT_InstanceDeleteCallback instances_cb,
-  void *instances_cb_cls)
+struct TALER_MERCHANT_InstanceDeleteHandle *
+TALER_MERCHANT_instance_delete (struct GNUNET_CURL_Context *ctx,
+                                const char *backend_url,
+                                const char *instance_id,
+                                TALER_MERCHANT_InstanceDeleteCallback cb,
+                                void *cb_cls)
 {
   struct TALER_MERCHANT_InstanceDeleteHandle *idh;
-  CURL *eh;
 
   idh = GNUNET_new (struct TALER_MERCHANT_InstanceDeleteHandle);
   idh->ctx = ctx;
-  idh->cb = instances_cb;
-  idh->cb_cls = instances_cb_cls;
+  idh->cb = cb;
+  idh->cb_cls = cb_cls;
   {
     char *path;
 
     GNUNET_asprintf (&path,
                      "instances/%s",
                      instance_id);
-    if (purge)
-      idh->url = TALER_url_join (backend_url,
-                                 path,
-                                 "purge",
-                                 "true",
-                                 NULL);
-    else
-      idh->url = TALER_url_join (backend_url,
-                                 path,
-                                 NULL);
+    idh->url = TALER_url_join (backend_url,
+                               path,
+                               NULL);
     GNUNET_free (path);
   }
   if (NULL == idh->url)
@@ -167,85 +154,27 @@ instance_delete (
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "Requesting URL '%s'\n",
               idh->url);
-  eh = curl_easy_init ();
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_URL,
-                                   idh->url));
-  GNUNET_assert (CURLE_OK ==
-                 curl_easy_setopt (eh,
-                                   CURLOPT_CUSTOMREQUEST,
-                                   MHD_HTTP_METHOD_DELETE));
-  idh->job = GNUNET_CURL_job_add (ctx,
-                                  eh,
-                                  GNUNET_YES,
-                                  &handle_instance_delete_finished,
-                                  idh);
+  {
+    CURL *eh;
+
+    eh = curl_easy_init ();
+    GNUNET_assert (CURLE_OK ==
+                   curl_easy_setopt (eh,
+                                     CURLOPT_URL,
+                                     idh->url));
+    idh->job = GNUNET_CURL_job_add (ctx,
+                                    eh,
+                                    GNUNET_YES,
+                                    &handle_delete_instance_finished,
+                                    idh);
+  }
   return idh;
 }
 
 
 /**
- * Purge all data associated with an instance. Use with
- * extreme caution.
- *
- * @param ctx the context
- * @param backend_url HTTP base URL for the backend
- * @param instance_id which instance should be deleted
- * @param instances_cb function to call with the
- *        backend's return
- * @param instances_cb_cls closure for @a config_cb
- * @return the instances handle; NULL upon error
- */
-struct TALER_MERCHANT_InstanceDeleteHandle *
-TALER_MERCHANT_instance_delete (
-  struct GNUNET_CURL_Context *ctx,
-  const char *backend_url,
-  const char *instance_id,
-  TALER_MERCHANT_InstanceDeleteCallback instances_cb,
-  void *instances_cb_cls)
-{
-  return instance_delete (ctx,
-                          backend_url,
-                          instance_id,
-                          false,
-                          instances_cb,
-                          instances_cb_cls);
-}
-
-
-/**
- * Purge all data associated with an instance. Use with
- * extreme caution.
- *
- * @param ctx the context
- * @param backend_url HTTP base URL for the backend
- * @param instance_id which instance should be deleted
- * @param instances_cb function to call with the
- *        backend's return
- * @param instances_cb_cls closure for @a config_cb
- * @return the instances handle; NULL upon error
- */
-struct TALER_MERCHANT_InstanceDeleteHandle *
-TALER_MERCHANT_instance_purge (
-  struct GNUNET_CURL_Context *ctx,
-  const char *backend_url,
-  const char *instance_id,
-  TALER_MERCHANT_InstanceDeleteCallback instances_cb,
-  void *instances_cb_cls)
-{
-  return instance_delete (ctx,
-                          backend_url,
-                          instance_id,
-                          true,
-                          instances_cb,
-                          instances_cb_cls);
-}
-
-
-/**
- * Cancel /instances DELETE request.  Must not be called by clients after the
- * callback was invoked.
+ * Cancel DELETE /instance/$ID request.  Must not be called by clients after
+ * the callback was invoked.
  *
  * @param idh request to cancel.
  */

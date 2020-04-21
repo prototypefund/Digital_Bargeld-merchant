@@ -506,21 +506,65 @@ struct TALER_MERCHANT_Account
 
 
 /**
+ * Details about an instance.
+ */
+struct TALER_MERCHANT_InstanceDetails
+{
+  /**
+   * Name of the merchant instance
+   */
+  const char *name;
+
+  /**
+   * public key of the merchant instance
+   */
+  const struct TALER_MerchantPublicKeyP *merchant_pub;
+
+  /**
+   * physical address of the merchant instance
+   */
+  const json_t *address;
+
+  /**
+   * jurisdiction of the merchant instance
+   */
+  const json_t *jurisdiction;
+
+  /**
+   * default maximum wire fee merchant is willing to fully pay
+   */
+  const struct TALER_Amount *default_max_wire_fee;
+
+  /**
+   * default amortization factor for excess wire fees
+   */
+  uint32_t default_wire_fee_amortization;
+
+  /**
+   * default maximum deposit fee merchant is willing to pay
+   */
+  const struct TALER_Amount *default_max_deposit_fee;
+
+  /**
+   * default wire transfer delay merchant will ask for
+   */
+  struct GNUNET_TIME_Relative default_wire_transfer_delay;
+
+  /**
+   * default validity period for offers merchant makes
+   */
+  struct GNUNET_TIME_Relative default_pay_delay;
+};
+
+
+/**
  * Function called with the result of the GET /instances/$ID operation.
  *
  * @param cls closure
  * @param hr HTTP response data
  * @param accounts_length length of the @a accounts array
  * @param accounts bank accounts of the merchant instance
- * @param name name of the merchant instance
- * @param merchant_pub public key of the merchant instance
- * @param address physical address of the merchant instance
- * @param jurisdiction jurisdiction of the merchant instance
- * @param default_max_wire_fee default maximum wire fee merchant is willing to fully pay
- * @param default_wire_fee_amortization default amortization factor for excess wire fees
- * @param default_max_deposit_fee default maximum deposit fee merchant is willing to pay
- * @param default_wire_transfer_delay default wire transfer delay merchant will ask for
- * @param default_pay_delay default validity period for offers merchant makes
+ * @param details details about the instance configuration
  */
 typedef void
 (*TALER_MERCHANT_InstanceGetCallback)(
@@ -528,15 +572,7 @@ typedef void
   const struct TALER_MERCHANT_HttpResponse *hr,
   unsigned int accounts_length,
   const struct TALER_MERCHANT_Account accounts[],
-  const char *name,
-  const struct TALER_MerchantPublicKeyP *merchant_pub,
-  const json_t *address,
-  const json_t *jurisdiction,
-  const struct TALER_Amount *default_max_wire_fee,
-  uint32_t default_wire_fee_amortization,
-  const struct TALER_Amount *default_max_deposit_fee,
-  struct GNUNET_TIME_Relative default_wire_transfer_delay,
-  struct GNUNET_TIME_Relative default_pay_delay);
+  const struct TALER_MERCHANT_InstanceDetails *details);
 
 
 /**
@@ -555,6 +591,7 @@ typedef void
 struct TALER_MERCHANT_InstanceGetHandle *
 TALER_MERCHANT_instance_get (struct GNUNET_CURL_Context *ctx,
                              const char *backend_url,
+                             const char *instance_id,
                              TALER_MERCHANT_InstanceGetCallback cb,
                              void *cb_cls);
 
@@ -589,7 +626,7 @@ typedef void
 
 
 /**
- * Get the private key of an instance of a backend, thereby disabling the
+ * Delete the private key of an instance of a backend, thereby disabling the
  * instance for future requests.  Will preserve the other instance data
  * (i.e. for taxation).
  *
