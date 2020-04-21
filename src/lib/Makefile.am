@@ -21,6 +21,7 @@ libtalermerchanttesting_la_LDFLAGS = \
 libtalermerchant_la_SOURCES = \
   merchant_api_common.c \
   merchant_api_delete_instance.c \
+  merchant_api_delete_product.c \
   merchant_api_get_config.c \
   merchant_api_get_instance.c \
   merchant_api_get_instances.c \
