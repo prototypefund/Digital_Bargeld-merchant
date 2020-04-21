@@ -162,6 +162,10 @@ TALER_MERCHANT_instance_delete (struct GNUNET_CURL_Context *ctx,
                    curl_easy_setopt (eh,
                                      CURLOPT_URL,
                                      idh->url));
+    GNUNET_assert (CURLE_OK ==
+                   curl_easy_setopt (eh,
+                                     CURLOPT_CUSTOMREQUEST,
+                                     MHD_HTTP_METHOD_DELETE));
     idh->job = GNUNET_CURL_job_add (ctx,
                                     eh,
                                     GNUNET_YES,

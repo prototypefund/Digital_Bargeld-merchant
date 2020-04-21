@@ -17,8 +17,8 @@
   If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_post_instances.c
- * @brief Implementation of the POST /instances request
+ * @file lib/merchant_api_patch_instance.c
+ * @brief Implementation of the PATCH /instances/$ID request
  *        of the merchant's HTTP API
  * @author Christian Grothoff
  */
@@ -33,9 +33,9 @@
 
 
 /**
- * Handle for a POST /instances/$ID operation.
+ * Handle for a PATCH /instances/$ID operation.
  */
-struct TALER_MERCHANT_InstancesPostHandle
+struct TALER_MERCHANT_InstancePatchHandle
 {
 
   /**
@@ -51,7 +51,7 @@ struct TALER_MERCHANT_InstancesPostHandle
   /**
    * Function to call with the result.
    */
-  TALER_MERCHANT_InstancesPostCallback cb;
+  TALER_MERCHANT_InstancePatchCallback cb;
 
   /**
    * Closure for @a cb.
@@ -73,18 +73,18 @@ struct TALER_MERCHANT_InstancesPostHandle
 
 /**
  * Function called when we're done processing the
- * HTTP POST /instances request.
+ * HTTP PATCH /instances/$ID request.
  *
- * @param cls the `struct TALER_MERCHANT_InstancesPostHandle`
+ * @param cls the `struct TALER_MERCHANT_InstancePatchHandle`
  * @param response_code HTTP response code, 0 on error
  * @param json response body, NULL if not in JSON
  */
 static void
-handle_post_instances_finished (void *cls,
+handle_patch_instance_finished (void *cls,
                                 long response_code,
                                 const void *response)
 {
-  struct TALER_MERCHANT_InstancesPostHandle *iph = cls;
+  struct TALER_MERCHANT_InstancePatchHandle *iph = cls;
   const json_t *json = response;
   struct TALER_MERCHANT_HttpResponse hr = {
     .http_status = (unsigned int) response_code,
@@ -93,7 +93,7 @@ handle_post_instances_finished (void *cls,
 
   iph->job = NULL;
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "POST /instances completed with response code %u\n",
+              "PATCH /instances/$ID completed with response code %u\n",
               (unsigned int) response_code);
   switch (response_code)
   {
@@ -105,6 +105,7 @@ handle_post_instances_finished (void *cls,
   case MHD_HTTP_BAD_REQUEST:
     hr.ec = TALER_JSON_get_error_code (json);
     hr.hint = TALER_JSON_get_error_hint (json);
+    GNUNET_break_op (0);
     /* This should never happen, either us
      * or the merchant is buggy (or API version conflict);
      * just pass JSON reply to the application */
@@ -119,9 +120,6 @@ handle_post_instances_finished (void *cls,
   case MHD_HTTP_NOT_FOUND:
     hr.ec = TALER_JSON_get_error_code (json);
     hr.hint = TALER_JSON_get_error_hint (json);
-    /* Nothing really to verify, this should never
-       happen, we should pass the JSON reply to the
-       application */
     break;
   case MHD_HTTP_CONFLICT:
     hr.ec = TALER_JSON_get_error_code (json);
@@ -147,12 +145,12 @@ handle_post_instances_finished (void *cls,
   }
   iph->cb (iph->cb_cls,
            &hr);
-  TALER_MERCHANT_instances_post_cancel (iph);
+  TALER_MERCHANT_instance_patch_cancel (iph);
 }
 
 
 /**
- * Setup an new instance in the backend.
+ * Update instance configuration.
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
@@ -172,8 +170,8 @@ handle_post_instances_finished (void *cls,
  * @param cb_cls closure for @a config_cb
  * @return the instances handle; NULL upon error
  */
-struct TALER_MERCHANT_InstancesPostHandle *
-TALER_MERCHANT_instances_post (
+struct TALER_MERCHANT_InstancePatchHandle *
+TALER_MERCHANT_instance_patch (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
   const char *instance_id,
@@ -187,10 +185,10 @@ TALER_MERCHANT_instances_post (
   const struct TALER_Amount *default_max_deposit_fee,
   struct GNUNET_TIME_Relative default_wire_transfer_delay,
   struct GNUNET_TIME_Relative default_pay_delay,
-  TALER_MERCHANT_InstancesPostCallback cb,
+  TALER_MERCHANT_InstancePatchCallback cb,
   void *cb_cls)
 {
-  struct TALER_MERCHANT_InstancesPostHandle *iph;
+  struct TALER_MERCHANT_InstancePatchHandle *iph;
   json_t *jpayto_uris;
   json_t *req_obj;
 
@@ -211,19 +209,17 @@ TALER_MERCHANT_instances_post (
       return NULL;
     }
   }
-  req_obj = json_pack ("{s:o, s:s, s:s, s:O, s:O"
+  req_obj = json_pack ("{s:o, s:s, s:O, s:O"
                        " s:o, s:I: s:o, s:o, s:o}",
                        "payto_uris",
                        jpayto_uris,
-                       "id",
-                       instance_id,
                        "name",
                        name,
                        "address",
                        address,
                        "jurisdiction",
                        jurisdiction,
-                       /* end of group of 5 */
+                       /* end of group of 4 */
                        "default_max_wire_fee",
                        TALER_JSON_from_amount (default_max_wire_fee),
                        "default_wire_fee_amortization",
@@ -239,13 +235,21 @@ TALER_MERCHANT_instances_post (
     GNUNET_break (0);
     return NULL;
   }
-  iph = GNUNET_new (struct TALER_MERCHANT_InstancesPostHandle);
+  iph = GNUNET_new (struct TALER_MERCHANT_InstancePatchHandle);
   iph->ctx = ctx;
   iph->cb = cb;
   iph->cb_cls = cb_cls;
-  iph->url = TALER_url_join (backend_url,
-                             "/instances",
-                             NULL);
+  {
+    char *path;
+
+    GNUNET_asprintf (&path,
+                     "instances/%s",
+                     instance_id);
+    iph->url = TALER_url_join (backend_url,
+                               path,
+                               NULL);
+    GNUNET_free (path);
+  }
   if (NULL == iph->url)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
@@ -273,10 +277,14 @@ TALER_MERCHANT_instances_post (
     GNUNET_assert (CURLE_OK == curl_easy_setopt (eh,
                                                  CURLOPT_URL,
                                                  iph->url));
+    GNUNET_assert (CURLE_OK ==
+                   curl_easy_setopt (eh,
+                                     CURLOPT_CUSTOMREQUEST,
+                                     MHD_HTTP_METHOD_PATCH));
     iph->job = GNUNET_CURL_job_add2 (ctx,
                                      eh,
                                      iph->post_ctx.headers,
-                                     &handle_post_instances_finished,
+                                     &handle_patch_instance_finished,
                                      iph);
   }
   return iph;
@@ -284,14 +292,14 @@ TALER_MERCHANT_instances_post (
 
 
 /**
- * Cancel /instances request.  Must not be called by clients after
+ * Cancel PATCH /instances/$ID request.  Must not be called by clients after
  * the callback was invoked.
  *
- * @param igh request to cancel.
+ * @param iph request to cancel.
  */
 void
-TALER_MERCHANT_instances_post_cancel (
-  struct TALER_MERCHANT_InstancesPostHandle *iph)
+TALER_MERCHANT_instance_patch_cancel (
+  struct TALER_MERCHANT_InstancePatchHandle *iph)
 {
   if (NULL != iph->job)
   {
@@ -304,4 +312,4 @@ TALER_MERCHANT_instances_post_cancel (
 }
 
 
-/* end of merchant_api_post_instances.c */
+/* end of merchant_api_patch_instance.c */
