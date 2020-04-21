@@ -1085,6 +1085,7 @@ TALER_MERCHANT_product_delete (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
   const char *instance_id,
+  const char *product_id,
   TALER_MERCHANT_ProductDeleteCallback cb,
   void *cb_cls);
 
