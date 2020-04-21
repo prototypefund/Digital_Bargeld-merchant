@@ -956,7 +956,7 @@ typedef void
  * @param total_lost in @a units, must be larger than previous values, and may
  *               not exceed total_stocked minus total_sold; if it does, the transaction
  *               will fail with a #MHD_HTTP_CONFLICT HTTP status code
- * @param location where the product is in stock
+ * @param address where the product is in stock
  * @param next_restock when the next restocking is expected to happen
  * @param cb function to call with the backend's result
  * @param cb_cls closure for @a cb
@@ -976,7 +976,7 @@ TALER_MERCHANT_product_patch (
   const json_t *taxes,
   int64_t total_stocked,
   uint64_t total_lost,
-  const json_t *location,
+  const json_t *address,
   struct GNUNET_TIME_Absolute next_restock,
   TALER_MERCHANT_ProductPatchCallback cb,
   void *cb_cls);

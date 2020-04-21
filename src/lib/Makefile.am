@@ -27,6 +27,7 @@ libtalermerchant_la_SOURCES = \
   merchant_api_get_product.c \
   merchant_api_get_products.c \
   merchant_api_patch_instance.c \
+  merchant_api_patch_product.c \
   merchant_api_post_instances.c \
   merchant_api_check_payment.c \
   merchant_api_history.c \
