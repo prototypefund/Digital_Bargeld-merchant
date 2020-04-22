@@ -14,6 +14,8 @@ libtalermerchanttesting_la_LDFLAGS = \
   -no-undefined
 
 libtalermerchanttesting_la_SOURCES = \
+  testing_api_cmd_get_instance.c \
+   \
   testing_api_cmd_check_payment.c \
   testing_api_cmd_config.c \
   testing_api_cmd_history.c \
