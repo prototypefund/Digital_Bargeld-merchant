@@ -213,6 +213,40 @@ TALER_TESTING_cmd_merchant_get_instance (const char *label,
                                          const char *instance_reference);
 
 
+/**
+ * Define a "PURGE instance" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        PURGE /instances/$ID request.
+ * @param instance_id the ID of the instance to query
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_purge_instance (const char *label,
+                                           const char *merchant_url,
+                                           const char *instance_id,
+                                           unsigned int http_status);
+
+
+/**
+ * Define a "DELETE instance" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        DELETE /instances/$ID request.
+ * @param instance_id the ID of the instance to query
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_delete_instance (const char *label,
+                                            const char *merchant_url,
+                                            const char *instance_id,
+                                            unsigned int http_status);
+
+
 /* ******************** OLD ******************* */
 
 /**

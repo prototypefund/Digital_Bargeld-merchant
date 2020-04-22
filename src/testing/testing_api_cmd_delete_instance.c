@@ -59,6 +59,11 @@ struct DeleteInstanceState
    */
   unsigned int http_status;
 
+  /**
+   * Use purge, not delete.
+   */
+  bool purge;
+
 };
 
 
@@ -112,11 +117,18 @@ delete_instance_run (void *cls,
   struct DeleteInstanceState *dis = cls;
 
   dis->is = is;
-  dis->igh = TALER_MERCHANT_instance_delete (is->ctx,
-                                             dis->merchant_url,
-                                             dis->instance_id,
-                                             &delete_instance_cb,
-                                             dis);
+  if (dis->purge)
+    dis->igh = TALER_MERCHANT_instance_purge (is->ctx,
+                                              dis->merchant_url,
+                                              dis->instance_id,
+                                              &delete_instance_cb,
+                                              dis);
+  else
+    dis->igh = TALER_MERCHANT_instance_delete (is->ctx,
+                                               dis->merchant_url,
+                                               dis->instance_id,
+                                               &delete_instance_cb,
+                                               dis);
   GNUNET_assert (NULL != dis->igh);
 }
 
@@ -166,6 +178,42 @@ TALER_TESTING_cmd_merchant_delete_instance (const char *label,
   dis->merchant_url = merchant_url;
   dis->instance_id = instance_id;
   dis->http_status = http_status;
+  {
+    struct TALER_TESTING_Command cmd = {
+      .cls = dis,
+      .label = label,
+      .run = &delete_instance_run,
+      .cleanup = &delete_instance_cleanup
+    };
+
+    return cmd;
+  }
+}
+
+
+/**
+ * Define a "PURGE instance" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        PURGE /instances/$ID request.
+ * @param instance_id the ID of the instance to query
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_purge_instance (const char *label,
+                                           const char *merchant_url,
+                                           const char *instance_id,
+                                           unsigned int http_status)
+{
+  struct DeleteInstanceState *dis;
+
+  dis = GNUNET_new (struct DeleteInstanceState);
+  dis->merchant_url = merchant_url;
+  dis->instance_id = instance_id;
+  dis->http_status = http_status;
+  dis->purge = true;
   {
     struct TALER_TESTING_Command cmd = {
       .cls = dis,
