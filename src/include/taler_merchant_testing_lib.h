@@ -82,6 +82,21 @@ TALER_TESTING_cmd_config (const char *label,
 
 
 /**
+ * Define a "GET /instances" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        GET /instances request.
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_get_instances (const char *label,
+                                          const char *merchant_url,
+                                          unsigned int http_status);
+
+
+/**
  * Define a "GET instance" CMD.
  *
  * @param label command label.
