@@ -156,6 +156,44 @@ TALER_TESTING_cmd_merchant_post_instances2 (
 
 
 /**
+ * Define a "PATCH /instances/$ID" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        PATCH /instance request.
+ * @param instance_id the ID of the instance to query
+ * @param payto_uris_length length of the @a accounts array
+ * @param payto_uris URIs of the bank accounts of the merchant instance
+ * @param name name of the merchant instance
+ * @param address physical address of the merchant instance
+ * @param jurisdiction jurisdiction of the merchant instance
+ * @param default_max_wire_fee default maximum wire fee merchant is willing to fully pay
+ * @param default_wire_fee_amortization default amortization factor for excess wire fees
+ * @param default_max_deposit_fee default maximum deposit fee merchant is willing to pay
+ * @param default_wire_transfer_delay default wire transfer delay merchant will ask for
+ * @param default_pay_delay default validity period for offers merchant makes
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_patch_instance (
+  const char *label,
+  const char *merchant_url,
+  const char *instance_id,
+  unsigned int payto_uris_length,
+  const char *payto_uris[],
+  const char *name,
+  json_t *address,
+  json_t *jurisdiction,
+  const struct TALER_Amount *default_max_wire_fee,
+  uint32_t default_wire_fee_amortization,
+  const struct TALER_Amount *default_max_deposit_fee,
+  struct GNUNET_TIME_Relative default_wire_transfer_delay,
+  struct GNUNET_TIME_Relative default_pay_delay,
+  unsigned int http_status);
+
+
+/**
  * Define a "GET instance" CMD.
  *
  * @param label command label.
