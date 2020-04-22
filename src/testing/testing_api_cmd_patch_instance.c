@@ -113,7 +113,7 @@ struct PatchInstanceState
 
 
 /**
- * Callback for a PATCH /instance operation.
+ * Callback for a PATCH /instances/$ID operation.
  *
  * @param cls closure for this function
  */
@@ -148,7 +148,7 @@ patch_instance_cb (void *cls,
 
 
 /**
- * Run the "PATCH /instance" CMD.
+ * Run the "PATCH /instances/$ID" CMD.
  *
  *
  * @param cls closure.
@@ -208,7 +208,7 @@ patch_instance_cleanup (void *cls,
 
 
 /**
- * Define a "PATCH /instance" CMD.
+ * Define a "PATCH /instances/$ID" CMD.
  *
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
