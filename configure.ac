@@ -341,5 +341,6 @@ src/include/Makefile
 src/backenddb/Makefile
 src/backend/Makefile
 src/lib/Makefile
+src/testing/Makefile
 ])
 AC_OUTPUT
