@@ -39,7 +39,7 @@ libtalermerchanttesting_la_SOURCES = \
   testing_api_trait_refund_entry.c
 
 libtalermerchanttesting_la_LIBADD = \
-  libtalermerchant.la \
+  $(top_srcdir)/src/lib/libtalermerchant.la \
   -ltalerexchange \
   -ltalerjson \
   -ltalerutil \
@@ -67,7 +67,7 @@ test_merchant_api_twisted_SOURCES = \
   test_merchant_api_twisted.c
 test_merchant_api_twisted_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
-  libtalermerchant.la \
+  $(top_srcdir)/src/lib/libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
   -ltalertesting \
   -ltalermerchanttesting \
@@ -87,7 +87,7 @@ test_merchant_api_SOURCES = \
   test_merchant_api.c
 test_merchant_api_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
-  libtalermerchant.la \
+  $(top_srcdir)/src/lib/libtalermerchant.la \
   $(LIBGCRYPT_LIBS) \
   -ltalertesting \
   -ltalermerchanttesting \

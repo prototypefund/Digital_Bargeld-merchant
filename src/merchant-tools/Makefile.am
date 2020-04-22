@@ -27,7 +27,7 @@ taler_merchant_benchmark_SOURCES = \
 taler_merchant_benchmark_LDADD = \
   $(top_srcdir)/src/backenddb/libtalermerchantdb.la \
   $(top_srcdir)/src/lib/libtalermerchant.la \
-  $(top_srcdir)/src/lib/libtalermerchanttesting.la \
+  $(top_srcdir)/src/testing/libtalermerchanttesting.la \
   $(LIBGCRYPT_LIBS) \
   -ltalertesting \
   -ltalerfakebank \
