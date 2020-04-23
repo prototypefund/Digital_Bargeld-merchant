@@ -855,7 +855,7 @@ struct TALER_MERCHANT_ProductsPostHandle;
 typedef void
 (*TALER_MERCHANT_ProductsPostCallback)(
   void *cls,
-  struct TALER_MERCHANT_HttpResponse *hr);
+  const struct TALER_MERCHANT_HttpResponse *hr);
 
 
 /**

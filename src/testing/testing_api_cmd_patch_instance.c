@@ -35,7 +35,7 @@ struct PatchInstanceState
 {
 
   /**
-   * Handle for a "GET instance" request.
+   * Handle for a "PATCH /instance/$ID" request.
    */
   struct TALER_MERCHANT_InstancePatchHandle *iph;
 
@@ -50,7 +50,7 @@ struct PatchInstanceState
   const char *merchant_url;
 
   /**
-   * ID of the instance to run GET for.
+   * ID of the instance to run PATCH for.
    */
   const char *instance_id;
 
@@ -183,7 +183,7 @@ patch_instance_run (void *cls,
 
 
 /**
- * Free the state of a "GET instance" CMD, and possibly
+ * Free the state of a "PATCH /instances/$ID" CMD, and possibly
  * cancel a pending operation thereof.
  *
  * @param cls closure.
@@ -198,7 +198,7 @@ patch_instance_cleanup (void *cls,
   if (NULL != pis->iph)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "GET /instance/$ID operation did not complete\n");
+                "PATCH /instance/$ID operation did not complete\n");
     TALER_MERCHANT_instance_patch_cancel (pis->iph);
   }
   json_decref (pis->address);

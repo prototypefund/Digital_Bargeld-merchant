@@ -115,17 +115,19 @@ handle_delete_instance_finished (void *cls,
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
  * @param instance_id which instance should be deleted
+ * @param purge purge instead of just deleting
  * @param instances_cb function to call with the
  *        backend's return
  * @param instances_cb_cls closure for @a config_cb
  * @return the instances handle; NULL upon error
  */
-struct TALER_MERCHANT_InstanceDeleteHandle *
-TALER_MERCHANT_instance_delete (struct GNUNET_CURL_Context *ctx,
-                                const char *backend_url,
-                                const char *instance_id,
-                                TALER_MERCHANT_InstanceDeleteCallback cb,
-                                void *cb_cls)
+static struct TALER_MERCHANT_InstanceDeleteHandle *
+instance_delete (struct GNUNET_CURL_Context *ctx,
+                 const char *backend_url,
+                 const char *instance_id,
+                 bool purge,
+                 TALER_MERCHANT_InstanceDeleteCallback cb,
+                 void *cb_cls)
 {
   struct TALER_MERCHANT_InstanceDeleteHandle *idh;
 
@@ -139,9 +141,16 @@ TALER_MERCHANT_instance_delete (struct GNUNET_CURL_Context *ctx,
     GNUNET_asprintf (&path,
                      "instances/%s",
                      instance_id);
-    idh->url = TALER_url_join (backend_url,
-                               path,
-                               NULL);
+    if (purge)
+      idh->url = TALER_url_join (backend_url,
+                                 path,
+                                 "purge",
+                                 "yes",
+                                 NULL);
+    else
+      idh->url = TALER_url_join (backend_url,
+                                 path,
+                                 NULL);
     GNUNET_free (path);
   }
   if (NULL == idh->url)
@@ -173,6 +182,63 @@ TALER_MERCHANT_instance_delete (struct GNUNET_CURL_Context *ctx,
                                     idh);
   }
   return idh;
+}
+
+
+/**
+ * Delete the private key of an instance of a backend, thereby disabling the
+ * instance for future requests.  Will preserve the other instance data
+ * (i.e. for taxation).
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id which instance should be deleted
+ * @param instances_cb function to call with the
+ *        backend's return
+ * @param instances_cb_cls closure for @a config_cb
+ * @return the instances handle; NULL upon error
+ */
+struct TALER_MERCHANT_InstanceDeleteHandle *
+TALER_MERCHANT_instance_delete (struct GNUNET_CURL_Context *ctx,
+                                const char *backend_url,
+                                const char *instance_id,
+                                TALER_MERCHANT_InstanceDeleteCallback cb,
+                                void *cb_cls)
+{
+  return instance_delete (ctx,
+                          backend_url,
+                          instance_id,
+                          false,
+                          cb,
+                          cb_cls);
+}
+
+
+/**
+ * Purge all data associated with an instance. Use with
+ * extreme caution.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param instance_id which instance should be deleted
+ * @param instances_cb function to call with the
+ *        backend's return
+ * @param instances_cb_cls closure for @a config_cb
+ * @return the instances handle; NULL upon error
+ */
+struct TALER_MERCHANT_InstanceDeleteHandle *
+TALER_MERCHANT_instance_purge (struct GNUNET_CURL_Context *ctx,
+                               const char *backend_url,
+                               const char *instance_id,
+                               TALER_MERCHANT_InstanceDeleteCallback cb,
+                               void *cb_cls)
+{
+  return instance_delete (ctx,
+                          backend_url,
+                          instance_id,
+                          true,
+                          cb,
+                          cb_cls);
 }
 
 

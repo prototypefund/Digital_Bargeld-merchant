@@ -35,7 +35,7 @@ struct PostInstancesState
 {
 
   /**
-   * Handle for a "GET instance" request.
+   * Handle for a "POST instance" request.
    */
   struct TALER_MERCHANT_InstancesPostHandle *iph;
 
@@ -50,7 +50,7 @@ struct PostInstancesState
   const char *merchant_url;
 
   /**
-   * ID of the instance to run GET for.
+   * ID of the instance to run POST for.
    */
   const char *instance_id;
 
@@ -183,7 +183,7 @@ post_instances_run (void *cls,
 
 
 /**
- * Free the state of a "GET instance" CMD, and possibly
+ * Free the state of a "POST /instances" CMD, and possibly
  * cancel a pending operation thereof.
  *
  * @param cls closure.
@@ -198,7 +198,7 @@ post_instances_cleanup (void *cls,
   if (NULL != pis->iph)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "GET /instances/$ID operation did not complete\n");
+                "POST /instances operation did not complete\n");
     TALER_MERCHANT_instances_post_cancel (pis->iph);
   }
   json_decref (pis->address);

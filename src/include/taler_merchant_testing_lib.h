@@ -247,6 +247,76 @@ TALER_TESTING_cmd_merchant_delete_instance (const char *label,
                                             unsigned int http_status);
 
 
+/* ******************* /products**************** */
+
+
+/**
+ * Define a "POST /products" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        POST /products request.
+ * @param instance_id instance to add a product to,
+ *                    NULL to query the default instance
+ * @param product_id the ID of the product to query
+ * @param description description of the product
+ * @param description_i18n Map from IETF BCP 47 language tags to localized descriptions
+ * @param unit unit in which the product is measured (liters, kilograms, packages, etc.)
+ * @param price the price for one @a unit of the product, zero is used to imply that
+ *              this product is not sold separately or that the price is not fixed and
+ *              must be supplied by the front-end.  If non-zero, price must include
+ *              applicable taxes.
+ * @param image base64-encoded product image
+ * @param taxes list of taxes paid by the merchant
+ * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books)
+ * @param address where the product is in stock
+ * @param next_restock when the next restocking is expected to happen, 0 for unknown,
+ *                     #GNUNET_TIME_UNIT_FOREVER_ABS for 'never'.
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_post_products2 (
+  const char *label,
+  const char *merchant_url,
+  const char *product_id,
+  const char *instance_id,
+  const char *description,
+  json_t *description_i18n,
+  const char *unit,
+  const struct TALER_Amount *price,
+  json_t *image,
+  json_t *taxes,
+  int64_t total_stocked,
+  json_t *address,
+  struct GNUNET_TIME_Absolute next_restock,
+  unsigned int http_status);
+
+
+/**
+ * Define a "POST /products" CMD, simple version
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        POST /products request.
+ * @param instance_id instance to add a product to,
+ *                    NULL to query the default instance
+ * @param product_id the ID of the product to create
+ * @param description name of the product
+ * @param price price of the product
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_post_products (const char *label,
+                                          const char *merchant_url,
+                                          const char *instance_id,
+                                          const char *product_id,
+                                          const char *description,
+                                          const char *price,
+                                          unsigned int http_status);
+
+
 /* ******************** OLD ******************* */
 
 /**
