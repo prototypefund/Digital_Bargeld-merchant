@@ -280,7 +280,7 @@ process_refund (struct MHD_Connection *connection,
       "{s:o, s:s}",
       "h_contract_terms",
       GNUNET_JSON_from_data_auto (&h_contract_terms),
-      "taler_refund_url",
+      "taler_refund_uri",
       taler_refund_uri);
     GNUNET_free (taler_refund_uri);
     return ret;
