@@ -155,8 +155,6 @@ handle_patch_product_finished (void *cls,
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to add a product to,
- *                    NULL to query the default instance
  * @param product_id identifier to use for the product; the product must exist,
  *                    or the transaction will fail with a #MHD_HTTP_NOT_FOUND
  *                    HTTP status code
@@ -184,7 +182,6 @@ struct TALER_MERCHANT_ProductPatchHandle *
 TALER_MERCHANT_product_patch (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   const char *description,
   const json_t *description_i18n,
@@ -237,15 +234,9 @@ TALER_MERCHANT_product_patch (
   {
     char *path;
 
-    if (NULL == instance_id)
-      GNUNET_asprintf (&path,
-                       "products/%s",
-                       product_id);
-    else
-      GNUNET_asprintf (&path,
-                       "instances/%s/products/%s",
-                       instance_id,
-                       product_id);
+    GNUNET_asprintf (&path,
+                     "products/%s",
+                     product_id);
     pph->url = TALER_url_join (backend_url,
                                path,
                                NULL);

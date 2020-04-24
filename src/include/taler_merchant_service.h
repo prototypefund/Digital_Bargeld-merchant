@@ -421,7 +421,7 @@ typedef void
 
 
 /**
- * Setup an new instance in the backend.
+ * Modify an existing instance in the backend.
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
@@ -722,7 +722,7 @@ struct TALER_MERCHANT_InventoryEntry
 typedef void
 (*TALER_MERCHANT_ProductsGetCallback)(
   void *cls,
-  struct TALER_MERCHANT_HttpResponse *hr,
+  const struct TALER_MERCHANT_HttpResponse *hr,
   unsigned int products_length,
   const struct TALER_MERCHANT_InventoryEntry products[]);
 
@@ -732,8 +732,6 @@ typedef void
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to query about its products,
- *                    NULL to query the default instance
  * @param cb function to call with the backend's inventory information
  * @param cb_cls closure for @a cb
  * @return the request handle; NULL upon error
@@ -742,7 +740,6 @@ struct TALER_MERCHANT_ProductsGetHandle *
 TALER_MERCHANT_products_get (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   TALER_MERCHANT_ProductsGetCallback cb,
   void *cb_cls);
 
@@ -793,7 +790,7 @@ struct TALER_MERCHANT_ProductGetHandle;
 typedef void
 (*TALER_MERCHANT_ProductGetCallback)(
   void *cls,
-  struct TALER_MERCHANT_HttpResponse *hr,
+  const struct TALER_MERCHANT_HttpResponse *hr,
   const char *description,
   const json_t *description_i18n,
   const char *unit,
@@ -813,8 +810,6 @@ typedef void
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to query about its products,
- *                    NULL to query the default instance
  * @param product_id identifier of the product to inquire about
  * @param cb function to call with the backend's product information
  * @param cb_cls closure for @a cb
@@ -824,7 +819,6 @@ struct TALER_MERCHANT_ProductGetHandle *
 TALER_MERCHANT_product_get (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   TALER_MERCHANT_ProductGetCallback cb,
   void *cb_cls);
@@ -864,8 +858,6 @@ typedef void
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to add a product to,
- *                    NULL to query the default instance
  * @param product_id identifier to use for the product
  * @param description description of the product
  * @param description_i18n Map from IETF BCP 47 language tags to localized descriptions
@@ -888,7 +880,6 @@ struct TALER_MERCHANT_ProductsPostHandle *
 TALER_MERCHANT_products_post (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   const char *description,
   const json_t *description_i18n,
@@ -928,7 +919,7 @@ struct TALER_MERCHANT_ProductPatchHandle;
 typedef void
 (*TALER_MERCHANT_ProductPatchCallback)(
   void *cls,
-  struct TALER_MERCHANT_HttpResponse *hr);
+  const struct TALER_MERCHANT_HttpResponse *hr);
 
 
 /**
@@ -937,8 +928,6 @@ typedef void
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to add a product to,
- *                    NULL to query the default instance
  * @param product_id identifier to use for the product; the product must exist,
  *                    or the transaction will fail with a #MHD_HTTP_NOT_FOUND
  *                    HTTP status code
@@ -966,7 +955,6 @@ struct TALER_MERCHANT_ProductPatchHandle *
 TALER_MERCHANT_product_patch (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   const char *description,
   const json_t *description_i18n,
@@ -1007,7 +995,7 @@ struct TALER_MERCHANT_ProductLockHandle;
 typedef void
 (*TALER_MERCHANT_ProductLockCallback)(
   void *cls,
-  struct TALER_MERCHANT_HttpResponse *hr);
+  const struct TALER_MERCHANT_HttpResponse *hr);
 
 
 /**
@@ -1016,8 +1004,6 @@ typedef void
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to query about its products,
- *                    NULL to query the default instance
  * @param product_id identifier of the product
  * @param uuid UUID that identifies the client holding the lock
  * @param duration how long should the lock be held
@@ -1030,7 +1016,6 @@ struct TALER_MERCHANT_ProductLockHandle *
 TALER_MERCHANT_product_lock (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   const struct GNUNET_Uuid *uuid,
   struct GNUNET_TIME_Relative duration,
@@ -1065,7 +1050,7 @@ struct TALER_MERCHANT_ProductDeleteHandle;
 typedef void
 (*TALER_MERCHANT_ProductDeleteCallback)(
   void *cls,
-  struct TALER_MERCHANT_HttpResponse *hr);
+  const struct TALER_MERCHANT_HttpResponse *hr);
 
 
 /**
@@ -1074,8 +1059,6 @@ typedef void
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to query about its products,
- *                    NULL to query the default instance
  * @param product_id identifier of the product
  * @param cb function to call with the backend's deletion status
  * @param cb_cls closure for @a cb
@@ -1085,7 +1068,6 @@ struct TALER_MERCHANT_ProductDeleteHandle *
 TALER_MERCHANT_product_delete (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   TALER_MERCHANT_ProductDeleteCallback cb,
   void *cb_cls);

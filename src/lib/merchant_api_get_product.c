@@ -188,8 +188,6 @@ handle_get_product_finished (void *cls,
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to query about its products,
- *                    NULL to query the default instance
  * @param product_id identifier of the product to inquire about
  * @param cb function to call with the backend's product information
  * @param cb_cls closure for @a cb
@@ -199,7 +197,6 @@ struct TALER_MERCHANT_ProductGetHandle *
 TALER_MERCHANT_product_get (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   TALER_MERCHANT_ProductGetCallback cb,
   void *cb_cls)
@@ -214,15 +211,9 @@ TALER_MERCHANT_product_get (
   {
     char *path;
 
-    if (NULL == instance_id)
-      GNUNET_asprintf (&path,
-                       "products/%s",
-                       product_id);
-    else
-      GNUNET_asprintf (&path,
-                       "instances/%s/products/%s",
-                       instance_id,
-                       product_id);
+    GNUNET_asprintf (&path,
+                     "products/%s",
+                     product_id);
     pgh->url = TALER_url_join (backend_url,
                                path,
                                NULL);

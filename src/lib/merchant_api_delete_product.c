@@ -121,8 +121,6 @@ handle_delete_product_finished (void *cls,
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to query about its products,
- *                    NULL to query the default instance
  * @param product_id identifier of the product
  * @param cb function to call with the backend's deletion status
  * @param cb_cls closure for @a cb
@@ -132,7 +130,6 @@ struct TALER_MERCHANT_ProductDeleteHandle *
 TALER_MERCHANT_product_delete (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   TALER_MERCHANT_ProductDeleteCallback cb,
   void *cb_cls)
@@ -146,15 +143,9 @@ TALER_MERCHANT_product_delete (
   {
     char *path;
 
-    if (NULL == instance_id)
-      GNUNET_asprintf (&path,
-                       "products/%s",
-                       product_id);
-    else
-      GNUNET_asprintf (&path,
-                       "instances/%s/products/%s",
-                       instance_id,
-                       product_id);
+    GNUNET_asprintf (&path,
+                     "products/%s",
+                     product_id);
     pdh->url = TALER_url_join (backend_url,
                                path,
                                NULL);

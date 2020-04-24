@@ -256,8 +256,6 @@ TALER_TESTING_cmd_merchant_delete_instance (const char *label,
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        POST /products request.
- * @param instance_id instance to add a product to,
- *                    NULL to query the default instance
  * @param product_id the ID of the product to query
  * @param description description of the product
  * @param description_i18n Map from IETF BCP 47 language tags to localized descriptions
@@ -280,7 +278,6 @@ TALER_TESTING_cmd_merchant_post_products2 (
   const char *label,
   const char *merchant_url,
   const char *product_id,
-  const char *instance_id,
   const char *description,
   json_t *description_i18n,
   const char *unit,
@@ -299,8 +296,6 @@ TALER_TESTING_cmd_merchant_post_products2 (
  * @param label command label.
  * @param merchant_url base URL of the merchant serving the
  *        POST /products request.
- * @param instance_id instance to add a product to,
- *                    NULL to query the default instance
  * @param product_id the ID of the product to create
  * @param description name of the product
  * @param price price of the product
@@ -310,11 +305,106 @@ TALER_TESTING_cmd_merchant_post_products2 (
 struct TALER_TESTING_Command
 TALER_TESTING_cmd_merchant_post_products (const char *label,
                                           const char *merchant_url,
-                                          const char *instance_id,
                                           const char *product_id,
                                           const char *description,
                                           const char *price,
                                           unsigned int http_status);
+
+
+/**
+ * Define a "PATCH /products/$ID" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        PATCH /product request.
+ * @param product_id the ID of the product to query
+ * @param description description of the product
+ * @param description_i18n Map from IETF BCP 47 language tags to localized descriptions
+ * @param unit unit in which the product is measured (liters, kilograms, packages, etc.)
+ * @param price the price for one @a unit of the product, zero is used to imply that
+ *              this product is not sold separately or that the price is not fixed and
+ *              must be supplied by the front-end.  If non-zero, price must include
+ *              applicable taxes.
+ * @param image base64-encoded product image
+ * @param taxes list of taxes paid by the merchant
+ * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books)
+ * @param total_lost in @a units, must be larger than previous values, and may
+ *               not exceed total_stocked minus total_sold; if it does, the transaction
+ *               will fail with a #MHD_HTTP_CONFLICT HTTP status code
+ * @param address where the product is in stock
+ * @param next_restock when the next restocking is expected to happen, 0 for unknown,
+ *                     #GNUNET_TIME_UNIT_FOREVER_ABS for 'never'.
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_patch_product (
+  const char *label,
+  const char *merchant_url,
+  const char *product_id,
+  const char *description,
+  json_t *description_i18n,
+  const char *unit,
+  const struct TALER_Amount *price,
+  json_t *image,
+  json_t *taxes,
+  int64_t total_stocked,
+  uint64_t total_lost,
+  json_t *address,
+  struct GNUNET_TIME_Absolute next_restock,
+  unsigned int http_status);
+
+
+/**
+ * Define a "GET /products" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        GET /products request.
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_get_products (const char *label,
+                                         const char *merchant_url,
+                                         unsigned int http_status);
+
+
+/**
+ * Define a "GET product" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        GET /products/$ID request.
+ * @param product_id the ID of the product to query
+ * @param http_status expected HTTP response code.
+ * @param product_reference reference to a "POST /products" or "PATCH /products/$ID" CMD
+ *        that will provide what we expect the backend to return to us
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_get_product (const char *label,
+                                        const char *merchant_url,
+                                        const char *product_id,
+                                        unsigned int http_status,
+                                        const char *product_reference);
+
+
+/**
+ * Define a "DELETE product" CMD.
+ *
+ * @param label command label.
+ * @param merchant_url base URL of the merchant serving the
+ *        DELETE /products/$ID request.
+ * @param product_id the ID of the product to query
+ * @param http_status expected HTTP response code.
+ * @return the command.
+ */
+struct TALER_TESTING_Command
+TALER_TESTING_cmd_merchant_delete_product (const char *label,
+                                           const char *merchant_url,
+                                           const char *product_id,
+                                           unsigned int http_status);
 
 
 /* ******************** OLD ******************* */

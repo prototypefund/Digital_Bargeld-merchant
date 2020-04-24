@@ -955,8 +955,8 @@ url_handler (void *cls,
       handlers = public_handlers;
     }
   }
-  if (strcmp (url,
-              ""))
+  if (0 == strcmp (url,
+                   ""))
     url = "/"; /* code below does not like empty string */
 
   {
@@ -1010,8 +1010,8 @@ url_handler (void *cls,
         if ( (NULL == infix_url)
              ^ (GNUNET_NO == rh->have_id_segment) )
           continue; /* infix existence missmatch */
-        if ( (NULL == suffix_url)
-             ^ (NULL != rh->url_suffix) )
+        if ( ( (NULL == suffix_url)
+               ^ (NULL == rh->url_suffix) ) )
           continue; /* suffix existence missmatch */
         if ( (NULL != suffix_url) &&
              ( (suffix_strlen != strlen (rh->url_suffix)) ||

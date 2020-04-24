@@ -17,10 +17,15 @@ libtalermerchanttesting_la_SOURCES = \
   testing_api_cmd_config.c \
   testing_api_cmd_get_instance.c \
   testing_api_cmd_get_instances.c \
+  testing_api_cmd_get_product.c \
+  testing_api_cmd_get_products.c \
   testing_api_cmd_delete_instance.c \
+  testing_api_cmd_delete_product.c \
+  testing_api_cmd_lock_product.c \
   testing_api_cmd_post_instances.c \
   testing_api_cmd_post_products.c \
   testing_api_cmd_patch_instance.c \
+  testing_api_cmd_patch_product.c \
    \
   testing_api_cmd_check_payment.c \
   testing_api_cmd_history.c \

@@ -155,8 +155,6 @@ handle_lock_product_finished (void *cls,
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to query about its products,
- *                    NULL to query the default instance
  * @param product_id identifier of the product
  * @param uuid UUID that identifies the client holding the lock
  * @param duration how long should the lock be held
@@ -169,7 +167,6 @@ struct TALER_MERCHANT_ProductLockHandle *
 TALER_MERCHANT_product_lock (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   const struct GNUNET_Uuid *uuid,
   struct GNUNET_TIME_Relative duration,
@@ -199,15 +196,9 @@ TALER_MERCHANT_product_lock (
   {
     char *path;
 
-    if (NULL == instance_id)
-      GNUNET_asprintf (&path,
-                       "products/%s/lock",
-                       product_id);
-    else
-      GNUNET_asprintf (&path,
-                       "instances/%s/products/%s/lock",
-                       instance_id,
-                       product_id);
+    GNUNET_asprintf (&path,
+                     "products/%s/lock",
+                     product_id);
     plh->url = TALER_url_join (backend_url,
                                path,
                                NULL);

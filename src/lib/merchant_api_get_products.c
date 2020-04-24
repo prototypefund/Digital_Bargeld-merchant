@@ -203,8 +203,6 @@ handle_get_products_finished (void *cls,
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to query about its products,
- *                    NULL to query the default instance
  * @param cb function to call with the backend's inventory information
  * @param cb_cls closure for @a cb
  * @return the request handle; NULL upon error
@@ -213,7 +211,6 @@ struct TALER_MERCHANT_ProductsGetHandle *
 TALER_MERCHANT_products_get (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   TALER_MERCHANT_ProductsGetCallback cb,
   void *cb_cls)
 {
@@ -224,21 +221,9 @@ TALER_MERCHANT_products_get (
   pgh->ctx = ctx;
   pgh->cb = cb;
   pgh->cb_cls = cb_cls;
-  {
-    char *path;
-
-    if (NULL == instance_id)
-      GNUNET_asprintf (&path,
-                       "products");
-    else
-      GNUNET_asprintf (&path,
-                       "instances/%s/products",
-                       instance_id);
-    pgh->url = TALER_url_join (backend_url,
-                               path,
-                               NULL);
-    GNUNET_free (path);
-  }
+  pgh->url = TALER_url_join (backend_url,
+                             "products",
+                             NULL);
   if (NULL == pgh->url)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,

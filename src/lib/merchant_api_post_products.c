@@ -157,8 +157,6 @@ handle_post_products_finished (void *cls,
  *
  * @param ctx the context
  * @param backend_url HTTP base URL for the backend
- * @param instance_id instance to add a product to,
- *                    NULL to query the default instance
  * @param product_id identifier to use for the product
  * @param description description of the product
  * @param description_i18n Map from IETF BCP 47 language tags to localized descriptions
@@ -181,7 +179,6 @@ struct TALER_MERCHANT_ProductsPostHandle *
 TALER_MERCHANT_products_post (
   struct GNUNET_CURL_Context *ctx,
   const char *backend_url,
-  const char *instance_id,
   const char *product_id,
   const char *description,
   const json_t *description_i18n,
@@ -230,21 +227,9 @@ TALER_MERCHANT_products_post (
   pph->ctx = ctx;
   pph->cb = cb;
   pph->cb_cls = cb_cls;
-  {
-    char *path;
-
-    if (NULL == instance_id)
-      GNUNET_asprintf (&path,
-                       "products");
-    else
-      GNUNET_asprintf (&path,
-                       "instances/%s/products",
-                       instance_id);
-    pph->url = TALER_url_join (backend_url,
-                               path,
-                               NULL);
-    GNUNET_free (path);
-  }
+  pph->url = TALER_url_join (backend_url,
+                             "products",
+                             NULL);
   if (NULL == pph->url)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
