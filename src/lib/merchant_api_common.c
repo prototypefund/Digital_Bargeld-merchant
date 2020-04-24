@@ -116,3 +116,37 @@ TALER_MERCHANT_parse_error_details_ (const json_t *response,
     hr->exchange_hint = json_string_value (jc);
   }
 }
+
+
+/**
+ * Construct a new base URL using the existing @a base_url
+ * and the given @a instance_id.  The result WILL end with
+ * '/'.
+ *
+ * @param base_url a merchant base URL without "/instances/" in it,
+ *         must not be the empty string; MAY end with '/'.
+ * @param instance_id ID of an instance
+ * @return "${base_url}/instances/${instance_id}/"
+ */
+char *
+TALER_MERCHANT_baseurl_add_instance (const char *base_url,
+                                     const char *instance_id)
+{
+  char *ret;
+  bool end_sl;
+
+  if ('\0' == *base_url)
+  {
+    GNUNET_break (0);
+    return NULL;
+  }
+  end_sl = '/' == base_url[strlen (base_url) - 1];
+
+  GNUNET_asprintf (&ret,
+                   (end_sl)
+                   ? "%sinstances/%s/"
+                   : "%s/instances/%s/",
+                   base_url,
+                   instance_id);
+  return ret;
+}
