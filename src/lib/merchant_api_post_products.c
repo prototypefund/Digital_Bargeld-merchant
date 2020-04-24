@@ -228,7 +228,7 @@ TALER_MERCHANT_products_post (
   pph->cb = cb;
   pph->cb_cls = cb_cls;
   pph->url = TALER_url_join (backend_url,
-                             "products",
+                             "private/products",
                              NULL);
   if (NULL == pph->url)
   {

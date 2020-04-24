@@ -203,6 +203,7 @@ post_instances_cleanup (void *cls,
   }
   json_decref (pis->address);
   json_decref (pis->jurisdiction);
+  GNUNET_free (pis->payto_uris);
   GNUNET_free (pis);
 }
 
@@ -251,7 +252,11 @@ TALER_TESTING_cmd_merchant_post_instances2 (
   pis->instance_id = instance_id;
   pis->http_status = http_status;
   pis->payto_uris_length = payto_uris_length;
-  pis->payto_uris = payto_uris;
+  pis->payto_uris = GNUNET_new_array (payto_uris_length,
+                                      const char *);
+  memcpy (pis->payto_uris,
+          payto_uris,
+          sizeof (const char *) * payto_uris_length);
   pis->name = name;
   pis->address = address; /* ownership transfer! */
   pis->jurisdiction = jurisdiction; /* ownership transfer! */

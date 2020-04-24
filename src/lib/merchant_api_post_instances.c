@@ -244,7 +244,7 @@ TALER_MERCHANT_instances_post (
   iph->cb = cb;
   iph->cb_cls = cb_cls;
   iph->url = TALER_url_join (backend_url,
-                             "/instances",
+                             "private/instances",
                              NULL);
   if (NULL == iph->url)
   {

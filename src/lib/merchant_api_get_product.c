@@ -212,7 +212,7 @@ TALER_MERCHANT_product_get (
     char *path;
 
     GNUNET_asprintf (&path,
-                     "products/%s",
+                     "private/products/%s",
                      product_id);
     pgh->url = TALER_url_join (backend_url,
                                path,

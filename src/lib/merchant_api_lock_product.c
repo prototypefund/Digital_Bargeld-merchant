@@ -197,7 +197,7 @@ TALER_MERCHANT_product_lock (
     char *path;
 
     GNUNET_asprintf (&path,
-                     "products/%s/lock",
+                     "private/products/%s/lock",
                      product_id);
     plh->url = TALER_url_join (backend_url,
                                path,

@@ -243,7 +243,7 @@ TALER_MERCHANT_instance_patch (
     char *path;
 
     GNUNET_asprintf (&path,
-                     "instances/%s",
+                     "private/instances/%s",
                      instance_id);
     iph->url = TALER_url_join (backend_url,
                                path,

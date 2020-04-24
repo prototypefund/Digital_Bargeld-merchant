@@ -235,7 +235,7 @@ TALER_MERCHANT_product_patch (
     char *path;
 
     GNUNET_asprintf (&path,
-                     "products/%s",
+                     "private/products/%s",
                      product_id);
     pph->url = TALER_url_join (backend_url,
                                path,

@@ -144,7 +144,7 @@ TALER_MERCHANT_product_delete (
     char *path;
 
     GNUNET_asprintf (&path,
-                     "products/%s",
+                     "private/products/%s",
                      product_id);
     pdh->url = TALER_url_join (backend_url,
                                path,

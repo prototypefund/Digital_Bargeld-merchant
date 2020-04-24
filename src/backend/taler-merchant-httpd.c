@@ -832,11 +832,9 @@ url_handler (void *cls,
     }
   };
   static struct TMH_RequestHandler h404 = {
-    .mime_type = "text/html",
-    .data = "<html><title>404: not found</title>"
-            "<body>404: not found</body></html>",
-    .data_size = strlen ("<html><title>404: not found</title>"
-                         "<body>404: not found</body></html>"),
+    .mime_type = "application/json",
+    .data = "{\"code\":10}",
+    .data_size = strlen ("{\"code\":10}"),
     .handler = &TMH_MHD_handler_static_response,
     .response_code = MHD_HTTP_NOT_FOUND
   };

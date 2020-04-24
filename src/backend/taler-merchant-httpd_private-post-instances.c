@@ -149,7 +149,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_json ("payto_uris",
                            &payto_uris),
-    GNUNET_JSON_spec_string ("instance",
+    GNUNET_JSON_spec_string ("id",
                              &id),
     GNUNET_JSON_spec_string ("name",
                              &name),

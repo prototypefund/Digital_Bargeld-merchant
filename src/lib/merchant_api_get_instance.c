@@ -244,7 +244,7 @@ TALER_MERCHANT_instance_get (struct GNUNET_CURL_Context *ctx,
     char *path;
 
     GNUNET_asprintf (&path,
-                     "instances/%s",
+                     "private/instances/%s",
                      instance_id);
     igh->url = TALER_url_join (backend_url,
                                path,

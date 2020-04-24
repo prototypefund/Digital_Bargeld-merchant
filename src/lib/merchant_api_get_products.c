@@ -222,7 +222,7 @@ TALER_MERCHANT_products_get (
   pgh->cb = cb;
   pgh->cb_cls = cb_cls;
   pgh->url = TALER_url_join (backend_url,
-                             "products",
+                             "private/products",
                              NULL);
   if (NULL == pgh->url)
   {

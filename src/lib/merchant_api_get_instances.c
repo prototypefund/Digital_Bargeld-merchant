@@ -249,7 +249,7 @@ TALER_MERCHANT_instances_get (struct GNUNET_CURL_Context *ctx,
   igh->cb = instances_cb;
   igh->cb_cls = instances_cb_cls;
   igh->url = TALER_url_join (backend_url,
-                             "instances",
+                             "private/instances",
                              NULL);
   if (NULL == igh->url)
   {
