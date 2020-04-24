@@ -142,17 +142,15 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
 {
   struct TALER_MERCHANTDB_InstanceSettings is;
   json_t *payto_uris;
-  const char *id;
-  const char *name;
   struct TMH_WireMethod *wm_head = NULL;
   struct TMH_WireMethod *wm_tail = NULL;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_json ("payto_uris",
                            &payto_uris),
     GNUNET_JSON_spec_string ("id",
-                             &id),
+                             (const char **) &is.id),
     GNUNET_JSON_spec_string ("name",
-                             &name),
+                             (const char **) &is.name),
     GNUNET_JSON_spec_json ("address",
                            &is.address),
     GNUNET_JSON_spec_json ("jurisdiction",
@@ -199,9 +197,9 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
     {
       /* Check for idempotency */
       if ( (0 == strcmp (mi->settings.id,
-                         id)) &&
+                         is.id)) &&
            (0 == strcmp (mi->settings.name,
-                         name)) &&
+                         is.name)) &&
            (1 == json_equal (mi->settings.address,
                              is.address)) &&
            (1 == json_equal (mi->settings.jurisdiction,
@@ -288,7 +286,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
                                     &salt,
                                     sizeof (salt));
         wm = GNUNET_new (struct TMH_WireMethod);
-        wm->j_wire = json_pack ("{s:O, s:s}",
+        wm->j_wire = json_pack ("{s:s, s:o}",
                                 "payto_uri", payto_uri,
                                 "salt", GNUNET_JSON_from_data_auto (&salt));
         GNUNET_assert (NULL != wm->j_wire);
@@ -337,8 +335,8 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
     mi->wm_head = wm_head;
     mi->wm_tail = wm_tail;
     mi->settings = is;
-    mi->settings.id = GNUNET_strdup (id);
-    mi->settings.name = GNUNET_strdup (name);
+    mi->settings.id = GNUNET_strdup (is.id);
+    mi->settings.name = GNUNET_strdup (is.name);
     GNUNET_CRYPTO_eddsa_key_create (&mi->merchant_priv.eddsa_priv);
     GNUNET_CRYPTO_eddsa_key_get_public (&mi->merchant_priv.eddsa_priv,
                                         &mi->merchant_pub.eddsa_pub);
