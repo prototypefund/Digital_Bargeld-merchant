@@ -86,7 +86,7 @@ parse_instances (const json_t *ia,
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_string ("name",
                                &ii->name),
-      GNUNET_JSON_spec_string ("instance",
+      GNUNET_JSON_spec_string ("id",
                                &ii->id),
       GNUNET_JSON_spec_fixed_auto ("merchant_pub",
                                    &ii->merchant_pub),

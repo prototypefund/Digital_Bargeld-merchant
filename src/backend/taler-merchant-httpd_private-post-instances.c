@@ -246,6 +246,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
 
     if (! json_is_array (payto_uris))
     {
+      GNUNET_break_op (0);
       payto_ok = false;
       len = 0;
     }
@@ -260,6 +261,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
 
       if (! json_is_string (payto_uri))
       {
+        GNUNET_break_op (0);
         payto_ok = false;
         break;
       }
@@ -271,6 +273,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
         if (json_equal (payto_uri,
                         old_uri))
         {
+          GNUNET_break_op (0);
           payto_ok = false;
           break;
         }
@@ -286,7 +289,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
                                     &salt,
                                     sizeof (salt));
         wm = GNUNET_new (struct TMH_WireMethod);
-        wm->j_wire = json_pack ("{s:s, s:o}",
+        wm->j_wire = json_pack ("{s:O, s:o}",
                                 "payto_uri", payto_uri,
                                 "salt", GNUNET_JSON_from_data_auto (&salt));
         GNUNET_assert (NULL != wm->j_wire);
@@ -295,6 +298,7 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
             TALER_JSON_merchant_wire_signature_hash (wm->j_wire,
                                                      &wm->h_wire))
         {
+          GNUNET_break_op (0);
           payto_ok = false;
           GNUNET_free (wm);
           break;
@@ -372,7 +376,8 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
           GNUNET_JSON_spec_string ("payto_uri",
                                    &ad.payto_uri),
           GNUNET_JSON_spec_fixed_auto ("salt",
-                                       &ad.salt)
+                                       &ad.salt),
+          GNUNET_JSON_spec_end ()
         };
 
         GNUNET_assert (GNUNET_OK ==
@@ -393,6 +398,8 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
         goto retry;
       }
       qs = TMH_db->commit (TMH_db->cls);
+      if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+        qs = GNUNET_DB_STATUS_SUCCESS_ONE_RESULT;
 retry:
       if (GNUNET_DB_STATUS_SOFT_ERROR != qs)
         break; /* success! -- or hard failure */
