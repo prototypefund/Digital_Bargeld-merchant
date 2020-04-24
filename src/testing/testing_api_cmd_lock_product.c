@@ -29,7 +29,7 @@
 
 
 /**
- * State of a "LOCK /product" CMD.
+ * State of a "POST /products/$ID" CMD.
  */
 struct LockProductState
 {
@@ -54,6 +54,20 @@ struct LockProductState
    */
   const char *product_id;
 
+  /**
+   * UUID that identifies the client holding the lock
+   */
+  struct GNUNET_Uuid uuid;
+
+  /**
+   * duration how long should the lock be held
+   */
+  struct GNUNET_TIME_Relative duration;
+
+  /**
+   * how much product should be locked
+   */
+  uint32_t quantity;
 
   /**
    * Expected HTTP response code.
@@ -117,8 +131,10 @@ lock_product_run (void *cls,
   pis->iph = TALER_MERCHANT_product_lock (is->ctx,
                                           pis->merchant_url,
                                           pis->product_id,
-                                          ...
-                                          & lock_product_cb,
+                                          &pis->uuid,
+                                          pis->duration,
+                                          pis->quantity,
+                                          &lock_product_cb,
                                           pis);
   GNUNET_assert (NULL != pis->iph);
 }
@@ -143,8 +159,6 @@ lock_product_cleanup (void *cls,
                 "POST /product/$ID/lock operation did not complete\n");
     TALER_MERCHANT_product_lock_cancel (pis->iph);
   }
-  json_decref (pis->address);
-  json_decref (pis->jurisdiction);
   GNUNET_free (pis);
 }
 
@@ -174,7 +188,9 @@ TALER_TESTING_cmd_merchant_lock_product (
   const char *label,
   const char *merchant_url,
   const char *product_id,
-  ...
+  const struct GNUNET_Uuid *uuid,
+  struct GNUNET_TIME_Relative duration,
+  uint32_t quantity,
   unsigned int http_status)
 {
   struct LockProductState *pis;
@@ -183,6 +199,9 @@ TALER_TESTING_cmd_merchant_lock_product (
   pis->merchant_url = merchant_url;
   pis->product_id = product_id;
   pis->http_status = http_status;
+  pis->uuid = *uuid;
+  pis->duration = duration;
+  pis->quantity = quantity;
 
   {
     struct TALER_TESTING_Command cmd = {
