@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS merchant_inventory
   ,image BYTEA NOT NULL
   ,taxes BYTEA NOT NULL
   ,price_val INT8 NOT NULL
-  ,price_frac cINT4 NOT NULL
+  ,price_frac INT4 NOT NULL
   ,total_stock BIGINT NOT NULL
   ,total_sold BIGINT NOT NULL
   ,total_lost BIGINT NOT NULL
