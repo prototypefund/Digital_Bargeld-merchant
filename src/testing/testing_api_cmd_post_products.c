@@ -234,7 +234,7 @@ TALER_TESTING_cmd_merchant_post_products2 (
   const char *description,
   json_t *description_i18n,
   const char *unit,
-  const struct TALER_Amount *price,
+  const char *price,
   json_t *image,
   json_t *taxes,
   int64_t total_stocked,
@@ -251,7 +251,9 @@ TALER_TESTING_cmd_merchant_post_products2 (
   pis->description = description;
   pis->description_i18n = description_i18n; /* ownership taken */
   pis->unit = unit;
-  pis->price = *price;
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (price,
+                                         &pis->price));
   pis->image = image; /* ownership taken */
   pis->taxes = taxes; /* ownership taken */
   pis->total_stocked = total_stocked;
@@ -290,11 +292,6 @@ TALER_TESTING_cmd_merchant_post_products (const char *label,
                                           const char *price,
                                           unsigned int http_status)
 {
-  struct TALER_Amount amount;
-
-  GNUNET_assert (GNUNET_OK ==
-                 TALER_string_to_amount (price,
-                                         &amount));
   return TALER_TESTING_cmd_merchant_post_products2 (
     label,
     merchant_url,
@@ -302,7 +299,7 @@ TALER_TESTING_cmd_merchant_post_products (const char *label,
     description,
     json_pack ("{s:s}", "en", description),
     "test-unit",
-    &amount,
+    price,
     json_object (),
     json_object (),
     4,

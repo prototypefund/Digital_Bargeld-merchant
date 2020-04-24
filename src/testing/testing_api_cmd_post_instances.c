@@ -237,9 +237,9 @@ TALER_TESTING_cmd_merchant_post_instances2 (
   const char *name,
   json_t *address,
   json_t *jurisdiction,
-  const struct TALER_Amount *default_max_wire_fee,
+  const char *default_max_wire_fee,
   uint32_t default_wire_fee_amortization,
-  const struct TALER_Amount *default_max_deposit_fee,
+  const char *default_max_deposit_fee,
   struct GNUNET_TIME_Relative default_wire_transfer_delay,
   struct GNUNET_TIME_Relative default_pay_delay,
   unsigned int http_status)
@@ -255,9 +255,13 @@ TALER_TESTING_cmd_merchant_post_instances2 (
   pis->name = name;
   pis->address = address; /* ownership transfer! */
   pis->jurisdiction = jurisdiction; /* ownership transfer! */
-  pis->default_max_wire_fee = *default_max_wire_fee;
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (default_max_wire_fee,
+                                         &pis->default_max_wire_fee));
   pis->default_wire_fee_amortization = default_wire_fee_amortization;
-  pis->default_max_deposit_fee = *default_max_deposit_fee;
+  GNUNET_assert (GNUNET_OK ==
+                 TALER_string_to_amount (default_max_deposit_fee,
+                                         &pis->default_max_deposit_fee));
   pis->default_wire_transfer_delay = default_wire_transfer_delay;
   pis->default_pay_delay = default_pay_delay;
   {
@@ -296,17 +300,14 @@ TALER_TESTING_cmd_merchant_post_instances (const char *label,
   const char *payto_uris[] = {
     payto_uri
   };
-  struct TALER_Amount default_max_wire_fee;
-  struct TALER_Amount default_max_deposit_fee;
+  struct TALER_Amount default_max_fee;
+  const char *default_max_fee_s;
 
   GNUNET_assert (GNUNET_OK ==
                  TALER_amount_get_zero (currency,
-                                        &default_max_wire_fee));
-  GNUNET_assert (GNUNET_OK ==
-                 TALER_amount_get_zero (currency,
-                                        &default_max_deposit_fee));
-  default_max_wire_fee.value = 1;
-  default_max_deposit_fee.value = 1;
+                                        &default_max_fee));
+  default_max_fee.value = 1;
+  default_max_fee_s = TALER_amount2s (&default_max_fee);
 
   return TALER_TESTING_cmd_merchant_post_instances2 (
     label,
@@ -317,9 +318,9 @@ TALER_TESTING_cmd_merchant_post_instances (const char *label,
     instance_id,
     json_pack ("{s:s}", "city", "shopcity"),
     json_pack ("{s:s}", "city", "lawyercity"),
-    &default_max_wire_fee,
+    default_max_fee_s,
     10,
-    &default_max_deposit_fee,
+    default_max_fee_s,
     GNUNET_TIME_UNIT_MINUTES,
     GNUNET_TIME_UNIT_MINUTES,
     http_status);

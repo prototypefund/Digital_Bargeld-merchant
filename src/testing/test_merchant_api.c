@@ -42,6 +42,8 @@
  */
 #define CONFIG_FILE "test_merchant_api.conf"
 
+#define PAYTO_I1 "payto://taler-bank/localhost/3"
+
 /**
  * Exchange base URL.  Could also be taken from config.
  */
@@ -895,10 +897,48 @@ run (void *cls,
     TALER_TESTING_cmd_end ()
   };
 
+  const char *payto_uris[] = {
+    PAYTO_I1
+  };
   struct TALER_TESTING_Command commands[] = {
     TALER_TESTING_cmd_config ("config",
                               merchant_url,
                               MHD_HTTP_OK),
+    TALER_TESTING_cmd_merchant_get_instances ("instances-empty",
+                                              merchant_url,
+                                              MHD_HTTP_OK),
+    TALER_TESTING_cmd_merchant_post_instances ("instance-create-i1",
+                                               merchant_url,
+                                               "i1",
+                                               PAYTO_I1,
+                                               "EUR",
+                                               MHD_HTTP_NO_CONTENT),
+    TALER_TESTING_cmd_merchant_get_instances ("instances-get-i1",
+                                              merchant_url,
+                                              MHD_HTTP_OK),
+    TALER_TESTING_cmd_merchant_get_instance ("instances-get-i1",
+                                             merchant_url,
+                                             "i1",
+                                             MHD_HTTP_OK,
+                                             "instance-create-i1"),
+    TALER_TESTING_cmd_merchant_patch_instance ("instance-create-i1",
+                                               merchant_url,
+                                               "i1",
+                                               1,
+                                               payto_uris,
+                                               "bob-the-merchant",
+                                               json_pack ("{s:s}",
+                                                          "street",
+                                                          "bobstreet"),
+                                               json_pack ("{s:s}",
+                                                          "street",
+                                                          "bobjuryst"),
+                                               "EUR:0.1",
+                                               4,
+                                               "EUR:0.5",
+                                               GNUNET_TIME_UNIT_MINUTES,
+                                               GNUNET_TIME_UNIT_MINUTES,
+                                               MHD_HTTP_NO_CONTENT),
 #if 0
     TALER_TESTING_cmd_batch ("pay",
                              pay),
