@@ -630,20 +630,20 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Retrieve order given its order id and the instance's merchant public key.
+   * Retrieve order given its @a order_id and the @a instance_id.
    *
    * @param cls closure
-   * @param[out] contract_terms where to store the retrieved contract terms
+   * @param instance_id instance to obtain order of
    * @param order id order id used to perform the lookup
-   * @param merchant_pub merchant public key that identifies the instance
+   * @param[out] contract_terms where to store the retrieved contract terms,
+   *             NULL to only test if the order exists
    * @return transaction status
    */
-  // FIXME: rename, change arguments!
   enum GNUNET_DB_QueryStatus
-  (*find_order)(void *cls,
-                json_t **contract_terms,
-                const char *order_id,
-                const struct TALER_MerchantPublicKeyP *merchant_pub);
+  (*lookup_order)(void *cls,
+                  const char *instance_id,
+                  const char *order_id,
+                  json_t **contract_terms);
 
 
   /* ****************** OLD API ******************** */

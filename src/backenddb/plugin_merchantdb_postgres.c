@@ -1058,6 +1058,62 @@ postgres_delete_order (void *cls,
 }
 
 
+/**
+ * Retrieve order given its @a order_id and the @a instance_id.
+ *
+ * @param cls closure
+ * @param instance_id instance to obtain order of
+ * @param order id order id used to perform the lookup
+ * @param[out] contract_terms where to store the retrieved contract terms,
+ *             NULL to only test if the order exists
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_lookup_order (void *cls,
+                       const char *instance_id,
+                       const char *order_id,
+                       json_t **contract_terms)
+{
+  struct PostgresClosure *pg = cls;
+  json_t *j;
+  enum GNUNET_DB_QueryStatus qs;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (order_id),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_json ("contract_terms",
+                               &j),
+    GNUNET_PQ_result_spec_end
+  };
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "Finding contract term, order_id: '%s', instance_id: '%s'.\n",
+              order_id,
+              instance_id);
+  check_connection (pg);
+  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                 "find_order",
+                                                 params,
+                                                 rs);
+  if (GNUNET_DB_STATUS_SUCCESS_ONE_RESULT == qs)
+  {
+    if (NULL != contract_terms)
+      *contract_terms = j;
+    else
+      json_decref (j);
+  }
+  else
+  {
+    /* just to be safe: NULL it */
+    if (NULL != contract_terms)
+      *contract_terms = NULL;
+  }
+  return qs;
+}
+
+
 /* ********************* OLD API ************************** */
 
 /**
@@ -1172,46 +1228,6 @@ postgres_find_contract_terms (void *cls,
   check_connection (pg);
   return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
                                                    "find_contract_terms",
-                                                   params,
-                                                   rs);
-}
-
-
-/**
- * Retrieve order given its order id and the instance's merchant public key.
- *
- * @param cls closure
- * @param[out] contract_terms where to store the retrieved contract terms
- * @param order id order id used to perform the lookup
- * @param merchant_pub merchant public key that identifies the instance
- * @return transaction status
- */
-static enum GNUNET_DB_QueryStatus
-postgres_find_order (void *cls,
-                     json_t **contract_terms,
-                     const char *order_id,
-                     const struct TALER_MerchantPublicKeyP *merchant_pub)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (order_id),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_end
-  };
-  struct GNUNET_PQ_ResultSpec rs[] = {
-    TALER_PQ_result_spec_json ("contract_terms",
-                               contract_terms),
-    GNUNET_PQ_result_spec_end
-  };
-
-  *contract_terms = NULL;
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Finding contract term, order_id: '%s', merchant_pub: '%s'.\n",
-              order_id,
-              TALER_B2S (merchant_pub));
-  check_connection (pg);
-  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-                                                   "find_order",
                                                    params,
                                                    rs);
 }
@@ -4166,6 +4182,18 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "   AND merchant_orders.order_id=$2"
                             "   AND pay_deadline < $3",
                             3),
+    /* for postgres_lookup_order() */
+    GNUNET_PQ_make_prepare ("lookup_order",
+                            "SELECT"
+                            " contract_terms"
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND merchant_orders.order_id=$2",
+                            2),
+
     /* OLD API: */
 #if 0
     GNUNET_PQ_make_prepare ("insert_deposit",
@@ -4313,14 +4341,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "SELECT"
                             " contract_terms"
                             " FROM merchant_contract_terms"
-                            " WHERE"
-                            " order_id=$1"
-                            " AND merchant_pub=$2",
-                            2),
-    GNUNET_PQ_make_prepare ("find_order",
-                            "SELECT"
-                            " contract_terms"
-                            " FROM merchant_orders"
                             " WHERE"
                             " order_id=$1"
                             " AND merchant_pub=$2",
@@ -4676,6 +4696,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->update_product = &postgres_update_product;
   plugin->lock_product = &postgres_lock_product;
   plugin->delete_order = &postgres_delete_order;
+  plugin->lookup_order = &postgres_lookup_order;
 
   /* old API: */
   plugin->store_deposit = &postgres_store_deposit;
@@ -4690,7 +4711,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
   plugin->insert_contract_terms = &postgres_insert_contract_terms;
   plugin->insert_order = &postgres_insert_order;
-  plugin->find_order = &postgres_find_order;
   plugin->find_contract_terms = &postgres_find_contract_terms;
   plugin->find_contract_terms_history = &postgres_find_contract_terms_history;
   plugin->find_contract_terms_by_date = &postgres_find_contract_terms_by_date;

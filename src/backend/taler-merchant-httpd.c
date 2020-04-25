@@ -30,6 +30,7 @@
 #include "taler-merchant-httpd_mhd.h"
 #include "taler-merchant-httpd_private-delete-instances-ID.h"
 #include "taler-merchant-httpd_private-delete-products-ID.h"
+#include "taler-merchant-httpd_private-delete-orders-ID.h"
 #include "taler-merchant-httpd_private-get-instances.h"
 #include "taler-merchant-httpd_private-get-instances-ID.h"
 #include "taler-merchant-httpd_private-get-products.h"
