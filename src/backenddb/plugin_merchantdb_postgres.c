@@ -1114,6 +1114,43 @@ postgres_lookup_order (void *cls,
 }
 
 
+/**
+ * Insert order into the DB.
+ *
+ * @param cls closure
+ * @param instance_id identifies the instance responsible for the order
+ * @param order_id alphanumeric string that uniquely identifies the proposal
+ * @param pay_deadline how long does the customer have to pay for the order
+ * @param contract_terms proposal data to store
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_insert_order (void *cls,
+                       const char *instance_id,
+                       const char *order_id,
+                       struct GNUNET_TIME_Absolute pay_deadline,
+                       const json_t *contract_terms)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (order_id),
+    GNUNET_PQ_query_param_absolute_time (&pay_deadline),
+    TALER_PQ_query_param_json (contract_terms),
+    GNUNET_PQ_query_param_end
+  };
+
+  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
+              "inserting order: order_id: %s, instance_id: %s.\n",
+              order_id,
+              instance_id);
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_order",
+                                             params);
+}
+
+
 /* ********************* OLD API ************************** */
 
 /**
@@ -1277,43 +1314,6 @@ postgres_insert_contract_terms (void *cls,
   check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "insert_contract_terms",
-                                             params);
-}
-
-
-/**
- * Insert order into the DB.
- *
- * @param cls closure
- * @param order_id identificator of the proposal being stored
- * @param merchant_pub merchant's public key
- * @param timestamp timestamp of this proposal data
- * @param contract_terms proposal data to store
- * @return transaction status
- */
-static enum GNUNET_DB_QueryStatus
-postgres_insert_order (void *cls,
-                       const char *order_id,
-                       const struct TALER_MerchantPublicKeyP *merchant_pub,
-                       struct GNUNET_TIME_Absolute timestamp,
-                       const json_t *contract_terms)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (order_id),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_absolute_time (&timestamp),
-    TALER_PQ_query_param_json (contract_terms),
-    GNUNET_PQ_query_param_end
-  };
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "inserting order: order_id: %s, merchant_pub: %s.\n",
-              order_id,
-              TALER_B2S (merchant_pub));
-  check_connection (pg);
-  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
-                                             "insert_order",
                                              params);
 }
 
@@ -4193,7 +4193,17 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "        WHERE merchant_id=$1)"
                             "   AND merchant_orders.order_id=$2",
                             2),
-
+    GNUNET_PQ_make_prepare ("insert_order",
+                            "INSERT INTO merchant_orders"
+                            "(merchant_serial"
+                            ",order_id"
+                            ",pay_deadline"
+                            ",contract_terms)"
+                            " SELECT merchant_serial,"
+                            " $2, $3, $4"
+                            " FROM merchant_instances"
+                            " WHERE merchant_id=$1",
+                            4),
     /* OLD API: */
 #if 0
     GNUNET_PQ_make_prepare ("insert_deposit",
@@ -4251,15 +4261,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             " VALUES "
                             "($1, $2, $3, $4, $5)",
                             5),
-    GNUNET_PQ_make_prepare ("insert_order",
-                            "INSERT INTO merchant_orders"
-                            "(order_id"
-                            ",merchant_pub"
-                            ",timestamp"
-                            ",contract_terms)"
-                            " VALUES "
-                            "($1, $2, $3, $4)",
-                            4),
     GNUNET_PQ_make_prepare ("insert_session_info",
                             "INSERT INTO merchant_session_info"
                             "(session_id"

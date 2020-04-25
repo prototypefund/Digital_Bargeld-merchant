@@ -1098,6 +1098,106 @@ TALER_MERCHANT_product_delete_cancel (
   struct TALER_MERCHANT_ProductDeleteHandle *pdh);
 
 
+/* ********************* /orders ************************** */
+
+
+/**
+ * Handle to a POST /orders operation
+ */
+struct TALER_MERCHANT_PostOrderOperation;
+
+/**
+ * Callbacks of this type are used to serve the result of submitting a
+ * POST /orders request to a merchant.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ * @param order_id order id of the newly created order
+ */
+typedef void
+(*TALER_MERCHANT_PostOrderCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  const char *order_id);
+
+
+/**
+ * POST to /orders at the backend to setup an order and obtain
+ * the order ID (which may have been set by the front-end).
+ *
+ * @param ctx execution context
+ * @param backend_url URL of the backend
+ * @param order basic information about this purchase, to be extended by the backend
+ * @param cb the callback to call when a reply for this request is available
+ * @param cb_cls closure for @a cb
+ * @return a handle for this request, NULL on error
+ */
+struct TALER_MERCHANT_PostOrderOperation *
+TALER_MERCHANT_order_post (struct GNUNET_CURL_Context *ctx,
+                           const char *backend_url,
+                           const json_t *order,
+                           TALER_MERCHANT_PostOrderCallback cb,
+                           void *cb_cls);
+
+
+/**
+ * Cancel a POST /orders request.  This function cannot be used
+ * on a request handle if a response is already served for it.
+ *
+ * @param po the proposal operation request handle
+ */
+void
+TALER_MERCHANT_order_post_cancel (struct TALER_MERCHANT_PostOrderOperation *po);
+
+
+/**
+ * Handle for a DELETE /orders/$ID operation.
+ */
+struct TALER_MERCHANT_OrderDeleteHandle;
+
+
+/**
+ * Function called with the result of the DELETE /order/$ID operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ */
+typedef void
+(*TALER_MERCHANT_OrderDeleteCallback)(
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr);
+
+
+/**
+ * Make a DELETE /orders/$ID request to delete a order from our
+ * inventory.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param order_id identifier of the order
+ * @param cb function to call with the backend's deletion status
+ * @param cb_cls closure for @a cb
+ * @return the request handle; NULL upon error
+ */
+struct TALER_MERCHANT_OrderDeleteHandle *
+TALER_MERCHANT_order_delete (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const char *order_id,
+  TALER_MERCHANT_OrderDeleteCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel DELETE /orders/$ID operation.
+ *
+ * @param odh operation to cancel
+ */
+void
+TALER_MERCHANT_order_delete_cancel (
+  struct TALER_MERCHANT_OrderDeleteHandle *odh);
+
+
 /* *********************   OLD ************************** */
 
 
@@ -1253,55 +1353,6 @@ TALER_MERCHANT_refund_increase_cancel (
 
 
 /* *********************  /proposal *********************** */
-
-
-/**
- * Handle to a PUT /proposal operation
- */
-struct TALER_MERCHANT_ProposalOperation;
-
-/**
- * Callbacks of this type are used to serve the result of submitting a
- * /contract request to a merchant.
- *
- * @param cls closure
- * @param hr HTTP response details
- * @param order_id order id of the newly created order
- */
-typedef void
-(*TALER_MERCHANT_ProposalCallback) (
-  void *cls,
-  const struct TALER_MERCHANT_HttpResponse *hr,
-  const char *order_id);
-
-
-/**
- * PUT an order to the backend and receives the related proposal.
- *
- * @param ctx execution context
- * @param backend_url URL of the backend
- * @param order basic information about this purchase, to be extended by the
- * backend
- * @param proposal_cb the callback to call when a reply for this request is available
- * @param proposal_cb_cls closure for @a proposal_cb
- * @return a handle for this request, NULL on error
- */
-struct TALER_MERCHANT_ProposalOperation *
-TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
-                          const char *backend_url,
-                          const json_t *order,
-                          TALER_MERCHANT_ProposalCallback proposal_cb,
-                          void *proposal_cb_cls);
-
-
-/**
- * Cancel a PUT /proposal request.  This function cannot be used
- * on a request handle if a response is already served for it.
- *
- * @param po the proposal operation request handle
- */
-void
-TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po);
 
 
 /**

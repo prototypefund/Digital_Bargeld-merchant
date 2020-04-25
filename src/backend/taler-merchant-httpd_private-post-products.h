@@ -28,7 +28,7 @@
 
 
 /**
- * Generate an instance, given its configuration.
+ * Generate a product entry in our inventory.
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle

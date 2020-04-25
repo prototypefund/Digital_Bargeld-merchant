@@ -188,8 +188,8 @@ CREATE TABLE IF NOT EXISTS merchant_orders
   ,merchant_serial BIGINT NOT NULL
     REFERENCES merchant_instances (merchant_serial) ON DELETE CASCADE
   ,order_id VARCHAR NOT NULL
-  ,contract_terms BYTEA NOT NULL
   ,pay_deadline INT8 NOT NULL
+  ,contract_terms BYTEA NOT NULL
   ,UNIQUE (merchant_serial, order_id)
   );
 COMMENT ON TABLE merchant_orders

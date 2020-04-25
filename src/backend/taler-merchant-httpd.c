@@ -40,6 +40,8 @@
 #include "taler-merchant-httpd_private-post-instances.h"
 #include "taler-merchant-httpd_private-post-products.h"
 #include "taler-merchant-httpd_private-post-products-ID-lock.h"
+#include "taler-merchant-httpd_private-post-orders.h"
+
 
 /**
  * Backlog for listen operation on unix-domain sockets.
@@ -795,6 +797,12 @@ url_handler (void *cls,
       .method = MHD_HTTP_METHOD_POST,
       .have_id_segment = true,
       .handler = &TMH_private_post_products_ID_lock
+    },
+    /* POST /orders: */
+    {
+      .url_prefix = "/orders",
+      .method = MHD_HTTP_METHOD_POST,
+      .handler = &TMH_private_post_orders
     },
     {
       NULL

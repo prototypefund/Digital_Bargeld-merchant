@@ -646,25 +646,25 @@ struct TALER_MERCHANTDB_Plugin
                   json_t **contract_terms);
 
 
-  /* ****************** OLD API ******************** */
-
   /**
    * Insert order into db.
    *
    * @param cls closure
+   * @param instance_id identifies the instance responsible for the order
    * @param order_id alphanumeric string that uniquely identifies the proposal
-   * @param merchant_pub merchant's public key
-   * @param timestamp timestamp of this proposal data
+   * @param pay_deadline how long does the customer have to pay for the order
    * @param contract_terms proposal data to store
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
   (*insert_order)(void *cls,
+                  const char *instance_id,
                   const char *order_id,
-                  const struct TALER_MerchantPublicKeyP *merchant_pub,
-                  struct GNUNET_TIME_Absolute timestamp,
+                  struct GNUNET_TIME_Absolute pay_deadline,
                   const json_t *contract_terms);
 
+
+  /* ****************** OLD API ******************** */
 
   /**
    * Insert proposal data into db; the routine will internally hash and
