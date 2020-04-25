@@ -97,11 +97,12 @@ handle_get_product_finished (void *cls,
       struct TALER_Amount price;
       json_t *image;
       json_t *taxes;
-      int64_t total_stocked;
+      int64_t total_stock;
       uint64_t total_sold;
       uint64_t total_lost;
-      json_t *location;
-      struct GNUNET_TIME_Absolute next_restock;
+      json_t *address;
+      bool rst_ok = true;
+      struct GNUNET_TIME_Absolute next_restock = {0};
       struct GNUNET_JSON_Specification spec[] = {
         GNUNET_JSON_spec_string ("description",
                                  &description),
@@ -109,29 +110,46 @@ handle_get_product_finished (void *cls,
                                &description_i18n),
         GNUNET_JSON_spec_string ("unit",
                                  &unit),
-        TALER_JSON_spec_amount ("price_fee",
+        TALER_JSON_spec_amount ("price",
                                 &price),
         GNUNET_JSON_spec_json ("image",
                                &image),
         GNUNET_JSON_spec_json ("taxes",
                                &taxes),
-        GNUNET_JSON_spec_int64 ("total_stocked",
-                                &total_stocked),
+        GNUNET_JSON_spec_int64 ("total_stock",
+                                &total_stock),
         GNUNET_JSON_spec_uint64 ("total_sold",
                                  &total_sold),
         GNUNET_JSON_spec_uint64 ("total_lost",
                                  &total_lost),
-        GNUNET_JSON_spec_json ("location",
-                               &location),
-        GNUNET_JSON_spec_absolute_time ("next_restock",
-                                        &next_restock),
+        GNUNET_JSON_spec_json ("address",
+                               &address),
         GNUNET_JSON_spec_end ()
       };
 
-      if (GNUNET_OK ==
-          GNUNET_JSON_parse (json,
-                             spec,
-                             NULL, NULL))
+      if (NULL !=
+          json_object_get (json,
+                           "next_restock"))
+      {
+        struct GNUNET_JSON_Specification spect[] = {
+          GNUNET_JSON_spec_absolute_time ("next_restock",
+                                          &next_restock),
+          GNUNET_JSON_spec_end ()
+        };
+
+        if (GNUNET_OK !=
+            GNUNET_JSON_parse (json,
+                               spect,
+                               NULL, NULL))
+          rst_ok = false;
+      }
+
+
+      if ( (rst_ok) &&
+           (GNUNET_OK ==
+            GNUNET_JSON_parse (json,
+                               spec,
+                               NULL, NULL)) )
       {
         pgh->cb (pgh->cb_cls,
                  &hr,
@@ -141,10 +159,10 @@ handle_get_product_finished (void *cls,
                  &price,
                  image,
                  taxes,
-                 total_stocked,
+                 total_stock,
                  total_sold,
                  total_lost,
-                 location,
+                 address,
                  next_restock);
         GNUNET_JSON_parse_free (spec);
         TALER_MERCHANT_product_get_cancel (pgh);

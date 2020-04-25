@@ -188,7 +188,7 @@ struct TALER_MERCHANTDB_ProductDetails
    * existing sales and lost product, in product-specific units. UINT64_MAX
    * indicates "infinite".
    */
-  uint64_t total_stocked;
+  uint64_t total_stock;
 
   /**
    * Number of units of the product in sold, in product-specific units.

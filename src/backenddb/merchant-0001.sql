@@ -129,8 +129,8 @@ CREATE TABLE IF NOT EXISTS merchant_inventory
   ,price_val INT8 NOT NULL
   ,price_frac INT4 NOT NULL
   ,total_stock BIGINT NOT NULL
-  ,total_sold BIGINT NOT NULL
-  ,total_lost BIGINT NOT NULL
+  ,total_sold BIGINT NOT NULL DEFAULT 0
+  ,total_lost BIGINT NOT NULL DEFAULT 0
   ,address BYTEA NOT NULL
   ,next_restock INT8 NOT NULL
   ,UNIQUE (merchant_serial, product_id)

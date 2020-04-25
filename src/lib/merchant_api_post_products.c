@@ -167,7 +167,7 @@ handle_post_products_finished (void *cls,
  *              applicable taxes.
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
- * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books)
+ * @param total_stock in @a units, -1 to indicate "infinite" (i.e. electronic books)
  * @param address where the product is in stock
  * @param next_restock when the next restocking is expected to happen, 0 for unknown,
  *                     #GNUNET_TIME_UNIT_FOREVER_ABS for 'never'.
@@ -186,7 +186,7 @@ TALER_MERCHANT_products_post (
   const struct TALER_Amount *price,
   const json_t *image,
   const json_t *taxes,
-  int64_t total_stocked,
+  int64_t total_stock,
   const json_t *address,
   struct GNUNET_TIME_Absolute next_restock,
   TALER_MERCHANT_ProductsPostCallback cb,
@@ -195,6 +195,7 @@ TALER_MERCHANT_products_post (
   struct TALER_MERCHANT_ProductsPostHandle *pph;
   json_t *req_obj;
 
+  (void) GNUNET_TIME_round_abs (&next_restock);
   req_obj = json_pack ("{s:s, s:s, s:O, s:s, s:o,"
                        " s:O, s:O, s:I, s:O, s:o}",
                        "product_id",
@@ -212,8 +213,8 @@ TALER_MERCHANT_products_post (
                        image,
                        "taxes",
                        taxes,
-                       "total_stocked",
-                       (json_int_t) total_stocked,
+                       "total_stock",
+                       (json_int_t) total_stock,
                        "address",
                        address,
                        "next_restock",

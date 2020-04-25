@@ -136,10 +136,13 @@ post_instances_cb (void *cls,
   }
   switch (hr->http_status)
   {
-  case MHD_HTTP_OK:
+  case MHD_HTTP_NO_CONTENT:
+    break;
+  case MHD_HTTP_CONFLICT:
     break;
   // FIXME: add other legitimate states here...
   default:
+    GNUNET_break (0);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Unhandled HTTP status.\n");
   }

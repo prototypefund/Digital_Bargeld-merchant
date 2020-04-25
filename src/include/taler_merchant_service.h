@@ -792,7 +792,7 @@ struct TALER_MERCHANT_ProductGetHandle;
  *              applicable taxes.
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
- * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books),
+ * @param total_stock in @a units, -1 to indicate "infinite" (i.e. electronic books),
  *                does NOT indicate remaining stocks, to get remaining stocks,
  *                subtract @a total_sold and @a total_lost. Note that this still
  *                does not then say how many of the remaining inventory are locked.
@@ -812,7 +812,7 @@ typedef void
   const struct TALER_Amount *price,
   const json_t *image,
   const json_t *taxes,
-  int64_t total_stocked,
+  int64_t total_stock,
   uint64_t total_sold,
   uint64_t total_lost,
   const json_t *location,
@@ -883,7 +883,7 @@ typedef void
  *              applicable taxes.
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
- * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books)
+ * @param total_stock in @a units, -1 to indicate "infinite" (i.e. electronic books)
  * @param address where the product is in stock
  * @param next_restock when the next restocking is expected to happen, 0 for unknown,
  *                     #GNUNET_TIME_UNIT_FOREVER_ABS for 'never'.
@@ -902,7 +902,7 @@ TALER_MERCHANT_products_post (
   const struct TALER_Amount *price,
   const json_t *image,
   const json_t *taxes,
-  int64_t total_stocked,
+  int64_t total_stock,
   const json_t *address,
   struct GNUNET_TIME_Absolute next_restock,
   TALER_MERCHANT_ProductsPostCallback cb,
@@ -955,10 +955,10 @@ typedef void
  *              applicable taxes.
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
- * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books),
+ * @param total_stock in @a units, -1 to indicate "infinite" (i.e. electronic books),
  *               must be larger than previous values
  * @param total_lost in @a units, must be larger than previous values, and may
- *               not exceed total_stocked minus total_sold; if it does, the transaction
+ *               not exceed total_stock minus total_sold; if it does, the transaction
  *               will fail with a #MHD_HTTP_CONFLICT HTTP status code
  * @param address where the product is in stock
  * @param next_restock when the next restocking is expected to happen
@@ -977,7 +977,7 @@ TALER_MERCHANT_product_patch (
   const struct TALER_Amount *price,
   const json_t *image,
   const json_t *taxes,
-  int64_t total_stocked,
+  int64_t total_stock,
   uint64_t total_lost,
   const json_t *address,
   struct GNUNET_TIME_Absolute next_restock,

@@ -86,15 +86,15 @@ determine_cause (struct MHD_Connection *connection,
       ec = TALER_EC_PRODUCTS_PATCH_TOTAL_LOST_REDUCED;
       hint = "total lost cannot be lowered";
     }
-    if (pdx.total_sold > pd->total_sold)
-    {
-      ec = TALER_EC_PRODUCTS_PATCH_TOTAL_SOLD_REDUCED;
-      hint = "total sold cannot be lowered";
-    }
-    if (pdx.total_stocked > pd->total_stocked)
+    if (pdx.total_stock > pd->total_stock)
     {
       ec = TALER_EC_PRODUCTS_PATCH_TOTAL_STOCKED_REDUCED;
       hint = "total stocked cannot be lowered";
+    }
+    if (pd->total_stock - pdx.total_sold > pd->total_lost)
+    {
+      ec = TALER_EC_PRODUCTS_PATCH_TOTAL_LOST_EXCEEDS_STOCKS;
+      hint = "total lost cannot exceed total stock minus total sold";
     }
     GNUNET_free (pdx.description);
     json_decref (pdx.description_i18n);
@@ -126,7 +126,7 @@ TMH_private_patch_products_ID (const struct TMH_RequestHandler *rh,
   struct TMH_MerchantInstance *mi = hc->instance;
   const char *product_id = hc->infix;
   struct TALER_MERCHANTDB_ProductDetails pd;
-  int64_t total_stocked;
+  int64_t total_stock;
   enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_string ("description",
@@ -143,8 +143,10 @@ TMH_private_patch_products_ID (const struct TMH_RequestHandler *rh,
                            &pd.taxes),
     GNUNET_JSON_spec_json ("address",
                            &pd.address),
-    GNUNET_JSON_spec_int64 ("total_stocked",
-                            &total_stocked),
+    GNUNET_JSON_spec_int64 ("total_stock",
+                            &total_stock),
+    GNUNET_JSON_spec_uint64 ("total_lost",
+                             &pd.total_lost),
     GNUNET_JSON_spec_absolute_time ("next_restock",
                                     &pd.next_restock),
     GNUNET_JSON_spec_end ()
@@ -172,10 +174,10 @@ TMH_private_patch_products_ID (const struct TMH_RequestHandler *rh,
                                          TALER_EC_INTERNAL_INVARIANT_FAILURE,
                                          "Impossible to parse the product description");
   }
-  if (-1 == total_stocked)
-    pd.total_stocked = UINT64_MAX;
+  if (-1 == total_stock)
+    pd.total_stock = UINT64_MAX;
   else
-    pd.total_stocked = (uint64_t) total_stocked;
+    pd.total_stock = (uint64_t) total_stock;
   if (NULL != json_object_get (hc->request_body,
                                "next_restock"))
   {

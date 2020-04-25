@@ -56,7 +56,7 @@ products_equal (const struct TALER_MERCHANTDB_ProductDetails *p1,
                                    &p2->price)) &&
            (1 == json_equal (p1->taxes,
                              p2->taxes)) &&
-           (p1->total_stocked == p2->total_stocked) &&
+           (p1->total_stock == p2->total_stock) &&
            (p1->total_sold == p2->total_sold) &&
            (p1->total_lost == p2->total_lost) &&
            (1 == json_equal (p1->image,
@@ -84,7 +84,7 @@ TMH_private_post_products (const struct TMH_RequestHandler *rh,
   struct TMH_MerchantInstance *mi = hc->instance;
   struct TALER_MERCHANTDB_ProductDetails pd;
   const char *product_id;
-  int64_t total_stocked;
+  int64_t total_stock;
   enum GNUNET_DB_QueryStatus qs;
   struct GNUNET_JSON_Specification spec[] = {
     GNUNET_JSON_spec_string ("product_id",
@@ -103,8 +103,8 @@ TMH_private_post_products (const struct TMH_RequestHandler *rh,
                            &pd.taxes),
     GNUNET_JSON_spec_json ("address",
                            &pd.address),
-    GNUNET_JSON_spec_int64 ("total_stocked",
-                            &total_stocked),
+    GNUNET_JSON_spec_int64 ("total_stock",
+                            &total_stock),
     GNUNET_JSON_spec_absolute_time ("next_restock",
                                     &pd.next_restock),
     GNUNET_JSON_spec_end ()
@@ -131,10 +131,10 @@ TMH_private_post_products (const struct TMH_RequestHandler *rh,
                                          "Impossible to parse the order");
   }
 
-  if (-1 == total_stocked)
-    pd.total_stocked = UINT64_MAX;
+  if (-1 == total_stock)
+    pd.total_stock = UINT64_MAX;
   else
-    pd.total_stocked = (uint64_t) total_stocked;
+    pd.total_stock = (uint64_t) total_stock;
   if (NULL != json_object_get (hc->request_body,
                                "next_restock"))
   {

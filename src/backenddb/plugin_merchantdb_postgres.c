@@ -846,7 +846,7 @@ postgres_lookup_product (void *cls,
     TALER_PQ_result_spec_json ("taxes",
                                &pd->taxes),
     GNUNET_PQ_result_spec_uint64 ("total_stock",
-                                  &pd->total_stocked),
+                                  &pd->total_stock),
     GNUNET_PQ_result_spec_uint64 ("total_sold",
                                   &pd->total_sold),
     GNUNET_PQ_result_spec_uint64 ("total_lost",
@@ -927,9 +927,7 @@ postgres_insert_product (void *cls,
     TALER_PQ_query_param_json (pd->image),
     TALER_PQ_query_param_json (pd->taxes),
     TALER_PQ_query_param_amount (&pd->price),
-    GNUNET_PQ_query_param_uint64 (&pd->total_stocked),
-    GNUNET_PQ_query_param_uint64 (&pd->total_sold),
-    GNUNET_PQ_query_param_uint64 (&pd->total_lost),
+    GNUNET_PQ_query_param_uint64 (&pd->total_stock),
     TALER_PQ_query_param_json (pd->address),
     GNUNET_PQ_query_param_absolute_time (&pd->next_restock),
     GNUNET_PQ_query_param_end
@@ -969,16 +967,16 @@ postgres_update_product (void *cls,
 {
   struct PostgresClosure *pg = cls;
   struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (instance_id), /* $1 */
     GNUNET_PQ_query_param_string (product_id),
     GNUNET_PQ_query_param_string (pd->description),
     TALER_PQ_query_param_json (pd->description_i18n),
     GNUNET_PQ_query_param_string (pd->unit),
-    TALER_PQ_query_param_json (pd->image),
+    TALER_PQ_query_param_json (pd->image), /* $6 */
     TALER_PQ_query_param_json (pd->taxes),
     TALER_PQ_query_param_amount (&pd->price),
-    GNUNET_PQ_query_param_uint64 (&pd->total_stocked),
-    GNUNET_PQ_query_param_uint64 (&pd->total_lost),
+    GNUNET_PQ_query_param_uint64 (&pd->total_stock),
+    GNUNET_PQ_query_param_uint64 (&pd->total_lost), /* $11 */
     TALER_PQ_query_param_json (pd->address),
     GNUNET_PQ_query_param_absolute_time (&pd->next_restock),
     GNUNET_PQ_query_param_end
@@ -4099,15 +4097,13 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             ",price_val"
                             ",price_frac"
                             ",total_stock"
-                            ",total_sold"
-                            ",total_lost"
                             ",address"
                             ",next_restock)"
                             " SELECT merchant_serial,"
-                            " $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14"
+                            " $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12"
                             " FROM merchant_instances"
                             " WHERE merchant_id=$1",
-                            14),
+                            12),
     /* for postgres_update_product() */
     GNUNET_PQ_make_prepare ("update_product",
                             "UPDATE merchant_inventory SET"
@@ -4163,7 +4159,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
     GNUNET_PQ_make_prepare ("delete_order",
                             "DELETE"
                             " FROM merchant_orders"
-                            " WHERE merchant_inventory.merchant_serial="
+                            " WHERE merchant_orders.merchant_serial="
                             "     (SELECT merchant_serial "
                             "        FROM merchant_instances"
                             "        WHERE merchant_id=$1)"

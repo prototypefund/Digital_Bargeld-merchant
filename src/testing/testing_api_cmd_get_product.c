@@ -81,7 +81,7 @@ struct GetProductState
  *              applicable taxes.
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
- * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books),
+ * @param total_stock in @a units, -1 to indicate "infinite" (i.e. electronic books),
  *                does NOT indicate remaining stocks, to get remaining stocks,
  *                subtract @a total_sold and @a total_lost. Note that this still
  *                does not then say how many of the remaining inventory are locked.
@@ -100,7 +100,7 @@ get_product_cb (void *cls,
                 const struct TALER_Amount *price,
                 const json_t *image,
                 const json_t *taxes,
-                int64_t total_stocked,
+                int64_t total_stock,
                 uint64_t total_sold,
                 uint64_t total_lost,
                 const json_t *location,

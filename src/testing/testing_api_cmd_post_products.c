@@ -87,7 +87,7 @@ struct PostProductsState
   /**
    * in @e units, -1 to indicate "infinite" (i.e. electronic books)
    */
-  int64_t total_stocked;
+  int64_t total_stock;
 
   /**
    * where the product is in stock
@@ -131,10 +131,13 @@ post_products_cb (void *cls,
   }
   switch (hr->http_status)
   {
-  case MHD_HTTP_OK:
+  case MHD_HTTP_NO_CONTENT:
+    break;
+  case MHD_HTTP_CONFLICT:
     break;
   // FIXME: add other legitimate states here...
   default:
+    GNUNET_break (0);
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Unhandled HTTP status.\n");
   }
@@ -167,7 +170,7 @@ post_products_run (void *cls,
                                            &pis->price,
                                            pis->image,
                                            pis->taxes,
-                                           pis->total_stocked,
+                                           pis->total_stock,
                                            pis->address,
                                            pis->next_restock,
                                            &post_products_cb,
@@ -219,7 +222,7 @@ post_products_cleanup (void *cls,
  *              applicable taxes.
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
- * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books)
+ * @param total_stock in @a units, -1 to indicate "infinite" (i.e. electronic books)
  * @param address where the product is in stock
  * @param next_restock when the next restocking is expected to happen, 0 for unknown,
  *                     #GNUNET_TIME_UNIT_FOREVER_ABS for 'never'.
@@ -237,7 +240,7 @@ TALER_TESTING_cmd_merchant_post_products2 (
   const char *price,
   json_t *image,
   json_t *taxes,
-  int64_t total_stocked,
+  int64_t total_stock,
   json_t *address,
   struct GNUNET_TIME_Absolute next_restock,
   unsigned int http_status)
@@ -256,7 +259,7 @@ TALER_TESTING_cmd_merchant_post_products2 (
                                          &pis->price));
   pis->image = image; /* ownership taken */
   pis->taxes = taxes; /* ownership taken */
-  pis->total_stocked = total_stocked;
+  pis->total_stock = total_stock;
   pis->address = address; /* ownership taken */
   pis->next_restock = next_restock;
   {

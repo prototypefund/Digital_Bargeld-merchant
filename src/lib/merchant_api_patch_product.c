@@ -167,10 +167,10 @@ handle_patch_product_finished (void *cls,
  *              applicable taxes.
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
- * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books),
+ * @param total_stock in @a units, -1 to indicate "infinite" (i.e. electronic books),
  *               must be larger than previous values
  * @param total_lost in @a units, must be larger than previous values, and may
- *               not exceed total_stocked minus total_sold; if it does, the transaction
+ *               not exceed total_stock minus total_sold; if it does, the transaction
  *               will fail with a #MHD_HTTP_CONFLICT HTTP status code
  * @param location where the product is in stock
  * @param next_restock when the next restocking is expected to happen
@@ -189,7 +189,7 @@ TALER_MERCHANT_product_patch (
   const struct TALER_Amount *price,
   const json_t *image,
   const json_t *taxes,
-  int64_t total_stocked,
+  int64_t total_stock,
   uint64_t total_lost,
   const json_t *address,
   struct GNUNET_TIME_Absolute next_restock,
@@ -199,6 +199,7 @@ TALER_MERCHANT_product_patch (
   struct TALER_MERCHANT_ProductPatchHandle *pph;
   json_t *req_obj;
 
+  (void) GNUNET_TIME_round_abs (&next_restock);
   req_obj = json_pack ("{s:s, s:O, s:s, s:o, s:O,"
                        " s:O, s:I: s:I, s:O, s:o}",
                        "description",
@@ -214,8 +215,8 @@ TALER_MERCHANT_product_patch (
                        /* End of first group of 5 */
                        "taxes",
                        taxes,
-                       "total_stocked",
-                       (json_int_t) total_stocked,
+                       "total_stock",
+                       (json_int_t) total_stock,
                        "total_lost",
                        (json_int_t) total_lost,
                        "address",

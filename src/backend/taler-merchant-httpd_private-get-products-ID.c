@@ -57,9 +57,8 @@ TMH_private_get_products_ID (const struct TMH_RequestHandler *rh,
     json_t *reply;
 
     reply = json_pack (
-      "{s:s, s:o, s:s, s:o, s:o,"
-      " s:I, s:I, s:I, s:o, s:o,"
-      " s:o}",
+      "{s:s, s:s, s:o, s:o, s:I,"
+      " s:I, s:I, s:o, s:o, s:o}",
       "description",
       pd.description,
       "unit",
@@ -68,11 +67,11 @@ TMH_private_get_products_ID (const struct TMH_RequestHandler *rh,
       TALER_JSON_from_amount (&pd.price),
       "taxes",
       pd.taxes,
-      /* end of first group of 5 */
-      "total_stocked",
-      (UINT64_MAX == pd.total_stocked)
+      "total_stock",
+      (UINT64_MAX == pd.total_stock)
       ? (json_int_t) -1
-      : (json_int_t) pd.total_stocked,
+      : (json_int_t) pd.total_stock,
+      /* end of first group of 5 */
       "total_sold",
       (json_int_t) pd.total_sold,
       "total_lost",

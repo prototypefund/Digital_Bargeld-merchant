@@ -266,7 +266,7 @@ TALER_TESTING_cmd_merchant_delete_instance (const char *label,
  *              applicable taxes.
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
- * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books)
+ * @param total_stock in @a units, -1 to indicate "infinite" (i.e. electronic books)
  * @param address where the product is in stock
  * @param next_restock when the next restocking is expected to happen, 0 for unknown,
  *                     #GNUNET_TIME_UNIT_FOREVER_ABS for 'never'.
@@ -284,7 +284,7 @@ TALER_TESTING_cmd_merchant_post_products2 (
   const char *price,
   json_t *image,
   json_t *taxes,
-  int64_t total_stocked,
+  int64_t total_stock,
   json_t *address,
   struct GNUNET_TIME_Absolute next_restock,
   unsigned int http_status);
@@ -327,9 +327,9 @@ TALER_TESTING_cmd_merchant_post_products (const char *label,
  *              applicable taxes.
  * @param image base64-encoded product image
  * @param taxes list of taxes paid by the merchant
- * @param total_stocked in @a units, -1 to indicate "infinite" (i.e. electronic books)
+ * @param total_stock in @a units, -1 to indicate "infinite" (i.e. electronic books)
  * @param total_lost in @a units, must be larger than previous values, and may
- *               not exceed total_stocked minus total_sold; if it does, the transaction
+ *               not exceed total_stock minus total_sold; if it does, the transaction
  *               will fail with a #MHD_HTTP_CONFLICT HTTP status code
  * @param address where the product is in stock
  * @param next_restock when the next restocking is expected to happen, 0 for unknown,
@@ -348,7 +348,7 @@ TALER_TESTING_cmd_merchant_patch_product (
   const char *price,
   json_t *image,
   json_t *taxes,
-  int64_t total_stocked,
+  int64_t total_stock,
   uint64_t total_lost,
   json_t *address,
   struct GNUNET_TIME_Absolute next_restock,
