@@ -845,7 +845,7 @@ postgres_lookup_product (void *cls,
                                  &pd->price),
     TALER_PQ_result_spec_json ("taxes",
                                &pd->taxes),
-    GNUNET_PQ_result_spec_uint64 ("total_stocked",
+    GNUNET_PQ_result_spec_uint64 ("total_stock",
                                   &pd->total_stocked),
     GNUNET_PQ_result_spec_uint64 ("total_sold",
                                   &pd->total_sold),
@@ -1025,6 +1025,37 @@ postgres_lock_product (void *cls,
   check_connection (pg);
   return GNUNET_PQ_eval_prepared_non_select (pg->conn,
                                              "lock_product",
+                                             params);
+}
+
+
+/**
+ * Delete information about an order.  Note that the transaction must
+ * enforce that the order is not awaiting payment anymore.
+ *
+ * @param cls closure
+ * @param instance_id instance to delete order of
+ * @param order_id order to delete
+ * @return DB status code, #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS
+ *           if pending payment prevents deletion OR order unknown
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_delete_order (void *cls,
+                       const char *instance_id,
+                       const char *order_id)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (order_id),
+    GNUNET_PQ_query_param_absolute_time (&now),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "delete_order",
                                              params);
 }
 
@@ -4128,7 +4159,17 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "        FROM merchant_order_locks"
                             "        WHERE product_serial=ps.product_serial)",
                             5),
-
+    /* for postgres_delete_order() */
+    GNUNET_PQ_make_prepare ("delete_order",
+                            "DELETE"
+                            " FROM merchant_orders"
+                            " WHERE merchant_inventory.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND merchant_orders.order_id=$2"
+                            "   AND pay_deadline < $3",
+                            3),
     /* OLD API: */
 #if 0
     GNUNET_PQ_make_prepare ("insert_deposit",
@@ -4638,6 +4679,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->insert_product = &postgres_insert_product;
   plugin->update_product = &postgres_update_product;
   plugin->lock_product = &postgres_lock_product;
+  plugin->delete_order = &postgres_delete_order;
 
   /* old API: */
   plugin->store_deposit = &postgres_store_deposit;

@@ -68,7 +68,7 @@ check_PROGRAMS = \
   test_merchant_api
 
 if HAVE_TWISTER
-check_PROGRAMS += test_merchant_api_twisted
+# check_PROGRAMS += test_merchant_api_twisted
 endif
 endif
 

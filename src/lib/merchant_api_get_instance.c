@@ -189,6 +189,7 @@ handle_get_instance_finished (void *cls,
           return;
         }
       }
+      GNUNET_break_op (0);
       hr.http_status = 0;
       hr.ec = TALER_EC_INVALID_RESPONSE;
       GNUNET_JSON_parse_free (spec);

@@ -179,6 +179,9 @@ TMH_private_patch_instances_ID (const struct TMH_RequestHandler *rh,
       bool matches[GNUNET_NZL (len)];
       bool matched;
 
+      memset (matches,
+              0,
+              sizeof (matches));
       for (struct TMH_WireMethod *wm = mi->wm_head;
            NULL != wm;
            wm = wm->next)
@@ -225,6 +228,9 @@ TMH_private_patch_instances_ID (const struct TMH_RequestHandler *rh,
         if (! matched)
         {
           /* Account was REMOVED */
+          GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                      "Existing account `%s' not found, inactivating it.\n",
+                      uri);
           wm->deleting = true;
           qs = TMH_db->inactivate_account (TMH_db->cls,
                                            &wm->h_wire);
@@ -249,11 +255,14 @@ TMH_private_patch_instances_ID (const struct TMH_RequestHandler *rh,
         ad.payto_uri = json_string_value (json_array_get (payto_uris,
                                                           i));
         GNUNET_assert (NULL != ad.payto_uri);
+        GNUNET_log (GNUNET_ERROR_TYPE_INFO,
+                    "Adding NEW account `%s'\n",
+                    ad.payto_uri);
         GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_NONCE,
                                     &ad.salt,
                                     sizeof (ad.salt));
         wm = GNUNET_new (struct TMH_WireMethod);
-        wm->j_wire = json_pack ("{s:O, s:s}",
+        wm->j_wire = json_pack ("{s:s, s:o}",
                                 "payto_uri", ad.payto_uri,
                                 "salt", GNUNET_JSON_from_data_auto (&ad.salt));
         GNUNET_assert (NULL != wm->j_wire);
@@ -265,6 +274,7 @@ TMH_private_patch_instances_ID (const struct TMH_RequestHandler *rh,
             TALER_JSON_merchant_wire_signature_hash (wm->j_wire,
                                                      &wm->h_wire))
         {
+          GNUNET_break_op (0);
           free_wm (wm);
           while (NULL != (wm = wm_head))
           {
@@ -338,8 +348,12 @@ giveup:
 
   /* Update our 'settings' */
   GNUNET_free (mi->settings.name);
+  json_decref (mi->settings.address);
+  json_decref (mi->settings.jurisdiction);
   is.id = mi->settings.id;
   mi->settings = is;
+  mi->settings.address = json_incref (mi->settings.address);
+  mi->settings.jurisdiction = json_incref (mi->settings.jurisdiction);
   mi->settings.name = GNUNET_strdup (name);
 
   /* Add 'new' wire methods to our list */

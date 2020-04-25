@@ -75,6 +75,7 @@ TMH_private_delete_instances_ID (const struct TMH_RequestHandler *rh,
                                        ? "Instance unknown"
                                        : "Private key unknown");
   case GNUNET_DB_STATUS_SUCCESS_ONE_RESULT:
+    TMH_instance_decref (mi);
     return TALER_MHD_reply_static (connection,
                                    MHD_HTTP_NO_CONTENT,
                                    NULL,

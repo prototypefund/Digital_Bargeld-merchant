@@ -25,19 +25,27 @@ BEGIN;
 
 -- Drops for 0001.sql
 
-DROP TABLE IF EXISTS merchant_transfers CASCADE;
-DROP TABLE IF EXISTS merchant_deposits CASCADE;
-DROP TABLE IF EXISTS merchant_transactions CASCADE;
-DROP TABLE IF EXISTS merchant_proofs CASCADE;
+DROP TABLE IF EXISTS merchant_exchange_wire_fees CASCADE;
+DROP TABLE IF EXISTS merchant_exchange_signing_keys CASCADE;
+DROP TABLE IF EXISTS merchant_instances CASCADE;
+DROP TABLE IF EXISTS merchant_keys CASCADE;
+DROP TABLE IF EXISTS merchant_accounts CASCADE;
+DROP TABLE IF EXISTS merchant_inventory CASCADE;
+DROP TABLE IF EXISTS merchant_inventory_locks CASCADE;
+DROP TABLE IF EXISTS merchant_accounts CASCADE;
+DROP TABLE IF EXISTS merchant_orders CASCADE;
+DROP TABLE IF EXISTS merchant_order_locks CASCADE;
 DROP TABLE IF EXISTS merchant_contract_terms CASCADE;
+DROP TABLE IF EXISTS merchant_deposits CASCADE;
 DROP TABLE IF EXISTS merchant_refunds CASCADE;
-DROP TABLE IF EXISTS exchange_wire_fees CASCADE;
+DROP TABLE IF EXISTS merchant_credits CASCADE;
+DROP TABLE IF EXISTS merchant_transfer_signatures CASCADE;
+DROP TABLE IF EXISTS merchant_transfer_by_coin CASCADE;
+DROP TABLE IF EXISTS merchant_tip_reserves CASCADE;
+DROP TABLE IF EXISTS merchant_tip_reserve_keys CASCADE;
 DROP TABLE IF EXISTS merchant_tips CASCADE;
 DROP TABLE IF EXISTS merchant_tip_pickups CASCADE;
-DROP TABLE IF EXISTS merchant_tip_reserve_credits CASCADE;
-DROP TABLE IF EXISTS merchant_tip_reserves CASCADE;
-DROP TABLE IF EXISTS merchant_orders CASCADE;
-DROP TABLE IF EXISTS merchant_session_info CASCADE;
+DROP TABLE IF EXISTS merchant_tip_pickup_signatures CASCADE;
 
 -- Drop versioning (0000.sql)
 DROP SCHEMA IF EXISTS _v CASCADE;

@@ -48,7 +48,7 @@ TMH_private_delete_products_ID (const struct TMH_RequestHandler *rh,
   case GNUNET_DB_STATUS_HARD_ERROR:
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                       TALER_EC_DELETE_PRODUCTS_ID_DB_HARD_FAILURE,
+                                       TALER_EC_PRODUCTS_DELETE_DB_HARD_FAILURE,
                                        "Transaction failed");
   case GNUNET_DB_STATUS_SOFT_ERROR:
     GNUNET_break (0);
@@ -64,11 +64,11 @@ TMH_private_delete_products_ID (const struct TMH_RequestHandler *rh,
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
       return TALER_MHD_reply_with_error (connection,
                                          MHD_HTTP_NOT_FOUND,
-                                         TALER_EC_DELETE_PRODUCTS_NO_SUCH_PRODUCT,
+                                         TALER_EC_PRODUCTS_DELETE_NO_SUCH_PRODUCT,
                                          "Product unknown");
     return TALER_MHD_reply_with_error (connection,
                                        MHD_HTTP_CONFLICT,
-                                       TALER_EC_DELETE_PRODUCTS_CONFLICTING_LOCK,
+                                       TALER_EC_PRODUCTS_DELETE_CONFLICTING_LOCK,
                                        "Product deletion impossible, product is locked");
   case GNUNET_DB_STATUS_SUCCESS_ONE_RESULT:
     return TALER_MHD_reply_static (connection,

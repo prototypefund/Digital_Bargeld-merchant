@@ -613,6 +613,39 @@ struct TALER_MERCHANTDB_Plugin
                   struct GNUNET_TIME_Absolute expiration_time);
 
 
+  /**
+   * Delete information about an order. Note that the transaction must
+   * enforce that the order is not awaiting payment anymore.
+   *
+   * @param cls closure
+   * @param instance_id instance to delete order of
+   * @param order_id order to delete
+   * @return DB status code, #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS
+   *           if locks prevent deletion OR order unknown
+   */
+  enum GNUNET_DB_QueryStatus
+  (*delete_order)(void *cls,
+                  const char *instance_id,
+                  const char *order_id);
+
+
+  /**
+   * Retrieve order given its order id and the instance's merchant public key.
+   *
+   * @param cls closure
+   * @param[out] contract_terms where to store the retrieved contract terms
+   * @param order id order id used to perform the lookup
+   * @param merchant_pub merchant public key that identifies the instance
+   * @return transaction status
+   */
+  // FIXME: rename, change arguments!
+  enum GNUNET_DB_QueryStatus
+  (*find_order)(void *cls,
+                json_t **contract_terms,
+                const char *order_id,
+                const struct TALER_MerchantPublicKeyP *merchant_pub);
+
+
   /* ****************** OLD API ******************** */
 
   /**
@@ -722,21 +755,6 @@ struct TALER_MERCHANTDB_Plugin
                          json_t **contract_terms,
                          const char *order_id,
                          const struct TALER_MerchantPublicKeyP *merchant_pub);
-
-  /**
-   * Retrieve order given its order id and the instance's merchant public key.
-   *
-   * @param cls closure
-   * @param[out] contract_terms where to store the retrieved contract terms
-   * @param order id order id used to perform the lookup
-   * @param merchant_pub merchant public key that identifies the instance
-   * @return transaction status
-   */
-  enum GNUNET_DB_QueryStatus
-  (*find_order)(void *cls,
-                json_t **contract_terms,
-                const char *order_id,
-                const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
   /**

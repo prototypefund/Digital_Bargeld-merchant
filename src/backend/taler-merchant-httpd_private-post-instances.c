@@ -339,6 +339,8 @@ TMH_private_post_instances (const struct TMH_RequestHandler *rh,
     mi->wm_head = wm_head;
     mi->wm_tail = wm_tail;
     mi->settings = is;
+    mi->settings.address = json_incref (mi->settings.address);
+    mi->settings.jurisdiction = json_incref (mi->settings.jurisdiction);
     mi->settings.id = GNUNET_strdup (is.id);
     mi->settings.name = GNUNET_strdup (is.name);
     GNUNET_CRYPTO_eddsa_key_create (&mi->merchant_priv.eddsa_priv);

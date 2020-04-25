@@ -89,7 +89,7 @@ TMH_private_get_instances_ID (const struct TMH_RequestHandler *rh,
       &mi->settings.default_max_wire_fee),
     "default_wire_fee_amortization",
     (json_int_t)
-    &mi->settings.default_wire_fee_amortization,
+    mi->settings.default_wire_fee_amortization,
     "default_wire_transfer_delay",
     GNUNET_JSON_from_time_rel (
       mi->settings.default_wire_transfer_delay),

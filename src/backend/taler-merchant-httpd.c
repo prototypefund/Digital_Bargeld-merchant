@@ -37,6 +37,7 @@
 #include "taler-merchant-httpd_private-patch-instances-ID.h"
 #include "taler-merchant-httpd_private-patch-products-ID.h"
 #include "taler-merchant-httpd_private-post-instances.h"
+#include "taler-merchant-httpd_private-post-products.h"
 #include "taler-merchant-httpd_private-post-products-ID-lock.h"
 
 /**
@@ -124,10 +125,18 @@ void
 TMH_instance_decref (struct TMH_MerchantInstance *mi)
 {
   struct TMH_WireMethod *wm;
+  struct GNUNET_HashCode h_instance;
 
   mi->rc--;
   if (0 != mi->rc)
     return;
+  GNUNET_CRYPTO_hash (mi->settings.id,
+                      strlen (mi->settings.id),
+                      &h_instance);
+  GNUNET_assert (GNUNET_OK ==
+                 GNUNET_CONTAINER_multihashmap_remove (TMH_by_id_map,
+                                                       &h_instance,
+                                                       mi));
   while (NULL != (wm = (mi->wm_head)))
   {
     GNUNET_CONTAINER_DLL_remove (mi->wm_head,
@@ -713,25 +722,6 @@ url_handler (void *cls,
              void **con_cls)
 {
   static struct TMH_RequestHandler private_handlers[] = {
-    /* GET /: */
-    {
-      .url_prefix = "/",
-      .method = MHD_HTTP_METHOD_GET,
-      .mime_type = "text/plain",
-      .skip_instance = true,
-      .data = "This is a GNU Taler merchant backend. See https://taler.net/.\n",
-      .data_size = strlen (
-        "This is a GNU Taler merchant backend. See https://taler.net/.\n"),
-      .handler = &TMH_MHD_handler_static_response,
-      .response_code = MHD_HTTP_OK
-    },
-    /* GET /agpl: */
-    {
-      .url_prefix = "/agpl",
-      .method = MHD_HTTP_METHOD_GET,
-      .skip_instance = true,
-      .handler = &TMH_MHD_handler_agpl_redirect
-    },
     /* GET /instances: */
     {
       .url_prefix = "/instances",
@@ -770,30 +760,36 @@ url_handler (void *cls,
       .method = MHD_HTTP_METHOD_GET,
       .handler = &TMH_private_get_products
     },
-    /* GET /products/$ID/: */
+    /* POST /products: */
     {
       .url_prefix = "/products",
+      .method = MHD_HTTP_METHOD_POST,
+      .handler = &TMH_private_post_products
+    },
+    /* GET /products/$ID/: */
+    {
+      .url_prefix = "/products/",
       .method = MHD_HTTP_METHOD_GET,
       .have_id_segment = true,
-      .handler = &TMH_private_get_instances_ID
+      .handler = &TMH_private_get_products_ID
     },
     /* DELETE /products/$ID/: */
     {
-      .url_prefix = "/products",
+      .url_prefix = "/products/",
       .method = MHD_HTTP_METHOD_DELETE,
       .have_id_segment = true,
-      .handler = &TMH_private_delete_instances_ID
+      .handler = &TMH_private_delete_products_ID
     },
     /* PATCH /products/$ID/: */
     {
-      .url_prefix = "/products",
+      .url_prefix = "/products/",
       .method = MHD_HTTP_METHOD_PATCH,
       .have_id_segment = true,
       .handler = &TMH_private_patch_products_ID
     },
     /* POST /products/$ID/lock: */
     {
-      .url_prefix = "/products",
+      .url_prefix = "/products/",
       .url_suffix = "lock",
       .method = MHD_HTTP_METHOD_POST,
       .have_id_segment = true,
@@ -840,6 +836,7 @@ url_handler (void *cls,
   };
   struct TMH_HandlerContext *hc = *con_cls;
   struct TMH_RequestHandler *handlers;
+  bool use_private = false;
 
   (void) cls;
   (void) version;
@@ -904,6 +901,18 @@ url_handler (void *cls,
                        MHD_HTTP_METHOD_HEAD))
     method = MHD_HTTP_METHOD_GET; /* MHD will deal with the rest */
 
+  {
+    const char *private_prefix = "/private/";
+
+    if (0 == strncmp (url,
+                      private_prefix,
+                      strlen (private_prefix)))
+    {
+      use_private = true;
+      url += strlen (private_prefix) - 1;
+    }
+  }
+
   /* Find out the merchant backend instance for the request.
    * If there is an instance, remove the instance specification
    * from the beginning of the request URL. */
@@ -920,16 +929,16 @@ url_handler (void *cls,
       char *instance_id;
 
       if (NULL == slash)
-      {
-        return TMH_MHD_handler_static_response (&h404,
-                                                connection,
-                                                hc);
-      }
-      instance_id = GNUNET_strndup (istart,
-                                    slash - istart);
+        instance_id = GNUNET_strdup (istart);
+      else
+        instance_id = GNUNET_strndup (istart,
+                                      slash - istart);
       hc->instance = TMH_lookup_instance (instance_id);
       GNUNET_free (instance_id);
-      url = slash;
+      if (NULL == slash)
+        url = "";
+      else
+        url = slash;
     }
     else
     {
@@ -950,7 +959,7 @@ url_handler (void *cls,
     }
     else
     {
-      handlers = public_handlers;
+      handlers = (use_private) ? private_handlers : public_handlers;
     }
   }
   if (0 == strcmp (url,
