@@ -185,6 +185,48 @@ TALER_MERCHANT_orders_post (struct GNUNET_CURL_Context *ctx,
                             TALER_MERCHANT_PostOrdersCallback cb,
                             void *cb_cls)
 {
+  return TALER_MERCHANT_orders_post2 (ctx,
+                                      backend_url,
+                                      order,
+                                      NULL,
+                                      0,
+                                      NULL,
+                                      0,
+                                      NULL,
+                                      cb,
+                                      cb_cls);
+}
+
+
+/**
+ * POST to /orders at the backend to setup an order and obtain
+ * the order ID (which may have been set by the front-end).
+ *
+ * @param ctx execution context
+ * @param backend_url URL of the backend
+ * @param order basic information about this purchase, to be extended by the backend
+ * @param payment_target desired payment target identifier (to select merchant bank details)
+ * @param inventory_products_length length of the @a inventory_products array
+ * @param inventory_products products to add to the order from the inventory
+ * @param lock_uuids_length length of the @a uuids array
+ * @param uuids array of UUIDs with locks on @a inventory_products
+ * @param cb the callback to call when a reply for this request is available
+ * @param cb_cls closure for @a cb
+ * @return a handle for this request, NULL on error
+ */
+struct TALER_MERCHANT_PostOrdersOperation *
+TALER_MERCHANT_orders_post2 (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const json_t *order,
+  const char *payment_target,
+  unsigned int inventory_products_length,
+  const struct TALER_MERCHANT_InventoryProduct inventory_products[],
+  unsigned int uuids_length,
+  const struct GNUNET_Uuid uuids[],
+  TALER_MERCHANT_PostOrdersCallback cb,
+  void *cb_cls)
+{
   struct TALER_MERCHANT_PostOrdersOperation *po;
   json_t *req;
   CURL *eh;
@@ -196,7 +238,62 @@ TALER_MERCHANT_orders_post (struct GNUNET_CURL_Context *ctx,
   po->url = TALER_url_join (backend_url, "orders", NULL);
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
+  GNUNET_assert (NULL != req);
+  if (NULL != payment_target)
+  {
+    GNUNET_assert (0 ==
+                   json_object_set_new (req,
+                                        "payment_target",
+                                        json_string (payment_target)));
+  }
+  if (0 != inventory_products_length)
+  {
+    json_t *ipa = json_array ();
+
+    GNUNET_assert (NULL != ipa);
+    for (unsigned int i = 0; i<inventory_products_length; i++)
+    {
+      json_t *ip;
+
+      ip = json_pack ("{s:s, s:I}",
+                      "product_id",
+                      inventory_products[i].product_id,
+                      "quantity",
+                      (json_int_t) inventory_products[i].quantity);
+      GNUNET_assert (NULL != ip);
+      GNUNET_assert (0 ==
+                     json_array_append_new (ipa,
+                                            ip));
+    }
+    GNUNET_assert (0 ==
+                   json_object_set_new (req,
+                                        "inventory_products",
+                                        ipa));
+  }
+  if (0 != uuids_length)
+  {
+    json_t *ua = json_array ();
+
+    GNUNET_assert (NULL != ua);
+    for (unsigned int i = 0; i<uuids_length; i++)
+    {
+      json_t *u;
+
+      u = json_pack ("{s:o}",
+                     "uuid",
+                     GNUNET_JSON_from_data_auto (&uuids[i]));
+      GNUNET_assert (NULL != u);
+      GNUNET_assert (0 ==
+                     json_array_append_new (ua,
+                                            u));
+    }
+    GNUNET_assert (0 ==
+                   json_object_set_new (req,
+                                        "lock_uuids",
+                                        ua));
+  }
   eh = curl_easy_init ();
+  GNUNET_assert (NULL != eh);
   if (GNUNET_OK != TALER_curl_easy_post (&po->post_ctx,
                                          eh,
                                          req))
@@ -207,7 +304,6 @@ TALER_MERCHANT_orders_post (struct GNUNET_CURL_Context *ctx,
     return NULL;
   }
   json_decref (req);
-
   GNUNET_assert (CURLE_OK ==
                  curl_easy_setopt (eh,
                                    CURLOPT_URL,

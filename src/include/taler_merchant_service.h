@@ -1139,7 +1139,53 @@ TALER_MERCHANT_orders_post (struct GNUNET_CURL_Context *ctx,
                             TALER_MERCHANT_PostOrdersCallback cb,
                             void *cb_cls);
 
-// TODO: implement orders_post2 with the OPTIONAL arguments!
+/**
+ * Information needed per product for constructing orders from
+ * the inventory.
+ */
+struct TALER_MERCHANT_InventoryProduct
+{
+
+  /**
+   * Identifier of the product.
+   */
+  char *product_id;
+
+  /**
+   * How many units of this product should be ordered.
+   */
+  unsigned int quantity;
+};
+
+
+/**
+ * POST to /orders at the backend to setup an order and obtain
+ * the order ID (which may have been set by the front-end).
+ *
+ * @param ctx execution context
+ * @param backend_url URL of the backend
+ * @param order basic information about this purchase, to be extended by the backend
+ * @param payment_target desired payment target identifier (to select merchant bank details)
+ * @param inventory_products_length length of the @a inventory_products array
+ * @param inventory_products products to add to the order from the inventory
+ * @param lock_uuids_length length of the @a uuids array
+ * @param uuids array of UUIDs with locks on @a inventory_products
+ * @param cb the callback to call when a reply for this request is available
+ * @param cb_cls closure for @a cb
+ * @return a handle for this request, NULL on error
+ */
+struct TALER_MERCHANT_PostOrdersOperation *
+TALER_MERCHANT_orders_post2 (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  const json_t *order,
+  const char *payment_target,
+  unsigned int inventory_products_length,
+  const struct TALER_MERCHANT_InventoryProduct inventory_products[],
+  unsigned int uuids_length,
+  const struct GNUNET_Uuid uuids[],
+  TALER_MERCHANT_PostOrdersCallback cb,
+  void *cb_cls);
 
 
 /**
