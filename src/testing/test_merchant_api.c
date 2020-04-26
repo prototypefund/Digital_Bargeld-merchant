@@ -261,10 +261,10 @@ run (void *cls,
                               "create-reserve-1",
                               "EUR:0",
                               MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-1",
-                                merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-1",
+                                            merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1\",\
         \"refund_deadline\": {\"t_ms\": 0},\
         \"pay_deadline\": {\"t_ms\": \"never\" },\
@@ -336,10 +336,10 @@ run (void *cls,
   };
 
   struct TALER_TESTING_Command double_spending[] = {
-    TALER_TESTING_cmd_proposal ("create-proposal-2",
-                                merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-2",
+                                            merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"2\",\
         \"refund_deadline\": {\"t_ms\": 0},\
         \"pay_deadline\": {\"t_ms\": \"never\" },\
@@ -348,11 +348,11 @@ run (void *cls,
         \"fulfillment_url\": \"https://example.com/\",\
         \"products\": [ {\"description\":\"ice cream\",\
                          \"value\":\"{EUR:5}\"} ] }"),
-    TALER_TESTING_cmd_proposal_lookup ("fetch-proposal-2",
-                                       merchant_url,
-                                       MHD_HTTP_OK,
-                                       "create-proposal-2",
-                                       NULL),
+    TALER_TESTING_cmd_merchant_post_orders_lookup ("fetch-proposal-2",
+                                                   merchant_url,
+                                                   MHD_HTTP_OK,
+                                                   "create-proposal-2",
+                                                   NULL),
     TALER_TESTING_cmd_pay ("deposit-double-2",
                            merchant_url,
                            MHD_HTTP_CONFLICT,
@@ -481,10 +481,10 @@ run (void *cls,
                               "create-reserve-1r",
                               "EUR:0",
                               MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-1r",
-                                merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-1r",
+                                            merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1r\",\
         \"refund_deadline\": {\"t_ms\": 0},\
         \"pay_deadline\": {\"t_ms\": \"never\" },\
@@ -533,10 +533,10 @@ run (void *cls,
                                      MHD_HTTP_NOT_FOUND),
 
     /* Test /refund on a contract that was never paid.  */
-    TALER_TESTING_cmd_proposal ("create-proposal-not-to-be-paid",
-                                merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-not-to-be-paid",
+                                            merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1-unpaid\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999},\
@@ -581,10 +581,11 @@ run (void *cls,
                                        "create-reserve-unincreased-refund",
                                        "EUR:5",
                                        MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-unincreased-refund",
-                                merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders (
+      "create-proposal-unincreased-refund",
+      merchant_url,
+      MHD_HTTP_OK,
+      "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"unincreased-proposal\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":\"never\"},\
@@ -745,10 +746,10 @@ run (void *cls,
                                           "fake-tip-authorization",
                                           pickup_amounts_1,
                                           TALER_EC_TIP_PICKUP_TIP_ID_UNKNOWN),
-    TALER_TESTING_cmd_proposal ("create-proposal-tip-1",
-                                merchant_url_internal ("tip"),
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-tip-1",
+                                            merchant_url_internal ("tip"),
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1-tip\",                           \
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999999},\
@@ -796,10 +797,10 @@ run (void *cls,
                               "create-reserve-10",
                               "EUR:0",
                               MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-10",
-                                merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-10",
+                                            merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"10\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999999},\
@@ -853,10 +854,10 @@ run (void *cls,
                               "create-reserve-11",
                               "EUR:0",
                               MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-11",
-                                merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-11",
+                                            merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"11\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":99999999999999},\

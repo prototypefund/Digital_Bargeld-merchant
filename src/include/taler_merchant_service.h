@@ -1104,7 +1104,7 @@ TALER_MERCHANT_product_delete_cancel (
 /**
  * Handle to a POST /orders operation
  */
-struct TALER_MERCHANT_PostOrderOperation;
+struct TALER_MERCHANT_PostOrdersOperation;
 
 /**
  * Callbacks of this type are used to serve the result of submitting a
@@ -1115,7 +1115,7 @@ struct TALER_MERCHANT_PostOrderOperation;
  * @param order_id order id of the newly created order
  */
 typedef void
-(*TALER_MERCHANT_PostOrderCallback) (
+(*TALER_MERCHANT_PostOrdersCallback) (
   void *cls,
   const struct TALER_MERCHANT_HttpResponse *hr,
   const char *order_id);
@@ -1132,12 +1132,14 @@ typedef void
  * @param cb_cls closure for @a cb
  * @return a handle for this request, NULL on error
  */
-struct TALER_MERCHANT_PostOrderOperation *
-TALER_MERCHANT_order_post (struct GNUNET_CURL_Context *ctx,
-                           const char *backend_url,
-                           const json_t *order,
-                           TALER_MERCHANT_PostOrderCallback cb,
-                           void *cb_cls);
+struct TALER_MERCHANT_PostOrdersOperation *
+TALER_MERCHANT_orders_post (struct GNUNET_CURL_Context *ctx,
+                            const char *backend_url,
+                            const json_t *order,
+                            TALER_MERCHANT_PostOrdersCallback cb,
+                            void *cb_cls);
+
+// TODO: implement orders_post2 with the OPTIONAL arguments!
 
 
 /**
@@ -1147,7 +1149,8 @@ TALER_MERCHANT_order_post (struct GNUNET_CURL_Context *ctx,
  * @param po the proposal operation request handle
  */
 void
-TALER_MERCHANT_order_post_cancel (struct TALER_MERCHANT_PostOrderOperation *po);
+TALER_MERCHANT_orders_post_cancel (
+  struct TALER_MERCHANT_PostOrdersOperation *po);
 
 
 /**

@@ -283,7 +283,7 @@ proposal_lookup_traits (void *cls,
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_proposal_lookup
+TALER_TESTING_cmd_merchant_post_orders_lookup
   (const char *label,
   const char *merchant_url,
   unsigned int http_status,

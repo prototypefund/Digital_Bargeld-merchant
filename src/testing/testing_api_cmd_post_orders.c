@@ -18,8 +18,8 @@
 */
 
 /**
- * @file exchange/testing_api_cmd_proposal.c
- * @brief command to run /proposal
+ * @file testing_api_cmd_post_orders.c
+ * @brief command to run POST /orders
  * @author Marcello Stanisci
  */
 
@@ -30,9 +30,9 @@
 #include "taler_merchant_testing_lib.h"
 
 /**
- * State for a "proposal" CMD.
+ * State for a "POST /orders" CMD.
  */
-struct ProposalState
+struct OrdersState
 {
 
   /**
@@ -61,14 +61,14 @@ struct ProposalState
   struct GNUNET_HashCode h_contract_terms;
 
   /**
-   * The /proposal operation handle.
+   * The /orders operation handle.
    */
-  struct TALER_MERCHANT_ProposalOperation *po;
+  struct TALER_MERCHANT_PostOrdersOperation *po;
 
   /**
-   * The (initial) /proposal/lookup operation handle.
-   * The logic is such that after a proposal creation,
-   * it soon makes a proposal lookup in order to check
+   * The (initial) GET /orders/$ID operation handle.
+   * The logic is such that after a orders creation,
+   * it soon makes a orders lookup in order to check
    * if the merchant backend is actually aware.
    */
   struct TALER_MERCHANT_ProposalLookupOperation *plo;
@@ -89,7 +89,7 @@ struct ProposalState
   struct TALER_TESTING_Interpreter *is;
 
   /**
-   * Merchant signature over the proposal.
+   * Merchant signature over the orders.
    */
   struct TALER_MerchantSignatureP merchant_sig;
 
@@ -110,15 +110,16 @@ struct ProposalState
  * @return #GNUNET_OK on success
  */
 static int
-proposal_traits (void *cls,
-                 const void **ret,
-                 const char *trait,
-                 unsigned int index)
+orders_traits (void *cls,
+               const void **ret,
+               const char *trait,
+               unsigned int index)
 {
-  struct ProposalState *ps = cls;
-#define MAKE_TRAIT_NONCE(ptr)                       \
-  TALER_TESTING_make_trait_merchant_pub (1, (struct \
-                                             TALER_MerchantPublicKeyP *) (ptr))
+  struct OrdersState *ps = cls;
+  // FIXME: wtf is this?
+#define MAKE_TRAIT_NONCE(ptr)  \
+  TALER_TESTING_make_trait_merchant_pub ( \
+    1, (struct TALER_MerchantPublicKeyP *) (ptr))
   struct TALER_TESTING_Trait traits[] = {
     TALER_TESTING_make_trait_order_id (0, ps->order_id),
     TALER_TESTING_make_trait_contract_terms (0, ps->contract_terms),
@@ -137,8 +138,8 @@ proposal_traits (void *cls,
 
 
 /**
- * Used to fill the "proposal" CMD state with backend-provided
- * values.  Also double-checks that the proposal was correctly
+ * Used to fill the "orders" CMD state with backend-provided
+ * values.  Also double-checks that the orders was correctly
  * created.
  *
  * @param cls closure
@@ -147,13 +148,13 @@ proposal_traits (void *cls,
  * @param hash hash over the contract
  */
 static void
-proposal_lookup_initial_cb (void *cls,
-                            const struct TALER_MERCHANT_HttpResponse *hr,
-                            const json_t *contract_terms,
-                            const struct TALER_MerchantSignatureP *sig,
-                            const struct GNUNET_HashCode *hash)
+orders_lookup_initial_cb (void *cls,
+                          const struct TALER_MERCHANT_HttpResponse *hr,
+                          const json_t *contract_terms,
+                          const struct TALER_MerchantSignatureP *sig,
+                          const struct GNUNET_HashCode *hash)
 {
-  struct ProposalState *ps = cls;
+  struct OrdersState *ps = cls;
   struct TALER_MerchantPublicKeyP merchant_pub;
   const char *error_name;
   unsigned int error_line;
@@ -197,20 +198,20 @@ proposal_lookup_initial_cb (void *cls,
 
 /**
  * Callback that processes the response following a
- * proposal's put.  NOTE: no contract terms are included
- * here; they need to be taken via the "proposal lookup"
+ * POST /orders.  NOTE: no contract terms are included
+ * here; they need to be taken via the "orders lookup"
  * method.
  *
  * @param cls closure.
  * @param hr HTTP response
- * @param order_id order id of the proposal.
+ * @param order_id order id of the orders.
  */
 static void
-proposal_cb (void *cls,
-             const struct TALER_MERCHANT_HttpResponse *hr,
-             const char *order_id)
+order_cb (void *cls,
+          const struct TALER_MERCHANT_HttpResponse *hr,
+          const char *order_id)
 {
-  struct ProposalState *ps = cls;
+  struct OrdersState *ps = cls;
 
   ps->po = NULL;
   if (ps->http_status != hr->http_status)
@@ -221,14 +222,12 @@ proposal_cb (void *cls,
                      ps->http_status);
     TALER_TESTING_FAIL (ps->is);
   }
-
   if (0 == ps->http_status)
   {
-    TALER_LOG_DEBUG ("/proposal, expected 0 status code\n");
+    TALER_LOG_DEBUG ("/orders, expected 0 status code\n");
     TALER_TESTING_interpreter_next (ps->is);
     return;
   }
-
   switch (hr->http_status)
   {
   case MHD_HTTP_OK:
@@ -239,7 +238,7 @@ proposal_cb (void *cls,
       char *s = json_dumps (hr->reply,
                             JSON_COMPACT);
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Unexpected status code from /proposal: %u (%d) at %s; JSON: %s\n",
+                  "Unexpected status code from /orders: %u (%d) at %s; JSON: %s\n",
                   hr->http_status,
                   hr->ec,
                   TALER_TESTING_interpreter_get_current_label (ps->is),
@@ -259,25 +258,25 @@ proposal_cb (void *cls,
                                                  ps->merchant_url,
                                                  ps->order_id,
                                                  &ps->nonce,
-                                                 &proposal_lookup_initial_cb,
+                                                 &orders_lookup_initial_cb,
                                                  ps)))
     TALER_TESTING_FAIL (ps->is);
 }
 
 
 /**
- * Run a "proposal" CMD.
+ * Run a "orders" CMD.
  *
  * @param cls closure.
  * @param cmd command currently being run.
  * @param is interpreter state.
  */
 static void
-proposal_run (void *cls,
-              const struct TALER_TESTING_Command *cmd,
-              struct TALER_TESTING_Interpreter *is)
+orders_run (void *cls,
+            const struct TALER_TESTING_Command *cmd,
+            struct TALER_TESTING_Interpreter *is)
 {
-  struct ProposalState *ps = cls;
+  struct OrdersState *ps = cls;
   json_t *order;
   json_error_t error;
 
@@ -310,41 +309,38 @@ proposal_run (void *cls,
                          json_string (order_id));
     GNUNET_free (order_id);
   }
-
-  GNUNET_CRYPTO_random_block
-    (GNUNET_CRYPTO_QUALITY_WEAK,
-    &ps->nonce,
-    sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
-
-  ps->po = TALER_MERCHANT_order_put (is->ctx,
-                                     ps->merchant_url,
-                                     order,
-                                     &proposal_cb,
-                                     ps);
+  GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
+                              &ps->nonce,
+                              sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
+  ps->po = TALER_MERCHANT_orders_post (is->ctx,
+                                       ps->merchant_url,
+                                       order,
+                                       &order_cb,
+                                       ps);
   json_decref (order);
   GNUNET_assert (NULL != ps->po);
 }
 
 
 /**
- * Free the state of a "proposal" CMD, and possibly
+ * Free the state of a "orders" CMD, and possibly
  * cancel it if it did not complete.
  *
  * @param cls closure.
  * @param cmd command being freed.
  */
 static void
-proposal_cleanup (void *cls,
-                  const struct TALER_TESTING_Command *cmd)
+orders_cleanup (void *cls,
+                const struct TALER_TESTING_Command *cmd)
 {
-  struct ProposalState *ps = cls;
+  struct OrdersState *ps = cls;
 
   if (NULL != ps->po)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "Command '%s' did not complete (proposal put)\n",
+                "Command '%s' did not complete (orders put)\n",
                 cmd->label);
-    TALER_MERCHANT_proposal_cancel (ps->po);
+    TALER_MERCHANT_orders_post_cancel (ps->po);
     ps->po = NULL;
   }
 
@@ -352,7 +348,7 @@ proposal_cleanup (void *cls,
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Command '%s' did not complete"
-                " (proposal lookup)\n",
+                " (orders lookup)\n",
                 cmd->label);
     TALER_MERCHANT_proposal_lookup_cancel (ps->plo);
     ps->plo = NULL;
@@ -365,25 +361,25 @@ proposal_cleanup (void *cls,
 
 
 /**
- * Make the "proposal" command.
+ * Make the "orders" command.
  *
  * @param label command label
  * @param merchant_url base URL of the merchant serving
- *        the proposal request.
+ *        the orders request.
  * @param http_status expected HTTP status.
  * @param order the order to PUT to the merchant.
  *
  * @return the command
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_proposal (const char *label,
-                            const char *merchant_url,
-                            unsigned int http_status,
-                            const char *order)
+TALER_TESTING_cmd_merchant_post_orders (const char *label,
+                                        const char *merchant_url,
+                                        unsigned int http_status,
+                                        const char *order)
 {
-  struct ProposalState *ps;
+  struct OrdersState *ps;
 
-  ps = GNUNET_new (struct ProposalState);
+  ps = GNUNET_new (struct OrdersState);
   ps->order = order;
   ps->http_status = http_status;
   ps->merchant_url = merchant_url;
@@ -391,9 +387,9 @@ TALER_TESTING_cmd_proposal (const char *label,
     struct TALER_TESTING_Command cmd = {
       .cls = ps,
       .label = label,
-      .run = &proposal_run,
-      .cleanup = &proposal_cleanup,
-      .traits = &proposal_traits
+      .run = &orders_run,
+      .cleanup = &orders_cleanup,
+      .traits = &orders_traits
     };
 
     return cmd;

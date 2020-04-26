@@ -216,10 +216,10 @@ run (void *cls,
                               "5719-create-reserve",
                               "EUR:0",
                               MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("5719-create-proposal",
-                                twister_merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("5719-create-proposal",
+                                            twister_merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"5719TRIGGER\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":\"never\"},\
@@ -253,7 +253,7 @@ run (void *cls,
   /**** Covering /check-payment ****/
   struct TALER_TESTING_Command check_payment[] = {
 
-    TALER_TESTING_cmd_proposal
+    TALER_TESTING_cmd_merchant_post_orders
       ("proposal-for-check-payment",
       twister_merchant_url,
       MHD_HTTP_OK,
@@ -305,23 +305,23 @@ run (void *cls,
      */
     TALER_TESTING_cmd_malform_request ("malform-order",
                                        PROXY_MERCHANT_CONFIG_FILE),
-    TALER_TESTING_cmd_proposal ("create-proposal-0",
-                                twister_merchant_url,
-                                MHD_HTTP_BAD_REQUEST,
-                                /* giving a valid JSON to not make it fail before
-                                 * data reaches the merchant.  */
-                                "{\"not\": \"used\"}"),
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-0",
+                                            twister_merchant_url,
+                                            MHD_HTTP_BAD_REQUEST,
+                                            /* giving a valid JSON to not make it fail before
+                                             * data reaches the merchant.  */
+                                            "{\"not\": \"used\"}"),
     TALER_TESTING_cmd_hack_response_code ("proposal-500",
                                           PROXY_MERCHANT_CONFIG_FILE,
                                           MHD_HTTP_INTERNAL_SERVER_ERROR),
-    TALER_TESTING_cmd_proposal ("create-proposal-1",
-                                twister_merchant_url,
-                                /* This status code == 0 is gotten via a 500 Internal Server
-                                 * Error handed to the library.  */
-                                MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                /* giving a valid JSON to not make it fail before
-                                 * data reaches the merchant.  */
-                                "{\"not\": \"used\"}"),
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-1",
+                                            twister_merchant_url,
+                                            /* This status code == 0 is gotten via a 500 Internal Server
+                                             * Error handed to the library.  */
+                                            MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                            /* giving a valid JSON to not make it fail before
+                                             * data reaches the merchant.  */
+                                            "{\"not\": \"used\"}"),
 
     /**
      * Cause the PUT /proposal callback to be called
@@ -331,10 +331,10 @@ run (void *cls,
     TALER_TESTING_cmd_malform_response ("malform-proposal",
                                         PROXY_MERCHANT_CONFIG_FILE),
 
-    TALER_TESTING_cmd_proposal ("create-proposal-2",
-                                twister_merchant_url,
-                                0,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-2",
+                                            twister_merchant_url,
+                                            0,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"1\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":\"never\"},\
@@ -349,10 +349,10 @@ run (void *cls,
     TALER_TESTING_cmd_delete_object ("remove-order-id",
                                      PROXY_MERCHANT_CONFIG_FILE,
                                      "order_id"),
-    TALER_TESTING_cmd_proposal ("create-proposal-3",
-                                twister_merchant_url,
-                                0,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-3",
+                                            twister_merchant_url,
+                                            0,
+                                            "{\"max_fee\":\"EUR:0.5\",\
          \"fulfillment_url\": \"https://example.com/\",\
          \"order_id\":\"2\",\
          \"refund_deadline\":{\"t_ms\":0},\
@@ -365,31 +365,31 @@ run (void *cls,
      * Cause a 404 Not Found response code,
      * due to a non existing merchant instance.
      */
-    TALER_TESTING_cmd_proposal ("create-proposal-4",
-                                twister_merchant_url_instance_nonexistent,
-                                MHD_HTTP_NOT_FOUND,
-                                "{\"amount\":\"EUR:5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-4",
+                                            twister_merchant_url_instance_nonexistent,
+                                            MHD_HTTP_NOT_FOUND,
+                                            "{\"amount\":\"EUR:5\",\
          \"fulfillment_url\": \"https://example.com/\",\
          \"summary\": \"merchant-lib testcase\"}"),
 
     /* Cause a 404 Not Found from /proposal/lookup,
      * due to a non existing order id being queried.  */
-    TALER_TESTING_cmd_proposal_lookup ("lookup-0",
-                                       twister_merchant_url,
-                                       MHD_HTTP_NOT_FOUND,
-                                       NULL,
-                                       "does-not-exist"),
+    TALER_TESTING_cmd_merchant_post_orders_lookup ("lookup-0",
+                                                   twister_merchant_url,
+                                                   MHD_HTTP_NOT_FOUND,
+                                                   NULL,
+                                                   "does-not-exist"),
     /* Cause a unparsable response to be returned.  */
     TALER_TESTING_cmd_malform_response
       ("malform-proposal-lookup",
       PROXY_MERCHANT_CONFIG_FILE),
     /* To be short, we'll make a _error_ response to be
      * unparsable.  */
-    TALER_TESTING_cmd_proposal_lookup ("lookup-1",
-                                       twister_merchant_url,
-                                       0, // response code.
-                                       NULL,
-                                       "does-not-exist"),
+    TALER_TESTING_cmd_merchant_post_orders_lookup ("lookup-1",
+                                                   twister_merchant_url,
+                                                   0, // response code.
+                                                   NULL,
+                                                   "does-not-exist"),
 
     /* Generating a proposal-lookup response which doesn't pass
      * validation, by removing a field that is expected by the
@@ -398,10 +398,10 @@ run (void *cls,
 
     /* First step is to create a _valid_ proposal, so that
      * we can lookup for it later.  */
-    TALER_TESTING_cmd_proposal ("create-proposal-5",
-                                twister_merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-5",
+                                            twister_merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"5\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":\"never\"},\
@@ -417,12 +417,12 @@ run (void *cls,
                                      "contract_terms"),
 
     /* lookup!  */
-    TALER_TESTING_cmd_proposal_lookup ("lookup-5",
-                                       twister_merchant_url,
-                                       // expected response code.
-                                       0,
-                                       "create-proposal-5",
-                                       NULL),
+    TALER_TESTING_cmd_merchant_post_orders_lookup ("lookup-5",
+                                                   twister_merchant_url,
+                                                   // expected response code.
+                                                   0,
+                                                   "create-proposal-5",
+                                                   NULL),
     TALER_TESTING_cmd_end ()
   };
 
@@ -486,14 +486,14 @@ run (void *cls,
                                        "create-reserve-unaggregation",
                                        "EUR:5",
                                        MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-unaggregation",
-                                /* Need a fresh instance in order to associate this
-                                 * proposal with a fresh h_wire;  this way, this proposal
-                                 * won't get hooked by the aggregator gathering same-h_wire'd
-                                 * transactions.  */
-                                twister_merchant_url_instance_tor,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-unaggregation",
+                                            /* Need a fresh instance in order to associate this
+                                             * proposal with a fresh h_wire;  this way, this proposal
+                                             * won't get hooked by the aggregator gathering same-h_wire'd
+                                             * transactions.  */
+                                            twister_merchant_url_instance_tor,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"refund_deadline\":{\"t_ms\":2000},\
         \"pay_deadline\":{\"t_ms\":2366841500000},\
         \"wire_transfer_deadline\":{\"t_ms\":2366841600000},\
@@ -535,10 +535,10 @@ run (void *cls,
                                        "create-reserve-5383",
                                        "EUR:1",
                                        MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-5383",
-                                twister_merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-5383",
+                                            twister_merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"5383\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":\"never\"},\
@@ -610,10 +610,10 @@ run (void *cls,
                               "create-reserve-1",
                               "EUR:0",
                               MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-6",
-                                twister_merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-6",
+                                            twister_merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"11\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":\"never\"},\
@@ -707,10 +707,10 @@ run (void *cls,
                               "create-reserve-abort-1",
                               "EUR:0",
                               MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-abort-1",
-                                twister_merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-abort-1",
+                                            twister_merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"abort-one\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":\"never\"},\
@@ -769,10 +769,10 @@ run (void *cls,
     CMD_TRANSFER_TO_EXCHANGE ("create-reserve-double-spend",
                               "EUR:1.01"),
     CMD_EXEC_WIREWATCH ("wirewatch-double-spend"),
-    TALER_TESTING_cmd_proposal ("create-proposal-double-spend",
-                                twister_merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-double-spend",
+                                            twister_merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"DS-1\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":\"never\"},\
@@ -780,10 +780,10 @@ run (void *cls,
         \"amount\":\"EUR:1.0\",\
         \"summary\": \"merchant-lib testcase\",\
         \"products\": [ {\"description\": \"will succeed\"}] }"),
-    TALER_TESTING_cmd_proposal ("create-proposal-double-spend-1",
-                                twister_merchant_url,
-                                MHD_HTTP_OK,
-                                "{\"max_fee\":\"EUR:0.5\",\
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-double-spend-1",
+                                            twister_merchant_url,
+                                            MHD_HTTP_OK,
+                                            "{\"max_fee\":\"EUR:0.5\",\
         \"order_id\":\"DS-2\",\
         \"refund_deadline\":{\"t_ms\":0},\
         \"pay_deadline\":{\"t_ms\":\"never\"},\

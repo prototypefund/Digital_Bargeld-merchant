@@ -17,8 +17,8 @@
   see <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_proposal.c
- * @brief Implementation of the /proposal POST
+ * @file lib/merchant_api_post_orders.c
+ * @brief Implementation of the POST /orders
  * @author Christian Grothoff
  * @author Marcello Stanisci
  */
@@ -35,9 +35,9 @@
 
 
 /**
- * @brief A Contract Operation Handle
+ * @brief A POST /orders Handle
  */
-struct TALER_MERCHANT_ProposalOperation
+struct TALER_MERCHANT_PostOrdersOperation
 {
 
   /**
@@ -53,7 +53,7 @@ struct TALER_MERCHANT_ProposalOperation
   /**
    * Function to call with the result.
    */
-  TALER_MERCHANT_ProposalCallback cb;
+  TALER_MERCHANT_PostOrdersCallback cb;
 
   /**
    * Closure for @a cb.
@@ -74,18 +74,18 @@ struct TALER_MERCHANT_ProposalOperation
 
 /**
  * Function called when we're done processing the
- * HTTP POST /proposal request.
+ * HTTP POST /orders request.
  *
- * @param cls the `struct TALER_MERCHANT_ProposalOperation`
+ * @param cls the `struct TALER_MERCHANT_PostOrdersOperation`
  * @param response_code HTTP response code, 0 on error
  * @param json response body, NULL if not JSON
  */
 static void
-handle_proposal_finished (void *cls,
-                          long response_code,
-                          const void *response)
+handle_post_order_finished (void *cls,
+                            long response_code,
+                            const void *response)
 {
-  struct TALER_MERCHANT_ProposalOperation *po = cls;
+  struct TALER_MERCHANT_PostOrdersOperation *po = cls;
   const char *order_id = NULL;
   const json_t *json = response;
   struct TALER_MERCHANT_HttpResponse hr = {
@@ -162,7 +162,7 @@ handle_proposal_finished (void *cls,
           order_id);
   if (MHD_HTTP_OK == response_code)
     GNUNET_JSON_parse_free (spec);
-  TALER_MERCHANT_proposal_cancel (po);
+  TALER_MERCHANT_orders_post_cancel (po);
 }
 
 
@@ -173,27 +173,27 @@ handle_proposal_finished (void *cls,
  * @param backend_url URL of the backend
  * @param order basic information about this purchase,
  *        to be extended by the backend
- * @param proposal_cb the callback to call when a reply
+ * @param cb the callback to call when a reply
  *        for this request is available
- * @param proposal_cb_cls closure for @a proposal_cb
+ * @param cb_cls closure for @a proposal_cb
  * @return a handle for this request, NULL on error
  */
-struct TALER_MERCHANT_ProposalOperation *
-TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
-                          const char *backend_url,
-                          const json_t *order,
-                          TALER_MERCHANT_ProposalCallback proposal_cb,
-                          void *proposal_cb_cls)
+struct TALER_MERCHANT_PostOrdersOperation *
+TALER_MERCHANT_orders_post (struct GNUNET_CURL_Context *ctx,
+                            const char *backend_url,
+                            const json_t *order,
+                            TALER_MERCHANT_PostOrdersCallback cb,
+                            void *cb_cls)
 {
-  struct TALER_MERCHANT_ProposalOperation *po;
+  struct TALER_MERCHANT_PostOrdersOperation *po;
   json_t *req;
   CURL *eh;
 
-  po = GNUNET_new (struct TALER_MERCHANT_ProposalOperation);
+  po = GNUNET_new (struct TALER_MERCHANT_PostOrdersOperation);
   po->ctx = ctx;
-  po->cb = proposal_cb;
-  po->cb_cls = proposal_cb_cls;
-  po->url = TALER_url_join (backend_url, "order", NULL);
+  po->cb = cb;
+  po->cb_cls = cb_cls;
+  po->url = TALER_url_join (backend_url, "orders", NULL);
   req = json_pack ("{s:O}",
                    "order", (json_t *) order);
   eh = curl_easy_init ();
@@ -215,7 +215,7 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
   po->job = GNUNET_CURL_job_add2 (ctx,
                                   eh,
                                   po->post_ctx.headers,
-                                  &handle_proposal_finished,
+                                  &handle_post_order_finished,
                                   po);
   return po;
 }
@@ -228,7 +228,8 @@ TALER_MERCHANT_order_put (struct GNUNET_CURL_Context *ctx,
  * @param po the proposal operation request handle
  */
 void
-TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po)
+TALER_MERCHANT_orders_post_cancel (
+  struct TALER_MERCHANT_PostOrdersOperation *po)
 {
   if (NULL != po->job)
   {
@@ -241,4 +242,4 @@ TALER_MERCHANT_proposal_cancel (struct TALER_MERCHANT_ProposalOperation *po)
 }
 
 
-/* end of merchant_api_proposal.c */
+/* end of merchant_api_post_orders.c */

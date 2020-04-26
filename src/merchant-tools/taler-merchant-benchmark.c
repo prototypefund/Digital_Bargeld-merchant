@@ -344,10 +344,10 @@ run (void *cls,
                                        "create-reserve-1",
                                        CURRENCY_5,
                                        MHD_HTTP_OK),
-    TALER_TESTING_cmd_proposal ("create-proposal-1",
-                                merchant_url,
-                                MHD_HTTP_OK,
-                                order_worth_5),
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-1",
+                                            merchant_url,
+                                            MHD_HTTP_OK,
+                                            order_worth_5),
     TALER_TESTING_cmd_pay ("deposit-simple",
                            merchant_url,
                            MHD_HTTP_OK,
@@ -362,10 +362,10 @@ run (void *cls,
     /* Next proposal-pay cycle will be used by /track CMDs
      * and so it will not have to be looped over, only /track
      * CMDs will have to.  */
-    TALER_TESTING_cmd_proposal ("create-proposal-2",
-                                merchant_url,
-                                MHD_HTTP_OK,
-                                order_worth_5_track),
+    TALER_TESTING_cmd_merchant_post_orders ("create-proposal-2",
+                                            merchant_url,
+                                            MHD_HTTP_OK,
+                                            order_worth_5_track),
     TALER_TESTING_cmd_pay ("deposit-simple-2",
                            merchant_url,
                            MHD_HTTP_OK,
@@ -410,7 +410,7 @@ run (void *cls,
       CURRENCY_5,
       MHD_HTTP_OK),
 
-    TALER_TESTING_cmd_proposal
+    TALER_TESTING_cmd_merchant_post_orders
       ("create-unaggregated-proposal",
       alt_instance_url,
       MHD_HTTP_OK,
@@ -453,7 +453,7 @@ run (void *cls,
       CURRENCY_5,
       MHD_HTTP_OK),
 
-    TALER_TESTING_cmd_proposal
+    TALER_TESTING_cmd_merchant_post_orders
       ("create-twocoins-proposal",
       merchant_url,
       MHD_HTTP_OK,

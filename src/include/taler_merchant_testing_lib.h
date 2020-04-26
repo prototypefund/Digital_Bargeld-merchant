@@ -407,8 +407,6 @@ TALER_TESTING_cmd_merchant_delete_product (const char *label,
                                            unsigned int http_status);
 
 
-/* ******************** OLD ******************* */
-
 /**
  * Make the "proposal" command.
  *
@@ -421,10 +419,14 @@ TALER_TESTING_cmd_merchant_delete_product (const char *label,
  * @return the command
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_proposal (const char *label,
-                            const char *merchant_url,
-                            unsigned int http_status,
-                            const char *order);
+TALER_TESTING_cmd_merchant_post_orders (const char *label,
+                                        const char *merchant_url,
+                                        unsigned int http_status,
+                                        const char *order);
+
+
+/* ******************** OLD ******************* */
+
 
 /**
  * Make a "proposal lookup" command.
@@ -439,11 +441,11 @@ TALER_TESTING_cmd_proposal (const char *label,
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_proposal_lookup (const char *label,
-                                   const char *merchant_url,
-                                   unsigned int http_status,
-                                   const char *proposal_reference,
-                                   const char *order_id);
+TALER_TESTING_cmd_merchant_post_orders_lookup (const char *label,
+                                               const char *merchant_url,
+                                               unsigned int http_status,
+                                               const char *proposal_reference,
+                                               const char *order_id);
 
 /**
  * Make a "check payment" test command.

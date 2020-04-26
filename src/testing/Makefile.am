@@ -24,6 +24,7 @@ libtalermerchanttesting_la_SOURCES = \
   testing_api_cmd_lock_product.c \
   testing_api_cmd_post_instances.c \
   testing_api_cmd_post_products.c \
+  testing_api_cmd_post_orders.c \
   testing_api_cmd_patch_instance.c \
   testing_api_cmd_patch_product.c \
    \
@@ -33,7 +34,6 @@ libtalermerchanttesting_la_SOURCES = \
   testing_api_cmd_pay_abort.c \
   testing_api_cmd_pay_abort_refund.c \
   testing_api_cmd_poll_payment.c \
-  testing_api_cmd_proposal.c \
   testing_api_cmd_proposal_lookup.c \
   testing_api_cmd_refund_increase.c \
   testing_api_cmd_refund_lookup.c \
