@@ -1115,6 +1115,140 @@ postgres_lookup_order (void *cls,
 
 
 /**
+ * Context used for postgres_lookup_orders().
+ */
+struct LookupOrdersContext
+{
+  /**
+   * Function to call with the results.
+   */
+  TALER_MERCHANTDB_OrdersCallback cb;
+
+  /**
+   * Closure for @a cb.
+   */
+  void *cb_cls;
+
+  /**
+   * Internal result.
+   */
+  enum GNUNET_DB_QueryStatus qs;
+};
+
+
+/**
+ * Function to be called with the results of a SELECT statement
+ * that has returned @a num_results results about orders.
+ *
+ * @param[in,out] cls of type `struct LookupOrdersContext *`
+ * @param result the postgres result
+ * @param num_result the number of results in @a result
+ */
+static void
+lookup_orders_cb (void *cls,
+                  PGresult *result,
+                  unsigned int num_results)
+{
+  struct LookupOrdersContext *plc = cls;
+
+  for (unsigned int i = 0; i < num_results; i++)
+  {
+    char *order_id;
+    uint64_t order_serial;
+    struct GNUNET_TIME_Absolute ts;
+    struct GNUNET_PQ_ResultSpec rs[] = {
+      GNUNET_PQ_result_spec_string ("order_id",
+                                    &order_id),
+      GNUNET_PQ_result_spec_uint64 ("order_serial",
+                                    &order_serial),
+      GNUNET_PQ_result_spec_absolute_time ("creation_time",
+                                           &ts),
+      GNUNET_PQ_result_spec_end
+    };
+
+    if (GNUNET_OK !=
+        GNUNET_PQ_extract_result (result,
+                                  rs,
+                                  i))
+    {
+      GNUNET_break (0);
+      plc->qs = GNUNET_DB_STATUS_HARD_ERROR;
+      return;
+    }
+    plc->cb (plc->cb_cls,
+             order_id,
+             order_serial,
+             ts);
+    GNUNET_PQ_cleanup_result (rs);
+  }
+}
+
+
+/**
+ * Retrieve orders given the @a instance_id.
+ *
+ * @param cls closure
+ * @param instance_id instance to obtain order of
+ * @param of filter to apply when looking up orders
+ * @param[out] contract_terms where to store the retrieved contract terms,
+ *             NULL to only test if the order exists
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_lookup_orders (void *cls,
+                        const char *instance_id,
+                        const struct TALER_MERCHANTDB_OrderFilter *of,
+                        TALER_MERCHANTDB_OrdersCallback cb,
+                        void *cb_cls)
+{
+  struct PostgresClosure *pg = cls;
+  struct LookupOrdersContext plc = {
+    .cb = cb,
+    .cb_cls = cb_cls
+  };
+  uint64_t limit = (of->delta > 0) ? of->delta : -of->delta;
+  uint8_t paid;
+  uint8_t refunded;
+  uint8_t wired;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_uint64 (&limit),
+    GNUNET_PQ_query_param_uint64 (&of->start_row),
+    GNUNET_PQ_query_param_absolute_time (&of->date),
+    GNUNET_PQ_query_param_auto_from_type (&paid),
+    GNUNET_PQ_query_param_auto_from_type (&refunded),
+    GNUNET_PQ_query_param_auto_from_type (&wired),
+    GNUNET_PQ_query_param_end
+  };
+  enum GNUNET_DB_QueryStatus qs;
+  char stmt[128];
+
+  paid = (TALER_MERCHANTDB_YNA_YES == of->paid);
+  refunded = (TALER_MERCHANTDB_YNA_YES == of->paid);
+  wired = (TALER_MERCHANTDB_YNA_YES == of->paid);
+  /* painfully many cases..., note that "_xxx" being present in 'stmt' merely
+     means that we filter by that variable, the value we filter for is
+     computed above */
+  GNUNET_snprintf (stmt,
+                   sizeof (stmt),
+                   "lookup_orders_%s%s%s%s",
+                   (of->delta > 0) ? "inc" : "dec",
+                   (TALER_MERCHANTDB_YNA_ALL == of->paid) ? "" : "_paid",
+                   (TALER_MERCHANTDB_YNA_ALL == of->refunded) ? "" :
+                   "_refunded",
+                   (TALER_MERCHANTDB_YNA_ALL == of->wired) ? "" : "_wired");
+  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
+                                             stmt,
+                                             params,
+                                             &lookup_orders_cb,
+                                             &plc);
+  if (0 != plc.qs)
+    return plc.qs;
+  return qs;
+}
+
+
+/**
  * Insert order into the DB.
  *
  * @param cls closure
@@ -1132,14 +1266,18 @@ postgres_insert_order (void *cls,
                        const json_t *contract_terms)
 {
   struct PostgresClosure *pg = cls;
+  struct GNUNET_TIME_Absolute now;
   struct GNUNET_PQ_QueryParam params[] = {
     GNUNET_PQ_query_param_string (instance_id),
     GNUNET_PQ_query_param_string (order_id),
     GNUNET_PQ_query_param_absolute_time (&pay_deadline),
+    GNUNET_PQ_query_param_absolute_time (&now),
     TALER_PQ_query_param_json (contract_terms),
     GNUNET_PQ_query_param_end
   };
 
+  now = GNUNET_TIME_absolute_get ();
+  (void) GNUNET_TIME_round_abs (&now);
   GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
               "inserting order: order_id: %s, instance_id: %s.\n",
               order_id,
@@ -4255,22 +4393,719 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "        WHERE merchant_id=$1)"
                             "   AND merchant_orders.order_id=$2",
                             2),
+    /* for postgres_lookup_orders() */
+    GNUNET_PQ_make_prepare ("lookup_orders_inc",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_inc_paid",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    NOT BOOL($5)" /* unclaimed orders are never paid */
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    BOOL($5) = paid"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_inc_refunded",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    NOT BOOL ($6)"/* unclaimed orders are never refunded */
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    BOOL($6) = (order_serial IN"
+                            "     (SELECT order_serial "
+                            "      FROM merchant_refunds))"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_inc_wired",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            ",BOOL($6)" /* otherwise $6 is unused and Postgres unhappy */
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    NOT BOOL ($7)" /* unclaimed orders are never wired */
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            ",BOOL($6)" /* otherwise $6 is unused and Postgres unhappy */
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    BOOL($7) = wired"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_inc_paid_refunded",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    NOT BOOL($5)" /* unclaimed orders are never paid */
+                            "   AND"
+                            "    NOT BOOL ($6)"/* unclaimed orders are never refunded */
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    BOOL($5) = paid"
+                            "   AND"
+                            "    BOOL($6) = (order_serial IN"
+                            "     (SELECT order_serial "
+                            "      FROM merchant_refunds))"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_inc_paid_wired",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($6)" /* otherwise $6 is unused and Postgres unhappy */
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    NOT BOOL($5)" /* unclaimed orders are never paid */
+                            "   AND"
+                            "    NOT BOOL ($7)" /* unclaimed orders are never wired */
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($6)" /* otherwise $6 is unused and Postgres unhappy */
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    BOOL($5) = paid"
+                            "   AND"
+                            "    BOOL($7) = wired"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_inc_refunded_wired",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    NOT BOOL ($6)"/* unclaimed orders are never refunded */
+                            "   AND"
+                            "    NOT BOOL ($7)" /* unclaimed orders are never wired */
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    BOOL($6) = (order_serial IN"
+                            "     (SELECT order_serial "
+                            "      FROM merchant_refunds))"
+                            "   AND"
+                            "    BOOL($7) = wired"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_inc_paid_refunded_wired",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    NOT BOOL($5)" /* unclaimed orders are never paid */
+                            "   AND"
+                            "    NOT BOOL ($6)"/* unclaimed orders are never refunded */
+                            "   AND"
+                            "    NOT BOOL ($7)" /* unclaimed orders are never wired */
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial > $3"
+                            "   AND"
+                            "    creation_time > $4"
+                            "   AND"
+                            "    BOOL($5) = paid"
+                            "   AND"
+                            "    BOOL($6) = (order_serial IN"
+                            "     (SELECT order_serial "
+                            "      FROM merchant_refunds))"
+                            "   AND"
+                            "    BOOL($7) = wired"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial ASC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_dec",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_dec_paid",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    NOT BOOL($5)" /* unclaimed orders are never paid */
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    BOOL($5) = paid"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_dec_refunded",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    NOT BOOL ($6)"/* unclaimed orders are never refunded */
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    BOOL($6) = (order_serial IN"
+                            "     (SELECT order_serial "
+                            "      FROM merchant_refunds))"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_dec_wired",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            ",BOOL($6)" /* otherwise $6 is unused and Postgres unhappy */
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    NOT BOOL ($7)" /* unclaimed orders are never wired */
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            ",BOOL($6)" /* otherwise $6 is unused and Postgres unhappy */
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    BOOL($7) = wired"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_dec_paid_refunded",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    NOT BOOL($5)" /* unclaimed orders are never paid */
+                            "   AND"
+                            "    NOT BOOL ($6)"/* unclaimed orders are never refunded */
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    BOOL($5) = paid"
+                            "   AND"
+                            "    BOOL($6) = (order_serial IN"
+                            "     (SELECT order_serial "
+                            "      FROM merchant_refunds))"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_dec_paid_wired",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($6)" /* otherwise $6 is unused and Postgres unhappy */
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    NOT BOOL($5)" /* unclaimed orders are never paid */
+                            "   AND"
+                            "    NOT BOOL ($7)" /* unclaimed orders are never wired */
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($6)" /* otherwise $6 is unused and Postgres unhappy */
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    BOOL($5) = paid"
+                            "   AND"
+                            "    BOOL($7) = wired"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_dec_refunded_wired",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    NOT BOOL ($6)"/* unclaimed orders are never refunded */
+                            "   AND"
+                            "    NOT BOOL ($7)" /* unclaimed orders are never wired */
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            ",BOOL($5)" /* otherwise $5 is unused and Postgres unhappy */
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    BOOL($6) = (order_serial IN"
+                            "     (SELECT order_serial "
+                            "      FROM merchant_refunds))"
+                            "   AND"
+                            "    BOOL($7) = wired"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2",
+                            7),
+    GNUNET_PQ_make_prepare ("lookup_orders_dec_paid_refunded_wired",
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_orders"
+                            " WHERE merchant_orders.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    NOT BOOL($5)" /* unclaimed orders are never paid */
+                            "   AND"
+                            "    NOT BOOL ($6)"/* unclaimed orders are never refunded */
+                            "   AND"
+                            "    NOT BOOL ($7)" /* unclaimed orders are never wired */
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            "UNION " /* union ensures elements are distinct! */
+                            "(SELECT"
+                            " order_id"
+                            ",order_serial"
+                            ",creation_time"
+                            " FROM merchant_contract_terms"
+                            " WHERE merchant_contract_terms.merchant_serial="
+                            "     (SELECT merchant_serial "
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND"
+                            "    order_serial < $3"
+                            "   AND"
+                            "    creation_time < $4"
+                            "   AND"
+                            "    BOOL($5) = paid"
+                            "   AND"
+                            "    BOOL($6) = (order_serial IN"
+                            "     (SELECT order_serial "
+                            "      FROM merchant_refunds))"
+                            "   AND"
+                            "    BOOL($7) = wired"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2)"
+                            " ORDER BY order_serial DESC"
+                            " LIMIT $2",
+                            7),
+    /* for postgres_insert_order() */
     GNUNET_PQ_make_prepare ("insert_order",
                             "INSERT INTO merchant_orders"
                             "(merchant_serial"
                             ",order_id"
                             ",pay_deadline"
+                            ",creation_time"
                             ",contract_terms)"
                             " SELECT merchant_serial,"
-                            " $2, $3, $4"
+                            " $2, $3, $4, $5"
                             " FROM merchant_instances"
                             " WHERE merchant_id=$1",
-                            4),
+                            5),
+    /* for postgres_unlock_inventory() */
     GNUNET_PQ_make_prepare ("unlock_inventory",
                             "DELETE"
                             " FROM merchant_inventory_locks"
                             " WHERE lock_uuid=$1",
                             1),
+    /* for postgres_insert_order_lock() */
     GNUNET_PQ_make_prepare ("insert_order_lock",
                             "WITH tmp AS"
                             "  (SELECT "
@@ -4795,6 +5630,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->lock_product = &postgres_lock_product;
   plugin->delete_order = &postgres_delete_order;
   plugin->lookup_order = &postgres_lookup_order;
+  plugin->lookup_orders = &postgres_lookup_orders;
   plugin->insert_order = &postgres_insert_order;
   plugin->unlock_inventory = &postgres_unlock_inventory;
   plugin->insert_order_lock = &postgres_insert_order_lock;

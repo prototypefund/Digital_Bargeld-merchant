@@ -289,10 +289,14 @@ struct TALER_MERCHANTDB_OrderFilter
  *
  * @param cls a `json_t *` JSON array to build
  * @param order_id ID of the order
+ * @param order_serial row of the order in the database
+ * @param timestamp creation time of the order in the database
  */
 typedef void
 (*TALER_MERCHANTDB_OrdersCallback)(void *cls,
-                                   const char *order_id);
+                                   const char *order_id,
+                                   uint64_t order_serial,
+                                   struct GNUNET_TIME_Absolute timestamp);
 
 
 /* **************** OLD: ******************** */

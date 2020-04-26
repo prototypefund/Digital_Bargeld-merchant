@@ -189,6 +189,7 @@ CREATE TABLE IF NOT EXISTS merchant_orders
     REFERENCES merchant_instances (merchant_serial) ON DELETE CASCADE
   ,order_id VARCHAR NOT NULL
   ,pay_deadline INT8 NOT NULL
+  ,creation_time INT8 NOT NULL
   ,contract_terms BYTEA NOT NULL
   ,UNIQUE (merchant_serial, order_id)
   );
@@ -203,6 +204,9 @@ COMMENT ON COLUMN merchant_orders.pay_deadline
 CREATE INDEX IF NOT EXISTS merchant_orders_by_expiration
   ON merchant_orders
     (pay_deadline);
+CREATE INDEX IF NOT EXISTS merchant_orders_by_creation_time
+  ON merchant_orders
+    (creation_time);
 
 CREATE TABLE IF NOT EXISTS merchant_order_locks
   (product_serial BIGINT NOT NULL
@@ -220,23 +224,25 @@ COMMENT ON COLUMN merchant_order_locks.total_locked
   IS 'how many units of the product does this lock reserve';
 
 CREATE TABLE IF NOT EXISTS merchant_contract_terms
-  (contract_serial BIGSERIAL PRIMARY KEY
+  (order_serial BIGINT PRIMARY KEY
   ,merchant_serial BIGINT NOT NULL
     REFERENCES merchant_instances (merchant_serial) ON DELETE CASCADE
-  ,contract_id VARCHAR NOT NULL
+  ,order_id VARCHAR NOT NULL
   ,contract_terms BYTEA NOT NULL
   ,h_contract_terms BYTEA NOT NULL CHECK (LENGTH(h_contract_terms)=64)
+  ,creation_time INT8 NOT NULL
   ,pay_deadline INT8 NOT NULL
   ,refund_deadline INT8 NOT NULL
   ,paid BOOLEAN DEFAULT FALSE NOT NULL
+  ,wired BOOLEAN DEFAULT FALSE NOT NULL
   ,fulfillment_url VARCHAR NOT NULL
   ,session_id VARCHAR NOT NULL
-  ,UNIQUE (merchant_serial, contract_id)
+  ,UNIQUE (merchant_serial, order_id)
   ,UNIQUE (merchant_serial, h_contract_terms)
   );
 COMMENT ON TABLE merchant_contract_terms
   IS 'Contracts are orders that have been claimed by a wallet';
-COMMENT ON COLUMN merchant_contract_terms.contract_id
+COMMENT ON COLUMN merchant_contract_terms.order_id
   IS 'Not a foreign key into merchant_orders because paid contracts persist after expiration';
 COMMENT ON COLUMN merchant_contract_terms.merchant_serial
   IS 'Identifies the instance offering the contract';
@@ -248,6 +254,8 @@ COMMENT ON COLUMN merchant_contract_terms.refund_deadline
   IS 'By what times do refunds have to be approved (useful to reject refund requests)';
 COMMENT ON COLUMN merchant_contract_terms.paid
   IS 'true implies the customer paid for this contract; order should be DELETEd from merchant_orders once paid is set to release merchant_order_locks; paid remains true even if the payment was later refunded';
+COMMENT ON COLUMN merchant_contract_terms.wired
+  IS 'true implies the exchange wired us the full amount for all non-refunded payments under this contract';
 COMMENT ON COLUMN merchant_contract_terms.fulfillment_url
   IS 'also included in contract_terms, but we need it here to SELECT on it during repurchase detection';
 COMMENT ON COLUMN merchant_contract_terms.session_id
@@ -269,8 +277,8 @@ CREATE INDEX IF NOT EXISTS merchant_contract_terms_by_merchant_session_and_fulfi
 
 CREATE TABLE IF NOT EXISTS merchant_deposits
   (deposit_serial BIGSERIAL PRIMARY KEY
-  ,contract_serial BIGINT
-     REFERENCES merchant_contract_terms (contract_serial) ON DELETE CASCADE
+  ,order_serial BIGINT
+     REFERENCES merchant_contract_terms (order_serial) ON DELETE CASCADE
   ,coin_pub BYTEA NOT NULL CHECK (LENGTH(coin_pub)=32)
   ,exchange_url VARCHAR NOT NULL
   ,amount_with_fee_val INT8 NOT NULL
@@ -287,7 +295,7 @@ CREATE TABLE IF NOT EXISTS merchant_deposits
   ,exchange_timestamp INT8 NOT NULL
   ,account_serial BIGINT NOT NULL
      REFERENCES merchant_accounts (account_serial) ON DELETE CASCADE
-  ,UNIQUE (contract_serial, coin_pub)
+  ,UNIQUE (order_serial, coin_pub)
   );
 COMMENT ON TABLE merchant_deposits
   IS 'Table with the deposit confirmations for each coin we deposited at the exchange';
@@ -300,14 +308,14 @@ COMMENT ON COLUMN merchant_deposits.wire_fee_val
 
 CREATE TABLE IF NOT EXISTS merchant_refunds
   (refund_serial BIGSERIAL PRIMARY KEY
-  ,contract_serial BIGINT NOT NULL
-     REFERENCES merchant_contract_terms (contract_serial) ON DELETE CASCADE
+  ,order_serial BIGINT NOT NULL
+     REFERENCES merchant_contract_terms (order_serial) ON DELETE CASCADE
   ,rtransaction_id BIGINT NOT NULL
   ,coin_pub BYTEA NOT NULL
   ,reason VARCHAR NOT NULL
   ,refund_amount_val INT8 NOT NULL
   ,refund_amount_frac INT4 NOT NULL
-  ,UNIQUE (contract_serial, coin_pub, rtransaction_id)
+  ,UNIQUE (order_serial, coin_pub, rtransaction_id)
   );
 COMMENT ON TABLE merchant_deposits
   IS 'Refunds approved by the merchant (backoffice) logic, excludes abort refunds';
