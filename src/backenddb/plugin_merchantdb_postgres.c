@@ -1151,6 +1151,68 @@ postgres_insert_order (void *cls,
 }
 
 
+/**
+ * Release an inventory lock by UUID. Releases ALL stocks locked under
+ * the given UUID.
+ *
+ * @param cls closure
+ * @param uuid the UUID to release locks for
+ * @return transaction status,
+ *   #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS means there are no locks under @a uuid
+ *   #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT indicates success
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_unlock_inventory (void *cls,
+                           const struct GNUNET_Uuid *uuid)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_auto_from_type (uuid),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "unlock_inventory",
+                                             params);
+}
+
+
+/**
+ * Lock inventory stock to a particular order.
+ *
+ * @param cls closure
+ * @param instance_id identifies the instance responsible for the order
+ * @param order_id alphanumeric string that uniquely identifies the order
+ * @param product_id uniquely identifies the product to be locked
+ * @param quantity how many units should be locked to the @a order_id
+ * @return transaction status,
+ *   #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS means there are insufficient stocks
+ *   #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT indicates success
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_insert_order_lock (void *cls,
+                            const char *instance_id,
+                            const char *order_id,
+                            const char *product_id,
+                            uint32_t quantity)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (order_id),
+    GNUNET_PQ_query_param_string (product_id),
+    GNUNET_PQ_query_param_uint32 (&quantity),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "insert_order_lock",
+                                             params);
+}
+
+
 /* ********************* OLD API ************************** */
 
 /**
@@ -4163,7 +4225,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "   FROM merchant_inventory"
                             "   JOIN ps USING (product_serial)"
                             "   WHERE "
-                            "     total_stock - total_sold - total_lost > "
+                            "     total_stock - total_sold - total_lost - $4 >= "
                             "     (SELECT SUM(total_locked)"
                             "        FROM merchant_inventory_locks"
                             "        WHERE product_serial=ps.product_serial) + "
@@ -4203,6 +4265,41 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             " $2, $3, $4"
                             " FROM merchant_instances"
                             " WHERE merchant_id=$1",
+                            4),
+    GNUNET_PQ_make_prepare ("unlock_inventory",
+                            "DELETE"
+                            " FROM merchant_inventory_locks"
+                            " WHERE lock_uuid=$1",
+                            1),
+    GNUNET_PQ_make_prepare ("insert_order_lock",
+                            "WITH tmp AS"
+                            "  (SELECT "
+                            "      product_serial"
+                            "     ,merchant_serial"
+                            "     ,total_stock"
+                            "     ,total_sold"
+                            "     ,total_lost"
+                            "   FROM merchant_inventory"
+                            "   WHERE product_id=$3"
+                            "     AND merchant_serial="
+                            "     (SELECT merchant_serial"
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1))"
+                            " INSERT INTO merchant_order_locks"
+                            " (product_serial"
+                            " ,total_locked"
+                            " ,order_serial)"
+                            " SELECT tmp.product_serial, $4, order_serial"
+                            "   FROM merchant_orders"
+                            "   JOIN tmp USING(merchant_serial)"
+                            "   WHERE order_id=$2 AND"
+                            "     tmp.total_stock - tmp.total_sold - tmp.total_lost - $4 >= "
+                            "     (SELECT SUM(total_locked)"
+                            "        FROM merchant_inventory_locks"
+                            "        WHERE product_serial=tmp.product_serial) + "
+                            "     (SELECT SUM(total_locked)"
+                            "        FROM merchant_order_locks"
+                            "        WHERE product_serial=tmp.product_serial)",
                             4),
     /* OLD API: */
 #if 0
@@ -4698,7 +4795,9 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->lock_product = &postgres_lock_product;
   plugin->delete_order = &postgres_delete_order;
   plugin->lookup_order = &postgres_lookup_order;
-
+  plugin->insert_order = &postgres_insert_order;
+  plugin->unlock_inventory = &postgres_unlock_inventory;
+  plugin->insert_order_lock = &postgres_insert_order_lock;
   /* old API: */
   plugin->store_deposit = &postgres_store_deposit;
   plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
@@ -4711,7 +4810,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
   plugin->insert_contract_terms = &postgres_insert_contract_terms;
-  plugin->insert_order = &postgres_insert_order;
   plugin->find_contract_terms = &postgres_find_contract_terms;
   plugin->find_contract_terms_history = &postgres_find_contract_terms_history;
   plugin->find_contract_terms_by_date = &postgres_find_contract_terms_by_date;

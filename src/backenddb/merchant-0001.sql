@@ -167,12 +167,12 @@ CREATE TABLE IF NOT EXISTS merchant_inventory_locks
   ,total_locked BIGINT NOT NULL
   ,expiration TIMESTAMP NOT NULL
   );
-CREATE INDEX IF NOT EXISTS merchant_inventory_locks_by_product_and_lock
-  ON merchant_inventory_locks
-    (product_serial, lock_uuid);
 CREATE INDEX IF NOT EXISTS merchant_inventory_locks_by_expiration
   ON merchant_inventory_locks
     (expiration);
+CREATE INDEX IF NOT EXISTS merchant_inventory_locks_by_uuid
+  ON merchant_inventory_locks
+    (lock_uuid);
 COMMENT ON TABLE merchant_inventory_locks
   IS 'locks on inventory helt by shopping carts; note that locks MAY not be honored if merchants increase total_lost for inventory';
 COMMENT ON COLUMN merchant_inventory_locks.total_locked

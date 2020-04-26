@@ -74,9 +74,6 @@ check_products (json_t *products)
     int res;
     struct GNUNET_JSON_Specification spec[] = {
       GNUNET_JSON_spec_string ("description", &description),
-      /* FIXME: there are other fields in the product specification
-         that are currently not labeled as optional. Maybe check
-        those as well, or make them truly optional. */
       GNUNET_JSON_spec_end ()
     };
 
@@ -89,7 +86,7 @@ check_products (json_t *products)
     {
       GNUNET_break (0);
       GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
-                  "Product description parsing failed at #%u: %s:%u\n",
+                  "Product parsing failed at #%u: %s:%u\n",
                   (unsigned int) index,
                   error_name,
                   error_line);
@@ -188,7 +185,7 @@ struct InventoryProduct
  * @param inventory_products array of products to add to @a order from our inventory
  * @param uuids_length length of the @a uuids array
  * @param uuids array of UUIDs used to reserve products from @a inventory_products
- * @return transaction status
+ * @return transaction status, 0 if @a uuids were insufficient to reserve required inventory
  */
 static enum GNUNET_DB_QueryStatus
 execute_transaction (struct TMH_HandlerContext *hc,
@@ -209,7 +206,7 @@ execute_transaction (struct TMH_HandlerContext *hc,
     GNUNET_break (0);
     return GNUNET_DB_STATUS_HARD_ERROR;
   }
-  // FIXME: migrate locks from UUIDs to ORDER here!
+  /* Setup order */
   qs = TMH_db->insert_order (TMH_db->cls,
                              hc->instance->settings.id,
                              order_id,
@@ -220,7 +217,44 @@ execute_transaction (struct TMH_HandlerContext *hc,
     TMH_db->rollback (TMH_db->cls);
     return qs;
   }
-  return TMH_db->commit (TMH_db->cls);
+  GNUNET_assert (qs > 0);
+  /* Migrate locks from UUIDs to new order: first release old locks */
+  for (unsigned int i = 0; i<uuids_length; i++)
+  {
+    qs = TMH_db->unlock_inventory (TMH_db->cls,
+                                   &uuids[i]);
+    if (qs < 0)
+    {
+      TMH_db->rollback (TMH_db->cls);
+      return qs;
+    }
+    /* qs == 0 is OK here, that just means we did not HAVE any lock under this
+       UUID */
+  }
+  /* Migrate locks from UUIDs to new order: acquire new locks
+     (note: this can basically ONLY fail on serializability OR
+     because the UUID locks were insufficient for the desired
+     quantities). */
+  for (unsigned int i = 0; i<inventory_products_length; i++)
+  {
+    qs = TMH_db->insert_order_lock (TMH_db->cls,
+                                    hc->instance->settings.id,
+                                    order_id,
+                                    inventory_products[i].product_id,
+                                    inventory_products[i].quantity);
+    if (qs <= 0)
+    {
+      /* qs == 0: lock acquisition failed due to insufficient stocks */
+      TMH_db->rollback (TMH_db->cls);
+      return qs;
+    }
+  }
+  /* finally, commit transaction (note: if it fails, we ALSO re-acquire
+     the UUID locks, which is exactly what we want) */
+  qs = TMH_db->commit (TMH_db->cls);
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+    return GNUNET_DB_STATUS_SUCCESS_ONE_RESULT; /* 1 == success! */
+  return qs;
 }
 
 
@@ -790,13 +824,137 @@ merge_inventory (struct MHD_Connection *connection,
   if (NULL == json_object_get (order,
                                "products"))
   {
-    json_object_set_new (order,
-                         "products",
-                         json_array ());
+    GNUNET_assert (0 ==
+                   json_object_set_new (order,
+                                        "products",
+                                        json_array ()));
   }
 
+  {
+    bool have_total = false;
+    bool want_total;
+    struct TALER_Amount total;
+    json_t *np = json_array ();
 
-  // FIXME: merge inventory products into order here!
+    want_total = (NULL == json_object_get (order,
+                                           "total"));
+
+    for (unsigned int i = 0; i<inventory_products_length; i++)
+    {
+      struct TALER_MERCHANTDB_ProductDetails pd;
+      enum GNUNET_DB_QueryStatus qs;
+
+      qs = TMH_db->lookup_product (TMH_db->cls,
+                                   hc->instance->settings.id,
+                                   inventory_products[i].product_id,
+                                   &pd);
+      if (qs <= 0)
+      {
+        enum TALER_ErrorCode ec;
+        unsigned int http_status;
+
+        switch (qs)
+        {
+        case GNUNET_DB_STATUS_HARD_ERROR:
+          http_status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+          ec = TALER_EC_ORDERS_LOOKUP_PRODUCT_DB_HARD_FAILURE;
+          break;
+        case GNUNET_DB_STATUS_SOFT_ERROR:
+          GNUNET_break (0);
+          http_status = MHD_HTTP_INTERNAL_SERVER_ERROR;
+          ec = TALER_EC_ORDERS_LOOKUP_PRODUCT_DB_SOFT_FAILURE;
+          break;
+        case GNUNET_DB_STATUS_SUCCESS_NO_RESULTS:
+          http_status = MHD_HTTP_NOT_FOUND;
+          ec = TALER_EC_ORDERS_LOOKUP_PRODUCT_NOT_FOUND;
+          break;
+        case GNUNET_DB_STATUS_SUCCESS_ONE_RESULT:
+          /* case listed to make compilers happy */
+          GNUNET_assert (0);
+        }
+        json_decref (np);
+        return TALER_MHD_reply_with_error (connection,
+                                           http_status,
+                                           ec,
+                                           inventory_products[i].product_id);
+      }
+      {
+        json_t *p;
+
+        p = json_pack ("{s:s, s:o, s:s, s:o, s:o, s:o}",
+                       "description",
+                       pd.description,
+                       "description_i18n",
+                       pd.description_i18n,
+                       "unit",
+                       pd.unit,
+                       "price",
+                       TALER_JSON_from_amount (&pd.price),
+                       "taxes",
+                       pd.taxes,
+                       "image",
+                       pd.image);
+        GNUNET_assert (NULL != p);
+        GNUNET_assert (0 ==
+                       json_array_append_new (np,
+                                              p));
+        if (have_total)
+        {
+          if (0 <
+              TALER_amount_add (&total,
+                                &total,
+                                &pd.price))
+          {
+            GNUNET_break (0);
+            json_decref (np);
+            return TALER_MHD_reply_with_error (connection,
+                                               MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                               TALER_EC_ORDERS_TOTAL_SUM_FAILED,
+                                               "failed to add up product prices");
+          }
+        }
+        else
+        {
+          have_total = true;
+          total = pd.price;
+        }
+
+      }
+      GNUNET_free (pd.description);
+      GNUNET_free (pd.unit);
+      json_decref (pd.address);
+    }
+    if ( (have_total) &&
+         (want_total) )
+    {
+      GNUNET_assert (0 ==
+                     json_object_set_new (order,
+                                          "total",
+                                          TALER_JSON_from_amount (&total)));
+    }
+    if ( (! have_total) &&
+         (want_total) )
+    {
+      GNUNET_break_op (0);
+      json_decref (np);
+      return TALER_MHD_reply_with_error (
+        connection,
+        MHD_HTTP_BAD_REQUEST,
+        TALER_EC_ORDERS_TOTAL_MISSING,
+        "total missing in order, and we could not calculate it");
+    }
+
+    /* merge into existing products list */
+    {
+      json_t *xp;
+
+      xp = json_object_get (order,
+                            "products");
+      GNUNET_assert (NULL != xp);
+      json_array_extend (xp, np);
+      json_decref (np);
+    }
+  }
   return add_payment_details (connection,
                               hc,
                               order,

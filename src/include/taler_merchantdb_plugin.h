@@ -651,7 +651,7 @@ struct TALER_MERCHANTDB_Plugin
    *
    * @param cls closure
    * @param instance_id identifies the instance responsible for the order
-   * @param order_id alphanumeric string that uniquely identifies the proposal
+   * @param order_id alphanumeric string that uniquely identifies the order
    * @param pay_deadline how long does the customer have to pay for the order
    * @param contract_terms proposal data to store
    * @return transaction status
@@ -662,6 +662,41 @@ struct TALER_MERCHANTDB_Plugin
                   const char *order_id,
                   struct GNUNET_TIME_Absolute pay_deadline,
                   const json_t *contract_terms);
+
+
+  /**
+   * Release an inventory lock by UUID. Releases ALL stocks locked under
+   * the given UUID.
+   *
+   * @param cls closure
+   * @param uuid the UUID to release locks for
+   * @return transaction status,
+   *   #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS means there are no locks under @a uuid
+   *   #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT indicates success
+   */
+  enum GNUNET_DB_QueryStatus
+  (*unlock_inventory)(void *cls,
+                      const struct GNUNET_Uuid *uuid);
+
+
+  /**
+   * Lock inventory stock to a particular order.
+   *
+   * @param cls closure
+   * @param instance_id identifies the instance responsible for the order
+   * @param order_id alphanumeric string that uniquely identifies the order
+   * @param product_id uniquely identifies the product to be locked
+   * @param quantity how many units should be locked to the @a order_id
+   * @return transaction status,
+   *   #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS means there are insufficient stocks
+   *   #GNUNET_DB_STATUS_SUCCESS_ONE_RESULT indicates success
+   */
+  enum GNUNET_DB_QueryStatus
+  (*insert_order_lock)(void *cls,
+                       const char *instance_id,
+                       const char *order_id,
+                       const char *product_id,
+                       uint32_t quantity);
 
 
   /* ****************** OLD API ******************** */
