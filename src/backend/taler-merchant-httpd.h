@@ -213,14 +213,6 @@ struct TMH_RequestHandler
 
 
 /**
- * Each MHD response handler that sets the "connection_cls" to a
- * non-NULL value must use a struct that has this struct as its first
- * member.  This struct contains a single callback, which will be
- * invoked to clean up the memory when the contection is completed.
- */
-struct TMH_HandlerContext;
-
-/**
  * Signature of a function used to clean up the context
  * we keep in the "connection_cls" of MHD when handling
  * a request.

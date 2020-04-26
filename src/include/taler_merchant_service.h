@@ -1200,6 +1200,122 @@ TALER_MERCHANT_orders_post_cancel (
 
 
 /**
+ * Handle for a GET /orders operation.
+ */
+struct TALER_MERCHANT_OrdersGetHandle;
+
+/**
+ * Individual order (minimal information returned via GET /orders).
+ */
+struct TALER_MERCHANT_OrderEntry
+{
+  /**
+   * Order identifier.
+   */
+  const char *order_id;
+
+};
+
+
+/**
+ * Function called with the result of the GET /orders operation.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ * @param orders_length length of the @a orders array
+ * @param orders array of orders the requested instance has made
+ */
+typedef void
+(*TALER_MERCHANT_OrdersGetCallback)(
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  unsigned int orders_length,
+  const struct TALER_MERCHANT_OrderEntry orders[]);
+
+
+/**
+ * Make a GET /orders request.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param cb function to call with the backend's inventory information
+ * @param cb_cls closure for @a cb
+ * @return the request handle; NULL upon error
+ */
+struct TALER_MERCHANT_OrdersGetHandle *
+TALER_MERCHANT_orders_get (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  TALER_MERCHANT_OrdersGetCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Possible values for a binary filter.
+ */
+enum TALER_MERCHANT_YesNoAll
+{
+  /**
+   * If condition is yes.
+   */
+  TALER_MERCHANT_YNA_YES = 1,
+
+  /**
+  * If condition is no.
+  */
+  TALER_MERCHANT_YNA_NO = 2,
+
+  /**
+   * Condition disabled.
+   */
+  TALER_MERCHANT_YNA_ALL = 3
+};
+
+
+/**
+ * Make a GET /orders request with filters.
+ *
+ * @param ctx the context
+ * @param backend_url HTTP base URL for the backend
+ * @param paid filter on payment status
+ * @param refunded filter on refund status
+ * @param wired filter on wire transfer status
+ * @param date range limit by date
+ * @param start_row range limit by order table row
+ * @param delta range from which @a date and @a start_row apply, positive
+ *              to return delta items after the given limit(s), negative to
+ *              return delta items before the given limit(s)
+ * @param timeout how long to wait (long polling) of zero results match the query
+ * @param cb function to call with the backend's inventory information
+ * @param cb_cls closure for @a cb
+ * @return the request handle; NULL upon error
+ */
+struct TALER_MERCHANT_OrdersGetHandle *
+TALER_MERCHANT_orders_get2 (
+  struct GNUNET_CURL_Context *ctx,
+  const char *backend_url,
+  enum TALER_MERCHANT_YesNoAll paid,
+  enum TALER_MERCHANT_YesNoAll refunded,
+  enum TALER_MERCHANT_YesNoAll wired,
+  struct GNUNET_TIME_Absolute date,
+  uint64_t start_row,
+  int64_t delta,
+  struct GNUNET_TIME_Relative timeout,
+  TALER_MERCHANT_OrdersGetCallback cb,
+  void *cb_cls);
+
+
+/**
+ * Cancel GET /orders operation.
+ *
+ * @param pgh operation to cancel
+ */
+void
+TALER_MERCHANT_orders_get_cancel (
+  struct TALER_MERCHANT_OrdersGetHandle *pgh);
+
+
+/**
  * Handle for a DELETE /orders/$ID operation.
  */
 struct TALER_MERCHANT_OrderDeleteHandle;

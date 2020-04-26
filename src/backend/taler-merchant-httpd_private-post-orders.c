@@ -831,13 +831,7 @@ merge_inventory (struct MHD_Connection *connection,
   }
 
   {
-    bool have_total = false;
-    bool want_total;
-    struct TALER_Amount total;
     json_t *np = json_array ();
-
-    want_total = (NULL == json_object_get (order,
-                                           "total"));
 
     for (unsigned int i = 0; i<inventory_products_length; i++)
     {
@@ -898,52 +892,11 @@ merge_inventory (struct MHD_Connection *connection,
         GNUNET_assert (0 ==
                        json_array_append_new (np,
                                               p));
-        if (have_total)
-        {
-          if (0 <
-              TALER_amount_add (&total,
-                                &total,
-                                &pd.price))
-          {
-            GNUNET_break (0);
-            json_decref (np);
-            return TALER_MHD_reply_with_error (connection,
-                                               MHD_HTTP_INTERNAL_SERVER_ERROR,
-                                               TALER_EC_ORDERS_TOTAL_SUM_FAILED,
-                                               "failed to add up product prices");
-          }
-        }
-        else
-        {
-          have_total = true;
-          total = pd.price;
-        }
-
       }
       GNUNET_free (pd.description);
       GNUNET_free (pd.unit);
       json_decref (pd.address);
     }
-    if ( (have_total) &&
-         (want_total) )
-    {
-      GNUNET_assert (0 ==
-                     json_object_set_new (order,
-                                          "total",
-                                          TALER_JSON_from_amount (&total)));
-    }
-    if ( (! have_total) &&
-         (want_total) )
-    {
-      GNUNET_break_op (0);
-      json_decref (np);
-      return TALER_MHD_reply_with_error (
-        connection,
-        MHD_HTTP_BAD_REQUEST,
-        TALER_EC_ORDERS_TOTAL_MISSING,
-        "total missing in order, and we could not calculate it");
-    }
-
     /* merge into existing products list */
     {
       json_t *xp;

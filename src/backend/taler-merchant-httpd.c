@@ -35,6 +35,7 @@
 #include "taler-merchant-httpd_private-get-instances-ID.h"
 #include "taler-merchant-httpd_private-get-products.h"
 #include "taler-merchant-httpd_private-get-products-ID.h"
+#include "taler-merchant-httpd_private-get-orders.h"
 #include "taler-merchant-httpd_private-patch-instances-ID.h"
 #include "taler-merchant-httpd_private-patch-products-ID.h"
 #include "taler-merchant-httpd_private-post-instances.h"
@@ -406,6 +407,7 @@ do_shutdown (void *cls)
   struct TMH_SuspendedConnection *sc;
 
   (void) cls;
+  TMH_force_get_orders_resume ();
 #if 0
   TMH_force_pc_resume ();
   TMH_force_trh_resume ();

@@ -37,6 +37,8 @@ taler_merchant_httpd_SOURCES = \
     taler-merchant-httpd_private-get-products.h \
   taler-merchant-httpd_private-get-products-ID.c \
     taler-merchant-httpd_private-get-products-ID.h \
+  taler-merchant-httpd_private-get-orders.c \
+    taler-merchant-httpd_private-get-orders.h \
   taler-merchant-httpd_private-patch-instances-ID.c \
     taler-merchant-httpd_private-patch-instances-ID.h \
   taler-merchant-httpd_private-patch-products-ID.c \

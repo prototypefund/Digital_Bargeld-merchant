@@ -218,6 +218,83 @@ struct TALER_MERCHANTDB_ProductDetails
 };
 
 
+/**
+ * Possible values for a binary filter.
+ */
+enum TALER_MERCHANTDB_YesNoAll
+{
+  /**
+   * If condition is yes.
+   */
+  TALER_MERCHANTDB_YNA_YES = 1,
+
+  /**
+  * If condition is no.
+  */
+  TALER_MERCHANTDB_YNA_NO = 2,
+
+  /**
+   * Condition disabled.
+   */
+  TALER_MERCHANTDB_YNA_ALL = 3
+};
+
+
+/**
+ * Filter preferences.
+ */
+struct TALER_MERCHANTDB_OrderFilter
+{
+  /**
+   * Filter by payment status.
+   */
+  enum TALER_MERCHANTDB_YesNoAll paid;
+
+  /**
+   * Filter by refund status.
+   */
+  enum TALER_MERCHANTDB_YesNoAll refunded;
+
+  /**
+   * Filter by wire transfer status.
+   */
+  enum TALER_MERCHANTDB_YesNoAll wired;
+
+  /**
+   * Filter orders by date, exact meaning depends on @e delta.
+   */
+  struct GNUNET_TIME_Absolute date;
+
+  /**
+   * Filter orders by order serial number, exact meaning depends on @e delta.
+   */
+  uint64_t start_row;
+
+  /**
+   * takes value of the form N (-N), so that at most N values strictly older
+   * (younger) than start and date are returned.
+   */
+  int64_t delta;
+
+  /**
+   * Timeout for long-polling.
+   */
+  struct GNUNET_TIME_Relative timeout;
+
+};
+
+
+/**
+ * Typically called by `lookup_orders`.
+ *
+ * @param cls a `json_t *` JSON array to build
+ * @param order_id ID of the order
+ */
+typedef void
+(*TALER_MERCHANTDB_OrdersCallback)(void *cls,
+                                   const char *order_id);
+
+
 /* **************** OLD: ******************** */
 
 /**
@@ -628,13 +705,12 @@ struct TALER_MERCHANTDB_Plugin
                   const char *instance_id,
                   const char *order_id);
 
-
   /**
    * Retrieve order given its @a order_id and the @a instance_id.
    *
    * @param cls closure
    * @param instance_id instance to obtain order of
-   * @param order id order id used to perform the lookup
+   * @param order_id order id used to perform the lookup
    * @param[out] contract_terms where to store the retrieved contract terms,
    *             NULL to only test if the order exists
    * @return transaction status
@@ -644,6 +720,23 @@ struct TALER_MERCHANTDB_Plugin
                   const char *instance_id,
                   const char *order_id,
                   json_t **contract_terms);
+
+  /**
+   * Retrieve orders given the @a instance_id.
+   *
+   * @param cls closure
+   * @param instance_id instance to obtain order of
+   * @param of filter to apply when looking up orders
+   * @param[out] contract_terms where to store the retrieved contract terms,
+   *             NULL to only test if the order exists
+   * @return transaction status
+   */
+  enum GNUNET_DB_QueryStatus
+  (*lookup_orders)(void *cls,
+                   const char *instance_id,
+                   const struct TALER_MERCHANTDB_OrderFilter *of,
+                   TALER_MERCHANTDB_OrdersCallback cb,
+                   void *cb_cls);
 
 
   /**
