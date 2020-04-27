@@ -425,27 +425,27 @@ TALER_TESTING_cmd_merchant_post_orders (const char *label,
                                         const char *order);
 
 
-/* ******************** OLD ******************* */
-
-
 /**
- * Make a "proposal lookup" command.
+ * Make a "claim order" command.
  *
  * @param label command label.
  * @param merchant_url base URL of the merchant backend
  *        serving the proposal lookup request.
  * @param http_status expected HTTP response code.
- * @param proposal_reference reference to a "proposal" CMD.
- * @param order_id order id to lookup, can be NULL.
- *
+ * @param order_reference reference to a POST order CMD, can be NULL if @a order_id given
+ * @param order_id order id to lookup, can be NULL (then we use @a order_reference)
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_merchant_post_orders_lookup (const char *label,
-                                               const char *merchant_url,
-                                               unsigned int http_status,
-                                               const char *proposal_reference,
-                                               const char *order_id);
+TALER_TESTING_cmd_merchant_claim_order (const char *label,
+                                        const char *merchant_url,
+                                        unsigned int http_status,
+                                        const char *order_reference,
+                                        const char *order_id);
+
+
+/* ******************** OLD ******************* */
+
 
 /**
  * Make a "check payment" test command.

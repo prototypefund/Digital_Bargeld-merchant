@@ -908,7 +908,7 @@ url_handler (void *cls,
          (GNUNET_YES != GNUNET_CURL_is_valid_scope_id (correlation_id)) )
     {
       GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                  "illegal incoming correlation ID\n");
+                  "Illegal incoming correlation ID\n");
       correlation_id = NULL;
     }
     if (NULL != correlation_id)

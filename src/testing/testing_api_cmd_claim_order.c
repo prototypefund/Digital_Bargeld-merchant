@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  Copyright (C) 2014-2018 Taler Systems SA
+  Copyright (C) 2014-2018, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as
@@ -18,8 +18,8 @@
 */
 
 /**
- * @file exchange/testing_api_cmd_proposal_lookup.c
- * @brief command to execute a proposal lookup
+ * @file exchange/testing_api_cmd_claim_order.c
+ * @brief command to claim an order
  * @author Marcello Stanisci
  */
 #include "platform.h"
@@ -29,10 +29,10 @@
 #include "taler_merchant_testing_lib.h"
 
 /**
- * State for a "proposal lookup" CMD.  Not used by
- * the initial lookup operation.
+ * State for a "order claim" CMD.  Not used by
+ * the initial claim operation.
  */
-struct ProposalLookupState
+struct OrderClaimState
 {
   /**
    * The interpreter state.
@@ -70,18 +70,18 @@ struct ProposalLookupState
   unsigned int http_status;
 
   /**
-   * /proposal/lookup operation handle.
+   * /order/claim operation handle.
    */
-  struct TALER_MERCHANT_ProposalLookupOperation *plo;
+  struct TALER_MERCHANT_OrderClaimHandle *och;
 
   /**
-   * Reference to a proposal operation.  Will offer the
+   * Reference to a order operation.  Will offer the
    * nonce for the operation.
    */
-  const char *proposal_reference;
+  const char *order_reference;
 
   /**
-   * Order id to lookup upon.  If null, the @a proposal_reference
+   * Order id to claim upon.  If null, the @a order_reference
    * will offer this value.
    */
   const char *order_id;
@@ -89,25 +89,25 @@ struct ProposalLookupState
 
 
 /**
- * Free the state of a "proposal lookup" CMD, and possibly
+ * Free the state of a "order claim" CMD, and possibly
  * cancel it if it did not complete.
  *
  * @param cls closure.
  * @param cmd command being freed.
  */
 static void
-proposal_lookup_cleanup (void *cls,
-                         const struct TALER_TESTING_Command *cmd)
+order_claim_cleanup (void *cls,
+                     const struct TALER_TESTING_Command *cmd)
 {
-  struct ProposalLookupState *pls = cls;
+  struct OrderClaimState *pls = cls;
 
-  if (NULL != pls->plo)
+  if (NULL != pls->och)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Command '%s' did not complete\n",
                 cmd->label);
-    TALER_MERCHANT_proposal_lookup_cancel (pls->plo);
-    pls->plo = NULL;
+    TALER_MERCHANT_order_claim_cancel (pls->och);
+    pls->och = NULL;
   }
   if (NULL != pls->contract_terms)
   {
@@ -119,27 +119,27 @@ proposal_lookup_cleanup (void *cls,
 
 
 /**
- * Callback for "proposal lookup" operation, to check the
+ * Callback for "order claim" operation, to check the
  * response code is as expected.
  *
  * @param cls closure
  * @param hr HTTP response we got
  * @param contract_terms the contract terms; they are the
- *        backend-filled up proposal minus cryptographic
+ *        backend-filled up order minus cryptographic
  *        information.
  * @param sig merchant signature over the contract terms.
  * @param hash hash code of the contract terms.
  */
 static void
-proposal_lookup_cb (void *cls,
-                    const struct TALER_MERCHANT_HttpResponse *hr,
-                    const json_t *contract_terms,
-                    const struct TALER_MerchantSignatureP *sig,
-                    const struct GNUNET_HashCode *hash)
+order_claim_cb (void *cls,
+                const struct TALER_MERCHANT_HttpResponse *hr,
+                const json_t *contract_terms,
+                const struct TALER_MerchantSignatureP *sig,
+                const struct GNUNET_HashCode *hash)
 {
-  struct ProposalLookupState *pls = cls;
+  struct OrderClaimState *pls = cls;
 
-  pls->plo = NULL;
+  pls->och = NULL;
   if (pls->http_status != hr->http_status)
     TALER_TESTING_FAIL (pls->is);
   if (MHD_HTTP_OK == hr->http_status)
@@ -173,27 +173,26 @@ proposal_lookup_cb (void *cls,
 
 
 /**
- * Run the "proposal lookup" CMD.
+ * Run the "order claim" CMD.
  *
  * @param cls closure.
  * @param cmd command currently being run.
  * @param is interpreter state.
  */
 static void
-proposal_lookup_run (void *cls,
-                     const struct TALER_TESTING_Command *cmd,
-                     struct TALER_TESTING_Interpreter *is)
+order_claim_run (void *cls,
+                 const struct TALER_TESTING_Command *cmd,
+                 struct TALER_TESTING_Interpreter *is)
 {
-  struct ProposalLookupState *pls = cls;
+  struct OrderClaimState *pls = cls;
   const char *order_id;
   const struct TALER_MerchantPublicKeyP *nonce;
   /* Only used if we do NOT use the nonce from traits.  */
   struct TALER_MerchantPublicKeyP dummy_nonce;
-  #define GET_TRAIT_NONCE(cmd,ptr) \
+#define GET_TRAIT_NONCE(cmd,ptr) \
   TALER_TESTING_get_trait_merchant_pub (cmd, 1, ptr)
 
   pls->is = is;
-
   if (NULL != pls->order_id)
   {
     order_id = pls->order_id;
@@ -204,16 +203,16 @@ proposal_lookup_run (void *cls,
   }
   else
   {
-    const struct TALER_TESTING_Command *proposal_cmd;
+    const struct TALER_TESTING_Command *order_cmd;
 
-    proposal_cmd = TALER_TESTING_interpreter_lookup_command
-                     (is, pls->proposal_reference);
-
-    if (NULL == proposal_cmd)
+    order_cmd
+      = TALER_TESTING_interpreter_lookup_command (is,
+                                                  pls->order_reference);
+    if (NULL == order_cmd)
       TALER_TESTING_FAIL (is);
-
-    if (GNUNET_OK != GET_TRAIT_NONCE (proposal_cmd,
-                                      &nonce))
+    if (GNUNET_OK !=
+        GET_TRAIT_NONCE (order_cmd,
+                         &nonce))
     {
       GNUNET_CRYPTO_random_block (GNUNET_CRYPTO_QUALITY_WEAK,
                                   &dummy_nonce,
@@ -221,17 +220,19 @@ proposal_lookup_run (void *cls,
       nonce = &dummy_nonce;
     }
 
-    if (GNUNET_OK != TALER_TESTING_get_trait_order_id
-          (proposal_cmd, 0, &order_id))
+    if (GNUNET_OK !=
+        TALER_TESTING_get_trait_order_id (order_cmd,
+                                          0,
+                                          &order_id))
       TALER_TESTING_FAIL (is);
   }
-  pls->plo = TALER_MERCHANT_proposal_lookup (is->ctx,
-                                             pls->merchant_url,
-                                             order_id,
-                                             &nonce->eddsa_pub,
-                                             &proposal_lookup_cb,
-                                             pls);
-  GNUNET_assert (NULL != pls->plo);
+  pls->och = TALER_MERCHANT_order_claim (is->ctx,
+                                         pls->merchant_url,
+                                         order_id,
+                                         &nonce->eddsa_pub,
+                                         &order_claim_cb,
+                                         pls);
+  GNUNET_assert (NULL != pls->och);
 }
 
 
@@ -245,12 +246,12 @@ proposal_lookup_run (void *cls,
  * @return #GNUNET_OK on success
  */
 static int
-proposal_lookup_traits (void *cls,
-                        const void **ret,
-                        const char *trait,
-                        unsigned int index)
+order_claim_traits (void *cls,
+                    const void **ret,
+                    const char *trait,
+                    unsigned int index)
 {
-  struct ProposalLookupState *pls = cls;
+  struct OrderClaimState *pls = cls;
   struct TALER_TESTING_Trait traits[] = {
     TALER_TESTING_make_trait_contract_terms (0,
                                              pls->contract_terms),
@@ -271,39 +272,38 @@ proposal_lookup_traits (void *cls,
 
 
 /**
- * Make a "proposal lookup" command.
+ * Make a "order claim" command.
  *
  * @param label command label.
  * @param merchant_url base URL of the merchant backend
- *        serving the proposal lookup request.
+ *        serving the order claim request.
  * @param http_status expected HTTP response code.
- * @param proposal_reference reference to a "proposal" CMD.
- * @param order_id order id to lookup, can be NULL.
- *
+ * @param order_reference reference to a POST order CMD, can be NULL if @a order_id given
+ * @param order_id order id to lookup, can be NULL (then we use @a order_reference)
  * @return the command.
  */
 struct TALER_TESTING_Command
-TALER_TESTING_cmd_merchant_post_orders_lookup
-  (const char *label,
+TALER_TESTING_cmd_merchant_claim_order (
+  const char *label,
   const char *merchant_url,
   unsigned int http_status,
-  const char *proposal_reference,
+  const char *order_reference,
   const char *order_id)
 {
-  struct ProposalLookupState *pls;
+  struct OrderClaimState *pls;
 
-  pls = GNUNET_new (struct ProposalLookupState);
+  pls = GNUNET_new (struct OrderClaimState);
   pls->http_status = http_status;
-  pls->proposal_reference = proposal_reference;
+  pls->order_reference = order_reference;
   pls->merchant_url = merchant_url;
   pls->order_id = order_id;
   {
     struct TALER_TESTING_Command cmd = {
       .cls = pls,
       .label = label,
-      .run = &proposal_lookup_run,
-      .cleanup = &proposal_lookup_cleanup,
-      .traits = &proposal_lookup_traits
+      .run = &order_claim_run,
+      .cleanup = &order_claim_cleanup,
+      .traits = &order_claim_traits
     };
 
     return cmd;

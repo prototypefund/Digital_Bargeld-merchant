@@ -243,17 +243,11 @@ TALER_MERCHANT_products_post (
     CURL *eh;
 
     eh = curl_easy_init ();
-    if (GNUNET_OK !=
-        TALER_curl_easy_post (&pph->post_ctx,
-                              eh,
-                              req_obj))
-    {
-      GNUNET_break (0);
-      json_decref (req_obj);
-      GNUNET_free (pph);
-      return NULL;
-    }
-
+    GNUNET_assert (NULL != eh);
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_curl_easy_post (&pph->post_ctx,
+                                         eh,
+                                         req_obj));
     json_decref (req_obj);
     GNUNET_assert (CURLE_OK == curl_easy_setopt (eh,
                                                  CURLOPT_URL,
@@ -263,6 +257,7 @@ TALER_MERCHANT_products_post (
                                      pph->post_ctx.headers,
                                      &handle_post_products_finished,
                                      pph);
+    GNUNET_assert (NULL != pph->job);
   }
   return pph;
 }

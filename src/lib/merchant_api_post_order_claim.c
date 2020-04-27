@@ -17,8 +17,8 @@
   see <http://www.gnu.org/licenses/>
 */
 /**
- * @file lib/merchant_api_proposal_lookup.c
- * @brief Implementation of the /proposal GET
+ * @file lib/merchant_api_post_order_claim.c
+ * @brief Implementation of POST /orders/$ID/claim
  * @author Christian Grothoff
  * @author Marcello Stanisci
  */
@@ -35,12 +35,12 @@
 
 
 /**
- * Structure representing a GET /proposal operation.
+ * Structure representing a POST /orders/$ID/claim operation.
  */
-struct TALER_MERCHANT_ProposalLookupOperation
+struct TALER_MERCHANT_OrderClaimHandle
 {
   /**
-   * Full URL, includes "/proposal".
+   * Full URL, includes "/orders/$ID/claim".
    */
   char *url;
 
@@ -52,7 +52,7 @@ struct TALER_MERCHANT_ProposalLookupOperation
   /**
    * Function to call with the result.
    */
-  TALER_MERCHANT_ProposalLookupOperationCallback cb;
+  TALER_MERCHANT_OrderClaimCallback cb;
 
   /**
    * Closure for @a cb.
@@ -65,31 +65,26 @@ struct TALER_MERCHANT_ProposalLookupOperation
   struct GNUNET_CURL_Context *ctx;
 
   /**
-   * Should we send the lookup operation with a nonce?
+   * Minor context that holds body and headers.
    */
-  int has_nonce;
-
-  /**
-   * Nonce, only initialized if has_nonce is GNUNET_YES.
-   */
-  struct GNUNET_CRYPTO_EddsaPublicKey nonce;
-
+  struct TALER_CURL_PostContext post_ctx;
 };
 
 
 /**
- * Function called when we're done processing the GET /proposal request.
+ * Function called when we're done processing the
+ * POST /orders/$ID/claim request.
  *
- * @param cls the `struct TALER_MERCHANT_ProposalLookupOperation`
+ * @param cls the `struct TALER_MERCHANT_OrderClaimHandle`
  * @param response_code HTTP response code, 0 on error
  * @param json response body, should be NULL
  */
 static void
-handle_proposal_lookup_finished (void *cls,
-                                 long response_code,
-                                 const void *response)
+handle_post_order_claim_finished (void *cls,
+                                  long response_code,
+                                  const void *response)
 {
-  struct TALER_MERCHANT_ProposalLookupOperation *plo = cls;
+  struct TALER_MERCHANT_OrderClaimHandle *och = cls;
   json_t *contract_terms;
   struct TALER_MerchantSignatureP sig;
   struct GNUNET_HashCode hash;
@@ -106,7 +101,7 @@ handle_proposal_lookup_finished (void *cls,
     .reply = json
   };
 
-  plo->job = NULL;
+  och->job = NULL;
   if (MHD_HTTP_OK != response_code)
   {
     hr.ec = TALER_JSON_get_error_code (json);
@@ -115,12 +110,12 @@ handle_proposal_lookup_finished (void *cls,
                 "Proposal lookup failed with HTTP status code %u/%d\n",
                 (unsigned int) response_code,
                 (int) hr.ec);
-    plo->cb (plo->cb_cls,
+    och->cb (och->cb_cls,
              &hr,
              NULL,
              NULL,
              NULL);
-    TALER_MERCHANT_proposal_lookup_cancel (plo);
+    TALER_MERCHANT_order_claim_cancel (och);
     return;
   }
 
@@ -130,16 +125,16 @@ handle_proposal_lookup_finished (void *cls,
                          NULL, NULL))
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
-                "proposal lookup failed to parse JSON\n");
+                "Claiming order failed: could not parse JSON response\n");
     GNUNET_break_op (0);
     hr.ec = TALER_EC_INVALID_RESPONSE;
     hr.http_status = 0;
-    plo->cb (plo->cb_cls,
+    och->cb (och->cb_cls,
              &hr,
              NULL,
              NULL,
              NULL);
-    TALER_MERCHANT_proposal_lookup_cancel (plo);
+    TALER_MERCHANT_order_claim_cancel (och);
     return;
   }
 
@@ -151,27 +146,22 @@ handle_proposal_lookup_finished (void *cls,
     hr.ec = TALER_EC_CLIENT_INTERNAL_FAILURE;
     hr.http_status = 0;
     GNUNET_JSON_parse_free (spec);
-    plo->cb (plo->cb_cls,
+    och->cb (och->cb_cls,
              &hr,
              NULL,
              NULL,
              NULL);
-    TALER_MERCHANT_proposal_lookup_cancel (plo);
+    TALER_MERCHANT_order_claim_cancel (och);
     return;
   }
 
-  plo->job = NULL;
-  /**
-   * As no data is supposed to be extracted from this
-   * call, we just invoke the provided callback.
-   */
-  plo->cb (plo->cb_cls,
+  och->cb (och->cb_cls,
            &hr,
            contract_terms,
            &sig,
            &hash);
   GNUNET_JSON_parse_free (spec);
-  TALER_MERCHANT_proposal_lookup_cancel (plo);
+  TALER_MERCHANT_order_claim_cancel (och);
 }
 
 
@@ -183,97 +173,97 @@ handle_proposal_lookup_finished (void *cls,
  * @param backend_url base URL of the merchant backend
  * @param order_id order id used to perform the lookup
  * @param nonce nonce used to perform the lookup
- * @param plo_cb callback which will work the response gotten from the backend
- * @param plo_cb_cls closure to pass to @a history_cb
- * @return handle for this operation, NULL upon errors
+ * @param cb callback which will work the response gotten from the backend
+ * @param cb_cls closure to pass to @a cb
+ * @return handle for this handle, NULL upon errors
  */
-struct TALER_MERCHANT_ProposalLookupOperation *
-TALER_MERCHANT_proposal_lookup (
-  struct GNUNET_CURL_Context *ctx,
-  const char *backend_url,
-  const char *order_id,
-  const struct GNUNET_CRYPTO_EddsaPublicKey *nonce,
-  TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
-  void *plo_cb_cls)
+struct TALER_MERCHANT_OrderClaimHandle *
+TALER_MERCHANT_order_claim (struct GNUNET_CURL_Context *ctx,
+                            const char *backend_url,
+                            const char *order_id,
+                            const struct GNUNET_CRYPTO_EddsaPublicKey *nonce,
+                            TALER_MERCHANT_OrderClaimCallback cb,
+                            void *cb_cls)
 {
-  struct TALER_MERCHANT_ProposalLookupOperation *plo;
-  CURL *eh;
-  char *nonce_str = NULL;
+  struct TALER_MERCHANT_OrderClaimHandle *och;
+  json_t *req_obj;
 
-  plo = GNUNET_new (struct TALER_MERCHANT_ProposalLookupOperation);
-  plo->ctx = ctx;
-  plo->cb = plo_cb;
-  plo->cb_cls = plo_cb_cls;
-  if (NULL != nonce)
+  req_obj = json_pack ("{s:o}",
+                       "nonce",
+                       GNUNET_JSON_from_data_auto (nonce));
+  if (NULL == req_obj)
   {
-    plo->has_nonce = GNUNET_YES;
-    plo->nonce = *nonce;
-    nonce_str = GNUNET_STRINGS_data_to_string_alloc (
-      nonce,
-      sizeof (struct GNUNET_CRYPTO_EddsaPublicKey));
+    GNUNET_break (0);
+    return NULL;
   }
-  plo->url = TALER_url_join (backend_url,
-                             "proposal",
-                             "order_id",
-                             order_id,
-                             "nonce",
-                             nonce_str,
-                             NULL);
-  GNUNET_free_non_null (nonce_str);
-  if (NULL == plo->url)
+  och = GNUNET_new (struct TALER_MERCHANT_OrderClaimHandle);
+  och->ctx = ctx;
+  och->cb = cb;
+  och->cb_cls = cb_cls;
+  {
+    char *path;
+
+    GNUNET_asprintf (&path,
+                     "orders/%s/claim",
+                     order_id);
+    och->url = TALER_url_join (backend_url,
+                               path,
+                               NULL);
+    GNUNET_free (path);
+  }
+  if (NULL == och->url)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_ERROR,
                 "Could not construct request URL.\n");
-    GNUNET_free (plo);
+    json_decref (req_obj);
+    GNUNET_free (och);
     return NULL;
   }
   GNUNET_log (GNUNET_ERROR_TYPE_INFO,
-              "looking up proposal from %s\n",
-              plo->url);
-  eh = curl_easy_init ();
-  if (CURLE_OK != curl_easy_setopt (eh,
-                                    CURLOPT_URL,
-                                    plo->url))
+              "Claiming order at %s\n",
+              och->url);
   {
-    GNUNET_break (0);
-    curl_easy_cleanup (eh);
-    GNUNET_free (plo->url);
-    GNUNET_free (plo);
-    return NULL;
-  }
+    CURL *eh;
 
-  if (NULL == (plo->job = GNUNET_CURL_job_add (ctx,
-                                               eh,
-                                               GNUNET_YES,
-                                               &handle_proposal_lookup_finished,
-                                               plo)))
-  {
-    GNUNET_break (0);
-    GNUNET_free (plo->url);
-    GNUNET_free (plo);
-    return NULL;
+    eh = curl_easy_init ();
+    GNUNET_assert (NULL != eh);
+    GNUNET_assert (GNUNET_OK ==
+                   TALER_curl_easy_post (&och->post_ctx,
+                                         eh,
+                                         req_obj));
+    json_decref (req_obj);
+    GNUNET_assert (CURLE_OK ==
+                   curl_easy_setopt (eh,
+                                     CURLOPT_URL,
+                                     och->url));
+    och->job = GNUNET_CURL_job_add2 (ctx,
+                                     eh,
+                                     och->post_ctx.headers,
+                                     &handle_post_order_claim_finished,
+                                     och);
+    GNUNET_assert (NULL != och->job);
   }
-  return plo;
+  return och;
 }
 
 
 /**
- * Cancel a GET /proposal request.
+ * Cancel a POST /orders/$ID/claim request.
  *
- * @param plo handle to the request to be canceled
+ * @param och handle to the request to be canceled
  */
 void
-TALER_MERCHANT_proposal_lookup_cancel (
-  struct TALER_MERCHANT_ProposalLookupOperation *plo)
+TALER_MERCHANT_order_claim_cancel (struct TALER_MERCHANT_OrderClaimHandle *och)
 {
-  if (NULL != plo->job)
+  if (NULL != och->job)
   {
-    GNUNET_CURL_job_cancel (plo->job);
-    plo->job = NULL;
+    GNUNET_CURL_job_cancel (och->job);
+    och->job = NULL;
   }
-  GNUNET_free (plo->url);
-  GNUNET_free (plo);
+  TALER_curl_easy_post_finished (&och->post_ctx);
+  GNUNET_free (och->url);
+  GNUNET_free (och);
 }
 
 
-/* end of merchant_api_proposal_lookup.c */
+/* end of merchant_api_post_order_claim.c */

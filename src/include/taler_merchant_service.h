@@ -1363,6 +1363,62 @@ TALER_MERCHANT_order_delete_cancel (
   struct TALER_MERCHANT_OrderDeleteHandle *odh);
 
 
+/**
+ * Handle to a POST /orders/$ID/claim handle
+ */
+struct TALER_MERCHANT_OrderClaimHandle;
+
+
+/**
+ * Callback called to process a POST /orders/$ID/claim response.
+ *
+ * @param cls closure
+ * @param hr HTTP response details
+ * @param contract_terms the details of the contract
+ * @param sig merchant's signature over @a contract_terms (already verified)
+ * @param h_contract_terms hash over @a contract_terms (computed
+ *        client-side to verify @a sig)
+ */
+typedef void
+(*TALER_MERCHANT_OrderClaimCallback) (
+  void *cls,
+  const struct TALER_MERCHANT_HttpResponse *hr,
+  const json_t *contract_terms,
+  const struct TALER_MerchantSignatureP *sig,
+  const struct GNUNET_HashCode *h_contract_terms);
+
+
+/**
+ * Calls the POST /orders/$ID/claim API at the backend.  That is,
+ * retrieve the final contract terms including the client nonce.
+ * This is a PUBLIC API for wallets.
+ *
+ * @param ctx execution context
+ * @param backend_url base URL of the merchant backend
+ * @param order_id order id used to perform the lookup
+ * @param nonce nonce to use to claim the proposal
+ * @param cb callback which will work the response gotten from the backend
+ * @param cb_cls closure to pass to @a cb
+ * @return handle for this handle, NULL upon errors
+ */
+struct TALER_MERCHANT_OrderClaimHandle *
+TALER_MERCHANT_order_claim (struct GNUNET_CURL_Context *ctx,
+                            const char *backend_url,
+                            const char *order_id,
+                            const struct GNUNET_CRYPTO_EddsaPublicKey *nonce,
+                            TALER_MERCHANT_OrderClaimCallback cb,
+                            void *cb_cls);
+
+
+/**
+ * Cancel a POST /order/$ID/claim request.
+ *
+ * @param och handle to the request to be canceled
+ */
+void
+TALER_MERCHANT_order_claim_cancel (struct TALER_MERCHANT_OrderClaimHandle *och);
+
+
 /* *********************   OLD ************************** */
 
 
@@ -1518,63 +1574,6 @@ TALER_MERCHANT_refund_increase_cancel (
 
 
 /* *********************  /proposal *********************** */
-
-
-/**
- * Handle to a GET /proposal operation
- */
-struct TALER_MERCHANT_ProposalLookupOperation;
-
-
-/**
- * Callback called to work a GET /proposal response.
- *
- * @param cls closure
- * @param hr HTTP response details
- * @param contract_terms the details of the contract
- * @param sig merchant's signature over @a contract_terms
- * @param contract_hash hash over @a contract_terms
- */
-typedef void
-(*TALER_MERCHANT_ProposalLookupOperationCallback) (
-  void *cls,
-  const struct TALER_MERCHANT_HttpResponse *hr,
-  const json_t *contract_terms,
-  const struct TALER_MerchantSignatureP *sig,
-  const struct GNUNET_HashCode *contract_hash);
-
-
-/**
- * Calls the GET /proposal API at the backend.  That is,
- * retrieve a proposal data by providing its transaction id.
- *
- * @param ctx execution context
- * @param backend_url base URL of the merchant backend
- * @param order_id order id used to perform the lookup
- * @param nonce nonce to use, only used when requesting the proposal the first time,
- *              can be NULL to omit the nonce (after the first request)
- * @param plo_cb callback which will work the response gotten from the backend
- * @param plo_cb_cls closure to pass to @a history_cb
- * @return handle for this operation, NULL upon errors
- */
-struct TALER_MERCHANT_ProposalLookupOperation *
-TALER_MERCHANT_proposal_lookup (
-  struct GNUNET_CURL_Context *ctx,
-  const char *backend_url,
-  const char *order_id,
-  const struct GNUNET_CRYPTO_EddsaPublicKey *nonce,
-  TALER_MERCHANT_ProposalLookupOperationCallback plo_cb,
-  void *plo_cb_cls);
-
-
-/**
- * Cancel a GET /proposal request.
- *
- * @param plo handle to the request to be canceled
- */
-void
-TALER_MERCHANT_proposal_lookup_cancel (
-  struct TALER_MERCHANT_ProposalLookupOperation *plo);
 
 
 /* *********************  /pay *********************** */

@@ -15,6 +15,7 @@ libtalermerchanttesting_la_LDFLAGS = \
 
 libtalermerchanttesting_la_SOURCES = \
   testing_api_cmd_config.c \
+  testing_api_cmd_claim_order.c \
   testing_api_cmd_get_instance.c \
   testing_api_cmd_get_instances.c \
   testing_api_cmd_get_product.c \
@@ -34,7 +35,6 @@ libtalermerchanttesting_la_SOURCES = \
   testing_api_cmd_pay_abort.c \
   testing_api_cmd_pay_abort_refund.c \
   testing_api_cmd_poll_payment.c \
-  testing_api_cmd_proposal_lookup.c \
   testing_api_cmd_refund_increase.c \
   testing_api_cmd_refund_lookup.c \
   testing_api_cmd_rewind.c \

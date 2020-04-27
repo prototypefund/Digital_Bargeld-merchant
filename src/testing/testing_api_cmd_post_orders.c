@@ -66,12 +66,11 @@ struct OrdersState
   struct TALER_MERCHANT_PostOrdersOperation *po;
 
   /**
-   * The (initial) GET /orders/$ID operation handle.
-   * The logic is such that after a orders creation,
-   * it soon makes a orders lookup in order to check
-   * if the merchant backend is actually aware.
+   * The (initial) POST /orders/$ID/claim operation handle.
+   * The logic is such that after an order creation,
+   * we immediately claim the order.
    */
-  struct TALER_MERCHANT_ProposalLookupOperation *plo;
+  struct TALER_MERCHANT_OrderClaimHandle *och;
 
   /**
    * The nonce.
@@ -139,7 +138,7 @@ orders_traits (void *cls,
 
 /**
  * Used to fill the "orders" CMD state with backend-provided
- * values.  Also double-checks that the orders was correctly
+ * values.  Also double-checks that the order was correctly
  * created.
  *
  * @param cls closure
@@ -148,11 +147,11 @@ orders_traits (void *cls,
  * @param hash hash over the contract
  */
 static void
-orders_lookup_initial_cb (void *cls,
-                          const struct TALER_MERCHANT_HttpResponse *hr,
-                          const json_t *contract_terms,
-                          const struct TALER_MerchantSignatureP *sig,
-                          const struct GNUNET_HashCode *hash)
+orders_claim_cb (void *cls,
+                 const struct TALER_MERCHANT_HttpResponse *hr,
+                 const json_t *contract_terms,
+                 const struct TALER_MerchantSignatureP *sig,
+                 const struct GNUNET_HashCode *hash)
 {
   struct OrdersState *ps = cls;
   struct TALER_MerchantPublicKeyP merchant_pub;
@@ -164,7 +163,7 @@ orders_lookup_initial_cb (void *cls,
     GNUNET_JSON_spec_end ()
   };
 
-  ps->plo = NULL;
+  ps->och = NULL;
   if (ps->http_status != hr->http_status)
     TALER_TESTING_FAIL (ps->is);
 
@@ -254,12 +253,12 @@ order_cb (void *cls,
   }
 
   if (NULL ==
-      (ps->plo = TALER_MERCHANT_proposal_lookup (ps->is->ctx,
-                                                 ps->merchant_url,
-                                                 ps->order_id,
-                                                 &ps->nonce,
-                                                 &orders_lookup_initial_cb,
-                                                 ps)))
+      (ps->och = TALER_MERCHANT_order_claim (ps->is->ctx,
+                                             ps->merchant_url,
+                                             ps->order_id,
+                                             &ps->nonce,
+                                             &orders_claim_cb,
+                                             ps)))
     TALER_TESTING_FAIL (ps->is);
 }
 
@@ -344,14 +343,14 @@ orders_cleanup (void *cls,
     ps->po = NULL;
   }
 
-  if (NULL != ps->plo)
+  if (NULL != ps->och)
   {
     GNUNET_log (GNUNET_ERROR_TYPE_WARNING,
                 "Command '%s' did not complete"
                 " (orders lookup)\n",
                 cmd->label);
-    TALER_MERCHANT_proposal_lookup_cancel (ps->plo);
-    ps->plo = NULL;
+    TALER_MERCHANT_order_claim_cancel (ps->och);
+    ps->och = NULL;
   }
 
   json_decref (ps->contract_terms);
