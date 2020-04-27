@@ -353,6 +353,14 @@ extern struct TALER_MERCHANTDB_Plugin *TMH_db;
 extern struct GNUNET_CONTAINER_MultiHashMap *TMH_by_id_map;
 
 /**
+ * How long do we need to keep information on paid contracts on file for tax
+ * or other legal reasons?  Used to block deletions for younger transaction
+ * data.
+ */
+extern struct GNUNET_TIME_Relative TMH_legal_expiration;
+
+
+/**
  * Kick MHD to run now, to be called after MHD_resume_connection().
  * Basically, we need to explicitly resume MHD's event loop whenever
  * we made progress serving a request.  This function re-schedules

@@ -26,6 +26,7 @@
 #include <taler/taler_util.h>
 #include <taler/taler_pq_lib.h>
 #include <taler/taler_json_lib.h>
+#include <taler/taler_mhd_lib.h>
 #include "taler_merchantdb_plugin.h"
 
 /**
@@ -1351,6 +1352,155 @@ postgres_insert_order_lock (void *cls,
 }
 
 
+/**
+ * Retrieve contract terms given its @a order_id
+ *
+ * @param cls closure
+ * @param instance_id instance's identifier
+ * @param order_id order_id used to lookup.
+ * @param[out] contract_terms where to store the result, NULL to only check for existence
+ * @return transaction status
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_lookup_contract_terms (void *cls,
+                                const char *instance_id,
+                                const char *order_id,
+                                json_t **contract_terms)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (order_id),
+    GNUNET_PQ_query_param_end
+  };
+  struct GNUNET_PQ_ResultSpec rs[] = {
+    TALER_PQ_result_spec_json ("contract_terms",
+                               contract_terms),
+    GNUNET_PQ_result_spec_end
+  };
+
+  *contract_terms = NULL;
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
+                                                   "lookup_contract_terms",
+                                                   params,
+                                                   rs);
+}
+
+
+/**
+ * Store contract terms given its @a order_id. Note that some attributes are
+ * expected to be calculated inside of the function, like the hash of the
+ * contract terms (to be hashed), the creation_time and pay_deadline (to be
+ * obtained from the merchant_orders table). The "session_id" should be
+ * initially set to the empty string.  The "fulfillment_url" and "refund_deadline"
+ * must be extracted from @a contract_terms.
+ *
+ * @param cls closure
+ * @param instance_id instance's identifier
+ * @param order_id order_id used to store
+ * @param contract_terms contract to store
+ * @return transaction status, #GNUNET_DB_STATUS_HARD_ERROR if @a contract_terms
+ *          is malformed
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_insert_contract_terms (void *cls,
+                                const char *instance_id,
+                                const char *order_id,
+                                json_t *contract_terms)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_TIME_Absolute pay_deadline;
+  struct GNUNET_TIME_Absolute refund_deadline;
+  const char *fulfillment_url;
+  struct GNUNET_HashCode h_contract_terms;
+
+  if (GNUNET_OK !=
+      TALER_JSON_hash (contract_terms,
+                       &h_contract_terms))
+  {
+    GNUNET_break (0);
+    return GNUNET_SYSERR;
+  }
+
+  {
+    struct GNUNET_JSON_Specification spec[] = {
+      GNUNET_JSON_spec_string ("fulfillment_url",
+                               &fulfillment_url),
+      GNUNET_JSON_spec_absolute_time ("pay_deadline",
+                                      &pay_deadline),
+      GNUNET_JSON_spec_absolute_time ("refund_deadline",
+                                      &refund_deadline),
+      GNUNET_JSON_spec_end ()
+    };
+    enum GNUNET_GenericReturnValue res;
+
+    res = TALER_MHD_parse_json_data (NULL,
+                                     contract_terms,
+                                     spec);
+    if (GNUNET_OK != res)
+    {
+      GNUNET_break (0);
+      return GNUNET_DB_STATUS_HARD_ERROR;
+    }
+  }
+
+  check_connection (pg);
+  {
+    struct GNUNET_PQ_QueryParam params[] = {
+      GNUNET_PQ_query_param_string (instance_id),
+      GNUNET_PQ_query_param_string (order_id),
+      TALER_PQ_query_param_json (contract_terms),
+      GNUNET_PQ_query_param_auto_from_type (&h_contract_terms),
+      GNUNET_PQ_query_param_absolute_time (&pay_deadline),
+      GNUNET_PQ_query_param_absolute_time (&refund_deadline),
+      GNUNET_PQ_query_param_string (fulfillment_url),
+      GNUNET_PQ_query_param_end
+    };
+
+    return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                               "insert_contract_terms",
+                                               params);
+  }
+}
+
+
+/**
+ * Delete information about a contract. Note that the transaction must
+ * enforce that the contract is not awaiting payment anymore AND was not
+ * paid, or is past the legal expiration.
+ *
+ * @param cls closure
+ * @param instance_id instance to delete order of
+ * @param order_id order to delete
+ * @param legal_expiration how long do we need to keep (paid) contracts on
+ *          file for legal reasons (i.e. taxation)
+ * @return DB status code, #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS
+ *           if locks prevent deletion OR order unknown
+ */
+static enum GNUNET_DB_QueryStatus
+postgres_delete_contract_terms (void *cls,
+                                const char *instance_id,
+                                const char *order_id,
+                                struct GNUNET_TIME_Relative legal_expiration)
+{
+  struct PostgresClosure *pg = cls;
+  struct GNUNET_TIME_Absolute now = GNUNET_TIME_absolute_get ();
+  struct GNUNET_PQ_QueryParam params[] = {
+    GNUNET_PQ_query_param_string (instance_id),
+    GNUNET_PQ_query_param_string (order_id),
+    GNUNET_PQ_query_param_relative_time (&legal_expiration),
+    GNUNET_PQ_query_param_absolute_time (&now),
+    GNUNET_PQ_query_param_end
+  };
+
+  check_connection (pg);
+  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
+                                             "delete_contract_terms",
+                                             params);
+}
+
+
 /* ********************* OLD API ************************** */
 
 /**
@@ -1426,95 +1576,6 @@ postgres_find_paid_contract_terms_from_hash (void *cls,
                                                    "find_paid_contract_terms_from_hash",
                                                    params,
                                                    rs);
-}
-
-
-/**
- * Retrieve proposal data given its order id.  Ignores if the
- * proposal has been paid or not.
- *
- * @param cls closure
- * @param[out] contract_terms where to store the retrieved contract terms
- * @param order id order id used to perform the lookup
- * @return transaction status
- */
-static enum GNUNET_DB_QueryStatus
-postgres_find_contract_terms (void *cls,
-                              json_t **contract_terms,
-                              const char *order_id,
-                              const struct
-                              TALER_MerchantPublicKeyP *merchant_pub)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (order_id),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_end
-  };
-  struct GNUNET_PQ_ResultSpec rs[] = {
-    TALER_PQ_result_spec_json ("contract_terms",
-                               contract_terms),
-    GNUNET_PQ_result_spec_end
-  };
-
-  *contract_terms = NULL;
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "Finding contract term, order_id: '%s', merchant_pub: '%s'.\n",
-              order_id,
-              TALER_B2S (merchant_pub));
-  check_connection (pg);
-  return GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-                                                   "find_contract_terms",
-                                                   params,
-                                                   rs);
-}
-
-
-/**
- * Insert proposal data and its hashcode into db
- *
- * @param cls closure
- * @param order_id identificator of the proposal being stored
- * @param merchant_pub merchant's public key
- * @param timestamp timestamp of this proposal data
- * @param contract_terms proposal data to store
- * @return transaction status
- */
-static enum GNUNET_DB_QueryStatus
-postgres_insert_contract_terms (void *cls,
-                                const char *order_id,
-                                const struct
-                                TALER_MerchantPublicKeyP *merchant_pub,
-                                struct GNUNET_TIME_Absolute timestamp,
-                                const json_t *contract_terms)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_HashCode h_contract_terms;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (order_id),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_absolute_time (&timestamp),
-    TALER_PQ_query_param_json (contract_terms),
-    GNUNET_PQ_query_param_auto_from_type (&h_contract_terms),
-    GNUNET_PQ_query_param_end
-  };
-
-  if (GNUNET_OK !=
-      TALER_JSON_hash (contract_terms,
-                       &h_contract_terms))
-  {
-    GNUNET_break (0);
-    return GNUNET_SYSERR;
-  }
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "inserting contract terms: order_id: %s, merchant_pub: %s, h_contract_terms: %s.\n",
-              order_id,
-              TALER_B2S (merchant_pub),
-              GNUNET_h2s (&h_contract_terms));
-  check_connection (pg);
-  return GNUNET_PQ_eval_prepared_non_select (pg->conn,
-                                             "insert_contract_terms",
-                                             params);
 }
 
 
@@ -1765,205 +1826,6 @@ postgres_store_transfer_to_proof (void *cls,
 
 
 /**
- * Lookup for a proposal, respecting the signature used by the
- * /history's db methods.
- *
- * @param cls db plugin handle
- * @param order_id order id used to search for the proposal data
- * @param merchant_pub public key of the merchant using this method
- * @param cb the callback
- * @param cb_cls closure to pass to the callback
- * @return transaction status
- */
-static enum GNUNET_DB_QueryStatus
-postgres_find_contract_terms_history (void *cls,
-                                      const char *order_id,
-                                      const struct
-                                      TALER_MerchantPublicKeyP *merchant_pub,
-                                      TALER_MERCHANTDB_ProposalDataCallback cb,
-                                      void *cb_cls)
-{
-  struct PostgresClosure *pg = cls;
-  json_t *contract_terms;
-  enum GNUNET_DB_QueryStatus qs;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_string (order_id),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_end
-  };
-  struct GNUNET_PQ_ResultSpec rs[] = {
-    TALER_PQ_result_spec_json ("contract_terms",
-                               &contract_terms),
-    GNUNET_PQ_result_spec_end
-  };
-
-  qs = GNUNET_PQ_eval_prepared_singleton_select (pg->conn,
-                                                 "find_contract_terms_history",
-                                                 params,
-                                                 rs);
-  if (qs <= 0)
-    return qs;
-  if (NULL != cb)
-    cb (cb_cls,
-        order_id,
-        0,
-        contract_terms);
-  GNUNET_PQ_cleanup_result (rs);
-  return qs;
-}
-
-
-/**
- * Closure for #find_contracts_cb().
- */
-struct FindContractsContext
-{
-  /**
-   * Function to call on each result.
-   */
-  TALER_MERCHANTDB_ProposalDataCallback cb;
-
-  /**
-   * Closure for @e cb.
-   */
-  void *cb_cls;
-
-  /**
-   * Transaction status code to set.
-   */
-  enum GNUNET_DB_QueryStatus qs;
-};
-
-
-/**
- * Function to be called with the results of a SELECT statement
- * that has returned @a num_results results.
- *
- * @param cls of type `struct FindContractsContext *`
- * @param result the postgres result
- * @param num_result the number of results in @a result
- */
-static void
-find_contracts_cb (void *cls,
-                   PGresult *result,
-                   unsigned int num_results)
-{
-  struct FindContractsContext *fcctx = cls;
-
-  for (unsigned int i = 0; i < num_results; i++)
-  {
-    char *order_id;
-    json_t *contract_terms;
-    uint64_t row_id;
-    struct GNUNET_PQ_ResultSpec rs[] = {
-      GNUNET_PQ_result_spec_string ("order_id",
-                                    &order_id),
-      TALER_PQ_result_spec_json ("contract_terms",
-                                 &contract_terms),
-      GNUNET_PQ_result_spec_uint64 ("row_id",
-                                    &row_id),
-      GNUNET_PQ_result_spec_end
-    };
-
-    if (GNUNET_OK !=
-        GNUNET_PQ_extract_result (result,
-                                  rs,
-                                  i))
-    {
-      GNUNET_break (0);
-      fcctx->qs = GNUNET_DB_STATUS_HARD_ERROR;
-      return;
-    }
-    fcctx->qs = i + 1;
-    fcctx->cb (fcctx->cb_cls,
-               order_id,
-               row_id,
-               contract_terms);
-    GNUNET_PQ_cleanup_result (rs);
-  }
-}
-
-
-/**
- * Return proposals whose timestamp are older than `date`.
- * Among those proposals, only those ones being between the
- * start-th and (start-nrows)-th record are returned.  The rows
- * are sorted having the youngest first.
- *
- * @param cls our plugin handle.
- * @param date only results older than this date are returned.
- * @param merchant_pub instance's public key; only rows related to this
- * instance are returned.
- * @param start only rows with serial id less than start are returned.
- * In other words, you lower `start` to get older records. The tipical
- * usage is to firstly call `find_contract_terms_by_date`, so that you get
- * the `nrows` youngest records. The oldest of those records will tell you
- * from which timestamp and `start` you can query the DB in order to get
- * furtherly older records, and so on. Alternatively, you can use always
- * the same timestamp and just go behind in history by tuning `start`.
- * @param nrows only nrows rows are returned.
- * @param past if set to #GNUNET_YES, retrieves rows older than `date`.
- * @param ascending if #GNUNET_YES, results will be sorted in chronological order.
- * This is typically used to show live updates on the merchant's backoffice
- * Web interface.
- * @param cb function to call with transaction data, can be NULL.
- * @param cb_cls closure for @a cb
- * @return transaction status
- */
-static enum GNUNET_DB_QueryStatus
-postgres_find_contract_terms_by_date_and_range (void *cls,
-                                                struct GNUNET_TIME_Absolute
-                                                date,
-                                                const struct
-                                                TALER_MerchantPublicKeyP *
-                                                merchant_pub,
-                                                uint64_t start,
-                                                uint64_t nrows,
-                                                int past,
-                                                unsigned int ascending,
-                                                TALER_MERCHANTDB_ProposalDataCallback
-                                                cb,
-                                                void *cb_cls)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_absolute_time (&date),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_uint64 (&start),
-    GNUNET_PQ_query_param_uint64 (&nrows),
-    GNUNET_PQ_query_param_end
-  };
-  const char *stmt;
-  enum GNUNET_DB_QueryStatus qs;
-  struct FindContractsContext fcctx = {
-    .cb = cb,
-    .cb_cls = cb_cls
-  };
-
-  GNUNET_log (GNUNET_ERROR_TYPE_DEBUG,
-              "DB serving /history with date %s\n",
-              GNUNET_STRINGS_absolute_time_to_string (date));
-  stmt =
-    (GNUNET_YES == past)
-    ? ( (GNUNET_YES == ascending)
-        ? "find_contract_terms_by_date_and_range_past_asc"
-        : "find_contract_terms_by_date_and_range_past")
-    : ( (GNUNET_YES == ascending)
-        ? "find_contract_terms_by_date_and_range_asc"
-        : "find_contract_terms_by_date_and_range");
-  check_connection (pg);
-  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
-                                             stmt,
-                                             params,
-                                             &find_contracts_cb,
-                                             &fcctx);
-  if (0 >= qs)
-    return qs;
-  return fcctx.qs;
-}
-
-
-/**
  * Closure for #find_tip_authorizations_cb().
  */
 struct GetAuthorizedTipAmountContext
@@ -2100,53 +1962,6 @@ postgres_get_authorized_tip_amount (void *cls,
     return qs;
   *authorized_amount = ctx.authorized_amount;
   return ctx.qs;
-}
-
-
-/**
- * Return proposals whose timestamp are older than `date`.
- * The rows are sorted having the youngest first.
- *
- * @param cls our plugin handle.
- * @param date only results older than this date are returned.
- * @param merchant_pub instance's public key; only rows related to this
- * instance are returned.
- * @param nrows at most nrows rows are returned.
- * @param cb function to call with transaction data, can be NULL.
- * @param cb_cls closure for @a cb
- * @return transaction status
- */
-static enum GNUNET_DB_QueryStatus
-postgres_find_contract_terms_by_date (void *cls,
-                                      struct GNUNET_TIME_Absolute date,
-                                      const struct
-                                      TALER_MerchantPublicKeyP *merchant_pub,
-                                      uint64_t nrows,
-                                      TALER_MERCHANTDB_ProposalDataCallback cb,
-                                      void *cb_cls)
-{
-  struct PostgresClosure *pg = cls;
-  struct GNUNET_PQ_QueryParam params[] = {
-    GNUNET_PQ_query_param_absolute_time (&date),
-    GNUNET_PQ_query_param_auto_from_type (merchant_pub),
-    GNUNET_PQ_query_param_uint64 (&nrows),
-    GNUNET_PQ_query_param_end
-  };
-  enum GNUNET_DB_QueryStatus qs;
-  struct FindContractsContext fcctx = {
-    .cb = cb,
-    .cb_cls = cb_cls
-  };
-
-  check_connection (pg);
-  qs = GNUNET_PQ_eval_prepared_multi_select (pg->conn,
-                                             "find_contract_terms_by_date",
-                                             params,
-                                             &find_contracts_cb,
-                                             &fcctx);
-  if (0 >= qs)
-    return qs;
-  return fcctx.qs;
 }
 
 
@@ -5136,7 +4951,60 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "        FROM merchant_order_locks"
                             "        WHERE product_serial=tmp.product_serial)",
                             4),
+    /* for postgres_lookup_contract_terms() */
+    GNUNET_PQ_make_prepare ("lookup_contract_terms",
+                            "SELECT contract_terms"
+                            " FROM merchant_contract_terms"
+                            " WHERE order_id=$2"
+                            "   AND merchant_serial="
+                            "     (SELECT merchant_serial"
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)",
+                            2),
+    /* for postgres_insert_contract_terms() */
+    GNUNET_PQ_make_prepare ("insert_contract_terms",
+                            "INSERT INTO merchant_contract_terms"
+                            "(order_serial"
+                            ",merchant_serial"
+                            ",order_id"
+                            ",contract_terms"
+                            ",h_contract_terms"
+                            ",creation_time"
+                            ",pay_deadline"
+                            ",refund_deadline"
+                            ",fulfillment_url)"
+                            "SELECT"
+                            " order_serial"
+                            ",merchant_serial"
+                            ",order_id"
+                            ",$3"  /* contract_terms */
+                            ",$4"  /* h_contract_terms */
+                            ",creation_time"
+                            ",$5" /* pay_deadline */
+                            ",$6" /* refund_deadline */
+                            ",$7" /* fulfillment_url */
+                            "FROM merchant_orders"
+                            " WHERE order_id=$2"
+                            "   AND merchant_serial="
+                            "     (SELECT merchant_serial"
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)",
+                            7),
+    /* for postgres_delete_contract_terms() */
+    GNUNET_PQ_make_prepare ("delete_contract_terms",
+                            "DELETE FROM merchant_contract_terms"
+                            " WHERE order_id=$2"
+                            "   AND merchant_serial="
+                            "     (SELECT merchant_serial"
+                            "        FROM merchant_instances"
+                            "        WHERE merchant_id=$1)"
+                            "   AND ( ( (pay_deadline < $4) AND"
+                            "           (NOT paid) ) OR"
+                            "         (creation_time + $3 > $4) )",
+                            4),
+
     /* OLD API: */
+
 #if 0
     GNUNET_PQ_make_prepare ("insert_deposit",
                             "INSERT INTO merchant_deposits"
@@ -5253,7 +5121,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             "   AND merchant_pub=$2"
                             "   AND paid=TRUE",
                             2),
-
     GNUNET_PQ_make_prepare ("find_refunds",
                             "SELECT"
                             " refund_amount_val"
@@ -5261,23 +5128,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             " FROM merchant_refunds"
                             " WHERE coin_pub=$1",
                             1),
-    GNUNET_PQ_make_prepare ("find_contract_terms_history",
-                            "SELECT"
-                            " contract_terms"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " order_id=$1"
-                            " AND merchant_pub=$2"
-                            " AND paid=TRUE",
-                            2),
-    GNUNET_PQ_make_prepare ("find_contract_terms",
-                            "SELECT"
-                            " contract_terms"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " order_id=$1"
-                            " AND merchant_pub=$2",
-                            2),
     GNUNET_PQ_make_prepare ("find_session_info",
                             "SELECT"
                             " order_id"
@@ -5287,19 +5137,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             " AND session_id=$2"
                             " AND merchant_pub=$3",
                             2),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp<$1"
-                            " AND merchant_pub=$2"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id DESC, timestamp DESC"
-                            " LIMIT $3",
-                            3),
     GNUNET_PQ_make_prepare ("find_refunds_from_contract_terms_hash",
                             "SELECT"
                             " coin_pub"
@@ -5337,62 +5174,6 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
                             " VALUES "
                             "($1, $2, $3, $4, $5, $6)",
                             6),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_asc",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp>$1"
-                            " AND merchant_pub=$2"
-                            " AND row_id>$3"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id ASC, timestamp ASC"
-                            " LIMIT $4",
-                            4),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp>$1"
-                            " AND merchant_pub=$2"
-                            " AND row_id>$3"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id DESC, timestamp DESC"
-                            " LIMIT $4",
-                            4),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past_asc",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp<$1"
-                            " AND merchant_pub=$2"
-                            " AND row_id<$3"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id ASC, timestamp ASC"
-                            " LIMIT $4",
-                            4),
-    GNUNET_PQ_make_prepare ("find_contract_terms_by_date_and_range_past",
-                            "SELECT"
-                            " contract_terms"
-                            ",order_id"
-                            ",row_id"
-                            " FROM merchant_contract_terms"
-                            " WHERE"
-                            " timestamp<$1"
-                            " AND merchant_pub=$2"
-                            " AND row_id<$3"
-                            " AND paid=TRUE"
-                            " ORDER BY row_id DESC, timestamp DESC"
-                            " LIMIT $4",
-                            4),
     GNUNET_PQ_make_prepare ("find_deposits",
                             "SELECT"
                             " coin_pub"
@@ -5634,7 +5415,14 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->insert_order = &postgres_insert_order;
   plugin->unlock_inventory = &postgres_unlock_inventory;
   plugin->insert_order_lock = &postgres_insert_order_lock;
-  /* old API: */
+  plugin->lookup_contract_terms = &postgres_lookup_contract_terms;
+  plugin->insert_contract_terms = &postgres_insert_contract_terms;
+  plugin->delete_contract_terms = &postgres_delete_contract_terms;
+  /* OLD API: */
+  plugin->find_contract_terms_from_hash =
+    &postgres_find_contract_terms_from_hash;
+  plugin->find_paid_contract_terms_from_hash =
+    &postgres_find_paid_contract_terms_from_hash;
   plugin->store_deposit = &postgres_store_deposit;
   plugin->store_coin_to_transfer = &postgres_store_coin_to_transfer;
   plugin->store_transfer_to_proof = &postgres_store_transfer_to_proof;
@@ -5645,17 +5433,7 @@ libtaler_plugin_merchantdb_postgres_init (void *cls)
   plugin->find_transfers_by_hash = &postgres_find_transfers_by_hash;
   plugin->find_deposits_by_wtid = &postgres_find_deposits_by_wtid;
   plugin->find_proof_by_wtid = &postgres_find_proof_by_wtid;
-  plugin->insert_contract_terms = &postgres_insert_contract_terms;
-  plugin->find_contract_terms = &postgres_find_contract_terms;
-  plugin->find_contract_terms_history = &postgres_find_contract_terms_history;
-  plugin->find_contract_terms_by_date = &postgres_find_contract_terms_by_date;
   plugin->get_authorized_tip_amount = &postgres_get_authorized_tip_amount;
-  plugin->find_contract_terms_by_date_and_range =
-    &postgres_find_contract_terms_by_date_and_range;
-  plugin->find_contract_terms_from_hash =
-    &postgres_find_contract_terms_from_hash;
-  plugin->find_paid_contract_terms_from_hash =
-    &postgres_find_paid_contract_terms_from_hash;
   plugin->get_refunds_from_contract_terms_hash =
     &postgres_get_refunds_from_contract_terms_hash;
   plugin->lookup_wire_fee = &postgres_lookup_wire_fee;

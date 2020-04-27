@@ -40,13 +40,14 @@ TMH_private_delete_orders_ID (const struct TMH_RequestHandler *rh,
   enum GNUNET_DB_QueryStatus qs;
 
   GNUNET_assert (NULL != mi);
-  // FIXME: do we delete ORDERS or (claimed) contract_terms?
-  // FIXME: what SHOULD be the semantics here?
-  // NOTE: We MAY need the delete_order() DB API to
-  //       clean up the order table when claiming orders...
   qs = TMH_db->delete_order (TMH_db->cls,
                              mi->settings.id,
                              hc->infix);
+  if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+    qs = TMH_db->delete_contract_terms (TMH_db->cls,
+                                        mi->settings.id,
+                                        hc->infix,
+                                        TMH_legal_expiration);
   switch (qs)
   {
   case GNUNET_DB_STATUS_HARD_ERROR:
@@ -65,6 +66,11 @@ TMH_private_delete_orders_ID (const struct TMH_RequestHandler *rh,
                                mi->settings.id,
                                hc->infix,
                                NULL);
+    if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
+      qs = TMH_db->lookup_contract_terms (TMH_db->cls,
+                                          mi->settings.id,
+                                          hc->infix,
+                                          NULL);
     if (GNUNET_DB_STATUS_SUCCESS_NO_RESULTS == qs)
       return TALER_MHD_reply_with_error (connection,
                                          MHD_HTTP_NOT_FOUND,

@@ -74,6 +74,13 @@ struct TALER_MERCHANTDB_Plugin *TMH_db;
 struct GNUNET_CONTAINER_MultiHashMap *TMH_by_id_map;
 
 /**
+ * How long do we need to keep information on paid contracts on file for tax
+ * or other legal reasons?  Used to block deletions for younger transaction
+ * data.
+ */
+struct GNUNET_TIME_Relative TMH_legal_expiration;
+
+/**
  * The port we are running on
  */
 static uint16_t port;
@@ -1186,6 +1193,18 @@ run (void *cls,
       TALER_config_get_currency (cfg,
                                  &TMH_currency))
   {
+    GNUNET_SCHEDULER_shutdown ();
+    return;
+  }
+  if (GNUNET_OK !=
+      GNUNET_CONFIGURATION_get_value_time (cfg,
+                                           "merchant",
+                                           "LEGAL_PRESERVATION",
+                                           &TMH_legal_expiration))
+  {
+    GNUNET_log_config_missing (GNUNET_ERROR_TYPE_ERROR,
+                               "merchant",
+                               "LEGAL_PRESERVATION");
     GNUNET_SCHEDULER_shutdown ();
     return;
   }

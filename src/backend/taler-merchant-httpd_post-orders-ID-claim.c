@@ -31,7 +31,7 @@
 
 
 /**
- * How often do we retry the simple INSERT database transaction?
+ * How often do we retry the database transaction?
  */
 #define MAX_RETRIES 3
 
@@ -103,7 +103,17 @@ claim_order (const char *instance_id,
       *contract_terms = NULL;
       return qs;
     }
-    // FIXME: should we remove the ORDER from the order table here?
+    qs = TMH_db->delete_order (TMH_db->cls,
+                               instance_id,
+                               order_id);
+    if (0 >= qs)
+    {
+      GNUNET_break (0);
+      TMH_db->rollback (TMH_db->cls);
+      json_decref (*contract_terms);
+      *contract_terms = NULL;
+      return qs;
+    }
     qs = TMH_db->commit (TMH_db->cls);
     if (0 > qs)
       return qs;

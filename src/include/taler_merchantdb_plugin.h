@@ -802,7 +802,7 @@ struct TALER_MERCHANTDB_Plugin
    * @param cls closure
    * @param instance_id instance's identifier
    * @param order_id order_id used to lookup.
-   * @param[out] contract_terms where to store the result
+   * @param[out] contract_terms where to store the result, NULL to only check for existence
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
@@ -813,13 +813,19 @@ struct TALER_MERCHANTDB_Plugin
 
 
   /**
-   * Store contract terms given its @a order_id
+   * Store contract terms given its @a order_id. Note that some attributes are
+   * expected to be calculated inside of the function, like the hash of the
+   * contract terms (to be hashed), the creation_time and pay_deadline (to be
+   * obtained from the merchant_orders table). The "session_id" should be
+   * initially set to the empty string.  The "fulfillment_url" and "refund_deadline"
+   * must be extracted from @a contract_terms.
    *
    * @param cls closure
    * @param instance_id instance's identifier
    * @param order_id order_id used to store
-   * @param[out] contract_terms contract to store
-   * @return transaction status
+   * @param contract_terms contract to store
+   * @return transaction status, #GNUNET_DB_STATUS_HARD_ERROR if @a contract_terms
+   *          is malformed
    */
   enum GNUNET_DB_QueryStatus
   (*insert_contract_terms)(void *cls,
@@ -827,6 +833,25 @@ struct TALER_MERCHANTDB_Plugin
                            const char *order_id,
                            json_t *contract_terms);
 
+
+  /**
+   * Delete information about a contract. Note that the transaction must
+   * enforce that the contract is not awaiting payment anymore AND was not
+   * paid, or is past the legal expiration.
+   *
+   * @param cls closure
+   * @param instance_id instance to delete order of
+   * @param order_id order to delete
+   * @param legal_expiration how long do we need to keep (paid) contracts on
+   *          file for legal reasons (i.e. taxation)
+   * @return DB status code, #GNUNET_DB_STATUS_SUCCESS_NO_RESULTS
+   *           if locks prevent deletion OR order unknown
+   */
+  enum GNUNET_DB_QueryStatus
+  (*delete_contract_terms)(void *cls,
+                           const char *instance_id,
+                           const char *order_id,
+                           struct GNUNET_TIME_Relative legal_expiration);
 
   /* ****************** OLD API ******************** */
 
