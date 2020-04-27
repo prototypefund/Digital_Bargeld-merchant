@@ -1,6 +1,6 @@
 /*
   This file is part of TALER
-  (C) 2014, 2015 INRIA
+  (C) 2014, 2015, 2020 Taler Systems SA
 
   TALER is free software; you can redistribute it and/or modify it under the
   terms of the GNU General Public License as published by the Free Software
@@ -14,34 +14,29 @@
   TALER; see the file COPYING.  If not, see <http://www.gnu.org/licenses/>
 */
 /**
- * @file backend/taler-merchant-httpd_propose.h
- * @brief headers for /contract handler
+ * @file backend/taler-merchant-httpd_post-orders-ID-claim.h
+ * @brief headers for POST /orders/$ID/claim handler
  * @author Marcello Stanisci
+ * @author Christian Grothoff
  */
-#ifndef TALER_MERCHANT_HTTPD_CONTRACT_H
-#define TALER_MERCHANT_HTTPD_CONTRACT_H
+#ifndef TALER_MERCHANT_HTTPD_POST_ORDERS_ID_CLAIM_H
+#define TALER_MERCHANT_HTTPD_POST_ORDERS_ID_CLAIM_H
 #include <microhttpd.h>
 #include "taler-merchant-httpd.h"
 
 /**
- * Manage a GET /proposal request. Query the db and returns the
- * proposal's data related to the transaction id given as the URL's
- * parameter.
+ * Manage a POST /orders/$ID/claim request.  Allows the client to
+ * claim the order (unless already claims) and creates the respective
+ * contract.  Returns the contract terms.
  *
  * @param rh context of the handler
  * @param connection the MHD connection to handle
- * @param[in,out] connection_cls the connection's closure (can be updated)
- * @param upload_data upload data
- * @param[in,out] upload_data_size number of bytes (left) in @a upload_data
- * @param mi merchant backend instance, never NULL
+ * @param[in,out] hc context with further information about the request
  * @return MHD result code
  */
 MHD_RESULT
-MH_handler_proposal_lookup (struct TMH_RequestHandler *rh,
-                            struct MHD_Connection *connection,
-                            void **connection_cls,
-                            const char *upload_data,
-                            size_t *upload_data_size,
-                            struct MerchantInstance *mi);
+TMH_post_orders_ID_claim (const struct TMH_RequestHandler *rh,
+                          struct MHD_Connection *connection,
+                          struct TMH_HandlerContext *hc);
 
 #endif

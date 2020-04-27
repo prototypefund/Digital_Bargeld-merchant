@@ -50,7 +50,9 @@ taler_merchant_httpd_SOURCES = \
   taler-merchant-httpd_private-post-products-ID-lock.c \
     taler-merchant-httpd_private-post-products-ID-lock.h \
   taler-merchant-httpd_private-post-orders.c \
-    taler-merchant-httpd_private-post-orders.h
+    taler-merchant-httpd_private-post-orders.h \
+  taler-merchant-httpd_post-orders-ID-claim.c \
+    taler-merchant-httpd_post-orders-ID-claim.h
 
 DEAD = \
   taler-merchant-httpd_check-payment.c taler-merchant-httpd_check-payment.h \

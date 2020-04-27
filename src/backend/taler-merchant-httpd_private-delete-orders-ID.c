@@ -40,6 +40,10 @@ TMH_private_delete_orders_ID (const struct TMH_RequestHandler *rh,
   enum GNUNET_DB_QueryStatus qs;
 
   GNUNET_assert (NULL != mi);
+  // FIXME: do we delete ORDERS or (claimed) contract_terms?
+  // FIXME: what SHOULD be the semantics here?
+  // NOTE: We MAY need the delete_order() DB API to
+  //       clean up the order table when claiming orders...
   qs = TMH_db->delete_order (TMH_db->cls,
                              mi->settings.id,
                              hc->infix);

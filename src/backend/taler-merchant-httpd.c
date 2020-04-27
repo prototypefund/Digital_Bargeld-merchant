@@ -42,6 +42,7 @@
 #include "taler-merchant-httpd_private-post-products.h"
 #include "taler-merchant-httpd_private-post-products-ID-lock.h"
 #include "taler-merchant-httpd_private-post-orders.h"
+#include "taler-merchant-httpd_post-orders-ID-claim.h"
 
 
 /**
@@ -833,6 +834,14 @@ url_handler (void *cls,
       .method = MHD_HTTP_METHOD_GET,
       .skip_instance = true,
       .handler = &MH_handler_config
+    },
+    /* POST /orders/$ID/claim: */
+    {
+      .url_prefix = "/orders/",
+      .have_id_segment = true,
+      .url_suffix = "claim",
+      .method = MHD_HTTP_METHOD_POST,
+      .handler = &TMH_post_orders_ID_claim
     },
     {
       NULL

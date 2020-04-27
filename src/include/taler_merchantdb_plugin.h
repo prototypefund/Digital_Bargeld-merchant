@@ -796,25 +796,40 @@ struct TALER_MERCHANTDB_Plugin
                        uint32_t quantity);
 
 
-  /* ****************** OLD API ******************** */
-
   /**
-   * Insert proposal data into db; the routine will internally hash and
-   * insert the proposal data's hashcode into the same row.
+   * Retrieve contract terms given its @a order_id
    *
    * @param cls closure
-   * @param order_id alphanumeric string that uniquely identifies the proposal
-   * @param merchant_pub merchant's public key
-   * @param timestamp timestamp of this proposal data
-   * @param contract_terms proposal data to store
+   * @param instance_id instance's identifier
+   * @param order_id order_id used to lookup.
+   * @param[out] contract_terms where to store the result
+   * @return transaction status
+   */
+  enum GNUNET_DB_QueryStatus
+  (*lookup_contract_terms)(void *cls,
+                           const char *instance_id,
+                           const char *order_id,
+                           json_t **contract_terms);
+
+
+  /**
+   * Store contract terms given its @a order_id
+   *
+   * @param cls closure
+   * @param instance_id instance's identifier
+   * @param order_id order_id used to store
+   * @param[out] contract_terms contract to store
    * @return transaction status
    */
   enum GNUNET_DB_QueryStatus
   (*insert_contract_terms)(void *cls,
+                           const char *instance_id,
                            const char *order_id,
-                           const struct TALER_MerchantPublicKeyP *merchant_pub,
-                           struct GNUNET_TIME_Absolute timestamp,
-                           const json_t *contract_terms);
+                           json_t *contract_terms);
+
+
+  /* ****************** OLD API ******************** */
+
 
   /**
    * Mark contract terms as paid.  Needed by /history as only paid
@@ -872,21 +887,6 @@ struct TALER_MERCHANTDB_Plugin
                        const char *session_id,
                        const char *fulfillment_url,
                        const struct TALER_MerchantPublicKeyP *merchant_pub);
-
-  /**
-   * Retrieve proposal data given its order ID.
-   *
-   * @param cls closure
-   * @param[out] contract_terms where to store the result
-   * @param order_id order_id used to lookup.
-   * @param merchant_pub instance's public key.
-   * @return transaction status
-   */
-  enum GNUNET_DB_QueryStatus
-  (*find_contract_terms)(void *cls,
-                         json_t **contract_terms,
-                         const char *order_id,
-                         const struct TALER_MerchantPublicKeyP *merchant_pub);
 
 
   /**
